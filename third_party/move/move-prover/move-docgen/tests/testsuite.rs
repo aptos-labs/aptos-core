@@ -94,7 +94,7 @@ fn test_docgen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     }
 
     let mut error_writer = Buffer::no_color();
-    let mut output = match run_move_prover_v2(&mut error_writer, options) {
+    let mut output = match run_move_prover_v2(&mut error_writer, options, vec![]) {
         Ok(()) => {
             let mut contents = String::new();
             debug!("writing to {}", temp_path.display());

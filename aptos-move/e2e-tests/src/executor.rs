@@ -1036,6 +1036,10 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
+    pub fn get_chain_id(&self) -> ChainId {
+        self.state_store.get_chain_id().unwrap()
+    }
+
     /// exec_func_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
     /// Additionally we have dynamic_args and gas_meter_type to configure it further.
@@ -1348,6 +1352,25 @@ impl FakeExecutor {
             arguments,
             max_gas_amount,
         )
+    }
+
+    /// Force-rotates the authentication key of the account at the given address.
+    ///
+    /// Returns a new [`Account`] struct that contains the newly generated key pair, which you
+    /// can use to sign transactions.
+    pub fn rotate_account_authentication_key(&mut self, addr: AccountAddress) -> Account {
+        let account = Account::new_from_addr_with_new_keypair_from_seed(addr, &mut self.rng);
+
+        // Note: This does not update the mapping of originating addresses but it is probably fine
+        //       for testing purposes.
+        self.exec("account", "rotate_authentication_key_call", vec![], vec![
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            MoveValue::vector_u8(account.auth_key())
+                .simple_serialize()
+                .unwrap(),
+        ]);
+
+        account
     }
 }
 

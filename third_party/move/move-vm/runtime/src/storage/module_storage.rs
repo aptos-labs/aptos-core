@@ -463,36 +463,6 @@ impl<T: ModuleStorage> AsFunctionValueExtension for T {
 }
 
 impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
-    fn get_function_arg_tys(
-        &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        substitution_ty_arg_tags: Vec<TypeTag>,
-    ) -> PartialVMResult<Vec<Type>> {
-        let substitution_ty_args = substitution_ty_arg_tags
-            .into_iter()
-            .map(|tag| self.module_storage.fetch_ty(&tag))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-
-        let (_, function) = self
-            .module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            .map_err(|err| err.to_partial())?;
-
-        let ty_builder = &self
-            .module_storage
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        function
-            .param_tys()
-            .iter()
-            .map(|ty_to_substitute| {
-                ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-    }
-
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,

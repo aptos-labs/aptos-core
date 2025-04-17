@@ -225,7 +225,7 @@ impl Bytecode for CompiledModule {
     }
 
     fn metadata(&self) -> Option<RuntimeModuleMetadataV1> {
-        get_metadata_from_compiled_module(self)
+        get_metadata_from_compiled_code(self)
     }
 
     fn function_is_view(&self, name: &IdentStr) -> bool {
@@ -275,7 +275,7 @@ impl Bytecode for CompiledScript {
     }
 
     fn metadata(&self) -> Option<RuntimeModuleMetadataV1> {
-        get_metadata_from_compiled_script(self)
+        get_metadata_from_compiled_code(self)
     }
 
     fn function_is_view(&self, _name: &IdentStr) -> bool {

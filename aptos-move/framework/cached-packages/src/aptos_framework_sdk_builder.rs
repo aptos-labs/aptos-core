@@ -143,6 +143,15 @@ pub enum EntryFunctionCall {
         new_auth_key: Vec<u8>,
     },
 
+    /// Private entry function for key rotation that allows the signer to update their authentication key from a given public key.
+    /// This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
+    ///
+    /// Note: This function does not update the `OriginatingAddress` table.
+    AccountRotateAuthenticationKeyFromPublicKey {
+        scheme: u8,
+        new_public_key_bytes: Vec<u8>,
+    },
+
     AccountRotateAuthenticationKeyWithRotationCapability {
         rotation_cap_offerer_address: AccountAddress,
         new_scheme: u8,
@@ -474,9 +483,9 @@ pub enum EntryFunctionCall {
         new_beneficiary: AccountAddress,
     },
 
-    /// Allows an owner to change the delegated voter of the underlying stake pool.
+    /// Deprecated. Use the partial governance voting flow instead.
     DelegationPoolSetDelegatedVoter {
-        new_voter: AccountAddress,
+        _new_voter: AccountAddress,
     },
 
     /// Allows an owner to change the operator of the underlying stake pool.
@@ -1266,6 +1275,10 @@ impl EntryFunctionCall {
             AccountRotateAuthenticationKeyCall { new_auth_key } => {
                 account_rotate_authentication_key_call(new_auth_key)
             },
+            AccountRotateAuthenticationKeyFromPublicKey {
+                scheme,
+                new_public_key_bytes,
+            } => account_rotate_authentication_key_from_public_key(scheme, new_public_key_bytes),
             AccountRotateAuthenticationKeyWithRotationCapability {
                 rotation_cap_offerer_address,
                 new_scheme,
@@ -1480,8 +1493,8 @@ impl EntryFunctionCall {
             DelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
                 delegation_pool_set_beneficiary_for_operator(new_beneficiary)
             },
-            DelegationPoolSetDelegatedVoter { new_voter } => {
-                delegation_pool_set_delegated_voter(new_voter)
+            DelegationPoolSetDelegatedVoter { _new_voter } => {
+                delegation_pool_set_delegated_voter(_new_voter)
             },
             DelegationPoolSetOperator { new_operator } => {
                 delegation_pool_set_operator(new_operator)
@@ -2153,6 +2166,31 @@ pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> Transact
         ident_str!("rotate_authentication_key_call").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_auth_key).unwrap()],
+    ))
+}
+
+/// Private entry function for key rotation that allows the signer to update their authentication key from a given public key.
+/// This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
+///
+/// Note: This function does not update the `OriginatingAddress` table.
+pub fn account_rotate_authentication_key_from_public_key(
+    scheme: u8,
+    new_public_key_bytes: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key_from_public_key").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&scheme).unwrap(),
+            bcs::to_bytes(&new_public_key_bytes).unwrap(),
+        ],
     ))
 }
 
@@ -3176,8 +3214,8 @@ pub fn delegation_pool_set_beneficiary_for_operator(
     ))
 }
 
-/// Allows an owner to change the delegated voter of the underlying stake pool.
-pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
+/// Deprecated. Use the partial governance voting flow instead.
+pub fn delegation_pool_set_delegated_voter(_new_voter: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -3188,7 +3226,7 @@ pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> Transac
         ),
         ident_str!("set_delegated_voter").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&new_voter).unwrap()],
+        vec![bcs::to_bytes(&_new_voter).unwrap()],
     ))
 }
 
@@ -5454,6 +5492,21 @@ mod decoder {
         }
     }
 
+    pub fn account_rotate_authentication_key_from_public_key(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountRotateAuthenticationKeyFromPublicKey {
+                    scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key_with_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6067,7 +6120,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSetDelegatedVoter {
-                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+                _new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -7350,6 +7403,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_rotate_authentication_key_call".to_string(),
             Box::new(decoder::account_rotate_authentication_key_call),
+        );
+        map.insert(
+            "account_rotate_authentication_key_from_public_key".to_string(),
+            Box::new(decoder::account_rotate_authentication_key_from_public_key),
         );
         map.insert(
             "account_rotate_authentication_key_with_rotation_capability".to_string(),

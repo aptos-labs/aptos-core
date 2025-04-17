@@ -3,7 +3,6 @@
 
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
-    loaded_data::runtime_types::Type,
     values::{
         AbstractFunction, DeserializationSeed, SerializationReadyValue, SerializedFunctionData,
         Value,
@@ -13,8 +12,6 @@ use crate::{
 use mockall::automock;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -23,15 +20,6 @@ use std::cell::RefCell;
 /// An extension to (de)serialize information about function values.
 #[cfg_attr(test, automock)]
 pub trait FunctionValueExtension {
-    /// Given the module's id and the function name, returns the parameter types of the
-    /// corresponding function, instantiated with the provided set of type tags.
-    fn get_function_arg_tys(
-        &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_arg_tags: Vec<TypeTag>,
-    ) -> PartialVMResult<Vec<Type>>;
-
     /// Create an implementation of an `AbstractFunction` from the serialization data.
     fn create_from_serialization_data(
         &self,

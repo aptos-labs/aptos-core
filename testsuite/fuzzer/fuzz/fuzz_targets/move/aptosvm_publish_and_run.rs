@@ -36,7 +36,7 @@ use utils::vm::{
 };
 
 // genesis write set generated once for each fuzzing session
-static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
+static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
 
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
 static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -51,6 +51,11 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
 const EXECUTION_TIME_GAS_RATIO: u8 = 50;
+
+#[inline(always)]
+fn is_coverage_enabled() -> bool {
+    cfg!(coverage_enabled) || std::env::var("LLVM_PROFILE_FILE").is_ok()
+}
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation
@@ -167,7 +172,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
-        &VM,
+        &VM_WRITE_SET,
         ChainId::mainnet(),
         Arc::clone(&TP),
     )
@@ -376,8 +381,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // EXECUTION_TIME_GAS_RATIO is a ratio between execution time and gas used. If the ratio is higher than EXECUTION_TIME_GAS_ratio, we consider the gas usage as unexpected.
     // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this ratio.
     // We only want to catch big unexpected gas usage.
-    if (elapsed.as_millis() / (fee.execution_gas_used() + fee.io_gas_used()) as u128)
-        > EXECUTION_TIME_GAS_RATIO as u128
+    if ((elapsed.as_millis() / (fee.execution_gas_used() + fee.io_gas_used()) as u128)
+        > EXECUTION_TIME_GAS_RATIO as u128)
+        && !is_coverage_enabled()
     {
         if std::env::var("DEBUG").is_ok() {
             tdbg!(

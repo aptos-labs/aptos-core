@@ -612,13 +612,12 @@ impl Type {
     #[inline]
     pub fn paranoid_write_ref(&self, val_ty: &Type) -> PartialVMResult<()> {
         if let Type::MutableReference(inner_ty) = self {
-            if inner_ty.as_ref() == val_ty {
-                return inner_ty.paranoid_check_has_ability(Ability::Drop);
-            }
+            val_ty.paranoid_check_assignable(inner_ty)?;
+            inner_ty.paranoid_check_has_ability(Ability::Drop)
+        } else {
+            let msg = format!("Cannot write type {} to immutable type {}", val_ty, self);
+            paranoid_failure!(msg)
         }
-
-        let msg = format!("Cannot write type {} to type {}", val_ty, self);
-        paranoid_failure!(msg)
     }
 
     pub fn paranoid_check_ref_eq(
