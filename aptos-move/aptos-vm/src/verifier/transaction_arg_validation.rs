@@ -11,9 +11,8 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt},
     VMStatus,
 };
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
-    errors::{Location, PartialVMError},
+    errors::{Location, PartialVMError, VMResult},
     file_format::FunctionDefinitionIndex,
     file_format_common::read_uleb128_as_u64,
 };
@@ -27,7 +26,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunction,
+    LoadedFunction, LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment,
 };
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
@@ -35,7 +34,7 @@ use move_vm_types::{
 };
 use once_cell::sync::Lazy;
 use std::{
-    collections::BTreeMap,
+    collections::{btree_map, BTreeMap},
     io::{Cursor, Read},
 };
 
@@ -108,7 +107,7 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub(crate) fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -144,7 +143,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(module_storage, &ty, allowed_structs);
+        let valid = is_valid_txn_arg(module_storage.runtime_environment(), &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -199,7 +198,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 /// references) returns false. An error is returned in cases when a struct type is encountered and
 /// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
-    module_storage: &impl AptosModuleStorage,
+    runtime_environment: &RuntimeEnvironment,
     ty: &Type,
     allowed_structs: &ConstructorMap,
 ) -> bool {
@@ -207,12 +206,11 @@ pub(crate) fn is_valid_txn_arg(
 
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(module_storage, inner, allowed_structs),
+        Vector(inner) => is_valid_txn_arg(runtime_environment, inner, allowed_structs),
         Struct { .. } | StructInstantiation { .. } => {
             // Note: Original behavior was to return false even if the module loading fails (e.g.,
             //       if struct does not exist. This preserves it.
-            module_storage
-                .runtime_environment()
+            runtime_environment
                 .get_struct_name(ty)
                 .ok()
                 .flatten()
@@ -233,7 +231,7 @@ pub(crate) fn is_valid_txn_arg(
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
@@ -271,7 +269,7 @@ fn invalid_signature() -> VMStatus {
 
 fn construct_arg(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
@@ -327,7 +325,7 @@ fn construct_arg(
 // constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
@@ -405,7 +403,7 @@ pub(crate) fn recursively_construct_arg(
 // value and returning the BCS serialized representation.
 fn validate_and_construct(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     expected_type: &Type,
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
@@ -464,7 +462,8 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let function = module_storage.load_function_with_type_arg_inference(
+    let function = load_constructor_function(
+        module_storage,
         &constructor.module_id,
         constructor.func_name,
         expected_type,
@@ -557,4 +556,199 @@ fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result
     dest.resize(len + n, 0);
     src.read_exact(&mut dest[len..])
         .map_err(|_| deserialization_error("Couldn't read bytes"))
+}
+
+fn load_constructor_function(
+    module_storage: &impl ModuleStorage,
+    module_id: &ModuleId,
+    function_name: &IdentStr,
+    expected_return_ty: &Type,
+) -> VMResult<LoadedFunction> {
+    // Here, we do not charge gas for module loading due to invoking a constructor function. This
+    // is safe to do because all constructor functions are located at 0x1 (special address) and so
+    // should not be charged.
+    if !module_id.address().is_special() {
+        let msg = format!(
+            "Constructor function {}::{}::{} has a non-special address!",
+            module_id.address(),
+            module_id.name(),
+            function_name
+        );
+        let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            .with_message(msg)
+            .finish(Location::Undefined);
+        return Err(err);
+    }
+    let (module, function) = module_storage.fetch_function_definition(
+        module_id.address(),
+        module_id.name(),
+        function_name,
+    )?;
+
+    if function.return_tys().len() != 1 {
+        // For functions that are marked constructor this should not happen.
+        return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
+    }
+
+    let mut map = BTreeMap::new();
+    if !match_return_type(&function.return_tys()[0], expected_return_ty, &mut map) {
+        // For functions that are marked constructor this should not happen.
+        return Err(
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                .finish(Location::Undefined),
+        );
+    }
+
+    // Construct the type arguments from the match.
+    let num_ty_args = function.ty_param_abilities().len();
+    let mut ty_args = Vec::with_capacity(num_ty_args);
+    for i in 0..num_ty_args {
+        if let Some(t) = map.get(&(i as u16)) {
+            ty_args.push((*t).clone());
+        } else {
+            // Unknown type argument we are not able to infer the type arguments.
+            // For functions that are marked constructor this should not happen.
+            return Err(
+                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                    .finish(Location::Undefined),
+            );
+        }
+    }
+
+    Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+        .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+
+    Ok(LoadedFunction {
+        owner: LoadedFunctionOwner::Module(module),
+        ty_args,
+        function,
+    })
+}
+
+/// Matches the actual returned type to the expected type, binding any type args to the necessary
+/// type as stored in the map. The expected type must be a concrete type (no [Type::TyParam]).
+/// Returns true if a successful match is made.
+// TODO: is this really needed in presence of paranoid mode? This does a deep structural
+//       comparison and is expensive.
+fn match_return_type<'a>(
+    returned: &Type,
+    expected: &'a Type,
+    map: &mut BTreeMap<u16, &'a Type>,
+) -> bool {
+    match (returned, expected) {
+        // The important case, deduce the type params.
+        (Type::TyParam(idx), _) => match map.entry(*idx) {
+            btree_map::Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(expected);
+                true
+            },
+            btree_map::Entry::Occupied(occupied_entry) => *occupied_entry.get() == expected,
+        },
+        // Recursive types we need to recurse the matching types.
+        (Type::Reference(ret_inner), Type::Reference(expected_inner))
+        | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner)) => {
+            match_return_type(ret_inner, expected_inner, map)
+        },
+        (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
+            match_return_type(ret_inner, expected_inner, map)
+        },
+        // Function types, the expected abilities need to be equal to the provided ones,
+        // and recursively argument and result types need to match.
+        (
+            Type::Function {
+                args,
+                results,
+                abilities,
+            },
+            Type::Function {
+                args: exp_args,
+                results: exp_results,
+                abilities: exp_abilities,
+            },
+        ) if abilities == exp_abilities
+            && args.len() == exp_args.len()
+            && results.len() == exp_results.len() =>
+        {
+            args.iter()
+                .zip(exp_args)
+                .all(|(t, e)| match_return_type(t, e, map))
+                && results
+                    .iter()
+                    .zip(exp_results)
+                    .all(|(t, e)| match_return_type(t, e, map))
+        },
+        // Abilities should not contribute to the equality check as they just serve for caching
+        // computations. For structs the both need to be the same struct.
+        (
+            Type::Struct { idx: ret_idx, .. },
+            Type::Struct {
+                idx: expected_idx, ..
+            },
+        ) => *ret_idx == *expected_idx,
+        // For struct instantiations we need to additionally match all type arguments.
+        (
+            Type::StructInstantiation {
+                idx: ret_idx,
+                ty_args: ret_fields,
+                ..
+            },
+            Type::StructInstantiation {
+                idx: expected_idx,
+                ty_args: expected_fields,
+                ..
+            },
+        ) => {
+            *ret_idx == *expected_idx
+                && ret_fields.len() == expected_fields.len()
+                && ret_fields
+                    .iter()
+                    .zip(expected_fields.iter())
+                    .all(|types| match_return_type(types.0, types.1, map))
+        },
+        // For primitive types we need to assure the types match.
+        (Type::U8, Type::U8)
+        | (Type::U16, Type::U16)
+        | (Type::U32, Type::U32)
+        | (Type::U64, Type::U64)
+        | (Type::U128, Type::U128)
+        | (Type::U256, Type::U256)
+        | (Type::Bool, Type::Bool)
+        | (Type::Address, Type::Address)
+        | (Type::Signer, Type::Signer) => true,
+        // Otherwise the types do not match, and we can't match return type to the expected type.
+        // Note we don't use the _ pattern but spell out all cases, so that the compiler will
+        // bark when a case is missed upon future updates to the types.
+        (Type::U8, _)
+        | (Type::U16, _)
+        | (Type::U32, _)
+        | (Type::U64, _)
+        | (Type::U128, _)
+        | (Type::U256, _)
+        | (Type::Bool, _)
+        | (Type::Address, _)
+        | (Type::Signer, _)
+        | (Type::Struct { .. }, _)
+        | (Type::StructInstantiation { .. }, _)
+        | (Type::Function { .. }, _)
+        | (Type::Vector(_), _)
+        | (Type::MutableReference(_), _)
+        | (Type::Reference(_), _) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case(true)]
+    #[test_case(false)]
+    fn test_constructor_functions_always_have_special_address(
+        are_struct_constructors_enabled: bool,
+    ) {
+        let constructors = get_allowed_structs(are_struct_constructors_enabled);
+        for function_id in constructors.values() {
+            assert!(function_id.module_id.address().is_special());
+        }
+    }
 }
