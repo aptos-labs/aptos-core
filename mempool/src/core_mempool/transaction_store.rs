@@ -224,7 +224,10 @@ impl TransactionStore {
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
-        let acc_seq_num = txn.sequence_info.account_sequence_number;
+        let acc_seq_num = max(
+            txn.sequence_info.account_sequence_number,
+            self.get_sequence_number(&address).map_or(0, |v| *v),
+        );
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -269,6 +272,15 @@ impl TransactionStore {
             }
         }
 
+        self.clean_committed_transactions(&address, acc_seq_num);
+
+        if txn_seq_num < acc_seq_num {
+            return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
+                "transaction sequence number is {}, current sequence number is  {}",
+                txn_seq_num, acc_seq_num,
+            ));
+        }
+
         if self.check_is_full_after_eviction(&txn, acc_seq_num) {
             return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
                 "Mempool is full. Mempool size: {}, Capacity: {}",
@@ -277,12 +289,7 @@ impl TransactionStore {
             ));
         }
 
-        self.clean_committed_transactions(&address, acc_seq_num);
-
         self.transactions.entry(address).or_default();
-
-        let current_seq_number = self.get_sequence_number(&address).map_or(0, |v| *v);
-
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
             if txns.len() >= self.capacity_per_user {
@@ -301,8 +308,7 @@ impl TransactionStore {
             self.hash_index
                 .insert(txn.get_committed_hash(), (address, txn_seq_num));
 
-            self.sequence_numbers
-                .insert(address, max(current_seq_number, acc_seq_num));
+            self.sequence_numbers.insert(address, acc_seq_num);
             self.size_bytes += txn.get_estimated_bytes();
             txns.insert(txn_seq_num, txn);
             self.track_indices();
