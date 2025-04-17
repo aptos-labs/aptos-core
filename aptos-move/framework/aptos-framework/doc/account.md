@@ -1767,7 +1767,7 @@ is the original public key of the account and the new backup key has been valida
 ### Arguments
 
 * <code><a href="account.md#0x1_account">account</a></code> - The signer representing the keyless account
-* <code>keyless_public_key</code> - The original keyless public key of the account
+* <code>keyless_public_key</code> - The original keyless public key of the account (wrapped in an AnyPublicKey)
 * <code>backup_public_key</code> - The ED25519 public key to add as a backup
 * <code>backup_key_proof</code> - A signature from the backup key proving ownership
 
@@ -1776,6 +1776,7 @@ is the original public key of the account and the new backup key has been valida
 
 ### Aborts
 
+* If the any of inputs deserialize incorrectly
 * If the provided public key is not a keyless public key
 * If the keyless public key is not the original public key of the account
 * If the backup key proof signature is invalid

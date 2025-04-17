@@ -184,11 +184,12 @@ pub enum EntryFunctionCall {
     ///
     /// # Arguments
     /// * `account` - The signer representing the keyless account
-    /// * `keyless_public_key` - The original keyless public key of the account
+    /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
     /// * `backup_public_key` - The ED25519 public key to add as a backup
     /// * `backup_key_proof` - A signature from the backup key proving ownership
     ///
     /// # Aborts
+    /// * If the any of inputs deserialize incorrectly
     /// * If the provided public key is not a keyless public key
     /// * If the keyless public key is not the original public key of the account
     /// * If the backup key proof signature is invalid
@@ -2293,11 +2294,12 @@ pub fn account_set_originating_address() -> TransactionPayload {
 ///
 /// # Arguments
 /// * `account` - The signer representing the keyless account
-/// * `keyless_public_key` - The original keyless public key of the account
+/// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
 /// * `backup_public_key` - The ED25519 public key to add as a backup
 /// * `backup_key_proof` - A signature from the backup key proving ownership
 ///
 /// # Aborts
+/// * If the any of inputs deserialize incorrectly
 /// * If the provided public key is not a keyless public key
 /// * If the keyless public key is not the original public key of the account
 /// * If the backup key proof signature is invalid
