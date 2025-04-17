@@ -294,13 +294,7 @@ impl InterpreterImpl<'_> {
         };
 
         let mut current_frame = self
-            .make_new_frame(
-                gas_meter,
-                function,
-                CallType::Regular,
-                locals,
-                frame_cache.clone(),
-            )
+            .make_new_frame(gas_meter, function, CallType::Regular, locals, frame_cache)
             .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
@@ -635,12 +629,18 @@ impl InterpreterImpl<'_> {
                             captured_vec,
                         )?
                     } else {
+                        let frame_cache = if RTCaches::caches_enabled() {
+                            FrameTypeCache::make_rc_for_function(&callee)
+                        } else {
+                            FrameTypeCache::make_rc()
+                        };
                         self.set_new_call_frame::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             gas_meter,
                             callee,
                             CallType::ClosureDynamicDispatch,
-                            frame_cache.clone(),
+                            // Make sure the frame cache is empty for the new call.
+                            frame_cache,
                             mask,
                             captured_vec,
                         )?

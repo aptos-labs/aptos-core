@@ -415,12 +415,7 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self.struct_name_index_map().idx_to_struct_name_ref(idx)?;
-        self.storage.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
+        self.storage.fetch_struct_ty_by_idx(&idx)
     }
 
     fn struct_name_index_map(&self) -> &StructNameIndexMap {

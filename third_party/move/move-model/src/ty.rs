@@ -664,6 +664,11 @@ impl Constraint {
         result
     }
 
+    /// Returns the constraints which need to be satisfied for function parameters.
+    pub fn for_fun_parameter() -> Vec<Constraint> {
+        vec![Constraint::NoPhantom, Constraint::NoTuple]
+    }
+
     /// Returns the constraints which need to be satisfied for a local or
     /// parameter type.
     pub fn for_local() -> Vec<Constraint> {
@@ -1842,7 +1847,7 @@ impl Substitution {
         ty: Type,
     ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
-        let ty = self.specialize(&ty);
+        let mut ty = self.specialize(&ty);
         if let Some(mut constrs) = self.constraints.remove(&var) {
             // Sort constraints to report primary errors first
             constrs.sort_by(|(_, _, c1), (_, _, c2)| c1.compare(c2).reverse());
@@ -1870,9 +1875,17 @@ impl Substitution {
                     },
                 }
             }
+            // New bindings could have been created, so specialize again.
+            ty = self.specialize(&ty)
         }
-        self.subs.insert(var, ty);
-        Ok(())
+
+        // Occurs check
+        if ty.get_vars().contains(&var) {
+            Err(TypeUnificationError::CyclicSubstitution(Type::Var(var), ty))
+        } else {
+            self.subs.insert(var, ty);
+            Ok(())
+        }
     }
 
     /// Evaluates whether the given type satisfies the constraint, discharging the constraint.
@@ -1902,7 +1915,7 @@ impl Substitution {
         if matches!(ty, Type::Error) {
             Ok(())
         } else if let Type::Var(other_var) = ty {
-            // Transfer constraint on to other variable, which we assert to be free
+            // Transfer constraint on to other variable which we assert to be free
             debug_assert!(!self.subs.contains_key(other_var));
             self.add_constraint(context, *other_var, loc.clone(), order, c, ctx_opt)
         } else if c.propagate_over_reference() && ty.is_reference() {
@@ -2564,38 +2577,16 @@ impl Substitution {
                     break;
                 }
             }
-            // Skip the cycle check if we are unifying the same two variables.
+            // Skip binding if we are unifying the same two variables.
             if t1 == &t2 {
-                return Ok(Some(t1.clone()));
-            }
-            // Cycle check.
-            if !self.occurs_check(&t2, *v1) {
+                Ok(Some(t1.clone()))
+            } else {
                 self.bind(context, *v1, variance, order, t2.clone())?;
                 Ok(Some(t2))
-            } else {
-                Err(TypeUnificationError::CyclicSubstitution(
-                    self.specialize(t1),
-                    self.specialize(&t2),
-                ))
             }
         } else {
             Ok(None)
         }
-    }
-
-    /// Check whether the variables occurs in the type, or in any assignment to variables in the
-    /// type.
-    fn occurs_check(&self, ty: &Type, var: u32) -> bool {
-        ty.get_vars().iter().any(|v| {
-            if v == &var {
-                return true;
-            }
-            if let Some(sty) = self.subs.get(v) {
-                self.occurs_check(sty, var)
-            } else {
-                false
-            }
-        })
     }
 }
 

@@ -212,7 +212,7 @@ function build-oss-fuzz() {
     clang --version
 
     # Limit the number of parallel jobs to avoid OOM
-    # export CARGO_BUILD_JOBS = 3
+    export CARGO_BUILD_JOBS=4
 
     # Build the fuzz targets
     # Doing one target at the time should prevent OOM, but use all thread while bulding dependecies
