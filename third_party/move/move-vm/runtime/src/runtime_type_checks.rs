@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    frame_type_cache::FrameTypeCache,
-    interpreter::{Frame, Stack},
-    LoadedFunction, ModuleStorage,
-};
+use crate::{frame::Frame, interpreter::Stack, LoadedFunction, ModuleStorage};
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
     ability::{Ability, AbilitySet},
@@ -23,7 +19,6 @@ pub(crate) trait RuntimeTypeCheck {
         frame: &Frame,
         module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()>;
 
@@ -32,7 +27,6 @@ pub(crate) trait RuntimeTypeCheck {
         frame: &Frame,
         module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()>;
 
@@ -160,7 +154,6 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _frame: &Frame,
         _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
-        _ty_cache: &mut FrameTypeCache,
         _instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -170,7 +163,6 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _frame: &Frame,
         _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
-        _ty_cache: &mut FrameTypeCache,
         _instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -193,9 +185,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         frame: &Frame,
         _module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
+        let mut ty_cache = frame.frame_cache.borrow_mut();
         match instruction {
             // Call instruction will be checked at execute_main.
             Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
@@ -213,18 +205,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::Branch(_) => (),
             Bytecode::Ret => {
-                for (idx, ty) in frame.local_tys.iter().enumerate() {
-                    if !frame.locals.is_invalid(idx)? {
-                        ty.paranoid_check_has_ability(Ability::Drop)?;
-                    }
-                }
+                frame.check_local_tys_have_drop_ability()?;
             },
             Bytecode::Abort => {
                 operand_stack.pop_ty()?;
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Bytecode::StLoc(idx) => {
-                let expected_ty = &frame.local_tys[*idx as usize];
+                let expected_ty = frame.local_ty_at(*idx as usize);
                 let val_ty = operand_stack.pop_ty()?;
                 // For store, use assignability
                 val_ty.paranoid_check_assignable(expected_ty)?;
@@ -329,10 +317,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         frame: &Frame,
         module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
-        let ty_builder = &frame.ty_builder;
+        let ty_builder = frame.ty_builder();
+        let mut ty_cache = frame.frame_cache.borrow_mut();
 
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
@@ -385,22 +373,22 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::CopyLoc(idx) => {
-                let ty = frame.local_tys[*idx as usize].clone();
+                let ty = frame.local_ty_at(*idx as usize).clone();
                 ty.paranoid_check_has_ability(Ability::Copy)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveLoc(idx) => {
-                let ty = frame.local_tys[*idx as usize].clone();
+                let ty = frame.local_ty_at(*idx as usize).clone();
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
-                let ty = &frame.local_tys[*idx as usize];
+                let ty = frame.local_ty_at(*idx as usize);
                 let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
                 operand_stack.push_ty(mut_ref_ty)?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
-                let ty = &frame.local_tys[*idx as usize];
+                let ty = frame.local_ty_at(*idx as usize);
                 let ref_ty = ty_builder.create_ref_ty(ty, false)?;
                 operand_stack.push_ty(ref_ty)?;
             },

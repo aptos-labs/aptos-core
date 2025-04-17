@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::Frame, LoadedFunction};
+use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
