@@ -495,7 +495,7 @@ module aptos_framework::account {
 
     /// Upserts an ED25519 backup key to a keyless account by converting the account's authentication key to a multi-key.
     /// This function takes a keyless account (identified by having a keyless public key is the original public key) and updates the
-    /// account's authentication key to a multi-key of the original keyless public key and the new backup key that requires 
+    /// account's authentication key to a multi-key of the original keyless public key and the new backup key that requires
     /// 1 signature from either key to authenticate.
     ///
     /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
