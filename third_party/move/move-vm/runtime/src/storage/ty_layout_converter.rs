@@ -70,8 +70,13 @@ pub(crate) trait LayoutConverterBase {
         if node_count > self.vm_config().layout_max_size {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+<<<<<<< HEAD
                     "Number of type nodes when constructing type layout exceeded the maximum of {}",
                     self.vm_config().layout_max_size
+=======
+                    "Number of type {} nodes when constructing type layout exceeded the maximum of {}",
+                    node_count, MAX_TYPE_TO_LAYOUT_NODES
+>>>>>>> 28476ee671 (Increse the max number of node types in layout check)
                 )),
             );
         }
@@ -291,7 +296,26 @@ pub(crate) trait LayoutConverterBase {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
+<<<<<<< HEAD
         self.check_type_layout_bounds(*count, depth)?;
+=======
+        if *count > MAX_TYPE_TO_LAYOUT_NODES {
+            return Err(
+                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                    "Number of type nodes {} when constructing type layout exceeded the maximum of {}",
+                    *count, MAX_TYPE_TO_LAYOUT_NODES
+                )),
+            );
+        }
+        if depth > VALUE_DEPTH_MAX {
+            return Err(
+                PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
+                    "Depth of a layout exceeded the maximum of {} during construction",
+                    VALUE_DEPTH_MAX
+                )),
+            );
+        }
+>>>>>>> 28476ee671 (Increse the max number of node types in layout check)
         Ok(match ty {
             Type::Bool => MoveTypeLayout::Bool,
             Type::U8 => MoveTypeLayout::U8,
