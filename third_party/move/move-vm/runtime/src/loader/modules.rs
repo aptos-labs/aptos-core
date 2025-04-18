@@ -249,6 +249,7 @@ impl Module {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
                 let function = Function::new(
                     natives,
+                    struct_name_index_map,
                     findex,
                     &module,
                     signature_table.as_slice(),
