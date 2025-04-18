@@ -692,7 +692,7 @@ mod tests {
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
             Block::new_proposal(
-                Payload::empty(false, true),
+                Payload::empty(false),
                 1,
                 1,
                 previous_qc.clone(),
