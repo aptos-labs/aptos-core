@@ -27,6 +27,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::chain_status`](chain_status.md#0x1_chain_status)
 -  [`0x1::code`](code.md#0x1_code)
 -  [`0x1::coin`](coin.md#0x1_coin)
+-  [`0x1::common_account_abstractions_utils`](common_account_abstractions_utils.md#0x1_common_account_abstractions_utils)
 -  [`0x1::config_buffer`](config_buffer.md#0x1_config_buffer)
 -  [`0x1::consensus_config`](consensus_config.md#0x1_consensus_config)
 -  [`0x1::create_signer`](create_signer.md#0x1_create_signer)
