@@ -253,7 +253,7 @@ impl StateKeyRegistry {
         handle: &TableHandle,
         key: &[u8],
     ) -> &TwoKeyRegistry<TableHandle, Vec<u8>> {
-        &self.table_item_shards[Self::hash_address_and_name(&handle.0, key) % NUM_MODULE_SHARDS]
+        &self.table_item_shards[Self::hash_address_and_name(&handle.0, key) % NUM_TABLE_ITEM_SHARDS]
     }
 
     pub(crate) fn raw(&self, bytes: &[u8]) -> &TwoKeyRegistry<Vec<u8>, ()> {
