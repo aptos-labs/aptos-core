@@ -18,6 +18,7 @@
 /// - OKX
 module aptos_framework::solana_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
+    use aptos_framework::common_account_abstractions_utils::network_name;
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
@@ -78,22 +79,6 @@ module aptos_framework::solana_derivable_account {
             SIWSAbstractSignature::MessageV1 { signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
-        }
-    }
-
-    fun network_name(): vector<u8> {
-        let chain_id = chain_id::get();
-        if (chain_id == 1) {
-            b"mainnet"
-        } else if (chain_id == 2) {
-            b"testnet"
-        } else if (chain_id == 4) {
-            b"local"
-        } else {
-            let network_name = &mut vector[];
-            network_name.append(b"custom network: ");
-            network_name.append(*string_utils::to_string(&chain_id).bytes());
-            *network_name
         }
     }
 
