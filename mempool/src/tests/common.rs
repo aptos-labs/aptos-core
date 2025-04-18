@@ -68,7 +68,6 @@ pub struct TestTransaction {
     pub(crate) address: AccountAddress,
     pub(crate) sequence_number: u64,
     pub(crate) gas_price: u64,
-    pub(crate) account_seqno: u64,
     pub(crate) script: Option<Script>,
 }
 
@@ -78,7 +77,6 @@ impl TestTransaction {
             address: TestTransaction::get_address(address),
             sequence_number,
             gas_price,
-            account_seqno: 0,
             script: None,
         }
     }
@@ -92,7 +90,6 @@ impl TestTransaction {
             address: TestTransaction::get_address(address),
             sequence_number,
             gas_price,
-            account_seqno: 0,
             script: Some(LARGE_SCRIPT.clone()),
         }
     }
@@ -106,7 +103,6 @@ impl TestTransaction {
             address: TestTransaction::get_address(address),
             sequence_number,
             gas_price,
-            account_seqno: 0,
             script: Some(HUGE_SCRIPT.clone()),
         }
     }
@@ -120,7 +116,6 @@ impl TestTransaction {
             address,
             sequence_number,
             gas_price,
-            account_seqno: 0,
             script: None,
         }
     }
@@ -182,7 +177,7 @@ pub(crate) fn add_txns_to_mempool(
         pool.add_txn(
             txn.clone(),
             txn.gas_unit_price(),
-            transaction.account_seqno,
+            0,
             TimelineState::NotReady,
             false,
             None,
