@@ -2872,6 +2872,7 @@ dependencies = [
 name = "aptos-logger"
 version = "0.1.0"
 dependencies = [
+ "aptos-build-info",
  "aptos-infallible",
  "aptos-log-derive",
  "aptos-node-identity",
