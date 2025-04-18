@@ -1951,7 +1951,10 @@ mod test {
     use super::*;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
-        proptest_types::types::{KeyType, MockEvent, ValueType},
+        proptest_types::{
+            mock_executor::MockEvent,
+            types::{KeyType, ValueType},
+        },
         scheduler::{DependencyResult, Scheduler, TWaitForDependency},
         view::{delayed_field_try_add_delta_outcome_impl, get_delayed_field_value_impl, ViewState},
     };

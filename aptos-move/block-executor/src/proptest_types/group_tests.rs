@@ -8,9 +8,10 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
+        mock_executor::{MockEvent, MockOutput, MockTask},
         resource_tests::{create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants},
         types::{
-            KeyType, MockEvent, MockOutput, MockTask, MockTransaction, NonEmptyGroupDataView,
+            KeyType, MockTransaction, NonEmptyGroupDataView,
             TransactionGen, TransactionGenParams,
         },
     },

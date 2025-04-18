@@ -13,8 +13,12 @@
 /// of each transaction of the tested block executor execution.
 use crate::{
     errors::{BlockExecutionError, BlockExecutionResult},
-    proptest_types::types::{
-        default_group_map, deserialize_to_delayed_field_id, raw_metadata, serialize_from_delayed_field_u128, GroupSizeOrMetadata, MockOutput, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE
+    proptest_types::{
+        mock_executor::MockOutput,
+        types::{
+            default_group_map, deserialize_to_delayed_field_id, raw_metadata, serialize_from_delayed_field_u128, 
+            GroupSizeOrMetadata, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE
+        },
     },
 };
 use aptos_aggregator::delta_change_set::serialize;

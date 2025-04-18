@@ -11,9 +11,10 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
+        mock_executor::{MockEvent, MockOutput, MockTask},
         types::{
-            DeltaDataView, KeyType, MockEvent, MockIncarnation, MockOutput, MockTask,
-            MockTransaction, NonEmptyGroupDataView, ValueType,
+            DeltaDataView, KeyType, MockIncarnation, MockTransaction, NonEmptyGroupDataView,
+            ValueType,
         },
     },
     scheduler::{

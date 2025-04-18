@@ -991,11 +991,13 @@ where
 #[cfg(test)]
 mod test {
     // TODO(BlockSTMv2): test compare_data_reads with true.
-
     use super::*;
     use crate::{
         code_cache_global::GlobalModuleCache,
-        proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
+        proptest_types::{
+            mock_executor::MockEvent,
+            types::{raw_metadata, KeyType, ValueType},
+        },
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq};
