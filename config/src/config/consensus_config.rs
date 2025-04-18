@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
 const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 3000;
+const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 1700;
 const MAX_SENDING_BLOCK_TXNS: u64 = 7000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
@@ -30,6 +31,7 @@ pub struct ConsensusConfig {
     pub max_network_channel_size: usize,
     pub max_sending_block_txns: u64,
     pub max_sending_block_txns_after_filtering: u64,
+    pub max_sending_opt_block_txns_after_filtering: u64,
     pub max_sending_block_bytes: u64,
     pub max_sending_inline_txns: u64,
     pub max_sending_inline_bytes: u64,
@@ -185,6 +187,7 @@ impl Default for ConsensusConfig {
             max_network_channel_size: 1024,
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
             max_sending_block_txns_after_filtering: MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            max_sending_opt_block_txns_after_filtering: MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING,
             max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
