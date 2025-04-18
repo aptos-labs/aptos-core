@@ -1245,6 +1245,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "dashmap",
+ "itertools 0.13.0",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
@@ -1255,6 +1256,7 @@ name = "aptos-db-indexer-schemas"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-crypto",
  "aptos-proptest-helpers",
  "aptos-schemadb",
@@ -1262,6 +1264,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "byteorder",
+ "move-core-types",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
