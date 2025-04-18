@@ -1,0 +1,68 @@
+
+digraph G {
+    label = "Module: 6e8799664626c9ef346e21c5ae73356bb4823168b90688344dbd459dec77173f::treasury
+    use 0000000000000000000000000000000000000000000000000000000000000001::account;
+    use 0000000000000000000000000000000000000000000000000000000000000001::aptos_account;
+    use 0000000000000000000000000000000000000000000000000000000000000001::aptos_coin;
+    use 0000000000000000000000000000000000000000000000000000000000000001::coin;
+    use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+    use 66302f3c648890f70ca3fafc42c919483945f3ba155101bc2e149e38a8b93afc::toss_coin;
+    use 6e8799664626c9ef346e21c5ae73356bb4823168b90688344dbd459dec77173f::config;";
+    labelloc = "t";
+    labeljust = "l";
+    fontsize = 36;
+
+    graph [
+	rankdir=LR,
+	ranksep=1.0,
+	nodesep=0.75,
+	splines=true,
+	concentrate=false
+    ];
+
+    node [
+	shape=ellipse,
+	fontsize=24
+    ];
+
+    edge [
+	arrowsize=1.5
+    ];
+
+    0 [label="account::create_resource_account(&signer, vector<u8>) -> signer, SignerCapability"];
+    1 [label="account::create_signer_with_capability(&SignerCapability) -> signer"];
+    2 [label="aptos_account::deposit_coins<T0>(address, Coin<T0>)"];
+    3 [label="aptos_account::set_allow_direct_coin_transfers(&signer, bool)"];
+    4 [label="aptos_account::transfer(&signer, address, u64)"];
+    5 [label="coin::register<T0>(&signer)"];
+    6 [label="coin::withdraw<T0>(&signer, u64) -> Coin<T0>"];
+    7 [label="config::assert_signer_is_treasury_admin(&signer)"];
+    8 [label="entry public register<T0>(&signer)"];
+    9 [label="entry public set_allow_direct_coin_transfers(&signer, bool)"];
+    10 [label="entry public withdraw<T0>(&signer, u64)"];
+    11 [label="init_module(&signer)"];
+    12 [label="public treasury_address() -> address"];
+    13 [label="public(friend) deposit_coins<T0>(Coin<T0>)"];
+    14 [label="public(friend) withdraw_coins<T0>(u64) -> Coin<T0>"];
+    15 [label="signer::address_of(&signer) -> address"];
+    8 -> 1 [label="", fontsize=24];
+    8 -> 5 [label="[T0 as T0]", fontsize=24];
+    8 -> 7 [label="", fontsize=24];
+    9 -> 1 [label="", fontsize=24];
+    9 -> 3 [label="", fontsize=24];
+    9 -> 7 [label="", fontsize=24];
+    10 -> 1 [label="", fontsize=24];
+    10 -> 4 [label="", fontsize=24];
+    10 -> 7 [label="", fontsize=24];
+    10 -> 15 [label="", fontsize=24];
+    11 -> 0 [label="", fontsize=24];
+    11 -> 5 [label="[AptosCoin as T0]", fontsize=24];
+    11 -> 5 [label="[TossCoin as T0]", fontsize=24];
+    12 -> 1 [label="", fontsize=24];
+    12 -> 15 [label="", fontsize=24];
+    13 -> 1 [label="", fontsize=24];
+    13 -> 2 [label="[T0 as T0]", fontsize=24];
+    13 -> 15 [label="", fontsize=24];
+    14 -> 1 [label="", fontsize=24];
+    14 -> 6 [label="[T0 as T0]", fontsize=24];
+}

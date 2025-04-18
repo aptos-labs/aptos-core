@@ -1,0 +1,29 @@
+
+digraph G {
+    label = "Module: 627aecfd856371b5dc26de6a15a040fab1a3ae342eccec49eac385821696d688::custom_coin
+    use 0000000000000000000000000000000000000000000000000000000000000001::managed_coin;";
+    labelloc = "t";
+    labeljust = "l";
+    fontsize = 36;
+
+    graph [
+	rankdir=LR,
+	ranksep=1.0,
+	nodesep=0.75,
+	splines=true,
+	concentrate=false
+    ];
+
+    node [
+	shape=ellipse,
+	fontsize=24
+    ];
+
+    edge [
+	arrowsize=1.5
+    ];
+
+    0 [label="init_module(&signer)"];
+    1 [label="managed_coin::initialize<T0>(&signer, vector<u8>, vector<u8>, u8, bool)"];
+    0 -> 1 [label="[CustomCoin as T0]", fontsize=24];
+}

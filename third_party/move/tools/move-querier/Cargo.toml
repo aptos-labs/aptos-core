@@ -1,0 +1,26 @@
+[package]
+name = "move-querier"
+version = "0.1.0"
+authors = ["Aptos Foundations"]
+description = "Query basic info like call graphs and type of a move bytecode"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+petgraph = { workspace = true }
+
+[dev-dependencies]
+datatest-stable = { workspace = true }
+move-prover-test-utils = { workspace = true }
+
+[features]
+default = []
+
+[[test]]
+name = "testsuite"
+harness = false
