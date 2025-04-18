@@ -34,7 +34,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     /// Initializes the module and stores the `EventHandle`s in the resource.
     public fun initialize(_aptos_framework: &signer) {
-        abort EATOMIC_BRIDGE_DISABLED
+  
     }
 
     /// Initiate a bridge transfer of ETH from Movement to the base layer
