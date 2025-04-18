@@ -10,5 +10,6 @@ mod delta_tests;
 mod delayed_field_tests;
 mod group_tests;
 mod module_tests;
+pub(crate) mod mock_executor;
 mod resource_tests;
 pub(crate) mod types;

@@ -8,8 +8,9 @@ use crate::{
         resource_tests::{
             create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants,
         },
+        mock_executor::{MockEvent, MockTask},
         types::{
-            key_to_module_id, KeyType, MockEvent, MockTask, MockTransaction,
+            key_to_module_id, KeyType, MockTransaction,
             TransactionGen, TransactionGenParams,
         },
     },
