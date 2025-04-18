@@ -67,7 +67,7 @@ spec aptos_framework::transaction_validation {
         use aptos_framework::coin::{CoinStore};
         sender: &signer;
         gas_payer: &signer;
-        txn_sequence_number: u64;
+        replay_protector: ReplayProtector;
         txn_authentication_key: Option<vector<u8>>;
         txn_gas_price: u64;
         txn_max_gas_units: u64;
@@ -82,42 +82,42 @@ spec aptos_framework::transaction_validation {
         let transaction_sender = signer::address_of(sender);
         let gas_payer_addr = signer::address_of(gas_payer);
 
-        aborts_if (
-            !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
-                || account::spec_exists_at(transaction_sender)
-                || transaction_sender == gas_payer_addr
-                || txn_sequence_number > 0
-        ) && (
-            !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number)
-                || !(option::spec_is_none(txn_authentication_key) || option::spec_borrow(
-                txn_authentication_key
-            ) == global<Account>(transaction_sender).authentication_key)
-                || !account::spec_exists_at(transaction_sender)
-                || !(txn_sequence_number == global<Account>(transaction_sender).sequence_number)
-        );
+        // aborts_if (
+        //     !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+        //         || account::spec_exists_at(transaction_sender)
+        //         || transaction_sender == gas_payer_addr
+        //         || txn_sequence_number > 0
+        // ) && (
+        //     !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number)
+        //         || !(option::spec_is_none(txn_authentication_key) || option::spec_borrow(
+        //         txn_authentication_key
+        //     ) == global<Account>(transaction_sender).authentication_key)
+        //         || !account::spec_exists_at(transaction_sender)
+        //         || !(txn_sequence_number == global<Account>(transaction_sender).sequence_number)
+        // );
 
-        aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
-            && transaction_sender != gas_payer_addr
-            && txn_sequence_number == 0
-            && !account::spec_exists_at(transaction_sender)
-            && (option::spec_is_none(txn_authentication_key) || option::spec_borrow(
-            txn_authentication_key
-        ) != bcs::to_bytes(transaction_sender));
+        // aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+        //     && transaction_sender != gas_payer_addr
+        //     && txn_sequence_number == 0
+        //     && !account::spec_exists_at(transaction_sender)
+        //     && (option::spec_is_none(txn_authentication_key) || option::spec_borrow(
+        //     txn_authentication_key
+        // ) != bcs::to_bytes(transaction_sender));
 
-        aborts_if !(txn_sequence_number < (1u64 << 63));
+        // aborts_if !(txn_sequence_number < (1u64 << 63));
 
-        let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        aborts_if max_transaction_fee > MAX_U64;
-        aborts_if !exists<CoinStore<AptosCoin>>(gas_payer_addr);
-        // property 1: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
-        /// [high-level-req-1]
-        aborts_if !(global<CoinStore<AptosCoin>>(gas_payer_addr).coin.value >= max_transaction_fee);
+        // let max_transaction_fee = txn_gas_price * txn_max_gas_units;
+        // aborts_if max_transaction_fee > MAX_U64;
+        // aborts_if !exists<CoinStore<AptosCoin>>(gas_payer_addr);
+        // // property 1: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
+        // /// [high-level-req-1]
+        // aborts_if !(global<CoinStore<AptosCoin>>(gas_payer_addr).coin.value >= max_transaction_fee);
     }
 
     spec prologue_common(
         sender: &signer,
         gas_payer: &signer,
-        txn_sequence_number: u64,
+        replay_protector: ReplayProtector,
         txn_authentication_key: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
@@ -131,21 +131,22 @@ spec aptos_framework::transaction_validation {
     }
 
     spec script_prologue_extended(
-    sender: signer,
-    txn_sequence_number: u64,
+        sender: signer,
+        txn_sequence_number: u64,
         txn_public_key: vector<u8>,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    chain_id: u8,
-    _script_hash: vector<u8>,
-    is_simulation: bool,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        _script_hash: vector<u8>,
+        is_simulation: bool,
     ) {
         // TODO(fa_migration)
         pragma verify = false;
         include PrologueCommonAbortsIf {
             gas_payer: sender,
-            txn_authentication_key: option::spec_some(txn_public_key)
+            txn_authentication_key: option::spec_some(txn_public_key),
+            replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
         };
     }
 
@@ -159,8 +160,8 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         _script_hash: vector<u8>,
     ) {
-    // TODO: temporary mockup
-    pragma verify = false;
+        // TODO: temporary mockup
+        pragma verify = false;        
     }
 
     spec schema MultiAgentPrologueCommonAbortsIf {
@@ -277,7 +278,7 @@ spec aptos_framework::transaction_validation {
         let gas_payer = create_signer::create_signer(fee_payer_address);
         include PrologueCommonAbortsIf {
             gas_payer,
-            txn_sequence_number,
+            replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
             txn_authentication_key: option::spec_some(txn_sender_public_key),
         };
         // include MultiAgentPrologueCommonAbortsIf {
@@ -331,8 +332,8 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64,
     ) {
-    // TODO: temporary mockup
-    pragma verify = false;
+        // TODO: temporary mockup
+        pragma verify = false;
     }
 
     /// Abort according to the conditions.
@@ -410,6 +411,55 @@ spec aptos_framework::transaction_validation {
         // TODO: temporary mockup
         pragma verify = false;
     }
+
+    spec unified_prologue_v2(
+        sender: signer,
+        txn_sender_public_key: Option<vector<u8>>,
+        replay_protector: ReplayProtector,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        is_simulation: bool,
+    ) {
+        // TODO: temporary mockup
+        pragma verify = false;
+    }
+
+    spec unified_prologue_fee_payer_v2(
+        sender: signer,
+        fee_payer: signer,
+        txn_sender_public_key: Option<vector<u8>>,
+        fee_payer_public_key_hash: Option<vector<u8>>,
+        replay_protector: ReplayProtector,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        is_simulation: bool,
+    ) {
+        // TODO: temporary mockup
+        pragma verify = false;
+    }
+
+    spec unified_epilogue_v2(
+        account: signer,
+        gas_payer: signer,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        is_simulation: bool,
+        is_orderless_txn: bool,
+    ) {
+        // TODO: temporary mockup
+        pragma verify = false;
+    }
+
 
     spec schema EpilogueGasPayerAbortsIf {
         use std::option;
