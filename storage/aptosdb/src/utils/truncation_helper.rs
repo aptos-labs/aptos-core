@@ -29,6 +29,7 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
@@ -372,10 +373,20 @@ fn delete_transaction_index_data(
             latest_version = start_version + num_txns as u64 - 1,
             "Truncate transaction index data."
         );
-        transaction_store.prune_transaction_by_account(&transactions, batch)?;
         ledger_db
             .transaction_db()
-            .prune_transaction_by_hash_indices(&transactions, batch)?;
+            .prune_transaction_by_hash_indices(
+                &transactions
+                    .iter()
+                    .map(|txn| txn.hash())
+                    .collect::<Vec<_>>(),
+                batch,
+            )?;
+
+        let transactions = (start_version..=start_version + transactions.len() as u64 - 1)
+            .zip(transactions)
+            .collect::<Vec<_>>();
+        transaction_store.prune_transaction_by_account(&transactions, batch)?;
     }
 
     Ok(())
