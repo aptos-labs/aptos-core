@@ -149,6 +149,20 @@ The first argument is the project, and the second one is the target directory.
 
 > Verify your testcase runs as expected by appending `DEBUG=1` while calling the fuzzer and using the newly generated test case as the second parameter.
 
+#### Bulk Build
+Use `./fuzz.sh block-builder generate_runnable_states_recursive data/0x1/ fuzz/corpus/move_aptosvm_publish_and_run` to compile all the modules under a specific directory.
+
+#### Steps (internal)
+The following steps apply to wathever seed we might want to make available, remember to add the public link at the begin of `fuzz.sh`.
+1. `gcloud auth login`
+2. `gcloud storage cp gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus.zip`
+3. `unzip move_aptosvm_publish_and_run_seed_corpus.zip -d move_aptosvm_publish_and_run_seed_corpus`
+4. `./fuzz.sh block-builder generate_runnable_states_recursive data/0x1/ move_aptosvm_publish_and_run_seed_corpus`
+5. Normally we would run cmin but we assume that manually created inputs are fine and serve a specific purse.
+6. `zip -r move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus`
+7. `gsutil storage cp move_aptosvm_publish_and_run_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip`
+8. We need to restore ACL (public URL remain the same): `gsutil storage acl ch -u AllUsers:R gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip`
+
 ## Debug Crashes
 Flamegraph and GDB are integrated into fuzz.sh for advanced metrics and debugging. A more rudimentary option is also available: since we have symbolized binaries, we can directly use the stack trace produced by the fuzzer. However, for INVARIANT_VIOLATIONS, the stack trace is incorrect. To obtain the correct stack trace, you can use the following command:
 ```bash
