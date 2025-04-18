@@ -29,7 +29,6 @@ Nonce: <aptos_txn_digest>
 -  [Function `deserialize_abstract_signature`](#0x1_solana_derivable_account_deserialize_abstract_signature)
 -  [Function `construct_message`](#0x1_solana_derivable_account_construct_message)
 -  [Function `to_public_key_bytes`](#0x1_solana_derivable_account_to_public_key_bytes)
--  [Function `entry_function_name`](#0x1_solana_derivable_account_entry_function_name)
 -  [Function `authenticate_auth_data`](#0x1_solana_derivable_account_authenticate_auth_data)
 -  [Function `authenticate`](#0x1_solana_derivable_account_authenticate)
 -  [Specification](#@Specification_1)
@@ -357,44 +356,6 @@ Returns a tuple of the signature type and the signature.
 
 </details>
 
-<a id="0x1_solana_derivable_account_entry_function_name"></a>
-
-## Function `entry_function_name`
-
-
-
-<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_entry_function_name">entry_function_name</a>(entry_function_payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="solana_derivable_account.md#0x1_solana_derivable_account_entry_function_name">entry_function_name</a>(entry_function_payload: &EntryFunctionPayload): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> entry_function_name = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <b>let</b> addr_str = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(
-        &<a href="transaction_context.md#0x1_transaction_context_account_address">transaction_context::account_address</a>(entry_function_payload)
-    ).bytes();
-    // .slice(1) <b>to</b> remove the leading '@' char
-    entry_function_name.append(addr_str.slice(1, addr_str.length()));
-    entry_function_name.append(b"::");
-    entry_function_name.append(
-        *<a href="transaction_context.md#0x1_transaction_context_module_name">transaction_context::module_name</a>(entry_function_payload).bytes()
-    );
-    entry_function_name.append(b"::");
-    entry_function_name.append(
-        *<a href="transaction_context.md#0x1_transaction_context_function_name">transaction_context::function_name</a>(entry_function_payload).bytes()
-    );
-    *entry_function_name
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_solana_derivable_account_authenticate_auth_data"></a>
 
 ## Function `authenticate_auth_data`
@@ -464,7 +425,7 @@ Authorization function for domain account abstraction.
     <b>let</b> maybe_entry_function_payload = <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">transaction_context::entry_function_payload</a>();
     <b>if</b> (maybe_entry_function_payload.is_some()) {
         <b>let</b> entry_function_payload = maybe_entry_function_payload.destroy_some();
-        <b>let</b> entry_function_name = <a href="solana_derivable_account.md#0x1_solana_derivable_account_entry_function_name">entry_function_name</a>(&entry_function_payload);
+        <b>let</b> entry_function_name = entry_function_name(&entry_function_payload);
         <a href="solana_derivable_account.md#0x1_solana_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data, &entry_function_name);
         <a href="account.md#0x1_account">account</a>
     } <b>else</b> {
