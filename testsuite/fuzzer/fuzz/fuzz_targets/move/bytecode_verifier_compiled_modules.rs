@@ -26,7 +26,7 @@ fuzz_target!(|fuzz_data: RunnableState| -> Corpus {
 
     for m in fuzz_data.dep_modules.iter() {
         if let Err(e) = move_bytecode_verifier::verify_module_with_config(&verifier_config, m) {
-            //check_for_invariant_violation_vmerror(e);
+            check_for_invariant_violation_vmerror(e);
             return Corpus::Keep;
         }
     }
