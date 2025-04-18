@@ -1566,7 +1566,7 @@ Unlock any vested portion of the grant.
         next_period_to_vest = next_period_to_vest + 1;
     };
 
-    <b>if</b>(last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount != 0) {
+    <b>if</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount != 0) {
         <b>let</b> final_fraction = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1);
         <b>let</b> final_fraction_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(vesting_record.init_amount, final_fraction);
         // Determine how many periods is needed based on the left_amount

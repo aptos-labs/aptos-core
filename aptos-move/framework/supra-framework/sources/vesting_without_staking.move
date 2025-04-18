@@ -608,7 +608,7 @@ module supra_framework::vesting_without_staking {
             next_period_to_vest = next_period_to_vest + 1;
         };
 
-        if(last_completed_period >= next_period_to_vest && vesting_record.left_amount != 0) {
+        if (last_completed_period >= next_period_to_vest && vesting_record.left_amount != 0) {
             let final_fraction = *vector::borrow(schedule, vector::length(schedule) - 1);
             let final_fraction_amount = fixed_point32::multiply_u64(vesting_record.init_amount, final_fraction);
             // Determine how many periods is needed based on the left_amount

@@ -35,7 +35,6 @@ pub fn native_verify_proof_eth_trie(
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-
     context.charge(ETH_TRIE_PROOF_BASE)?;
 
     let proof: Vec<Vec<u8>> = safely_pop_vec_arg!(arguments, Vec<u8>);
