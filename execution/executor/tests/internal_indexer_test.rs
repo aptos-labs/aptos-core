@@ -321,6 +321,7 @@ fn test_db_indexer_data() {
         ident_str!("validator_consensus_info"),
         ident_str!("ristretto255_bulletproofs"),
         ident_str!("dispatchable_fungible_asset"),
+        ident_str!("ethereum_derivable_account"),
     ]
     .into_iter()
     .map(|module| StateKey::module(&AccountAddress::ONE, module))
