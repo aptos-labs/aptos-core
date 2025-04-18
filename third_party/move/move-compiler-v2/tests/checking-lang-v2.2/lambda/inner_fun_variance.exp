@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot pass `&vector<|u64|u64 with drop>` to a function which expects argument of type `&vector<|u64|u64>`
+  ┌─ tests/checking-lang-v2.2/lambda/inner_fun_variance.move:8:13
+  │
+8 │         zzz(&b);
+  │             ^^
