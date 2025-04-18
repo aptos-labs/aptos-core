@@ -4,6 +4,9 @@ All notable changes to the Aptos Protos will be captured in this file. This chan
 
 ## Unreleased
 
+## 1.1.4
+- Regenerated code with latest protos compatible with aptos-indexer-grpc-v1.9.
+
 ## 1.1.3
 - Regenerated code with latest codegen tooling.
 

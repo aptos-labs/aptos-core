@@ -12,7 +12,7 @@ from google.protobuf.internal import containers as _containers
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class TransactionsInStorage(_message.Message):
-    __slots__ = ["transactions", "starting_version"]
+    __slots__ = ("transactions", "starting_version")
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     transactions: _containers.RepeatedCompositeFieldContainer[
@@ -28,7 +28,7 @@ class TransactionsInStorage(_message.Message):
     ) -> None: ...
 
 class GetTransactionsRequest(_message.Message):
-    __slots__ = ["starting_version", "transactions_count", "batch_size"]
+    __slots__ = ("starting_version", "transactions_count", "batch_size")
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     TRANSACTIONS_COUNT_FIELD_NUMBER: _ClassVar[int]
     BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
@@ -43,7 +43,7 @@ class GetTransactionsRequest(_message.Message):
     ) -> None: ...
 
 class TransactionsResponse(_message.Message):
-    __slots__ = ["transactions", "chain_id"]
+    __slots__ = ("transactions", "chain_id")
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     transactions: _containers.RepeatedCompositeFieldContainer[
