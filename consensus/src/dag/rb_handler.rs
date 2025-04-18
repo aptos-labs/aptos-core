@@ -123,7 +123,7 @@ impl NodeBroadcastHandler {
             ensure!(
                 is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                 "unexpected validator transaction: {:?}",
-                vtxn.topic()
+                vtxn.type_name()
             );
         }
         let vtxn_total_bytes = node

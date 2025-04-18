@@ -4,7 +4,7 @@
 #![allow(clippy::match_result_ok)]
 
 use crate::{
-    jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
+    jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK, KID},
     move_any::{Any as MoveAny, AsMoveAny},
     move_utils::as_move_value::AsMoveValue,
 };
@@ -57,7 +57,7 @@ pub enum JWK {
 }
 
 impl JWK {
-    pub fn id(&self) -> Vec<u8> {
+    pub fn id(&self) -> KID {
         match self {
             JWK::RSA(rsa) => rsa.id(),
             JWK::Unsupported(unsupported) => unsupported.id(),

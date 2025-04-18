@@ -143,6 +143,7 @@ pub enum FeatureFlag {
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
     DefaultAccountResource,
+    JwkConsensusPerKeyMode,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -381,6 +382,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
             },
             FeatureFlag::DefaultAccountResource => AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            FeatureFlag::JwkConsensusPerKeyMode => AptosFeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
         }
     }
 }
@@ -546,6 +548,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::NewAccountsDefaultToFaStore
             },
             AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE => FeatureFlag::DefaultAccountResource,
+            AptosFeatureFlag::JWK_CONSENSUS_PER_KEY_MODE => FeatureFlag::JwkConsensusPerKeyMode,
         }
     }
 }
