@@ -20,6 +20,7 @@
 /// - Metamask
 module aptos_framework::ethereum_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
+    use aptos_framework::common_account_abstractions_utils::network_name;
     use aptos_std::secp256k1;
     use aptos_std::option;
     use aptos_std::aptos_hash;
@@ -74,22 +75,6 @@ module aptos_framework::ethereum_derivable_account {
             SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
-        }
-    }
-
-    fun network_name(): vector<u8> {
-        let chain_id = chain_id::get();
-        if (chain_id == 1) {
-            b"mainnet"
-        } else if (chain_id == 2) {
-            b"testnet"
-        } else if (chain_id == 4) {
-            b"local"
-        } else {
-            let network_name = &mut vector[];
-            network_name.append(b"custom network: ");
-            network_name.append(*string_utils::to_string(&chain_id).bytes());
-            *network_name
         }
     }
 
@@ -213,8 +198,8 @@ module aptos_framework::ethereum_derivable_account {
         aa_auth_data: AbstractionAuthData,
         entry_function_name: &vector<u8>
     ) {
-        let abstract_public_key = aa_auth_data.derivable_abstract_public_key();
-        let abstract_public_key = deserialize_abstract_public_key(abstract_public_key);
+        let derivable_abstract_public_key = aa_auth_data.derivable_abstract_public_key();
+        let abstract_public_key = deserialize_abstract_public_key(derivable_abstract_public_key);
         let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
         let issued_at = abstract_signature.issued_at.bytes();
