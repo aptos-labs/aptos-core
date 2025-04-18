@@ -1,20 +1,21 @@
 #[test_only]
-module aptos_framework::confidential_asset_tests {
+module aptos_experimental::confidential_asset_tests {
     use std::features;
     use std::option;
     use std::signer;
     use std::string::utf8;
     use aptos_std::ristretto255::Scalar;
-    use aptos_std::ristretto255_twisted_elgamal::{Self as twisted_elgamal, generate_twisted_elgamal_keypair};
     use aptos_framework::account;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::confidential_asset;
-    use aptos_framework::confidential_balance;
-    use aptos_framework::confidential_proof;
     use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
+
+    use aptos_experimental::confidential_asset;
+    use aptos_experimental::confidential_balance;
+    use aptos_experimental::confidential_proof;
+    use aptos_experimental::ristretto255_twisted_elgamal::{Self as twisted_elgamal, generate_twisted_elgamal_keypair};
 
     struct MockCoin {}
 
@@ -214,6 +215,7 @@ module aptos_framework::confidential_asset_tests {
     }
 
     public fun set_up_for_confidential_asset_test(
+        confidential_asset: &signer,
         aptos_fx: &signer,
         fa: &signer,
         sender: &signer,
@@ -240,7 +242,7 @@ module aptos_framework::confidential_asset_tests {
         assert!(signer::address_of(aptos_fx) != signer::address_of(sender), 1);
         assert!(signer::address_of(aptos_fx) != signer::address_of(recipient), 2);
 
-        confidential_asset::init_module_for_testing(aptos_fx);
+        confidential_asset::init_module_for_testing(confidential_asset);
 
         features::change_feature_flags_for_testing(aptos_fx, vector[features::get_bulletproofs_feature()], vector[]);
 
@@ -256,18 +258,20 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
         bob = @0xb0
     )]
     fun success_deposit_test(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
         bob: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &bob, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500);
 
         let alice_addr = signer::address_of(&alice);
         let bob_addr = signer::address_of(&bob);
@@ -287,18 +291,20 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
         bob = @0xb0
     )]
     fun success_withdraw_test(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
         bob: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &bob, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500);
 
         let alice_addr = signer::address_of(&alice);
         let bob_addr = signer::address_of(&bob);
@@ -322,18 +328,20 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
         bob = @0xb0
     )]
     fun success_transfer_test(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
         bob: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &bob, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500);
 
         let alice_addr = signer::address_of(&alice);
         let bob_addr = signer::address_of(&bob);
@@ -359,18 +367,20 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
         bob = @0xb0
     )]
     fun success_audit_transfer_test(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
         bob: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &bob, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500);
 
         let alice_addr = signer::address_of(&alice);
         let bob_addr = signer::address_of(&bob);
@@ -408,6 +418,7 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
@@ -415,12 +426,13 @@ module aptos_framework::confidential_asset_tests {
     )]
     #[expected_failure(abort_code = 0x010006, location = confidential_asset)]
     fun fail_audit_transfer_if_wrong_auditor_list(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
         bob: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &bob, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500);
 
         let bob_addr = signer::address_of(&bob);
 
@@ -454,18 +466,20 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
         bob = @0xb0
     )]
     fun success_rotate(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
         bob: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &bob, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500);
 
         let alice_addr = signer::address_of(&alice);
         let bob_addr = signer::address_of(&bob);
@@ -488,12 +502,14 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1,
         bob = @0xb0
     )]
     fun success_normalize(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer,
@@ -501,6 +517,7 @@ module aptos_framework::confidential_asset_tests {
     {
         let max_chunk_value = 1 << 16 - 1;
         let token = set_up_for_confidential_asset_test(
+            &confidential_asset,
             &aptos_fx,
             &fa,
             &alice,
@@ -534,17 +551,19 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1
     )]
     #[expected_failure(abort_code = 0x01000D, location = confidential_asset)]
     fun fail_register_if_token_disallowed(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &alice, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &alice, 500, 500);
 
         confidential_asset::enable_allow_list(&aptos_fx);
 
@@ -554,16 +573,18 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         fa = @0xfa,
         alice = @0xa1
     )]
     fun success_register_if_token_allowed(
+        confidential_asset: signer,
         aptos_fx: signer,
         fa: signer,
         alice: signer)
     {
-        let token = set_up_for_confidential_asset_test(&aptos_fx, &fa, &alice, &alice, 500, 500);
+        let token = set_up_for_confidential_asset_test(&confidential_asset, &aptos_fx, &fa, &alice, &alice, 500, 500);
 
         confidential_asset::enable_allow_list(&aptos_fx);
         confidential_asset::enable_token(&aptos_fx, token);
@@ -574,22 +595,24 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         alice = @0xa1
     )]
     #[expected_failure(abort_code = 0x010004, location = fungible_asset)]
     fun fail_deposit_with_coins_if_insufficient_amount(
+        confidential_asset: signer,
         aptos_fx: signer,
         alice: signer)
     {
         chain_id::initialize_for_test(&aptos_fx, 4);
-        confidential_asset::init_module_for_testing(&aptos_fx);
+        confidential_asset::init_module_for_testing(&confidential_asset);
         coin::create_coin_conversion_map(&aptos_fx);
 
         let alice_addr = signer::address_of(&alice);
 
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<MockCoin>(
-            &aptos_fx, utf8(b"MockCoin"), utf8(b"MC"), 0, false);
+            &confidential_asset, utf8(b"MockCoin"), utf8(b"MC"), 0, false);
 
         let coin_amount = coin::mint(100, &mint_cap);
         coin::destroy_burn_cap(burn_cap);
@@ -611,21 +634,23 @@ module aptos_framework::confidential_asset_tests {
     }
 
     #[test(
+        confidential_asset = @aptos_experimental,
         aptos_fx = @aptos_framework,
         alice = @0xa1,
     )]
     fun success_deposit_with_coins(
+        confidential_asset: signer,
         aptos_fx: signer,
         alice: signer)
     {
         chain_id::initialize_for_test(&aptos_fx, 4);
-        confidential_asset::init_module_for_testing(&aptos_fx);
+        confidential_asset::init_module_for_testing(&confidential_asset);
         coin::create_coin_conversion_map(&aptos_fx);
 
         let alice_addr = signer::address_of(&alice);
 
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<MockCoin>(
-            &aptos_fx, utf8(b"MockCoin"), utf8(b"MC"), 0, false);
+            &confidential_asset, utf8(b"MockCoin"), utf8(b"MC"), 0, false);
 
         let coin_amount = coin::mint(100, &mint_cap);
         coin::destroy_burn_cap(burn_cap);

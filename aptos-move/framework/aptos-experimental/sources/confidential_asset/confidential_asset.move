@@ -1,6 +1,6 @@
 /// This module implements the Confidential Asset (CA) Standard, a privacy-focused protocol for managing fungible assets (FA).
 /// It enables private transfers by obfuscating token amounts while keeping sender and recipient addresses visible.
-module aptos_framework::confidential_asset {
+module aptos_experimental::confidential_asset {
     use std::bcs;
     use std::error;
     use std::option::Option;
@@ -8,19 +8,20 @@ module aptos_framework::confidential_asset {
     use std::vector;
     use aptos_std::ristretto255::Self;
     use aptos_std::ristretto255_bulletproofs::Self as bulletproofs;
-    use aptos_std::ristretto255_twisted_elgamal as twisted_elgamal;
     use aptos_std::string_utils;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::confidential_balance;
-    use aptos_framework::confidential_proof::{
-        Self, NormalizationProof, RotationProof, TransferProof, WithdrawalProof
-    };
     use aptos_framework::event;
     use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::object::{Self, ExtendRef, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
+
+    use aptos_experimental::confidential_balance;
+    use aptos_experimental::confidential_proof::{
+        Self, NormalizationProof, RotationProof, TransferProof, WithdrawalProof
+    };
+    use aptos_experimental::ristretto255_twisted_elgamal as twisted_elgamal;
 
     #[test_only]
     use aptos_std::ristretto255::Scalar;
@@ -434,7 +435,7 @@ module aptos_framework::confidential_asset {
     public fun enable_allow_list(aptos_framework: &signer) acquires FAController {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let fa_controller = borrow_global_mut<FAController>(@aptos_framework);
+        let fa_controller = borrow_global_mut<FAController>(@aptos_experimental);
 
         assert!(!fa_controller.allow_list_enabled, error::invalid_state(EALLOW_LIST_ENABLED));
 
@@ -445,7 +446,7 @@ module aptos_framework::confidential_asset {
     public fun disable_allow_list(aptos_framework: &signer) acquires FAController {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let fa_controller = borrow_global_mut<FAController>(@aptos_framework);
+        let fa_controller = borrow_global_mut<FAController>(@aptos_experimental);
 
         assert!(fa_controller.allow_list_enabled, error::invalid_state(EALLOW_LIST_DISABLED));
 
@@ -524,7 +525,7 @@ module aptos_framework::confidential_asset {
     /// If the allow list is enabled, only tokens from the allow list can be transferred.
     /// Otherwise, all tokens are allowed.
     public fun is_allow_list_enabled(): bool acquires FAController {
-        borrow_global<FAController>(@aptos_framework).allow_list_enabled
+        borrow_global<FAController>(@aptos_experimental).allow_list_enabled
     }
 
     #[view]
@@ -889,12 +890,12 @@ module aptos_framework::confidential_asset {
 
     /// Returns an object for handling all the FA primary stores, and returns a signer for it.
     fun get_fa_store_signer(): signer acquires FAController {
-        object::generate_signer_for_extending(&borrow_global<FAController>(@aptos_framework).extend_ref)
+        object::generate_signer_for_extending(&borrow_global<FAController>(@aptos_experimental).extend_ref)
     }
 
     /// Returns the address that handles all the FA primary stores.
     fun get_fa_store_address(): address acquires FAController {
-        object::address_from_extend_ref(&borrow_global<FAController>(@aptos_framework).extend_ref)
+        object::address_from_extend_ref(&borrow_global<FAController>(@aptos_experimental).extend_ref)
     }
 
     /// Returns an object for handling the `ConfidentialAssetStore` and returns a signer for it.
@@ -911,7 +912,7 @@ module aptos_framework::confidential_asset {
 
     /// Returns an object for handling the `FAConfig`, and returns a signer for it.
     fun get_fa_config_signer(token: Object<Metadata>): signer acquires FAController {
-        let fa_ext = &borrow_global<FAController>(@aptos_framework).extend_ref;
+        let fa_ext = &borrow_global<FAController>(@aptos_experimental).extend_ref;
         let fa_ext_signer = object::generate_signer_for_extending(fa_ext);
 
         let fa_ctor = &object::create_named_object(&fa_ext_signer, construct_fa_seed(token));
@@ -921,7 +922,7 @@ module aptos_framework::confidential_asset {
 
     /// Returns the address that handles primary FA store and `FAConfig` objects for the specified token.
     fun get_fa_config_address(token: Object<Metadata>): address acquires FAController {
-        let fa_ext = &borrow_global<FAController>(@aptos_framework).extend_ref;
+        let fa_ext = &borrow_global<FAController>(@aptos_experimental).extend_ref;
         let fa_ext_address = object::address_from_extend_ref(fa_ext);
 
         object::create_object_address(&fa_ext_address, construct_fa_seed(token))
@@ -933,7 +934,7 @@ module aptos_framework::confidential_asset {
         bcs::to_bytes(
             &string_utils::format2(
                 &b"confidential_asset::{}::token::{}::user",
-                @aptos_framework,
+                @aptos_experimental,
                 object::object_address(&token)
             )
         )
@@ -945,7 +946,7 @@ module aptos_framework::confidential_asset {
         bcs::to_bytes(
             &string_utils::format2(
                 &b"confidential_asset::{}::token::{}::fa",
-                @aptos_framework,
+                @aptos_experimental,
                 object::object_address(&token)
             )
         )

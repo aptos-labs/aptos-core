@@ -1,8 +1,8 @@
 #[test_only]
-module aptos_framework::confidential_proof_tests {
-    use aptos_std::ristretto255_twisted_elgamal::{Self as twisted_elgamal, generate_twisted_elgamal_keypair};
-    use aptos_framework::confidential_balance;
-    use aptos_framework::confidential_proof;
+module aptos_experimental::confidential_proof_tests {
+    use aptos_experimental::confidential_balance;
+    use aptos_experimental::confidential_proof;
+    use aptos_experimental::ristretto255_twisted_elgamal::{Self as twisted_elgamal, generate_twisted_elgamal_keypair};
 
     struct WithdrawParameters has drop {
         ek: twisted_elgamal::CompressedPubkey,

@@ -9,7 +9,7 @@
 /// flexibility and functionality in cryptographic protocols. This design still maintains the homomorphic property:
 /// `Enc_Y(v, r) + Enc_Y(v', r') = Enc_Y(v + v', r + r')`, where `v, v'` are plaintexts, `Y` is the public key, 
 /// and `r, r'` are random scalars.
-module aptos_std::ristretto255_twisted_elgamal {
+module aptos_experimental::ristretto255_twisted_elgamal {
     use std::option::Option;
     use aptos_std::ristretto255::{Self, CompressedRistretto, RistrettoPoint, Scalar};
 
