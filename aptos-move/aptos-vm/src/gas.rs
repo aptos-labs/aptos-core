@@ -129,7 +129,6 @@ pub(crate) fn check_gas(
         .calculate_intrinsic_gas(raw_bytes_len)
         .evaluate(gas_feature_version, &gas_params.vm);
     let total_rounded: Gas = (intrinsic_gas + keyless).to_unit_round_up_with_params(txn_gas_params);
-
     if txn_metadata.max_gas_amount() < total_rounded {
         speculative_warn!(
             log_context,
@@ -198,14 +197,18 @@ pub(crate) fn check_gas(
             .hack_estimated_fee_for_account_creation(txn_gas_params)
             .into();
 
-        let expected = gas_unit_price * 10 + 2 * storage_fee_per_account_create;
+        let expected = gas_unit_price * 10
+            + if features.is_new_account_default_to_fa_store() {
+                1
+            } else {
+                2
+            } * storage_fee_per_account_create;
         let actual = gas_unit_price * max_gas_amount;
-
         if actual < expected {
             speculative_warn!(
                 log_context,
                 format!(
-                    "[VM] Insufficient gas for sponsored transaction; min {}, submitted {}",
+                    "[VM] Insufficient gas for account creation; min {}, submitted {}",
                     expected, actual,
                 ),
             );

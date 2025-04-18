@@ -50,17 +50,17 @@ fn test_basic_fungible_token() {
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
-        .insert("example_addr".to_string(), *alice.address());
+        .insert("example_addr".to_string(), *root.address());
 
     let result = h.publish_package_with_options(
-        &alice,
+        &root,
         &common::test_dir_path("../../../move-examples/fungible_asset/managed_fungible_asset"),
         build_options.clone(),
     );
 
     assert_success!(result);
     let result = h.publish_package_with_options(
-        &alice,
+        &root,
         &common::test_dir_path("../../../move-examples/fungible_asset/managed_fungible_token"),
         build_options,
     );
@@ -81,7 +81,7 @@ fn test_basic_fungible_token() {
         .execute_view_function(
             str::parse(&format!(
                 "0x{}::managed_fungible_token::get_metadata",
-                (*alice.address()).to_hex()
+                (*root.address()).to_hex()
             ))
             .unwrap(),
             vec![],
@@ -94,10 +94,10 @@ fn test_basic_fungible_token() {
     let metadata = bcs::from_bytes::<AccountAddress>(metadata.as_slice()).unwrap();
 
     let result = h.run_entry_function(
-        &alice,
+        &root,
         str::parse(&format!(
             "0x{}::managed_fungible_asset::mint_to_primary_stores",
-            (*alice.address()).to_hex()
+            (*root.address()).to_hex()
         ))
         .unwrap(),
         vec![],
@@ -110,10 +110,10 @@ fn test_basic_fungible_token() {
     assert_success!(result);
 
     let result = h.run_entry_function(
-        &alice,
+        &root,
         str::parse(&format!(
             "0x{}::managed_fungible_asset::transfer_between_primary_stores",
-            (*alice.address()).to_hex()
+            (*root.address()).to_hex()
         ))
         .unwrap(),
         vec![],
@@ -127,10 +127,10 @@ fn test_basic_fungible_token() {
 
     assert_success!(result);
     let result = h.run_entry_function(
-        &alice,
+        &root,
         str::parse(&format!(
             "0x{}::managed_fungible_asset::burn_from_primary_stores",
-            (*alice.address()).to_hex()
+            (*root.address()).to_hex()
         ))
         .unwrap(),
         vec![],
@@ -143,7 +143,7 @@ fn test_basic_fungible_token() {
     assert_success!(result);
 
     let token_addr = account_address::create_token_address(
-        *alice.address(),
+        *root.address(),
         "test collection name",
         "test token name",
     );
@@ -179,7 +179,12 @@ fn test_basic_fungible_token() {
 // A simple test to verify gas paying still work for prologue and epilogue.
 #[test]
 fn test_coin_to_fungible_asset_migration() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
+    ]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let alice_primary_store_addr =

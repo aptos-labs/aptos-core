@@ -19,13 +19,13 @@ TokenV1MintAndTransferNFTSequential	61	0.927	1.104	1099.5
 TokenV2AmbassadorMint { numbered: true }	61	0.950	1.045	642.8
 LiquidityPoolSwap { is_stable: true }	61	0.929	1.035	902.4
 LiquidityPoolSwap { is_stable: false }	61	0.926	1.034	849.9
-CoinInitAndMint	61	0.952	1.087	722.9
+CoinInitAndMint	61	0.952	1.087	981.8
 FungibleAssetMint	61	0.942	1.050	326.1
 IncGlobalMilestoneAggV2 { milestone_every: 1 }	61	0.919	1.054	41.7
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	61	0.920	1.116	25.2
 EmitEvents { count: 1000 }	61	0.951	1.065	8023.6
-APTTransferWithPermissionedSigner	61	0.942	1.190	1424.8
-APTTransferWithMasterSigner	61	0.931	1.087	224.8
+APTTransferWithPermissionedSigner	61	0.942	1.190	1180.9
+APTTransferWithMasterSigner	61	0.931	1.087	124.1
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	61	0.936	1.057	6714.5
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	61	0.930	1.313	28508.1
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	61	0.959	1.051	16335.1
