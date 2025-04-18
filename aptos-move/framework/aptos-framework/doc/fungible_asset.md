@@ -4427,7 +4427,7 @@ Removing permissions from permissioned signer.
 
 
 <pre><code>#[deprecated]
-<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(_permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
 </code></pre>
 
 
@@ -4436,7 +4436,7 @@ Removing permissions from permissioned signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(_permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;) {
     <b>abort</b> 0
 }
 </code></pre>
