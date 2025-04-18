@@ -430,6 +430,36 @@ Not enough coins to complete transaction.
 
 
 
+<a id="0x7_veiled_coin_EINTERNAL_ERROR"></a>
+
+Non-specific internal error (see source code)
+
+
+<pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_EINTERNAL_ERROR">EINTERNAL_ERROR</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x7_veiled_coin_ERANGE_PROOF_VERIFICATION_FAILED"></a>
+
+A range proof failed to verify.
+
+
+<pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_ERANGE_PROOF_VERIFICATION_FAILED">ERANGE_PROOF_VERIFICATION_FAILED</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x7_veiled_coin_ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE"></a>
+
+The range proof system does not support proofs for any number \in [0, 2^{32})
+
+
+<pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE">ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x7_veiled_coin_EBYTES_WRONG_LENGTH"></a>
 
 Byte vector given for deserialization was the wrong length.
@@ -446,36 +476,6 @@ Failed deserializing bytes into either ElGamal ciphertext or $\Sigma$-protocol p
 
 
 <pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_EDESERIALIZATION_FAILED">EDESERIALIZATION_FAILED</a>: u64 = 6;
-</code></pre>
-
-
-
-<a id="0x7_veiled_coin_EINTERNAL_ERROR"></a>
-
-Non-specific internal error (see source code)
-
-
-<pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_EINTERNAL_ERROR">EINTERNAL_ERROR</a>: u64 = 9;
-</code></pre>
-
-
-
-<a id="0x7_veiled_coin_ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE"></a>
-
-The range proof system does not support proofs for any number \in [0, 2^{32})
-
-
-<pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE">ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x7_veiled_coin_ERANGE_PROOF_VERIFICATION_FAILED"></a>
-
-A range proof failed to verify.
-
-
-<pre><code><b>const</b> <a href="veiled_coin.md#0x7_veiled_coin_ERANGE_PROOF_VERIFICATION_FAILED">ERANGE_PROOF_VERIFICATION_FAILED</a>: u64 = 2;
 </code></pre>
 
 
