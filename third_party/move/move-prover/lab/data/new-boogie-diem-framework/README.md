@@ -1,6 +1,6 @@
 # Benchmarking current vs alternative version of Boogie
 
-To examine the performance regression, this compares the current version of Boogie with a an alternative, newer one.
+To examine the performance regression, this compares the current version of Boogie with an alternative, newer one.
 
 - The `current_boogie` benchmark uses Boogie 2.15.8.
 - The `new_boogie:` benchmark uses Boogie 2.16.9.

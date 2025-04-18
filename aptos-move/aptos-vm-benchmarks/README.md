@@ -51,7 +51,7 @@ cargo run -p aptos -- move init --name proj-name
 
 ## Examples
 
-Two basics examples are included under the `/samples` directory to demonstrate how the 
+Two basic examples are included under the `/samples` directory to demonstrate how the 
 crate works: `/samples/add-numbers` and `/samples/do-nothing`. The `do-nothing` package 
 demonstrates basic usage, as well as situations where the benchmark script will complain.
 

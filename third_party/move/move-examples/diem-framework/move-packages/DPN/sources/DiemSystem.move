@@ -225,7 +225,7 @@ module DiemFramework::DiemSystem {
         validator_addr: address;
         /// DIP-6 property: validator has validator role. The code does not check this explicitly,
         /// but it is implied by the `assert ValidatorConfig::is_valid`, since there
-        /// is an invariant (in ValidatorConfig) that a an address with a published ValidatorConfig has
+        /// is an invariant (in ValidatorConfig) that an address with a published ValidatorConfig has
         /// a ValidatorRole
         ensures Roles::spec_has_validator_role_addr(validator_addr);
         ensures ValidatorConfig::is_valid(validator_addr);
