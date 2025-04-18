@@ -284,7 +284,10 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
 mod test {
     use super::*;
     use crate::{
-        proptest_types::types::{KeyType, MockEvent, MockTransaction},
+        proptest_types::{
+            mock_executor::MockEvent,
+            types::{KeyType, MockTransaction},
+        },
         types::InputOutputKey,
     };
     use std::collections::HashSet;

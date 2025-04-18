@@ -7,9 +7,9 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
+        mock_executor::{MockEvent, MockOutput, MockTask},
         types::{
-            KeyType, MockEvent, MockOutput, MockTask, MockTransaction, TransactionGen,
-            TransactionGenParams, MAX_GAS_PER_TXN,
+            KeyType, MockTransaction, TransactionGen, TransactionGenParams, MAX_GAS_PER_TXN,
         },
     },
     task::ExecutorTask,

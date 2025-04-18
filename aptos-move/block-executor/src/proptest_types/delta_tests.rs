@@ -5,9 +5,10 @@
 use crate::{
     proptest_types::{
         baseline::BaselineOutput,
+        mock_executor::{MockEvent, MockTask},
         resource_tests::{create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants, generate_universe_and_transactions},
         types::{
-            DeltaDataView, KeyType, MockEvent, MockTask, MockTransaction, 
+            DeltaDataView, KeyType, MockTransaction, 
         },
     },
     task::ExecutorTask,
