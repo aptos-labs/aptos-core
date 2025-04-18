@@ -28,7 +28,7 @@ use aptos_types::{
 use aptos_vm_environment::gas::get_gas_feature_version;
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView, UnknownOrLayout,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -108,7 +108,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             let key = StateKey::resource_group(address, &resource_group);
             let buf =
                 self.resource_group_view
-                    .get_resource_from_group(&key, struct_tag, maybe_layout)?;
+                    .get_resource_from_group(&key, struct_tag, UnknownOrLayout::Known(maybe_layout))?;
 
             let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
             let group_size = if first_access {
@@ -123,7 +123,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             let state_key = resource_state_key(address, struct_tag)?;
             let buf = self
                 .executor_view
-                .get_resource_bytes(&state_key, maybe_layout)?;
+                .get_resource_bytes(&state_key, UnknownOrLayout::Known(maybe_layout))?;
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size))
         }
@@ -183,7 +183,7 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
     ) -> Result<Option<Bytes>, PartialVMError> {
         let state_key = StateKey::table_item(&(*handle).into(), key);
         self.executor_view
-            .get_resource_bytes(&state_key, maybe_layout)
+            .get_resource_bytes(&state_key, UnknownOrLayout::Known(maybe_layout))
     }
 }
 
@@ -254,7 +254,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
     fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
         self.executor_view
-            .get_resource_bytes(state_key, None)
+            .get_resource_bytes(state_key, UnknownOrLayout::Known(None))
             .ok()?
     }
 }
