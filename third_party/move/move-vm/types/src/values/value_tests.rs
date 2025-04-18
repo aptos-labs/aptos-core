@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
+use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::*};
 use claims::{assert_err, assert_ok};
 use move_binary_format::errors::*;
 use move_core_types::{account_address::AccountAddress, u256::U256};
@@ -140,89 +140,6 @@ fn global_value_non_struct() -> PartialVMResult<()> {
 }
 
 #[test]
-fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let mut locals = Locals::new(10);
-
-    locals.store_loc(0, Value::u128(0), false)?;
-    let r = locals.borrow_loc(0)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    locals.store_loc(1, Value::vector_u8([1, 2, 3]), false)?;
-    let r = locals.borrow_loc(1)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    // Actual limits for type builder are irrelevant for the test.
-    let u8_ty = TypeBuilder::with_limits(10, 10).create_u8_ty();
-
-    let r: VectorRef = r.value_as()?;
-    let r = r.borrow_elem(0, &u8_ty)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    locals.store_loc(2, Value::struct_(Struct::pack([])), false)?;
-    let r: Reference = locals.borrow_loc(2)?.value_as()?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    Ok(())
-}
-
-#[test]
-fn legacy_struct_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let structs = [
-        Struct::pack([]),
-        Struct::pack([Value::struct_(Struct::pack([Value::u8(0), Value::u64(0)]))]),
-    ];
-
-    for s in &structs {
-        assert_eq!(s.legacy_abstract_memory_size(), s.legacy_size());
-    }
-
-    Ok(())
-}
-
-#[test]
-fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let vals = [
-        Value::u8(0),
-        Value::u16(0),
-        Value::u32(0),
-        Value::u64(0),
-        Value::u128(0),
-        Value::u256(U256::zero()),
-        Value::bool(true),
-        Value::address(AccountAddress::ZERO),
-        Value::vector_u8([0, 1, 2]),
-        Value::vector_u16([0, 1, 2]),
-        Value::vector_u32([0, 1, 2]),
-        Value::vector_u64([]),
-        Value::vector_u128([1, 2, 3, 4]),
-        Value::vector_u256([1, 2, 3, 4].iter().map(|q| U256::from(*q as u64))),
-        Value::struct_(Struct::pack([])),
-        Value::struct_(Struct::pack([Value::u8(0), Value::bool(false)])),
-        Value::vector_for_testing_only([]),
-        Value::vector_for_testing_only([Value::u8(0), Value::u8(1)]),
-    ];
-
-    let mut locals = Locals::new(vals.len());
-    for (idx, val) in vals.into_iter().enumerate() {
-        let val_size_new = val.legacy_abstract_memory_size();
-        let val_size_old = val.legacy_size();
-        assert_eq!(val_size_new, val_size_old);
-
-        locals.store_loc(idx, val, false)?;
-
-        let val_size_through_ref = locals
-            .borrow_loc(idx)?
-            .value_as::<Reference>()?
-            .value_view()
-            .legacy_abstract_memory_size();
-
-        assert_eq!(val_size_through_ref, val_size_old)
-    }
-
-    Ok(())
-}
-
-#[test]
 fn test_vm_value_vector_u64_casting() {
     assert_eq!(
         vec![1, 2, 3],
@@ -255,24 +172,16 @@ fn test_mem_swap() -> PartialVMResult<()> {
     locals.store_loc(11, Value::master_signer(AccountAddress::ONE), false)?;
 
     // -- Container of vector
-    locals.store_loc(
-        12,
-        Value::vector_for_testing_only(vec![Value::u64(1u64), Value::u64(2u64)]),
-        false,
-    )?;
-    locals.store_loc(
-        13,
-        Value::vector_for_testing_only(vec![Value::u64(3u64), Value::u64(4u64)]),
-        false,
-    )?;
+    locals.store_loc(12, Value::vector_u64(vec![1, 2]), false)?;
+    locals.store_loc(13, Value::vector_u64(vec![3, 4]), false)?;
     locals.store_loc(
         14,
-        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ZERO)]),
+        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ZERO)]).unwrap(),
         false,
     )?;
     locals.store_loc(
         15,
-        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ONE)]),
+        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ONE)]).unwrap(),
         false,
     )?;
 
@@ -310,8 +219,195 @@ fn test_mem_swap() -> PartialVMResult<()> {
     Ok(())
 }
 
+#[test]
+fn test_vector_unchecked() {
+    assert_err!(Value::vector_unchecked(vec![Value::bool(true)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u8(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u16(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u32(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u64(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u128(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u256(U256::one())]));
+    assert_err!(Value::vector_unchecked(vec![Value::address(
+        AccountAddress::ONE
+    )]));
+
+    assert_ok!(Value::vector_unchecked(vec![Value::delayed_value(
+        DelayedFieldID::from(0)
+    )]));
+    assert_ok!(Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2])]));
+    assert_ok!(Value::vector_unchecked(vec![Value::struct_(Struct::pack(
+        vec![Value::u128(1), Value::u8(0)]
+    ))]));
+}
+
 #[cfg(test)]
-mod native_values {
+mod indexed_ref_tests {
+    use crate::{
+        delayed_values::delayed_field_id::DelayedFieldID,
+        loaded_data::{
+            runtime_types::{AbilityInfo, Type},
+            struct_name_indexing::StructNameIndex,
+        },
+        values::{AbstractFunction, Locals, Struct, StructRef, Value, ValueImpl, VectorRef},
+    };
+    use better_any::{Tid, TidAble};
+    use claims::{assert_matches, assert_ok};
+    use move_binary_format::errors::PartialVMResult;
+    use move_core_types::{
+        ability::AbilitySet, account_address::AccountAddress, function::ClosureMask, u256::U256,
+    };
+    use std::cmp::Ordering;
+
+    #[derive(Clone, Tid)]
+    struct MockAbstractFunction;
+
+    impl AbstractFunction for MockAbstractFunction {
+        fn closure_mask(&self) -> ClosureMask {
+            unreachable!()
+        }
+
+        fn cmp_dyn(&self, _other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
+            unreachable!()
+        }
+
+        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            unreachable!()
+        }
+
+        fn to_stable_string(&self) -> String {
+            unreachable!()
+        }
+    }
+
+    fn test_locals_or_struct_fields() -> Vec<(bool, Value)> {
+        vec![
+            // Primitives.
+            (true, Value::bool(true)),
+            (true, Value::u8(1)),
+            (true, Value::u16(1)),
+            (true, Value::u32(1)),
+            (true, Value::u64(1)),
+            (true, Value::u128(1)),
+            (true, Value::u256(U256::one())),
+            (true, Value::address(AccountAddress::ONE)),
+            (true, Value::delayed_value(DelayedFieldID::from(0))),
+            (true, Value::closure(Box::new(MockAbstractFunction), vec![])),
+            // Non-primitives.
+            (false, Value::vector_u8(vec![1, 2, 3])),
+            (false, Value::struct_(Struct::pack(vec![Value::bool(true)]))),
+        ]
+    }
+
+    fn test_vectors() -> Vec<(bool, Value, Type)> {
+        let vec_ty = |ty| Type::Vector(triomphe::Arc::new(ty));
+
+        vec![
+            // Primitives.
+            (true, Value::vector_bool(vec![false]), Type::Bool),
+            (true, Value::vector_u8(vec![1]), Type::U8),
+            (true, Value::vector_u16(vec![1]), Type::U16),
+            (true, Value::vector_u32(vec![1]), Type::U32),
+            (true, Value::vector_u64(vec![1]), Type::U64),
+            (true, Value::vector_u128(vec![1]), Type::U128),
+            (true, Value::vector_u256(vec![U256::one()]), Type::U256),
+            (
+                true,
+                Value::vector_address(vec![AccountAddress::ONE]),
+                Type::Address,
+            ),
+            (
+                true,
+                Value::vector_unchecked(vec![Value::closure(
+                    Box::new(MockAbstractFunction),
+                    vec![],
+                )])
+                .unwrap(),
+                Type::Function {
+                    args: vec![],
+                    results: vec![],
+                    abilities: AbilitySet::EMPTY,
+                },
+            ),
+            // Non-primitives.
+            (
+                false,
+                Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2, 3])]).unwrap(),
+                vec_ty(Type::U8),
+            ),
+            (
+                false,
+                Value::vector_unchecked(vec![Value::struct_(Struct::pack(vec![Value::bool(
+                    true,
+                )]))])
+                .unwrap(),
+                Type::Struct {
+                    idx: StructNameIndex::new(0),
+                    ability: AbilityInfo::struct_(AbilitySet::EMPTY),
+                },
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_locals_indexed_ref() {
+        let values = test_locals_or_struct_fields();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, value, false));
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            if is_indexed_ref {
+                assert_matches!(reference.0, ValueImpl::IndexedRef(_));
+            } else {
+                assert_matches!(reference.0, ValueImpl::ContainerRef(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_struct_indexed_ref() {
+        let values = test_locals_or_struct_fields();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, Value::struct_(Struct::pack(vec![value])), false));
+
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            let struct_ref = assert_ok!(reference.value_as::<StructRef>());
+            let field = assert_ok!(struct_ref.borrow_field(0));
+
+            if is_indexed_ref {
+                assert_matches!(field.0, ValueImpl::IndexedRef(_));
+            } else {
+                assert_matches!(field.0, ValueImpl::ContainerRef(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_vector_indexed_ref() {
+        let values = test_vectors();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value, elem_ty)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, value, false));
+
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            let vector_ref = assert_ok!(reference.value_as::<VectorRef>());
+            let elem = assert_ok!(vector_ref.borrow_elem(0, &elem_ty));
+
+            if is_indexed_ref {
+                assert_matches!(elem.0, ValueImpl::IndexedRef(_));
+            } else {
+                assert_matches!(elem.0, ValueImpl::ContainerRef(_));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod delayed_fields {
     use super::*;
     use crate::delayed_values::delayed_field_id::{
         DelayedFieldID, ExtractUniqueIndex, ExtractWidth,

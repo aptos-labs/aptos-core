@@ -296,12 +296,12 @@ fn native_test_only_batch_prove_range(
 
     Ok(smallvec![
         Value::vector_u8(proof.to_bytes()),
-        Value::vector_for_testing_only(
+        Value::vector_unchecked(
             commitments
                 .iter()
                 .map(|commitment| Value::vector_u8(commitment.as_bytes().to_vec()))
                 .collect::<Vec<_>>()
-        )
+        )?
     ])
 }
 
