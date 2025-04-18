@@ -20,7 +20,7 @@
 /// - Metamask
 module aptos_framework::ethereum_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::network_name;
+    use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
     use aptos_std::secp256k1;
     use aptos_std::option;
     use aptos_std::aptos_hash;
@@ -28,7 +28,7 @@ module aptos_framework::ethereum_derivable_account {
     use std::bcs_stream::{Self, deserialize_u8};
     use std::chain_id;
     use std::string_utils;
-    use std::transaction_context::{Self, EntryFunctionPayload};
+    use std::transaction_context;
     use std::vector;
     use std::string::String;
 
@@ -51,8 +51,9 @@ module aptos_framework::ethereum_derivable_account {
     }
 
     struct SIWEAbstractPublicKey has drop {
-        // The Ethereum address with 0x prefix
+        // The Ethereum address, with 0x prefix, in utf8 bytes
         ethereum_address: vector<u8>,
+        // The domain, in utf8 bytes
         domain: vector<u8>,
     }
 
@@ -121,7 +122,7 @@ module aptos_framework::ethereum_derivable_account {
         full_message.append(*msg_len_bytes);
         full_message.append(*message);
 
-        aptos_hash::keccak256(*full_message)
+        *full_message
     }
 
     fun recover_public_key(signature_bytes: &vector<u8>, message: &vector<u8>): vector<u8> {
@@ -150,23 +151,6 @@ module aptos_framework::ethereum_derivable_account {
         *full_pubkey
     }
 
-    fun entry_function_name(entry_function_payload: &EntryFunctionPayload): vector<u8> {
-        let entry_function_name = &mut vector[];
-        let addr_str = string_utils::to_string(
-            &transaction_context::account_address(entry_function_payload)
-        ).bytes();
-        // .slice(1) to remove the leading '@' char
-        entry_function_name.append(addr_str.slice(1, addr_str.length()));
-        entry_function_name.append(b"::");
-        entry_function_name.append(
-            *transaction_context::module_name(entry_function_payload).bytes()
-        );
-        entry_function_name.append(b"::");
-        entry_function_name.append(
-            *transaction_context::function_name(entry_function_payload).bytes()
-        );
-        *entry_function_name
-    }
 
     fun authenticate_auth_data(
         aa_auth_data: AbstractionAuthData,
@@ -178,7 +162,8 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
         let issued_at = abstract_signature.issued_at.bytes();
         let message = construct_message(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at);
-        let public_key_bytes = recover_public_key(&abstract_signature.signature, &message);
+        let hashed_message = aptos_hash::keccak256(message);
+        let public_key_bytes = recover_public_key(&abstract_signature.signature, &hashed_message);
 
         // 1. Skip the 0x04 prefix (take the bytes after the first byte)
         let public_key_without_prefix = vector::slice(&public_key_bytes, 1, vector::length(&public_key_bytes));
@@ -186,7 +171,7 @@ module aptos_framework::ethereum_derivable_account {
         let kexHash = aptos_hash::keccak256(public_key_without_prefix);
         // 3. Slice the last 20 bytes (this is the Ethereum address)
         let recovered_addr = vector::slice(&kexHash, 12, 32);
-        // 4. Remove the 0x prefix from the base16 account address
+        // 4. Remove the 0x prefix from the utf8 account address
         let ethereum_address_without_prefix = vector::slice(&abstract_public_key.ethereum_address, 2, vector::length(&abstract_public_key.ethereum_address));
 
         let account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
@@ -268,10 +253,8 @@ module aptos_framework::ethereum_derivable_account {
         let digest_utf8 = b"0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd";
         let issued_at = b"2025-01-01T00:00:00.000Z";
         let message = construct_message(&ethereum_address, &domain, &entry_function_name, &digest_utf8, &issued_at);
-        assert!(message == vector[
-            159, 1, 81, 52, 102, 86, 67, 176, 3, 190, 92, 192, 163, 154, 35, 223,
-            174, 209, 212, 43, 88, 223, 49, 199, 229, 59, 251, 237, 49, 153, 131, 118
-        ]);
+        let expected_message = b"\x19Ethereum Signed Message:\n342localhost:3001 wants you to sign in with your Ethereum account:\n0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a\n\nTo execute transaction 0x1::aptos_account::transfer on Aptos blockchain (local).\n\nURI: localhost:3001\nVersion: 1\nChain ID: 4\nNonce: 0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd\nIssued At: 2025-01-01T00:00:00.000Z";
+        assert!(message == expected_message);
     }
 
     #[test(framework = @0x1)]
@@ -283,6 +266,7 @@ module aptos_framework::ethereum_derivable_account {
         let digest = b"0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd";
         let issued_at = b"2025-01-01T00:00:00.000Z";
         let message = construct_message(&ethereum_address, &domain, &entry_function_name, &digest, &issued_at);
+        let hashed_message = aptos_hash::keccak256(message);
         let signature_bytes = vector[
             249, 247, 194, 250, 31, 233, 100, 234, 109, 142, 6, 193, 203, 33, 147, 199,
             236, 117, 69, 119, 252, 219, 150, 143, 28, 112, 33, 9, 95, 53, 0, 69,
@@ -290,7 +274,7 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let base64_public_key = recover_public_key(&signature_bytes, &message);
+        let base64_public_key = recover_public_key(&signature_bytes, &hashed_message);
         assert!(base64_public_key == vector[
             4, 186, 242, 201, 107, 125, 171, 241, 239, 174, 216, 103, 198, 245, 151, 84,
             208, 238, 134, 130, 51, 223, 164, 243, 149, 234, 188, 140, 237, 189, 190, 221,
@@ -298,43 +282,6 @@ module aptos_framework::ethereum_derivable_account {
             100, 150, 220, 31, 135, 165, 51, 83, 53, 159, 139, 98, 103, 106, 250, 194, 94
         ]
         );
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_mainnet(framework: &signer) {
-        chain_id::initialize_for_test(framework, 1);
-        assert!(network_name() == b"mainnet");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_testnet(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
-        assert!(network_name() == b"testnet");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_local(framework: &signer) {
-        chain_id::initialize_for_test(framework, 4);
-        assert!(network_name() == b"local");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_other(framework: &signer) {
-        chain_id::initialize_for_test(framework, 99);
-        assert!(network_name() == b"custom network: 99");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_entry_function_name() {
-        let entry_function_payload = transaction_context::new_entry_function_payload(
-            @0x1,
-            utf8(b"coin"),
-            utf8(b"transfer"),
-            vector[],
-            vector[]
-        );
-        let entry_function_name = entry_function_name(&entry_function_payload);
-        assert!(entry_function_name == b"0x1::coin::transfer");
     }
 
     #[test(framework = @0x1)]

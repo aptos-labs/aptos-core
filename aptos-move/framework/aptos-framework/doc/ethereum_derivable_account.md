@@ -32,7 +32,6 @@ Issued At: <issued_at>
 -  [Function `deserialize_abstract_signature`](#0x1_ethereum_derivable_account_deserialize_abstract_signature)
 -  [Function `construct_message`](#0x1_ethereum_derivable_account_construct_message)
 -  [Function `recover_public_key`](#0x1_ethereum_derivable_account_recover_public_key)
--  [Function `entry_function_name`](#0x1_ethereum_derivable_account_entry_function_name)
 -  [Function `authenticate_auth_data`](#0x1_ethereum_derivable_account_authenticate_auth_data)
 -  [Function `authenticate`](#0x1_ethereum_derivable_account_authenticate)
 
@@ -304,7 +303,8 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     full_message.append(*msg_len_bytes);
     full_message.append(*message);
 
-    <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(*full_message)
+    *full_message
+    //<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(*full_message)
 }
 </code></pre>
 
@@ -358,44 +358,6 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 
 </details>
 
-<a id="0x1_ethereum_derivable_account_entry_function_name"></a>
-
-## Function `entry_function_name`
-
-
-
-<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_entry_function_name">entry_function_name</a>(entry_function_payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_entry_function_name">entry_function_name</a>(entry_function_payload: &EntryFunctionPayload): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> entry_function_name = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <b>let</b> addr_str = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(
-        &<a href="transaction_context.md#0x1_transaction_context_account_address">transaction_context::account_address</a>(entry_function_payload)
-    ).bytes();
-    // .slice(1) <b>to</b> remove the leading '@' char
-    entry_function_name.append(addr_str.slice(1, addr_str.length()));
-    entry_function_name.append(b"::");
-    entry_function_name.append(
-        *<a href="transaction_context.md#0x1_transaction_context_module_name">transaction_context::module_name</a>(entry_function_payload).bytes()
-    );
-    entry_function_name.append(b"::");
-    entry_function_name.append(
-        *<a href="transaction_context.md#0x1_transaction_context_function_name">transaction_context::function_name</a>(entry_function_payload).bytes()
-    );
-    *entry_function_name
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_ethereum_derivable_account_authenticate_auth_data"></a>
 
 ## Function `authenticate_auth_data`
@@ -421,7 +383,8 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     <b>let</b> abstract_signature = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
     <b>let</b> issued_at = abstract_signature.issued_at.bytes();
     <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at);
-    <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(&abstract_signature.signature, &message);
+    <b>let</b> hashed_message = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(message);
+    <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(&abstract_signature.signature, &hashed_message);
 
     // 1. Skip the 0x04 prefix (take the bytes after the first byte)
     <b>let</b> public_key_without_prefix = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&public_key_bytes, 1, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&public_key_bytes));
@@ -429,7 +392,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     <b>let</b> kexHash = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(public_key_without_prefix);
     // 3. Slice the last 20 bytes (this is the Ethereum <b>address</b>)
     <b>let</b> recovered_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&kexHash, 12, 32);
-    // 4. Remove the 0x prefix from the <a href="../../aptos-stdlib/doc/base16.md#0x1_base16">base16</a> <a href="account.md#0x1_account">account</a> <b>address</b>
+    // 4. Remove the 0x prefix from the utf8 <a href="account.md#0x1_account">account</a> <b>address</b>
     <b>let</b> ethereum_address_without_prefix = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&abstract_public_key.ethereum_address, 2, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&abstract_public_key.ethereum_address));
 
     <b>let</b> account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
@@ -462,7 +425,7 @@ Authorization function for domain account abstraction.
     <b>let</b> maybe_entry_function_payload = <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">transaction_context::entry_function_payload</a>();
     <b>if</b> (maybe_entry_function_payload.is_some()) {
         <b>let</b> entry_function_payload = maybe_entry_function_payload.destroy_some();
-        <b>let</b> entry_function_name = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_entry_function_name">entry_function_name</a>(&entry_function_payload);
+        <b>let</b> entry_function_name = entry_function_name(&entry_function_payload);
         <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data, &entry_function_name);
         <a href="account.md#0x1_account">account</a>
     } <b>else</b> {
