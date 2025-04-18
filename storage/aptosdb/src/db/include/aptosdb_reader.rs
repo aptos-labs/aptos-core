@@ -155,11 +155,11 @@ impl DbReader for AptosDB {
                     let (_version, txn_summary) = result?;
                     Ok(txn_summary)
                 });
-            
+
             // TODO[Orderless]: If start_version is not specified, then we are currently scanning the database in reverse direction
-            // to return the latest transactions. This is a bad design. Discuss and update this. 
+            // to return the latest transactions. This is a bad design. Discuss and update this.
             if start_version.is_some() {
-                txn_summaries_iter 
+                txn_summaries_iter
                     .collect::<Result<Vec<_>>>()
             } else {
                 let txn_summaries = txn_summaries_iter

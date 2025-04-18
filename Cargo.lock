@@ -2183,6 +2183,7 @@ dependencies = [
  "once_cell",
  "prost 0.13.4",
  "redis",
+ "rstest",
  "serde",
  "serde_json",
  "tokio",
