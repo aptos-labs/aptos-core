@@ -53,6 +53,7 @@ aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true, features = ["failpoints"] }
 itertools = { workspace = true }
 move-vm-runtime = { workspace = true, features = ["testing"] }
@@ -63,6 +64,7 @@ rand = { workspace = true }
 test-case = { workspace = true }
 
 [features]
+blockstm-profiling = []
 testing = []
 fuzzing = ["criterion", "proptest", "proptest-derive"]
 

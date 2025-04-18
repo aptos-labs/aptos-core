@@ -258,7 +258,10 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
 mod test {
     use super::*;
     use crate::{
-        proptest_types::types::{KeyType, MockEvent, MockTransaction},
+        proptest_types::{
+            mock_executor::MockEvent,
+            types::{KeyType, MockTransaction},
+        },
         types::InputOutputKey,
     };
     use std::collections::HashSet;
@@ -346,8 +349,8 @@ mod test {
         reads
             .iter()
             .map(|key| match key {
-                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k, false)),
-                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k, false), *t),
+                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k)),
+                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k), *t),
                 InputOutputKey::DelayedField(i) => InputOutputKey::DelayedField(*i),
             })
             .collect()
