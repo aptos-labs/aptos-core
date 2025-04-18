@@ -310,14 +310,13 @@ impl Mempool {
             expiration_time,
             ranking_score,
             timeline_state,
-            db_sequence_number,
             now,
             client_submitted,
             priority.clone(),
         );
 
         let submitted_by_label = txn_info.insertion_info.submitted_by_label();
-        let status = self.transactions.insert(txn_info);
+        let status = self.transactions.insert(txn_info, db_sequence_number);
         let now = aptos_infallible::duration_since_epoch().as_millis() as u64;
 
         if status.code == MempoolStatusCode::Accepted {
@@ -418,7 +417,7 @@ impl Mempool {
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
             }
-            let tx_seq = txn.sequence_number.transaction_sequence_number;
+            let tx_seq = txn.sequence_number;
             let txn_in_sequence = tx_seq > 0
                 && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
