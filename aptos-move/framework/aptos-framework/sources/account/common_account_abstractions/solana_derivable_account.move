@@ -26,7 +26,6 @@ module aptos_framework::solana_derivable_account {
         public_key_into_unvalidated,
     };
     use std::bcs_stream::{Self, deserialize_u8};
-    use std::chain_id;
     use std::string_utils;
     use std::transaction_context::{Self, EntryFunctionPayload};
     use std::vector;
@@ -232,6 +231,8 @@ module aptos_framework::solana_derivable_account {
     use std::string::{String, utf8};
     #[test_only]
     use aptos_framework::auth_data::{create_derivable_auth_data};
+    #[test_only]
+    use std::chain_id;
 
     #[test_only]
     struct SIWSAbstractPublicKey has drop {
