@@ -1,7 +1,29 @@
 processed 3 tasks
 
+task 0 'publish'. lines 1-27:
+Error: compilation errors:
+ error: cannot pass `&|u64|u64 with copy+drop` to a function which expects argument of type `&|u64|u64 with copy`
+  ┌─ TEMPFILE:8:20
+  │
+8 │         ref_helper(&f, 5)
+  │                    ^^
+
+
+
 task 1 'run'. lines 29-29:
-return values: 10
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
 
 task 2 'run'. lines 31-31:
-return values: 49
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
