@@ -656,13 +656,20 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             gas_unit_price,
             expiration_timestamp_secs,
             payload,
+            replay_protection_nonce,
         } = user_transaction_request;
         Ok(RawTransaction::new(
             sender.into(),
-            sequence_number.into(),
-            // TODO[Orderless]: Change nonce from None to replay_protection_nonce.map(|nonce| nonce.into())
-            self.try_into_aptos_core_transaction_payload(payload, None)
-                .context("Failed to parse transaction payload")?,
+            if replay_protection_nonce.is_none() {
+                sequence_number.into()
+            } else {
+                u64::MAX
+            },
+            self.try_into_aptos_core_transaction_payload(
+                payload,
+                replay_protection_nonce.map(|nonce| nonce.into()),
+            )
+            .context("Failed to parse transaction payload")?,
             max_gas_amount.into(),
             gas_unit_price.into(),
             expiration_timestamp_secs.into(),
