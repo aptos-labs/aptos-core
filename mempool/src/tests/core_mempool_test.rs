@@ -1193,6 +1193,19 @@ fn test_sequence_number_behavior_at_capacity() {
 }
 
 #[test]
+fn test_sequence_number_stale_account_sequence_number() {
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.capacity = 2;
+    let mut pool = CoreMempool::new(&config);
+    pool.commit_transaction(&TestTransaction::get_address(0), 1);
+    // This has a stale account sequence number of 0
+    add_txn(&mut pool, TestTransaction::new(0, 2, 1)).unwrap();
+
+    let batch = pool.get_batch(10, 10240, true, btreemap![]);
+    assert_eq!(batch.len(), 1);
+}
+
+#[test]
 fn test_not_return_non_full() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;

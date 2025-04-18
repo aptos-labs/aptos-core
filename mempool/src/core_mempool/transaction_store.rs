@@ -224,7 +224,10 @@ impl TransactionStore {
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
-        let acc_seq_num = txn.sequence_info.account_sequence_number;
+        let acc_seq_num = max(
+            txn.sequence_info.account_sequence_number,
+            self.get_sequence_number(&address).map_or(0, |v| *v),
+        );
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -263,9 +266,19 @@ impl TransactionStore {
                     // If the transaction is the same, it's an idempotent call
                     // Updating signers is not supported, the previous submission must fail
                     counters::CORE_MEMPOOL_IDEMPOTENT_TXNS.inc();
+                    self.process_ready_transactions(&address, acc_seq_num);
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
             }
+        }
+
+        self.clean_committed_transactions(&address, acc_seq_num);
+
+        if txn_seq_num < acc_seq_num {
+            return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
+                "transaction sequence number is {}, current sequence number is  {}",
+                txn_seq_num, acc_seq_num,
+            ));
         }
 
         if self.check_is_full_after_eviction(&txn, acc_seq_num) {
@@ -276,10 +289,7 @@ impl TransactionStore {
             ));
         }
 
-        self.clean_committed_transactions(&address, acc_seq_num);
-
         self.transactions.entry(address).or_default();
-
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
             if txns.len() >= self.capacity_per_user {
@@ -296,8 +306,9 @@ impl TransactionStore {
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
             self.hash_index
-                .insert(txn.get_committed_hash(), (txn.get_sender(), txn_seq_num));
-            self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
+                .insert(txn.get_committed_hash(), (address, txn_seq_num));
+
+            self.sequence_numbers.insert(address, acc_seq_num);
             self.size_bytes += txn.get_estimated_bytes();
             txns.insert(txn_seq_num, txn);
             self.track_indices();
@@ -485,12 +496,10 @@ impl TransactionStore {
         let sender_bucket = sender_bucket(address, self.num_sender_buckets);
         if let Some(txns) = self.transactions.get_mut(address) {
             let mut min_seq = sequence_num;
-
             while let Some(txn) = txns.get_mut(&min_seq) {
                 let process_ready = !self.priority_index.contains(txn);
 
                 self.priority_index.insert(txn);
-
                 let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
                 if process_broadcast_ready {
                     self.timeline_index
