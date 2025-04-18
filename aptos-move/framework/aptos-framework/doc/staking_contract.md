@@ -41,6 +41,7 @@ pool.
 -  [Struct `CreateStakingContract`](#0x1_staking_contract_CreateStakingContract)
 -  [Struct `UpdateVoter`](#0x1_staking_contract_UpdateVoter)
 -  [Struct `ResetLockup`](#0x1_staking_contract_ResetLockup)
+-  [Struct `ExtendLockup`](#0x1_staking_contract_ExtendLockup)
 -  [Struct `AddStake`](#0x1_staking_contract_AddStake)
 -  [Struct `RequestCommission`](#0x1_staking_contract_RequestCommission)
 -  [Struct `UnlockStake`](#0x1_staking_contract_UnlockStake)
@@ -71,6 +72,8 @@ pool.
 -  [Function `add_stake`](#0x1_staking_contract_add_stake)
 -  [Function `update_voter`](#0x1_staking_contract_update_voter)
 -  [Function `reset_lockup`](#0x1_staking_contract_reset_lockup)
+-  [Function `extend_lockup`](#0x1_staking_contract_extend_lockup)
+-  [Function `extend_lockup_and_vote`](#0x1_staking_contract_extend_lockup_and_vote)
 -  [Function `update_commision`](#0x1_staking_contract_update_commision)
 -  [Function `request_commission`](#0x1_staking_contract_request_commission)
 -  [Function `request_commission_internal`](#0x1_staking_contract_request_commission_internal)
@@ -126,6 +129,7 @@ pool.
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
+<b>use</b> <a href="aptos_governance.md#0x1_aptos_governance">0x1::aptos_governance</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -576,6 +580,46 @@ pool.
 </dd>
 <dt>
 <code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_staking_contract_ExtendLockup"></a>
+
+## Struct `ExtendLockup`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="staking_contract.md#0x1_staking_contract_ExtendLockup">ExtendLockup</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>operator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_lockup_secs: u64</code>
 </dt>
 <dd>
 
@@ -1854,8 +1898,8 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
-    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> store.staking_contracts, &operator);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
+    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <a href="stake.md#0x1_stake_increase_lockup_with_cap">stake::increase_lockup_with_cap</a>(&<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap);
 
@@ -1864,6 +1908,82 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
     } <b>else</b> {
         emit_event(&<b>mut</b> store.reset_lockup_events, <a href="staking_contract.md#0x1_staking_contract_ResetLockupEvent">ResetLockupEvent</a> { operator, pool_address });
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_staking_contract_extend_lockup"></a>
+
+## Function `extend_lockup`
+
+Extend the lockup period of the stake pool to match a governance proposal's expiration.
+Can only be called by the staker.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_extend_lockup">extend_lockup</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, proposal_id: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_extend_lockup">extend_lockup</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, proposal_id: u64) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+    <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
+    <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
+    <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker_address, operator);
+
+    <b>let</b> proposal_expiration = <a href="aptos_governance.md#0x1_aptos_governance_get_proposal_expiration">aptos_governance::get_proposal_expiration</a>(proposal_id);
+    <b>let</b> current_lockup = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address);
+    // Only extend the lockup <b>if</b> it ends before the proposal expiration.
+    <b>if</b> (current_lockup &lt; proposal_expiration) {
+        <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address].staking_contracts.borrow_mut(&operator);
+        <a href="stake.md#0x1_stake_update_lockup_with_cap">stake::update_lockup_with_cap</a>(&<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap, proposal_expiration);
+        emit(<a href="staking_contract.md#0x1_staking_contract_ExtendLockup">ExtendLockup</a> {
+            operator,
+            pool_address,
+            new_lockup_secs: proposal_expiration
+        });
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_staking_contract_extend_lockup_and_vote"></a>
+
+## Function `extend_lockup_and_vote`
+
+Convenience function to allow a staker to vote on a proposal and extend the lockup period if necessary.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_extend_lockup_and_vote">extend_lockup_and_vote</a>(staker_voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, proposal_id: u64, should_pass: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_extend_lockup_and_vote">extend_lockup_and_vote</a>(
+    staker_voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    operator: <b>address</b>,
+    proposal_id: u64,
+    should_pass: bool
+) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+    // Extend
+    <a href="staking_contract.md#0x1_staking_contract_extend_lockup">extend_lockup</a>(staker_voter, operator, proposal_id);
+
+    <b>let</b> staker_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker_voter);
+    <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker_addr, operator);
+    <a href="aptos_governance.md#0x1_aptos_governance_vote">aptos_governance::vote</a>(staker_voter, pool_address, proposal_id, should_pass);
 }
 </code></pre>
 
