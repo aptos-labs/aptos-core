@@ -1,0 +1,61 @@
+# This defines a workflow to build and release a new version of the
+# aptos-protos crate. In order to trigger it go to the Actions tab of the
+# repo, click "Publish aptos-protos crate" and then "Run Workflow".
+
+name: "Publish aptos-protos for Rust"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch name or tag to build the binaries from. Defaults to the workflow Git REV, but can be different than that:"
+
+jobs:
+  publish-crate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+
+      - uses: ./.github/actions/rust-setup
+
+      # Get the version of the crate on crates.io
+      - name: Get current version
+        id: get_current_version
+        run: |
+          echo "::set-output name=current_version::$(cargo search aptos-protos --limit 1 | cut -d' ' -f3)"
+
+      # Get the version of the crate in the repo
+      - name: Get repo version
+        id: get_repo_version
+        run: |
+          echo "::set-output name=repo_version::$(grep -oP '(?<=version = ").*(?=")' Cargo.toml)"
+
+      # Exit if the crate version in the repo matches the one on crates.io
+      - name: Exit if versions match
+        if: ${{ steps.get_current_version.outputs.current_version == steps.get_repo_version.outputs.repo_version }}
+        run: echo "Version of crate in repo matches version on crates.io, exiting..." && exit 1
+
+      # Generate code from the proto files.
+      - uses: arduino/setup-protoc@v2
+      - name: Install rust prost plugins
+        run: |
+          cargo install protoc-gen-prost
+          cargo install protoc-gen-prost-serde
+          cargo install protoc-gen-prost-crate
+          cargo install protoc-gen-tonic
+      - uses: bufbuild/buf-setup-action@v1.24.0
+      - run: buf generate --template buf.rust.gen.yaml
+
+      # Ensure the generated code matches the protos.
+      - name: Check generated code matches protos
+        run: git diff --ignore-space-at-eol --ignore-blank-lines
+        with:
+          working-directory: protos/rust/aptos-protos
+
+      # Publish the crate.
+      - name: Publish crate
+        run: cargo publish --token ${{ secrets.CRATES_IO_API_KEY }} --dry-run
