@@ -256,18 +256,7 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        // TODO @bchcho @hariria the sending of new ConsensusMsg::BlockRetrievalRequest must be
-        // phased over multiple releases to avoid `warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);`
-        // Uncomment and replace after release
-        // let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
-        let msg = match &retrieval_request {
-            BlockRetrievalRequest::V1(v1) => {
-                ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(v1.clone()))
-            },
-            BlockRetrievalRequest::V2(_) => {
-                panic!("Unexpected BlockRetrievalRequest::V2, should be using ConsensusMsg::DeprecatedBlockRetrievalRequest with BlockRetrievalRequestV1")
-            },
-        };
+        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
