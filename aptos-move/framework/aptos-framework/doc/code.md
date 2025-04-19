@@ -132,7 +132,7 @@ Metadata for a package. All byte blobs are represented as base64-of-gzipped-byte
 </dt>
 <dd>
  The source digest of the sources in the package. This is constructed by first building the
- sha256 of each individual source, than sorting them alphabetically, and sha256 them again.
+ sha256 of each individual source, then sorting them alphabetically, and sha256 them again.
 </dd>
 <dt>
 <code>manifest: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
@@ -426,7 +426,7 @@ Cannot delete a module that was published in the same package
 
 <a id="0x1_code_EMODULE_NAME_CLASH"></a>
 
-Package contains duplicate module names with existing modules publised in other packages on this address
+Package contains duplicate module names with existing modules published in other packages on this address
 
 
 <pre><code><b>const</b> <a href="code.md#0x1_code_EMODULE_NAME_CLASH">EMODULE_NAME_CLASH</a>: u64 = 1;

@@ -36,7 +36,7 @@ module aptos_framework::code {
         /// This field will be automatically assigned on successful upgrade.
         upgrade_number: u64,
         /// The source digest of the sources in the package. This is constructed by first building the
-        /// sha256 of each individual source, than sorting them alphabetically, and sha256 them again.
+        /// sha256 of each individual source, then sorting them alphabetically, and sha256 them again.
         source_digest: String,
         /// The package manifest, in the Move.toml format. Gzipped text.
         manifest: vector<u8>,
@@ -78,7 +78,7 @@ module aptos_framework::code {
         is_upgrade: bool,
     }
 
-    /// Package contains duplicate module names with existing modules publised in other packages on this address
+    /// Package contains duplicate module names with existing modules published in other packages on this address
     const EMODULE_NAME_CLASH: u64 = 0x1;
 
     /// Cannot upgrade an immutable package

@@ -127,7 +127,7 @@ module aptos_framework::aptos_governance {
         proposal_metadata: SimpleMap<String, vector<u8>>,
     }
 
-    /// Event emitted when there's a vote on a proposa;
+    /// Event emitted when there's a vote on a proposal;
     struct VoteEvent has drop, store {
         proposal_id: u64,
         voter: address,
@@ -154,7 +154,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[event]
-    /// Event emitted when there's a vote on a proposa;
+    /// Event emitted when there's a vote on a proposal;
     struct Vote has drop, store {
         proposal_id: u64,
         voter: address,
@@ -438,7 +438,7 @@ module aptos_framework::aptos_governance {
 
         // We want to allow early resolution of proposals if more than 50% of the total supply of the network coins
         // has voted. This doesn't take into subsequent inflation/deflation (rewards are issued every epoch and gas fees
-        // are burnt after every transaction), but inflation/delation is very unlikely to have a major impact on total
+        // are burnt after every transaction), but inflation/deflation is very unlikely to have a major impact on total
         // supply during the voting period.
         let total_voting_token_supply = coin::supply<AptosCoin>();
         let early_resolution_vote_threshold = option::none<u128>();
