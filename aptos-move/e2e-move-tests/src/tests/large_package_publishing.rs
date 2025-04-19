@@ -327,7 +327,7 @@ fn large_package_upgrade_fail_overlapping_module() {
     }
     let abort_info = Some(AbortInfo {
         reason_name: "EMODULE_NAME_CLASH".to_string(),
-        description: "Package contains duplicate module names with existing modules publised in other packages on this address".to_string(),
+        description: "Package contains duplicate module names with existing modules published in other packages on this address".to_string(),
     });
     assert_move_abort!(last_tx_status, abort_info);
 }

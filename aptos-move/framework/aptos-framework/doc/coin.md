@@ -1067,7 +1067,7 @@ The value of aggregatable coin used for transaction fees redistribution does not
 
 <a id="0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED"></a>
 
-APT pairing is not eanbled yet.
+APT pairing is not enabled yet.
 
 
 <pre><code><b>const</b> <a href="coin.md#0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED">EAPT_PAIRING_IS_NOT_ENABLED</a>: u64 = 28;
