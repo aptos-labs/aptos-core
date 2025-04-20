@@ -4,21 +4,23 @@
 
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
 use aptos_types::{
-    account_address::AccountAddress, contract_event::TransactionEvent, executable::ModulePath, on_chain_config::CurrentTimeMicroseconds, 
+    account_address::AccountAddress,
+    contract_event::TransactionEvent,
+    executable::ModulePath,
+    on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         errors::StateViewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
-    }, transaction::BlockExecutableTransaction as Transaction, write_set::{TransactionWrite, WriteOpKind}
+    },
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
 use bytes::Bytes;
 use claims::{assert_ge, assert_le};
-use move_core_types::{
-    identifier::IdentStr,
-    language_storage::ModuleId,
-};
+use move_core_types::{identifier::IdentStr, language_storage::ModuleId};
 use move_vm_runtime::Module;
 use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -28,10 +30,7 @@ use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::{
-        atomic::AtomicUsize,
-        Arc,
-    },
+    sync::{atomic::AtomicUsize, Arc},
 };
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
@@ -78,19 +77,20 @@ pub(crate) struct NonEmptyGroupDataView<K> {
 }
 
 pub(crate) fn default_group_map() -> BTreeMap<u32, Bytes> {
-    BTreeMap::from([(
-        RESERVED_TAG,
-        serialize_delayed_field_tuple(&(
-            STORAGE_AGGREGATOR_VALUE,
-            // u32::MAX represents storage version.
-            u32::MAX,
-        )),
-    )])
+    let bytes: Bytes = bcs::to_bytes(&(
+        STORAGE_AGGREGATOR_VALUE,
+        // u32::MAX represents storage version.
+        u32::MAX,
+    ))
+    .unwrap()
+    .into();
+
+    BTreeMap::from([(RESERVED_TAG, bytes)])
 }
 
 impl<K> TStateView for NonEmptyGroupDataView<K>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: Debug + PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
 {
     type Key = K;
 
@@ -100,10 +100,8 @@ where
             .group_keys
             .contains(key)
             .then(|| {
-                StateValue::new_with_metadata(
-                    bcs::to_bytes(&default_group_map()).unwrap().into(),
-                    raw_metadata(5),
-                )
+                let bytes = bcs::to_bytes(&default_group_map()).unwrap();
+                StateValue::new_with_metadata(bytes.into(), raw_metadata(5))
             })
             .or_else(|| {
                 self.delayed_field_testing.then(|| {
@@ -333,8 +331,9 @@ pub(crate) struct MockIncarnation<K, E> {
     pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
     /// Keys to query group size for - false is querying size, true is querying metadata.
     pub(crate) group_queries: Vec<(K, bool)>,
-    /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
-    pub(crate) deltas: Vec<(K, DeltaOp)>,
+    /// A vector of keys and corresponding deltas to be produced during mock incarnation
+    /// execution. For delayed fields in groups, the Option is set to Some(tag).
+    pub(crate) deltas: Vec<(K, DeltaOp, Option<u32>)>,
     /// A vector of events.
     pub(crate) events: Vec<E>,
     metadata_seeds: [u64; 3],
@@ -349,7 +348,7 @@ impl<K, E> MockIncarnation<K, E> {
     pub(crate) fn new_with_metadata_seeds(
         reads: Vec<(K, bool)>,
         writes: Vec<(K, ValueType, bool)>,
-        deltas: Vec<(K, DeltaOp)>,
+        deltas: Vec<(K, DeltaOp, Option<u32>)>,
         events: Vec<E>,
         metadata_seeds: [u64; 3],
         gas: u64,
@@ -372,7 +371,7 @@ impl<K, E> MockIncarnation<K, E> {
     pub(crate) fn new(
         reads: Vec<(K, bool)>,
         writes: Vec<(K, ValueType, bool)>,
-        deltas: Vec<(K, DeltaOp)>,
+        deltas: Vec<(K, DeltaOp, Option<u32>)>,
         events: Vec<E>,
         gas: u64,
     ) -> Self {
@@ -692,7 +691,11 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             MockIncarnation::new_with_metadata_seeds(
                 reads,
                 writes,
-                deltas,
+                // materialize_groups sets the Option<u32> to a tag as needed.
+                deltas
+                    .into_iter()
+                    .map(|(k, delta)| (k, delta, None))
+                    .collect(),
                 vec![], // events
                 metadata_seeds,
                 gas,
@@ -779,7 +782,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             let group_key_idx = bytes[1] % 4;
 
             // 3/4 of the time key will map to group - rest are normal resource accesses.
-            // 2/3 groups are tested with delayed fields.
             (group_key_idx < 3).then_some((group_key_idx as usize, tag, group_key_idx > 0))
         };
 
@@ -840,6 +842,24 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             behavior.group_reads = group_reads;
             behavior.group_writes = group_writes;
 
+            if delta_threshold.is_some() {
+                // TODO: We can have a threshold over which we create a delta for RESERVED_TAG,
+                // because currently only RESERVED_TAG in a group contains a delayed field.
+                let mut delta_for_keys = vec![false; 3];
+                behavior.deltas = behavior.deltas.iter().filter_map(|(key, delta, maybe_tag)| {
+                    if let Some((idx, _, has_delayed_field)) = key_to_group(&key) {
+                        if has_delayed_field && !delta_for_keys[idx] {
+                            delta_for_keys[idx] = true;
+                            Some((KeyType(universe[universe_len - 1 - idx].clone()), delta.clone(), Some(RESERVED_TAG)))
+                        } else {
+                            None
+                        }
+                    } else {
+                        Some((key.clone(), delta.clone(), maybe_tag.clone()))
+                    }
+                }).collect();
+            }
+
             behavior.group_queries = group_size_query_pcts
                 .iter()
                 .enumerate()
@@ -887,8 +907,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         self.new_mock_write_txn(universe, allow_deletes, Some(delta_threshold))
     }
 }
-
-
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })

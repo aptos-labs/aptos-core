@@ -421,7 +421,7 @@ fn delta_counters() {
         >::new(
             vec![(key, false)], // reads
             vec![],
-            vec![(key, delta_add(5, u128::MAX))], // deltas
+            vec![(key, delta_add(5, u128::MAX), None)], // deltas
             vec![],
             1, // gas
         )));
@@ -445,7 +445,7 @@ fn delta_counters() {
         >::new(
             vec![(key, false)], // reads
             vec![],
-            vec![(key, delta_sub(2, u128::MAX))], // deltas
+            vec![(key, delta_sub(2, u128::MAX), None)], // deltas
             vec![],
             1, // gas
         )));
@@ -484,6 +484,7 @@ fn delta_chains() {
                                 u128::MAX,
                                 DeltaHistory::new(),
                             ),
+                            None,
                         )),
                         false => None,
                     })
