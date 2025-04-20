@@ -7,7 +7,6 @@ use aptos_aggregator::{
     types::{DelayedFieldValue, ReadPosition},
 };
 use aptos_types::error::{code_invariant_error, PanicError, PanicOr};
-use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -115,19 +114,9 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     }
 
     fn remove(&mut self, txn_idx: TxnIndex) {
-        let deleted_entry = self.versioned_map.remove(&txn_idx);
-        // Entries should only be deleted if the transaction that produced them is
-        // aborted and re-executed, but abort must have marked the entry as an Estimate.
-        assert_matches!(
-            deleted_entry
-                .expect("Entry must exist to be removed")
-                .as_ref()
-                .deref(),
-            VersionEntry::Estimate(_),
-            "Removed entry must be an Estimate",
-        );
-        // Incarnation changed output behavior, disable reading through estimates optimization.
-        self.read_estimate_deltas = false;
+        self.versioned_map.remove(&txn_idx);
+        // TODO(BlockSTMv2): deal w. V2 & estimates and potentially bring back the check
+        // that removed entry must be an estimate (but with PanicError).
     }
 
     // Insert value computed from speculative transaction execution,
@@ -165,11 +154,13 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     // Bypass stored in the estimate does not match the new entry.
                     (Estimate(_), _) => false,
 
-                    (cur, new) => {
-                        return Err(code_invariant_error(format!(
-                            "Replaced entry must be an Estimate, {:?} to {:?}",
-                            cur, new,
-                        )))
+                    (_cur, _new) => {
+                        // TODO(BlockSTMv2): V2 currently does not mark estimate.
+                        //return Err(code_invariant_error(format!(
+                        //    "Replaced entry must be an Estimate, {:?} to {:?}",
+                        //    cur, new,
+                        //)))
+                        true
                     },
                 } {
                     // TODO[agg_v2](optimize): See if we want to invalidate, when we change read_estimate_deltas

@@ -7,14 +7,14 @@ use crate::{
         group_tests::{
             create_mock_transactions, create_non_empty_group_data_view, run_tests_with_groups,
         },
-        resource_tests::{create_executor_thread_pool, get_gas_limit_variants},
         mock_executor::{MockEvent, MockTask},
+        resource_tests::{create_executor_thread_pool, get_gas_limit_variants},
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams},
     },
     task::ExecutorTask,
 };
 use fail::FailScenario;
-use proptest::{collection::vec, prelude::*, test_runner::TestRunner, strategy::ValueTree};
+use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::cmp::min;
 use test_case::test_case;
 
@@ -72,7 +72,7 @@ fn delayed_field_transaction_tests(
     let executor_thread_pool = create_executor_thread_pool();
 
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
-    
+
     run_tests_with_groups(
         executor_thread_pool,
         gas_limits,
@@ -85,4 +85,4 @@ fn delayed_field_transaction_tests(
 
     // Tear down the failpoint scenario
     scenario.teardown();
-} 
+}
