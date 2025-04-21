@@ -1,13 +1,13 @@
 /// This module implements a Twisted ElGamal encryption API, over the Ristretto255 curve, designed to work with
 /// additional cryptographic constructs such as Bulletproofs.
 ///
-/// A Twisted ElGamal *ciphertext* encrypts a value `v` under a basepoint `G` and a secondary point `H`, 
+/// A Twisted ElGamal *ciphertext* encrypts a value `v` under a basepoint `G` and a secondary point `H`,
 /// alongside a public key `Y = sk^(-1) * H`, where `sk` is the corresponding secret key. The ciphertext is of the form:
 /// `(v * G + r * H, r * Y)`, where `r` is a random scalar.
 ///
-/// The Twisted ElGamal scheme differs from standard ElGamal by introducing a secondary point `H` to enhance 
+/// The Twisted ElGamal scheme differs from standard ElGamal by introducing a secondary point `H` to enhance
 /// flexibility and functionality in cryptographic protocols. This design still maintains the homomorphic property:
-/// `Enc_Y(v, r) + Enc_Y(v', r') = Enc_Y(v + v', r + r')`, where `v, v'` are plaintexts, `Y` is the public key, 
+/// `Enc_Y(v, r) + Enc_Y(v', r') = Enc_Y(v + v', r + r')`, where `v, v'` are plaintexts, `Y` is the public key,
 /// and `r, r'` are random scalars.
 module aptos_experimental::ristretto255_twisted_elgamal {
     use std::option::Option;

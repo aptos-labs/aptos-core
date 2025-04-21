@@ -95,20 +95,20 @@ module aptos_experimental::confidential_asset {
     /// The `confidential_asset` module stores a `ConfidentialAssetStore` object for each user-token pair.
     struct ConfidentialAssetStore has key {
         /// Indicates if the account is frozen. If `true`, transactions are temporarily disabled
-        /// for this account. This is particularly useful during key rotations, which require 
-        /// two transactions: rolling over the pending balance to the actual balance and rotating 
-        /// the encryption key. Freezing prevents the user from accepting additional payments 
+        /// for this account. This is particularly useful during key rotations, which require
+        /// two transactions: rolling over the pending balance to the actual balance and rotating
+        /// the encryption key. Freezing prevents the user from accepting additional payments
         /// between these two transactions.
         frozen: bool,
 
-        /// A flag indicating whether the actual balance is normalized. A normalized balance 
+        /// A flag indicating whether the actual balance is normalized. A normalized balance
         /// ensures that all chunks fit within the defined 16-bit bounds, preventing overflows.
         normalized: bool,
 
-        /// Tracks the maximum number of transactions the user can accept before normalization 
-        /// is required. For example, if the user can accept up to 2^16 transactions and each 
-        /// chunk has a 16-bit limit, the maximum chunk value before normalization would be 
-        /// 2^16 * 2^16 = 2^32. Maintaining this counter is crucial because users must solve 
+        /// Tracks the maximum number of transactions the user can accept before normalization
+        /// is required. For example, if the user can accept up to 2^16 transactions and each
+        /// chunk has a 16-bit limit, the maximum chunk value before normalization would be
+        /// 2^16 * 2^16 = 2^32. Maintaining this counter is crucial because users must solve
         /// a discrete logarithm problem of this size to decrypt their balances.
         pending_counter: u64,
 
@@ -121,7 +121,7 @@ module aptos_experimental::confidential_asset {
         pending_balance: confidential_balance::CompressedConfidentialBalance,
 
         /// Represents the actual user balance, which is available for sending payments.
-        /// It consists of eight 16-bit chunks (p0 + 2^16 * p1 + ... + 2^112 * p8), supporting a 128-bit balance. 
+        /// It consists of eight 16-bit chunks (p0 + 2^16 * p1 + ... + 2^112 * p8), supporting a 128-bit balance.
         /// Users can decrypt this balance with their decryption keys and by solving a discrete logarithm problem.
         actual_balance: confidential_balance::CompressedConfidentialBalance,
 
@@ -141,7 +141,7 @@ module aptos_experimental::confidential_asset {
 
     /// Represents the configuration of a token.
     struct FAConfig has key {
-        /// Indicates whether the token is allowed for confidential transfers. 
+        /// Indicates whether the token is allowed for confidential transfers.
         /// If allow list is disabled, all tokens are allowed.
         /// Can be toggled by the governance module. The withdrawals are always allowed.
         allowed: bool,
@@ -204,9 +204,9 @@ module aptos_experimental::confidential_asset {
     // Entry functions
     //
 
-    /// Registers an account for a specified token. Users must register an account for each token they 
+    /// Registers an account for a specified token. Users must register an account for each token they
     /// intend to transact with.
-    /// 
+    ///
     /// Users are also responsible for generating a Twisted ElGamal key pair on their side.
     public entry fun register(
         sender: &signer,
@@ -218,7 +218,7 @@ module aptos_experimental::confidential_asset {
         register_internal(sender, token, ek);
     }
 
-    /// Brings tokens into the protocol, transferring the passed amount from the sender's primary FA store 
+    /// Brings tokens into the protocol, transferring the passed amount from the sender's primary FA store
     /// to the pending balance of the recipient.
     /// The initial confidential balance is publicly visible, as entering the protocol requires a normal transfer.
     /// However, tokens within the protocol become obfuscated through confidential transfers, ensuring privacy in
@@ -232,7 +232,7 @@ module aptos_experimental::confidential_asset {
         deposit_to_internal(sender, token, to, amount)
     }
 
-    /// The same as `deposit_to`, but the recipient is the sender. 
+    /// The same as `deposit_to`, but the recipient is the sender.
     public entry fun deposit(
         sender: &signer,
         token: Object<Metadata>,
@@ -264,7 +264,7 @@ module aptos_experimental::confidential_asset {
 
     /// Brings tokens out of the protocol by transferring the specified amount from the sender's actual balance to
     /// the recipient's primary FA store.
-    /// The withdrawn amount is publicly visible, as this process requires a normal transfer. 
+    /// The withdrawn amount is publicly visible, as this process requires a normal transfer.
     /// The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
     public entry fun withdraw_to(
         sender: &signer,
@@ -304,13 +304,13 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Transfers tokens from the sender's actual balance to the recipient's pending balance.
-    /// The function hides the transferred amount while keeping the sender and recipient addresses visible. 
+    /// The function hides the transferred amount while keeping the sender and recipient addresses visible.
     /// The sender encrypts the transferred amount with the recipient's encryption key and the function updates the
     /// recipient's confidential balance homomorphically.
     /// Additionally, the sender encrypts the transferred amount with the auditors' EKs, allowing auditors to decrypt
     /// the it on their side.
     /// The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
-    /// Warning: If the auditor feature is enabled, the sender must include the auditor as the first element in the 
+    /// Warning: If the auditor feature is enabled, the sender must include the auditor as the first element in the
     /// `auditor_eks` vector.
     public entry fun confidential_transfer(
         sender: &signer,
@@ -347,7 +347,7 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Rotates the encryption key for the user's confidential balance, updating it to a new encryption key.
-    /// The function ensures that the pending balance is zero before the key rotation, requiring the sender to 
+    /// The function ensures that the pending balance is zero before the key rotation, requiring the sender to
     /// call `rollover_pending_balance_and_freeze` beforehand if necessary.
     /// The sender provides their new normalized confidential balance, encrypted with the new encryption key and fresh randomness
     /// to preserve privacy.
@@ -608,7 +608,7 @@ module aptos_experimental::confidential_asset {
     //
     // Public functions that correspond to the entry functions and don't require serializtion of the input data.
     // These function can be useful for external contracts that want to integrate with the Confidential Asset protocol.
-    // 
+    //
 
     /// Implementation of the `register` entry function.
     public fun register_internal(

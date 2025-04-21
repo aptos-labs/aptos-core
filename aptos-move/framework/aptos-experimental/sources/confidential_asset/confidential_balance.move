@@ -1,7 +1,7 @@
 /// This module implements a Confidential Balance abstraction, built on top of Twisted ElGamal encryption,
 /// over the Ristretto255 curve.
-/// 
-/// The Confidential Balance encapsulates encrypted representations of a balance, split into chunks and stored as pairs of 
+///
+/// The Confidential Balance encapsulates encrypted representations of a balance, split into chunks and stored as pairs of
 /// ciphertext components `(C_i, D_i)` under basepoints `G` and `H` and an encryption key `P = dk^(-1) * H`, where `dk`
 /// is the corresponding decryption key. Each pair represents an encrypted value `a_i` - the `i`-th 16-bit portion of
 /// the total encrypted amount - and its associated randomness `r_i`, such that `C_i = a_i * G + r_i * H` and `D_i = r_i * P`.

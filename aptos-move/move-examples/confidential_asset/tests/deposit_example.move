@@ -47,7 +47,7 @@ module confidential_asset_example::deposit_example {
 
         // In real world, we would not be able to see the someone else's balance as it requires
         // the knowledge of the decryption key.
-        // The balance decryption requires solving the discrete logarithm problem, 
+        // The balance decryption requires solving the discrete logarithm problem,
         // so we just check if the passed amount is correct for simplicity.
         assert!(confidential_asset::verify_pending_balance(bob_addr, token, &bob_dk, bob_amount));
 

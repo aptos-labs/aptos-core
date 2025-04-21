@@ -23,7 +23,7 @@ module confidential_asset_example::normalize_example {
         confidential_asset::register(bob, token, bob_ek_bytes);
         confidential_asset::deposit(bob, token, (bob_amount as u64));
 
-        // The rollover function is the only function that requires the actual balance to be normalized 
+        // The rollover function is the only function that requires the actual balance to be normalized
         // beforehand and leaves it unnormalized after execution, no matter what the pending balance was.
         confidential_asset::rollover_pending_balance(bob, token);
 
@@ -31,7 +31,7 @@ module confidential_asset_example::normalize_example {
 
         confidential_asset::deposit(bob, token, (bob_amount as u64));
 
-        // Before performing a second rollover, the actual balance must be normalized. 
+        // Before performing a second rollover, the actual balance must be normalized.
         // You will get an error if you try to rollover an unnormalized balance:
         // confidential_asset::rollover_pending_balance(bob, token);
 
@@ -62,9 +62,9 @@ module confidential_asset_example::normalize_example {
         assert!(confidential_asset::is_normalized(bob_addr, token));
         assert!(confidential_asset::verify_actual_balance(bob_addr, token, &bob_dk, bob_amount));
 
-        // A rollover can be performed once the balance is normalized. 
-        // Note that functions like `withdraw` and `confidential_transfer` do not require the actual balance 
-        // to be normalized beforehand, as zk-proofs guarantee that the actual balance is normalized after 
+        // A rollover can be performed once the balance is normalized.
+        // Note that functions like `withdraw` and `confidential_transfer` do not require the actual balance
+        // to be normalized beforehand, as zk-proofs guarantee that the actual balance is normalized after
         // their execution.
         confidential_asset::rollover_pending_balance(bob, token);
     }

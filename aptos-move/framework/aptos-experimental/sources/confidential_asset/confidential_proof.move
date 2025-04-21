@@ -1,4 +1,4 @@
-/// The `confidential_proof` module provides the infrastructure for verifying zero-knowledge proofs used in the Confidential Asset protocol. 
+/// The `confidential_proof` module provides the infrastructure for verifying zero-knowledge proofs used in the Confidential Asset protocol.
 /// These proofs ensure correctness for operations such as `confidential_transfer`, `withdraw`, `rotate_encryption_key`, and `normalize`.
 module aptos_experimental::confidential_proof {
     use std::error;
@@ -193,9 +193,9 @@ module aptos_experimental::confidential_proof {
     //
 
     /// Verifies the validity of the `withdraw` operation.
-    /// 
+    ///
     /// This function ensures that the provided proof (`WithdrawalProof`) meets the following conditions:
-    /// 1. The current balance (`current_balance`) and new balance (`new_balance`) encrypt the corresponding values 
+    /// 1. The current balance (`current_balance`) and new balance (`new_balance`) encrypt the corresponding values
     ///    under the same encryption key (`ek`) before and after the withdrawal of the specified amount (`amount`), respectively.
     /// 2. The relationship `new_balance = current_balance - amount` holds, verifying that the withdrawal amount is deducted correctly.
     /// 3. The new balance (`new_balance`) is normalized, with each chunk adhering to the range [0, 2^16).
@@ -213,12 +213,12 @@ module aptos_experimental::confidential_proof {
     }
 
     /// Verifies the validity of the `confidential_transfer` operation.
-    /// 
+    ///
     /// This function ensures that the provided proof (`TransferProof`) meets the following conditions:
     /// 1. The transferred amount (`transfer_amount`) and the auditor's balances (`auditor_amounts`), if provided,
-    ///    encrypt the same transfer value under the recipient's encryption key (`recipient_ek`) and the auditor's 
+    ///    encrypt the same transfer value under the recipient's encryption key (`recipient_ek`) and the auditor's
     ///    encryption keys (`auditor_eks`), respectively.
-    /// 2. The sender's current balance (`current_balance`) and new balance (`new_balance`) encrypt the corresponding values 
+    /// 2. The sender's current balance (`current_balance`) and new balance (`new_balance`) encrypt the corresponding values
     ///    under the sender's encryption key (`sender_ek`) before and after the transfer, respectively.
     /// 3. The relationship `new_balance = current_balance - transfer_amount` is maintained, ensuring balance integrity.
     /// 4. The transferred value is properly normalized, with each chunk in both `transfer_amount` and the `auditor_amounts`
@@ -251,11 +251,11 @@ module aptos_experimental::confidential_proof {
     }
 
     /// Verifies the validity of the `normalize` operation.
-    /// 
+    ///
     /// This function ensures that the provided proof (`NormalizationProof`) meets the following conditions:
-    /// 1. The current balance (`current_balance`) and new balance (`new_balance`) encrypt the same value 
+    /// 1. The current balance (`current_balance`) and new balance (`new_balance`) encrypt the same value
     ///    under the same provided encryption key (`ek`), verifying that the normalization process preserves the balance value.
-    /// 2. The new balance (`new_balance`) is properly normalized, with each chunk adhering to the range [0, 2^16), 
+    /// 2. The new balance (`new_balance`) is properly normalized, with each chunk adhering to the range [0, 2^16),
     ///    as verified through the range proof in the normalization process.
     ///
     /// If all conditions are satisfied, the proof validates the normalization; otherwise, the function causes an error.
@@ -270,7 +270,7 @@ module aptos_experimental::confidential_proof {
     }
 
     /// Verifies the validity of the `rotate_encryption_key` operation.
-    /// 
+    ///
     /// This function ensures that the provided proof (`RotationProof`) meets the following conditions:
     /// 1. The current balance (`current_balance`) and new balance (`new_balance`) encrypt the same value under the
     ///    current encryption key (`current_ek`) and the new encryption key (`new_ek`), respectively, verifying
@@ -1250,8 +1250,8 @@ module aptos_experimental::confidential_proof {
 
     //
     // Private functions for constructing the scalar multipliers (`gammas`) used for uniting multiple proof relations
-    // into a single multi-scalar multiplication (MSM) equation 
-    // 
+    // into a single multi-scalar multiplication (MSM) equation
+    //
 
     /// Returns the scalar multipliers for the `WithdrawalSigmaProof`.
     fun msm_withdrawal_gammas(rho: &Scalar): WithdrawalSigmaProofGammas {

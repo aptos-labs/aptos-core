@@ -452,8 +452,8 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::deposit(&alice, token, 200);
         confidential_asset::rollover_pending_balance(&alice, token);
 
-        // This fails because the `auditor1` is set for `token`, 
-        // so each transfer must include `auditor1` in the auditor list as the FIRST element. 
+        // This fails because the `auditor1` is set for `token`,
+        // so each transfer must include `auditor1` in the auditor list as the FIRST element.
         // Please, see `confidential_asset::validate_auditors` for more details.
         audit_transfer(
             &alice,
