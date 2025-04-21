@@ -20,7 +20,7 @@ module aptos_framework::system_addresses {
     }
 
     public fun is_core_resource_address(addr: address): bool {
-        addr == @core_resources
+        false
     }
 
     public fun assert_aptos_framework(account: &signer) {
@@ -78,5 +78,12 @@ module aptos_framework::system_addresses {
     /// Return true if `addr` is either the VM address or an Aptos Framework address.
     public fun is_reserved_address(addr: address): bool {
         is_aptos_framework_address(addr) || is_vm_address(addr)
+    }
+
+    #[test(aptos_framework = @aptos_framework, core_resources = @0xA550C18)]
+    #[expected_failure(abort_code = 327681, location = Self)]
+    public entry fun test_core_resource_check_fails(core_resources: signer) {
+        // This should now abort due to is_core_resource_address always returning false
+        assert_core_resource_address(signer::address_of(&core_resources));
     }
 }

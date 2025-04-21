@@ -92,6 +92,7 @@ module aptos_framework::version {
     }
 
     #[test(aptos_framework = @aptos_framework, core_resources = @core_resources)]
+    #[expected_failure(abort_code = 327681, location = system_addresses)]
     public entry fun test_set_version_core_resources(
         aptos_framework: signer,
         core_resources: signer,
