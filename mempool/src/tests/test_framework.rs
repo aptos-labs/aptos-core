@@ -685,7 +685,6 @@ pub fn test_transaction(seq_num: u64) -> TestTransaction {
         address: TestTransaction::get_address(1),
         sequence_number: seq_num,
         gas_price: 1,
-        account_seqno: 0,
         script: None,
     }
 }

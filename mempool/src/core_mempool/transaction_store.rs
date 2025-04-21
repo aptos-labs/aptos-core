@@ -221,11 +221,15 @@ impl TransactionStore {
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
-    pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
+    pub(crate) fn insert(
+        &mut self,
+        txn: MempoolTransaction,
+        db_sequence_number: u64,
+    ) -> MempoolStatus {
         let address = txn.get_sender();
-        let txn_seq_num = txn.sequence_info.transaction_sequence_number;
+        let txn_seq_num = txn.get_sequence_number();
         let acc_seq_num = max(
-            txn.sequence_info.account_sequence_number,
+            db_sequence_number,
             self.get_sequence_number(&address).map_or(0, |v| *v),
         );
 
@@ -381,7 +385,7 @@ impl TransactionStore {
                     debug!(
                         LogSchema::new(LogEntry::MempoolFullEvictedTxn).txns(TxnsLog::new_txn(
                             txn.get_sender(),
-                            txn.sequence_info.transaction_sequence_number
+                            txn.get_sequence_number()
                         ))
                     );
                     evicted_bytes += txn.get_estimated_bytes() as u64;
@@ -416,7 +420,7 @@ impl TransactionStore {
     /// previous txn is committed).
     /// 2. The txn before this is ready for broadcast but not yet committed.
     fn check_txn_ready(&self, txn: &MempoolTransaction, curr_sequence_number: u64) -> bool {
-        let tx_sequence_number = txn.sequence_info.transaction_sequence_number;
+        let tx_sequence_number = txn.get_sequence_number();
         if tx_sequence_number == curr_sequence_number {
             return true;
         } else if tx_sequence_number == 0 {
@@ -572,10 +576,7 @@ impl TransactionStore {
                 false => TxnsLog::new_with_max(10),
             };
             for transaction in txns_for_removal.values() {
-                rm_txns.add(
-                    transaction.get_sender(),
-                    transaction.sequence_info.transaction_sequence_number,
-                );
+                rm_txns.add(transaction.get_sender(), transaction.get_sequence_number());
                 self.index_remove(transaction);
             }
             trace!(
@@ -620,7 +621,7 @@ impl TransactionStore {
                 let mut txns_log = TxnsLog::new();
                 txns_log.add(
                     txn_to_remove.get_sender(),
-                    txn_to_remove.sequence_info.transaction_sequence_number,
+                    txn_to_remove.get_sequence_number(),
                 );
                 trace!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
             }
@@ -864,7 +865,7 @@ impl TransactionStore {
                         counters::GC_PARKED_TXN_LABEL
                     };
                     let account = txn.get_sender();
-                    let txn_sequence_number = txn.sequence_info.transaction_sequence_number;
+                    let txn_sequence_number = txn.get_sequence_number();
                     gc_txns_log.add_with_status(account, txn_sequence_number, status);
                     if let Ok(time_delta) =
                         SystemTime::now().duration_since(txn.insertion_info.insertion_time)
