@@ -266,6 +266,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         summary.write_starting_msg()?;
 
         if test_count > 0 {
+            // Get the current time in seconds
+            let start_time = std::time::Instant::now();
+
             println!(
                 "Starting Swarm with supported versions: {:?}",
                 self.factory
@@ -278,7 +281,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let genesis_version = initial_version.clone();
             let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
-            let mut swarm = runtime.block_on(self.factory.launch_swarm(
+
+            let mut swarm = runtime.block_on(
+                tokio::time::timeout(self.global_duration, self.factory.launch_swarm(
                 &mut rng,
                 self.tests.initial_validator_count,
                 self.tests.initial_fullnode_count,
@@ -289,22 +294,26 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.genesis_helm_config_fn.clone(),
                 self.tests.build_node_helm_config_fn(retain_debug_logs),
                 self.tests.existing_db_tag.clone(),
-            ))?;
+            )))??;
 
             // Run AptosTests
             for test in self.filter_tests(&self.tests.aptos_tests) {
+                let test_duration = std::time::Instant::now() - start_time + self.global_duration;
+
                 let mut aptos_ctx = AptosContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info().into_aptos_public_info(),
                     &mut report,
                 );
-                let result = process_test_result(runtime.block_on(test.run(&mut aptos_ctx)));
+                let result = process_test_result(runtime.block_on(
+                    tokio::time::timeout(test_duration, test.run(&mut aptos_ctx))));
                 report.report_text(result.to_string());
                 summary.handle_result(test.details(), result)?;
             }
 
             // Run AdminTests
             for test in self.filter_tests(&self.tests.admin_tests) {
+                // This is not async so we can't really set a timeout, however these tests should be quick
                 let mut admin_ctx = AdminContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info(),
@@ -318,6 +327,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let logs_location = swarm.logs_location();
             let swarm = Arc::new(tokio::sync::RwLock::new(swarm));
             for test in self.filter_tests(&self.tests.network_tests) {
+                let test_duration = std::time::Instant::now() - start_time + self.global_duration;
+
                 let network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.clone(),
@@ -329,7 +340,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 let handle = network_ctx.runtime.handle().clone();
                 let _handle_context = handle.enter();
                 let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle.clone());
-                let result = process_test_result(handle.block_on(test.run(network_ctx.clone())));
+                let result = process_test_result(handle.block_on(tokio::time::timeout(test_duration, test.run(network_ctx.clone()))));
                 // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.
                 let NetworkContextSynchronizer { ctx, handle } = network_ctx;
                 drop(handle);
@@ -458,10 +469,10 @@ mod test {
             "Invalid runner mode: durian"
         );
     }
-}
 
-#[test]
-fn verify_tool() {
-    use clap::CommandFactory;
-    Options::command().debug_assert()
+    #[test]
+    fn verify_tool() {
+        use clap::CommandFactory;
+        Options::command().debug_assert()
+    }
 }
