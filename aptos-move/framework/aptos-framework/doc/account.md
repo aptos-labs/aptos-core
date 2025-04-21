@@ -1753,10 +1753,10 @@ Note: This function does not update the <code><a href="account.md#0x1_account_Or
 
 ## Function `upsert_ed25519_backup_key_on_keyless_account`
 
-Upserts an ED25519 backup key to a keyless account by converting the account's authentication key to a multi-key.
-This function takes a keyless account (identified by having a keyless public key is the original public key) and updates the
-account's authentication key to a multi-key of the original keyless public key and the new backup key that requires
-1 signature from either key to authenticate.
+Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
 
 Note: This function emits a <code>KeyRotationToMultiPublicKey</code> event marking both keys as verified since the keyless public key
 is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
