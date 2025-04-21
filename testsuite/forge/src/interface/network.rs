@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Test;
+use anyhow::anyhow;
 use crate::{
     prometheus_metrics::LatencyBreakdown,
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
@@ -20,6 +21,11 @@ use tokio::runtime::{Handle, Runtime};
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
     async fn run<'t>(&self, ctx: NetworkContextSynchronizer<'t>) -> Result<()>;
+
+    async fn run_with_timeout<'t>(&self, ctx: NetworkContextSynchronizer<'t>, timeout: Duration) -> Result<()> {
+        let timeout = tokio::time::timeout(timeout, self.run(ctx));
+        timeout.await.map_err(|_| anyhow!("Test timed out"))?
+    }
 }
 
 #[derive(Clone)]

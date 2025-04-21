@@ -306,7 +306,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut report,
                 );
                 let result = process_test_result(
-                    runtime.block_on(tokio::time::timeout(test_duration, test.run(&mut aptos_ctx))).unwrap()
+                    runtime.block_on(test.run_with_timeout(&mut aptos_ctx, test_duration))
                 );
                 report.report_text(result.to_string());
                 summary.handle_result(test.details(), result)?;
@@ -342,7 +342,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 let _handle_context = handle.enter();
                 let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle.clone());
                 let result = process_test_result(
-                    handle.block_on(tokio::time::timeout(test_duration, test.run(network_ctx.clone()))).unwrap()
+                    handle.block_on(test.run_with_timeout(network_ctx.clone(), test_duration))
                 );
                 // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.
                 let NetworkContextSynchronizer { ctx, handle } = network_ctx;

@@ -24,12 +24,17 @@ use aptos_sdk::{
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 #[async_trait::async_trait]
 pub trait AptosTest: Test {
     /// Executes the test against the given context.
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()>;
+
+    async fn run_with_timeout<'t>(&self, ctx: &mut AptosContext<'t>, timeout: Duration) -> Result<()> {
+        let timeout = tokio::time::timeout(timeout, self.run(ctx));
+        timeout.await.map_err(|_| anyhow!("Test timed out"))?
+    }
 }
 
 pub struct AptosContext<'t> {
