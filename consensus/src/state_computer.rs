@@ -82,6 +82,7 @@ pub struct ExecutionProxy {
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
+    enable_pre_commit: bool,
 }
 
 impl ExecutionProxy {
@@ -113,6 +114,7 @@ impl ExecutionProxy {
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
             state: RwLock::new(None),
+            enable_pre_commit,
         }
     }
 
@@ -215,6 +217,7 @@ impl ExecutionProxy {
             self.state_sync_notifier.clone(),
             payload_manager,
             self.txn_notifier.clone(),
+            self.enable_pre_commit,
         )
     }
 }

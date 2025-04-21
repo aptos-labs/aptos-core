@@ -69,6 +69,7 @@ pub struct PipelineBuilder {
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
     txn_notifier: Arc<dyn TxnNotifier>,
+    enable_pre_commit: bool,
 }
 
 fn spawn_shared_fut<
@@ -185,6 +186,7 @@ impl PipelineBuilder {
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         payload_manager: Arc<dyn TPayloadManager>,
         txn_notifier: Arc<dyn TxnNotifier>,
+        enable_pre_commit: bool,
     ) -> Self {
         Self {
             block_preparer,
@@ -196,6 +198,7 @@ impl PipelineBuilder {
             state_sync_notifier,
             payload_manager,
             txn_notifier,
+            enable_pre_commit,
         }
     }
 
@@ -350,6 +353,7 @@ impl PipelineBuilder {
                 commit_proof_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
+                self.enable_pre_commit,
             ),
             Some(&mut abort_handles),
         );
@@ -661,6 +665,7 @@ impl PipelineBuilder {
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
+        enable_pre_commit: bool,
     ) -> TaskResult<PreCommitResult> {
         let mut tracker = Tracker::start_waiting("pre_commit", &block);
         let (compute_result, _, _) = ledger_update_fut.await?;
@@ -668,7 +673,7 @@ impl PipelineBuilder {
 
         order_proof_fut.await?;
 
-        if compute_result.has_reconfiguration() {
+        if compute_result.has_reconfiguration() || !enable_pre_commit {
             commit_proof_fut.await?;
         }
 
