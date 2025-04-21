@@ -3,6 +3,7 @@
 
 //! This module (and its submodules) contain various model-AST-based lint checks.
 
+mod almost_swapped;
 mod blocks_in_conditions;
 mod needless_bool;
 mod needless_deref_ref;
@@ -19,6 +20,7 @@ use move_compiler_v2::external_checks::ExpChecker;
 /// Returns a default pipeline of "expression linters" to run.
 pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
     vec![
+        Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
