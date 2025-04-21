@@ -2018,6 +2018,40 @@ module aptos_framework::account {
         assert!(Account[alice_addr].authentication_key == new_auth_key, 0);
     }
 
+    #[test(account = @aptos_framework)]
+    public entry fun test_add_ed25519_backup_key_to_keyless_account(
+        account: signer
+    ) acquires Account {
+        initialize(&account);
+        let keyless_pk_bytes: vector<u8> = x"031b68747470733a2f2f6163636f756e74732e676f6f676c652e636f6d2086bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514";
+        let curr_pk = single_key::new_public_key_from_bytes(keyless_pk_bytes);
+        let alice_addr = from_bcs::to_address(curr_pk.to_authentication_key());
+        let alice = create_account_unchecked(alice_addr);
+
+        let (new_sk, new_pk) = ed25519::generate_keys();
+
+        let challenge = RotationProofChallenge {
+            sequence_number: Account[alice_addr].sequence_number,
+            originator: alice_addr,
+            current_auth_key: alice_addr,
+            new_public_key: ed25519::validated_public_key_to_bytes(&new_pk),
+        };
+
+        let new_pk_unvalidated = ed25519::public_key_to_unvalidated(&new_pk);
+        let backup_key_as_single_key = single_key::from_ed25519_public_key_unvalidated(new_pk_unvalidated);
+        let new_public_key = multi_key::new_multi_key_from_single_keys(vector[curr_pk, backup_key_as_single_key], 1);
+        let new_auth_key = new_public_key.to_authentication_key();
+
+        let to_sig = ed25519::sign_struct(&new_sk, challenge);
+
+        upsert_ed25519_backup_key_on_keyless_account(
+            &alice,
+            keyless_pk_bytes,
+            ed25519::validated_public_key_to_bytes(&new_pk),
+            ed25519::signature_to_bytes(&to_sig),
+        );
+        assert!(Account[alice_addr].authentication_key == new_auth_key, 0);
+    }
 
     #[test(account = @aptos_framework)]
     public entry fun test_simple_rotation(account: &signer) acquires Account {
