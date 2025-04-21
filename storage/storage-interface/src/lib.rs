@@ -25,9 +25,9 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -299,7 +299,7 @@ pub trait DbReader: Send + Sync {
 
         /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
         /// the transaction with given `seq_num` doesn't exist, returns `None`.
-        fn get_account_transaction(
+        fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -311,14 +311,14 @@ pub trait DbReader: Send + Sync {
         /// at sequence number `seq_num`. Will return no more than `limit` transactions.
         /// Will ignore transactions with `txn.version > ledger_version`. Optionally
         /// fetch events for each transaction when `fetch_events` is `true`.
-        fn get_account_transactions(
+        fn get_account_ordered_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountOrderedTransactionsWithProof>;
 
         /// Returns proof of new state for a given ledger info with signatures relative to version known
         /// to client

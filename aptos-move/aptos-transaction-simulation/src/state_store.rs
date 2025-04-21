@@ -160,16 +160,20 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         Ok(Some(m))
     }
 
-    /// Sets the `ChainId` resource that is used to identify the blockchain network.
-    fn set_chain_id(&self, chain_id: ChainId) -> Result<()> {
-        let bytes = bcs::to_bytes(&chain_id)?;
-
-        self.set_state_value(
-            StateKey::resource(ChainId::address(), &ChainId::struct_tag()).unwrap(),
-            StateValue::new_legacy(bytes.into()),
-        )
+    /// Gets the [`ChainId`] resource that is used to identify the blockchain network.
+    fn get_chain_id(&self) -> Result<ChainId>
+    where
+        Self: Sized,
+    {
+        self.get_on_chain_config()
     }
 
+    /// Sets the [`ChainId`] resource that is used to identify the blockchain network.
+    fn set_chain_id(&self, chain_id: ChainId) -> Result<()> {
+        self.set_on_chain_config(&chain_id)
+    }
+
+    /// Gets the on-chain feature flags.
     fn get_features(&self) -> Result<Features>
     where
         Self: Sized,

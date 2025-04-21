@@ -139,7 +139,7 @@ class RunHelper:
                 f.write(
                     "".join(
                         traceback.format_exception(
-                            etype=type(e), value=e, tb=e.__traceback__
+                            type(e), e, e.__traceback__
                         )
                     )
                 )
