@@ -305,8 +305,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     swarm.chain_info().into_aptos_public_info(),
                     &mut report,
                 );
-                let result = process_test_result(runtime.block_on(
-                    tokio::time::timeout(test_duration, test.run(&mut aptos_ctx))));
+                let result = process_test_result(
+                    runtime.block_on(tokio::time::timeout(test_duration, test.run(&mut aptos_ctx))).unwrap()
+                );
                 report.report_text(result.to_string());
                 summary.handle_result(test.details(), result)?;
             }
@@ -340,7 +341,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 let handle = network_ctx.runtime.handle().clone();
                 let _handle_context = handle.enter();
                 let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle.clone());
-                let result = process_test_result(handle.block_on(tokio::time::timeout(test_duration, test.run(network_ctx.clone()))));
+                let result = process_test_result(
+                    handle.block_on(tokio::time::timeout(test_duration, test.run(network_ctx.clone()))).unwrap()
+                );
                 // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.
                 let NetworkContextSynchronizer { ctx, handle } = network_ctx;
                 drop(handle);
