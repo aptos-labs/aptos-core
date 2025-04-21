@@ -304,7 +304,6 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     full_message.append(*message);
 
     *full_message
-    //<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(*full_message)
 }
 </code></pre>
 
