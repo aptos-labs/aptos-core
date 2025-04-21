@@ -16,6 +16,7 @@ module 0x815::m {
     enum CommonFields {
         Foo{x: u64, y: u8},
         Bar{x: u64, z: u32}
+        Baz{other: u32}
     }
 
     fun t1(self: Color): bool {

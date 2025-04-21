@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: not supported before language version `2.0`: access specifier type instantiation. Try removing the type instantiation.
+  ┌─ tests/checking-lang-v1/acquires_list_generic.move:6:24
+  │
+6 │     fun foo() acquires B<CupC<R>> {
+  │                        ^^^^^^^^^^^

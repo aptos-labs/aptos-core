@@ -14,6 +14,8 @@
 //! this transformation removes dead stores, i.e., assignments and loads to locals which
 //! are not live afterwards (or are live only in dead code, making them effectively dead).
 //! In addition, it also removes self-assignments, i.e., assignments of the form `x = x`.
+//! One can also remove only those self-assignments where the definition is in the same block
+//! before the self-assign by using `eliminate_all_self_assigns=false`.
 
 use crate::pipeline::livevar_analysis_processor::LiveVarAnnotation;
 use move_binary_format::file_format::CodeOffset;
@@ -59,18 +61,24 @@ struct ReducedDefUseGraph {
 
 impl ReducedDefUseGraph {
     /// Get the dead stores that are safe to remove from the function `target`.
-    pub fn dead_stores(target: &FunctionTarget) -> BTreeSet<u16> {
+    /// If `eliminate_all_self_assigns` is true, all self-assignments are removed.
+    pub fn dead_stores(target: &FunctionTarget, eliminate_all_self_assigns: bool) -> BTreeSet<u16> {
         Self {
             children: BTreeMap::new(),
             parents: BTreeMap::new(),
             defs_alive: BTreeSet::new(),
             defs_dead: BTreeSet::new(),
         }
-        .run_stages(target)
+        .run_stages(target, eliminate_all_self_assigns)
     }
 
     /// Run various stages to return the dead stores from `target`.
-    fn run_stages(mut self, target: &FunctionTarget) -> BTreeSet<u16> {
+    /// If `eliminate_all_self_assigns` is true, all self-assignments are removed.
+    fn run_stages(
+        mut self,
+        target: &FunctionTarget,
+        eliminate_all_self_assigns: bool,
+    ) -> BTreeSet<u16> {
         let code = target.get_bytecode();
         let live_vars = target
             .get_annotations()
@@ -97,8 +105,18 @@ impl ReducedDefUseGraph {
         for dead_def_leaf in self.defs_dead.clone() {
             self.disconnect_from_parents(dead_def_leaf);
         }
-        // Stage 3: Let's disconnect all the self-assignments from the graph and kill them.
+        // Stage 3: Let's disconnect self-assignments from the graph and kill them
+        // (conditioned upon `eliminate_all_self_assigns`).
         for self_assign in self_assigns {
+            let eliminate_this_self_assign = Self::should_eliminate_given_self_assign(
+                self_assign,
+                code,
+                live_vars,
+                eliminate_all_self_assigns,
+            );
+            if !eliminate_this_self_assign {
+                continue;
+            }
             let mut parents = self.disconnect_from_parents(self_assign);
             let mut children = self.disconnect_from_children(self_assign);
             // In case there is a cycle of self-assignments in the graph.
@@ -208,12 +226,57 @@ impl ReducedDefUseGraph {
             self.defs_dead.insert(def); // def without a use is dead
         }
     }
+
+    /// Should `self_assign` be eliminated?
+    fn should_eliminate_given_self_assign(
+        self_assign_offset: CodeOffset,
+        code: &[Bytecode],
+        live_vars: &LiveVarAnnotation,
+        eliminate_all_self_assigns: bool,
+    ) -> bool {
+        if !eliminate_all_self_assigns {
+            // Eliminate this self assign if each of its uses are the last sources of their instructions.
+            let self_assign_instr = &code[self_assign_offset as usize];
+            let self_assign_temp = self_assign_instr.dests()[0];
+            let live_info_after = live_vars
+                .get_info_at(self_assign_offset)
+                .after
+                .get(&self_assign_temp);
+            match live_info_after {
+                None => true,
+                Some(live) => live.usage_offsets().iter().all(|use_offset| {
+                    let use_instr = &code[*use_offset as usize];
+                    let sources = use_instr.sources();
+                    sources
+                        .iter()
+                        .position(|source| *source == self_assign_temp)
+                        .is_some_and(|pos| pos == sources.len() - 1)
+                }),
+            }
+        } else {
+            true
+        }
+    }
 }
 
 /// A processor which performs dead store elimination transformation.
-pub struct DeadStoreElimination {}
+pub struct DeadStoreElimination {
+    /// If true, eliminate all self-assignments of the form `x = x`.
+    /// Otherwise, only self assignments where the definition is in the same block
+    /// before the self-assign are removed.
+    eliminate_all_self_assigns: bool,
+}
 
 impl DeadStoreElimination {
+    /// If `eliminate_all_self_assigns` is true, all self-assignments are removed.
+    /// Otherwise, only self assignments where the definition is in the same block
+    /// before the self-assign are removed.
+    pub fn new(eliminate_all_self_assigns: bool) -> Self {
+        Self {
+            eliminate_all_self_assigns,
+        }
+    }
+
     /// Transforms the `code` of a function by removing the instructions corresponding to
     /// the code offsets contained in `dead_stores`.
     ///
@@ -242,7 +305,7 @@ impl FunctionTargetProcessor for DeadStoreElimination {
             return data;
         }
         let target = FunctionTarget::new(func_env, &data);
-        let dead_stores = ReducedDefUseGraph::dead_stores(&target);
+        let dead_stores = ReducedDefUseGraph::dead_stores(&target, self.eliminate_all_self_assigns);
         let new_code = Self::transform(&target, dead_stores);
         // Note that the file format generator will not include unused locals in the generated code,
         // so we don't need to prune unused locals here for various fields of `data` (like `local_types`).

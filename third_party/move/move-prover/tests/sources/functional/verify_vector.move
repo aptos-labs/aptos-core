@@ -88,7 +88,7 @@ module 0x42::VerifyVector {
     spec verify_singleton {
         aborts_if false;
         ensures len(result) == 1;
-        ensures result[0] == e;
+        ensures result == vector[e];
     }
 
     // Reverses the order of the elements in the vector in place.
@@ -146,28 +146,26 @@ module 0x42::VerifyVector {
     }
 
     // Moves all of the elements of the `other` vector into the `v` vector.
-    fun verify_append<Element>(v: &mut vector<Element>, other: vector<Element>) {
-        let o = &mut other;
-        vector::reverse(o);
+    fun verify_append<Element>(v: &mut vector<Element>, other: &mut vector<Element>) {
+        vector::reverse(other);
         while ({
             spec {
                 invariant len(v) >= len(old(v));
-                invariant len(o) <= len(other);
-                invariant len(v) + len(o) == len(old(v)) + len(other);
+                invariant len(other) <= len(old(other));
+                invariant len(v) + len(other) == len(old(v)) + len(old(other));
                 invariant forall k in 0..len(old(v)): v[k] == old(v)[k];
-                invariant forall k in 0..len(o): o[k] == other[len(other)-1-k];
-                invariant forall k in len(old(v))..len(v): v[k] == other[k-len(old(v))];
+                invariant forall k in 0..len(other): other[k] == old(other)[len(old(other))-1-k];
+                invariant forall k in len(old(v))..len(v): v[k] == old(other)[k-len(old(v))];
             };
-            !vector::is_empty(o)
+            !vector::is_empty(other)
         }) {
-            vector::push_back(v, vector::pop_back(o))
+            vector::push_back(v, vector::pop_back(other))
         };
-        vector::destroy_empty(other);
     }
     spec verify_append {
-        ensures len(v) == old(len(v)) + len(other);
+        ensures len(v) == old(len(v)) + old(len(other));
         ensures v[0..len(old(v))] == old(v);
-        ensures v[len(old(v))..len(v)] == other;
+        ensures v[len(old(v))..len(v)] == old(other);
     }
 
     fun verify_append_with_unroll<Element>(v: &mut vector<Element>, other: vector<Element>) {
@@ -408,5 +406,39 @@ module 0x42::VerifyVector {
         ensures len(v) == len(old(v)) - 1;
         ensures v == old(update(v,i,v[len(v)-1])[0..len(v)-1]);
         ensures old(v[i]) == result;
+    }
+
+    fun vector_operator_in_function<Element: copy + drop>(e1: Element, e2: Element, e3: Element): vector<Element> {
+        vector[e1, e2, e3]
+    }
+
+    fun spec_with_vector_operator<Element: copy + drop>(e1: Element, e2: Element, e3: Element): (vector<Element>, vector<Element>) {
+        let v0 = vector::empty();
+        let v3 = vector::empty();
+        vector::push_back(&mut v3, e1);
+        spec {
+            assert v3 == vector[e1];
+        };
+        vector::push_back(&mut v3, e2);
+        spec {
+            assert v3 == vector[e1, e2];
+        };
+        vector::push_back(&mut v3, e3);
+        spec {
+            assert v3 == vector_operator_in_function(e1, e2, e3);
+        };
+        vector::push_back(&mut v3, e1);
+        spec {
+            assert v3 == vector[e1, e2, e3, e1];
+        };
+        vector::push_back(&mut v3, e2);
+        spec {
+            assert v3 == vector[e1, e2, e3, e1, e2];
+        };
+        (v3, v0)
+    }
+    spec spec_with_vector_operator {
+        ensures result_2 == vector[];
+        ensures result_1 == concat(vector_operator_in_function(e1, e2, e3), vector[e1, e2]);
     }
 }

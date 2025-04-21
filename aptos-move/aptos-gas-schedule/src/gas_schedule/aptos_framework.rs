@@ -6,7 +6,9 @@
 use crate::{
     gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13},
+    ver::gas_feature_versions::{
+        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
+    },
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -19,6 +21,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
     [
         [account_create_address_base: InternalGas, "account.create_address.base", 1102],
         [account_create_signer_base: InternalGas, "account.create_signer.base", 1102],
+
+        // Permissioned signer gas parameters
+        [permission_address_base: InternalGas, { RELEASE_V1_26 => "permissioned_signer.permission_address.base"}, 1102],
+        [is_permissioned_signer_base: InternalGas, { RELEASE_V1_26 => "permissioned_signer.is_permissioned_signer.base"}, 1102],
+        [signer_from_permissioned_handle_base: InternalGas, { RELEASE_V1_26 => "permissioned_signer.signer_from_permissioned_handle.base"}, 1102],
 
         // BN254 algebra gas parameters begin.
         // Generated at time 1701559125.5498126 by `scripts/algebra-gas/update_bn254_algebra_gas_params.py` with gas_per_ns=209.10511688369482.
@@ -237,6 +244,30 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bulletproofs_per_byte_rangeproof_deserialize: InternalGasPerByte, { 11.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 121],
         // Bulletproofs gas parameters end.
 
+        // Bulletproofs batch verify gas parameters begin.
+        // Generated at time 1738897425.2325199 by `scripts/algebra-gas/update_bulletproofs_batch_verify_gas_params.py` with gas_per_ns=37.59.
+        [bulletproofs_verify_base_batch_1_bits_8: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_1_bits_8" }, 17_099_501],
+        [bulletproofs_verify_base_batch_1_bits_16: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_1_bits_16" }, 25_027_962],
+        [bulletproofs_verify_base_batch_1_bits_32: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_1_bits_32" }, 39_739_929],
+        [bulletproofs_verify_base_batch_1_bits_64: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_1_bits_64" }, 67_748_218],
+        [bulletproofs_verify_base_batch_2_bits_8: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_2_bits_8" }, 25_645_449],
+        [bulletproofs_verify_base_batch_2_bits_16: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_2_bits_16" }, 40_207_383],
+        [bulletproofs_verify_base_batch_2_bits_32: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_2_bits_32" }, 68_498_984],
+        [bulletproofs_verify_base_batch_2_bits_64: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_2_bits_64" }, 118_069_899],
+        [bulletproofs_verify_base_batch_4_bits_8: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_4_bits_8" }, 41_471_127],
+        [bulletproofs_verify_base_batch_4_bits_16: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_4_bits_16" }, 69_359_728],
+        [bulletproofs_verify_base_batch_4_bits_32: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_4_bits_32" }, 118_697_464],
+        [bulletproofs_verify_base_batch_4_bits_64: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_4_bits_64" }, 196_689_638],
+        [bulletproofs_verify_base_batch_8_bits_8: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_8_bits_8" }, 71_932_907],
+        [bulletproofs_verify_base_batch_8_bits_16: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_8_bits_16" }, 120_974_478],
+        [bulletproofs_verify_base_batch_8_bits_32: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_8_bits_32" }, 198_670_838],
+        [bulletproofs_verify_base_batch_8_bits_64: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_8_bits_64" }, 339_391_615],
+        [bulletproofs_verify_base_batch_16_bits_8: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_16_bits_8" }, 124_950_279],
+        [bulletproofs_verify_base_batch_16_bits_16: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_16_bits_16" }, 202_393_357],
+        [bulletproofs_verify_base_batch_16_bits_32: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_16_bits_32" }, 344_222_644],
+        [bulletproofs_verify_base_batch_16_bits_64: InternalGas, { RELEASE_V1_28.. => "bulletproofs.verify.base_batch_16_bits_64" }, 603_952_779],
+        // Bulletproofs batch verify gas parameters end.
+
         [type_info_type_of_base: InternalGas, "type_info.type_of.base", 1102],
         // TODO(Gas): the on-chain name is wrong...
         [type_info_type_of_per_byte_in_str: InternalGasPerByte, "type_info.type_of.per_abstract_memory_unit", 18],
@@ -251,6 +282,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [function_info_check_dispatch_type_compatibility_impl_base: InternalGas, { RELEASE_V1_13.. => "function_info.check_dispatch_type_compatibility_impl.base" }, 1002],
         [function_info_load_function_base: InternalGas, { RELEASE_V1_13.. => "function_info.load_function.base" }, 551],
         [dispatchable_fungible_asset_dispatch_base: InternalGas, { RELEASE_V1_13.. => "dispatchable_fungible_asset.dispatch.base" }, 551],
+        [dispatchable_authenticate_dispatch_base: InternalGas, { RELEASE_V1_26.. => "dispatchable_authenticate.dispatch.base" }, 551],
 
         // Reusing SHA2-512's cost from Ristretto
         [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 11910],  // 3_240 * 20
@@ -322,5 +354,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [object_exists_at_per_item_loaded: InternalGas, { 7.. => "object.exists_at.per_item_loaded" }, 1470],
         [string_utils_base: InternalGas, { 8.. => "string_utils.format.base" }, 1102],
         [string_utils_per_byte: InternalGasPerByte, { 8.. =>"string_utils.format.per_byte" }, 3],
+
+        [randomness_fetch_and_inc_counter: InternalGas, { RELEASE_V1_23.. => "randomness.fetch_and_inc_counter" }, 1],
     ]
 );

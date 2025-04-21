@@ -51,7 +51,7 @@ async fn test_jwk_manager_state_transition() {
         .collect();
     let epoch_state = EpochState {
         epoch: 999,
-        verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
+        verifier: ValidatorVerifier::new(validator_consensus_infos.clone()).into(),
     };
 
     let update_certifier = DummyUpdateCertifier::default();

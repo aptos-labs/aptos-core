@@ -8,19 +8,19 @@ use crate::{
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
         buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
-        signing_phase::CommitSignerProvider,
+        pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::types::RandConfig,
     state_replication::StateComputerCommitCallBackType,
     test_utils::mock_storage::MockStorage,
 };
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::{Payload, Round},
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{bls12381::PrivateKey, HashValue};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -29,11 +29,12 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     transaction::SignedTransaction,
+    validator_signer::ValidatorSigner,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 pub struct MockExecutionClient {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
@@ -74,8 +75,10 @@ impl MockExecutionClient {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let (mut payload_txns, _max_txns_from_block_to_execute) =
-                self.payload_manager.get_transactions(block.block()).await?;
+            let (mut payload_txns, _max_txns_from_block_to_execute, _block_gas_limit) = self
+                .payload_manager
+                .get_transactions(block.block(), None)
+                .await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
@@ -94,6 +97,7 @@ impl MockExecutionClient {
 impl TExecutionClient for MockExecutionClient {
     async fn start_epoch(
         &self,
+        _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
@@ -104,6 +108,7 @@ impl TExecutionClient for MockExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
+        _new_pipeline_enabled: bool,
     ) {
     }
 
@@ -161,7 +166,16 @@ impl TExecutionClient for MockExecutionClient {
         Ok(())
     }
 
-    async fn sync_to(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the MockExecutionClient!"
+        )))
+    }
+
+    async fn sync_to_target(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         debug!(
             "Fake sync to block id {}",
             commit.ledger_info().consensus_block_id()
@@ -176,4 +190,8 @@ impl TExecutionClient for MockExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        unimplemented!()
+    }
 }

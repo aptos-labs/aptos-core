@@ -28,8 +28,8 @@ Value `k` and `b` should be printed.
 {"b": 336.51096106242346, "k": 4.868293006038344}
 ```
 
-Combined with the [pre-defined](https://github.com/aptos-labs/aptos-core/blob/28df4c1f0ea0d6c6dc6b0460257aa9086e830d1a/aptos-move/aptos-gas/src/move_stdlib.rs#L17-L18) SHA2-256 gas formula (unscaled internal gas):`g(n)=50n+3000`,
-it can be calculated that `gas_per_ns = 50/k`.
+Combined with the [pre-defined](https://github.com/aptos-labs/aptos-core/blob/2d6ed231ca39fc07422dfe95aa76746b2210e36d/aptos-move/aptos-gas-schedule/src/gas_schedule/move_stdlib.rs#L23-L24) SHA2-256 gas formula (unscaled internal gas):`g(n)=183n+11028`,
+it can be calculated that `gas_per_ns = 183/k`.
 
 Second last, go to `scripts/algebra-gas/update_algebra_gas_params.py`
 and update the value of the global variable `TARGET_GAS_VERSION` if necessary.

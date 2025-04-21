@@ -38,6 +38,7 @@ fn mk_module(vis: u8) -> CompiledModule {
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
                 access_specifiers: None,
+                attributes: vec![],
             },
         ],
         function_defs: vec![

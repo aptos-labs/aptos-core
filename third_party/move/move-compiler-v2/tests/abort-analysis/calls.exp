@@ -19,9 +19,7 @@ fun test::test0() {
 fun test::nothing() {
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: return ()
 }
@@ -31,23 +29,15 @@ fun test::nothing() {
 fun test::test0() {
      # abort state: {returns,aborts}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: test::nothing()
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: return ()
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
   2: return ()
 }

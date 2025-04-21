@@ -59,10 +59,9 @@ spec aptos_framework::aggregator {
     }
 
     spec limit {
-        pragma opaque;
+        pragma intrinsic;
         /// [high-level-req-1.2]
-        aborts_if false;
-        ensures [abstract] result == spec_get_limit(aggregator);
+        aborts_if [abstract] false;
     }
 
     spec native fun spec_read(aggregator: Aggregator): u128;

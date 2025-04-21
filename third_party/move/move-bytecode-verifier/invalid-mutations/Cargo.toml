@@ -1,5 +1,5 @@
 [package]
-name = "invalid-mutations"
+name = "move-bytecode-verifier-invalid-mutations"
 version = "0.1.0"
 edition = "2021"
 authors = ["Diem Association <opensource@diem.com>"]
@@ -10,9 +10,6 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-move-binary-format = { path = "../../move-binary-format" }
-move-core-types = { path = "../../move-core/types" }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
 proptest = { workspace = true }
-
-[features]
-default = []

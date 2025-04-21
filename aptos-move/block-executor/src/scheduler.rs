@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
-use aptos_aggregator::types::code_invariant_error;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
-use aptos_types::delayed_fields::PanicError;
+use aptos_types::error::{code_invariant_error, PanicError};
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
@@ -297,6 +296,10 @@ pub struct Scheduler {
 
     has_halted: CachePadded<AtomicBool>,
 
+    /// Set to true if we do not need to validate module reads. Most of the time this is the case,
+    /// unless modules are published.
+    skip_module_reads_validation: CachePadded<AtomicBool>,
+
     queueing_commits_lock: CachePadded<ArmedLock>,
 
     commit_queue: ConcurrentQueue<u32>,
@@ -326,6 +329,7 @@ impl Scheduler {
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
             has_halted: CachePadded::new(AtomicBool::new(false)),
+            skip_module_reads_validation: CachePadded::new(AtomicBool::new(true)),
             queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
@@ -557,7 +561,12 @@ impl Scheduler {
         Ok(SchedulerTask::Retry)
     }
 
-    pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+    /// Wakes up dependencies of the specified transaction, and decreases validation index so that
+    /// all transactions above are re-validated.
+    pub fn wake_dependencies_and_decrease_validation_idx(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<(), PanicError> {
         // We have exclusivity on this transaction.
         self.wake_dependencies_after_execution(txn_idx)?;
 
@@ -642,6 +651,10 @@ impl Scheduler {
         }
 
         !self.has_halted.swap(true, Ordering::SeqCst)
+    }
+
+    pub(crate) fn has_halted(&self) -> bool {
+        self.has_halted.load(Ordering::Relaxed)
     }
 }
 
@@ -1010,6 +1023,17 @@ impl Scheduler {
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
     fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
+    }
+
+    /// Sets the flag to validate module reads.
+    pub(crate) fn validate_module_reads(&self) {
+        self.skip_module_reads_validation
+            .store(false, Ordering::Release);
+    }
+
+    /// Returns true if module validation can be skipped.
+    pub(crate) fn skip_module_reads_validation(&self) -> bool {
+        self.skip_module_reads_validation.load(Ordering::Acquire)
     }
 }
 

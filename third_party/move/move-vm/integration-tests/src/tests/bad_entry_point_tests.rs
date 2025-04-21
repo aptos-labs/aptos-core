@@ -10,21 +10,22 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
-use move_vm_test_utils::{BlankStorage, InMemoryStorage};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage};
+use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
 #[test]
 fn call_non_existent_module() {
-    let vm = MoveVM::new(vec![]);
-    let storage = BlankStorage;
+    let storage = InMemoryStorage::new();
+    let vm = MoveVM::new();
 
     let mut sess = vm.new_session(&storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
+    let module_storage = storage.as_unsync_module_storage();
 
     let err = sess
         .execute_function_bypass_visibility(
@@ -34,6 +35,7 @@ fn call_non_existent_module() {
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &module_storage,
         )
         .unwrap_err();
 
@@ -54,14 +56,15 @@ fn call_non_existent_function() {
 
     let mut storage = InMemoryStorage::new();
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(module_id.clone(), blob);
+    storage.add_module_bytes(module_id.address(), module_id.name(), blob.into());
 
-    let vm = MoveVM::new(vec![]);
+    let vm = MoveVM::new();
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 
-    let storage = TraversalStorage::new();
+    let traversal_storage = TraversalStorage::new();
+    let module_storage = storage.as_unsync_module_storage();
 
     let err = sess
         .execute_function_bypass_visibility(
@@ -70,7 +73,8 @@ fn call_non_existent_function() {
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&storage),
+            &mut TraversalContext::new(&traversal_storage),
+            &module_storage,
         )
         .unwrap_err();
 

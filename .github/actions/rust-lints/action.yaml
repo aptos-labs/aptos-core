@@ -10,10 +10,6 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
     # Run the pre-commit checks
     - uses: pre-commit/action@v3.0.0
 

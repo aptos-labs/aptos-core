@@ -35,7 +35,7 @@ impl Signature {
 
     /// Deserialize an P256Signature, without checking for malleability
     /// Uses the SEC1 serialization format.
-    pub(crate) fn from_bytes_unchecked(
+    pub fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<Signature, CryptoMaterialError> {
         match p256::ecdsa::Signature::try_from(bytes) {

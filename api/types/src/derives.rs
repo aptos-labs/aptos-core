@@ -20,8 +20,8 @@
 
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
-    Address, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
-    MoveStructTag, MoveType, StateKeyWrapper, U128, U256, U64,
+    Address, AssetType, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper,
+    MoveModuleId, MoveStructTag, MoveType, StateKeyWrapper, U128, U256, U64,
 };
 use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use indoc::indoc;
@@ -42,6 +42,24 @@ impl_poem_type!(
             shortened by stripping leading 0s, and adding a 0x.
 
             For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
+        "})
+    )
+);
+
+impl_poem_type!(
+    AssetType,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "0x1::aptos_coin::AptosCoin".to_string()
+        )),
+        format = Some("hex"),
+        description = Some(indoc! {"
+            A hex encoded 32 byte Aptos account address or a struct tag.
+
+            This is represented in a string as a 64 character hex string, sometimes
+            shortened by stripping leading 0s, and adding a 0x or
+            Format: `{address}::{module name}::{struct name}`
         "})
     )
 );
@@ -293,6 +311,7 @@ impl_poem_type!(
 
 impl_poem_parameter!(
     Address,
+    AssetType,
     HashValue,
     IdentifierWrapper,
     HexEncodedBytes,

@@ -4,13 +4,14 @@
 
 use anyhow::Result;
 use aptos_schemadb::{
+    batch::SchemaBatch,
     define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
-    ColumnFamilyName, SchemaBatch, DB,
+    ColumnFamilyName, DB,
 };
 use aptos_storage_interface::AptosDbError;
 use byteorder::{LittleEndian, ReadBytesExt};
-use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
+use rocksdb::{ColumnFamilyDescriptor, DEFAULT_COLUMN_FAMILY_NAME};
 
 // Creating two schemas that share exactly the same structure but are stored in different column
 // families. Also note that the key and value are of the same type `TestField`. By implementing
@@ -81,6 +82,13 @@ fn get_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+fn get_cfds() -> Vec<ColumnFamilyDescriptor> {
+    get_column_families()
+        .iter()
+        .map(|cf_name| ColumnFamilyDescriptor::new(*cf_name, rocksdb::Options::default()))
+        .collect()
+}
+
 fn open_db(dir: &aptos_temppath::TempPath) -> DB {
     let mut db_opts = rocksdb::Options::default();
     db_opts.create_if_missing(true);
@@ -89,13 +97,8 @@ fn open_db(dir: &aptos_temppath::TempPath) -> DB {
 }
 
 fn open_db_read_only(dir: &aptos_temppath::TempPath) -> DB {
-    DB::open_cf_readonly(
-        &rocksdb::Options::default(),
-        dir.path(),
-        "test",
-        get_column_families(),
-    )
-    .expect("Failed to open DB.")
+    DB::open_cf_readonly(&rocksdb::Options::default(), dir.path(), "test", get_cfds())
+        .expect("Failed to open DB.")
 }
 
 fn open_db_as_secondary(dir: &aptos_temppath::TempPath, dir_sec: &aptos_temppath::TempPath) -> DB {
@@ -104,7 +107,7 @@ fn open_db_as_secondary(dir: &aptos_temppath::TempPath, dir_sec: &aptos_temppath
         dir.path(),
         dir_sec.path(),
         "test",
-        get_column_families(),
+        get_cfds(),
     )
     .expect("Failed to open DB.")
 }
@@ -192,7 +195,7 @@ fn gen_expected_values(values: &[(u32, u32)]) -> Vec<(TestField, TestField)> {
 fn test_single_schema_batch() {
     let db = TestDB::new();
 
-    let db_batch = SchemaBatch::new();
+    let mut db_batch = SchemaBatch::new();
     db_batch
         .put::<TestSchema1>(&TestField(0), &TestField(0))
         .unwrap();
@@ -230,7 +233,7 @@ fn test_single_schema_batch() {
 fn test_two_schema_batches() {
     let db = TestDB::new();
 
-    let db_batch1 = SchemaBatch::new();
+    let mut db_batch1 = SchemaBatch::new();
     db_batch1
         .put::<TestSchema1>(&TestField(0), &TestField(0))
         .unwrap();
@@ -248,7 +251,7 @@ fn test_two_schema_batches() {
         gen_expected_values(&[(0, 0), (1, 1)]),
     );
 
-    let db_batch2 = SchemaBatch::new();
+    let mut db_batch2 = SchemaBatch::new();
     db_batch2.delete::<TestSchema2>(&TestField(3)).unwrap();
     db_batch2
         .put::<TestSchema2>(&TestField(3), &TestField(3))
@@ -328,7 +331,7 @@ fn test_report_size() {
     let db = TestDB::new();
 
     for i in 0..1000 {
-        let db_batch = SchemaBatch::new();
+        let mut db_batch = SchemaBatch::new();
         db_batch
             .put::<TestSchema1>(&TestField(i), &TestField(i))
             .unwrap();

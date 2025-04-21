@@ -13,3 +13,11 @@ output "kubernetes_ca_certificate" {
 output "kubernetes_token" {
   value = data.aws_eks_cluster_auth.aptos.token
 }
+
+output "s3_backup_role" {
+  value = aws_iam_role.backup
+}
+
+output "s3_backup_bucket" {
+  value = aws_s3_bucket.backup
+}

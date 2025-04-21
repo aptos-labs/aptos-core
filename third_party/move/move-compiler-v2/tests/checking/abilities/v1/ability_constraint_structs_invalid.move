@@ -26,6 +26,11 @@ module M {
         cds<Cup<u64>>();
         cds<Cup<NoC>>();
         cds<Pair<u64, NoC>>();
+    }
+
+    /// Not all above errors are shown because of duplicate removal,
+    /// so some moved here.
+    fun t2() {
         let Sc {} = Sc<NoC> {};
         let Sc {} = Sc<Cup<u64>> {};
         let Sc {} = Sc<Box<NoC>> {};
@@ -37,7 +42,5 @@ module M {
         let Scds {} = Scds<Cup<NoC>> {};
         let Scds {} = Scds<Pair<u64, NoC>> {};
     }
-
-
 }
 }

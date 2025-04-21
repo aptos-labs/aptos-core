@@ -58,11 +58,13 @@ spec aptos_framework::transaction_context {
     }
     spec generate_unique_address(): address {
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract] result == spec_generate_unique_address();
     }
     spec fun spec_generate_unique_address(): address;
     spec generate_auid_address(): address {
         pragma opaque;
+        aborts_if [abstract] false;
         // property 3: Generating the unique address should return a vector with 32 bytes, if the auid feature flag is enabled.
         /// [high-level-req-3]
         ensures [abstract] result == spec_generate_unique_address();

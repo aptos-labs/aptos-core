@@ -28,6 +28,15 @@ module M {
         cds<Cup<TnoC>>();
         cds<Cup<TnoK>>();
         cds<Pair<u64, TnoC>>();
+    }
+
+    /// Not all above errors are shown because of duplicate removal,
+    /// so some moved here.
+    fun t<
+        TnoC: drop + store + key,
+        TnoK: copy + drop + store,
+        T,
+    >() {
         let Sc {} = Sc<TnoC> {};
         let Sc {} = Sc<Cup<TnoK>> {};
         let Sc {} = Sc<Box<TnoC>> {};

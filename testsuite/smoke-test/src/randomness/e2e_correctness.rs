@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{
-        decrypt_key_map, get_current_version, get_on_chain_resource, verify_dkg_transcript,
-        verify_randomness,
-    },
+    randomness::{decrypt_key_map, get_current_version, verify_dkg_transcript, verify_randomness},
     smoke_test_environment::SwarmBuilder,
+    utils::get_on_chain_resource,
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;

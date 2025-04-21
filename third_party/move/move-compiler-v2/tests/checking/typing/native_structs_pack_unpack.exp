@@ -1,22 +1,16 @@
 
 Diagnostics:
-bug: inconsistent struct definition
+error: native struct `C::T` has no fields
   ┌─ tests/checking/typing/native_structs_pack_unpack.move:9:9
   │
 9 │         C::T {}
   │         ^^^^
 
-bug: inconsistent struct definition
+error: native struct `C::T` has no fields
    ┌─ tests/checking/typing/native_structs_pack_unpack.move:12:13
    │
 12 │         let C::T {} = c;
    │             ^^^^
-
-error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
-   ┌─ tests/checking/typing/native_structs_pack_unpack.move:12:13
-   │
-12 │         let C::T {} = c;
-   │             ^^^^^^^
 
 error: field `f` not declared in struct `C::T`
    ┌─ tests/checking/typing/native_structs_pack_unpack.move:15:17

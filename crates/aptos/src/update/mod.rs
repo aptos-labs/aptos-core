@@ -6,12 +6,17 @@
 
 mod aptos;
 mod helpers;
+mod movefmt;
+mod prover_dependencies;
+mod prover_dependency_installer;
 mod revela;
 mod tool;
+mod update_helper;
 
 use crate::common::types::CliTypedResult;
 use anyhow::{anyhow, Context, Result};
 pub use helpers::get_additional_binaries_dir;
+pub use movefmt::get_movefmt_path;
 pub use revela::get_revela_path;
 use self_update::{update::ReleaseUpdate, version::bump_is_greater, Status};
 pub use tool::UpdateTool;
@@ -22,7 +27,7 @@ trait BinaryUpdater {
     fn check(&self) -> bool;
 
     /// Only used for messages we print to the user.
-    fn pretty_name(&self) -> &'static str;
+    fn pretty_name(&self) -> String;
 
     /// Return information about whether an update is required.
     fn get_update_info(&self) -> Result<UpdateRequiredInfo>;
@@ -84,10 +89,21 @@ pub struct UpdateRequiredInfo {
 impl UpdateRequiredInfo {
     pub fn update_required(&self) -> Result<bool> {
         match self.current_version {
-            Some(ref current_version) => bump_is_greater(current_version, &self.target_version)
-                .context(
+            Some(ref current_version) => {
+                // ignore ".beta" or ".rc" for version comparison
+                // because bump_is_greater only supports comparison bewteen `x.y.z`
+                // as a result, `1.0.0.rc1` cannot be updated to `1.0.0.rc2`
+                let target_version = if self.target_version.ends_with(".beta") {
+                    &self.target_version[0..self.target_version.len() - 5]
+                } else if self.target_version.ends_with(".rc") {
+                    &self.target_version[0..self.target_version.len() - 3]
+                } else {
+                    &self.target_version
+                };
+                bump_is_greater(current_version, target_version).context(
                     "Failed to compare current and latest CLI versions, please update manually",
-                ),
+                )
+            },
             None => Ok(true),
         }
     }

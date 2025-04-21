@@ -59,6 +59,8 @@ impl AUTransactionGen for CreateAccountGen {
                 self.new_account.clone(),
                 self.amount,
                 0,
+                false,
+                false,
             ));
         } else {
             gas_used = 0;

@@ -1,9 +1,0 @@
-Move prover returns: exiting with checking errors
-error: A specification variable in the schema TestSchemaName::TestNameConflict conflicts with...
-   ┌─ tests/sources/functional/schema_name.move:9:16
-   │
- 9 │             x: c + 3
-   │                ^^^^^
-   ·
-25 │         let c = x > 3;
-   │         -------------- ...variable c defined here

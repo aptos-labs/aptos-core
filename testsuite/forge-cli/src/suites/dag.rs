@@ -1,14 +1,18 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand};
+use super::{
+    realistic_environment::wrap_with_realistic_env, ungrouped::changing_working_quorum_test_helper,
+};
+use crate::TestCommand;
 use aptos_forge::{
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig,
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
-    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig,
+    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -60,7 +64,7 @@ fn dag_realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 50000,
@@ -89,9 +93,10 @@ fn dag_realistic_env_max_load_test(
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
 
-            let onchain_consensus_config = OnChainConsensusConfig::V3 {
+            let onchain_consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
+                window_size: DEFAULT_WINDOW_SIZE
             };
 
             helm_values["chain"]["on_chain_consensus_config"] =
@@ -109,6 +114,10 @@ fn dag_realistic_env_max_load_test(
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
                     config_v4.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
+                }
+                OnChainExecutionConfig::V5(config_v5) => {
+                    config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v5.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -130,8 +139,10 @@ fn dag_realistic_env_max_load_test(
                 )
                 .add_latency_threshold(4.0, LatencyType::P50)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 8,
+                    max_non_epoch_no_progress_secs: 15.0,
+                    max_epoch_no_progress_secs: 15.0,
+                    max_non_epoch_round_gap: 8,
+                    max_epoch_round_gap: 8,
                 }),
         )
 }
@@ -171,9 +182,10 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
             helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
                 num_large_validators.into();
 
-            let onchain_consensus_config = OnChainConsensusConfig::V3 {
+            let onchain_consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
+                window_size: DEFAULT_WINDOW_SIZE,
             };
 
             helm_values["chain"]["on_chain_consensus_config"] =
@@ -208,6 +220,9 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
                     }
+                    OnChainExecutionConfig::V5(config_v5) => {
+                        config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    }
             }
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
@@ -217,8 +232,10 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 20,
+                    max_non_epoch_no_progress_secs: 20.0,
+                    max_epoch_no_progress_secs: 20.0,
+                    max_non_epoch_round_gap: 20,
+                    max_epoch_round_gap: 20,
                 }),
         )
 }

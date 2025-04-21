@@ -8,6 +8,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::ChangeSetInterface,
+    module_and_script_storage::module_storage::AptosModuleStorage,
     resolver::ExecutorView,
     storage::{
         io_pricing::IoPricing,
@@ -82,6 +83,9 @@ pub trait GasAlgebra {
 
     /// Returns the amount of storage fee used.
     fn storage_fee_used(&self) -> Fee;
+
+    /// Bump the `extra_balance`.
+    fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()>;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.
@@ -144,6 +148,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
         executor_view: &dyn ExecutorView,
+        module_storage: &impl AptosModuleStorage,
     ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
@@ -163,7 +168,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         // Write set
         let mut write_fee = Fee::new(0);
         let mut total_refund = Fee::new(0);
-        for res in change_set.write_op_info_iter_mut(executor_view) {
+        for res in change_set.write_op_info_iter_mut(executor_view, module_storage) {
             let ChargeAndRefund { charge, refund } = pricing.charge_refund_write_op(
                 params,
                 res.map_err(|err| err.finish(Location::Undefined))?,
@@ -245,5 +250,12 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()
+    }
+
+    /// Bump the `extra_balance`.
+    fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> VMResult<()> {
+        self.algebra_mut()
+            .inject_balance(extra_balance)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }

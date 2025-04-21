@@ -147,7 +147,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
-            .build()
+            .build_v1alpha()
             .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?
             .send_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Zstd)

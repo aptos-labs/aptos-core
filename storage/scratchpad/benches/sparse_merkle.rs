@@ -7,7 +7,6 @@ use aptos_scratchpad::{
     test_utils::{naive_smt::NaiveSmt, proof_reader::ProofReader},
     SparseMerkleTree,
 };
-use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use itertools::zip_eq;
 use rand::{distributions::Standard, prelude::StdRng, seq::IteratorRandom, Rng, SeedableRng};
@@ -18,14 +17,14 @@ use std::collections::HashSet;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 struct Block {
-    smt: SparseMerkleTree<StateValue>,
-    updates: Vec<(HashValue, Option<StateValue>)>,
+    smt: SparseMerkleTree,
+    updates: Vec<(HashValue, Option<HashValue>)>,
     proof_reader: ProofReader,
 }
 
 impl Block {
-    fn updates(&self) -> Vec<(HashValue, Option<&StateValue>)> {
-        self.updates.iter().map(|(k, v)| (*k, v.as_ref())).collect()
+    fn updates(&self) -> Vec<(HashValue, Option<HashValue>)> {
+        self.updates.clone()
     }
 }
 
@@ -48,10 +47,10 @@ impl Group {
                 b.iter_batched(
                     || one_large_batch.clone(),
                     // return the resulting smt so the cost of Dropping it is not counted
-                    |one_large_batch| -> SparseMerkleTree<StateValue> {
+                    |one_large_batch| -> SparseMerkleTree {
                         block
                             .smt
-                            .batch_update(one_large_batch, &block.proof_reader)
+                            .freeze_self_and_update(one_large_batch, &block.proof_reader)
                             .unwrap()
                     },
                     BatchSize::LargeInput,
@@ -85,10 +84,7 @@ impl Benches {
             blocks: block_sizes
                 .iter()
                 .map(|block_size| Block {
-                    smt: SparseMerkleTree::new(
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        StateStorageUsage::new_untracked(),
-                    ),
+                    smt: SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH),
                     updates: Self::gen_updates(&mut rng, &keys, *block_size),
                     proof_reader: ProofReader::new(Vec::new()),
                 })
@@ -113,10 +109,7 @@ impl Benches {
                     let updates = Self::gen_updates(&mut rng, &keys, *block_size);
                     let proof_reader = Self::gen_proof_reader(&mut naive_base_smt, &updates);
                     Block {
-                        smt: SparseMerkleTree::new(
-                            naive_base_smt.get_root_hash(),
-                            StateStorageUsage::new_untracked(),
-                        ),
+                        smt: SparseMerkleTree::new(naive_base_smt.get_root_hash()),
                         updates,
                         proof_reader,
                     }
@@ -138,7 +131,7 @@ impl Benches {
                     Block {
                         smt: base_block
                             .smt
-                            .batch_update(base_block.updates(), &base_block.proof_reader)
+                            .freeze_self_and_update(base_block.updates(), &base_block.proof_reader)
                             .unwrap(),
                         updates,
                         proof_reader,
@@ -164,28 +157,28 @@ impl Benches {
         rng: &mut StdRng,
         keys: &[HashValue],
         block_size: usize,
-    ) -> Vec<(HashValue, Option<StateValue>)> {
+    ) -> Vec<(HashValue, Option<HashValue>)> {
         std::iter::repeat_with(|| Self::gen_update(rng, keys))
             .take(block_size)
             .collect()
     }
 
-    fn gen_update(rng: &mut StdRng, keys: &[HashValue]) -> (HashValue, Option<StateValue>) {
+    fn gen_update(rng: &mut StdRng, keys: &[HashValue]) -> (HashValue, Option<HashValue>) {
         (*keys.iter().choose(rng).unwrap(), Self::gen_value(rng))
     }
 
-    fn gen_value(rng: &mut StdRng) -> Option<StateValue> {
+    fn gen_value(rng: &mut StdRng) -> Option<HashValue> {
         if rng.gen_ratio(1, 10) {
             None
         } else {
             let bytes: Vec<u8> = rng.sample_iter::<u8, _>(Standard).take(100).collect();
-            Some(StateValue::new_legacy(bytes.into()))
+            Some(HashValue::new_legacy(bytes.into()))
         }
     }
 
     fn gen_proof_reader(
         naive_smt: &mut NaiveSmt,
-        updates: &[(HashValue, Option<StateValue>)],
+        updates: &[(HashValue, Option<HashValue>)],
     ) -> ProofReader {
         let proofs = updates
             .iter()

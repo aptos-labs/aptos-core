@@ -42,7 +42,7 @@ impl OnDiskStorage {
         // working directory provided by PathBuf::new().
         let file_dir = file_path
             .parent()
-            .map_or(PathBuf::new(), |p| p.to_path_buf());
+            .map_or_else(PathBuf::new, |p| p.to_path_buf());
 
         Self {
             file_path,

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/dotdot_not_supported.move:8:11
+  │
+8 │         let S { .. } = x;
+  │                 ^^ Move 2 language construct is not enabled: `..` patterns

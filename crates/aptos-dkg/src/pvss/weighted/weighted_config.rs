@@ -29,7 +29,9 @@ pub struct WeightedConfig {
     /// `W[a, a + weight[player])`. Useful during weighted secret reconstruction.
     starting_index: Vec<usize>,
     /// The maximum weight of any player.
-    max_player_weight: usize,
+    max_weight: usize,
+    /// The minimum weight of any player.
+    min_weight: usize,
 }
 
 impl WeightedConfig {
@@ -46,7 +48,8 @@ impl WeightedConfig {
         if weights.is_empty() {
             return Err(anyhow!("expected a non-empty vector of player weights"));
         }
-        let max_player_weight = *weights.iter().max().unwrap();
+        let max_weight = *weights.iter().max().unwrap();
+        let min_weight = *weights.iter().min().unwrap();
 
         let n = weights.len();
         let W = weights.iter().sum();
@@ -70,12 +73,47 @@ impl WeightedConfig {
             num_players: n,
             weight: weights,
             starting_index,
-            max_player_weight,
+            max_weight,
+            min_weight,
         })
     }
 
-    pub fn get_max_player_weight(&self) -> usize {
-        self.max_player_weight
+    pub fn get_min_weight(&self) -> usize {
+        self.min_weight
+    }
+
+    /// Returns _a_ player who has the smallest weight.
+    pub fn get_min_weight_player(&self) -> Player {
+        if let Some((i, _weight)) = self
+            .weight
+            .iter()
+            .enumerate()
+            .min_by_key(|&(_, &weight)| weight)
+        {
+            // println!("Player {} has the smallest weight: {}", i, _weight);
+            self.get_player(i)
+        } else {
+            panic!("Weights vector should not be empty");
+        }
+    }
+
+    /// Returns _a_ player who has the largest weight.
+    pub fn get_max_weight_player(&self) -> Player {
+        if let Some((i, _weight)) = self
+            .weight
+            .iter()
+            .enumerate()
+            .max_by_key(|&(_, &weight)| weight)
+        {
+            // println!("Player {} has the largest weight: {}", i, _weight);
+            self.get_player(i)
+        } else {
+            panic!("Weights vector should not be empty");
+        }
+    }
+
+    pub fn get_max_weight(&self) -> usize {
+        self.max_weight
     }
 
     pub fn get_threshold_config(&self) -> &ThresholdConfig {

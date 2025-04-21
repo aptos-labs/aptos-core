@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/dotdot/field_update_not_supported.move:8:16
+  │
+8 │         Foo { x: 42, ..y }
+  │                      ^^
+  │                      │
+  │                      Unexpected '..'
+  │                      Expected an identifier

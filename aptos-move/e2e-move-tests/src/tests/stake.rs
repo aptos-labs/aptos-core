@@ -15,7 +15,7 @@ pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_s
 
 fn build_scripts() -> BTreeMap<String, Vec<u8>> {
     let package_folder = "stake.data";
-    let package_names = vec!["enable_rewards_rate_decrease"];
+    let package_names = vec!["update_rewards_config"];
     common::build_scripts(package_folder, package_names)
 }
 
@@ -194,7 +194,7 @@ fn test_staking_rewards() {
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
     let script_code = PROPOSAL_SCRIPTS
-        .get("enable_rewards_rate_decrease")
+        .get("update_rewards_config")
         .expect("proposal script should be built");
     let txn = harness.create_script(&core_resources, script_code.clone(), vec![], vec![]);
     assert_success!(harness.run(txn));

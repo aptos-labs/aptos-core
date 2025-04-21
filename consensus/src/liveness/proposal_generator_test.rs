@@ -8,6 +8,7 @@ use crate::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
         },
+        proposal_status_tracker::TOptQSPullParamsProvider,
         rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
@@ -17,13 +18,25 @@ use crate::{
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
+    payload_pull_params::OptQSPayloadPullParams,
+    utils::PayloadTxnsSize,
 };
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_signer::ValidatorSigner};
 use futures::{future::BoxFuture, FutureExt};
 use std::{sync::Arc, time::Duration};
 
+const MAX_BLOCK_GAS_LIMIT: u64 = 30_000;
+
 fn empty_callback() -> BoxFuture<'static, ()> {
     async move {}.boxed()
+}
+
+struct MockOptQSPayloadProvider {}
+
+impl TOptQSPullParamsProvider for MockOptQSPayloadProvider {
+    fn get_params(&self) -> Option<OptQSPayloadPullParams> {
+        None
+    }
 }
 
 #[tokio::test]
@@ -36,18 +49,18 @@ async fn test_proposal_generation_empty_tree() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         Duration::ZERO,
+        PayloadTxnsSize::new(1, 10),
         1,
-        1,
+        PayloadTxnsSize::new(1, 10),
         10,
         1,
-        10,
-        10,
-        1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![signer.author()], 1),
@@ -83,18 +96,18 @@ async fn test_proposal_generation_parent() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         Duration::ZERO,
+        PayloadTxnsSize::new(1, 1000),
         1,
-        1,
-        1000,
-        1,
-        500,
+        PayloadTxnsSize::new(1, 500),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![inserter.signer().author()], 1),
@@ -160,18 +173,18 @@ async fn test_old_proposal_generation() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         Duration::ZERO,
+        PayloadTxnsSize::new(1, 1000),
         1,
-        1,
-        1000,
-        1,
-        500,
+        PayloadTxnsSize::new(1, 500),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![inserter.signer().author()], 1),
@@ -202,18 +215,18 @@ async fn test_correct_failed_authors() {
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         Duration::ZERO,
+        PayloadTxnsSize::new(1, 1000),
         1,
-        1,
-        1000,
-        1,
-        500,
+        PayloadTxnsSize::new(1, 500),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![author, peer1, peer2], 1),

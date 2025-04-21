@@ -15,3 +15,11 @@ module 0x42::M {
         Sub<u64>(x, 1)
     }
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    fun bar(x: u64): u64 {
+        if (x > 0) () else abort 1;
+        x - 1
+    }
+}

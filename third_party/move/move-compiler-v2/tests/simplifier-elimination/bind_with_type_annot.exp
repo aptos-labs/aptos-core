@@ -31,27 +31,37 @@ module 0x8675309::M {
     }
     private fun t0() {
         {
-          let (x: u64, b: bool, M::R{ f }): (u64, bool, M::R) = Tuple(0, false, pack M::R(0));
+          let (x: u64, b: bool, M::R{ f }): (u64, bool, R) = Tuple(0, false, pack M::R(0));
           Tuple()
         }
     }
 } // end 0x8675309::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    fun t0() {
+        let (x,b,R{f: f}) = (0, false, R{f: 0});
+    }
+}
+
 
 Diagnostics:
-warning: Unused assignment to `f`. Consider removing or prefixing with an underscore: `_f`
+warning: Unused assignment/binding to `f`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_f`), or binding to `_`
   ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:20
   │
 7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
   │                    ^^^^
 
-warning: Unused assignment to `b`. Consider removing or prefixing with an underscore: `_b`
+warning: Unused assignment/binding to `b`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_b`), or binding to `_`
   ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:13
   │
 7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
   │             ^^^^^^^^^^^^
 
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:13
   │
 7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;

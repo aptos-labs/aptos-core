@@ -1,0 +1,106 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct R<T> {
+        r: T,
+    }
+    struct X<T> {
+        r: T,
+    }
+    private fun t0() {
+        {
+          let y: R<X<u64>> = pack M::R<X<u64>>(pack M::X<u64>(0));
+          {
+            let M::R<X<u64>>{ r: _r } = y;
+            Tuple()
+          }
+        }
+    }
+    private fun t0_u128() {
+        {
+          let y: R<X<u128>> = pack M::R<X<u128>>(pack M::X<u128>(18446744073709551616));
+          {
+            let M::R<X<u128>>{ r: _r } = y;
+            Tuple()
+          }
+        }
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R<T: key> {
+        r: T,
+    }
+    struct X<T> has drop, key {
+        r: T,
+    }
+    fun t0() {
+        let y = R<X<u64>>{r: X<u64>{r: 0}};
+        let R<X<u64>>{r: _r} = y;
+    }
+    fun t0_u128() {
+        let y = R<X<u128>>{r: X<u128>{r: 18446744073709551616u128}};
+        let R<X<u128>>{r: _r} = y;
+    }
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+fun M::t0() {
+     var $t0: 0x8675309::M::R<0x8675309::M::X<u64>>
+     var $t1: 0x8675309::M::X<u64>
+     var $t2: u64
+     var $t3: 0x8675309::M::X<u64>
+  0: $t2 := 0
+  1: $t1 := pack 0x8675309::M::X<u64>($t2)
+  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u64>>($t1)
+  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u64>>($t0)
+  4: return ()
+}
+
+
+[variant baseline]
+fun M::t0_u128() {
+     var $t0: 0x8675309::M::R<0x8675309::M::X<u128>>
+     var $t1: 0x8675309::M::X<u128>
+     var $t2: u128
+     var $t3: 0x8675309::M::X<u128>
+  0: $t2 := 18446744073709551616
+  1: $t1 := pack 0x8675309::M::X<u128>($t2)
+  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u128>>($t1)
+  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u128>>($t0)
+  4: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 8675309.M {
+struct R<T: key> {
+	r: T
+}
+struct X<T> has drop, key {
+	r: T
+}
+
+t0() /* def_idx: 0 */ {
+B0:
+	0: LdU64(0)
+	1: PackGeneric[0](X<u64>)
+	2: PackGeneric[1](R<X<u64>>)
+	3: UnpackGeneric[1](R<X<u64>>)
+	4: Pop
+	5: Ret
+}
+t0_u128() /* def_idx: 1 */ {
+B0:
+	0: LdU128(18446744073709551616)
+	1: PackGeneric[2](X<u128>)
+	2: PackGeneric[3](R<X<u128>>)
+	3: UnpackGeneric[3](R<X<u128>>)
+	4: Pop
+	5: Ret
+}
+}
+============ bytecode verification succeeded ========

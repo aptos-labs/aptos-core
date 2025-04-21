@@ -4,9 +4,9 @@
 
 use crate::{
     file_format::{
-        AbilitySet, FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken,
-        StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex,
-        StructTypeParameter, TableIndex, TypeSignature, VariantDefinition,
+        FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TableIndex,
+        TypeSignature, VariantDefinition,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -14,6 +14,7 @@ use crate::{
         signature::{AbilitySetGen, SignatureTokenGen},
     },
 };
+use move_core_types::ability::AbilitySet;
 use proptest::{
     collection::{vec, SizeRange},
     option,
@@ -71,6 +72,7 @@ impl StDefnMaterializeState {
                 let inner = self.potential_abilities(ty);
                 inner.intersect(AbilitySet::VECTOR)
             },
+            Function(_, _, a) => *a,
             Struct(idx) => {
                 let sh = &self.struct_handles[idx.0 as usize];
                 sh.abilities
@@ -230,15 +232,22 @@ impl StructDefinitionGen {
                     for (i, fd) in fields.into_iter().enumerate() {
                         variant_fields[i % self.variants.len()].push(fd)
                     }
+                    let mut seen_names = BTreeSet::new();
                     StructFieldInformation::DeclaredVariants(
                         variant_fields
                             .into_iter()
                             .zip(self.variants.iter())
-                            .map(|(fields, name)| VariantDefinition {
-                                name: IdentifierIndex(
-                                    name.index(state.identifiers_len) as TableIndex
-                                ),
-                                fields,
+                            .filter_map(|(fields, name)| {
+                                let variant_name = name.index(state.identifiers_len) as TableIndex;
+                                // avoid duplicates
+                                if seen_names.insert(variant_name) {
+                                    Some(VariantDefinition {
+                                        name: IdentifierIndex(variant_name),
+                                        fields,
+                                    })
+                                } else {
+                                    None
+                                }
                             })
                             .collect(),
                     )

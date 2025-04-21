@@ -1029,6 +1029,7 @@ Returns the inner entry function payload of the multisig payload.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();
 </code></pre>
 
@@ -1055,6 +1056,7 @@ Returns the inner entry function payload of the multisig payload.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();
 </code></pre>

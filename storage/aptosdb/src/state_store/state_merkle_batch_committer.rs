@@ -7,42 +7,38 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_store::{buffered_state::CommitMessage, StateDb},
+    state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::state_value::StateValue;
+use aptos_schemadb::batch::RawBatch;
+use aptos_storage_interface::state_store::{state::State, state_with_summary::StateWithSummary};
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
-    pub top_levels_batch: SchemaBatch,
-    pub batches_for_shards: Vec<SchemaBatch>,
-    pub root_hash: HashValue,
-    pub state_delta: Arc<StateDelta>,
+    pub top_levels_batch: RawBatch,
+    pub batches_for_shards: Vec<RawBatch>,
+    pub snapshot: StateWithSummary,
 }
 
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
     state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-    smt_ancestors: SmtAncestors<StateValue>,
+    persisted_state: PersistedState,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
         state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-        smt_ancestors: SmtAncestors<StateValue>,
+        persisted_state: PersistedState,
     ) -> Self {
         Self {
             state_db,
             state_merkle_batch_receiver,
-            smt_ancestors,
+            persisted_state,
         }
     }
 
@@ -54,18 +50,17 @@ impl StateMerkleBatchCommitter {
                     let StateMerkleBatch {
                         top_levels_batch,
                         batches_for_shards,
-                        root_hash,
-                        state_delta,
+                        snapshot,
                     } = state_merkle_batch;
 
-                    let current_version = state_delta
-                        .current_version
+                    let base_version = self.persisted_state.get_state_summary().version();
+                    let current_version = snapshot
+                        .version()
                         .expect("Current version should not be None");
 
                     // commit jellyfish merkle nodes
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["commit_jellyfish_merkle_nodes"])
-                        .start_timer();
+                    let _timer =
+                        OTHER_TIMERS_SECONDS.timer_with(&["commit_jellyfish_merkle_nodes"]);
                     self.state_db
                         .state_merkle_db
                         .commit(current_version, top_levels_batch, batches_for_shards)
@@ -79,10 +74,11 @@ impl StateMerkleBatchCommitter {
                                 cache.maybe_evict_version(self.state_db.state_merkle_db.lru_cache())
                             });
                     }
+
                     info!(
                         version = current_version,
-                        base_version = state_delta.base_version,
-                        root_hash = root_hash,
+                        base_version = base_version,
+                        root_hash = snapshot.summary().root_hash(),
                         "State snapshot committed."
                     );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
@@ -93,14 +89,13 @@ impl StateMerkleBatchCommitter {
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
-                    self.check_usage_consistency(&state_delta).unwrap();
+                    self.check_usage_consistency(&snapshot).unwrap();
 
-                    state_delta.base.log_generation("buffered_state_commit");
-                    state_delta
-                        .current
-                        .log_generation("buffered_state_in_mem_base");
-
-                    self.smt_ancestors.add(state_delta.current.clone());
+                    snapshot
+                        .summary()
+                        .global_state_summary
+                        .log_generation("buffered_state_commit");
+                    self.persisted_state.set(snapshot);
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
@@ -111,9 +106,9 @@ impl StateMerkleBatchCommitter {
         trace!("State merkle batch committing thread exit.")
     }
 
-    fn check_usage_consistency(&self, state_delta: &StateDelta) -> Result<()> {
-        let version = state_delta
-            .current_version
+    fn check_usage_consistency(&self, state: &State) -> Result<()> {
+        let version = state
+            .version()
             .ok_or_else(|| anyhow!("Committing without version."))?;
 
         let usage_from_ledger_db = self.state_db.ledger_db.metadata_db().get_usage(version)?;
@@ -132,12 +127,12 @@ impl StateMerkleBatchCommitter {
             leaf_count_from_jmt,
         );
 
-        let usage_from_smt = state_delta.current.usage();
-        if !usage_from_smt.is_untracked() {
+        let usage_from_in_mem_state = state.usage();
+        if !usage_from_in_mem_state.is_untracked() {
             ensure!(
-                usage_from_smt == usage_from_ledger_db,
+                usage_from_in_mem_state == usage_from_ledger_db,
                 "State storage usage info inconsistent. from smt: {:?}, from ledger_db: {:?}",
-                usage_from_smt,
+                usage_from_in_mem_state,
                 usage_from_ledger_db,
             );
         }

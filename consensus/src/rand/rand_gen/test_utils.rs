@@ -13,7 +13,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

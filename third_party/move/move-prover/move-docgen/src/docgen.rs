@@ -5,17 +5,16 @@
 use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
-#[allow(unused_imports)]
-use log::{debug, info, warn};
+use log::info;
 use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use move_model::{
     ast::{Address, Attribute, AttributeValue, ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},
     emit, emitln,
     model::{
-        AbilitySet, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv,
-        Parameter, QualifiedId, StructEnv, TypeParameter,
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv, Parameter,
+        QualifiedId, StructEnv, TypeParameter,
     },
     symbol::Symbol,
     ty::TypeDisplayContext,
@@ -96,7 +95,7 @@ pub struct DocgenOptions {
     /// documentation.
     ///
     /// A root document is a markdown file which contains placeholders for generated
-    /// documentation content. It is also processed following the same rules than
+    /// documentation content. It is also processed following the same rules as
     /// documentation comments in Move, including creation of cross-references and
     /// Move code highlighting.
     ///
@@ -117,7 +116,7 @@ pub struct DocgenOptions {
     /// module/script content work transparently.
     pub root_doc_templates: Vec<String>,
     /// An optional file containing reference definitions. The content of this file will
-    /// be added to each generated markdown doc.
+    /// be added to each generated Markdown doc.
     pub references_file: Option<String>,
     /// Whether to include dependency diagrams in the generated docs.
     pub include_dep_diagrams: bool,
@@ -125,7 +124,10 @@ pub struct DocgenOptions {
     pub include_call_diagrams: bool,
     /// If this is being compiled relative to a different place where it will be stored (output directory).
     pub compile_relative_to_output_dir: bool,
+    /// Output format for docs, either MD or MDX
     pub output_format: Option<OutputFormat>,
+    /// Ensure Unix paths
+    pub ensure_unix_paths: bool,
 }
 
 impl Default for DocgenOptions {
@@ -146,6 +148,7 @@ impl Default for DocgenOptions {
             include_dep_diagrams: false,
             include_call_diagrams: false,
             output_format: None,
+            ensure_unix_paths: false,
         }
     }
 }
@@ -513,18 +516,14 @@ impl<'env> Docgen<'env> {
                 let mut path = PathBuf::from(dir);
                 path.push(&file_name);
                 if path.exists() {
-                    Some(
-                        self.path_relative_to(&path, &output_path)
-                            .to_string_lossy()
-                            .to_string(),
-                    )
+                    Some(self.path_to_string(self.path_relative_to(&path, &output_path).as_path()))
                 } else {
                     None
                 }
             })
         } else {
             // We will generate this file in the provided output directory.
-            Some(file_name.to_string_lossy().to_string())
+            Some(self.path_to_string(file_name.as_ref()))
         }
     }
 
@@ -535,8 +534,22 @@ impl<'env> Docgen<'env> {
         } else {
             let mut path = PathBuf::from(&self.options.output_directory);
             path.push(name);
-            path.to_string_lossy().to_string()
+
+            self.path_to_string(path.as_path())
         }
+    }
+
+    fn path_to_string(&self, path: &Path) -> String {
+        #[cfg(not(unix))]
+        {
+            if self.options.ensure_unix_paths {
+                path.to_string_lossy().replace('\\', "/")
+            } else {
+                path.to_string_lossy().to_string()
+            }
+        }
+        #[cfg(unix)]
+        path.to_string_lossy().to_string()
     }
 
     /// Makes path relative to other path.
@@ -878,7 +891,7 @@ impl<'env> Docgen<'env> {
     fn convert_to_anchor(&self, input: &str) -> String {
         // Regular expression to match Markdown link format [text](link)
         let re = Regex::new(r"\[(.*?)\]\((.*?)\)").unwrap();
-        re.replace_all(input, |caps: &regex::Captures| {
+        re.replace_all(input, |caps: &Captures| {
             let tag = &caps[1];
             let text = &caps[2];
 
@@ -925,9 +938,9 @@ impl<'env> Docgen<'env> {
             let curr_env = self.env.get_function(id);
             let curr_name = name_of(&curr_env);
             let next_list = if is_forward {
-                curr_env.get_called_functions().cloned().unwrap_or_default()
+                curr_env.get_used_functions().cloned().unwrap_or_default()
             } else {
-                curr_env.get_calling_functions().unwrap_or_default()
+                curr_env.get_using_functions().unwrap_or_default()
             };
 
             if fun_env.module_env.get_id() == curr_env.module_env.get_id() {
@@ -968,7 +981,7 @@ impl<'env> Docgen<'env> {
             .join(format!(
                 "{}_{}_call_graph.svg",
                 fun_env.get_name_string().to_string().replace("::", "_"),
-                (if is_forward { "forward" } else { "backward" })
+                if is_forward { "forward" } else { "backward" }
             ));
 
         self.gen_svg_file(&out_file_path, &dot_src_lines.join("\n"));
@@ -1016,7 +1029,7 @@ impl<'env> Docgen<'env> {
             .join(format!(
                 "{}_{}_dep.svg",
                 module_name,
-                (if is_forward { "forward" } else { "backward" })
+                if is_forward { "forward" } else { "backward" }
             ));
 
         self.gen_svg_file(&out_file_path, &dot_src_lines.join("\n"));
@@ -1143,7 +1156,7 @@ impl<'env> Docgen<'env> {
         for (id, _) in sorted_infos {
             let module_env = self.env.get_module(*id);
             if !module_env.is_primary_target() {
-                // Do not include modules which are not target (outside of the package)
+                // Do not include modules which are not target (outside the package)
                 // into the index.
                 continue;
             }
@@ -1173,19 +1186,25 @@ impl<'env> Docgen<'env> {
     fn gen_struct(&self, spec_block_map: &SpecBlockMap<'_>, struct_env: &StructEnv<'_>) {
         let name = struct_env.get_name();
         self.section_header(
-            &self.struct_title(struct_env),
+            &self.struct_or_enum_title(struct_env),
             &self.label_for_module_item(&struct_env.module_env, name),
         );
         self.increment_section_nest();
         self.doc_text(struct_env.get_doc());
-        self.code_block(&self.struct_header_display(struct_env));
+        self.code_block(&self.struct_or_enum_header_display(struct_env));
 
         if self.options.include_impl || (self.options.include_specs && self.options.specs_inlined) {
             // Include field documentation if either impls or specs are present and inlined,
             // because they are used by both.
-            self.begin_collapsed("Fields");
-            self.gen_struct_fields(struct_env);
-            self.end_collapsed();
+            if struct_env.has_variants() {
+                self.begin_collapsed("Variants");
+                self.gen_enum_inner(struct_env);
+                self.end_collapsed();
+            } else {
+                self.begin_collapsed("Fields");
+                self.gen_struct_fields(struct_env);
+                self.end_collapsed();
+            }
         }
 
         if self.options.specs_inlined {
@@ -1199,19 +1218,26 @@ impl<'env> Docgen<'env> {
         self.decrement_section_nest();
     }
 
-    /// Returns "Struct `N`" or "Resource `N`".
-    fn struct_title(&self, struct_env: &StructEnv<'_>) -> String {
+    /// Returns "Struct `N`" or "Resource `N`" or "Enum `N`".
+    fn struct_or_enum_title(&self, struct_env: &StructEnv<'_>) -> String {
         // NOTE(mengxu): although we no longer declare structs with the `resource` keyword, it
         // might be helpful in keeping `Resource N` in struct title as the boogie translator still
         // depends on the `is_resource()` predicate to add additional functions to structs declared
         // with the `key` ability.
+        let resource_or_enum = if struct_env.has_variants() {
+            if struct_env.has_memory() {
+                "Enum Resource"
+            } else {
+                "Enum"
+            }
+        } else if struct_env.has_memory() {
+            "Resource"
+        } else {
+            "Struct"
+        };
         format!(
             "{} `{}`",
-            if struct_env.has_memory() {
-                "Resource"
-            } else {
-                "Struct"
-            },
+            resource_or_enum,
             self.name_string(struct_env.get_name())
         )
     }
@@ -1229,8 +1255,8 @@ impl<'env> Docgen<'env> {
         )
     }
 
-    /// Generates code signature for a struct.
-    fn struct_header_display(&self, struct_env: &StructEnv<'_>) -> String {
+    /// Generates code signature for a struct or enum.
+    fn struct_or_enum_header_display(&self, struct_env: &StructEnv<'_>) -> String {
         let name = self.name_string(struct_env.get_name());
         let type_params = self.type_parameter_list_display(struct_env.get_type_parameters());
         let ability_tokens = self.ability_tokens(struct_env.get_abilities());
@@ -1239,12 +1265,21 @@ impl<'env> Docgen<'env> {
             .iter()
             .map(|attr| format!("{}\n", attr))
             .join("");
+        let enum_or_struct = if struct_env.has_variants() {
+            "enum"
+        } else {
+            "struct"
+        };
         if ability_tokens.is_empty() {
-            format!("{}struct {}{}", attributes_string, name, type_params)
+            format!(
+                "{}{} {}{}",
+                attributes_string, enum_or_struct, name, type_params
+            )
         } else {
             format!(
-                "{}struct {}{} has {}",
+                "{}{} {}{} has {}",
                 attributes_string,
+                enum_or_struct,
                 name,
                 type_params,
                 ability_tokens.join(", ")
@@ -1252,6 +1287,7 @@ impl<'env> Docgen<'env> {
         }
     }
 
+    /// Generates doc for struct fields.
     fn gen_struct_fields(&self, struct_env: &StructEnv<'_>) {
         let tctx = self.type_display_context_for_struct(struct_env);
         self.begin_definitions();
@@ -1266,6 +1302,40 @@ impl<'env> Docgen<'env> {
             );
         }
         self.end_definitions();
+    }
+
+    /// Generates doc for `variant` of an enum.
+    fn gen_fields_for_variant(&self, struct_env: &StructEnv<'_>, variant: Symbol) {
+        let tctx = self.type_display_context_for_struct(struct_env);
+        self.begin_definitions();
+        for field in struct_env.get_fields_of_variant(variant) {
+            self.definition_text(
+                &format!(
+                    "`{}: {}`",
+                    self.name_string(field.get_name()),
+                    field.get_type().display(&tctx)
+                ),
+                field.get_doc(),
+            );
+        }
+        self.end_definitions();
+    }
+
+    /// Generates doc for fields from all variants of an enum
+    fn gen_enum_fields(&self, struct_env: &StructEnv<'_>) {
+        self.begin_definitions();
+        self.gen_enum_inner(struct_env);
+        self.end_definitions();
+    }
+
+    fn gen_enum_inner(&self, struct_env: &StructEnv<'_>) {
+        for variant in struct_env.get_variants() {
+            self.begin_collapsed(&format!("{}", variant.display(struct_env.symbol_pool())));
+            self.begin_collapsed("Fields");
+            self.gen_fields_for_variant(struct_env, variant);
+            self.end_collapsed();
+            self.end_collapsed();
+        }
     }
 
     /// Generates documentation for a function.
@@ -1577,11 +1647,15 @@ impl<'env> Docgen<'env> {
             if spec_block_map.contains_key(&target) {
                 let name = self.name_string(struct_env.get_name());
                 self.section_header(
-                    &self.struct_title(&struct_env),
+                    &self.struct_or_enum_title(&struct_env),
                     &format!("{}_{}", section_label, name),
                 );
-                self.code_block(&self.struct_header_display(&struct_env));
-                self.gen_struct_fields(&struct_env);
+                self.code_block(&self.struct_or_enum_header_display(&struct_env));
+                if struct_env.has_variants() {
+                    self.gen_enum_fields(&struct_env);
+                } else {
+                    self.gen_struct_fields(&struct_env);
+                }
                 self.gen_spec_blocks(module_env, "", &target, spec_block_map);
             }
         }
@@ -1631,26 +1705,27 @@ impl<'env> Docgen<'env> {
     }
 
     /// Creates a type display context for a function.
-    fn type_display_context_for_fun(&self, func_env: &FunctionEnv<'_>) -> TypeDisplayContext<'_> {
-        let type_param_names = func_env
-            .get_type_parameters()
-            .iter()
-            .map(|TypeParameter(name, _, _)| *name)
-            .collect_vec();
-        TypeDisplayContext::new_with_params(self.env, type_param_names)
+    fn type_display_context_for_fun<'a>(
+        &self,
+        func_env: &'a FunctionEnv<'a>,
+    ) -> TypeDisplayContext<'a> {
+        TypeDisplayContext {
+            // For consistency in navigation links, always use module qualification
+            use_module_qualification: true,
+            ..func_env.get_type_display_ctx()
+        }
     }
 
     /// Creates a type display context for a struct.
-    fn type_display_context_for_struct(
+    fn type_display_context_for_struct<'a>(
         &self,
-        struct_env: &StructEnv<'_>,
-    ) -> TypeDisplayContext<'_> {
-        let type_param_names = struct_env
-            .get_type_parameters()
-            .iter()
-            .map(|TypeParameter(name, _, _)| *name)
-            .collect_vec();
-        TypeDisplayContext::new_with_params(self.env, type_param_names)
+        struct_env: &'a StructEnv<'a>,
+    ) -> TypeDisplayContext<'a> {
+        TypeDisplayContext {
+            // For consistency in navigation links, always use module qualification
+            use_module_qualification: true,
+            ..struct_env.get_type_display_ctx()
+        }
     }
 
     /// Increments section nest.
@@ -1658,7 +1733,7 @@ impl<'env> Docgen<'env> {
         *self.section_nest.borrow_mut() += 1;
     }
 
-    /// Decrements section nest, committing sub-sections to the table-of-contents map.
+    /// Decrements section nest, committing subsections to the table-of-contents map.
     fn decrement_section_nest(&self) {
         *self.section_nest.borrow_mut() -= 1;
     }
@@ -1832,11 +1907,11 @@ impl<'env> Docgen<'env> {
         decorated_text
     }
 
-    /// Begins a code block. This uses html, not markdown code blocks, so we are able to
+    /// Begins a code block. This uses html, not Markdown code blocks, so we are able to
     /// insert style and links into the code.
     fn begin_code(&self) {
         emitln!(self.writer);
-        // If we newline after <pre><code>, an empty line will be created. So we don't.
+        // If we add a newline after <pre><code>, an empty line will be created. So we don't.
         // This, however, creates some ugliness with indented code.
         emit!(self.writer, "<pre><code>");
     }
@@ -1888,7 +1963,7 @@ impl<'env> Docgen<'env> {
         r
     }
 
-    /// Decorates a code fragment, for use in an html block. Replaces < and >, bolds keywords and
+    /// Decorates a code fragment, for use in a html block. Replaces < and >, bolds keywords and
     /// tries to resolve and cross-link references.
     /// If the output format is MDX, replace all html entities to make the doc mdx compatible
     fn decorate_code(&self, code: &str) -> String {
@@ -1990,7 +2065,7 @@ impl<'env> Docgen<'env> {
             |module: &ModuleEnv<'_>, name: Symbol, is_qualified: bool| {
                 // Below we only resolve a simple name to a hyperref if it is followed by a ( or <,
                 // or if it is a named constant in the module.
-                // Otherwise we get too many false positives where names are resolved to functions
+                // Otherwise, we get too many false positives where names are resolved to functions
                 // but are actually fields.
                 if module.find_struct(name).is_some()
                     || module.find_named_constant(name).is_some()
@@ -2160,7 +2235,7 @@ impl<'env> Docgen<'env> {
     }
 
     /// Retrieves source of code fragment with adjusted indentation.
-    /// Typically code has the first line unindented because location tracking starts
+    /// Typically, code has the first line unindented because location tracking starts
     /// at the first keyword of the item (e.g. `public fun`), but subsequent lines are then
     /// indented. This uses a heuristic by guessing the indentation from the context.
     fn get_source_with_indent(&self, loc: &Loc) -> String {

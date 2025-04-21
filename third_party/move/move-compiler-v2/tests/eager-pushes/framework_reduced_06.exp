@@ -1,0 +1,226 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &mut u64
+  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: write_ref($t3, $t1)
+  2: $t2 := infer($t1)
+  3: return $t2
+}
+
+
+[variant baseline]
+fun m::destroy($t0: 0xc0ffee::m::S) {
+     var $t1: u64
+  0: $t1 := unpack 0xc0ffee::m::S($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+     var $t2: &mut u64
+  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
+  1: write_ref($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut 0xc0ffee::m::S
+     var $t7: u64
+     var $t8: &mut 0xc0ffee::m::S
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t2 := 0
+  1: label L0
+  2: $t4 := infer($t2)
+  3: $t5 := 42
+  4: $t3 := <($t4, $t5)
+  5: if ($t3) goto 6 else goto 16
+  6: label L2
+  7: $t6 := infer($t0)
+  8: $t8 := borrow_local($t1)
+  9: $t7 := m::bar($t8, $t2)
+ 10: m::foo($t6, $t7)
+ 11: $t10 := infer($t2)
+ 12: $t11 := 1
+ 13: $t9 := +($t10, $t11)
+ 14: $t2 := infer($t9)
+ 15: goto 18
+ 16: label L3
+ 17: goto 20
+ 18: label L4
+ 19: goto 1
+ 20: label L1
+ 21: m::destroy($t1)
+ 22: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &mut u64
+     # live vars: $t0, $t1
+  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+     # live vars: $t1, $t3
+  1: write_ref($t3, $t1)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::destroy($t0: 0xc0ffee::m::S) {
+     var $t1: u64
+     # live vars: $t0
+  0: $t1 := unpack 0xc0ffee::m::S($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+     var $t2: &mut u64
+     # live vars: $t0, $t1
+  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
+     # live vars: $t1, $t2
+  1: write_ref($t2, $t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: &mut 0xc0ffee::m::S
+     var $t7: u64 [unused]
+     var $t8: &mut 0xc0ffee::m::S
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t2 := 0
+     # live vars: $t0, $t1, $t2
+  1: label L0
+     # live vars: $t0, $t1, $t2
+  2: $t4 := copy($t2)
+     # live vars: $t0, $t1, $t2, $t4
+  3: $t5 := 42
+     # live vars: $t0, $t1, $t2, $t4, $t5
+  4: $t3 := <($t4, $t5)
+     # live vars: $t0, $t1, $t2, $t3
+  5: if ($t3) goto 6 else goto 16
+     # live vars: $t0, $t1, $t2
+  6: label L2
+     # live vars: $t0, $t1, $t2
+  7: $t6 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t6
+  8: $t8 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t6, $t8
+  9: $t4 := m::bar($t8, $t2)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+ 10: m::foo($t6, $t4)
+     # live vars: $t0, $t1, $t2
+ 11: $t4 := move($t2)
+     # live vars: $t0, $t1, $t4
+ 12: $t5 := 1
+     # live vars: $t0, $t1, $t4, $t5
+ 13: $t4 := +($t4, $t5)
+     # live vars: $t0, $t1, $t4
+ 14: $t2 := move($t4)
+     # live vars: $t0, $t1, $t2
+ 15: goto 1
+     # live vars: $t0, $t1, $t2
+ 16: label L3
+     # live vars: $t0, $t1
+ 17: drop($t0)
+     # live vars: $t1
+ 18: m::destroy($t1)
+     # live vars:
+ 19: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+struct S {
+	x: u64
+}
+
+bar(r: &mut S, i: u64): u64 /* def_idx: 0 */ {
+L2:	$t3: &mut u64
+B0:
+	0: MoveLoc[0](r: &mut S)
+	1: MutBorrowField[0](S.x: u64)
+	2: StLoc[2]($t3: &mut u64)
+	3: CopyLoc[1](i: u64)
+	4: MoveLoc[2]($t3: &mut u64)
+	5: WriteRef
+	6: MoveLoc[1](i: u64)
+	7: Ret
+}
+destroy(s: S) /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](s: S)
+	1: Unpack[0](S)
+	2: Pop
+	3: Ret
+}
+foo(l: &mut S, i: u64) /* def_idx: 2 */ {
+L2:	$t2: &mut u64
+B0:
+	0: MoveLoc[0](l: &mut S)
+	1: MutBorrowField[0](S.x: u64)
+	2: StLoc[2]($t2: &mut u64)
+	3: MoveLoc[1](i: u64)
+	4: MoveLoc[2]($t2: &mut u64)
+	5: WriteRef
+	6: Ret
+}
+public test(l: &mut S, r: S) /* def_idx: 3 */ {
+L2:	i: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[2](i: u64)
+B1:
+	2: CopyLoc[2](i: u64)
+	3: LdU64(42)
+	4: Lt
+	5: BrFalse(16)
+B2:
+	6: CopyLoc[0](l: &mut S)
+	7: MutBorrowLoc[1](r: S)
+	8: CopyLoc[2](i: u64)
+	9: Call bar(&mut S, u64): u64
+	10: Call foo(&mut S, u64)
+	11: MoveLoc[2](i: u64)
+	12: LdU64(1)
+	13: Add
+	14: StLoc[2](i: u64)
+	15: Branch(2)
+B3:
+	16: MoveLoc[0](l: &mut S)
+	17: Pop
+	18: MoveLoc[1](r: S)
+	19: Call destroy(S)
+	20: Ret
+}
+}
+============ bytecode verification succeeded ========

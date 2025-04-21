@@ -1,19 +1,7 @@
 
 Diagnostics:
-error: assert macro must have two arguments
-  ┌─ tests/checking/naming/assert_one_arg.move:3:16
-  │
-3 │         assert!(false);
-  │                ^^^^^^^
-
-error: assert macro must have two arguments
-  ┌─ tests/checking/naming/assert_one_arg.move:4:16
-  │
-4 │         assert!(0 != 1);
-  │                ^^^^^^^^
-
-error: assert macro must have two arguments
-  ┌─ tests/checking/naming/assert_one_arg.move:5:16
+error: undeclared `y`
+  ┌─ tests/checking/naming/assert_one_arg.move:5:22
   │
 5 │         assert!(x != y);
-  │                ^^^^^^^^
+  │                      ^

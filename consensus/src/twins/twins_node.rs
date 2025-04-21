@@ -279,6 +279,7 @@ impl SMRNode {
             config.base.waypoint = WaypointConfig::FromConfig(waypoint);
             // Disable timeout in twins test to avoid flakiness
             config.consensus.round_initial_timeout_ms = 2_000_000;
+            config.consensus.enable_pipeline = false;
 
             let author = author_from_config(&config);
 

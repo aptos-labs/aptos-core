@@ -28,6 +28,5 @@ pub mod fuzzing;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 pub mod testutils;
 
-pub type DisconnectReason = peer::DisconnectReason;
 pub type ConnectivityRequest = connectivity_manager::ConnectivityRequest;
 pub type ProtocolId = protocols::wire::handshake::v1::ProtocolId;

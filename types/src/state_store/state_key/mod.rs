@@ -94,7 +94,7 @@ impl StateKey {
         Ok(myself)
     }
 
-    fn crypto_hash(&self) -> &HashValue {
+    pub fn crypto_hash_ref(&self) -> &HashValue {
         &self.0.hash_value
     }
 
@@ -215,7 +215,7 @@ impl StateKey {
     }
 
     pub fn get_shard_id(&self) -> u8 {
-        self.crypto_hash().nibble(0)
+        self.crypto_hash_ref().nibble(0)
     }
 
     pub fn is_aptos_code(&self) -> bool {
@@ -235,7 +235,7 @@ impl CryptoHash for StateKey {
     type Hasher = DummyHasher;
 
     fn hash(&self) -> HashValue {
-        *self.crypto_hash()
+        *self.crypto_hash_ref()
     }
 }
 
@@ -268,7 +268,7 @@ impl Eq for StateKey {}
 
 impl Hash for StateKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write(self.crypto_hash().as_ref())
+        state.write(self.crypto_hash_ref().as_ref())
     }
 }
 

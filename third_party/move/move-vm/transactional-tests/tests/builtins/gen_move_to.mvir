@@ -155,7 +155,7 @@ module 0x1.M {
 //
 // create, publish and exists
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -169,7 +169,7 @@ label b0:
     return;
 }
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -186,7 +186,7 @@ label b0:
     return;
 }
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -219,7 +219,7 @@ label b0:
 //
 // borrows and mutations
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -243,7 +243,7 @@ label b0:
     return;
 }
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -263,7 +263,7 @@ label b0:
 //
 // unpublish, destroy and exists
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -277,7 +277,7 @@ label b0:
     return;
 }
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {
@@ -303,7 +303,7 @@ label b0:
 }
 
 
-//# run --args @0x1
+//# run --signers 0x1
 import 0x1.M;
 
 main(account: signer) {

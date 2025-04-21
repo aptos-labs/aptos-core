@@ -8,6 +8,7 @@ use crate::{
     },
     payload_manager::TPayloadManager,
 };
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
@@ -22,19 +23,20 @@ pub(super) struct MockPayloadManager {}
 
 #[async_trait]
 impl TPayloadManager for MockPayloadManager {
-    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+    fn prefetch_payload_data(&self, _payload: &Payload, _author: Author, _timestamp: u64) {}
 
     fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
 
-    fn check_payload_availability(&self, _block: &Block) -> bool {
+    fn check_payload_availability(&self, _block: &Block) -> Result<(), BitVec> {
         unimplemented!()
     }
 
     async fn get_transactions(
         &self,
         _block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
-        Ok((Vec::new(), None))
+        _block_signers: Option<BitVec>,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
+        Ok((Vec::new(), None, None))
     }
 }
 

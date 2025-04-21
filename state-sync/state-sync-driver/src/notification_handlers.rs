@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
-    ConsensusSyncNotification,
+    ConsensusSyncDurationNotification, ConsensusSyncTargetNotification,
 };
 use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
@@ -16,6 +16,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -27,6 +28,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Instant,
 };
 
 /// A notification for new data that has been committed to storage
@@ -144,44 +146,90 @@ impl FusedStream for CommitNotificationListener {
     }
 }
 
-/// A consensus sync request for a specified target ledger info
-pub struct ConsensusSyncRequest {
-    consensus_sync_notification: ConsensusSyncNotification,
+/// A consensus sync request for a specified target ledger info or duration
+pub enum ConsensusSyncRequest {
+    SyncDuration(Instant, ConsensusSyncDurationNotification), // The start time and duration to sync for
+    SyncTarget(ConsensusSyncTargetNotification),              // The target ledger info to sync to
 }
 
 impl ConsensusSyncRequest {
-    pub fn new(consensus_sync_notification: ConsensusSyncNotification) -> Self {
-        Self {
-            consensus_sync_notification,
+    /// Returns a new sync target request
+    pub fn new_with_target(sync_target_notification: ConsensusSyncTargetNotification) -> Self {
+        ConsensusSyncRequest::SyncTarget(sync_target_notification)
+    }
+
+    /// Returns a new sync duration request
+    pub fn new_with_duration(
+        start_time: Instant,
+        sync_duration_notification: ConsensusSyncDurationNotification,
+    ) -> Self {
+        ConsensusSyncRequest::SyncDuration(start_time, sync_duration_notification)
+    }
+
+    /// Returns the sync target (if one exists)
+    pub fn get_sync_target(&self) -> Option<LedgerInfoWithSignatures> {
+        match self {
+            ConsensusSyncRequest::SyncTarget(sync_target_notification) => {
+                Some(sync_target_notification.get_target().clone())
+            },
+            _ => None,
         }
     }
 
-    pub fn get_sync_target(&self) -> LedgerInfoWithSignatures {
-        self.consensus_sync_notification.target.clone()
+    /// Returns true iff the sync request is a duration request
+    pub fn is_sync_duration_request(&self) -> bool {
+        matches!(self, ConsensusSyncRequest::SyncDuration(_, _))
     }
 
-    pub fn get_sync_target_version(&self) -> Version {
-        self.consensus_sync_notification
-            .target
-            .ledger_info()
-            .version()
+    /// Returns true iff the sync request has been satisfied
+    pub fn sync_request_satisfied(
+        &self,
+        latest_synced_ledger_info: &LedgerInfoWithSignatures,
+        time_service: TimeService,
+    ) -> bool {
+        match self {
+            ConsensusSyncRequest::SyncDuration(start_time, sync_duration_notification) => {
+                // Get the duration and the current time
+                let sync_duration = sync_duration_notification.get_duration();
+                let current_time = time_service.now();
+
+                // Check if the duration has been reached
+                current_time.duration_since(*start_time) >= sync_duration
+            },
+            ConsensusSyncRequest::SyncTarget(sync_target_notification) => {
+                // Get the sync target version and latest synced version
+                let sync_target = sync_target_notification.get_target();
+                let sync_target_version = sync_target.ledger_info().version();
+                let latest_synced_version = latest_synced_ledger_info.ledger_info().version();
+
+                // Check if we've satisfied the target
+                latest_synced_version >= sync_target_version
+            },
+        }
     }
 }
 
-/// A simple handler for consensus notifications
+/// A simple handler for consensus or consensus observer notifications
 pub struct ConsensusNotificationHandler {
     // The listener for notifications from consensus
     consensus_listener: ConsensusNotificationListener,
 
     // The latest consensus sync request that has been received
     consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
+
+    // The time service
+    time_service: TimeService,
 }
 
 impl ConsensusNotificationHandler {
-    pub fn new(consensus_listener: ConsensusNotificationListener) -> Self {
+    pub fn new(
+        consensus_listener: ConsensusNotificationListener,
+        time_service: TimeService,
+    ) -> Self {
         Self {
             consensus_listener,
             consensus_sync_request: Arc::new(Mutex::new(None)),
+            time_service,
         }
     }
 
@@ -195,14 +243,33 @@ impl ConsensusNotificationHandler {
         self.consensus_sync_request.clone()
     }
 
-    /// Initializes the sync request received from consensus
-    pub async fn initialize_sync_request(
+    /// Initializes the sync duration request received from consensus
+    pub async fn initialize_sync_duration_request(
         &mut self,
-        sync_notification: ConsensusSyncNotification,
+        sync_duration_notification: ConsensusSyncDurationNotification,
+    ) -> Result<(), Error> {
+        // Get the current time
+        let start_time = self.time_service.now();
+
+        // Save the request so we can notify consensus once we've hit the duration
+        let consensus_sync_request =
+            ConsensusSyncRequest::new_with_duration(start_time, sync_duration_notification);
+        self.consensus_sync_request = Arc::new(Mutex::new(Some(consensus_sync_request)));
+
+        Ok(())
+    }
+
+    /// Initializes the sync target request received from consensus
+    pub async fn initialize_sync_target_request(
+        &mut self,
+        sync_target_notification: ConsensusSyncTargetNotification,
         latest_synced_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         // Get the latest committed version and the target sync version
-        let sync_target_version = sync_notification.target.ledger_info().version();
+        let sync_target_version = sync_target_notification
+            .get_target()
+            .ledger_info()
+            .version();
         let latest_committed_version = latest_synced_ledger_info.ledger_info().version();
 
         // If the target version is old, return an error to consensus (something is wrong!)
@@ -211,8 +278,7 @@ impl ConsensusNotificationHandler {
                 sync_target_version,
                 latest_committed_version,
             ));
-            self.respond_to_sync_notification(sync_notification, error.clone())
-                .await?;
+            self.respond_to_sync_target_notification(sync_target_notification, error.clone())?;
             return error;
         }
 
@@ -221,114 +287,146 @@ impl ConsensusNotificationHandler {
             info!(LogSchema::new(LogEntry::NotificationHandler)
                 .message("We're already at the requested sync target version! Returning early"));
             let result = Ok(());
-            self.respond_to_sync_notification(sync_notification, result.clone())
-                .await?;
+            self.respond_to_sync_target_notification(sync_target_notification, result.clone())?;
             return result;
         }
 
         // Save the request so we can notify consensus once we've hit the target
-        let consensus_sync_request = ConsensusSyncRequest::new(sync_notification);
+        let consensus_sync_request =
+            ConsensusSyncRequest::new_with_target(sync_target_notification);
         self.consensus_sync_request = Arc::new(Mutex::new(Some(consensus_sync_request)));
 
         Ok(())
     }
 
-    /// Checks to see if the sync request has been successfully fulfilled
-    pub async fn check_sync_request_progress(
+    /// Notifies consensus of a satisfied sync request, and removes the active request.
+    /// Note: this assumes that the sync request has already been checked for satisfaction.
+    pub async fn handle_satisfied_sync_request(
         &mut self,
         latest_synced_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        // Fetch the sync target version
-        let consensus_sync_request = self.get_sync_request();
-        let sync_target_version = consensus_sync_request.lock().as_ref().map(|sync_request| {
-            sync_request
-                .consensus_sync_notification
-                .target
-                .ledger_info()
-                .version()
-        });
+        // Remove the active sync request
+        let mut sync_request_lock = self.consensus_sync_request.lock();
+        let consensus_sync_request = sync_request_lock.take();
 
-        // Compare our local state to the target version
-        if let Some(sync_target_version) = sync_target_version {
-            let latest_committed_version = latest_synced_ledger_info.ledger_info().version();
+        // Notify consensus of the satisfied request
+        match consensus_sync_request {
+            Some(ConsensusSyncRequest::SyncDuration(_, sync_duration_notification)) => {
+                self.respond_to_sync_duration_notification(
+                    sync_duration_notification,
+                    Ok(()),
+                    Some(latest_synced_ledger_info),
+                )?;
+            },
+            Some(ConsensusSyncRequest::SyncTarget(sync_target_notification)) => {
+                // Get the sync target version and latest synced version
+                let sync_target = sync_target_notification.get_target();
+                let sync_target_version = sync_target.ledger_info().version();
+                let latest_synced_version = latest_synced_ledger_info.ledger_info().version();
 
-            // Check if we've synced beyond the target
-            if latest_committed_version > sync_target_version {
-                return Err(Error::SyncedBeyondTarget(
-                    latest_committed_version,
-                    sync_target_version,
-                ));
-            }
-
-            // Check if we've hit the target
-            if latest_committed_version == sync_target_version {
-                let consensus_sync_request = self.get_sync_request().lock().take();
-                if let Some(consensus_sync_request) = consensus_sync_request {
-                    self.respond_to_sync_notification(
-                        consensus_sync_request.consensus_sync_notification,
-                        Ok(()),
-                    )
-                    .await?;
+                // Check if we've synced beyond the target. If so, notify consensus with an error.
+                if latest_synced_version > sync_target_version {
+                    let error = Err(Error::SyncedBeyondTarget(
+                        latest_synced_version,
+                        sync_target_version,
+                    ));
+                    self.respond_to_sync_target_notification(
+                        sync_target_notification,
+                        error.clone(),
+                    )?;
+                    return error;
                 }
-                return Ok(());
-            }
+
+                // Otherwise, notify consensus that the target has been reached
+                self.respond_to_sync_target_notification(sync_target_notification, Ok(()))?;
+            },
+            None => { /* Nothing needs to be done */ },
         }
 
         Ok(())
     }
 
-    /// Responds to consensus for a sync notification using the specified result
-    pub async fn respond_to_sync_notification(
-        &mut self,
-        sync_notification: ConsensusSyncNotification,
+    /// Responds to consensus for a sync duration notification using the specified result
+    pub fn respond_to_sync_duration_notification(
+        &self,
+        sync_duration_notification: ConsensusSyncDurationNotification,
         result: Result<(), Error>,
+        latest_synced_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
-        let message = result.map_err(|error| {
+        let result = result.map_err(|error| {
             aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
+        // Send the result
         info!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
-                "Responding to consensus sync notification with message: {:?}",
-                message
+                "Responding to consensus sync duration notification with message: {:?}",
+                result
             ))
         );
-
-        // Send the result
         self.consensus_listener
-            .respond_to_sync_notification(sync_notification, message)
-            .await
+            .respond_to_sync_duration_notification(
+                sync_duration_notification,
+                result,
+                latest_synced_ledger_info,
+            )
             .map_err(|error| {
                 Error::CallbackSendFailed(format!(
-                    "Consensus sync request response error: {:?}",
+                    "Consensus sync duration response error: {:?}",
+                    error
+                ))
+            })
+    }
+
+    /// Responds to consensus for a sync notification using the specified result
+    pub fn respond_to_sync_target_notification(
+        &self,
+        sync_target_notification: ConsensusSyncTargetNotification,
+        result: Result<(), Error>,
+    ) -> Result<(), Error> {
+        // Wrap the result in an error that consensus can process
+        let result = result.map_err(|error| {
+            aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
+        });
+
+        // Send the result
+        info!(
+            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                "Responding to consensus sync target notification with message: {:?}",
+                result
+            ))
+        );
+        self.consensus_listener
+            .respond_to_sync_target_notification(sync_target_notification, result)
+            .map_err(|error| {
+                Error::CallbackSendFailed(format!(
+                    "Consensus sync target response error: {:?}",
                     error
                 ))
             })
     }
 
     /// Responds successfully to consensus for a commit notification
-    pub async fn respond_to_commit_notification(
-        &mut self,
+    pub fn respond_to_commit_notification(
+        &self,
         commit_notification: ConsensusCommitNotification,
         result: Result<(), Error>,
     ) -> Result<(), Error> {
         // Wrap the result in an error that consensus can process
-        let message = result.map_err(|error| {
+        let result = result.map_err(|error| {
             aptos_consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
+        // Send the result
         debug!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Responding to consensus commit notification with message: {:?}",
-                message
+                result
             ))
         );
-
-        // Send the result
         self.consensus_listener
-            .respond_to_commit_notification(commit_notification, message)
-            .await
+            .respond_to_commit_notification(commit_notification, result)
             .map_err(|error| {
                 Error::CallbackSendFailed(format!("Consensus commit response error: {:?}", error))
             })

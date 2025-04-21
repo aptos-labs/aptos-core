@@ -9,16 +9,38 @@ module 0x42::operators {
     private fun bools(x: bool,y: bool): bool {
         Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
     }
-    private fun equality<T>(x: #0,y: #0): bool {
+    private fun equality<T>(x: T,y: T): bool {
         Eq<T>(x, y)
     }
-    private fun inequality<T>(x: #0,y: #0): bool {
+    private fun inequality<T>(x: T,y: T): bool {
         Neq<T>(x, y)
     }
     private fun order(x: u64,y: u64): bool {
         And(And(And(Lt<u64>(x, y), Le<u64>(x, y)), Not(Gt<u64>(x, y))), Not(Ge<u64>(x, y)))
     }
 } // end 0x42::operators
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::operators {
+    fun arithm(x: u64, y: u64): u64 {
+        x + y / (x - y) * y % x
+    }
+    fun bits(x: u64, y: u8): u64 {
+        x << y & x
+    }
+    fun bools(x: bool, y: bool): bool {
+        x && y || x && !y || !x && y || !x && !y
+    }
+    fun equality<T: drop>(x: T, y: T): bool {
+        x == y
+    }
+    fun inequality<T: drop>(x: T, y: T): bool {
+        x != y
+    }
+    fun order(x: u64, y: u64): bool {
+        x < y && x <= y && !(x > y) && !(x >= y)
+    }
+}
 
 ============ initial bytecode ================
 
@@ -29,12 +51,18 @@ fun operators::arithm($t0: u64, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64
      var $t6: u64
-  0: $t6 := -($t0, $t1)
-  1: $t5 := /($t1, $t6)
-  2: $t4 := *($t5, $t1)
-  3: $t3 := %($t4, $t0)
-  4: $t2 := +($t0, $t3)
-  5: return $t2
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: $t3 := infer($t0)
+  1: $t7 := infer($t1)
+  2: $t9 := infer($t0)
+  3: $t8 := -($t9, $t1)
+  4: $t6 := /($t7, $t8)
+  5: $t5 := *($t6, $t1)
+  6: $t4 := %($t5, $t0)
+  7: $t2 := +($t3, $t4)
+  8: return $t2
 }
 
 
@@ -42,9 +70,11 @@ fun operators::arithm($t0: u64, $t1: u64): u64 {
 fun operators::bits($t0: u64, $t1: u8): u64 {
      var $t2: u64
      var $t3: u64
-  0: $t3 := <<($t0, $t1)
-  1: $t2 := &($t3, $t0)
-  2: return $t2
+     var $t4: u64
+  0: $t4 := infer($t0)
+  1: $t3 := <<($t4, $t1)
+  2: $t2 := &($t3, $t0)
+  3: return $t2
 }
 
 
@@ -111,16 +141,20 @@ fun operators::bools($t0: bool, $t1: bool): bool {
 [variant baseline]
 fun operators::equality<#0>($t0: #0, $t1: #0): bool {
      var $t2: bool
-  0: $t2 := ==($t0, $t1)
-  1: return $t2
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
 }
 
 
 [variant baseline]
 fun operators::inequality<#0>($t0: #0, $t1: #0): bool {
      var $t2: bool
-  0: $t2 := !=($t0, $t1)
-  1: return $t2
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
 }
 
 
@@ -130,34 +164,206 @@ fun operators::order($t0: u64, $t1: u64): bool {
      var $t3: bool
      var $t4: bool
      var $t5: bool
-     var $t6: bool
-     var $t7: bool
-  0: $t5 := <($t0, $t1)
-  1: if ($t5) goto 2 else goto 5
-  2: label L0
-  3: $t4 := <=($t0, $t1)
-  4: goto 7
-  5: label L1
-  6: $t4 := false
-  7: label L2
-  8: if ($t4) goto 9 else goto 13
-  9: label L3
- 10: $t6 := >($t0, $t1)
- 11: $t3 := !($t6)
- 12: goto 15
- 13: label L4
- 14: $t3 := false
- 15: label L5
- 16: if ($t3) goto 17 else goto 21
- 17: label L6
- 18: $t7 := >=($t0, $t1)
- 19: $t2 := !($t7)
- 20: goto 23
- 21: label L7
- 22: $t2 := false
- 23: label L8
- 24: return $t2
+     var $t6: u64
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+  0: $t6 := infer($t0)
+  1: $t5 := <($t6, $t1)
+  2: if ($t5) goto 3 else goto 7
+  3: label L0
+  4: $t7 := infer($t0)
+  5: $t4 := <=($t7, $t1)
+  6: goto 9
+  7: label L1
+  8: $t4 := false
+  9: label L2
+ 10: if ($t4) goto 11 else goto 16
+ 11: label L3
+ 12: $t9 := infer($t0)
+ 13: $t8 := >($t9, $t1)
+ 14: $t3 := !($t8)
+ 15: goto 18
+ 16: label L4
+ 17: $t3 := false
+ 18: label L5
+ 19: if ($t3) goto 20 else goto 25
+ 20: label L6
+ 21: $t11 := infer($t0)
+ 22: $t10 := >=($t11, $t1)
+ 23: $t2 := !($t10)
+ 24: goto 27
+ 25: label L7
+ 26: $t2 := false
+ 27: label L8
+ 28: return $t2
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.operators {
+
+
+arithm(x: u64, y: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: CopyLoc[0](x: u64)
+	1: CopyLoc[1](y: u64)
+	2: CopyLoc[0](x: u64)
+	3: CopyLoc[1](y: u64)
+	4: Sub
+	5: Div
+	6: MoveLoc[1](y: u64)
+	7: Mul
+	8: MoveLoc[0](x: u64)
+	9: Mod
+	10: Add
+	11: Ret
+}
+bits(x: u64, y: u8): u64 /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](x: u64)
+	1: MoveLoc[1](y: u8)
+	2: Shl
+	3: MoveLoc[0](x: u64)
+	4: BitAnd
+	5: Ret
+}
+bools(x: bool, y: bool): bool /* def_idx: 2 */ {
+L2:	$t5: bool
+L3:	$t4: bool
+L4:	$t3: bool
+L5:	return: bool
+B0:
+	0: CopyLoc[0](x: bool)
+	1: BrFalse(44)
+B1:
+	2: CopyLoc[1](y: bool)
+	3: StLoc[2]($t5: bool)
+B2:
+	4: MoveLoc[2]($t5: bool)
+	5: BrFalse(35)
+B3:
+	6: LdTrue
+	7: StLoc[3]($t4: bool)
+B4:
+	8: MoveLoc[3]($t4: bool)
+	9: BrFalse(27)
+B5:
+	10: LdTrue
+	11: StLoc[4]($t3: bool)
+B6:
+	12: MoveLoc[4]($t3: bool)
+	13: BrFalse(18)
+B7:
+	14: LdTrue
+	15: StLoc[5](return: bool)
+B8:
+	16: MoveLoc[5](return: bool)
+	17: Ret
+B9:
+	18: MoveLoc[0](x: bool)
+	19: BrTrue(24)
+B10:
+	20: MoveLoc[1](y: bool)
+	21: Not
+	22: StLoc[5](return: bool)
+	23: Branch(16)
+B11:
+	24: LdFalse
+	25: StLoc[5](return: bool)
+	26: Branch(16)
+B12:
+	27: CopyLoc[0](x: bool)
+	28: BrTrue(32)
+B13:
+	29: CopyLoc[1](y: bool)
+	30: StLoc[4]($t3: bool)
+	31: Branch(12)
+B14:
+	32: LdFalse
+	33: StLoc[4]($t3: bool)
+	34: Branch(12)
+B15:
+	35: CopyLoc[0](x: bool)
+	36: BrFalse(41)
+B16:
+	37: CopyLoc[1](y: bool)
+	38: Not
+	39: StLoc[3]($t4: bool)
+	40: Branch(8)
+B17:
+	41: LdFalse
+	42: StLoc[3]($t4: bool)
+	43: Branch(8)
+B18:
+	44: LdFalse
+	45: StLoc[2]($t5: bool)
+	46: Branch(4)
+}
+equality<T: drop>(x: T, y: T): bool /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](x: T)
+	1: MoveLoc[1](y: T)
+	2: Eq
+	3: Ret
+}
+inequality<T: drop>(x: T, y: T): bool /* def_idx: 4 */ {
+B0:
+	0: MoveLoc[0](x: T)
+	1: MoveLoc[1](y: T)
+	2: Neq
+	3: Ret
+}
+order(x: u64, y: u64): bool /* def_idx: 5 */ {
+L2:	$t5: bool
+L3:	$t8: bool
+L4:	$t10: bool
+B0:
+	0: CopyLoc[0](x: u64)
+	1: CopyLoc[1](y: u64)
+	2: Lt
+	3: BrFalse(30)
+B1:
+	4: CopyLoc[0](x: u64)
+	5: CopyLoc[1](y: u64)
+	6: Le
+	7: StLoc[2]($t5: bool)
+B2:
+	8: MoveLoc[2]($t5: bool)
+	9: BrFalse(27)
+B3:
+	10: CopyLoc[0](x: u64)
+	11: CopyLoc[1](y: u64)
+	12: Gt
+	13: Not
+	14: StLoc[3]($t8: bool)
+B4:
+	15: MoveLoc[3]($t8: bool)
+	16: BrFalse(24)
+B5:
+	17: MoveLoc[0](x: u64)
+	18: MoveLoc[1](y: u64)
+	19: Ge
+	20: Not
+	21: StLoc[4]($t10: bool)
+B6:
+	22: MoveLoc[4]($t10: bool)
+	23: Ret
+B7:
+	24: LdFalse
+	25: StLoc[4]($t10: bool)
+	26: Branch(22)
+B8:
+	27: LdFalse
+	28: StLoc[3]($t8: bool)
+	29: Branch(15)
+B9:
+	30: LdFalse
+	31: StLoc[2]($t5: bool)
+	32: Branch(8)
+}
+}
 ============ bytecode verification succeeded ========

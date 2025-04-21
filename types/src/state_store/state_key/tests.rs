@@ -7,6 +7,7 @@ use crate::{
 };
 use aptos_crypto::hash::CryptoHash;
 use move_core_types::{account_address::AccountAddress, ident_str, move_resource::MoveStructType};
+use proptest::prelude::*;
 
 fn assert_crypto_hash(key: &StateKey, expected_hash: &str) {
     let expected_hash = expected_hash.parse().unwrap();
@@ -86,4 +87,25 @@ fn test_debug() {
     // raw
     let key = StateKey::raw(&[1, 2, 3]);
     assert_eq!(&format!("{:?}", key), "StateKey::Raw(010203)",);
+}
+
+proptest! {
+    #[test]
+    fn test_shard_order(
+        key1 in any::<StateKey>(),
+        key2 in any::<StateKey>(),
+    ) {
+        let shard1 = key1.get_shard_id();
+        let shard2 = key2.get_shard_id();
+
+        assert_eq!(shard1, key1.crypto_hash_ref().nibble(0));
+        assert_eq!(shard2, key2.crypto_hash_ref().nibble(0));
+
+        if shard1 != shard2 {
+            assert_eq!(
+                shard1.cmp(&shard2),
+                key1.crypto_hash_ref().cmp(key2.crypto_hash_ref()),
+            )
+        }
+    }
 }

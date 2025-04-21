@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
 aptos-infallible = { workspace = true }

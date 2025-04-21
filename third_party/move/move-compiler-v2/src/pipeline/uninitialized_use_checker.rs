@@ -200,13 +200,9 @@ impl UninitializedUseChecker {
     /// Violations are reported as errors in the `target`'s global environment.
     fn perform_checks(&self, target: &FunctionTarget, annotation: &InitializedStateAnnotation) {
         for (offset, bc) in target.get_bytecode().iter().enumerate() {
-            if bc.is_spec_only() {
-                // We don't check spec-only instructions here.
-                continue;
-            }
-            bc.sources().iter().for_each(|src| {
+            let check = |temp: &usize| {
                 if let Some(state @ (Initialized::Maybe | Initialized::No)) =
-                    annotation.get_initialized_state(*src, offset as CodeOffset)
+                    annotation.get_initialized_state(*temp, offset as CodeOffset)
                 {
                     target.global_env().error(
                         &target.get_bytecode_loc(bc.get_attr_id()),
@@ -216,11 +212,26 @@ impl UninitializedUseChecker {
                                 Initialized::Maybe => "possibly ",
                                 _ => "",
                             },
-                            target.get_local_name_for_error_message(*src)
+                            target.get_local_name_for_error_message(*temp)
                         ),
                     );
                 }
-            });
+            };
+            if let Bytecode::SpecBlock(_, spec) = bc {
+                // `update_map` is not yet filled in this phase
+                // only need to handle expressions in `conditions`
+                for cond in &spec.conditions {
+                    for exp in cond.all_exps() {
+                        exp.used_temporaries().iter().for_each(check);
+                    }
+                }
+            } else if bc.is_spec_only() {
+                // We don't check spec-only instructions here because
+                // they don't exist in the compilation phase
+                continue;
+            } else {
+                bc.sources().iter().for_each(check);
+            }
         }
     }
 

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected `bool` but found a value of type `integer`
+  ┌─ tests/lambda/storable/retain_funcs.move:6:23
+  │
+6 │         let f = |x| { if (x) { 2 } else { false } };
+  │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^

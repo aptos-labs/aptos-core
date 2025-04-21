@@ -123,6 +123,8 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
+                non_conflicting: false,
+                use_fa_transfer: false,
             },
             100,
         )]],

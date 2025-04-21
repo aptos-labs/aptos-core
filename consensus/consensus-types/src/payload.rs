@@ -1,18 +1,19 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::DataStatus,
-    proof_of_store::{BatchInfo, ProofOfStore},
-};
-use aptos_infallible::Mutex;
+use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use anyhow::ensure;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{
+    fmt::Debug,
     ops::{Deref, DerefMut},
-    sync::Arc,
 };
+
+pub type OptBatches = BatchPointer<BatchInfo>;
+
+pub type ProofBatches = BatchPointer<ProofOfStore>;
 
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
@@ -27,8 +28,6 @@ pub trait TDataInfo {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct BatchPointer<T> {
     pub batch_summary: Vec<T>,
-    #[serde(skip)]
-    pub status: Arc<Mutex<Option<DataStatus>>>,
 }
 
 impl<T> BatchPointer<T>
@@ -38,21 +37,11 @@ where
     pub fn new(metadata: Vec<T>) -> Self {
         Self {
             batch_summary: metadata,
-            status: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn extend(&mut self, other: BatchPointer<T>) {
-        let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.batch_summary.extend(other.batch_summary);
-        let mut status = self.status.lock();
-        *status = match &mut *status {
-            None => Some(other_data_status),
-            Some(status) => {
-                status.extend(other_data_status);
-                return;
-            },
-        };
     }
 
     pub fn num_txns(&self) -> usize {
@@ -74,10 +63,20 @@ where
     }
 }
 
+impl<T> From<Vec<T>> for BatchPointer<T>
+where
+    T: TDataInfo,
+{
+    fn from(value: Vec<T>) -> Self {
+        Self {
+            batch_summary: value,
+        }
+    }
+}
+
 impl<T: PartialEq> PartialEq for BatchPointer<T> {
     fn eq(&self, other: &Self) -> bool {
         self.batch_summary == other.batch_summary
-            && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
     }
 }
 
@@ -101,12 +100,36 @@ impl<T> IntoIterator for BatchPointer<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct TxnAndGasLimits {
+    pub transaction_limit: Option<u64>,
+    pub gas_limit: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum PayloadExecutionLimit {
     None,
     MaxTransactionsToExecute(u64),
+    TxnAndGasLimits(TxnAndGasLimits),
 }
 
 impl PayloadExecutionLimit {
+    pub fn new(max_txns: Option<u64>, _max_gas: Option<u64>) -> Self {
+        // TODO: on next release, start using TxnAndGasLimits
+        match max_txns {
+            Some(max_txns) => PayloadExecutionLimit::MaxTransactionsToExecute(max_txns),
+            None => PayloadExecutionLimit::None,
+        }
+    }
+
+    fn extend_options(o1: Option<u64>, o2: Option<u64>) -> Option<u64> {
+        match (o1, o2) {
+            (Some(v1), Some(v2)) => Some(v1 + v2),
+            (Some(v), None) => Some(v),
+            (None, Some(v)) => Some(v),
+            _ => None,
+        }
+    }
+
     pub(crate) fn extend(&mut self, other: PayloadExecutionLimit) {
         *self = match (&self, &other) {
             (PayloadExecutionLimit::None, _) => other,
@@ -115,7 +138,48 @@ impl PayloadExecutionLimit {
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
             ) => PayloadExecutionLimit::MaxTransactionsToExecute(*limit1 + *limit2),
+            (
+                PayloadExecutionLimit::TxnAndGasLimits(block1_limits),
+                PayloadExecutionLimit::TxnAndGasLimits(block2_limits),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Self::extend_options(
+                    block1_limits.transaction_limit,
+                    block2_limits.transaction_limit,
+                ),
+                gas_limit: Self::extend_options(block1_limits.gas_limit, block2_limits.gas_limit),
+            }),
+            (
+                PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
+                PayloadExecutionLimit::TxnAndGasLimits(block2_limits),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Some(*limit1 + block2_limits.transaction_limit.unwrap_or(0)),
+                gas_limit: block2_limits.gas_limit,
+            }),
+            (
+                PayloadExecutionLimit::TxnAndGasLimits(block1_limits),
+                PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Some(*limit2 + block1_limits.transaction_limit.unwrap_or(0)),
+                gas_limit: block1_limits.gas_limit,
+            }),
         };
+    }
+
+    pub fn max_txns_to_execute(&self) -> Option<u64> {
+        match self {
+            PayloadExecutionLimit::None => None,
+            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(*max),
+            PayloadExecutionLimit::TxnAndGasLimits(limits) => limits.transaction_limit,
+        }
+    }
+
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        match self {
+            PayloadExecutionLimit::None | PayloadExecutionLimit::MaxTransactionsToExecute(_) => {
+                None
+            },
+            PayloadExecutionLimit::TxnAndGasLimits(limits) => limits.gas_limit,
+        }
     }
 }
 
@@ -123,6 +187,23 @@ impl PayloadExecutionLimit {
 pub struct InlineBatch {
     batch_info: BatchInfo,
     transactions: Vec<SignedTransaction>,
+}
+
+impl InlineBatch {
+    pub fn new(batch_info: BatchInfo, transactions: Vec<SignedTransaction>) -> Self {
+        Self {
+            batch_info,
+            transactions,
+        }
+    }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.batch_info
+    }
+
+    pub fn transactions(&self) -> &Vec<SignedTransaction> {
+        &self.transactions
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -162,6 +243,22 @@ impl InlineBatches {
     }
 }
 
+impl From<Vec<InlineBatch>> for InlineBatches {
+    fn from(value: Vec<InlineBatch>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Vec<(BatchInfo, Vec<SignedTransaction>)>> for InlineBatches {
+    fn from(value: Vec<(BatchInfo, Vec<SignedTransaction>)>) -> Self {
+        value
+            .into_iter()
+            .map(|(batch_info, transactions)| InlineBatch::new(batch_info, transactions))
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
 impl Deref for InlineBatches {
     type Target = Vec<InlineBatch>;
 
@@ -179,8 +276,8 @@ impl DerefMut for InlineBatches {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct OptQuorumStorePayloadV1 {
     inline_batches: InlineBatches,
-    opt_batches: BatchPointer<BatchInfo>,
-    proofs: BatchPointer<ProofOfStore>,
+    opt_batches: OptBatches,
+    proofs: ProofBatches,
     execution_limits: PayloadExecutionLimit,
 }
 
@@ -202,10 +299,27 @@ impl OptQuorumStorePayloadV1 {
     }
 
     pub fn max_txns_to_execute(&self) -> Option<u64> {
-        match self.execution_limits {
-            PayloadExecutionLimit::None => None,
-            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(max),
-        }
+        self.execution_limits.max_txns_to_execute()
+    }
+
+    pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
+        ensure!(
+            self.inline_batches
+                .iter()
+                .all(|b| b.info().epoch() == epoch),
+            "OptQS InlineBatch epoch doesn't match given epoch"
+        );
+        ensure!(
+            self.opt_batches.iter().all(|b| b.info().epoch() == epoch),
+            "OptQS OptBatch epoch doesn't match given epoch"
+        );
+
+        ensure!(
+            self.proofs.iter().all(|b| b.info().epoch() == epoch),
+            "OptQS Proof epoch doesn't match given epoch"
+        );
+
+        Ok(())
     }
 }
 
@@ -215,6 +329,20 @@ pub enum OptQuorumStorePayload {
 }
 
 impl OptQuorumStorePayload {
+    pub fn new(
+        inline_batches: InlineBatches,
+        opt_batches: OptBatches,
+        proofs: ProofBatches,
+        execution_limits: PayloadExecutionLimit,
+    ) -> Self {
+        Self::V1(OptQuorumStorePayloadV1 {
+            inline_batches,
+            opt_batches,
+            proofs,
+            execution_limits,
+        })
+    }
+
     pub(crate) fn num_txns(&self) -> usize {
         self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns()
     }
@@ -252,6 +380,10 @@ impl OptQuorumStorePayload {
 
     pub fn opt_batches(&self) -> &BatchPointer<BatchInfo> {
         &self.opt_batches
+    }
+
+    pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
+        self.execution_limits = execution_limits;
     }
 }
 

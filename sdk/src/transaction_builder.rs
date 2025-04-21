@@ -12,7 +12,10 @@ use crate::{
 pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
-use aptos_types::transaction::{EntryFunction, Script};
+use aptos_types::{
+    function_info::FunctionInfo,
+    transaction::{EntryFunction, Script},
+};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -155,6 +158,19 @@ impl TransactionFactory {
         ))
     }
 
+    pub fn add_dispatchable_authentication_function(
+        &self,
+        function_info: FunctionInfo,
+    ) -> TransactionBuilder {
+        self.payload(
+            aptos_stdlib::account_abstraction_add_authentication_function(
+                function_info.module_address,
+                function_info.module_name.into_bytes(),
+                function_info.function_name.into_bytes(),
+            ),
+        )
+    }
+
     pub fn implicitly_create_user_account_and_transfer(
         &self,
         public_key: &Ed25519PublicKey,
@@ -185,6 +201,36 @@ impl TransactionFactory {
             vec![],
             vec![],
         ))
+    }
+
+    pub fn create_multisig_account_with_existing_account(
+        &self,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+    ) -> TransactionBuilder {
+        self.payload(
+            aptos_stdlib::multisig_account_create_with_existing_account_call(
+                owners,
+                signatures_required,
+                vec![],
+                vec![],
+            ),
+        )
+    }
+
+    pub fn create_multisig_account_with_existing_account_and_revoke_auth_key(
+        &self,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+    ) -> TransactionBuilder {
+        self.payload(
+            aptos_stdlib::multisig_account_create_with_existing_account_and_revoke_auth_key_call(
+                owners,
+                signatures_required,
+                vec![],
+                vec![],
+            ),
+        )
     }
 
     pub fn create_multisig_transaction(

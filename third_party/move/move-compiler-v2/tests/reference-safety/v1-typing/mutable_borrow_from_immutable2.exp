@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot mutably borrow from an immutable ref
+  ┌─ tests/reference-safety/v1-typing/mutable_borrow_from_immutable2.move:6:9
+  │
+6 │         &mut (&s).v;
+  │         ^^^^^^^^^^^
+
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/reference-safety/v1-typing/mutable_borrow_from_immutable2.move:10:9
+   │
+10 │         &mut (&s.x).f;
+   │         ^^^^^^^^^^^^^
+
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/reference-safety/v1-typing/mutable_borrow_from_immutable2.move:15:9
+   │
+15 │         &mut sref.v;
+   │         ^^^^^^^^^^^
+
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/reference-safety/v1-typing/mutable_borrow_from_immutable2.move:20:9
+   │
+20 │         &mut xref.f;
+   │         ^^^^^^^^^^^

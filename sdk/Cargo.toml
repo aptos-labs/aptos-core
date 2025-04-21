@@ -24,8 +24,12 @@ base64 = { workspace = true }
 bcs = { workspace = true }
 ed25519-dalek-bip32 = { workspace = true }
 hex = { workspace = true }
+lazy_static = "1.4.0"
 move-core-types = { workspace = true }
+rand = { workspace = true }
 rand_core = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tiny-bip39 = { workspace = true }
 

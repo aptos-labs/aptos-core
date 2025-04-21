@@ -46,6 +46,16 @@ pub trait Bytecode {
 
     fn function_is_view(&self, name: &IdentStr) -> bool;
 
+    fn struct_is_event(&self, name: &IdentStr) -> bool {
+        match self.metadata() {
+            Some(m) => match m.struct_attributes.get(name.as_str()) {
+                Some(attrs) => attrs.iter().any(|attr| attr.is_event()),
+                None => false,
+            },
+            None => false,
+        }
+    }
+
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
             name: self.identifier_at(def.name).to_owned().into(),
@@ -95,6 +105,10 @@ pub trait Bytecode {
                 mutable: true,
                 to: Box::new(self.new_move_type(t.borrow())),
             },
+            SignatureToken::Function(..) => {
+                // TODO
+                unimplemented!("signature token function to API MoveType")
+            },
         }
     }
 
@@ -115,6 +129,7 @@ pub trait Bytecode {
             },
         };
         let name = self.identifier_at(handle.name).to_owned();
+        let is_event = self.struct_is_event(&name);
         let abilities = handle
             .abilities
             .into_iter()
@@ -128,6 +143,7 @@ pub trait Bytecode {
         MoveStruct {
             name: name.into(),
             is_native,
+            is_event,
             abilities,
             generic_type_params,
             fields,

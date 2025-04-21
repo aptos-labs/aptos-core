@@ -78,6 +78,7 @@ pub struct ConsensusConfig {
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+    // Deprecated
     pub qc_aggregator_type: QcAggregatorType,
     // Max blocks allowed for block retrieval requests
     pub max_blocks_per_sending_request: u64,
@@ -89,57 +90,27 @@ pub struct ConsensusConfig {
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
     pub enable_pre_commit: bool,
+    pub max_pending_rounds_in_commit_vote_cache: u64,
+    pub optimistic_sig_verification: bool,
+    pub enable_round_timeout_msg: bool,
     pub enable_pipeline: bool,
 }
 
+/// Deprecated
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub enum QcAggregatorType {
     #[default]
     NoDelay,
-    Delayed(DelayedQcAggregatorConfig),
 }
 
-impl QcAggregatorType {
-    pub fn default_delayed() -> Self {
-        // TODO: Enable the delayed aggregation by default once we have tested it more.
-        Self::Delayed(DelayedQcAggregatorConfig::default())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct DelayedQcAggregatorConfig {
-    // Maximum Delay for a QC to be aggregated after round start (in milliseconds). This assumes that
-    // we have enough voting power to form a QC. If we don't have enough voting power, we will wait
-    // until we have enough voting power to form a QC.
-    pub max_delay_after_round_start_ms: u64,
-    // Percentage of aggregated voting power to wait for before aggregating a QC. For example, if this
-    // is set to 95% then, a QC is formed as soon as we have 95% of the voting power aggregated without
-    // any additional waiting.
-    pub aggregated_voting_power_pct_to_wait: usize,
-    // This knob control what is the % of the time (as compared to time between round start and time when we
-    // have enough voting power to form a QC) we wait after we have enough voting power to form a QC. In a sense,
-    // this knobs controls how much slower we are willing to make consensus to wait for more votes.
-    pub pct_delay_after_qc_aggregated: usize,
-    // In summary, let's denote the time we have enough voting power (2f + 1) to form a QC as T1 and
-    // the time we have aggregated `aggregated_voting_power_pct_to_wait` as T2. Then, we wait for
-    // min((T1 + `pct_delay_after_qc_aggregated` * T1 / 100), `max_delay_after_round_start_ms`, T2)
-    // before forming a QC.
-}
-
-impl Default for DelayedQcAggregatorConfig {
-    fn default() -> Self {
-        Self {
-            max_delay_after_round_start_ms: 700,
-            aggregated_voting_power_pct_to_wait: 90,
-            pct_delay_after_qc_aggregated: 30,
-        }
-    }
-}
-
-/// Execution backpressure which handles gas/s variance,
-/// and adjusts block sizes to "recalibrate it" to wanted range.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ExecutionBackpressureConfig {
+pub enum ExecutionBackpressureMetric {
+    Mean,
+    Percentile(f64),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureLookbackConfig {
     /// Look at execution time for this many last blocks
     pub num_blocks_to_look_at: usize,
 
@@ -152,17 +123,36 @@ pub struct ExecutionBackpressureConfig {
     /// at least `min_blocks_to_activate` are above `min_block_time_ms_to_activate`
     pub min_blocks_to_activate: usize,
 
-    /// Out of blocks in the window, take this percentile (from 0-1 range), to use for calibration.
-    /// i.e. 0.5 means take a median of last `num_blocks_to_look_at` blocks.
-    pub percentile: f64,
+    /// Out of blocks in the window, the metric to use for calibration.
+    /// i.e. Percentile(0.5) means take a median of last `num_blocks_to_look_at` blocks.
+    pub metric: ExecutionBackpressureMetric,
     /// Recalibrating max block size, to target blocks taking this long.
     pub target_block_time_ms: usize,
+}
+
+/// Execution backpressure which handles txn/s variance,
+/// and adjusts block sizes to "recalibrate it" to wanted range.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureTxnLimitConfig {
+    pub lookback_config: ExecutionBackpressureLookbackConfig,
     /// A minimal number of transactions per block, even if calibration suggests otherwise
     /// To make sure backpressure doesn't become too aggressive.
     pub min_calibrated_txns_per_block: u64,
-    // We compute re-calibrated block size, and use that for `max_txns_in_block`.
-    // But after execution pool and cost of overpacking being minimal - we should
-    // change so that backpressure sets `max_txns_to_execute` instead
+}
+
+/// Execution backpressure which handles gas/s variance,
+/// and adjusts gas limit to "recalibrate it" to wanted range.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureGasLimitConfig {
+    pub lookback_config: ExecutionBackpressureLookbackConfig,
+    pub block_execution_overhead_ms: u64,
+    pub min_calibrated_block_gas_limit: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ExecutionBackpressureConfig {
+    pub txn_limit: Option<ExecutionBackpressureTxnLimitConfig>,
+    pub gas_limit: Option<ExecutionBackpressureGasLimitConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -228,13 +218,27 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 7,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                num_blocks_to_look_at: 12,
-                min_blocks_to_activate: 4,
-                percentile: 0.5,
-                target_block_time_ms: 250,
-                min_block_time_ms_to_activate: 100,
-                // allow at least two spreading group from reordering in a single block, to utilize paralellism
-                min_calibrated_txns_per_block: 8,
+                txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
+                    lookback_config: ExecutionBackpressureLookbackConfig {
+                        num_blocks_to_look_at: 12,
+                        min_block_time_ms_to_activate: 100,
+                        min_blocks_to_activate: 4,
+                        metric: ExecutionBackpressureMetric::Percentile(0.5),
+                        target_block_time_ms: 200,
+                    },
+                    min_calibrated_txns_per_block: 8,
+                }),
+                gas_limit: Some(ExecutionBackpressureGasLimitConfig {
+                    lookback_config: ExecutionBackpressureLookbackConfig {
+                        num_blocks_to_look_at: 20,
+                        min_block_time_ms_to_activate: 10,
+                        min_blocks_to_activate: 4,
+                        metric: ExecutionBackpressureMetric::Mean,
+                        target_block_time_ms: 200,
+                    },
+                    block_execution_overhead_ms: 10,
+                    min_calibrated_block_gas_limit: 2000,
+                }),
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
@@ -243,25 +247,25 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    max_sending_block_txns_after_filtering_override:
+                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    backpressure_proposal_delay_ms: 50,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    back_pressure_pipeline_latency_limit_ms: 1900,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1600,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
                 },
                 // with execution backpressure, only later start reducing block size
                 PipelineBackpressureValues {
@@ -337,7 +341,6 @@ impl Default for ConsensusConfig {
                     backoff_proposal_delay_ms: 300,
                 },
             ],
-
             qc_aggregator_type: QcAggregatorType::default(),
             // This needs to fit into the network message size, so with quorum store it can be much bigger
             max_blocks_per_sending_request: 10,
@@ -355,6 +358,9 @@ impl Default for ConsensusConfig {
             },
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
+            max_pending_rounds_in_commit_vote_cache: 100,
+            optimistic_sig_verification: true,
+            enable_round_timeout_msg: true,
             enable_pipeline: false,
         }
     }

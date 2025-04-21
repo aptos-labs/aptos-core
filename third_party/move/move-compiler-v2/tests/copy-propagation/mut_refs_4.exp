@@ -24,29 +24,9 @@ error: cannot copy local `p` which is still mutably borrowed
   ┌─ tests/copy-propagation/mut_refs_4.move:5:17
   │
 4 │         let a = &mut p;
-  │                 ------ previous mutable local borrow
+  │                 ------ local `p` previously mutably borrowed here
 5 │         let b = p;
-  │                 ^ copied here
+  │                 ^ copy attempted here
   ·
 8 │         *a = 0;
   │         ------ conflicting reference `a` used here
-
-============ after DeadStoreElimination: ================
-
-[variant baseline]
-fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: &mut u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t2 := borrow_local($t0)
-  1: $t3 := copy($t0)
-  2: $t4 := move($t3)
-  3: $t5 := move($t4)
-  4: $t6 := 0
-  5: write_ref($t2, $t6)
-  6: $t1 := move($t5)
-  7: return $t1
-}

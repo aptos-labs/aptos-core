@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/checking/naming/standalone_module_ident2.move:6:14
+  │
+6 │     use 0x2::X;
+  │              ^ Unused 'use' of alias 'X'. Consider removing it
+
+error: undeclared `X`
+  ┌─ tests/checking/naming/standalone_module_ident2.move:8:17
+  │
+8 │         let x = X;
+  │                 ^

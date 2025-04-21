@@ -1,85 +1,53 @@
 
 Diagnostics:
-error: cannot write to reference in local `s` which is still borrowed
+error: cannot write local `s` since it is borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:14:9
    │
 13 │         if (cond) f = &s.f else f = &s.g;
-   │                       ----          ---- previous field borrow
+   │                       ----          ---- field `g` previously borrowed here
    │                       │
-   │                       previous field borrow
+   │                       field `f` previously borrowed here
 14 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ written here
-
-error: mutable reference in local `s` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:14:9
-   │
-13 │         if (cond) f = &s.f else f = &s.g;
-   │                       ----          ---- previous field borrow
-   │                       │
-   │                       previous field borrow
-14 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^^^^^^^^^^^ write attempted here
 15 │         *f;
    │         -- conflicting reference `f` used here
 
-error: cannot write to reference in local `s` which is still borrowed
+error: cannot write local `s` since it is borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:23:9
    │
 22 │         if (cond) f = &mut s.f else f = &mut other.f;
-   │                       -------- previous mutable field borrow
+   │                       -------- field `f` previously mutably borrowed here
 23 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ written here
-
-error: mutable reference in local `s` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:23:9
-   │
-22 │         if (cond) f = &mut s.f else f = &mut other.f;
-   │                       -------- previous mutable field borrow
-23 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^^^^^^^^^^^ write attempted here
 24 │         *f;
    │         -- conflicting reference `f` used here
 
-error: mutable reference in local `s` requires exclusive access but is borrowed
+error: cannot write local `s` since it is borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:32:9
    │
+31 │         if (cond) f = s else f = other; // error in v2 because s is copied
+   │                   ----- previously mutably borrowed here
 32 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^^^^^^^^^^^ write attempted here
 33 │         *f;
    │         -- conflicting reference `f` used here
 
-error: cannot write to reference in local `s` which is still borrowed
+error: cannot write local `s` since it is borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:41:9
    │
 40 │         if (cond) f = id_mut(s) else f = other;
-   │                       --------- previous mutable call result
+   │                       --------- previously mutably borrowed here
 41 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ written here
-
-error: mutable reference in local `s` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:41:9
-   │
-40 │         if (cond) f = id_mut(s) else f = other;
-   │                       --------- previous mutable call result
-41 │         *s = S { f: 0, g: 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^^^^^^^^^^^ write attempted here
 42 │         *f;
    │         -- conflicting reference `f` used here
 
-error: cannot write to reference in local `s` which is still borrowed
+error: cannot write local `s` since it is borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:49:19
    │
 48 │         let f = &s.f;
-   │                 ---- previous field borrow
+   │                 ---- field `f` previously borrowed here
 49 │         if (cond) *s = S { f: 0, g: 0 };
-   │                   ^^^^^^^^^^^^^^^^^^^^^ written here
-
-error: mutable reference in local `s` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:49:19
-   │
-48 │         let f = &s.f;
-   │                 ---- previous field borrow
-49 │         if (cond) *s = S { f: 0, g: 0 };
-   │                   ^^^^^^^^^^^^^^^^^^^^^ requirement enforced here
+   │                   ^^^^^^^^^^^^^^^^^^^^^ write attempted here
 50 │         *f;
    │         -- conflicting reference `f` used here

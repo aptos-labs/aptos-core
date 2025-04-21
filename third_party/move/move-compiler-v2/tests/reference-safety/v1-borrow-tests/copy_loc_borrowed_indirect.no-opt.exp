@@ -1,9 +1,2 @@
 
-============ bytecode verification failed ========
-
-Diagnostics:
-error: reference safety check failed on bytecode level. This is a known issue, to be fixed later, resulting from differences between safety rules of the v1 and v2 compiler. Try to rewrite your code to workaround this problem.
-  ┌─ tests/reference-safety/v1-borrow-tests/copy_loc_borrowed_indirect.move:7:9
-  │
-7 │         x + copy x;
-  │         ^^^^^^^^^^
+============ bytecode verification succeeded ========

@@ -1,0 +1,119 @@
+processed 7 tasks
+
+task 0 'publish'. lines 1-77:
+Error: compilation errors:
+ error: undeclared `_`
+  ┌─ TEMPFILE:7:17
+  │
+7 │         let x = _ + 3;
+  │                 ^
+
+error: undeclared `_`
+  ┌─ TEMPFILE:8:13
+  │
+8 │         x + _
+  │             ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:12:17
+   │
+12 │         let x = _ + 3;
+   │                 ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:13:13
+   │
+13 │         _ = _ + 1;
+   │             ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:14:13
+   │
+14 │         x + _
+   │             ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:18:13
+   │
+18 │         _ = _ + 2;
+   │             ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:19:9
+   │
+19 │         _
+   │         ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:23:13
+   │
+23 │         _ = _ + 3;
+   │             ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:24:9
+   │
+24 │         _
+   │         ^
+
+error: undeclared `_`
+   ┌─ TEMPFILE:28:10
+   │
+28 │          _
+   │          ^
+
+
+
+task 1 'run'. lines 79-79:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 2 'run'. lines 81-81:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 3 'run'. lines 83-83:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 4 'run'. lines 85-85:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 5 'run'. lines 87-99:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 6 'run'. lines 101-101:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

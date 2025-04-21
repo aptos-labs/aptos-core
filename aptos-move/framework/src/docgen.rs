@@ -105,6 +105,7 @@ impl DocgenOptions {
             include_call_diagrams: false,
             compile_relative_to_output_dir: false,
             output_format: self.output_format,
+            ensure_unix_paths: true,
         };
         let output = move_docgen::Docgen::new(model, &options).gen();
         if model.diag_count(Severity::Warning) > 0 {

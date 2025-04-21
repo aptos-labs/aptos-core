@@ -41,6 +41,7 @@ fn test_vec_pack() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
     m.identifiers
         .push(Identifier::new("foo".to_string()).unwrap());

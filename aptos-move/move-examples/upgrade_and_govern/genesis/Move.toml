@@ -7,4 +7,6 @@ version = '1.0.0'
 upgrade_and_govern = '_'
 
 [dependencies.AptosFramework]
-local = '../../../framework/aptos-framework' # <:!:manifest
+git = "https://github.com/aptos-labs/aptos-framework.git"
+subdir = "aptos-framework"
+rev = "mainnet"

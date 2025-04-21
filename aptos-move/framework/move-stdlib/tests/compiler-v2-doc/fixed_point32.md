@@ -291,7 +291,7 @@ adding or subtracting FixedPoint32 values, can be done using the raw
 values directly.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_get_raw_value">get_raw_value</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_get_raw_value">get_raw_value</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -300,8 +300,8 @@ values directly.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_get_raw_value">get_raw_value</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-    num.value
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_get_raw_value">get_raw_value</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+    self.value
 }
 </code></pre>
 
@@ -316,7 +316,7 @@ values directly.
 Returns true if the ratio is zero.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_is_zero">is_zero</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_is_zero">is_zero</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): bool
 </code></pre>
 
 
@@ -325,8 +325,8 @@ Returns true if the ratio is zero.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_is_zero">is_zero</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): bool {
-    num.value == 0
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_is_zero">is_zero</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): bool {
+    self.value == 0
 }
 </code></pre>
 
@@ -426,7 +426,7 @@ Create a fixedpoint value from a u64 value.
 Returns the largest integer less than or equal to a given number.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -435,8 +435,8 @@ Returns the largest integer less than or equal to a given number.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-    num.value &gt;&gt; 32
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+    self.value &gt;&gt; 32
 }
 </code></pre>
 
@@ -451,7 +451,7 @@ Returns the largest integer less than or equal to a given number.
 Rounds up the given FixedPoint32 to the next largest integer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -460,9 +460,9 @@ Rounds up the given FixedPoint32 to the next largest integer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-    <b>let</b> floored_num = <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num) &lt;&lt; 32;
-    <b>if</b> (num.value == floored_num) {
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+    <b>let</b> floored_num = <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self) &lt;&lt; 32;
+    <b>if</b> (self.value == floored_num) {
         <b>return</b> floored_num &gt;&gt; 32
     };
     <b>let</b> val = ((floored_num <b>as</b> u128) + (1 &lt;&lt; 32));
@@ -481,7 +481,7 @@ Rounds up the given FixedPoint32 to the next largest integer.
 Returns the value of a FixedPoint32 to the nearest integer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -490,13 +490,13 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-    <b>let</b> floored_num = <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num) &lt;&lt; 32;
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+    <b>let</b> floored_num = <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self) &lt;&lt; 32;
     <b>let</b> boundary = floored_num + ((1 &lt;&lt; 32) / 2);
-    <b>if</b> (num.value &lt; boundary) {
+    <b>if</b> (self.value &lt; boundary) {
         floored_num &gt;&gt; 32
     } <b>else</b> {
-        <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num)
+        <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(self)
     }
 }
 </code></pre>
@@ -780,7 +780,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `floor`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -788,7 +788,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(num);
+<b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(self);
 </code></pre>
 
 
@@ -797,12 +797,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_floor"></a>
 
 
-<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-   <b>let</b> fractional = val.value % (1 &lt;&lt; 32);
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+   <b>let</b> fractional = self.value % (1 &lt;&lt; 32);
    <b>if</b> (fractional == 0) {
-       val.value &gt;&gt; 32
+       self.value &gt;&gt; 32
    } <b>else</b> {
-       (val.value - fractional) &gt;&gt; 32
+       (self.value - fractional) &gt;&gt; 32
    }
 }
 </code></pre>
@@ -814,7 +814,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `ceil`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -823,7 +823,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(num);
+<b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(self);
 </code></pre>
 
 
@@ -832,13 +832,13 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_ceil"></a>
 
 
-<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-   <b>let</b> fractional = val.value % (1 &lt;&lt; 32);
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+   <b>let</b> fractional = self.value % (1 &lt;&lt; 32);
    <b>let</b> one = 1 &lt;&lt; 32;
    <b>if</b> (fractional == 0) {
-       val.value &gt;&gt; 32
+       self.value &gt;&gt; 32
    } <b>else</b> {
-       (val.value - fractional + one) &gt;&gt; 32
+       (self.value - fractional + one) &gt;&gt; 32
    }
 }
 </code></pre>
@@ -850,7 +850,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `round`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64
 </code></pre>
 
 
@@ -859,7 +859,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(num);
+<b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(self);
 </code></pre>
 
 
@@ -868,14 +868,14 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_round"></a>
 
 
-<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
-   <b>let</b> fractional = val.value % (1 &lt;&lt; 32);
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(self: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 {
+   <b>let</b> fractional = self.value % (1 &lt;&lt; 32);
    <b>let</b> boundary = (1 &lt;&lt; 32) / 2;
    <b>let</b> one = 1 &lt;&lt; 32;
    <b>if</b> (fractional &lt; boundary) {
-       (val.value - fractional) &gt;&gt; 32
+       (self.value - fractional) &gt;&gt; 32
    } <b>else</b> {
-       (val.value - fractional + one) &gt;&gt; 32
+       (self.value - fractional + one) &gt;&gt; 32
    }
 }
 </code></pre>

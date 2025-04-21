@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+  ┌─ tests/sources/functional/invariants_positional.move:9:9
+  │
+9 │         invariant self.0 > 10;
+  │         ^^^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/invariants_positional.move:18: pack_positional_struct_incorrect
+  =     at tests/sources/functional/invariants_positional.move:9

@@ -56,7 +56,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let event_store = &aptos_db.event_store;
-    let batch = SchemaBatch::new();
+    let mut batch = SchemaBatch::new();
     let num_versions = events.len();
 
     // Write events to DB
@@ -66,7 +66,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
                 version as u64,
                 events_for_version,
                 /*skip_index=*/ false,
-                &batch,
+                &mut batch,
             )
             .unwrap();
     }
@@ -102,7 +102,7 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let event_store = &aptos_db.event_store;
-    let batch = SchemaBatch::new();
+    let mut batch = SchemaBatch::new();
     let num_versions = events.len();
 
     // Write events to DB
@@ -112,7 +112,7 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
                 version as u64,
                 events_for_version,
                 /*skip_index=*/ false,
-                &batch,
+                &mut batch,
             )
             .unwrap();
     }

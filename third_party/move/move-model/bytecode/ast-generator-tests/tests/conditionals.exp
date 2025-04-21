@@ -1,0 +1,603 @@
+
+=== Processing m::if_1 =====================================================
+--- Source
+fun if_1(c: bool): u8 {
+        let result = 0;
+        if (c) {
+            result = 1;
+        };
+        result
+    }
+
+--- Stackless Bytecode
+fun m::if_1($t0|c: bool): u8 {
+     var $t1|result: u8
+     var $t2: u8
+     var $t3: bool
+     var $t4: u8
+     var $t5: u8
+  0: $t2 := 0
+  1: $t1 := $t2
+  2: $t3 := move($t0)
+  3: if ($t3) goto 4 else goto 8
+  4: label L0
+  5: $t4 := 1
+  6: $t1 := $t4
+  7: goto 8
+  8: label L2
+  9: $t5 := move($t1)
+ 10: return $t5
+}
+
+--- Raw Generated AST
+_t2: u8 = 0;
+_t1: u8 = _t2;
+_t3: bool = c;
+loop {
+  if (Not(_t3)) break;
+  _t4: u8 = 1;
+  _t1: u8 = _t4;
+  break
+};
+_t5: u8 = _t1;
+return _t5
+
+--- Assign-Transformed Generated AST
+_t1: u8 = 0;
+loop {
+  if (Not(c)) break;
+  _t1: u8 = 1;
+  break
+};
+return _t1
+
+--- If-Transformed Generated AST
+_t1: u8 = 0;
+if (c) _t1: u8 = 1;
+return _t1
+
+--- Var-Bound Generated AST
+{
+  let _t1: u8;
+  _t1: u8 = 0;
+  if (c) _t1: u8 = 1;
+  return _t1
+}
+
+
+=== Processing m::if_else_1 =====================================================
+--- Source
+fun if_else_1(c: bool): u8 {
+        if (c) 1 else 2
+    }
+
+--- Stackless Bytecode
+fun m::if_else_1($t0|c: bool): u8 {
+     var $t1|return: u8
+     var $t2: bool
+     var $t3: u8
+     var $t4: u8
+     var $t5: u8
+  0: $t2 := move($t0)
+  1: if ($t2) goto 2 else goto 9
+  2: label L1
+  3: $t3 := 1
+  4: $t1 := $t3
+  5: goto 6
+  6: label L2
+  7: $t4 := move($t1)
+  8: return $t4
+  9: label L0
+ 10: $t5 := 2
+ 11: $t1 := $t5
+ 12: goto 6
+}
+
+--- Raw Generated AST
+_t2: bool = c;
+loop {
+  loop {
+    if (Not(_t2)) break;
+    _t3: u8 = 1;
+    _t1: u8 = _t3;
+    break[1]
+  };
+  _t5: u8 = 2;
+  _t1: u8 = _t5;
+  break
+};
+_t4: u8 = _t1;
+return _t4
+
+--- Assign-Transformed Generated AST
+loop {
+  loop {
+    if (Not(c)) break;
+    _t1: u8 = 1;
+    break[1]
+  };
+  _t1: u8 = 2;
+  break
+};
+return _t1
+
+--- If-Transformed Generated AST
+if c {
+  _t1: u8 = 1
+} else {
+  _t1: u8 = 2
+};
+return _t1
+
+--- Var-Bound Generated AST
+{
+  let _t1: u8;
+  if c {
+    _t1: u8 = 1
+  } else {
+    _t1: u8 = 2
+  };
+  return _t1
+}
+
+
+=== Processing m::if_else_2 =====================================================
+--- Source
+fun if_else_2(c: bool, d: bool): u8 {
+        if (c) {
+            if (d) {
+                1
+            } else {
+                2
+            }
+        } else {
+            3
+        }
+    }
+
+--- Stackless Bytecode
+fun m::if_else_2($t0|c: bool, $t1|d: bool): u8 {
+     var $t2|return: u8
+     var $t3: bool
+     var $t4: bool
+     var $t5: u8
+     var $t6: u8
+     var $t7: u8
+     var $t8: u8
+  0: $t3 := move($t0)
+  1: if ($t3) goto 2 else goto 16
+  2: label L1
+  3: $t4 := move($t1)
+  4: if ($t4) goto 5 else goto 12
+  5: label L3
+  6: $t5 := 1
+  7: $t2 := $t5
+  8: goto 9
+  9: label L4
+ 10: $t6 := move($t2)
+ 11: return $t6
+ 12: label L2
+ 13: $t7 := 2
+ 14: $t2 := $t7
+ 15: goto 9
+ 16: label L0
+ 17: $t8 := 3
+ 18: $t2 := $t8
+ 19: goto 9
+}
+
+--- Raw Generated AST
+_t3: bool = c;
+loop {
+  loop {
+    if (_t3) break;
+    _t8: u8 = 3;
+    _t2: u8 = _t8;
+    break[1]
+  };
+  _t4: bool = d;
+  loop {
+    if (Not(_t4)) break;
+    _t5: u8 = 1;
+    _t2: u8 = _t5;
+    break[1]
+  };
+  _t7: u8 = 2;
+  _t2: u8 = _t7;
+  break
+};
+_t6: u8 = _t2;
+return _t6
+
+--- Assign-Transformed Generated AST
+loop {
+  loop {
+    if (c) break;
+    _t2: u8 = 3;
+    break[1]
+  };
+  loop {
+    if (Not(d)) break;
+    _t2: u8 = 1;
+    break[1]
+  };
+  _t2: u8 = 2;
+  break
+};
+return _t2
+
+--- If-Transformed Generated AST
+if c {
+  if d {
+    _t2: u8 = 1
+  } else {
+    _t2: u8 = 2
+  }
+} else {
+  _t2: u8 = 3
+};
+return _t2
+
+--- Var-Bound Generated AST
+{
+  let _t2: u8;
+  if c {
+    if d {
+      _t2: u8 = 1
+    } else {
+      _t2: u8 = 2
+    }
+  } else {
+    _t2: u8 = 3
+  };
+  return _t2
+}
+
+
+=== Processing m::if_else_3 =====================================================
+--- Source
+fun if_else_3(c: bool): u64 {
+        let r = if (c) 1 else 2;
+        r
+    }
+
+--- Stackless Bytecode
+fun m::if_else_3($t0|c: bool): u64 {
+     var $t1|r: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := move($t0)
+  1: if ($t2) goto 2 else goto 9
+  2: label L1
+  3: $t3 := 1
+  4: $t1 := $t3
+  5: goto 6
+  6: label L2
+  7: $t4 := move($t1)
+  8: return $t4
+  9: label L0
+ 10: $t5 := 2
+ 11: $t1 := $t5
+ 12: goto 6
+}
+
+--- Raw Generated AST
+_t2: bool = c;
+loop {
+  loop {
+    if (Not(_t2)) break;
+    _t3: u64 = 1;
+    _t1: u64 = _t3;
+    break[1]
+  };
+  _t5: u64 = 2;
+  _t1: u64 = _t5;
+  break
+};
+_t4: u64 = _t1;
+return _t4
+
+--- Assign-Transformed Generated AST
+loop {
+  loop {
+    if (Not(c)) break;
+    _t1: u64 = 1;
+    break[1]
+  };
+  _t1: u64 = 2;
+  break
+};
+return _t1
+
+--- If-Transformed Generated AST
+if c {
+  _t1: u64 = 1
+} else {
+  _t1: u64 = 2
+};
+return _t1
+
+--- Var-Bound Generated AST
+{
+  let _t1: u64;
+  if c {
+    _t1: u64 = 1
+  } else {
+    _t1: u64 = 2
+  };
+  return _t1
+}
+
+
+=== Processing m::if_else_if =====================================================
+--- Source
+fun if_else_if(c: bool, d: bool): u8 {
+        if (c) {
+          1
+        } else if (d) {
+          2
+        } else {
+          3
+        }
+    }
+
+--- Stackless Bytecode
+fun m::if_else_if($t0|c: bool, $t1|d: bool): u8 {
+     var $t2|return: u8
+     var $t3: bool
+     var $t4: u8
+     var $t5: u8
+     var $t6: bool
+     var $t7: u8
+     var $t8: u8
+  0: $t3 := move($t0)
+  1: if ($t3) goto 2 else goto 9
+  2: label L1
+  3: $t4 := 1
+  4: $t2 := $t4
+  5: goto 6
+  6: label L4
+  7: $t5 := move($t2)
+  8: return $t5
+  9: label L0
+ 10: $t6 := move($t1)
+ 11: if ($t6) goto 12 else goto 16
+ 12: label L3
+ 13: $t7 := 2
+ 14: $t2 := $t7
+ 15: goto 6
+ 16: label L2
+ 17: $t8 := 3
+ 18: $t2 := $t8
+ 19: goto 6
+}
+
+--- Raw Generated AST
+_t3: bool = c;
+loop {
+  loop {
+    if (Not(_t3)) break;
+    _t4: u8 = 1;
+    _t2: u8 = _t4;
+    break[1]
+  };
+  _t6: bool = d;
+  loop {
+    if (Not(_t6)) break;
+    _t7: u8 = 2;
+    _t2: u8 = _t7;
+    break[1]
+  };
+  _t8: u8 = 3;
+  _t2: u8 = _t8;
+  break
+};
+_t5: u8 = _t2;
+return _t5
+
+--- Assign-Transformed Generated AST
+loop {
+  loop {
+    if (Not(c)) break;
+    _t2: u8 = 1;
+    break[1]
+  };
+  loop {
+    if (Not(d)) break;
+    _t2: u8 = 2;
+    break[1]
+  };
+  _t2: u8 = 3;
+  break
+};
+return _t2
+
+--- If-Transformed Generated AST
+if c {
+  _t2: u8 = 1
+} else {
+  if d {
+    _t2: u8 = 2
+  } else {
+    _t2: u8 = 3
+  }
+};
+return _t2
+
+--- Var-Bound Generated AST
+{
+  let _t2: u8;
+  if c {
+    _t2: u8 = 1
+  } else {
+    if d {
+      _t2: u8 = 2
+    } else {
+      _t2: u8 = 3
+    }
+  };
+  return _t2
+}
+
+
+=== Processing m::if_else_with_shared_exp =====================================================
+--- Source
+fun if_else_with_shared_exp(x: u64): u64 {
+        let y = x + x;
+        let z = y * y;
+        if (z > 0) z + 1 else z - 1
+    }
+
+--- Stackless Bytecode
+fun m::if_else_with_shared_exp($t0|x: u64): u64 {
+     var $t1|$t3: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t2 := copy($t0)
+  1: $t3 := move($t0)
+  2: $t4 := +($t2, $t3)
+  3: $t0 := $t4
+  4: $t5 := copy($t0)
+  5: $t6 := move($t0)
+  6: $t7 := *($t5, $t6)
+  7: $t0 := $t7
+  8: $t8 := copy($t0)
+  9: $t9 := 0
+ 10: $t10 := >($t8, $t9)
+ 11: if ($t10) goto 12 else goto 21
+ 12: label L1
+ 13: $t11 := move($t0)
+ 14: $t12 := 1
+ 15: $t13 := +($t11, $t12)
+ 16: $t1 := $t13
+ 17: goto 18
+ 18: label L2
+ 19: $t14 := move($t1)
+ 20: return $t14
+ 21: label L0
+ 22: $t15 := move($t0)
+ 23: $t16 := 1
+ 24: $t17 := -($t15, $t16)
+ 25: $t1 := $t17
+ 26: goto 18
+}
+
+--- Raw Generated AST
+_t2: u64 = x;
+_t3: u64 = x;
+_t4: u64 = Add(_t2, _t3);
+x: u64 = _t4;
+_t5: u64 = x;
+_t6: u64 = x;
+_t7: u64 = Mul(_t5, _t6);
+x: u64 = _t7;
+_t8: u64 = x;
+_t9: u64 = 0;
+_t10: bool = Gt(_t8, _t9);
+loop {
+  loop {
+    if (Not(_t10)) break;
+    _t11: u64 = x;
+    _t12: u64 = 1;
+    _t13: u64 = Add(_t11, _t12);
+    _t1: u64 = _t13;
+    break[1]
+  };
+  _t15: u64 = x;
+  _t16: u64 = 1;
+  _t17: u64 = Sub(_t15, _t16);
+  _t1: u64 = _t17;
+  break
+};
+_t14: u64 = _t1;
+return _t14
+
+--- Assign-Transformed Generated AST
+x: u64 = Add(x, x);
+x: u64 = Mul(x, x);
+loop {
+  loop {
+    if (Not(Gt(x, 0))) break;
+    _t1: u64 = Add(x, 1);
+    break[1]
+  };
+  _t1: u64 = Sub(x, 1);
+  break
+};
+return _t1
+
+--- If-Transformed Generated AST
+x: u64 = Add(x, x);
+x: u64 = Mul(x, x);
+if Gt(x, 0) {
+  _t1: u64 = Add(x, 1)
+} else {
+  _t1: u64 = Sub(x, 1)
+};
+return _t1
+
+--- Var-Bound Generated AST
+{
+  let _t1: u64;
+  x: u64 = Add(x, x);
+  x: u64 = Mul(x, x);
+  if Gt(x, 0) {
+    _t1: u64 = Add(x, 1)
+  } else {
+    _t1: u64 = Sub(x, 1)
+  };
+  return _t1
+}
+
+=== Sourcified Output ============================================
+module 0x815::m {
+    fun if_1(c: bool): u8 {
+        let _t1;
+        _t1 = 0u8;
+        if (c) _t1 = 1u8;
+        _t1
+    }
+    fun if_else_1(c: bool): u8 {
+        let _t1;
+        if (c) _t1 = 1u8 else _t1 = 2u8;
+        _t1
+    }
+    fun if_else_2(c: bool, d: bool): u8 {
+        let _t2;
+        if (c) if (d) _t2 = 1u8 else _t2 = 2u8 else _t2 = 3u8;
+        _t2
+    }
+    fun if_else_3(c: bool): u64 {
+        let _t1;
+        if (c) _t1 = 1 else _t1 = 2;
+        _t1
+    }
+    fun if_else_if(c: bool, d: bool): u8 {
+        let _t2;
+        if (c) _t2 = 1u8 else if (d) _t2 = 2u8 else _t2 = 3u8;
+        _t2
+    }
+    fun if_else_with_shared_exp(x: u64): u64 {
+        let _t1;
+        x = x + x;
+        x = x * x;
+        if (x > 0) _t1 = x + 1 else _t1 = x - 1;
+        _t1
+    }
+}

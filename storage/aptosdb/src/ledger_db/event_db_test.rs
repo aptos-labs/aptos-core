@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::db::AptosDB;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
 use aptos_types::contract_event::ContractEvent;
@@ -19,8 +19,8 @@ proptest! {
 
         prop_assert_eq!(event_db.latest_version().unwrap(), None);
 
-        let batch = SchemaBatch::new();
-        event_db.put_events(100, &events, /*skip_index=*/false, &batch).unwrap();
+        let mut batch = SchemaBatch::new();
+        event_db.put_events(100, &events, /*skip_index=*/false, &mut batch).unwrap();
         event_db.write_schemas(batch).unwrap();
 
         prop_assert_eq!(event_db.latest_version().unwrap(), Some(100));
@@ -39,8 +39,8 @@ proptest! {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
         let event_db = &db.ledger_db.event_db();
-        let batch = SchemaBatch::new();
-        event_db.put_events_multiple_versions(99, &[events1.clone(), events2.clone(), events3.clone()], &batch).unwrap();
+        let mut batch = SchemaBatch::new();
+        event_db.put_events_multiple_versions(99, &[events1.clone(), events2.clone(), events3.clone()], &mut batch).unwrap();
         event_db.write_schemas(batch).unwrap();
 
         let events_99 = event_db.get_events_by_version(99).unwrap();

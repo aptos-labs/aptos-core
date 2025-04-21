@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::aggregator::AggregatorResource;
+use crate::account_address::create_derived_object_address;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -11,20 +13,17 @@ use move_core_types::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-pub fn primary_store(address: &AccountAddress) -> AccountAddress {
-    let mut bytes = address.to_vec();
-    bytes.append(&mut AccountAddress::TEN.to_vec());
-    bytes.push(0xFC);
-    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+pub fn primary_apt_store(address: AccountAddress) -> AccountAddress {
+    create_derived_object_address(address, AccountAddress::TEN)
 }
 
 /// The balance resource held under an account.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct FungibleStoreResource {
-    metadata: AccountAddress,
-    balance: u64,
-    frozen: bool,
+    pub metadata: AccountAddress,
+    pub balance: u64,
+    pub frozen: bool,
 }
 
 impl FungibleStoreResource {
@@ -55,3 +54,43 @@ impl MoveStructType for FungibleStoreResource {
 }
 
 impl MoveResource for FungibleStoreResource {}
+
+/// The balance resource held under an account.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConcurrentFungibleBalanceResource {
+    /// The balance of the fungible metadata.
+    balance: AggregatorResource<u64>,
+}
+
+impl ConcurrentFungibleBalanceResource {
+    pub fn new(balance: u64) -> Self {
+        Self {
+            balance: AggregatorResource::new(balance, u64::MAX),
+        }
+    }
+
+    pub fn balance(&self) -> u64 {
+        *self.balance.get()
+    }
+}
+
+impl MoveStructType for ConcurrentFungibleBalanceResource {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungible_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("ConcurrentFungibleBalance");
+}
+
+impl MoveResource for ConcurrentFungibleBalanceResource {}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct MigrationFlag {
+    // Thanks to the "feature" of 1-byte empty struct
+    dummy: bool,
+}
+
+impl MoveStructType for MigrationFlag {
+    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("MigrationFlag");
+}
+
+impl MoveResource for MigrationFlag {}

@@ -535,7 +535,7 @@ mod tests {
     };
     use aptos_config::network_id::{NetworkId, PeerNetworkId};
     use aptos_consensus_types::{
-        block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus},
+        block_retrieval::{BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus},
         common::Payload,
     };
     use aptos_crypto::HashValue;
@@ -625,6 +625,7 @@ mod tests {
         let mut playground = NetworkPlayground::new(runtime.handle().clone());
         let mut nodes = Vec::new();
         let (signers, validator_verifier) = random_validator_verifier(num_nodes, None, false);
+        let validator_verifier = Arc::new(validator_verifier);
         let peers: Vec<_> = signers.iter().map(|signer| signer.author()).collect();
         let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
 
@@ -741,6 +742,7 @@ mod tests {
         let mut playground = NetworkPlayground::new(runtime.handle().clone());
         let mut nodes = Vec::new();
         let (signers, validator_verifier) = random_validator_verifier(num_nodes, None, false);
+        let validator_verifier = Arc::new(validator_verifier);
         let peers: Vec<_> = signers.iter().map(|signer| signer.author()).collect();
         let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
 
@@ -822,8 +824,9 @@ mod tests {
                     BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
                 let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
                 let bytes = Bytes::from(serde_json::to_vec(&response).unwrap());
+                // TODO: @bchocho @hariria can change after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
                 match request {
-                    IncomingRpcRequest::BlockRetrieval(request) => {
+                    IncomingRpcRequest::DeprecatedBlockRetrieval(request) => {
                         request.response_sender.send(Ok(bytes)).unwrap()
                     },
                     _ => panic!("unexpected message"),
@@ -835,7 +838,7 @@ mod tests {
         timed_block_on(&runtime, async {
             let response = nodes[0]
                 .request_block(
-                    BlockRetrievalRequest::new(HashValue::zero(), 1),
+                    BlockRetrievalRequestV1::new(HashValue::zero(), 1),
                     peer,
                     Duration::from_secs(5),
                 )
@@ -877,8 +880,8 @@ mod tests {
             .push((peer_id, protocol_id), bad_msg)
             .unwrap();
 
-        let liveness_check_msg = ConsensusMsg::BlockRetrievalRequest(Box::new(
-            BlockRetrievalRequest::new(HashValue::random(), 1),
+        let liveness_check_msg = ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(
+            BlockRetrievalRequestV1::new(HashValue::random(), 1),
         ));
 
         let protocol_id = ProtocolId::ConsensusRpcJson;

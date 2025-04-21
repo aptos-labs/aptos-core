@@ -7,12 +7,12 @@
 use crate::{
     compatibility,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, StructTypeParameter, Visibility},
+    file_format::{StructTypeParameter, Visibility},
     file_format_common::VERSION_5,
     normalized::Module,
 };
 use compatibility::Compatibility;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ability::AbilitySet, vm_status::StatusCode};
 use std::collections::BTreeSet;
 
 impl Compatibility {
@@ -71,17 +71,20 @@ impl Compatibility {
         //   - if the function visibility is upgraded to public, it is OK
         //   - otherwise, it is considered as incompatible.
         //
-        // NOTE: it is possible to relax the compatibility checking for a friend function, i.e.,
-        // we can remove/change a friend function if the function is not used by any module in the
-        // friend list. But for simplicity, we decided to go to the more restrictive form now and
-        // we may revisit this in the future.
         for (name, old_func) in &old_module.exposed_functions {
             let new_func = match new_module.exposed_functions.get(name) {
                 Some(new_func) => new_func,
                 None => {
-                    if matches!(old_func.visibility, Visibility::Friend) {
+                    if matches!(old_func.visibility, Visibility::Friend)
+                        && !(old_func.is_entry && self.treat_entry_as_public)
+                    // self.treat_entry_as_public is false: trying to remove friend
+                    // self.treat_entry_as_public is true:  trying to remove Friend non-entry
+                    {
+                        // Report as friend linking error, which would be dismissed when
+                        // self.check_friend_linking is set to false
                         friend_linking = false;
                     } else {
+                        // Otherwise report as function linking error.
                         struct_and_pub_function_linking = false;
                     }
                     continue;
@@ -118,9 +121,16 @@ impl Compatibility {
                     &new_func.type_parameters,
                 )
             {
-                if matches!(old_func.visibility, Visibility::Friend) {
+                if matches!(old_func.visibility, Visibility::Friend)
+                    && (!old_func.is_entry || !self.treat_entry_as_public)
+                // self.treat_entry_as_public is false: trying to change signature of a friend function
+                // self.treat_entry_as_public is true:  trying to change signature of a friend non-entry function.
+                {
+                    // Report as friend linking error, which would be dismissed when
+                    // self.check_friend_linking is set to false
                     friend_linking = false;
                 } else {
+                    // Otherwise report as function linking error.
                     struct_and_pub_function_linking = false;
                 }
             }

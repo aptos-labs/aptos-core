@@ -13,12 +13,7 @@ use clap::{
 };
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
-use log::LevelFilter;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_model::{
-    model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope},
-    parse_addresses_from_options, run_model_builder_with_options,
-};
+use move_model::model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope};
 use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, create_init_num_operation_state,
     generate_boogie, verify_boogie,
@@ -97,7 +92,7 @@ pub fn benchmark(args: &[String]) {
     let matches = cmd_line_parser.get_matches_from(args);
     let get_vec = |s: &str| -> Vec<String> {
         let vs = matches.get_many::<String>(s);
-        vs.map_or(vec![], |v| v.cloned().collect())
+        vs.map_or_else(Vec::new, |v| v.cloned().collect())
     };
     let sources = get_vec("sources");
     let deps = get_vec("dependencies");
@@ -148,27 +143,9 @@ fn run_benchmark(
     } else {
         Options::default()
     };
-    let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
+    options.move_sources.append(&mut modules.to_vec());
     options.move_deps.append(&mut dep_dirs.to_vec());
-    let skip_attribute_checks = true;
-    let known_attributes = KnownAttribute::get_all_attribute_names().clone();
-    let env = run_model_builder_with_options(
-        vec![PackagePaths {
-            name: None,
-            paths: modules.to_vec(),
-            named_address_map: addrs.clone(),
-        }],
-        vec![],
-        vec![PackagePaths {
-            name: None,
-            paths: options.move_deps.clone(),
-            named_address_map: addrs,
-        }],
-        options.model_builder.clone(),
-        skip_attribute_checks,
-        &known_attributes,
-    )?;
-    let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+    options.skip_attribute_checks = true;
 
     if use_aptos_natives {
         options.backend.custom_natives =
@@ -177,24 +154,22 @@ fn run_benchmark(
                     "../../../../../aptos-move/framework/src/aptos-natives.bpl"
                 )
                 .to_vec(),
-                module_instance_names: vec![(
-                    "0x1::object".to_string(),
-                    "object_instances".to_string(),
-                    true,
-                )],
+                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
             });
     }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
     // indicates a bug in boogie or the solver, because we already propagate soft timeouts, but
     // they are ignored.
-    options.backend.hard_timeout_secs = 400;
+    options.backend.hard_timeout_secs = 60;
     options.backend.global_timeout_overwrite = false;
-    options.backend.vc_timeout = 300;
-
-    options.verbosity_level = LevelFilter::Warn;
+    options.backend.vc_timeout = 400;
+    options.set_quiet();
     options.backend.proc_cores = 1;
     options.backend.derive_options();
     options.setup_logging();
+
+    let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+    let env = move_prover::create_move_prover_v2_model(&mut error_writer, options.clone())?;
     check_errors(&env, &options, &mut error_writer, "unexpected build errors")?;
 
     let config_descr = if let Some(config) = config_file_opt {
@@ -253,13 +228,13 @@ impl Runner {
         // Write data record of benchmark result
         writeln!(
             self.out,
-            "{:<40} {:>12} {:>12}",
+            "{:<50} {:>15} {:>15}",
             fun.get_full_name_str(),
             duration.as_millis(),
             status
         )?;
 
-        println!("\x08\x08{:.3}s {}.", duration.as_secs_f64(), status);
+        println!(" {:.3}s {}.", duration.as_secs_f64(), status);
         Ok(())
     }
 
@@ -299,7 +274,7 @@ impl Runner {
         )?;
 
         // Generate boogie code.
-        let code_writer = generate_boogie(env, &self.options, &targets)?;
+        let code_writer = generate_boogie(env, &self.options, None, &targets)?;
         check_errors(
             env,
             &self.options,

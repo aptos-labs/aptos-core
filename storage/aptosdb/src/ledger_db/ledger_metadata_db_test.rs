@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ledger_db::ledger_metadata_db::LedgerMetadataDb, AptosDB};
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::AptosDbError;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -63,10 +63,10 @@ fn set_up(path: &impl AsRef<Path>, ledger_infos_with_sigs: &[LedgerInfoWithSigna
     let db = AptosDB::new_for_test(path);
     let ledger_metadata_db = db.ledger_db.metadata_db();
 
-    let batch = SchemaBatch::new();
+    let mut batch = SchemaBatch::new();
     ledger_infos_with_sigs
         .iter()
-        .map(|info| ledger_metadata_db.put_ledger_info(info, &batch))
+        .map(|info| ledger_metadata_db.put_ledger_info(info, &mut batch))
         .collect::<Result<Vec<_>, AptosDbError>>()
         .unwrap();
     ledger_metadata_db.write_schemas(batch).unwrap();
@@ -233,7 +233,7 @@ fn test_block_api() {
     let db = AptosDB::new_for_test(&tmp_dir);
     let ledger_metadata_db = db.ledger_db.metadata_db();
 
-    let batch = SchemaBatch::new();
+    let mut batch = SchemaBatch::new();
     let proposer_1 = AccountAddress::random();
     let proposer_2 = AccountAddress::random();
     let events = vec![
@@ -266,7 +266,7 @@ fn test_block_api() {
             TypeTag::from(NewBlockEvent::struct_tag()),
             bcs::to_bytes(&events[0]).unwrap(),
         ),
-        &batch,
+        &mut batch,
     )
     .unwrap();
     LedgerMetadataDb::put_block_info(
@@ -277,7 +277,7 @@ fn test_block_api() {
             TypeTag::from(NewBlockEvent::struct_tag()),
             bcs::to_bytes(&events[1]).unwrap(),
         ),
-        &batch,
+        &mut batch,
     )
     .unwrap();
     ledger_metadata_db.write_schemas(batch).unwrap();

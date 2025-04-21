@@ -12,7 +12,6 @@ that are used by the [`move-cli`](./move-cli) `package` subcommand:
 
 * `move-bytecode-viewer`
 * `move-disassembler`
-* `move-explain`
 * `move-unit-test`
 * `move-package`
 * `move-coverage`

@@ -45,6 +45,10 @@ spec:
             {{- end }}
             - --metadata-cache-dir
             - /tmp/aptos-backup-verify-metadata
+            {{- if .Values.backup_verify.config.concurrent_downloads }}
+            - --concurrent-downloads
+            - "{{ .Values.backup_verify.config.concurrent_downloads }}"
+            {{- end }}
             - --command-adapter-config
             # use the same config with the backup sts
             - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml
@@ -59,7 +63,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: PUSH_METRICS_ENDPOINT
-              value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_verify" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
+              value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_verify" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)&extra_label=chain_name={{ $.Values.chain.label | default $.Values.chain.name }}"
             {{- end }}
             {{- include "backup.backupEnvironment" (dict "config" $.Values.backup.config "era" $.Values.chain.era) | nindent 12 }}
             {{- with .Values.backup_verify }}

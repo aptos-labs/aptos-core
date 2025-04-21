@@ -6,7 +6,8 @@ use move_bytecode_verifier::{
     limits::LimitsVerifier, verify_module_with_config_for_test, VerifierConfig,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+    vm_status::StatusCode,
 };
 
 #[test]
@@ -19,6 +20,7 @@ fn test_function_handle_type_instantiation() {
         return_: SignatureIndex(0),
         type_parameters: std::iter::repeat(AbilitySet::ALL).take(10).collect(),
         access_specifiers: None,
+        attributes: vec![],
     });
 
     assert_eq!(
@@ -42,6 +44,7 @@ fn test_function_handle_type_instantiation() {
         return_: SignatureIndex(0),
         type_parameters: std::iter::repeat(AbilitySet::ALL).take(10).collect(),
         access_specifiers: None,
+        attributes: vec![],
     });
 
     assert_eq!(
@@ -126,6 +129,7 @@ fn test_function_handle_parameters() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
 
     assert_eq!(
@@ -152,6 +156,7 @@ fn test_function_handle_parameters() {
         return_: SignatureIndex(0),
         type_parameters: vec![],
         access_specifiers: None,
+        attributes: vec![],
     });
 
     assert_eq!(
@@ -215,6 +220,7 @@ fn big_vec_unpacks() {
             return_: SignatureIndex(0),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -662,6 +668,7 @@ fn multi_functions(module: &mut CompiledModule, count: usize) {
             return_: SignatureIndex((module.signatures.len() - 1) as u16),
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         });
         module.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex((module.function_handles.len() - 1) as u16),

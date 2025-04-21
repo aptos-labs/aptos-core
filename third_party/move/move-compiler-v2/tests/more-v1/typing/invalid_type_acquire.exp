@@ -1,0 +1,29 @@
+
+Diagnostics:
+error: invalid access specifier
+   ┌─ tests/more-v1/typing/invalid_type_acquire.move:18:9
+   │
+18 │         T,
+   │         ^
+
+error: invalid access specifier
+   ┌─ tests/more-v1/typing/invalid_type_acquire.move:19:9
+   │
+19 │         u64,
+   │         ^^^
+
+error: type `u64` is missing required ability `key`
+   ┌─ tests/more-v1/typing/invalid_type_acquire.move:32:36
+   │
+32 │         destroy(account, move_from<u64>(a));
+   │                                    ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `S` is missing required ability `key`
+   ┌─ tests/more-v1/typing/invalid_type_acquire.move:34:36
+   │
+34 │         destroy(account, move_from<S>(a));
+   │                                    ^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`

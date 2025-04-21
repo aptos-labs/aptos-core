@@ -27,7 +27,10 @@ have a simple layout which is easily accessible in Rust.
 -  [Struct `PatchUpsertJWK`](#0x1_jwks_PatchUpsertJWK)
 -  [Resource `Patches`](#0x1_jwks_Patches)
 -  [Resource `PatchedJWKs`](#0x1_jwks_PatchedJWKs)
+-  [Resource `FederatedJWKs`](#0x1_jwks_FederatedJWKs)
 -  [Constants](#@Constants_0)
+-  [Function `patch_federated_jwks`](#0x1_jwks_patch_federated_jwks)
+-  [Function `update_federated_jwk_set`](#0x1_jwks_update_federated_jwk_set)
 -  [Function `get_patched_jwk`](#0x1_jwks_get_patched_jwk)
 -  [Function `try_get_patched_jwk`](#0x1_jwks_try_get_patched_jwk)
 -  [Function `upsert_oidc_provider`](#0x1_jwks_upsert_oidc_provider)
@@ -59,7 +62,8 @@ have a simple layout which is easily accessible in Rust.
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/comparator.md#0x1_comparator">0x1::comparator</a>;
 <b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
@@ -67,6 +71,7 @@ have a simple layout which is easily accessible in Rust.
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -605,9 +610,64 @@ This is what applications should consume.
 
 </details>
 
+<a id="0x1_jwks_FederatedJWKs"></a>
+
+## Resource `FederatedJWKs`
+
+JWKs for federated keyless accounts are stored in this resource.
+
+
+<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> <b>has</b> drop, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
+
+
+<a id="0x1_jwks_EFEDERATED_JWKS_TOO_LARGE"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EFEDERATED_JWKS_TOO_LARGE">EFEDERATED_JWKS_TOO_LARGE</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x1_jwks_EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK">EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_jwks_EINVALID_FEDERATED_JWK_SET"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EINVALID_FEDERATED_JWK_SET">EINVALID_FEDERATED_JWK_SET</a>: u64 = 9;
+</code></pre>
+
 
 
 <a id="0x1_jwks_EISSUER_NOT_FOUND"></a>
@@ -708,6 +768,156 @@ This is what applications should consume.
 </code></pre>
 
 
+
+<a id="0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES"></a>
+
+We limit the size of a <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> resource installed by a dapp owner for federated keyless accounts.
+Note: If too large, validators waste work reading it for invalid TXN signatures.
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES">MAX_FEDERATED_JWKS_SIZE_BYTES</a>: u64 = 2048;
+</code></pre>
+
+
+
+<a id="0x1_jwks_patch_federated_jwks"></a>
+
+## Function `patch_federated_jwks`
+
+Called by a federated keyless dapp owner to install the JWKs for the federated OIDC provider (e.g., Auth0, AWS
+Cognito, etc). For type-safety, we explicitly use a <code><b>struct</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code> instead of
+reusing <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code>, which is a JWK-consensus-specific struct.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">Patch</a>&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> {
+    // Prevents accidental calls in <a href="jwks.md#0x1_jwks">0x1::jwks</a> that install federated JWKs at the Aptos framework <b>address</b>.
+    <b>assert</b>!(!<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(jwk_owner)),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK">EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK</a>)
+    );
+
+    <b>let</b> jwk_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(jwk_owner);
+    <b>if</b> (!<b>exists</b>&lt;<a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a>&gt;(jwk_addr)) {
+        <b>move_to</b>(jwk_owner, <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
+    };
+
+    <b>let</b> fed_jwks = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a>&gt;(jwk_addr);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&patches, |obj|{
+        <b>let</b> patch: &<a href="jwks.md#0x1_jwks_Patch">Patch</a> = obj;
+        <a href="jwks.md#0x1_jwks_apply_patch">apply_patch</a>(&<b>mut</b> fed_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, *patch);
+    });
+
+    // TODO: Can we check the size more efficiently instead of serializing it via BCS?
+    <b>let</b> num_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(fed_jwks));
+    <b>assert</b>!(num_bytes &lt; <a href="jwks.md#0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES">MAX_FEDERATED_JWKS_SIZE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EFEDERATED_JWKS_TOO_LARGE">EFEDERATED_JWKS_TOO_LARGE</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_jwks_update_federated_jwk_set"></a>
+
+## Function `update_federated_jwk_set`
+
+This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
+be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
+
+The <code>iss</code> parameter is the value of the <code>iss</code> claim on the JWTs that are to be verified by the JWK set.
+<code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code> are String vectors of the JWK attributes <code>kid</code>, <code>alg</code>, <code>e</code> and <code>n</code> respectively.
+See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
+
+For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
+```json
+{
+"keys": [
+{
+"alg": "RS256",
+"use": "sig",
+"kty": "RSA",
+"n": "wNHgGSG5B5xOEQNFPW2p_6ZxZbfPoAU5VceBUuNwQWLop0ohW0vpoZLU1tAsq_S9s5iwy27rJw4EZAOGBR9oTRq1Y6Li5pDVJfmzyRNtmWCWndR-bPqhs_dkJU7MbGwcvfLsN9FSHESFrS9sfGtUX-lZfLoGux23TKdYV9EE-H-NDASxrVFUk2GWc3rL6UEMWrMnOqV9-tghybDU3fcRdNTDuXUr9qDYmhmNegYjYu4REGjqeSyIG1tuQxYpOBH-tohtcfGY-oRTS09kgsSS9Q5BRM4qqCkGP28WhlSf4ui0-norS0gKMMI1P_ZAGEsLn9p2TlYMpewvIuhjJs1thw",
+"kid": "d7b939771a7800c413f90051012d975981916d71",
+"e": "AQAB"
+},
+{
+"kty": "RSA",
+"kid": "b2620d5e7f132b52afe8875cdf3776c064249d04",
+"alg": "RS256",
+"n": "pi22xDdK2fz5gclIbDIGghLDYiRO56eW2GUcboeVlhbAuhuT5mlEYIevkxdPOg5n6qICePZiQSxkwcYMIZyLkZhSJ2d2M6Szx2gDtnAmee6o_tWdroKu0DjqwG8pZU693oLaIjLku3IK20lTs6-2TeH-pUYMjEqiFMhn-hb7wnvH_FuPTjgz9i0rEdw_Hf3Wk6CMypaUHi31y6twrMWq1jEbdQNl50EwH-RQmQ9bs3Wm9V9t-2-_Jzg3AT0Ny4zEDU7WXgN2DevM8_FVje4IgztNy29XUkeUctHsr-431_Iu23JIy6U4Kxn36X3RlVUKEkOMpkDD3kd81JPW4Ger_w",
+"e": "AQAB",
+"use": "sig"
+}
+]
+}
+```
+
+We can call update_federated_jwk_set for Google's <code>iss</code> - "https://accounts.google.com" and for each vector
+argument <code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code>, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+the corresponding attribute in the second JWK as shown below.
+
+```move
+use std::string::utf8;
+aptos_framework::jwks::update_federated_jwk_set(
+jwk_owner,
+b"https://accounts.google.com",
+vector[utf8(b"d7b939771a7800c413f90051012d975981916d71"), utf8(b"b2620d5e7f132b52afe8875cdf3776c064249d04")],
+vector[utf8(b"RS256"), utf8(b"RS256")],
+vector[utf8(b"AQAB"), utf8(b"AQAB")],
+vector[
+utf8(b"wNHgGSG5B5xOEQNFPW2p_6ZxZbfPoAU5VceBUuNwQWLop0ohW0vpoZLU1tAsq_S9s5iwy27rJw4EZAOGBR9oTRq1Y6Li5pDVJfmzyRNtmWCWndR-bPqhs_dkJU7MbGwcvfLsN9FSHESFrS9sfGtUX-lZfLoGux23TKdYV9EE-H-NDASxrVFUk2GWc3rL6UEMWrMnOqV9-tghybDU3fcRdNTDuXUr9qDYmhmNegYjYu4REGjqeSyIG1tuQxYpOBH-tohtcfGY-oRTS09kgsSS9Q5BRM4qqCkGP28WhlSf4ui0-norS0gKMMI1P_ZAGEsLn9p2TlYMpewvIuhjJs1thw"),
+utf8(b"pi22xDdK2fz5gclIbDIGghLDYiRO56eW2GUcboeVlhbAuhuT5mlEYIevkxdPOg5n6qICePZiQSxkwcYMIZyLkZhSJ2d2M6Szx2gDtnAmee6o_tWdroKu0DjqwG8pZU693oLaIjLku3IK20lTs6-2TeH-pUYMjEqiFMhn-hb7wnvH_FuPTjgz9i0rEdw_Hf3Wk6CMypaUHi31y6twrMWq1jEbdQNl50EwH-RQmQ9bs3Wm9V9t-2-_Jzg3AT0Ny4zEDU7WXgN2DevM8_FVje4IgztNy29XUkeUctHsr-431_Iu23JIy6U4Kxn36X3RlVUKEkOMpkDD3kd81JPW4Ger_w")
+]
+)
+```
+
+See AIP-96 for more details about federated keyless - https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-96.md
+
+NOTE: Currently only RSA keys are supported.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="jwks.md#0x1_jwks_update_federated_jwk_set">update_federated_jwk_set</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, alg_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, e_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, n_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="jwks.md#0x1_jwks_update_federated_jwk_set">update_federated_jwk_set</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, alg_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, e_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, n_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> {
+    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&kid_vec), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EINVALID_FEDERATED_JWK_SET">EINVALID_FEDERATED_JWK_SET</a>));
+    <b>let</b> num_jwk = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>&lt;String&gt;(&kid_vec);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&alg_vec) == num_jwk , <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EINVALID_FEDERATED_JWK_SET">EINVALID_FEDERATED_JWK_SET</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&e_vec) == num_jwk, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EINVALID_FEDERATED_JWK_SET">EINVALID_FEDERATED_JWK_SET</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&n_vec) == num_jwk, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EINVALID_FEDERATED_JWK_SET">EINVALID_FEDERATED_JWK_SET</a>));
+
+    <b>let</b> remove_all_patch = <a href="jwks.md#0x1_jwks_new_patch_remove_all">new_patch_remove_all</a>();
+    <b>let</b> patches = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[remove_all_patch];
+    <b>while</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&kid_vec)) {
+        <b>let</b> kid = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> kid_vec);
+        <b>let</b> alg = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> alg_vec);
+        <b>let</b> e = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> e_vec);
+        <b>let</b> n = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> n_vec);
+        <b>let</b> jwk = <a href="jwks.md#0x1_jwks_new_rsa_jwk">new_rsa_jwk</a>(kid, alg, e, n);
+        <b>let</b> patch = <a href="jwks.md#0x1_jwks_new_patch_upsert_jwk">new_patch_upsert_jwk</a>(iss, jwk);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> patches, patch)
+    };
+    <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner, patches);
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_jwks_get_patched_jwk"></a>
 
@@ -828,7 +1038,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
     <b>let</b> provider_set = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
         <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()
     } <b>else</b> {
-        *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)
+        *<b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)
     };
 
     <b>let</b> old_config_url = <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(&<b>mut</b> provider_set, name);
@@ -903,7 +1113,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
     <b>let</b> provider_set = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
         <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()
     } <b>else</b> {
-        *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)
+        *<b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)
     };
     <b>let</b> ret = <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(&<b>mut</b> provider_set, name);
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(provider_set);
@@ -1315,7 +1525,7 @@ Regenerate <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> f
 
 ## Function `try_get_jwk_by_issuer`
 
-Get a JWK by issuer and key ID from a <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>, if it exists.
+Get a JWK by issuer and key ID from an <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>, if it exists.
 
 
 <pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_issuer">try_get_jwk_by_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;

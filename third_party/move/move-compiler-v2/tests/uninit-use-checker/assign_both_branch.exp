@@ -50,3 +50,28 @@ fun m::test($t0: bool): u64 {
      # before: { maybe: $t3, $t4 }, after: { maybe: $t3, $t4 }
  10: return $t1
 }
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+test(cond: bool): u64 /* def_idx: 0 */ {
+L1:	$t3: u64
+B0:
+	0: MoveLoc[0](cond: bool)
+	1: BrFalse(6)
+B1:
+	2: LdU64(1)
+	3: StLoc[1]($t3: u64)
+B2:
+	4: MoveLoc[1]($t3: u64)
+	5: Ret
+B3:
+	6: LdU64(2)
+	7: StLoc[1]($t3: u64)
+	8: Branch(4)
+}
+}
+============ bytecode verification succeeded ========

@@ -35,7 +35,10 @@ impl Cmd {
 
         let ledger_db = self.db_dir.open_ledger_db()?;
         let db = self.db_dir.open_state_kv_db()?;
-        let latest_version = ledger_db.metadata_db().get_synced_version()?;
+        let latest_version = ledger_db
+            .metadata_db()
+            .get_synced_version()?
+            .expect("DB is empty.");
         println!("latest version: {latest_version}");
         if self.version != Version::MAX && self.version > latest_version {
             println!(

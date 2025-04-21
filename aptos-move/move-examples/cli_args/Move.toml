@@ -7,4 +7,6 @@ upgrade_policy = "compatible"
 test_account = "_"
 
 [dependencies.AptosFramework]
-local = "../../framework/aptos-framework"
+git = "https://github.com/aptos-labs/aptos-framework.git"
+subdir = "aptos-framework"
+rev = "mainnet"

@@ -1,0 +1,79 @@
+
+Diagnostics:
+error: missing field `0`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:18:9
+   │
+18 │         S1()
+   │         ^^^^
+
+error: field `1` not declared in `test::S1`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:22:15
+   │
+22 │         S1(0, 1)
+   │               ^
+
+error: missing fields `0`, `1`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:26:9
+   │
+26 │         S2();
+   │         ^^^^
+
+error: missing field `1`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:27:9
+   │
+27 │         S2(1);
+   │         ^^^^^
+
+error: field `2` not declared in `test::S2`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:28:22
+   │
+28 │         S2(1, false, 2);
+   │                      ^
+
+error: field `0` not declared in `test::S0`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:32:12
+   │
+32 │         S0(false);
+   │            ^^^^^
+
+error: expected `u8` but found a value of type `address`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:33:12
+   │
+33 │         S1(@0x42);
+   │            ^^^^^
+
+error: expected `u8` but found a value of type `()`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:34:12
+   │
+34 │         S2((), 1);
+   │            ^^
+
+error: expected `bool` but found a value of type `integer`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:34:16
+   │
+34 │         S2((), 1);
+   │                ^
+
+error: expected struct constructor `test::Unit { .. }` for struct `test::Unit`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:38:9
+   │
+38 │         Unit();
+   │         ^^^^^^
+
+error: expected struct constructor `test::E::V1 { .. }` for struct variant `test::E`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:39:9
+   │
+39 │         E::V1();
+   │         ^^^^^^^
+
+error: expected struct constructor `test::E::V2 { .. }` for struct variant `test::E`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:40:9
+   │
+40 │         E::V2();
+   │         ^^^^^^^
+
+error: expected positional constructor `test::E::V3(..)` for struct variant `test::E`
+   ┌─ tests/checking/positional_fields/named_tuple_construct_invalid.move:41:9
+   │
+41 │         E::V3 {};
+   │         ^^^^^^^^

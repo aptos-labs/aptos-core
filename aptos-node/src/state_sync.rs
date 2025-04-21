@@ -33,7 +33,7 @@ use aptos_storage_service_server::{
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::waypoint::Waypoint;
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -152,7 +152,7 @@ pub fn start_state_sync_and_get_notification_handles(
         setup_data_streaming_service(state_sync_config, aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
-    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db_rw.clone()));
     let metadata_storage = PersistentMetadataStorage::new(&node_config.storage.dir());
 
     // Create notification senders and listeners for mempool, consensus and the storage service

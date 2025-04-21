@@ -1,0 +1,83 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun Module0::test_1() {
+     var $t0: u64
+     var $t1: u64
+  0: spec {
+  assert Eq<u64>($t0, 3);
+}
+
+  1: $t1 := 2
+  2: $t0 := infer($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun Module0::test_2() {
+     var $t0: u64
+     var $t1: u64
+  0: spec {
+  update select Module0::Ghost$y.v(global<0xcafe::Module0::Ghost$y>(0x0)) = $t0;
+}
+
+  1: $t1 := 2
+  2: $t0 := infer($t1)
+  3: return ()
+}
+
+
+Diagnostics:
+error: use of unassigned local `z`
+   ┌─ tests/uninit-use-checker/unused_spec.move:8:9
+   │
+ 8 │ ╭         spec {
+ 9 │ │             assert z == 3;
+10 │ │         };
+   │ ╰─────────^
+
+error: use of unassigned local `z`
+   ┌─ tests/uninit-use-checker/unused_spec.move:16:9
+   │
+16 │ ╭         spec {
+17 │ │             update y = z;
+18 │ │         };
+   │ ╰─────────^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun Module0::test_1() {
+     var $t0: u64
+     var $t1: u64
+     # before: { no: $t0, $t1 }, after: { no: $t0, $t1 }
+  0: spec {
+  assert Eq<u64>($t0, 3);
+}
+
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
+  1: $t1 := 2
+     # before: { no: $t0 }, after: all initialized
+  2: $t0 := infer($t1)
+     # before: all initialized, after: all initialized
+  3: return ()
+}
+
+
+[variant baseline]
+public fun Module0::test_2() {
+     var $t0: u64
+     var $t1: u64
+     # before: { no: $t0, $t1 }, after: { no: $t0, $t1 }
+  0: spec {
+  update select Module0::Ghost$y.v(global<0xcafe::Module0::Ghost$y>(0x0)) = $t0;
+}
+
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
+  1: $t1 := 2
+     # before: { no: $t0 }, after: all initialized
+  2: $t0 := infer($t1)
+     # before: all initialized, after: all initialized
+  3: return ()
+}

@@ -51,6 +51,7 @@ pub fn enable_consensus_observer(use_consensus_observer: bool, node_config: &mut
             },
             aptos_config::config::RoleType::FullNode => {
                 node_config.consensus_observer.observer_enabled = true;
+                node_config.consensus_observer.publisher_enabled = true;
             },
         }
     }

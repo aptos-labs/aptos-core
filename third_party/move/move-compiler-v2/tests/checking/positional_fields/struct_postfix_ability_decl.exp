@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: type `S` is missing required ability `drop`
+  ┌─ tests/checking/positional_fields/struct_postfix_ability_decl.move:4:28
+  │
+4 │     struct T<T> { x: T, y: S } has drop;
+  │                            ^
+  │
+  = required by declaration of field `y`

@@ -1215,7 +1215,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             || self.analyze_mode == AnalyzeMode::All;
         let print_max_tps =
             self.analyze_mode == AnalyzeMode::MaxTps || self.analyze_mode == AnalyzeMode::All;
-        for epoch_info in epochs {
+        for epoch_info in &epochs {
             let mut epoch_stats =
                 AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
             if !self.pool_addresses.is_empty() {
@@ -1313,6 +1313,8 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
                 stats.keys().max().unwrap()
             );
             AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
+
+            AnalyzeValidators::print_gap(epochs.iter().flat_map(|epoch| epoch.blocks.iter()));
         }
         Ok(())
     }
@@ -1441,7 +1443,7 @@ async fn get_epoch_info(client: &Client) -> CliTypedResult<EpochInfo> {
 
     let epoch_interval = block_resource.epoch_interval();
     let epoch_interval_secs = epoch_interval / SECS_TO_MICROSECS;
-    let last_reconfig = reconfig_resource.last_reconfiguration_time();
+    let last_reconfig = reconfig_resource.last_reconfiguration_time_micros();
     Ok(EpochInfo {
         epoch: reconfig_resource.epoch(),
         epoch_interval_secs,

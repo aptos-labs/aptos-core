@@ -1,21 +1,16 @@
 ### Tools Image ###
 FROM debian-base AS tools
 
-RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
-    echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
-
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get --no-install-recommends --allow-downgrades -y \
     install \
     wget \
     curl \
-    perl-base=5.32.1-4+deb11u1 \
+    perl-base=5.32.1-4+deb11u4 \
     libtinfo6=6.2+20201114-2+deb11u2 \
     git \
-    libssl1.1 \
-    ca-certificates \
-    socat \
+            socat \
     python3-botocore/bullseye \
     awscli/bullseye \
     gnupg2 \

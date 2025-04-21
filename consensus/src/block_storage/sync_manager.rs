@@ -17,7 +17,9 @@ use crate::{
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
-    network::{IncomingBlockRetrievalRequest, NetworkSender},
+    network::{
+        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
+    },
     network_interface::ConsensusMsg,
     payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -27,7 +29,7 @@ use anyhow::{anyhow, bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
+        BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
         NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
     common::Author,
@@ -62,7 +64,8 @@ impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
-        // TODO move min gap to fallback (30) to config.
+        // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
+        // larger than buffer manager MAX_BACKLOG (20)
         (self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id()))
             || self.commit_root().round() + 30.max(2 * self.vote_back_pressure_limit)
@@ -398,7 +401,11 @@ impl BlockStore {
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
             if let Some(payload) = block.payload() {
-                payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
+                payload_manager.prefetch_payload_data(
+                    payload,
+                    block.author().expect("payload block must have author"),
+                    block.timestamp_usecs(),
+                );
             }
         }
 
@@ -431,7 +438,7 @@ impl BlockStore {
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         execution_client
-            .sync_to(highest_commit_cert.ledger_info().clone())
+            .sync_to_target(highest_commit_cert.ledger_info().clone())
             .await?;
 
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
@@ -469,7 +476,7 @@ impl BlockStore {
     /// future possible changes.
     pub async fn process_block_retrieval(
         &self,
-        request: IncomingBlockRetrievalRequest,
+        request: DeprecatedIncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process_block_retrieval", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
@@ -503,6 +510,23 @@ impl BlockStore {
             .response_sender
             .send(Ok(response_bytes.into()))
             .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
+    }
+
+    /// TODO @bchocho @hariria to implement in upcoming PR
+    /// Retrieve a n chained blocks from the block store starting from
+    /// an initial parent id, returning with <n (as many as possible) if
+    /// id or its ancestors can not be found.
+    ///
+    /// The current version of the function is not really async, but keeping it this way for
+    /// future possible changes.
+    pub async fn process_block_retrieval_v2(
+        &self,
+        request: IncomingBlockRetrievalRequest,
+    ) -> anyhow::Result<()> {
+        bail!(
+            "Unexpected request {:?} for process_block_retrieval_v2",
+            request.req
+        )
     }
 }
 
@@ -575,7 +599,7 @@ impl BlockRetriever {
                     .boxed(),
                 )
             }
-            let request = BlockRetrievalRequest::new_with_target_block_id(
+            let request = BlockRetrievalRequestV1::new_with_target_block_id(
                 block_id,
                 retrieve_batch_size,
                 target_block_id,

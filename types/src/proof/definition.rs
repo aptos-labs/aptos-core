@@ -200,6 +200,10 @@ impl SparseMerkleProofExt {
         }
     }
 
+    pub fn new_empty() -> Self {
+        Self::new(None, vec![])
+    }
+
     pub fn new_partial(
         leaf: Option<SparseMerkleLeafNode>,
         siblings: Vec<NodeInProof>,
@@ -893,6 +897,13 @@ impl TransactionInfoListWithProof {
     /// Constructs a proof for an empty list of transaction infos. Mostly used for tests.
     pub fn new_empty() -> Self {
         Self::new(AccumulatorRangeProof::new_empty(), vec![])
+    }
+
+    pub fn state_checkpoint_hashes(&self) -> Vec<Option<HashValue>> {
+        self.transaction_infos
+            .iter()
+            .map(|t| t.state_checkpoint_hash())
+            .collect()
     }
 
     /// Verifies the list of transaction infos are correct using the proof. The verifier

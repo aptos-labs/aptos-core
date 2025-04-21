@@ -14,11 +14,16 @@ module M {
         f4: S<(u64, u64)>,
     }
 
-    fun f1(
+    fun f1a(
         _f1: S<R>,
         _f2: S<&u64>,
         _f3: &(&u64),
         _f4: S<(u64, u64)>,
+    ) {
+        abort 0
+    }
+
+    fun f1b(
     ): (
         S<R>,
         S<&u64>,

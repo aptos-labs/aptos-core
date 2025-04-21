@@ -6,14 +6,12 @@ use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -320,12 +318,18 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
 }
 
 impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.base_executor_view.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-        Err(StateviewError::Other(
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
+        self.base_executor_view.read_state_value(state_key)
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+        Err(StateViewError::Other(
             "Unexpected access to get_usage()".to_string(),
         ))
     }

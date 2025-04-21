@@ -150,6 +150,32 @@ storage:
   enable_indexer: false
 ```
 
+## Internal Indexer
+
+Internal indexer is used to provide data for the following node APIs after DB sharding.
+
+Account based event APIs
+* /accounts/{address}/events/{event_handle}/{field_name}
+* /accounts/{address}/events/{creation_number}
+
+Account based transaction API
+* /accounts/{address}/transactions
+
+Account based resource APIs
+* /accounts/{address}/modules
+* /accounts/{address}/resources
+
+The internal indexer is configured as below.
+The batch size is used to chunk the transactions to smaller batches before writting to internal indexer DB.
+```
+indexer_db_config:
+    enable_transaction: true // this is required for account based transaction API
+    enable_event: true // this is required for account based event APIs
+    enable_statekeys: true // this is required for account based resource APIs
+    batch_size: 10000
+```
+
+
 ## Backup and Restore CLI tools
 
 The DB backup is a concise format to preserve the raw data of the blockchain. It
@@ -189,7 +215,7 @@ OPTIONS:
         --command-adapter-config <COMMAND_ADAPTER_CONFIG>
             Select the CommandAdapter backup storage type, which reads shell commands with which it
             communicates with either a local file system or a remote cloud storage. Compression or
-            other fitlers can be added as part of the commands. See a sample config here:
+            other filters can be added as part of the commands. See a sample config here:
             https://github.com/aptos-labs/aptos-networks/tree/main/testnet/backups
 
         --concurrent-downloads <CONCURRENT_DOWNLOADS>

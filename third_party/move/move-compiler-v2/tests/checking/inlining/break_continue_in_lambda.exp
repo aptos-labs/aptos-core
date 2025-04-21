@@ -1,13 +1,19 @@
 
 Diagnostics:
-error: Break outside of a loop not currently supported in inline functions
-  ┌─ tests/checking/inlining/break_continue_in_lambda.move:3:9
+error: Break outside of a loop not supported in function-typed arguments (lambda expressions)
+  ┌─ tests/checking/inlining/break_continue_in_lambda.move:7:17
   │
-3 │         break;
-  │         ^^^^^
+7 │                 break;
+  │                 ^^^^^
+
+error: Break outside of a loop not currently supported in inline functions
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:14:9
+   │
+14 │         break;
+   │         ^^^^^
 
 error: Break outside of a loop not supported in function-typed arguments (lambda expressions)
-   ┌─ tests/checking/inlining/break_continue_in_lambda.move:40:26
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:51:26
    │
-40 │                 brk2(| | break);
+51 │                 brk2(| | break);
    │                          ^^^^^

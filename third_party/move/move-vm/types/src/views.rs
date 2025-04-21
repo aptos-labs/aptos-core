@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delayed_values::delayed_field_id::DelayedFieldID;
+use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::LEGACY_CLOSURE_SIZE};
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
 };
@@ -79,6 +79,11 @@ pub trait ValueView {
                 true
             }
 
+            fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
+                self.0 += LEGACY_CLOSURE_SIZE;
+                true
+            }
+
             fn visit_vec(&mut self, _depth: usize, _len: usize) -> bool {
                 self.0 += LEGACY_STRUCT_SIZE;
                 true
@@ -142,6 +147,7 @@ pub trait ValueVisitor {
     fn visit_address(&mut self, depth: usize, val: AccountAddress);
 
     fn visit_struct(&mut self, depth: usize, len: usize) -> bool;
+    fn visit_closure(&mut self, depth: usize, len: usize) -> bool;
     fn visit_vec(&mut self, depth: usize, len: usize) -> bool;
 
     fn visit_ref(&mut self, depth: usize, is_global: bool) -> bool;

@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: function values outside of inline functions not supported in this language version
+  ┌─ tests/more-v1/parser/invalid_call_lhs_parens_around_name.move:3:10
+  │
+3 │         (foo)()
+  │          ^^^
+
+error: function values outside of inline functions not supported in this language version
+  ┌─ tests/more-v1/parser/invalid_call_lhs_parens_around_name.move:3:9
+  │
+3 │         (foo)()
+  │         ^^^^^^^

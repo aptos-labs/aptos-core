@@ -1,0 +1,83 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    private fun test() {
+        {
+          let x: u64 = 42;
+          {
+            let p: &mut u64 = Borrow(Mutable)(x);
+            x: u64 = Add<u64>(x, 1);
+            {
+              let $t1: &mut u64 = p;
+              $t1 = Add<u64>(Deref($t1), 1)
+            };
+            x;
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    fun test() {
+        let x = 42;
+        let p = &mut x;
+        x = x + 1;
+        {
+            let $t1 = p;
+            *$t1 = *$t1 + 1
+        };
+        x;
+    }
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+fun test::test() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: $t0 := 42
+  1: $t1 := borrow_local($t0)
+  2: $t3 := infer($t0)
+  3: $t4 := 1
+  4: $t2 := +($t3, $t4)
+  5: $t0 := infer($t2)
+  6: $t5 := infer($t1)
+  7: $t7 := read_ref($t5)
+  8: $t8 := 1
+  9: $t6 := +($t7, $t8)
+ 10: write_ref($t5, $t6)
+ 11: $t9 := infer($t0)
+ 12: return ()
+}
+
+
+Diagnostics:
+error: cannot copy local `x` which is still mutably borrowed
+  ┌─ tests/op-equal/invalid1.move:5:3
+  │
+4 │         let p = &mut x;
+  │                 ------ local `x` previously mutably borrowed here
+5 │         x += 1;
+  │         ^ copy attempted here
+6 │         *p += 1;
+  │          - conflicting reference `p` used here
+
+error: cannot drop local `x` which is still borrowed
+  ┌─ tests/op-equal/invalid1.move:5:3
+  │
+4 │         let p = &mut x;
+  │                 ------ local `x` previously mutably borrowed here
+5 │         x += 1;
+  │         ^^^^^^ dropped here
+6 │         *p += 1;
+  │          - conflicting reference `p` used here

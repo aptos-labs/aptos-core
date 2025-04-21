@@ -1,0 +1,36 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: &mut u64
+     var $t2: u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t1 := borrow_local($t0)
+     # live vars: $t1
+  1: $t2 := 42
+     # live vars: $t1, $t2
+  2: write_ref($t1, $t2)
+     # live vars:
+  3: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+public test(x: u64) /* def_idx: 0 */ {
+L1:	$t2: u64
+L2:	y: &mut u64
+B0:
+	0: MutBorrowLoc[0](x: u64)
+	1: StLoc[2](y: &mut u64)
+	2: LdU64(42)
+	3: MoveLoc[2](y: &mut u64)
+	4: WriteRef
+	5: Ret
+}
+}
+============ bytecode verification succeeded ========

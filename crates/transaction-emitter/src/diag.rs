@@ -19,6 +19,7 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
         TransactionFactory::new(cluster.chain_id)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_entropy(),
+        client,
     );
     let coin_source_account_address = coin_source_account.address();
     let instances: Vec<_> = cluster.all_instances().collect();

@@ -14,10 +14,8 @@ use move_model::{
         StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
-    ty::{
-        NoUnificationContext, Type, TypeDisplayContext, TypeInstantiationDerivation,
-        TypeUnificationAdapter, Variance,
-    },
+    ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
+    ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
         TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
         TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
@@ -570,8 +568,16 @@ impl<'a> Analyzer<'a> {
                 .entry(struct_.get_qualified_id())
                 .or_default()
                 .insert(targs.to_owned());
-            for field in struct_.get_fields() {
-                self.add_type(&field.get_type().instantiate(targs));
+            if struct_.has_variants() {
+                for variant in struct_.get_variants() {
+                    for field in struct_.get_fields_of_variant(variant) {
+                        self.add_type(&field.get_type().instantiate(targs));
+                    }
+                }
+            } else {
+                for field in struct_.get_fields() {
+                    self.add_type(&field.get_type().instantiate(targs));
+                }
             }
         }
     }

@@ -37,7 +37,7 @@ module 0x42::t {
 
 }
 
-//# run 0x42::t::add --args @0x42
+//# run 0x42::t::add --signers 0x42
 
 //# view --address 0x42 --resource 0x42::t::Ints
 

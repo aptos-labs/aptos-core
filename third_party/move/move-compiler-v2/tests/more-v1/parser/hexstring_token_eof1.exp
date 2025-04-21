@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid hex string
+  ┌─ tests/more-v1/parser/hexstring_token_eof1.move:3:9
+  │
+3 │         x"
+  │         ^^ Missing closing quote (") after byte string

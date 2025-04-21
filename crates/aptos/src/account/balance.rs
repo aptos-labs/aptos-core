@@ -5,7 +5,7 @@ use crate::common::types::{
     CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, ProfileOptions, RestOptions,
 };
 use aptos_api_types::ViewFunction;
-use aptos_types::{account_address::AccountAddress, APTOS_COIN_TYPE};
+use aptos_types::{account_address::AccountAddress, AptosCoinType, CoinType};
 use async_trait::async_trait;
 use clap::Parser;
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_type_tag};
@@ -66,7 +66,7 @@ impl CliCommand<Vec<AccountBalance>> for Balance {
             })?
         } else {
             // If nothing is given, use the default APT
-            APTOS_COIN_TYPE.to_owned()
+            AptosCoinType::type_tag()
         };
 
         let client = self.rest_options.client(&self.profile_options)?;

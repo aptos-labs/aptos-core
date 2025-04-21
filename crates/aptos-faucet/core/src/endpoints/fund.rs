@@ -9,6 +9,7 @@ use crate::{
     bypasser::{Bypasser, BypasserTrait},
     checkers::{Checker, CheckerData, CheckerTrait, CompleteData},
     endpoints::AptosTapErrorCode,
+    firebase_jwt::jwt_sub,
     funder::{Funder, FunderTrait},
     helpers::{get_current_time_secs, transaction_hashes},
 };
@@ -307,6 +308,7 @@ impl FundApiComponents {
         // Include some additional logging that the logging middleware doesn't do.
         info!(
             source_ip = checker_data.source_ip,
+            jwt_sub = jwt_sub(checker_data.headers.clone()).ok(),
             address = checker_data.receiver,
             requested_amount = fund_request.amount,
             txn_hashes = txn_hashes,

@@ -3,6 +3,7 @@
 
 mod function_generator;
 mod module_generator;
+mod peephole_optimizer;
 
 use crate::{file_format_generator::module_generator::ModuleContext, options::Options, Experiment};
 use module_generator::ModuleGenerator;

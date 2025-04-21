@@ -3,16 +3,14 @@
 FROM debian-base as forge
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \   
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install --no-install-recommends -y \
-    libssl1.1 \
-    ca-certificates \
-    openssh-client \
-    wget \
-    busybox \
-    git \
-    unzip \
-    awscli 
+        awscli \
+        busybox \
+        git \
+        openssh-client \
+        unzip \
+        wget
 
 WORKDIR /aptos
 

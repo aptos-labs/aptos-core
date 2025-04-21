@@ -18,6 +18,27 @@
 
 ## Function `borrow_address`
 
+signer is a builtin move type that represents an address that has been verfied by the VM.
+
+VM Runtime representation is equivalent to following:
+```
+enum signer has drop {
+Master { account: address },
+Permissioned { account: address, permissions_address: address },
+}
+```
+
+for bcs serialization:
+
+```
+struct signer has drop {
+account: address,
+}
+```
+^ The discrepency is needed to maintain backwards compatibility of signer serialization
+semantics.
+
+<code>borrow_address</code> borrows this inner field
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>

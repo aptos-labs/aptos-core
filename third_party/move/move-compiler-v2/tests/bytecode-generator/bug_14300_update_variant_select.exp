@@ -1,0 +1,303 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            y: u8,
+            z: u32,
+        }
+        Baz {
+            y: u8,
+        }
+    }
+    private fun update_common_field(): u64 {
+        {
+          let common: CommonFields = pack m::CommonFields::Bar(30, 40, 50);
+          select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<CommonFields>(common) = 15;
+          select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<CommonFields>(common)
+        }
+    }
+    private fun update_common_field_different_offset(): u8 {
+        {
+          let common: CommonFields = pack m::CommonFields::Bar(30, 40, 50);
+          select_variants m::CommonFields.Foo.y|m::CommonFields.Bar.y|m::CommonFields.Baz.y<CommonFields>(common) = 15;
+          select_variants m::CommonFields.Foo.y|m::CommonFields.Bar.y|m::CommonFields.Baz.y<CommonFields>(common)
+        }
+    }
+    private fun update_non_common_field(): u32 {
+        {
+          let common: CommonFields = pack m::CommonFields::Bar(30, 40, 50);
+          select_variants m::CommonFields.Bar.z<CommonFields>(common) = 15;
+          select_variants m::CommonFields.Bar.z<CommonFields>(common)
+        }
+    }
+} // end 0x815::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    enum CommonFields has drop {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            y: u8,
+            z: u32,
+        }
+        Baz {
+            y: u8,
+        }
+    }
+    fun update_common_field(): u64 {
+        let common = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
+        common.x = 15;
+        common.x
+    }
+    fun update_common_field_different_offset(): u8 {
+        let common = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
+        common.y = 15u8;
+        common.y
+    }
+    fun update_non_common_field(): u32 {
+        let common = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
+        common.z = 15u32;
+        common.z
+    }
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::update_common_field(): u64 {
+     var $t0: u64
+     var $t1: 0x815::m::CommonFields
+     var $t2: u64
+     var $t3: u8
+     var $t4: u32
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: &mut 0x815::m::CommonFields
+     var $t8: &0x815::m::CommonFields
+     var $t9: &u64
+  0: $t2 := 30
+  1: $t3 := 40
+  2: $t4 := 50
+  3: $t1 := pack_variant 0x815::m::CommonFields::Bar($t2, $t3, $t4)
+  4: $t5 := 15
+  5: $t7 := borrow_local($t1)
+  6: $t6 := borrow_variant_field<0x815::m::CommonFields::Foo|Bar>.x($t7)
+  7: write_ref($t6, $t5)
+  8: $t8 := borrow_local($t1)
+  9: $t9 := borrow_variant_field<0x815::m::CommonFields::Foo|Bar>.x($t8)
+ 10: $t0 := read_ref($t9)
+ 11: return $t0
+}
+
+
+[variant baseline]
+fun m::update_common_field_different_offset(): u8 {
+     var $t0: u8
+     var $t1: 0x815::m::CommonFields
+     var $t2: u64
+     var $t3: u8
+     var $t4: u32
+     var $t5: u8
+     var $t6: &mut u8
+     var $t7: &mut 0x815::m::CommonFields
+     var $t8: bool
+     var $t9: &0x815::m::CommonFields
+     var $t10: &u8
+     var $t11: bool
+  0: $t2 := 30
+  1: $t3 := 40
+  2: $t4 := 50
+  3: $t1 := pack_variant 0x815::m::CommonFields::Bar($t2, $t3, $t4)
+  4: $t5 := 15
+  5: $t7 := borrow_local($t1)
+  6: $t8 := test_variant 0x815::m::CommonFields::Foo($t7)
+  7: if ($t8) goto 13 else goto 8
+  8: label L3
+  9: $t8 := test_variant 0x815::m::CommonFields::Bar($t7)
+ 10: if ($t8) goto 13 else goto 11
+ 11: label L4
+ 12: goto 16
+ 13: label L2
+ 14: $t6 := borrow_variant_field<0x815::m::CommonFields::Foo|Bar>.y($t7)
+ 15: goto 18
+ 16: label L1
+ 17: $t6 := borrow_variant_field<0x815::m::CommonFields::Baz>.y($t7)
+ 18: label L0
+ 19: write_ref($t6, $t5)
+ 20: $t9 := borrow_local($t1)
+ 21: $t11 := test_variant 0x815::m::CommonFields::Foo($t9)
+ 22: if ($t11) goto 28 else goto 23
+ 23: label L8
+ 24: $t11 := test_variant 0x815::m::CommonFields::Bar($t9)
+ 25: if ($t11) goto 28 else goto 26
+ 26: label L9
+ 27: goto 31
+ 28: label L7
+ 29: $t10 := borrow_variant_field<0x815::m::CommonFields::Foo|Bar>.y($t9)
+ 30: goto 33
+ 31: label L6
+ 32: $t10 := borrow_variant_field<0x815::m::CommonFields::Baz>.y($t9)
+ 33: label L5
+ 34: $t0 := read_ref($t10)
+ 35: return $t0
+}
+
+
+[variant baseline]
+fun m::update_non_common_field(): u32 {
+     var $t0: u32
+     var $t1: 0x815::m::CommonFields
+     var $t2: u64
+     var $t3: u8
+     var $t4: u32
+     var $t5: u32
+     var $t6: &mut u32
+     var $t7: &mut 0x815::m::CommonFields
+     var $t8: &0x815::m::CommonFields
+     var $t9: &u32
+  0: $t2 := 30
+  1: $t3 := 40
+  2: $t4 := 50
+  3: $t1 := pack_variant 0x815::m::CommonFields::Bar($t2, $t3, $t4)
+  4: $t5 := 15
+  5: $t7 := borrow_local($t1)
+  6: $t6 := borrow_variant_field<0x815::m::CommonFields::Bar>.z($t7)
+  7: write_ref($t6, $t5)
+  8: $t8 := borrow_local($t1)
+  9: $t9 := borrow_variant_field<0x815::m::CommonFields::Bar>.z($t8)
+ 10: $t0 := read_ref($t9)
+ 11: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 815.m {
+enum CommonFields has drop {
+ Foo{
+	x: u64,
+	y: u8
+ },
+ Bar{
+	x: u64,
+	y: u8,
+	z: u32
+ },
+ Baz{
+	y: u8
+ }
+}
+
+update_common_field(): u64 /* def_idx: 0 */ {
+L0:	common: CommonFields
+B0:
+	0: LdU64(30)
+	1: LdU8(40)
+	2: LdU32(50)
+	3: PackVariant[0](CommonFields/Bar)
+	4: StLoc[0](common: CommonFields)
+	5: LdU64(15)
+	6: MutBorrowLoc[0](common: CommonFields)
+	7: MutBorrowVariantField[0](Foo.x|Bar.x: u64)
+	8: WriteRef
+	9: ImmBorrowLoc[0](common: CommonFields)
+	10: ImmBorrowVariantField[0](Foo.x|Bar.x: u64)
+	11: ReadRef
+	12: Ret
+}
+update_common_field_different_offset(): u8 /* def_idx: 1 */ {
+L0:	common: CommonFields
+L1:	$t3: u8
+L2:	$t7: &mut CommonFields
+L3:	$t6: &mut u8
+L4:	$t9: &CommonFields
+L5:	$t10: &u8
+B0:
+	0: LdU64(30)
+	1: LdU8(40)
+	2: LdU32(50)
+	3: PackVariant[0](CommonFields/Bar)
+	4: StLoc[0](common: CommonFields)
+	5: LdU8(15)
+	6: StLoc[1]($t3: u8)
+	7: MutBorrowLoc[0](common: CommonFields)
+	8: StLoc[2]($t7: &mut CommonFields)
+	9: CopyLoc[2]($t7: &mut CommonFields)
+	10: TestVariant[1](CommonFields/Foo)
+	11: BrFalse(39)
+B1:
+	12: Branch(13)
+B2:
+	13: MoveLoc[2]($t7: &mut CommonFields)
+	14: MutBorrowVariantField[1](Foo.y|Bar.y: u8)
+	15: StLoc[3]($t6: &mut u8)
+B3:
+	16: MoveLoc[1]($t3: u8)
+	17: MoveLoc[3]($t6: &mut u8)
+	18: WriteRef
+	19: ImmBorrowLoc[0](common: CommonFields)
+	20: StLoc[4]($t9: &CommonFields)
+	21: CopyLoc[4]($t9: &CommonFields)
+	22: TestVariant[1](CommonFields/Foo)
+	23: BrFalse(31)
+B4:
+	24: Branch(25)
+B5:
+	25: MoveLoc[4]($t9: &CommonFields)
+	26: ImmBorrowVariantField[1](Foo.y|Bar.y: u8)
+	27: StLoc[5]($t10: &u8)
+B6:
+	28: MoveLoc[5]($t10: &u8)
+	29: ReadRef
+	30: Ret
+B7:
+	31: CopyLoc[4]($t9: &CommonFields)
+	32: TestVariant[0](CommonFields/Bar)
+	33: BrFalse(35)
+B8:
+	34: Branch(25)
+B9:
+	35: MoveLoc[4]($t9: &CommonFields)
+	36: ImmBorrowVariantField[2](Baz.y: u8)
+	37: StLoc[5]($t10: &u8)
+	38: Branch(28)
+B10:
+	39: CopyLoc[2]($t7: &mut CommonFields)
+	40: TestVariant[0](CommonFields/Bar)
+	41: BrFalse(43)
+B11:
+	42: Branch(13)
+B12:
+	43: MoveLoc[2]($t7: &mut CommonFields)
+	44: MutBorrowVariantField[2](Baz.y: u8)
+	45: StLoc[3]($t6: &mut u8)
+	46: Branch(16)
+}
+update_non_common_field(): u32 /* def_idx: 2 */ {
+L0:	common: CommonFields
+B0:
+	0: LdU64(30)
+	1: LdU8(40)
+	2: LdU32(50)
+	3: PackVariant[0](CommonFields/Bar)
+	4: StLoc[0](common: CommonFields)
+	5: LdU32(15)
+	6: MutBorrowLoc[0](common: CommonFields)
+	7: MutBorrowVariantField[3](Bar.z: u32)
+	8: WriteRef
+	9: ImmBorrowLoc[0](common: CommonFields)
+	10: ImmBorrowVariantField[3](Bar.z: u32)
+	11: ReadRef
+	12: Ret
+}
+}
+============ bytecode verification succeeded ========

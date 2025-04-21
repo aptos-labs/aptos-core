@@ -504,6 +504,11 @@ where
         }
         Ok(())
     }
+
+    #[inline]
+    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 impl<A> AptosGasMeter for StandardGasMeter<A>

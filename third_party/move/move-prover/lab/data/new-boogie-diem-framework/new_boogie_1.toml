@@ -7,7 +7,7 @@ move_named_address_values = [
     "VMReserved=0x0",
 ]
 move_deps = [
-    "../../../../documentation/examples/diem-framework/move-packages/DPN/sources",
+    "../../../../move-examples/diem-framework/move-packages/DPN/sources",
     "../../../../move-stdlib/sources",
     "../../../../move-stdlib/nursery/sources",
 ]

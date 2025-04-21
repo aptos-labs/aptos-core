@@ -1,21 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod docker;
-mod faucet;
-mod health_checker;
-mod indexer_api;
 mod logging;
-mod node;
 mod postgres;
-mod processors;
 mod ready_server;
-mod traits;
 mod utils;
+
+// This is to allow external crates to use the localnode.
+pub mod docker;
+pub mod faucet;
+pub mod health_checker;
+pub mod indexer_api;
+pub mod node;
+pub mod processors;
+pub mod traits;
 
 use self::{
     faucet::FaucetArgs,
-    health_checker::HealthChecker,
     indexer_api::IndexerApiArgs,
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
@@ -39,6 +40,7 @@ use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
+pub use health_checker::HealthChecker;
 use std::{
     collections::HashSet,
     fs::{create_dir_all, remove_dir_all},
@@ -97,7 +99,7 @@ pub struct RunLocalnet {
     /// By default all services running on the host system will be bound to 127.0.0.1,
     /// unless you're running the CLI inside a container, in which case it will run
     /// them on 0.0.0.0. You can use this flag to override this behavior in both cases.
-    #[clap(long, hide = true)]
+    #[clap(long)]
     bind_to: Option<Ipv4Addr>,
 
     /// By default, tracing output goes to files. With this set, it goes to stdout.
@@ -133,14 +135,14 @@ impl RunLocalnet {
                 HealthChecker::IndexerApiMetadata(_) => continue,
             };
             if !silent {
-                eprintln!("{} is starting, please wait...", health_checker);
+                println!("{} is starting, please wait...", health_checker);
             } else {
                 info!("[silent] {} is starting, please wait...", health_checker);
             }
             let fut = async move {
                 health_checker.wait(None).await?;
                 if !silent {
-                    eprintln!(
+                    println!(
                         "{} is ready. Endpoint: {}",
                         health_checker,
                         health_checker.address_str()
@@ -190,13 +192,8 @@ impl CliCommand<()> for RunLocalnet {
             setup_logging(None);
         }
 
-        let global_config = GlobalConfig::load().context("Failed to load global config")?;
-        let test_dir = match &self.test_dir {
-            Some(test_dir) => test_dir.clone(),
-            None => global_config
-                .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
-                .join(TESTNET_FOLDER),
-        };
+        // Based on the input and global config, get the test directory.
+        let test_dir = get_derived_test_dir(&self.test_dir)?;
 
         // If asked, remove the current test directory and start with a new node.
         if self.force_restart && test_dir.exists() {
@@ -340,7 +337,7 @@ impl CliCommand<()> for RunLocalnet {
             })?;
         }
 
-        eprintln!(
+        println!(
             "\nReadiness endpoint: http://{}:{}/\n",
             bind_to, self.ready_server_args.ready_server_listen_port,
         );
@@ -461,4 +458,14 @@ async fn run_shutdown_steps(shutdown_steps: Vec<Box<dyn ShutdownStep>>) -> Resul
             .context("Failed to run shutdown step")?;
     }
     Ok(())
+}
+
+pub fn get_derived_test_dir(input_test_dir: &Option<PathBuf>) -> Result<PathBuf> {
+    let global_config = GlobalConfig::load().context("Failed to load global config")?;
+    match input_test_dir {
+        Some(test_dir) => Ok(test_dir.clone()),
+        None => Ok(global_config
+            .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
+            .join(TESTNET_FOLDER)),
+    }
 }

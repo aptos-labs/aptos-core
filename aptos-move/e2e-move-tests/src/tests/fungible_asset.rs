@@ -1,8 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
-use aptos_types::account_address::{self, AccountAddress};
+use crate::{assert_success, tests::common, BlockSplit, MoveHarness, SUCCESS};
+use aptos_cached_packages::aptos_stdlib::{aptos_account_batch_transfer, aptos_account_transfer};
+use aptos_language_e2e_tests::{
+    account::Account,
+    executor::{ExecutorMode, FakeExecutor},
+};
+use aptos_types::{
+    account_address::{self, AccountAddress},
+    on_chain_config::FeatureFlag,
+};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
@@ -222,4 +230,59 @@ fn test_coin_to_fungible_asset_migration() {
             FUNGIBLE_STORE_TAG.clone()
         )
         .is_some());
+}
+
+/// Trigger speculative error in prologue, from accessing delayed field that was created later than
+/// last committed index (so that read_last_commited_value fails speculatively)
+///
+/// We do that by having an expensive transaction first (to make sure committed index isn't moved),
+/// and then create some new aggregators (concurrent balances for new accounts), and then have them issue
+/// transactions - so their balance is checked in prologue.
+#[test]
+fn test_prologue_speculation() {
+    let executor = FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::ParallelOnly);
+
+    let mut harness = MoveHarness::new_with_executor(executor);
+    harness.enable_features(
+        vec![
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
+        ],
+        vec![],
+    );
+    let independent_account = harness.new_account_at(AccountAddress::random());
+
+    let sink_txn = harness.create_transaction_payload(
+        &independent_account,
+        aptos_account_batch_transfer(vec![AccountAddress::random(); 50], vec![10_000_000_000; 50]),
+    );
+
+    let account = harness.new_account_at(AccountAddress::ONE);
+    let dst_1 = Account::new();
+    let dst_2 = Account::new();
+    let dst_3 = Account::new();
+
+    let fund_txn = harness.create_transaction_payload(
+        &account,
+        aptos_account_batch_transfer(
+            vec![*dst_1.address(), *dst_2.address(), *dst_3.address()],
+            vec![10_000_000_000, 10_000_000_000, 10_000_000_000],
+        ),
+    );
+
+    let transfer_1_txn =
+        harness.create_transaction_payload(&dst_1, aptos_account_transfer(*dst_2.address(), 1));
+    let transfer_2_txn =
+        harness.create_transaction_payload(&dst_2, aptos_account_transfer(*dst_3.address(), 1));
+    let transfer_3_txn =
+        harness.create_transaction_payload(&dst_3, aptos_account_transfer(*dst_1.address(), 1));
+
+    harness.run_block_in_parts_and_check(BlockSplit::Whole, vec![
+        (SUCCESS, sink_txn),
+        (SUCCESS, fund_txn),
+        (SUCCESS, transfer_1_txn),
+        (SUCCESS, transfer_2_txn),
+        (SUCCESS, transfer_3_txn),
+    ]);
 }

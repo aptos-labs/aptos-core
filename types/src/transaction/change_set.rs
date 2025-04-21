@@ -5,7 +5,7 @@
 use crate::{contract_event::ContractEvent, write_set::WriteSet};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangeSet {
     write_set: WriteSet,
     events: Vec<ContractEvent>,

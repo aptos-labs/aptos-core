@@ -1,0 +1,10 @@
+[package]
+name = "AA"
+version = "0.0.0"
+
+[addresses]
+aa = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosStdlib = { local = "../../../framework/aptos-stdlib" }

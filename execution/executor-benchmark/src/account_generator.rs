@@ -17,15 +17,15 @@ impl AccountGenerator {
     const SEED_ACCOUNTS_ROOT_SEED: u64 = u64::max_value();
     const USER_ACCOUNTS_ROOT_SEED: u64 = 0;
 
-    pub fn new_for_seed_accounts() -> Self {
-        Self::new(Self::SEED_ACCOUNTS_ROOT_SEED, 0)
+    pub fn new_for_seed_accounts(is_keyless: bool) -> Self {
+        Self::new(Self::SEED_ACCOUNTS_ROOT_SEED, 0, is_keyless)
     }
 
-    pub fn new_for_user_accounts(num_to_skip: u64) -> Self {
-        Self::new(Self::USER_ACCOUNTS_ROOT_SEED, num_to_skip)
+    pub fn new_for_user_accounts(num_to_skip: u64, is_keyless: bool) -> Self {
+        Self::new(Self::USER_ACCOUNTS_ROOT_SEED, num_to_skip, is_keyless)
     }
 
-    fn new(root_seed: u64, num_to_skip: u64) -> Self {
+    fn new(root_seed: u64, num_to_skip: u64, is_keyless: bool) -> Self {
         let mut root_rng = StdRng::seed_from_u64(root_seed);
         let num_rngs_to_skip = num_to_skip / Self::MAX_ACCOUNT_GEN_PER_RNG;
         for _ in 0..num_rngs_to_skip {
@@ -35,14 +35,20 @@ impl AccountGenerator {
         let mut active_rng_quota = Self::MAX_ACCOUNT_GEN_PER_RNG - active_rng_to_skip;
         let mut active_rng = StdRng::seed_from_u64(root_rng.next_u64());
         for _ in 0..active_rng_to_skip {
-            LocalAccount::generate(&mut active_rng);
+            LocalAccount::generate_for_testing(&mut active_rng, is_keyless);
         }
         let (sender, receiver) = mpsc::sync_channel(100 /* bound */);
 
         std::thread::Builder::new()
             .name("account_generator".to_string())
             .spawn(move || {
-                while sender.send(LocalAccount::generate(&mut active_rng)).is_ok() {
+                while sender
+                    .send(LocalAccount::generate_for_testing(
+                        &mut active_rng,
+                        is_keyless,
+                    ))
+                    .is_ok()
+                {
                     active_rng_quota -= 1;
                     if active_rng_quota == 0 {
                         active_rng = StdRng::seed_from_u64(root_rng.next_u64());

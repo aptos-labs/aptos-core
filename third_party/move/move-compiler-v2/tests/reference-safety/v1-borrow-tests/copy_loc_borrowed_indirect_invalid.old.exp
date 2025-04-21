@@ -1,0 +1,14 @@
+
+Diagnostics:
+error: cannot copy local `x` which is still mutably borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/copy_loc_borrowed_indirect_invalid.move:6:9
+  │
+5 │         let r1 = foo(&mut x, &mut y);
+  │                  -------------------
+  │                  │   │
+  │                  │   previous mutable local borrow
+  │                  used by mutable call result
+6 │         copy x;
+  │         ^^^^^^ copied here
+7 │         r1;
+  │         -- conflicting reference `r1` used here

@@ -5,8 +5,8 @@ module 0x42::m {
     use std::vector;
     public entry fun init() {
         {
-          let _: vector<string::String> = {
-            let result: vector<string::String> = Vector<string::String>();
+          let _: vector<0x1::string::String> = {
+            let result: vector<0x1::string::String> = Vector<0x1::string::String>();
             {
               let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple([]);
               vector::reverse<vector<u8>>(Borrow(Mutable)(v));
@@ -16,7 +16,7 @@ module 0x42::m {
                     let e: vector<u8> = vector::pop_back<vector<u8>>(Borrow(Mutable)(v));
                     {
                       let (elem: vector<u8>): (vector<u8>) = Tuple(e);
-                      vector::push_back<string::String>(Borrow(Mutable)(result), {
+                      vector::push_back<0x1::string::String>(Borrow(Mutable)(result), {
                         let (key: vector<u8>): (vector<u8>) = Tuple(elem);
                         string::utf8(key)
                       })
@@ -63,6 +63,48 @@ module 0x42::m {
         }
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    public entry fun init() {
+        let _ = {
+            let result = vector[];
+            {
+                let (v) = (vector[]);
+                0x1::vector::reverse<vector<u8>>(&mut v);
+                while (!0x1::vector::is_empty<vector<u8>>(&v)) {
+                    let e = 0x1::vector::pop_back<vector<u8>>(&mut v);
+                    {
+                        let (elem) = (e);
+                        0x1::vector::push_back<0x1::string::String>(&mut result, {
+                            let (key) = (elem);
+                            0x1::string::utf8(key)
+                        })
+                    };
+                };
+            };
+            result
+        };
+        let _ = {
+            let result = vector[];
+            {
+                let (v) = (vector[]);
+                0x1::vector::reverse<u64>(&mut v);
+                while (!0x1::vector::is_empty<u64>(&v)) {
+                    let e = 0x1::vector::pop_back<u64>(&mut v);
+                    {
+                        let (elem) = (e);
+                        0x1::vector::push_back<vector<u8>>(&mut result, {
+                            let (v) = (elem);
+                            0x1::bcs::to_bytes<u64>(&v)
+                        })
+                    };
+                };
+            };
+            result
+        };
+    }
+}
 
 
 ============ bytecode verification succeeded ========

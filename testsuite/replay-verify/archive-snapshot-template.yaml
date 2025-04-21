@@ -1,0 +1,22 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotContent
+metadata:
+  name: testnet-archive
+spec:
+  deletionPolicy: Retain
+  driver: pd.csi.storage.gke.io
+  source:
+    snapshotHandle: projects/aptos-devinfra-0/global/snapshots/testnet-archive
+  volumeSnapshotRef:
+    kind: VolumeSnapshot
+    name: testnet-archive
+    namespace: default
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: testnet-archive
+spec:
+  volumeSnapshotClassName: pd-data
+  source:
+    volumeSnapshotContentName: testnet-archive

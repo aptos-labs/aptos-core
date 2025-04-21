@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/expansion/use_spec_function_as_normal_function.move:4:16
+  │
+4 │         define foo(): bool { true }
+  │                ^^^
+  │                │
+  │                Unexpected 'foo'
+  │                Expected ':'

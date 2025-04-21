@@ -1,0 +1,32 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-29:
+Error: compilation errors:
+ error: a reference is expected but `_` was provided
+   ┌─ TEMPFILE:24:82
+   │
+24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
+   │                                                                                  ^
+
+error: a reference is expected but `_` was provided
+   ┌─ TEMPFILE:24:87
+   │
+24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
+   │                                                                                       ^
+
+error: function takes arguments of type `(u64, u64)` but `(&integer, &mut integer)` was expected
+   ┌─ TEMPFILE:24:64
+   │
+24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
+   │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+
+task 1 'run'. lines 31-31:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

@@ -6,17 +6,19 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
+     var $t4: u64
   0: $t1 := 1
   1: $t2 := 2
   2: $t3 := 9
   3: $t1 := infer($t3)
-  4: $t0 := +($t1, $t2)
-  5: return $t0
+  4: $t4 := infer($t1)
+  5: $t0 := +($t4, $t2)
+  6: return $t0
 }
 
 
 Diagnostics:
-warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
   ┌─ tests/variable-coalescing/reassigned_var.move:3:17
   │
 3 │         let a = 1;
@@ -30,11 +32,13 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
+     var $t4: u64
   0: $t2 := 2
   1: $t3 := 9
   2: $t1 := move($t3)
-  3: $t0 := +($t1, $t2)
-  4: return $t0
+  3: $t4 := move($t1)
+  4: $t0 := +($t4, $t2)
+  5: return $t0
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -45,6 +49,7 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
+     var $t4: u64
      # live vars:
      # events: b:$t2
   0: $t2 := 2
@@ -55,11 +60,14 @@ fun m::test(): u64 {
      # events: e:$t3, b:$t1
   2: $t1 := move($t3)
      # live vars: $t1, $t2
-     # events: e:$t1, e:$t2, b:$t0
-  3: $t0 := +($t1, $t2)
+     # events: e:$t1, b:$t4
+  3: $t4 := move($t1)
+     # live vars: $t2, $t4
+     # events: e:$t2, e:$t4, b:$t0
+  4: $t0 := +($t4, $t2)
      # live vars: $t0
      # events: e:$t0
-  4: return $t0
+  5: return $t0
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -70,11 +78,13 @@ fun m::test(): u64 {
      var $t1: u64 [unused]
      var $t2: u64
      var $t3: u64
+     var $t4: u64 [unused]
   0: $t2 := 2
   1: $t3 := 9
   2: $t3 := move($t3)
-  3: $t2 := +($t3, $t2)
-  4: return $t2
+  3: $t3 := move($t3)
+  4: $t2 := +($t3, $t2)
+  5: return $t2
 }
 
 ============ after DeadStoreElimination: ================
@@ -85,30 +95,27 @@ fun m::test(): u64 {
      var $t1: u64 [unused]
      var $t2: u64
      var $t3: u64
+     var $t4: u64 [unused]
   0: $t2 := 2
   1: $t3 := 9
-  2: $t2 := +($t3, $t2)
-  3: return $t2
+  2: $t3 := move($t3)
+  3: $t2 := +($t3, $t2)
+  4: return $t2
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
 test(): u64 /* def_idx: 0 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	b: u64
 B0:
-	0: LdU64(2)
-	1: LdU64(9)
-	2: StLoc[0](loc0: u64)
-	3: StLoc[1](loc1: u64)
-	4: MoveLoc[0](loc0: u64)
-	5: MoveLoc[1](loc1: u64)
-	6: Add
-	7: Ret
+	0: LdU64(9)
+	1: LdU64(2)
+	2: Add
+	3: Ret
 }
 }
 ============ bytecode verification succeeded ========

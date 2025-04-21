@@ -10,9 +10,9 @@ publish = false
 edition = "2021"
 
 [dependencies]
-move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-utils = { path = "../move-bytecode-utils" }
-move-core-types = { path = "../../move-core/types" }
+move-binary-format = { workspace = true }
+move-bytecode-utils = { workspace = true }
+move-core-types = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 
 anyhow = { workspace = true }

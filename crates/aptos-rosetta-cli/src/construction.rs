@@ -4,7 +4,7 @@
 use crate::common::{format_output, NetworkArgs, UrlArgs};
 use aptos::common::types::{EncodingOptions, PrivateKeyInputOptions, ProfileOptions};
 use aptos_logger::info;
-use aptos_rosetta::types::TransactionIdentifier;
+use aptos_rosetta::types::{Currency, TransactionIdentifier};
 use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -154,6 +154,12 @@ pub struct TransferCommand {
     /// The amount of coins to send
     #[clap(long)]
     amount: u64,
+    #[clap(long, value_parser = parse_currency)]
+    currency: Currency,
+}
+
+fn parse_currency(str: &str) -> anyhow::Result<Currency> {
+    Ok(serde_json::from_str(str)?)
 }
 
 impl TransferCommand {
@@ -175,6 +181,7 @@ impl TransferCommand {
                 self.txn_args.sequence_number,
                 self.txn_args.max_gas,
                 self.txn_args.gas_price,
+                self.currency,
             )
             .await
     }

@@ -15,5 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+rand = { workspace = true }
 ureq = { workspace = true }
 url = { workspace = true }

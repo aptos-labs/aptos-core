@@ -15,31 +15,33 @@ fun m::test($t0: u64, $t1: bool) {
      var $t4: u64
      var $t5: u64
      var $t6: u64
+     var $t7: u64
   0: $t2 := move($t0)
   1: if ($t1) goto 2 else goto 5
   2: label L0
   3: m::consume($t2)
-  4: goto 12
+  4: goto 13
   5: label L1
   6: $t3 := 99
   7: $t0 := infer($t3)
   8: $t4 := infer($t2)
-  9: $t6 := 1
- 10: $t5 := +($t4, $t6)
- 11: $t4 := infer($t5)
- 12: label L2
- 13: return ()
+  9: $t6 := infer($t4)
+ 10: $t7 := 1
+ 11: $t5 := +($t6, $t7)
+ 12: $t4 := infer($t5)
+ 13: label L2
+ 14: return ()
 }
 
 
 Diagnostics:
-warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
    ┌─ tests/variable-coalescing/cant_copy_propagate.move:11:13
    │
 11 │             a = 99;
    │             ^^^^^^
 
-warning: Unused assignment to `c`. Consider removing or prefixing with an underscore: `_c`
+warning: Unused assignment/binding to `c`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_c`), or binding to `_`
    ┌─ tests/variable-coalescing/cant_copy_propagate.move:13:13
    │
 13 │             c = c + 1;
@@ -61,17 +63,19 @@ fun m::test($t0: u64, $t1: bool) {
      var $t4: u64
      var $t5: u64
      var $t6: u64
+     var $t7: u64
   0: $t2 := move($t0)
-  1: if ($t1) goto 2 else goto 5
+  1: if ($t1) goto 2 else goto 6
   2: label L0
   3: m::consume($t2)
-  4: goto 9
-  5: label L1
-  6: $t4 := move($t2)
-  7: $t6 := 1
-  8: $t5 := +($t4, $t6)
-  9: label L2
- 10: return ()
+  4: label L2
+  5: return ()
+  6: label L1
+  7: $t4 := move($t2)
+  8: $t6 := move($t4)
+  9: $t7 := 1
+ 10: $t5 := +($t6, $t7)
+ 11: goto 4
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -92,33 +96,37 @@ fun m::test($t0: u64, $t1: bool) {
      var $t4: u64
      var $t5: u64
      var $t6: u64
+     var $t7: u64
      # live vars: $t0, $t1
      # events: b:$t0, b:$t1, e:$t0, b:$t2
   0: $t2 := move($t0)
      # live vars: $t1, $t2
      # events: e:$t1
-  1: if ($t1) goto 2 else goto 5
+  1: if ($t1) goto 2 else goto 6
      # live vars: $t2
   2: label L0
      # live vars: $t2
   3: m::consume($t2)
      # live vars:
-  4: goto 9
+  4: label L2
+     # live vars:
+  5: return ()
      # live vars: $t2
-  5: label L1
+  6: label L1
      # live vars: $t2
      # events: e:$t2, b:$t4
-  6: $t4 := move($t2)
+  7: $t4 := move($t2)
      # live vars: $t4
-     # events: b:$t6
-  7: $t6 := 1
-     # live vars: $t4, $t6
-     # events: e:$t4, e:$t5, e:$t6, b:$t5
-  8: $t5 := +($t4, $t6)
+     # events: e:$t4, b:$t6
+  8: $t6 := move($t4)
+     # live vars: $t6
+     # events: b:$t7
+  9: $t7 := 1
+     # live vars: $t6, $t7
+     # events: e:$t5, e:$t6, e:$t7, b:$t5
+ 10: $t5 := +($t6, $t7)
      # live vars:
-  9: label L2
-     # live vars:
- 10: return ()
+ 11: goto 4
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -136,18 +144,20 @@ fun m::test($t0: u64, $t1: bool) {
      var $t3: u64 [unused]
      var $t4: u64 [unused]
      var $t5: u64 [unused]
-     var $t6: u64
+     var $t6: u64 [unused]
+     var $t7: u64
   0: $t0 := move($t0)
-  1: if ($t1) goto 2 else goto 5
+  1: if ($t1) goto 2 else goto 6
   2: label L0
   3: m::consume($t0)
-  4: goto 9
-  5: label L1
-  6: $t0 := move($t0)
-  7: $t6 := 1
-  8: $t0 := +($t0, $t6)
-  9: label L2
- 10: return ()
+  4: label L2
+  5: return ()
+  6: label L1
+  7: $t0 := move($t0)
+  8: $t0 := move($t0)
+  9: $t7 := 1
+ 10: $t0 := +($t0, $t7)
+ 11: goto 4
 }
 
 ============ after DeadStoreElimination: ================
@@ -165,46 +175,45 @@ fun m::test($t0: u64, $t1: bool) {
      var $t3: u64 [unused]
      var $t4: u64 [unused]
      var $t5: u64 [unused]
-     var $t6: u64
-  0: if ($t1) goto 1 else goto 4
+     var $t6: u64 [unused]
+     var $t7: u64
+  0: if ($t1) goto 1 else goto 5
   1: label L0
   2: m::consume($t0)
-  3: goto 7
-  4: label L1
-  5: $t6 := 1
-  6: $t0 := +($t0, $t6)
-  7: label L2
-  8: return ()
+  3: label L2
+  4: return ()
+  5: label L1
+  6: $t0 := move($t0)
+  7: $t7 := 1
+  8: $t0 := +($t0, $t7)
+  9: goto 3
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
-consume(Arg0: u64) /* def_idx: 0 */ {
+consume(a: u64) /* def_idx: 0 */ {
 B0:
 	0: Ret
 }
-test(Arg0: u64, Arg1: bool) /* def_idx: 1 */ {
-L2:	loc0: u64
+test(a: u64, p: bool) /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[1](Arg1: bool)
+	0: MoveLoc[1](p: bool)
 	1: BrFalse(5)
 B1:
-	2: MoveLoc[0](Arg0: u64)
+	2: MoveLoc[0](a: u64)
 	3: Call consume(u64)
-	4: Branch(11)
 B2:
-	5: LdU64(1)
-	6: StLoc[2](loc0: u64)
-	7: MoveLoc[0](Arg0: u64)
-	8: MoveLoc[2](loc0: u64)
-	9: Add
-	10: Pop
+	4: Ret
 B3:
-	11: Ret
+	5: MoveLoc[0](a: u64)
+	6: LdU64(1)
+	7: Add
+	8: Pop
+	9: Branch(4)
 }
 }
 ============ bytecode verification succeeded ========

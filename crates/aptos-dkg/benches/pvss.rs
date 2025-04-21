@@ -6,6 +6,7 @@
 
 use aptos_crypto::Uniform;
 use aptos_dkg::{
+    algebra::evaluation_domain::BatchEvaluationDomain,
     pvss,
     pvss::{
         test_utils,
@@ -17,7 +18,7 @@ use aptos_dkg::{
             transcript::{MalleableTranscript, Transcript},
             SecretSharingConfig,
         },
-        WeightedConfig,
+        LowDegreeTest, WeightedConfig,
     },
 };
 use criterion::{
@@ -42,6 +43,33 @@ pub fn all_groups(c: &mut Criterion) {
         // Note: Insecure, so not interested in benchmarks.
         // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
         // weighted_pvss_group(&wc, d, c);
+    }
+
+    // LDT
+    ldt_group(c);
+}
+
+pub fn ldt_group(c: &mut Criterion) {
+    let mut rng = thread_rng();
+
+    for sc in get_threshold_configs_for_benchmarking() {
+        let mut group = c.benchmark_group("ldt");
+
+        group.bench_function(format!("dual_code_word/{}", sc), move |b| {
+            b.iter_with_setup(
+                || {
+                    let n = sc.get_total_num_players();
+                    let t = sc.get_threshold();
+                    let batch_dom = BatchEvaluationDomain::new(n);
+
+                    (n, t, batch_dom)
+                },
+                |(n, t, batch_dom)| {
+                    let ldt = LowDegreeTest::random(&mut rng, t, n, true, &batch_dom);
+                    ldt.dual_code_word();
+                },
+            )
+        });
     }
 }
 

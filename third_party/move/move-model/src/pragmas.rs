@@ -193,7 +193,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>
 pub fn is_pragma_valid_for_block(
     symbols: &SymbolPool,
     bag: &PropertyBag,
-    target: &SpecBlockContext<'_>,
+    target: &SpecBlockContext,
     pragma: &str,
 ) -> bool {
     use crate::builder::module_builder::SpecBlockContext::*;

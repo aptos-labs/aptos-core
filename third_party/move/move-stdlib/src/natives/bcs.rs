@@ -13,6 +13,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
+    value_serde::ValueSerDeContext,
     values::{values_impl::Reference, Value},
 };
 use smallvec::smallvec;
@@ -62,7 +63,11 @@ fn native_to_bytes(
     };
     // serialize value
     let val = ref_to_val.read_ref()?;
-    let serialized_value = match val.simple_serialize(&layout) {
+    let serialized_value = match ValueSerDeContext::new()
+        .with_legacy_signer()
+        .with_func_args_deserialization(context.function_value_extension())
+        .serialize(&val, &layout)?
+    {
         Some(serialized_value) => serialized_value,
         None => {
             cost += gas_params.failure;

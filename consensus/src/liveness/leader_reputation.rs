@@ -283,11 +283,13 @@ impl NewBlockEventAggregation {
                 usize::try_from(*index)
                     .map_err(|_err| format!("index {} out of bounds", index))
                     .and_then(|index| {
-                        validators.get(index).ok_or(format!(
-                            "index {} is larger than number of validators {}",
-                            index,
-                            validators.len()
-                        ))
+                        validators.get(index).ok_or_else(|| {
+                            format!(
+                                "index {} is larger than number of validators {}",
+                                index,
+                                validators.len()
+                            )
+                        })
                     })
             })
             .collect()

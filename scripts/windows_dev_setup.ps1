@@ -50,7 +50,6 @@ function build_tools_message {
       * protoc-gen-prost-crate
     * Python (and necessary components)
       * pip
-      * schemathesis
     * LLVM
     * CMake
     * OpenSSL
@@ -364,7 +363,6 @@ function install_python {
     winget upgrade --id Python.Python.3.11 --silent --accept-source-agreements
   }
   python -m pip install --upgrade pip
-  python -m pip install schemathesis
 }
 
 function install_pnpm {

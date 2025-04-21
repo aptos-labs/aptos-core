@@ -4,12 +4,12 @@
 
 use aptos_crypto::HashValue;
 use aptos_storage_interface::AptosDbError;
-use aptos_types::{state_store::errors::StateviewError, transaction::Version};
+use aptos_types::{state_store::errors::StateViewError, transaction::Version};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize, Clone)]
 /// Different reasons for proposal rejection
 pub enum ExecutorError {
     #[error("Cannot find speculation result for block id {0}")]
@@ -59,8 +59,8 @@ impl From<AptosDbError> for ExecutorError {
     }
 }
 
-impl From<StateviewError> for ExecutorError {
-    fn from(error: StateviewError) -> Self {
+impl From<StateViewError> for ExecutorError {
+    fn from(error: StateViewError) -> Self {
         Self::InternalError {
             error: format!("{}", error),
         }

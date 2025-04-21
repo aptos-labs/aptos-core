@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_logger::info;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -49,7 +49,7 @@ impl StateKvShardPruner {
         current_progress: Version,
         target_version: Version,
     ) -> Result<()> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
 
         let mut iter = self
             .db_shard

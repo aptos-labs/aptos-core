@@ -2930,5 +2930,2549 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::Test {
+    inline fun f1(x: u64): u64 {
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = ({
+                                                                    let (x) = ({
+                                                                        let (x) = (x);
+                                                                        x + 1
+                                                                    });
+                                                                    x + 1
+                                                                });
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = ({
+                                                                    let (x) = (x);
+                                                                    x + 1
+                                                                });
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = (x);
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = ({
+                                                                    let (x) = (x);
+                                                                    x + 1
+                                                                });
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = (x);
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = (x);
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = ({
+                                                                    let (x) = (x);
+                                                                    x + 1
+                                                                });
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = (x);
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = (x);
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = ({
+                                                                let (x) = (x);
+                                                                x + 1
+                                                            });
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = ({
+                                                            let (x) = (x);
+                                                            x + 1
+                                                        });
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        x + 1
+    }
+    inline fun f2(x: u64): u64 {
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = ({
+                                                        let (x) = (x);
+                                                        x + 1
+                                                    });
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = ({
+                                                    let (x) = (x);
+                                                    x + 1
+                                                });
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = ({
+                                                let (x) = (x);
+                                                x + 1
+                                            });
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = ({
+                                            let (x) = (x);
+                                            x + 1
+                                        });
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        x + 1
+    }
+    inline fun f3(x: u64): u64 {
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = ({
+                                        let (x) = (x);
+                                        x + 1
+                                    });
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = ({
+                                    let (x) = (x);
+                                    x + 1
+                                });
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = ({
+                                let (x) = (x);
+                                x + 1
+                            });
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = ({
+                            let (x) = (x);
+                            x + 1
+                        });
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        x + 1
+    }
+    inline fun f4(x: u64): u64 {
+        let (x) = ({
+            let (x) = ({
+                let (x) = ({
+                    let (x) = ({
+                        let (x) = (x);
+                        x + 1
+                    });
+                    x + 1
+                });
+                x + 1
+            });
+            x + 1
+        });
+        x + 1
+    }
+    inline fun f5(x: u64): u64 {
+        x + 1
+    }
+    public fun test(): u64 {
+        625
+    }
+}
+
 
 ============ bytecode verification succeeded ========

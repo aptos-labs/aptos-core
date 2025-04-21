@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db::{
-    test_helper::{arb_blocks_to_commit, update_in_memory_state},
-    AptosDB,
-};
+use crate::db::{test_helper::arb_blocks_to_commit, AptosDB};
 use anyhow::Result;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
@@ -18,18 +15,13 @@ proptest! {
     fn test_get_transaction_iter(input in arb_blocks_to_commit()) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
-        let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
-        let _ancestor = in_memory_state.base.clone();
         let mut cur_ver: Version = 0;
         for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
-            update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
             db.save_transactions_for_test(
                 txns_to_commit,
                 cur_ver,
-                cur_ver.checked_sub(1),
                 Some(ledger_info_with_sigs),
                 true, // sync commit
-                in_memory_state.clone(),
             )
             .unwrap();
             cur_ver += txns_to_commit.len() as u64;

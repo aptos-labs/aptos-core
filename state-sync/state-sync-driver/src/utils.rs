@@ -278,8 +278,8 @@ pub fn fetch_latest_synced_ledger_info(
 }
 
 /// Fetches the latest synced version from the specified storage
-pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version, Error> {
-    storage.get_synced_version().map_err(|e| {
+pub fn fetch_pre_committed_version(storage: Arc<dyn DbReader>) -> Result<Version, Error> {
+    storage.ensure_pre_committed_version().map_err(|e| {
         Error::StorageError(format!("Failed to get latest version from storage: {e:?}"))
     })
 }
@@ -288,11 +288,12 @@ pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version
 /// or after a state snapshot has been restored).
 pub fn initialize_sync_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
     // Update the latest synced versions
-    let highest_synced_version = fetch_latest_synced_version(storage.clone())?;
+    let highest_synced_version = fetch_pre_committed_version(storage.clone())?;
     let metrics = [
         metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
         metrics::StorageSynchronizerOperations::ExecutedTransactions,
         metrics::StorageSynchronizerOperations::Synced,
+        metrics::StorageSynchronizerOperations::SyncedIncremental,
     ];
     for metric in metrics {
         metrics::set_gauge(
@@ -302,13 +303,19 @@ pub fn initialize_sync_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
         );
     }
 
-    // Update the latest synced epoch
+    // Update the latest synced epochs
     let highest_synced_epoch = fetch_latest_epoch_state(storage)?.epoch;
-    metrics::set_gauge(
-        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-        metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
-        highest_synced_epoch,
-    );
+    let metrics = [
+        metrics::StorageSynchronizerOperations::SyncedEpoch,
+        metrics::StorageSynchronizerOperations::SyncedEpochIncremental,
+    ];
+    for metric in metrics {
+        metrics::set_gauge(
+            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+            metric.get_label(),
+            highest_synced_epoch,
+        );
+    }
 
     Ok(())
 }
@@ -328,7 +335,7 @@ pub async fn handle_committed_transactions<
 ) {
     // Fetch the latest synced version and ledger info from storage
     let (latest_synced_version, latest_synced_ledger_info) =
-        match fetch_latest_synced_version(storage.clone()) {
+        match fetch_pre_committed_version(storage.clone()) {
             Ok(latest_synced_version) => match fetch_latest_synced_ledger_info(storage.clone()) {
                 Ok(latest_synced_ledger_info) => (latest_synced_version, latest_synced_ledger_info),
                 Err(error) => {
@@ -365,19 +372,65 @@ pub async fn handle_committed_transactions<
 }
 
 /// Updates the metrics to handle an epoch change event
-pub fn update_new_epoch_metrics() {
-    // Increment the epoch
-    metrics::increment_gauge(
+pub fn update_new_epoch_metrics(storage: Arc<dyn DbReader>, reconfiguration_occurred: bool) {
+    // Update the epoch metric (by reading directly from storage)
+    let highest_synced_epoch = match fetch_latest_epoch_state(storage.clone()) {
+        Ok(epoch_state) => epoch_state.epoch,
+        Err(error) => {
+            error!(LogSchema::new(LogEntry::Driver).message(&format!(
+                "Failed to fetch the latest epoch state from storage! Error: {:?}",
+                error
+            )));
+            return;
+        },
+    };
+    metrics::set_gauge(
         &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
         metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
-        1,
+        highest_synced_epoch,
+    );
+
+    // Update the incremental epoch metric (by incrementing the current value)
+    if reconfiguration_occurred {
+        metrics::increment_gauge(
+            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+            metrics::StorageSynchronizerOperations::SyncedEpochIncremental.get_label(),
+            1,
+        );
+    }
+}
+
+/// Updates the metrics to handle newly synced transactions
+pub fn update_new_synced_metrics(storage: Arc<dyn DbReader>, num_synced_transactions: usize) {
+    // Update the version metric (by reading directly from storage)
+    let highest_synced_version = match fetch_pre_committed_version(storage.clone()) {
+        Ok(highest_synced_version) => highest_synced_version,
+        Err(error) => {
+            error!(LogSchema::new(LogEntry::Driver).message(&format!(
+                "Failed to fetch the pre committed version from storage! Error: {:?}",
+                error
+            )));
+            return;
+        },
+    };
+    metrics::set_gauge(
+        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+        metrics::StorageSynchronizerOperations::Synced.get_label(),
+        highest_synced_version,
+    );
+
+    // Update the incremental version metric (by incrementing the current value)
+    metrics::increment_gauge(
+        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+        metrics::StorageSynchronizerOperations::SyncedIncremental.get_label(),
+        num_synced_transactions as u64,
     );
 }
 
 /// Executes the given list of transactions and
 /// returns the number of transactions in the list.
-pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + Clone>(
-    mut storage_synchronizer: StorageSyncer,
+pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface>(
+    storage_synchronizer: &mut StorageSyncer,
     notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -397,8 +450,8 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
 
 /// Applies the given list of transaction outputs and
 /// returns the number of outputs in the list.
-pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterface + Clone>(
-    mut storage_synchronizer: StorageSyncer,
+pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterface>(
+    storage_synchronizer: &mut StorageSyncer,
     notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,

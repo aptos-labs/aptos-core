@@ -26,7 +26,7 @@ use aptos_protos::{
 };
 use aptos_types::jwks::jwk::JWK;
 use hex;
-use move_binary_format::file_format::Ability;
+use move_core_types::ability::Ability;
 use std::time::Duration;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> transaction::MoveModuleId {
@@ -56,6 +56,7 @@ pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct 
     transaction::MoveStruct {
         name: move_struct.name.0.to_string(),
         is_native: move_struct.is_native,
+        is_event: move_struct.is_event,
         abilities: move_struct
             .abilities
             .iter()
@@ -240,6 +241,7 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
         MoveType::Struct(_) => transaction::MoveTypes::Struct,
         MoveType::GenericTypeParam { .. } => transaction::MoveTypes::GenericTypeParam,
         MoveType::Reference { .. } => transaction::MoveTypes::Reference,
+        MoveType::Function { .. } => transaction::MoveTypes::Unparsable,
         MoveType::Unparsable(_) => transaction::MoveTypes::Unparsable,
     };
     let content = match move_type {
@@ -266,6 +268,9 @@ pub fn convert_move_type(move_type: &MoveType) -> transaction::MoveType {
                 mutable: *mutable,
                 to: Some(Box::new(convert_move_type(to))),
             }),
+        )),
+        MoveType::Function { .. } => Some(transaction::move_type::Content::Unparsable(
+            "function".to_string(),
         )),
         MoveType::Unparsable(string) => {
             Some(transaction::move_type::Content::Unparsable(string.clone()))
@@ -636,6 +641,10 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Keyless as i32,
             public_key: p.value.clone().into(),
         },
+        PublicKey::FederatedKeyless(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::FederatedKeyless as i32,
+            public_key: p.value.clone().into(),
+        },
     }
 }
 
@@ -665,6 +674,20 @@ pub fn convert_account_signature(
                 convert_multi_key_signature(s),
             ),
         ),
+        AccountSignature::NoAccountSignature(_) => {
+            unreachable!(
+                "[Indexer Fullnode] Indexer should never see transactions with NoAccountSignature"
+            )
+        },
+        AccountSignature::AbstractionSignature(s) => (
+            transaction::account_signature::Type::Abstraction,
+            transaction::account_signature::Signature::Abstraction(
+                transaction::AbstractionSignature {
+                    function_info: s.function_info.to_owned(),
+                    signature: s.auth_data.inner().to_owned(),
+                },
+            ),
+        ),
     };
 
     transaction::AccountSignature {
@@ -688,16 +711,19 @@ pub fn convert_transaction_signature(
         TransactionSignature::MultiAgentSignature(_) => transaction::signature::Type::MultiAgent,
         TransactionSignature::FeePayerSignature(_) => transaction::signature::Type::FeePayer,
         TransactionSignature::SingleSender(_) => transaction::signature::Type::SingleSender,
+        TransactionSignature::NoAccountSignature(_) => {
+            unreachable!("No account signature can't be committed onchain")
+        },
     };
 
     let signature = match signature {
-        TransactionSignature::Ed25519Signature(s) => {
-            transaction::signature::Signature::Ed25519(convert_ed25519_signature(s))
-        },
-        TransactionSignature::MultiEd25519Signature(s) => {
-            transaction::signature::Signature::MultiEd25519(convert_multi_ed25519_signature(s))
-        },
-        TransactionSignature::MultiAgentSignature(s) => {
+        TransactionSignature::Ed25519Signature(s) => Some(
+            transaction::signature::Signature::Ed25519(convert_ed25519_signature(s)),
+        ),
+        TransactionSignature::MultiEd25519Signature(s) => Some(
+            transaction::signature::Signature::MultiEd25519(convert_multi_ed25519_signature(s)),
+        ),
+        TransactionSignature::MultiAgentSignature(s) => Some(
             transaction::signature::Signature::MultiAgent(transaction::MultiAgentSignature {
                 sender: Some(convert_account_signature(&s.sender)),
                 secondary_signer_addresses: s
@@ -710,9 +736,9 @@ pub fn convert_transaction_signature(
                     .iter()
                     .map(convert_account_signature)
                     .collect(),
-            })
-        },
-        TransactionSignature::FeePayerSignature(s) => {
+            }),
+        ),
+        TransactionSignature::FeePayerSignature(s) => Some(
             transaction::signature::Signature::FeePayer(transaction::FeePayerSignature {
                 sender: Some(convert_account_signature(&s.sender)),
                 secondary_signer_addresses: s
@@ -727,18 +753,19 @@ pub fn convert_transaction_signature(
                     .collect(),
                 fee_payer_address: s.fee_payer_address.to_string(),
                 fee_payer_signer: Some(convert_account_signature(&s.fee_payer_signer)),
-            })
-        },
-        TransactionSignature::SingleSender(s) => {
+            }),
+        ),
+        TransactionSignature::SingleSender(s) => Some(
             transaction::signature::Signature::SingleSender(transaction::SingleSender {
                 sender: Some(convert_account_signature(s)),
-            })
-        },
+            }),
+        ),
+        TransactionSignature::NoAccountSignature(_) => None,
     };
 
     Some(transaction::Signature {
         r#type: r#type as i32,
-        signature: Some(signature),
+        signature,
     })
 }
 

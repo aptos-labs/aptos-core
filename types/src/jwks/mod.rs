@@ -184,6 +184,22 @@ pub struct AllProvidersJWKs {
     pub entries: Vec<ProviderJWKs>,
 }
 
+impl AllProvidersJWKs {
+    pub fn get_provider_jwks(&self, iss: &str) -> Option<&ProviderJWKs> {
+        self.entries
+            .iter()
+            .find(|&provider_jwk_set| provider_jwk_set.issuer.eq(&issuer_from_str(iss)))
+    }
+
+    pub fn get_jwk(&self, iss: &str, kid: &str) -> anyhow::Result<&JWKMoveStruct> {
+        let provider_jwk_set = self
+            .get_provider_jwks(iss)
+            .context("JWK not found for issuer")?;
+        let jwk = provider_jwk_set.get_jwk(kid)?;
+        Ok(jwk)
+    }
+}
+
 impl From<AllProvidersJWKs> for HashMap<Issuer, ProviderJWKs> {
     fn from(value: AllProvidersJWKs) -> Self {
         let AllProvidersJWKs { entries } = value;
@@ -213,32 +229,26 @@ impl OnChainConfig for ObservedJWKs {
     const TYPE_IDENTIFIER: &'static str = "ObservedJWKs";
 }
 
-/// Reflection of Move type `0x1::jwks::ObservedJWKs`.
+/// Reflection of Move type `0x1::jwks::PatchedJWKs`.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
 }
 
-impl PatchedJWKs {
-    pub fn get_provider_jwks(&self, iss: &str) -> Option<&ProviderJWKs> {
-        self.jwks
-            .entries
-            .iter()
-            .find(|&provider_jwk_set| provider_jwk_set.issuer.eq(&issuer_from_str(iss)))
-    }
-
-    pub fn get_jwk(&self, iss: &str, kid: &str) -> anyhow::Result<&JWKMoveStruct> {
-        let provider_jwk_set = self
-            .get_provider_jwks(iss)
-            .context("JWK not found for issuer")?;
-        let jwk = provider_jwk_set.get_jwk(kid)?;
-        Ok(jwk)
-    }
-}
-
 impl OnChainConfig for PatchedJWKs {
     const MODULE_IDENTIFIER: &'static str = "jwks";
     const TYPE_IDENTIFIER: &'static str = "PatchedJWKs";
+}
+
+/// Reflection of Move type `0x1::jwks::FederatedJWKs`.
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct FederatedJWKs {
+    pub jwks: AllProvidersJWKs,
+}
+
+impl MoveStructType for FederatedJWKs {
+    const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("FederatedJWKs");
 }
 
 /// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.

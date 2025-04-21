@@ -1,6 +1,5 @@
 /// The `string` module defines the `String` type which represents UTF8 encoded strings.
 module std::string {
-    use std::vector;
     use std::option::{Self, Option};
 
     /// An invalid UTF8 encoding.
@@ -30,49 +29,49 @@ module std::string {
     }
 
     /// Returns a reference to the underlying byte vector.
-    public fun bytes(s: &String): &vector<u8> {
-        &s.bytes
+    public fun bytes(self: &String): &vector<u8> {
+        &self.bytes
     }
 
     /// Checks whether this string is empty.
-    public fun is_empty(s: &String): bool {
-        vector::is_empty(&s.bytes)
+    public fun is_empty(self: &String): bool {
+        self.bytes.is_empty()
     }
 
     /// Returns the length of this string, in bytes.
-    public fun length(s: &String): u64 {
-        vector::length(&s.bytes)
+    public fun length(self: &String): u64 {
+        self.bytes.length()
     }
 
     /// Appends a string.
-    public fun append(s: &mut String, r: String) {
-        vector::append(&mut s.bytes, r.bytes)
+    public fun append(self: &mut String, r: String) {
+        self.bytes.append(r.bytes)
     }
 
     /// Appends bytes which must be in valid utf8 format.
-    public fun append_utf8(s: &mut String, bytes: vector<u8>) {
-        append(s, utf8(bytes))
+    public fun append_utf8(self: &mut String, bytes: vector<u8>) {
+        self.append(utf8(bytes))
     }
 
     /// Insert the other string at the byte index in given string. The index must be at a valid utf8 char
     /// boundary.
-    public fun insert(s: &mut String, at: u64, o: String) {
-        let bytes = &s.bytes;
-        assert!(at <= vector::length(bytes) && internal_is_char_boundary(bytes, at), EINVALID_INDEX);
-        let l = length(s);
-        let front = sub_string(s, 0, at);
-        let end = sub_string(s, at, l);
-        append(&mut front, o);
-        append(&mut front, end);
-        *s = front;
+    public fun insert(self: &mut String, at: u64, o: String) {
+        let bytes = &self.bytes;
+        assert!(at <= bytes.length() && internal_is_char_boundary(bytes, at), EINVALID_INDEX);
+        let l = self.length();
+        let front = self.sub_string(0, at);
+        let end = self.sub_string(at, l);
+        front.append(o);
+        front.append(end);
+        *self = front;
     }
 
     /// Returns a sub-string using the given byte indices, where `i` is the first byte position and `j` is the start
     /// of the first byte not included (or the length of the string). The indices must be at valid utf8 char boundaries,
     /// guaranteeing that the result is valid utf8.
-    public fun sub_string(s: &String, i: u64, j: u64): String {
-        let bytes = &s.bytes;
-        let l = vector::length(bytes);
+    public fun sub_string(self: &String, i: u64, j: u64): String {
+        let bytes = &self.bytes;
+        let l = bytes.length();
         assert!(
             j <= l && i <= j && internal_is_char_boundary(bytes, i) && internal_is_char_boundary(bytes, j),
             EINVALID_INDEX
@@ -81,8 +80,8 @@ module std::string {
     }
 
     /// Computes the index of the first occurrence of a string. Returns `length(s)` if no occurrence found.
-    public fun index_of(s: &String, r: &String): u64 {
-        internal_index_of(&s.bytes, &r.bytes)
+    public fun index_of(self: &String, r: &String): u64 {
+        internal_index_of(&self.bytes, &r.bytes)
     }
 
     // Native API

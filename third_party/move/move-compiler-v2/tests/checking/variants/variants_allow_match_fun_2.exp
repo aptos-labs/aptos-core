@@ -15,12 +15,12 @@ module 0x815::m {
     }
     private fun match(): bool {
         {
-          let c: m::CommonFields = pack m::CommonFields::Foo(0, 0);
+          let c: CommonFields = pack m::CommonFields::Foo(0, 0);
           match (c) {
             m::CommonFields::Foo{ x, y: _ } => {
               Gt<u64>(x, 0)
             }
-            _: m::CommonFields => {
+            _: CommonFields => {
               false
             }
           }
@@ -28,3 +28,27 @@ module 0x815::m {
         }
     }
 } // end 0x815::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            z: u32,
+        }
+    }
+    fun caller(): bool {
+        match()
+    }
+    fun match(): bool {
+        let c = CommonFields::Foo{x: 0,y: 0u8};
+        match (c) {
+            CommonFields::Foo{x: x,y: _} => x > 0,
+            _ => false,
+        }
+    }
+}

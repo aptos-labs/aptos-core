@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_visibility_multiple.move:2:19
+  │
+2 │     public(script script) fun f() {}
+  │                   ^^^^^^
+  │                   │
+  │                   Unexpected 'script'
+  │                   Expected ')'

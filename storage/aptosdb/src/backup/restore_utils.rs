@@ -14,12 +14,15 @@ use crate::{
         transaction_accumulator::TransactionAccumulatorSchema,
     },
     state_store::StateStore,
-    utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
+    utils::ShardedStateKvSchemaBatch,
 };
 use aptos_crypto::HashValue;
-use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_storage_interface::{
+    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
+};
 use aptos_types::{
+    account_config::new_block_event_key,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
@@ -118,7 +121,7 @@ pub(crate) fn save_transactions(
     existing_batch: Option<(
         &mut LedgerDbSchemaBatches,
         &mut ShardedStateKvSchemaBatch,
-        &SchemaBatch,
+        &mut SchemaBatch,
     )>,
     kv_replay: bool,
 ) -> Result<()> {
@@ -137,8 +140,10 @@ pub(crate) fn save_transactions(
         )?;
     } else {
         let mut ledger_db_batch = LedgerDbSchemaBatches::new();
-        let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
+        let mut sharded_kv_schema_batch = state_store
+            .state_db
+            .state_kv_db
+            .new_sharded_native_batches();
         save_transactions_impl(
             Arc::clone(&state_store),
             Arc::clone(&ledger_db),
@@ -154,11 +159,10 @@ pub(crate) fn save_transactions(
         // get the last version and commit to the state kv db
         // commit the state kv before ledger in case of failure happens
         let last_version = first_version + txns.len() as u64 - 1;
-        state_store.state_db.state_kv_db.commit(
-            last_version,
-            state_kv_metadata_batch,
-            sharded_kv_schema_batch,
-        )?;
+        state_store
+            .state_db
+            .state_kv_db
+            .commit(last_version, None, sharded_kv_schema_batch)?;
 
         ledger_db.write_schemas(ledger_db_batch)?;
     }
@@ -198,7 +202,7 @@ pub(crate) fn save_transactions_impl(
             first_version + idx as Version,
             txn,
             /*skip_index=*/ false,
-            &ledger_db_batch.transaction_db_batches,
+            &mut ledger_db_batch.transaction_db_batches,
         )?;
     }
 
@@ -206,7 +210,7 @@ pub(crate) fn save_transactions_impl(
         TransactionInfoDb::put_transaction_info(
             first_version + idx as Version,
             txn_info,
-            &ledger_db_batch.transaction_info_db_batches,
+            &mut ledger_db_batch.transaction_info_db_batches,
         )?;
     }
 
@@ -215,31 +219,47 @@ pub(crate) fn save_transactions_impl(
         .put_transaction_accumulator(
             first_version,
             txn_infos,
-            &ledger_db_batch.transaction_accumulator_db_batches,
+            &mut ledger_db_batch.transaction_accumulator_db_batches,
         )?;
 
     ledger_db.event_db().put_events_multiple_versions(
         first_version,
         events,
-        &ledger_db_batch.event_db_batches,
+        &mut ledger_db_batch.event_db_batches,
     )?;
+
+    if ledger_db.enable_storage_sharding() {
+        for (idx, txn_events) in events.iter().enumerate() {
+            for event in txn_events {
+                if let Some(event_key) = event.event_key() {
+                    if *event_key == new_block_event_key() {
+                        LedgerMetadataDb::put_block_info(
+                            first_version + idx as Version,
+                            event,
+                            &mut ledger_db_batch.ledger_metadata_db_batches,
+                        )?;
+                    }
+                }
+            }
+        }
+    }
     // insert changes in write set schema batch
     for (idx, ws) in write_sets.iter().enumerate() {
         WriteSetDb::put_write_set(
             first_version + idx as Version,
             ws,
-            &ledger_db_batch.write_set_db_batches,
+            &mut ledger_db_batch.write_set_db_batches,
         )?;
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        state_store.put_write_sets(
-            write_sets.to_vec(),
-            first_version,
-            &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
+        let ledger_state = state_store.calculate_state_and_put_updates(
+            &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), None),
+            &mut ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
-            state_store.state_kv_db.enabled_sharding(),
         )?;
+        // n.b. ideally this is set after the batches are committed
+        state_store.set_state_ignoring_summary(ledger_state);
     }
 
     let last_version = first_version + txns.len() as u64 - 1;

@@ -1,0 +1,63 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/enum.move:17:9
+   │
+17 │         invariant self.x > 20;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum.move:23: t9_common_field
+   =     at tests/sources/functional/enum.move:24: t9_common_field
+   =     at tests/sources/functional/enum.move:25: t9_common_field
+   =     at tests/sources/functional/enum.move:22: t9_common_field
+   =     at tests/sources/functional/enum.move:17
+   =     at tests/sources/functional/enum.move:18
+   =     at tests/sources/functional/enum.move:22: t9_common_field
+   =         common = <redacted>
+   =     at tests/sources/functional/enum.move:27: t9_common_field
+   =     at tests/sources/functional/enum.move:17
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/enum.move:18:9
+   │
+18 │         invariant (self is CommonFields::Bar) ==> self.z > 10;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum.move:33: test_data_invariant
+   =     at tests/sources/functional/enum.move:34: test_data_invariant
+   =     at tests/sources/functional/enum.move:35: test_data_invariant
+   =     at tests/sources/functional/enum.move:32: test_data_invariant
+   =     at tests/sources/functional/enum.move:17
+   =     at tests/sources/functional/enum.move:18
+   =     at tests/sources/functional/enum.move:32: test_data_invariant
+   =         common = <redacted>
+   =     at tests/sources/functional/enum.move:37: test_data_invariant
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/enum.move:38: test_data_invariant
+   =         z = <redacted>
+   =     at tests/sources/functional/enum.move:17
+   =     at tests/sources/functional/enum.move:18
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/enum.move:76:13
+   │
+76 │             assert _common_vector_1.x != _common_vector_2.x; // this fails
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum.move:64: test_enum_vector
+   =     at tests/sources/functional/enum.move:63: test_enum_vector
+   =         _common_vector_1 = <redacted>
+   =     at tests/sources/functional/enum.move:67: test_enum_vector
+   =     at tests/sources/functional/enum.move:68: test_enum_vector
+   =     at tests/sources/functional/enum.move:69: test_enum_vector
+   =     at tests/sources/functional/enum.move:66: test_enum_vector
+   =     at tests/sources/functional/enum.move:17
+   =     at tests/sources/functional/enum.move:18
+   =     at tests/sources/functional/enum.move:66: test_enum_vector
+   =         _common_fields = <redacted>
+   =     at tests/sources/functional/enum.move:72: test_enum_vector
+   =     at tests/sources/functional/enum.move:73: test_enum_vector
+   =     at tests/sources/functional/enum.move:17
+   =     at tests/sources/functional/enum.move:73: test_enum_vector
+   =     at tests/sources/functional/enum.move:71: test_enum_vector
+   =         _common_vector_2 = <redacted>
+   =     at tests/sources/functional/enum.move:76: test_enum_vector

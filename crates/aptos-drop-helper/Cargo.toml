@@ -17,3 +17,6 @@ aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 once_cell = { workspace = true }
 threadpool = { workspace = true }
+
+[dev-dependencies]
+rayon = { workspace = true }

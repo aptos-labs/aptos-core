@@ -65,7 +65,10 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Struct `DistributeEvent`](#0x1_vesting_DistributeEvent)
 -  [Struct `TerminateEvent`](#0x1_vesting_TerminateEvent)
 -  [Struct `AdminWithdrawEvent`](#0x1_vesting_AdminWithdrawEvent)
+-  [Struct `VestPermission`](#0x1_vesting_VestPermission)
 -  [Constants](#@Constants_0)
+-  [Function `check_vest_permission`](#0x1_vesting_check_vest_permission)
+-  [Function `grant_permission`](#0x1_vesting_grant_permission)
 -  [Function `stake_pool_address`](#0x1_vesting_stake_pool_address)
 -  [Function `vesting_start_secs`](#0x1_vesting_vesting_start_secs)
 -  [Function `period_duration_secs`](#0x1_vesting_period_duration_secs)
@@ -169,6 +172,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64">0x1::pool_u64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
@@ -1425,6 +1429,34 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 
 </details>
 
+<a id="0x1_vesting_VestPermission"></a>
+
+## Struct `VestPermission`
+
+Permissions to mutate the vesting config for a given account.
+
+
+<pre><code><b>struct</b> <a href="vesting.md#0x1_vesting_VestPermission">VestPermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -1466,6 +1498,16 @@ Shareholders list cannot be empty.
 
 
 <pre><code><b>const</b> <a href="vesting.md#0x1_vesting_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_vesting_ENO_VESTING_PERMISSION"></a>
+
+Current permissioned signer cannot perform vesting operations.
+
+
+<pre><code><b>const</b> <a href="vesting.md#0x1_vesting_ENO_VESTING_PERMISSION">ENO_VESTING_PERMISSION</a>: u64 = 17;
 </code></pre>
 
 
@@ -1639,6 +1681,59 @@ Vesting contract has been terminated and all funds have been released back to th
 </code></pre>
 
 
+
+<a id="0x1_vesting_check_vest_permission"></a>
+
+## Function `check_vest_permission`
+
+Permissions
+
+
+<pre><code><b>fun</b> <a href="vesting.md#0x1_vesting_check_vest_permission">check_vest_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="vesting.md#0x1_vesting_check_vest_permission">check_vest_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(s, <a href="vesting.md#0x1_vesting_VestPermission">VestPermission</a> {}),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="vesting.md#0x1_vesting_ENO_VESTING_PERMISSION">ENO_VESTING_PERMISSION</a>),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vesting_grant_permission"></a>
+
+## Function `grant_permission`
+
+Grant permission to perform vesting operations on behalf of the master signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(master, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>, <a href="vesting.md#0x1_vesting_VestPermission">VestPermission</a> {})
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_vesting_stake_pool_address"></a>
 
@@ -2162,6 +2257,7 @@ Create a vesting contract with a given configurations.
     // Optional seed used when creating the staking contract <a href="account.md#0x1_account">account</a>.
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): <b>address</b> <b>acquires</b> <a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a> {
+    <a href="vesting.md#0x1_vesting_check_vest_permission">check_vest_permission</a>(admin);
     <b>assert</b>!(
         !<a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(withdrawal_address),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>),
@@ -2223,19 +2319,20 @@ Create a vesting contract with a given configurations.
                 commission_percentage,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> admin_store.create_events,
+            <a href="vesting.md#0x1_vesting_CreateVestingContractEvent">CreateVestingContractEvent</a> {
+                operator,
+                voter,
+                withdrawal_address,
+                grant_amount,
+                vesting_contract_address: contract_address,
+                staking_pool_address: pool_address,
+                commission_percentage,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> admin_store.create_events,
-        <a href="vesting.md#0x1_vesting_CreateVestingContractEvent">CreateVestingContractEvent</a> {
-            operator,
-            voter,
-            withdrawal_address,
-            grant_amount,
-            vesting_contract_address: contract_address,
-            staking_pool_address: pool_address,
-            commission_percentage,
-        },
-    );
 
     <b>move_to</b>(&contract_signer, <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
         state: <a href="vesting.md#0x1_vesting_VESTING_POOL_ACTIVE">VESTING_POOL_ACTIVE</a>,
@@ -2392,17 +2489,18 @@ Unlock any vested portion of the grant.
                 amount: vested_amount,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.vest_events,
+            <a href="vesting.md#0x1_vesting_VestEvent">VestEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                period_vested: next_period_to_vest,
+                amount: vested_amount,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.vest_events,
-        <a href="vesting.md#0x1_vesting_VestEvent">VestEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            period_vested: next_period_to_vest,
-            amount: vested_amount,
-        },
-    );
 }
 </code></pre>
 
@@ -2496,15 +2594,16 @@ Distribute any withdrawable stake from the stake pool.
                 amount: total_distribution_amount,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.distribute_events,
+            <a href="vesting.md#0x1_vesting_DistributeEvent">DistributeEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                amount: total_distribution_amount,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.distribute_events,
-        <a href="vesting.md#0x1_vesting_DistributeEvent">DistributeEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            amount: total_distribution_amount,
-        },
-    );
 }
 </code></pre>
 
@@ -2583,14 +2682,15 @@ Terminate the vesting contract and send all funds back to the withdrawal address
                 vesting_contract_address: contract_address,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.terminate_events,
+            <a href="vesting.md#0x1_vesting_TerminateEvent">TerminateEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.terminate_events,
-        <a href="vesting.md#0x1_vesting_TerminateEvent">TerminateEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-        },
-    );
 }
 </code></pre>
 
@@ -2640,15 +2740,16 @@ has already been terminated.
                 amount,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.admin_withdraw_events,
+            <a href="vesting.md#0x1_vesting_AdminWithdrawEvent">AdminWithdrawEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                amount,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.admin_withdraw_events,
-        <a href="vesting.md#0x1_vesting_AdminWithdrawEvent">AdminWithdrawEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            amount,
-        },
-    );
 }
 </code></pre>
 
@@ -2696,18 +2797,19 @@ has already been terminated.
                 commission_percentage,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.update_operator_events,
+            <a href="vesting.md#0x1_vesting_UpdateOperatorEvent">UpdateOperatorEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                old_operator,
+                new_operator,
+                commission_percentage,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.update_operator_events,
-        <a href="vesting.md#0x1_vesting_UpdateOperatorEvent">UpdateOperatorEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            old_operator,
-            new_operator,
-            commission_percentage,
-        },
-    );
 }
 </code></pre>
 
@@ -2816,17 +2918,18 @@ has already been terminated.
                 new_voter,
             },
         );
-    };
-    emit_event(
-        &<b>mut</b> vesting_contract.update_voter_events,
-        <a href="vesting.md#0x1_vesting_UpdateVoterEvent">UpdateVoterEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            old_voter,
-            new_voter,
-        },
-    );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.update_voter_events,
+            <a href="vesting.md#0x1_vesting_UpdateVoterEvent">UpdateVoterEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                old_voter,
+                new_voter,
+            },
+        );
+    }
 }
 </code></pre>
 
@@ -2867,16 +2970,17 @@ has already been terminated.
                 new_lockup_expiration_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(vesting_contract.staking.pool_address),
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.reset_lockup_events,
+            <a href="vesting.md#0x1_vesting_ResetLockupEvent">ResetLockupEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                new_lockup_expiration_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(vesting_contract.staking.pool_address),
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.reset_lockup_events,
-        <a href="vesting.md#0x1_vesting_ResetLockupEvent">ResetLockupEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            new_lockup_expiration_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(vesting_contract.staking.pool_address),
-        },
-    );
 }
 </code></pre>
 
@@ -2931,17 +3035,18 @@ has already been terminated.
                 new_beneficiary,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.set_beneficiary_events,
+            <a href="vesting.md#0x1_vesting_SetBeneficiaryEvent">SetBeneficiaryEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                shareholder,
+                old_beneficiary,
+                new_beneficiary,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.set_beneficiary_events,
-        <a href="vesting.md#0x1_vesting_SetBeneficiaryEvent">SetBeneficiaryEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            shareholder,
-            old_beneficiary,
-            new_beneficiary,
-        },
-    );
 }
 </code></pre>
 
@@ -2971,6 +3076,7 @@ account.
     contract_address: <b>address</b>,
     shareholder: <b>address</b>,
 ) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>, <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <a href="vesting.md#0x1_vesting_check_vest_permission">check_vest_permission</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(
@@ -3011,7 +3117,7 @@ account.
     role: String,
     role_holder: <b>address</b>,
 ) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>, <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
 
     <b>if</b> (!<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address)) {
@@ -3135,7 +3241,7 @@ staking_contract and stake modules.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_get_vesting_account_signer">get_vesting_account_signer</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
     <a href="vesting.md#0x1_vesting_get_vesting_account_signer_internal">get_vesting_account_signer_internal</a>(vesting_contract)
 }
@@ -3190,6 +3296,7 @@ This address should be deterministic for the same admin and vesting contract cre
     admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, SignerCapability) <b>acquires</b> <a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a> {
+    <a href="vesting.md#0x1_vesting_check_vest_permission">check_vest_permission</a>(admin);
     <b>let</b> admin_store = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin));
     <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin));
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&admin_store.nonce));
@@ -3229,6 +3336,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>fun</b> <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vesting_contract: &<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>) {
+    <a href="vesting.md#0x1_vesting_check_vest_permission">check_vest_permission</a>(admin);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) == vesting_contract.admin, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="vesting.md#0x1_vesting_ENOT_ADMIN">ENOT_ADMIN</a>));
 }
 </code></pre>
@@ -3483,10 +3591,23 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> aborts_if_is_partial;
 // This enforces <a id="high-level-spec-2" href="#high-level-req">high-level requirement 2</a>:
 <b>invariant</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a):
     <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a).grant_pool.shareholders_limit &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_vesting_AbortsIfPermissionedSigner"></a>
+
+
+<pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_AbortsIfPermissionedSigner">AbortsIfPermissionedSigner</a> {
+    s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> perm = <a href="vesting.md#0x1_vesting_VestPermission">VestPermission</a> {};
+    <b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">permissioned_signer::spec_check_permission_exists</a>(s, perm);
+}
 </code></pre>
 
 
@@ -3686,7 +3807,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a> {
     vesting_contract_address: <b>address</b>;
-    <b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &lt;= 100;
     <b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
     <b>let</b> staker = vesting_contract_address;
@@ -3892,7 +4012,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
-<b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
 </code></pre>
 
 
@@ -3927,7 +4046,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
-<b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
 </code></pre>
 
 
@@ -4241,7 +4359,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 </code></pre>
 
 
@@ -4321,7 +4440,9 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(admin);
+// This enforces <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 </code></pre>
 
@@ -4502,6 +4623,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a> {
     contract_address: <b>address</b>;
     admin: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(admin);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;

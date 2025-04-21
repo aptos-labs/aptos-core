@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::create_k8s_client;
 use crate::{
     backend::k8s::stateful_set, get_free_port, scale_stateful_set_replicas, FullNode,
     HealthCheckError, Node, NodeExt, Result, Validator, Version, KUBECTL_BIN, LOCALHOST,
@@ -14,6 +15,9 @@ use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
+use futures::try_join;
+use k8s_openapi::api::core::v1::Pod;
+use kube::Api;
 use reqwest::Url;
 use serde_json::Value;
 use std::{
@@ -118,6 +122,29 @@ impl K8sNode {
         };
         self.port_forward(self.rest_api_port(), remote_rest_api_port)
     }
+
+    /// Wait until the pod is running
+    async fn wait_for_pod_running(&self, deadline: Instant) -> Result<()> {
+        let kube_client = create_k8s_client().await?;
+        let pod_api: Api<Pod> = Api::namespaced(kube_client, self.namespace());
+        let pod_name = format!("{}-0", self.stateful_set_name());
+
+        while Instant::now() < deadline {
+            if let Some(status) = pod_api.get_status(&pod_name).await?.status {
+                if let Some(phase) = status.phase {
+                    if phase == "Running" {
+                        return Ok(());
+                    }
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+
+        Err(anyhow!(
+            "Timed out waiting for pod {} to be running",
+            pod_name
+        ))
+    }
 }
 
 #[async_trait::async_trait]
@@ -142,8 +169,24 @@ impl Node for K8sNode {
             self.rest_api_port.store(get_free_port(), Ordering::SeqCst);
             self.port_forward_rest_api()?;
         }
-        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
-            .await
+
+        let infra_deadline = Instant::now() + Duration::from_secs(120);
+        let health_deadline = Instant::now() + Duration::from_secs(180);
+
+        try_join!(
+            async {
+                self.wait_for_pod_running(infra_deadline)
+                    .await
+                    .map_err(|e| anyhow!("Infrastructure error - pod failed to start: {}", e))
+            },
+            async {
+                self.wait_until_healthy(health_deadline)
+                    .await
+                    .map_err(|e| anyhow!("Health check failed - node failed to start: {}", e))
+            }
+        )?;
+
+        Ok(())
     }
 
     async fn stop(&self) -> Result<()> {

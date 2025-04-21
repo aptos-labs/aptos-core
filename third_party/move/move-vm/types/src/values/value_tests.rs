@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
+use claims::{assert_err, assert_ok};
 use move_binary_format::errors::*;
 use move_core_types::{account_address::AccountAddress, u256::U256};
 
@@ -229,6 +230,86 @@ fn test_vm_value_vector_u64_casting() {
     );
 }
 
+#[test]
+fn test_mem_swap() -> PartialVMResult<()> {
+    let mut locals = Locals::new(20);
+    // IndexedRef(Locals)
+    locals.store_loc(0, Value::u64(0), false)?;
+    locals.store_loc(1, Value::u64(1), false)?;
+    locals.store_loc(2, Value::address(AccountAddress::ZERO), false)?;
+    locals.store_loc(3, Value::address(AccountAddress::ONE), false)?;
+
+    // ContainerRef
+
+    // - Specialized
+    locals.store_loc(4, Value::vector_u64(vec![1, 2]), false)?;
+    locals.store_loc(5, Value::vector_u64(vec![3, 4, 5]), false)?;
+    locals.store_loc(6, Value::vector_address(vec![AccountAddress::ZERO]), false)?;
+    locals.store_loc(7, Value::vector_address(vec![AccountAddress::ONE]), false)?;
+
+    // - Generic
+    // -- Container of container
+    locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])), false)?;
+    locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])), false)?;
+    locals.store_loc(10, Value::master_signer(AccountAddress::ZERO), false)?;
+    locals.store_loc(11, Value::master_signer(AccountAddress::ONE), false)?;
+
+    // -- Container of vector
+    locals.store_loc(
+        12,
+        Value::vector_for_testing_only(vec![Value::u64(1u64), Value::u64(2u64)]),
+        false,
+    )?;
+    locals.store_loc(
+        13,
+        Value::vector_for_testing_only(vec![Value::u64(3u64), Value::u64(4u64)]),
+        false,
+    )?;
+    locals.store_loc(
+        14,
+        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ZERO)]),
+        false,
+    )?;
+    locals.store_loc(
+        15,
+        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ONE)]),
+        false,
+    )?;
+
+    let mut locals2 = Locals::new(2);
+    locals2.store_loc(0, Value::u64(0), false)?;
+
+    let get_local =
+        |ls: &Locals, idx: usize| ls.borrow_loc(idx).unwrap().value_as::<Reference>().unwrap();
+
+    for i in (0..16).step_by(2) {
+        assert_ok!(get_local(&locals, i).swap_values(get_local(&locals, i + 1)));
+    }
+
+    assert_ok!(get_local(&locals, 0).swap_values(get_local(&locals2, 0)));
+
+    for i in (0..16).step_by(2) {
+        for j in ((i + 2)..16).step_by(2) {
+            let result = get_local(&locals, i).swap_values(get_local(&locals, j));
+
+            // These would all fail in `call_native` typing checks.
+            // But here some do pass:
+            if j < 4  // locals are not checked between each other
+               || (8 <= i && j < 12) // ContainerRef of containers is not checked between each other
+               || (12 <= i && j < 16)
+            // ContainerRef of vector is not checked between each other
+            //    || i >= 8 // containers are also interchangeable
+            {
+                assert_ok!(result, "{} and {}", i, j);
+            } else {
+                assert_err!(result, "{} and {}", i, j);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod native_values {
     use super::*;
@@ -253,8 +334,8 @@ mod native_values {
         assert_err!(Value::u256(U256::zero()).equals(&v));
 
         assert_err!(Value::address(AccountAddress::ONE).equals(&v));
-        assert_err!(Value::signer(AccountAddress::ONE).equals(&v));
-        assert_err!(Value::signer_reference(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::master_signer(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::master_signer_reference(AccountAddress::ONE).equals(&v));
 
         assert_err!(Value::vector_bool(vec![true, false]).equals(&v));
 

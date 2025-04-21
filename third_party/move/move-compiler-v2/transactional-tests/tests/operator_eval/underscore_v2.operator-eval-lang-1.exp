@@ -1,0 +1,57 @@
+processed 5 tasks
+
+task 0 'publish'. lines 1-91:
+Error: compilation errors:
+ error: duplicate declaration of `_`
+   ┌─ TEMPFILE:38:37
+   │
+38 │     inline fun fun9(x: u64, _: u64, _: u64): u64 {
+   │                             -       ^
+   │                             │        
+   │                             previous declaration of `_`
+
+error: duplicate declaration of `_`
+   ┌─ TEMPFILE:44:38
+   │
+44 │     inline fun fun10(x: u64, _: u64, _: |u64|u64): u64 {
+   │                              -       ^
+   │                              │        
+   │                              previous declaration of `_`
+
+
+
+task 1 'run'. lines 93-95:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 2 'run'. lines 97-97:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 3 'run'. lines 99-99:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 4 'run'. lines 101-101:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

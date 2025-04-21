@@ -8,7 +8,7 @@ module 0x42::Test {
         [Number(0), Number(1), Number(2)];
         [Number(0), Number(1), Number(2)];
         [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000)), Address(Numerical(0000000000000000000000000000000000000000000000000000000000000001))];
-        Vector<Test::X>(pack Test::X(false), pack Test::X(false));
+        Vector<X>(pack Test::X(false), pack Test::X(false));
         Vector<vector<address>>(Vector<address>(), Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>(), Vector<address>()), Vector<vector<address>>());
         Tuple()
@@ -22,9 +22,36 @@ module 0x42::Test {
         [Number(0)];
         [Number(0)];
         [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000))];
-        Vector<Test::X>(pack Test::X(false));
+        Vector<X>(pack Test::X(false));
         Vector<vector<address>>(Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>()));
         Tuple()
     }
 } // end 0x42::Test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::Test {
+    struct X has drop {
+    }
+    fun many() {
+        vector[0u8, 1u8, 2u8];
+        vector[0, 1, 2];
+        vector[0u128, 1u128, 2u128];
+        vector[0x0, 0x1];
+        vector[X{}, X{}];
+        vector[vector[], vector[]];
+        vector[vector[vector[], vector[]], vector[]];
+    }
+    fun none() {
+        vector[];
+    }
+    fun one() {
+        vector[0u8];
+        vector[0];
+        vector[0u128];
+        vector[0x0];
+        vector[X{}];
+        vector[vector[]];
+        vector[vector[vector[]]];
+    }
+}

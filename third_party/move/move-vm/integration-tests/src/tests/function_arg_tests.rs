@@ -7,12 +7,12 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     u256::U256,
     value::{MoveStruct, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -56,14 +56,14 @@ fn run(
     m.serialize(&mut blob).unwrap();
 
     let mut storage = InMemoryStorage::new();
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(module_id.clone(), blob);
+    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
-    let vm = MoveVM::new(vec![]);
+    let vm = MoveVM::new();
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
+    let module_storage = storage.as_unsync_module_storage();
 
     let args: Vec<_> = args
         .into_iter()
@@ -71,12 +71,13 @@ fn run(
         .collect();
 
     sess.execute_function_bypass_visibility(
-        &module_id,
+        &m.self_id(),
         &fun_name,
         ty_args,
         args,
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
+        &module_storage,
     )?;
 
     Ok(())

@@ -16,9 +16,13 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::CompiledModule;
+use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_compiler::{
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    shared::NumericalAddress,
+};
+use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -26,6 +30,7 @@ use move_model::{
 };
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+    resolution::resolution_graph::ResolvedGraph,
     source_package::{
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
         std_lib::StdVersion,
@@ -37,6 +42,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     io::{stderr, Write},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
@@ -121,7 +127,7 @@ impl Default for BuildOptions {
             compiler_version: None,
             language_version: None,
             skip_attribute_checks: false,
-            check_test_code: false,
+            check_test_code: true,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
@@ -131,8 +137,9 @@ impl Default for BuildOptions {
 impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
-            language_version: Some(LanguageVersion::V2_0),
-            compiler_version: Some(CompilerVersion::V2_0),
+            bytecode_version: Some(VERSION_7),
+            language_version: Some(LanguageVersion::latest_stable()),
+            compiler_version: Some(CompilerVersion::latest_stable()),
             ..Self::default()
         }
     }
@@ -146,6 +153,14 @@ impl BuildOptions {
     pub fn with_experiment(mut self, exp: &str) -> Self {
         self.experiments.push(exp.to_string());
         self
+    }
+
+    pub fn set_latest_language(self) -> Self {
+        BuildOptions {
+            language_version: Some(LanguageVersion::latest()),
+            bytecode_version: Some(file_format_common::VERSION_MAX),
+            ..self
+        }
     }
 }
 
@@ -177,7 +192,6 @@ pub fn build_model(
     let build_config = BuildConfig {
         dev_mode,
         additional_named_addresses,
-        architecture: None,
         generate_abis: false,
         generate_docs: false,
         generate_move_model: false,
@@ -214,15 +228,20 @@ impl BuiltPackage {
     /// This function currently reports all Move compilation errors and warnings to stdout,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
+        let build_config = Self::create_build_config(&options)?;
+        let resolved_graph = Self::prepare_resolution_graph(package_path, build_config.clone())?;
+        BuiltPackage::build_with_external_checks(resolved_graph, options, build_config, vec![])
+    }
+
+    pub fn create_build_config(options: &BuildOptions) -> anyhow::Result<BuildConfig> {
         let bytecode_version = Some(options.inferred_bytecode_version());
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
         Self::check_versions(&compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
-        let build_config = BuildConfig {
+        Ok(BuildConfig {
             dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
-            architecture: None,
             generate_abis: options.with_abis,
             generate_docs: false,
             generate_move_model: true,
@@ -241,68 +260,108 @@ impl BuiltPackage {
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
             },
-        };
-
-        eprintln!("Compiling, may take a little while to download git dependencies...");
-        let (mut package, model_opt) =
-            build_config.compile_package_no_exit(&package_path, &mut stderr())?;
-
-        // Run extended checks as well derive runtime metadata
-        let model = &model_opt.expect("move model");
-        let runtime_metadata = extended_checks::run_extended_checks(model);
-        if model.diag_count(Severity::Warning) > 0 {
-            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-            model.report_diag(&mut error_writer, Severity::Warning);
-            if model.has_errors() {
-                bail!("extended checks failed")
-            }
-        }
-
-        let compiled_pkg_path = package
-            .compiled_package_info
-            .build_flags
-            .install_dir
-            .as_ref()
-            .unwrap_or(&package_path)
-            .join(CompiledPackageLayout::Root.path())
-            .join(package.compiled_package_info.package_name.as_str());
-        inject_runtime_metadata(
-            compiled_pkg_path,
-            &mut package,
-            runtime_metadata,
-            bytecode_version,
-        )?;
-
-        // If enabled generate docs.
-        if options.with_docs {
-            let docgen = if let Some(opts) = options.docgen_options.clone() {
-                opts
-            } else {
-                DocgenOptions::default()
-            };
-            let dep_paths = package
-                .deps_compiled_units
-                .iter()
-                .map(|(_, u)| {
-                    u.source_path
-                        .parent()
-                        .unwrap()
-                        .parent()
-                        .unwrap()
-                        .join(get_docgen_output_dir())
-                        .display()
-                        .to_string()
-                })
-                .unique()
-                .collect::<Vec<_>>();
-            docgen.run(package_path.display().to_string(), dep_paths, model)?
-        }
-
-        Ok(Self {
-            options,
-            package_path,
-            package,
         })
+    }
+
+    pub fn prepare_resolution_graph(
+        package_path: PathBuf,
+        build_config: BuildConfig,
+    ) -> anyhow::Result<ResolvedGraph> {
+        eprintln!("Compiling, may take a little while to download git dependencies...");
+        build_config.resolution_graph_for_package(&package_path, &mut stderr())
+    }
+
+    /// Same as `build` but allows to provide external checks to be made on Move code.
+    /// The `external_checks` are only run when compiler v2 is used.
+    pub fn build_with_external_checks(
+        resolved_graph: ResolvedGraph,
+        options: BuildOptions,
+        build_config: BuildConfig,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
+    ) -> anyhow::Result<Self> {
+        {
+            let package_path = resolved_graph.root_package_path.clone();
+            let bytecode_version = build_config.compiler_config.bytecode_version;
+
+            let (mut package, model_opt) = build_config.compile_package_no_exit(
+                resolved_graph,
+                external_checks,
+                &mut stderr(),
+            )?;
+
+            // Run extended checks as well derive runtime metadata
+            let model = &model_opt.expect("move model");
+
+            if let Some(model_options) = model.get_extension::<Options>() {
+                if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
+                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
+                }
+            }
+
+            let runtime_metadata = extended_checks::run_extended_checks(model);
+            if model.diag_count(Severity::Warning) > 0 {
+                let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+                model.report_diag(&mut error_writer, Severity::Warning);
+                if model.has_errors() {
+                    bail!("extended checks failed")
+                }
+            }
+
+            if let Some(model_options) = model.get_extension::<Options>() {
+                if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && model.has_warnings()
+                {
+                    bail!("found warning(s), and `--fail-on-warning` is set")
+                } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
+                }
+            }
+
+            let compiled_pkg_path = package
+                .compiled_package_info
+                .build_flags
+                .install_dir
+                .as_ref()
+                .unwrap_or(&package_path)
+                .join(CompiledPackageLayout::Root.path())
+                .join(package.compiled_package_info.package_name.as_str());
+            inject_runtime_metadata(
+                compiled_pkg_path,
+                &mut package,
+                runtime_metadata,
+                bytecode_version,
+            )?;
+
+            // If enabled generate docs.
+            if options.with_docs {
+                let docgen = if let Some(opts) = options.docgen_options.clone() {
+                    opts
+                } else {
+                    DocgenOptions::default()
+                };
+                let dep_paths = package
+                    .deps_compiled_units
+                    .iter()
+                    .map(|(_, u)| {
+                        u.source_path
+                            .parent()
+                            .unwrap()
+                            .parent()
+                            .unwrap()
+                            .join(get_docgen_output_dir())
+                            .display()
+                            .to_string()
+                    })
+                    .unique()
+                    .collect::<Vec<_>>();
+                docgen.run(package_path.display().to_string(), dep_paths, model)?
+            }
+
+            Ok(Self {
+                options,
+                package_path,
+                package,
+            })
+        }
     }
 
     // Check versions and warn user if using unstable ones.
@@ -451,17 +510,28 @@ impl BuiltPackage {
             .package
             .deps_compiled_units
             .iter()
-            .map(|(name, unit)| {
-                let package_name = name.as_str().to_string();
-                let account = match &unit.unit {
-                    CompiledUnit::Module(m) => AccountAddress::new(m.address.into_bytes()),
-                    _ => panic!("script not a dependency"),
-                };
-                PackageDep {
-                    account,
-                    package_name,
-                }
+            .flat_map(|(name, unit)| match &unit.unit {
+                CompiledUnit::Module(m) => {
+                    let package_name = name.as_str().to_string();
+                    let account = AccountAddress::new(m.address.into_bytes());
+
+                    Some(PackageDep {
+                        account,
+                        package_name,
+                    })
+                },
+                CompiledUnit::Script(_) => None,
             })
+            .chain(
+                self.package
+                    .bytecode_deps
+                    .iter()
+                    .map(|(name, module)| PackageDep {
+                        account: NumericalAddress::from_account_address(*module.self_addr())
+                            .into_inner(),
+                        package_name: name.as_str().to_string(),
+                    }),
+            )
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();

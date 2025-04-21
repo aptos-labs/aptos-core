@@ -22,6 +22,7 @@ use proptest::{
     prelude::*,
     sample::Index,
 };
+use std::sync::Arc;
 
 // hack strategy to generate a length from `impl Into<SizeRange>`
 fn arb_length(size_range: impl Into<SizeRange>) -> impl Strategy<Value = usize> {
@@ -56,7 +57,7 @@ fn arb_validator_sets(
 fn into_epoch_state(epoch: u64, signers: &[ValidatorSigner]) -> EpochState {
     EpochState {
         epoch,
-        verifier: ValidatorVerifier::new(
+        verifier: Arc::new(ValidatorVerifier::new(
             signers
                 .iter()
                 .map(|signer| {
@@ -67,7 +68,7 @@ fn into_epoch_state(epoch: u64, signers: &[ValidatorSigner]) -> EpochState {
                     )
                 })
                 .collect(),
-        ),
+        )),
     }
 }
 
@@ -84,7 +85,9 @@ fn sign_ledger_info(
             .map(|s| (s.author(), s.sign(ledger_info).unwrap()))
             .collect(),
     );
-    verifier.aggregate_signatures(&partial_sig).unwrap()
+    verifier
+        .aggregate_signatures(partial_sig.signatures_iter())
+        .unwrap()
 }
 
 fn mock_ledger_info(

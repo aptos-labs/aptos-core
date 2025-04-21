@@ -23,12 +23,13 @@ use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
     common::Author,
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
+    round_timeout::RoundTimeoutMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
@@ -91,6 +92,22 @@ impl RpcResponder {
     }
 }
 
+/// NOTE:
+/// 1. [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) struct was
+/// renamed to `DeprecatedIncomingBlockRetrievalRequest`.
+/// 2. `DeprecatedIncomingBlockRetrievalRequest` is being deprecated in favor of a new [`IncomingBlockRetrievalRequest`](IncomingBlockRetrievalRequest)
+/// struct which supports the new [`BlockRetrievalRequest`](BlockRetrievalRequest) enum for the `req` field
+///
+/// Going forward, please use [`IncomingBlockRetrievalRequest`](IncomingBlockRetrievalRequest)
+/// For more details, see comments above [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1)
+/// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+#[derive(Debug)]
+pub struct DeprecatedIncomingBlockRetrievalRequest {
+    pub req: BlockRetrievalRequestV1,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
 #[derive(Debug)]
@@ -131,20 +148,26 @@ pub struct IncomingRandGenRequest {
 
 #[derive(Debug)]
 pub enum IncomingRpcRequest {
-    BlockRetrieval(IncomingBlockRetrievalRequest),
+    /// NOTE: This is being phased out in two releases to accommodate `IncomingBlockRetrievalRequestV2`
+    /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+    DeprecatedBlockRetrieval(DeprecatedIncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
+    #[allow(dead_code)]
+    BlockRetrieval(IncomingBlockRetrievalRequest),
 }
 
 impl IncomingRpcRequest {
+    /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     pub fn epoch(&self) -> Option<u64> {
         match self {
             IncomingRpcRequest::BatchRetrieval(req) => Some(req.req.epoch()),
             IncomingRpcRequest::DAGRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::RandGenRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
+            IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
             IncomingRpcRequest::BlockRetrieval(_) => None,
         }
     }
@@ -198,7 +221,7 @@ pub struct NetworkSender {
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-    validators: ValidatorVerifier,
+    validators: Arc<ValidatorVerifier>,
     time_service: aptos_time_service::TimeService,
 }
 
@@ -207,7 +230,7 @@ impl NetworkSender {
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-        validators: ValidatorVerifier,
+        validators: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
             author,
@@ -222,7 +245,7 @@ impl NetworkSender {
     /// returns a future that is fulfilled with BlockRetrievalResponse.
     pub async fn request_block(
         &self,
-        retrieval_request: BlockRetrievalRequest,
+        retrieval_request: BlockRetrievalRequestV1,
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
@@ -234,7 +257,8 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg =
+            ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -317,6 +341,8 @@ impl NetworkSender {
     }
 
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+
         let self_author = self.author;
         let mut other_validators: Vec<_> = self
             .validators
@@ -346,7 +372,7 @@ impl NetworkSender {
             if self.author == peer {
                 let self_msg = Event::Message(self.author, msg.clone());
                 if let Err(err) = self_sender.send(self_msg).await {
-                    error!(error = ?err, "Error delivering a self msg");
+                    warn!(error = ?err, "Error delivering a self msg");
                 }
                 continue;
             }
@@ -402,6 +428,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg) {
+        fail_point!("consensus::send::round_timeout", |_| ());
+        let msg = ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout));
         self.broadcast(msg).await
     }
 
@@ -749,6 +781,7 @@ impl NetworkTask {
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
@@ -795,18 +828,20 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     let req = match msg {
-                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                        ConsensusMsg::DeprecatedBlockRetrievalRequest(request) => {
                             debug!(
                                 remote_peer = peer_id,
                                 event = LogEvent::ReceiveBlockRetrieval,
                                 "{}",
                                 request
                             );
-                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
-                                req: *request,
-                                protocol,
-                                response_sender: callback,
-                            })
+                            IncomingRpcRequest::DeprecatedBlockRetrieval(
+                                DeprecatedIncomingBlockRetrievalRequest {
+                                    req: *request,
+                                    protocol,
+                                    response_sender: callback,
+                                },
+                            )
                         },
                         ConsensusMsg::BatchRequestMsg(request) => {
                             debug!(

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid byte string
+  ┌─ tests/folding/constants_quoted_string.move:5:29
+  │
+5 │     const C12: vector<u8> = "<empty>";
+  │                             ^ String literal must begin with b" (for a byte string) or x" (for a hex string)

@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_while.move:4:28
+  │
+4 │         while (cond) { _ = move x };
+  │                            ^^^^^^
+  │                            │
+  │                            attempted to move here
+  │                            used here
+
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_while.move:9:45
+  │
+9 │         while (cond) { if (cond) break; _ = move x };
+  │                                             ^^^^^^
+  │                                             │
+  │                                             attempted to move here
+  │                                             used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_while.move:14:39
+   │
+14 │         while (cond) { let y = x; _ = move x; y; };
+   │                                -      ^^^^^^ attempted to move here
+   │                                │
+   │                                used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_while.move:19:59
+   │
+19 │         while (cond) { let y = x; if (cond) continue; _ = move x; y; };
+   │                                -                          ^^^^^^ attempted to move here
+   │                                │
+   │                                used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_while.move:24:52
+   │
+24 │         while (cond) { let y = &x; _ = move y; _ = move x };
+   │                                --                  ^^^^^^ attempted to move here
+   │                                │
+   │                                used here

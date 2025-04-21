@@ -1,0 +1,165 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    struct MyMap {
+        table: Table<address, ValueWrap>,
+    }
+    struct Table<T1,T2> {
+        x: T1,
+        y: T2,
+    }
+    struct ValueWrap {
+        val: u64,
+    }
+    private fun contains<T1,T2>(self: &Table<T1, T2>,_key: T1): bool {
+        true
+    }
+    private fun add<T1,T2>(self: &mut Table<T1, T2>,_key: T1,_val: T2) {
+        Tuple()
+    }
+    public fun add_when_missing(key: address,val: u64)
+        acquires MyMap(*)
+     {
+        {
+          let my_map: &mut MyMap = BorrowGlobal(Mutable)<MyMap>(0x815);
+          if Not(m::contains<address, ValueWrap>(Borrow(Immutable)(select m::MyMap.table<&mut MyMap>(my_map)), key)) {
+            {
+              let wrap: ValueWrap = pack m::ValueWrap(val);
+              m::add<address, ValueWrap>(Borrow(Mutable)(select m::MyMap.table<&mut MyMap>(my_map)), key, wrap);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          }
+        }
+    }
+} // end 0x815::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    struct MyMap has key {
+        table: Table<address, ValueWrap>,
+    }
+    struct Table<T1, T2> has store {
+        x: T1,
+        y: T2,
+    }
+    struct ValueWrap has drop, store {
+        val: u64,
+    }
+    fun contains<T1: drop, T2: drop>(self: &Table<T1, T2>, _key: T1): bool {
+        true
+    }
+    fun add<T1: drop, T2: drop>(self: &mut Table<T1, T2>, _key: T1, _val: T2) {
+    }
+    public fun add_when_missing(key: address, val: u64)
+        acquires MyMap
+    {
+        let my_map = borrow_global_mut<MyMap>(0x815);
+        if (!contains<address,ValueWrap>(&my_map.table, key)) {
+            let wrap = ValueWrap{val: val};
+            add<address,ValueWrap>(&mut my_map.table, key, wrap);
+        }
+    }
+}
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::contains<#0, #1>($t0: &0x815::m::Table<#0, #1>, $t1: #0): bool {
+     var $t2: bool
+  0: $t2 := true
+  1: return $t2
+}
+
+
+[variant baseline]
+fun m::add<#0, #1>($t0: &mut 0x815::m::Table<#0, #1>, $t1: #0, $t2: #1) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::add_when_missing($t0: address, $t1: u64) {
+     var $t2: &mut 0x815::m::MyMap
+     var $t3: address
+     var $t4: bool
+     var $t5: bool
+     var $t6: &0x815::m::Table<address, 0x815::m::ValueWrap>
+     var $t7: 0x815::m::ValueWrap
+     var $t8: &mut 0x815::m::Table<address, 0x815::m::ValueWrap>
+     var $t9: address
+  0: $t3 := 0x815
+  1: $t2 := borrow_global<0x815::m::MyMap>($t3)
+  2: $t6 := borrow_field<0x815::m::MyMap>.table($t2)
+  3: $t5 := m::contains<address, 0x815::m::ValueWrap>($t6, $t0)
+  4: $t4 := !($t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L0
+  7: $t7 := pack 0x815::m::ValueWrap($t1)
+  8: $t8 := borrow_field<0x815::m::MyMap>.table($t2)
+  9: $t9 := infer($t0)
+ 10: m::add<address, 0x815::m::ValueWrap>($t8, $t9, $t7)
+ 11: goto 13
+ 12: label L1
+ 13: label L2
+ 14: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 815.m {
+struct MyMap has key {
+	table: Table<address, ValueWrap>
+}
+struct Table<T1, T2> has store {
+	x: T1,
+	y: T2
+}
+struct ValueWrap has drop, store {
+	val: u64
+}
+
+contains<T1: drop, T2: drop>(self: &Table<T1, T2>, _key: T1): bool /* def_idx: 0 */ {
+B0:
+	0: LdTrue
+	1: MoveLoc[0](self: &Table<T1, T2>)
+	2: Pop
+	3: Ret
+}
+add<T1: drop, T2: drop>(self: &mut Table<T1, T2>, _key: T1, _val: T2) /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](self: &mut Table<T1, T2>)
+	1: Pop
+	2: Ret
+}
+public add_when_missing(key: address, val: u64) /* def_idx: 2 */ {
+L2:	my_map: &mut MyMap
+L3:	wrap: ValueWrap
+B0:
+	0: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 21])
+	1: MutBorrowGlobal[0](MyMap)
+	2: StLoc[2](my_map: &mut MyMap)
+	3: CopyLoc[2](my_map: &mut MyMap)
+	4: ImmBorrowField[0](MyMap.table: Table<address, ValueWrap>)
+	5: CopyLoc[0](key: address)
+	6: Call contains<address, ValueWrap>(&Table<address, ValueWrap>, address): bool
+	7: BrTrue(17)
+B1:
+	8: MoveLoc[1](val: u64)
+	9: Pack[2](ValueWrap)
+	10: StLoc[3](wrap: ValueWrap)
+	11: MoveLoc[2](my_map: &mut MyMap)
+	12: MutBorrowField[0](MyMap.table: Table<address, ValueWrap>)
+	13: MoveLoc[0](key: address)
+	14: MoveLoc[3](wrap: ValueWrap)
+	15: Call add<address, ValueWrap>(&mut Table<address, ValueWrap>, address, ValueWrap)
+B2:
+	16: Ret
+B3:
+	17: MoveLoc[2](my_map: &mut MyMap)
+	18: Pop
+	19: Branch(16)
+}
+}
+============ bytecode verification succeeded ========

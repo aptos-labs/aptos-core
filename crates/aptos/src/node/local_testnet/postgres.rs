@@ -57,6 +57,11 @@ pub struct PostgresArgs {
     #[clap(long, requires = "with_indexer_api")]
     pub use_host_postgres: bool,
 
+    /// If --use-host-postgres is set, you can use this to change the host we try to
+    /// connect to.
+    #[clap(long, default_value = "127.0.0.1")]
+    pub host_postgres_host: String,
+
     /// When --use-host-postgres is set, this is the port to connect to.
     #[clap(long, default_value_t = 5432)]
     pub host_postgres_port: u16,
@@ -98,7 +103,7 @@ impl PostgresArgs {
             None => &self.postgres_database,
         };
         let host = match self.use_host_postgres {
-            true => "127.0.0.1",
+            true => &self.host_postgres_host,
             false => match external {
                 true => "127.0.0.1",
                 false => POSTGRES_CONTAINER_NAME,

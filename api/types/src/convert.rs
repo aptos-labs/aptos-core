@@ -4,9 +4,10 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
-        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
+        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
+        WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -204,8 +205,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
             },
-            BlockMetadata(txn) => (&txn, info, events).into(),
-            BlockMetadataExt(txn) => (&txn, info, events).into(),
+            BlockMetadata(txn) => Transaction::BlockMetadataTransaction(
+                BlockMetadataTransaction::from_internal(txn, info, events),
+            ),
+            BlockMetadataExt(txn) => Transaction::BlockMetadataTransaction(
+                BlockMetadataTransaction::from_internal_ext(txn, info, events),
+            ),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
@@ -292,7 +297,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 };
                 TransactionPayload::ScriptPayload(ScriptPayload {
                     code: MoveScriptBytecode::new(code).try_parse_abi(),
-                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
                     arguments: json_args,
                 })
             },
@@ -319,7 +324,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         module: module.into(),
                         name: function.into(),
                     },
-                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
                 })
             },
             Multisig(multisig) => {
@@ -350,10 +355,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                         module: module.into(),
                                         name: function.into(),
                                     },
-                                    type_arguments: ty_args
-                                        .into_iter()
-                                        .map(|arg| arg.into())
-                                        .collect(),
+                                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
                                 },
                             ))
                         },
@@ -593,13 +595,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         txn: UserTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
-        let signature = txn
+        let auth = txn
             .signature
-            .clone()
-            .ok_or_else(|| format_err!("missing signature"))?;
+            .as_ref()
+            .ok_or_else(|| format_err!("missing signature"))?
+            .try_into();
         Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction(txn, chain_id)?,
-            signature.try_into()?,
+            auth?,
         ))
     }
 
@@ -608,12 +611,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
+        let SubmitTransactionRequest {
+            user_transaction_request,
+            signature,
+        } = submit_transaction_request;
+
         Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction_poem(
-                submit_transaction_request.user_transaction_request,
+                user_transaction_request,
                 chain_id,
             )?,
-            submit_transaction_request.signature.try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
+            (&signature).try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
         ))
     }
 
@@ -681,9 +689,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     arguments,
                 } = entry_func_payload;
 
-                let module = function.module.clone();
-                let code =
-                    self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
+                let module_id: ModuleId = function.module.clone().into();
+                let code = self.inner.view_existing_module(&module_id)? as Arc<dyn Bytecode>;
                 let func = code
                     .find_entry_function(function.name.0.as_ident_str())
                     .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
@@ -695,16 +702,16 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     type_arguments.len()
                 );
                 let args = self
-                    .try_into_vm_values(func, arguments)?
+                    .try_into_vm_values(&func, arguments.as_slice())?
                     .iter()
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
 
                 Target::EntryFunction(EntryFunction::new(
-                    module.into(),
-                    function.name.into(),
+                    module_id,
+                    function.name.clone().into(),
                     type_arguments
-                        .into_iter()
+                        .iter()
                         .map(|v| v.try_into())
                         .collect::<Result<_>>()?,
                     args,
@@ -717,14 +724,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     arguments,
                 } = script;
 
-                let MoveScriptBytecode { bytecode, abi } = code.try_parse_abi();
+                let MoveScriptBytecode { bytecode, abi } = code.clone().try_parse_abi();
                 match abi {
                     Some(func) => {
-                        let args = self.try_into_vm_values(func, arguments)?;
+                        let args = self.try_into_vm_values(&func, arguments.as_slice())?;
                         Target::Script(Script::new(
                             bytecode.into(),
                             type_arguments
-                                .into_iter()
+                                .iter()
                                 .map(|v| v.try_into())
                                 .collect::<Result<_>>()?,
                             args.into_iter()
@@ -736,7 +743,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 }
             },
             TransactionPayload::MultisigPayload(multisig) => {
-                let transaction_payload = if let Some(payload) = multisig.transaction_payload {
+                let transaction_payload = if let Some(ref payload) = multisig.transaction_payload {
                     match payload {
                         MultisigTransactionPayload::EntryFunctionPayload(entry_function) => {
                             let EntryFunctionPayload {
@@ -762,7 +769,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             );
 
                             let args = self
-                                .try_into_vm_values(func, arguments)?
+                                .try_into_vm_values(&func, arguments)?
                                 .iter()
                                 .map(bcs::to_bytes)
                                 .collect::<Result<_, bcs::Error>>()?;
@@ -770,9 +777,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
                                     EntryFunction::new(
                                         module.into(),
-                                        function.name.into(),
+                                        (&function.name).into(),
                                         type_arguments
-                                            .into_iter()
+                                            .iter()
                                             .map(|v| v.try_into())
                                             .collect::<Result<_>>()?,
                                         args,
@@ -800,12 +807,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     pub fn try_into_vm_values(
         &self,
-        func: MoveFunction,
-        args: Vec<serde_json::Value>,
+        func: &MoveFunction,
+        args: &[serde_json::Value],
     ) -> Result<Vec<move_core_types::value::MoveValue>> {
         let arg_types = func
             .params
-            .into_iter()
+            .iter()
             .filter(|p| !p.is_signer())
             .collect::<Vec<_>>();
         ensure!(
@@ -813,7 +820,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             "expected {} arguments [{}], but got {} ({:?})",
             arg_types.len(),
             arg_types
-                .into_iter()
+                .iter()
                 .map(|t| t.json_type_name())
                 .collect::<Vec<String>>()
                 .join(", "),
@@ -825,7 +832,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             .zip(args)
             .enumerate()
             .map(|(i, (arg_type, arg))| {
-                self.try_into_vm_value(&arg_type.clone().try_into()?, arg)
+                self.try_into_vm_value(&arg_type.try_into()?, arg.clone())
                     .map_err(|e| {
                         format_err!(
                             "parse arguments[{}] failed, expect {}, caused by error: {}",
@@ -887,6 +894,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
+            },
+            MoveTypeLayout::Function(..) => {
+                // TODO(#15664): do we actually need this? It appears the code here is dead and
+                //   nowhere used
+                bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
 
             // Some values, e.g., signer or ones with custom serialization
@@ -965,8 +977,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     }
 
     pub fn function_return_types(&self, function: &ViewFunction) -> Result<Vec<MoveType>> {
-        let module = function.module.clone();
-        let code = self.inner.view_existing_module(&module)? as Arc<dyn Bytecode>;
+        let code = self.inner.view_existing_module(&function.module)? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.function.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {:?}", function))?;
@@ -994,7 +1005,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             type_arguments.len()
         );
         let args = self
-            .try_into_vm_values(func, arguments)?
+            .try_into_vm_values(&func, &arguments)?
             .iter()
             .map(bcs::to_bytes)
             .collect::<Result<_, bcs::Error>>()?;
@@ -1003,7 +1014,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             module: module.into(),
             function: function.name.into(),
             ty_args: type_arguments
-                .into_iter()
+                .iter()
                 .map(|v| v.try_into())
                 .collect::<Result<_>>()?,
             args,
@@ -1012,14 +1023,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         if let Some(indexer_reader) = self.indexer_reader.as_ref() {
-            // Attempt to get table_info from the indexer_reader if it exists
-            Ok(indexer_reader.get_table_info(handle)?)
-        } else if self.db.indexer_enabled() {
-            // Attempt to get table_info from the db if indexer is enabled
-            Ok(Some(self.db.get_table_info(handle)?))
-        } else {
-            Ok(None)
+            return Ok(indexer_reader.get_table_info(handle).unwrap_or(None));
         }
+        Ok(None)
     }
 
     fn explain_vm_status(
@@ -1027,7 +1033,13 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         status: &ExecutionStatus,
         txn_aux_data: Option<TransactionAuxiliaryData>,
     ) -> String {
-        match status {
+        let mut status = status.to_owned();
+        status = if let Some(aux_data) = txn_aux_data {
+            ExecutionStatus::aug_with_aux_data(status, &aux_data)
+        } else {
+            status
+        };
+        match &status {
             ExecutionStatus::MoveAbort {
                 location,
                 code,
@@ -1079,17 +1091,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 )
             },
             ExecutionStatus::MiscellaneousError(code) => {
-                if txn_aux_data.is_none() && code.is_none() {
+                if code.is_none() {
                     "Execution failed with miscellaneous error and no status code".to_owned()
-                } else if code.is_some() {
-                    format!("{:#?}", code.unwrap())
                 } else {
-                    let aux_data = txn_aux_data.unwrap();
-                    let vm_details = aux_data.get_detail_error_message();
-                    vm_details.map_or(
-                        "Execution failed with miscellaneous error and no status code".to_owned(),
-                        |e| format!("{:#?}", e.status_code()),
-                    )
+                    format!("{:#?}", code.unwrap())
                 }
             },
         }

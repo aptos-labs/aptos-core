@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{KnownAttribute, RandomnessAnnotation, RuntimeModuleMetadataV1};
-use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
+use move_binary_format::file_format::Visibility;
 use move_cli::base::test_validation;
 use move_compiler::shared::known_attributes;
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     errmap::{ErrorDescription, ErrorMapping},
     identifier::Identifier,
@@ -40,6 +41,7 @@ const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
 const EVENT_STRUCT_ATTRIBUTE: &str = "event";
+const MUTATION_SKIP_ATTRIBUTE: &str = "mutation::skip";
 const RANDOMNESS_ATTRIBUTE: &str = "randomness";
 const RANDOMNESS_MAX_GAS_CLAIM: &str = "max_gas";
 const RESOURCE_GROUP: &str = "resource_group";
@@ -52,10 +54,11 @@ const RANDOMNESS_MODULE_NAME: &str = "randomness";
 
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 8] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 9] = [
         ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE,
         FMT_SKIP_ATTRIBUTE,
         LEGACY_ENTRY_FUN_ATTRIBUTE,
+        MUTATION_SKIP_ATTRIBUTE,
         RESOURCE_GROUP,
         RESOURCE_GROUP_MEMBER,
         VIEW_FUN_ATTRIBUTE,
@@ -190,7 +193,8 @@ impl<'a> ExtendedChecker<'a> {
                 continue;
             }
 
-            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameters());
+            self.check_transaction_args(&fun.get_parameters());
+            self.check_signer_args(&fun.get_parameters());
             if fun.get_return_count() > 0 {
                 self.env
                     .error(&fun.get_id_loc(), "entry function cannot return values")
@@ -198,12 +202,34 @@ impl<'a> ExtendedChecker<'a> {
         }
     }
 
-    fn check_transaction_args(&self, _loc: &Loc, arg_tys: &[Parameter]) {
+    fn check_transaction_args(&self, arg_tys: &[Parameter]) {
         for Parameter(_sym, ty, param_loc) in arg_tys {
             self.check_transaction_input_type(param_loc, ty)
         }
     }
 
+    fn check_signer_args(&self, arg_tys: &[Parameter]) {
+        // All signer args should precede non-signer args, for an entry function to be
+        // used as an entry function.
+        let mut seen_non_signer = false;
+        for Parameter(_, ty, loc) in arg_tys {
+            // We assume `&mut signer` are disallowed by checks elsewhere, so it is okay
+            // for `skip_reference()` below to skip both kinds of reference.
+            let ty_is_signer = ty.skip_reference().is_signer();
+            if seen_non_signer && ty_is_signer {
+                self.env.warning(
+                    loc,
+                    "to be used as an entry function, all signers should precede non-signers",
+                );
+            }
+            if !ty_is_signer {
+                seen_non_signer = true;
+            }
+        }
+    }
+
+    /// Note: this should be kept up in sync with `is_valid_txn_arg` in
+    /// aptos-move/aptos-vm/src/verifier/transaction_arg_validation.rs
     fn check_transaction_input_type(&self, loc: &Loc, ty: &Type) {
         use Type::*;
         match ty {
@@ -213,7 +239,7 @@ impl<'a> ExtendedChecker<'a> {
             Reference(ReferenceKind::Immutable, bt)
                 if matches!(bt.as_ref(), Primitive(PrimitiveType::Signer)) =>
             {
-                // Reference to signer allowed
+                // Immutable reference to signer allowed
             },
             Vector(ety) => {
                 // Vectors are allowed if element type is allowed
@@ -656,7 +682,7 @@ impl<'a> ExtendedChecker<'a> {
             if !self.has_attribute(fun, VIEW_FUN_ATTRIBUTE) {
                 continue;
             }
-            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameters());
+            self.check_transaction_args(&fun.get_parameters());
             if fun.get_return_count() == 0 {
                 self.env
                     .error(&fun.get_id_loc(), "`#[view]` function must return values")

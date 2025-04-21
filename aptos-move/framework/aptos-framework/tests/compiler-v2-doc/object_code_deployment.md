@@ -39,7 +39,10 @@ Once modules are marked as immutable, they cannot be made mutable again.
 -  [Struct `Publish`](#0x1_object_code_deployment_Publish)
 -  [Struct `Upgrade`](#0x1_object_code_deployment_Upgrade)
 -  [Struct `Freeze`](#0x1_object_code_deployment_Freeze)
+-  [Struct `ObjectCodePermission`](#0x1_object_code_deployment_ObjectCodePermission)
 -  [Constants](#@Constants_0)
+-  [Function `check_signer_permission`](#0x1_object_code_deployment_check_signer_permission)
+-  [Function `grant_permission`](#0x1_object_code_deployment_grant_permission)
 -  [Function `publish`](#0x1_object_code_deployment_publish)
 -  [Function `object_seed`](#0x1_object_code_deployment_object_seed)
 -  [Function `upgrade`](#0x1_object_code_deployment_upgrade)
@@ -53,6 +56,7 @@ Once modules are marked as immutable, they cannot be made mutable again.
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
@@ -175,6 +179,33 @@ Event emitted when code in an existing object is made immutable.
 
 </details>
 
+<a id="0x1_object_code_deployment_ObjectCodePermission"></a>
+
+## Struct `ObjectCodePermission`
+
+
+
+<pre><code><b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ObjectCodePermission">ObjectCodePermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -186,6 +217,16 @@ Event emitted when code in an existing object is made immutable.
 
 
 <pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_object_code_deployment_ENO_CODE_PERMISSION"></a>
+
+Current permissioned signer cannot deploy object code.
+
+
+<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ENO_CODE_PERMISSION">ENO_CODE_PERMISSION</a>: u64 = 4;
 </code></pre>
 
 
@@ -219,6 +260,59 @@ Object code deployment feature not supported.
 
 
 
+<a id="0x1_object_code_deployment_check_signer_permission"></a>
+
+## Function `check_signer_permission`
+
+Permissions
+
+
+<pre><code><b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_check_signer_permission">check_signer_permission</a>(s: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_check_signer_permission">check_signer_permission</a>(s: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(s, <a href="object_code_deployment.md#0x1_object_code_deployment_ObjectCodePermission">ObjectCodePermission</a> {}),
+        <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENO_CODE_PERMISSION">ENO_CODE_PERMISSION</a>),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_code_deployment_grant_permission"></a>
+
+## Function `grant_permission`
+
+Grant permission to publish code on behalf of the master signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_grant_permission">grant_permission</a>(master: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_grant_permission">grant_permission</a>(master: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(master, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>, <a href="object_code_deployment.md#0x1_object_code_deployment_ObjectCodePermission">ObjectCodePermission</a> {})
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_code_deployment_publish"></a>
 
 ## Function `publish`
@@ -243,6 +337,7 @@ the code to be published via <code><a href="code.md#0x1_code">code</a></code>. T
     metadata_serialized: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="code.md#0x1_code">code</a>: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ) {
+    <a href="object_code_deployment.md#0x1_object_code_deployment_check_signer_permission">check_signer_permission</a>(publisher);
     <b>assert</b>!(
         <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_is_object_code_deployment_enabled">features::is_object_code_deployment_enabled</a>(),
         <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED">EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED</a>),
@@ -319,6 +414,7 @@ Requires the publisher to be the owner of the <code>code_object</code>.
     <a href="code.md#0x1_code">code</a>: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     code_object: Object&lt;PackageRegistry&gt;,
 ) <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a> {
+    <a href="object_code_deployment.md#0x1_object_code_deployment_check_signer_permission">check_signer_permission</a>(publisher);
     <b>let</b> publisher_address = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher);
     <b>assert</b>!(
         <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, publisher_address),

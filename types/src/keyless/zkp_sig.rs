@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Copy, Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
 )]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum ZKP {
     Groth16(Groth16Proof),
 }

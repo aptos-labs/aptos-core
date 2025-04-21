@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: cannot assign to borrowed local `_y`
+   ┌─ tests/reference-safety/write_ref_dest_err.move:18:19
+   │
+17 │         let z = &_y;
+   │                 --- previous local borrow
+18 │         (_y, _) = foo(&_y);
+   │                   ^^^^^^^^ attempted to assign here
+19 │         *z;
+   │         -- conflicting reference `z` used here
+
+error: cannot assign to borrowed local `_y`
+   ┌─ tests/reference-safety/write_ref_dest_err.move:25:9
+   │
+24 │         let z = &_y;
+   │                 --- previous local borrow
+25 │         _y = vector[2];
+   │         ^^^^^^^^^^^^^^ attempted to assign here
+26 │         *z;
+   │         -- conflicting reference `z` used here

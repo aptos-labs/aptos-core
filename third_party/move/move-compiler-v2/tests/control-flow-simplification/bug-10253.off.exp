@@ -1,0 +1,195 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module cafe.vectors {
+
+
+entry public guess_flips(flips: vector<u8>) /* def_idx: 0 */ {
+L1:	$t2: &vector<u8>
+L2:	i: u64
+B0:
+	0: ImmBorrowLoc[0](flips: vector<u8>)
+	1: StLoc[1]($t2: &vector<u8>)
+	2: LdU64(0)
+	3: StLoc[2](i: u64)
+B1:
+	4: CopyLoc[2](i: u64)
+	5: CopyLoc[1]($t2: &vector<u8>)
+	6: VecLen(2)
+	7: Lt
+	8: BrFalse(24)
+B2:
+	9: CopyLoc[1]($t2: &vector<u8>)
+	10: CopyLoc[2](i: u64)
+	11: VecImmBorrow(2)
+	12: ReadRef
+	13: LdU8(0)
+	14: Neq
+	15: BrFalse(19)
+B3:
+	16: MoveLoc[1]($t2: &vector<u8>)
+	17: Pop
+	18: Branch(28)
+B4:
+	19: MoveLoc[2](i: u64)
+	20: LdU64(1)
+	21: Add
+	22: StLoc[2](i: u64)
+	23: Branch(27)
+B5:
+	24: MoveLoc[1]($t2: &vector<u8>)
+	25: Pop
+	26: Branch(28)
+B6:
+	27: Branch(4)
+B7:
+	28: Ret
+}
+entry public guess_flips_directly(flips: vector<u8>) /* def_idx: 1 */ {
+L1:	i: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[1](i: u64)
+B1:
+	2: CopyLoc[1](i: u64)
+	3: ImmBorrowLoc[0](flips: vector<u8>)
+	4: VecLen(2)
+	5: Lt
+	6: BrFalse(20)
+B2:
+	7: ImmBorrowLoc[0](flips: vector<u8>)
+	8: CopyLoc[1](i: u64)
+	9: VecImmBorrow(2)
+	10: ReadRef
+	11: LdU8(0)
+	12: Neq
+	13: BrFalse(15)
+B3:
+	14: Branch(22)
+B4:
+	15: MoveLoc[1](i: u64)
+	16: LdU64(1)
+	17: Add
+	18: StLoc[1](i: u64)
+	19: Branch(21)
+B5:
+	20: Branch(22)
+B6:
+	21: Branch(2)
+B7:
+	22: Ret
+}
+entry public guess_with_break_without_inline(flips: vector<u8>) /* def_idx: 2 */ {
+B0:
+	0: ImmBorrowLoc[0](flips: vector<u8>)
+	1: Call loops_with_break_no_inline(&vector<u8>)
+	2: Ret
+}
+entry public guess_without_break_with_inline(flips: vector<u8>) /* def_idx: 3 */ {
+L1:	$t2: &vector<u8>
+L2:	i: u64
+B0:
+	0: ImmBorrowLoc[0](flips: vector<u8>)
+	1: StLoc[1]($t2: &vector<u8>)
+	2: LdU64(0)
+	3: StLoc[2](i: u64)
+B1:
+	4: CopyLoc[2](i: u64)
+	5: CopyLoc[1]($t2: &vector<u8>)
+	6: VecLen(2)
+	7: Lt
+	8: BrFalse(26)
+B2:
+	9: CopyLoc[1]($t2: &vector<u8>)
+	10: CopyLoc[2](i: u64)
+	11: VecImmBorrow(2)
+	12: ReadRef
+	13: LdU8(0)
+	14: Eq
+	15: BrFalse(17)
+B3:
+	16: Branch(21)
+B4:
+	17: MoveLoc[1]($t2: &vector<u8>)
+	18: Pop
+	19: LdU64(3)
+	20: Abort
+B5:
+	21: MoveLoc[2](i: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](i: u64)
+	25: Branch(29)
+B6:
+	26: MoveLoc[1]($t2: &vector<u8>)
+	27: Pop
+	28: Branch(30)
+B7:
+	29: Branch(4)
+B8:
+	30: Ret
+}
+loops_with_break_no_inline(flips: &vector<u8>) /* def_idx: 4 */ {
+L1:	i: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[1](i: u64)
+B1:
+	2: CopyLoc[1](i: u64)
+	3: CopyLoc[0](flips: &vector<u8>)
+	4: VecLen(2)
+	5: Lt
+	6: BrFalse(22)
+B2:
+	7: CopyLoc[0](flips: &vector<u8>)
+	8: CopyLoc[1](i: u64)
+	9: VecImmBorrow(2)
+	10: ReadRef
+	11: LdU8(0)
+	12: Neq
+	13: BrFalse(17)
+B3:
+	14: MoveLoc[0](flips: &vector<u8>)
+	15: Pop
+	16: Branch(26)
+B4:
+	17: MoveLoc[1](i: u64)
+	18: LdU64(1)
+	19: Add
+	20: StLoc[1](i: u64)
+	21: Branch(25)
+B5:
+	22: MoveLoc[0](flips: &vector<u8>)
+	23: Pop
+	24: Branch(26)
+B6:
+	25: Branch(2)
+B7:
+	26: Ret
+}
+test_guess_directly() /* def_idx: 5 */ {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips_directly(vector<u8>)
+	2: Ret
+}
+test_guess_with_break_no_inline() /* def_idx: 6 */ {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_with_break_without_inline(vector<u8>)
+	2: Ret
+}
+test_guess_with_inline_break() /* def_idx: 7 */ {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_flips(vector<u8>)
+	2: Ret
+}
+test_guess_without_break() /* def_idx: 8 */ {
+B0:
+	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
+	1: Call guess_without_break_with_inline(vector<u8>)
+	2: Ret
+}
+}
+============ bytecode verification succeeded ========

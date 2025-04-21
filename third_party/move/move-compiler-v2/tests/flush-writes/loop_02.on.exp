@@ -1,0 +1,86 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::inc($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 1
+     # live vars: $t0, $t3
+  2: $t0 := +($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64
+     # flush: $t0
+     # live vars:
+  0: $t0 := 0
+     # live vars: $t0
+  1: label L0
+     # live vars: $t0
+  2: $t1 := m::inc($t0)
+     # flush: $t0
+     # live vars: $t1
+  3: $t0 := move($t1)
+     # live vars: $t0
+  4: $t1 := copy($t0)
+     # live vars: $t0, $t1
+  5: $t4 := 10
+     # live vars: $t0, $t1, $t4
+  6: $t2 := >($t1, $t4)
+     # live vars: $t0, $t2
+  7: if ($t2) goto 10 else goto 8
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: goto 1
+     # live vars: $t0
+ 10: label L2
+     # live vars:
+ 11: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+inc(x: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: LdU64(1)
+	2: Add
+	3: Ret
+}
+public test() /* def_idx: 1 */ {
+L0:	x: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[0](x: u64)
+B1:
+	2: MoveLoc[0](x: u64)
+	3: Call inc(u64): u64
+	4: StLoc[0](x: u64)
+	5: CopyLoc[0](x: u64)
+	6: LdU64(10)
+	7: Gt
+	8: BrTrue(10)
+B2:
+	9: Branch(2)
+B3:
+	10: Ret
+}
+}
+============ bytecode verification succeeded ========

@@ -9,7 +9,6 @@ use crate::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -19,11 +18,37 @@ pub enum SignatureVerifiedTransaction {
     Invalid(Transaction),
 }
 
+impl PartialEq for SignatureVerifiedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                SignatureVerifiedTransaction::Invalid(a),
+                SignatureVerifiedTransaction::Invalid(b),
+            ) => a.eq(b),
+            (SignatureVerifiedTransaction::Valid(a), SignatureVerifiedTransaction::Valid(b)) => {
+                a.eq(b)
+            },
+            _ => {
+                panic!("Unexpected equality check on {:?} and {:?}", self, other)
+            },
+        }
+    }
+}
+
+impl Eq for SignatureVerifiedTransaction {}
+
 impl SignatureVerifiedTransaction {
     pub fn into_inner(self) -> Transaction {
         match self {
             SignatureVerifiedTransaction::Valid(txn) => txn,
             SignatureVerifiedTransaction::Invalid(txn) => txn,
+        }
+    }
+
+    pub fn borrow_into_inner(&self) -> &Transaction {
+        match self {
+            SignatureVerifiedTransaction::Valid(ref txn) => txn,
+            SignatureVerifiedTransaction::Invalid(ref txn) => txn,
         }
     }
 
@@ -61,7 +86,6 @@ impl SignatureVerifiedTransaction {
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Event = ContractEvent;
-    type Identifier = DelayedFieldID;
     type Key = StateKey;
     type Tag = StructTag;
     type Value = WriteOp;

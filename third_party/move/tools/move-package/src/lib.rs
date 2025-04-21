@@ -17,11 +17,12 @@ use crate::{
     resolution::resolution_graph::{ResolutionGraph, ResolvedGraph},
     source_package::manifest_parser,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::*;
 use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
+use move_compiler_v2::external_checks::ExternalChecks;
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -31,69 +32,10 @@ use serde::{Deserialize, Serialize};
 use source_package::{layout::SourcePackageLayout, std_lib::StdVersion};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum Architecture {
-    Move,
-
-    AsyncMove,
-
-    Ethereum,
-}
-
-impl fmt::Display for Architecture {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Move => write!(f, "move"),
-
-            Self::AsyncMove => write!(f, "async-move"),
-
-            Self::Ethereum => write!(f, "ethereum"),
-        }
-    }
-}
-
-impl Architecture {
-    fn all() -> impl Iterator<Item = Self> {
-        IntoIterator::into_iter([
-            Self::Move,
-            Self::AsyncMove,
-            #[cfg(feature = "evm-backend")]
-            Self::Ethereum,
-        ])
-    }
-
-    fn try_parse_from_str(s: &str) -> Result<Self> {
-        Ok(match s {
-            "move" => Self::Move,
-
-            "async-move" => Self::AsyncMove,
-
-            "ethereum" => Self::Ethereum,
-
-            _ => {
-                let supported_architectures = Self::all()
-                    .map(|arch| format!("\"{}\"", arch))
-                    .collect::<Vec<_>>();
-                let be = if supported_architectures.len() == 1 {
-                    "is"
-                } else {
-                    "are"
-                };
-                bail!(
-                    "Unrecognized architecture {} -- only {} {} supported",
-                    s,
-                    supported_architectures.join(", "),
-                    be
-                )
-            },
-        })
-    }
-}
 
 #[derive(Debug, Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default)]
 #[clap(author, version, about)]
@@ -141,9 +83,6 @@ pub struct BuildConfig {
     #[clap(skip)]
     pub additional_named_addresses: BTreeMap<String, AccountAddress>,
 
-    #[clap(long = "arch", global = true, value_parser = Architecture::try_parse_from_str)]
-    pub architecture: Option<Architecture>,
-
     /// Only fetch dependency repos to MOVE_HOME
     #[clap(long = "fetch-deps-only", global = true)]
     pub fetch_deps_only: bool,
@@ -159,7 +98,7 @@ pub struct BuildConfig {
 #[derive(Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default, Debug)]
 pub struct CompilerConfig {
     /// Bytecode version to compile move code
-    #[clap(long = "bytecode-version", global = true)]
+    #[clap(long, global = true)]
     pub bytecode_version: Option<u32>,
 
     // Known attribute names.  Depends on compilation context (Move variant)
@@ -171,17 +110,15 @@ pub struct CompilerConfig {
     pub skip_attribute_checks: bool,
 
     /// Compiler version to use
-    #[clap(long = "compiler-version", global = true,
-           value_parser = clap::value_parser!(CompilerVersion))]
+    #[clap(long, global = true, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Language version to support
-    #[clap(long = "language-version", global = true,
-           value_parser = clap::value_parser!(LanguageVersion))]
+    #[clap(long, global = true, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
     /// Experiments for v2 compiler to set to true
-    #[clap(long = "experiments", global = true)]
+    #[clap(long, global = true)]
     pub experiments: Vec<String>,
 }
 
@@ -212,26 +149,17 @@ impl BuildConfig {
 
     /// Compile the package at `path` or the containing Move package. Do not exit process on warning
     /// or failure.
+    /// External checks on Move code can be provided, these are only run if compiler v2 is used.
     pub fn compile_package_no_exit<W: Write>(
         self,
-        path: &Path,
+        resolved_graph: ResolvedGraph,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
         writer: &mut W,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let config = self.compiler_config.clone(); // Need clone because of mut self
-        let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile_no_exit(&config, writer);
-        mutx.unlock();
-        ret
-    }
-
-    #[cfg(feature = "evm-backend")]
-    pub fn compile_package_evm<W: Write>(self, path: &Path, writer: &mut W) -> Result<()> {
-        // resolution graph diagnostics are only needed for CLI commands so ignore them by passing a
-        // vector as the writer
-        let resolved_graph = self.resolution_graph_for_package(path, &mut Vec::new())?;
-        let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile_evm(writer);
+        let ret =
+            BuildPlan::create(resolved_graph)?.compile_no_exit(&config, external_checks, writer);
         mutx.unlock();
         ret
     }

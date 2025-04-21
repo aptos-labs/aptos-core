@@ -250,6 +250,9 @@ def setup_fullnode_config(bootstrapping_mode, continuous_syncing_mode, data_dir_
   data_streaming_service_config = {"max_concurrent_requests": 10, "max_concurrent_state_requests": 12}
   fullnode_config['state_sync'] = {"state_sync_driver": state_sync_driver_config, "data_streaming_service":data_streaming_service_config}
 
+  # Avoid having to set ulimit configurations
+  fullnode_config['storage'] = {"ensure_rlimit_nofile": 0}
+
   # Write the config file back to disk
   with open(FULLNODE_CONFIG_NAME, "w") as file:
     yaml.dump(fullnode_config, file)

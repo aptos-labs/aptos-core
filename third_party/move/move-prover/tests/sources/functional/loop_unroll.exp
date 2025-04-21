@@ -3,7 +3,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/loop_unroll.move:101:5
     │
  97 │               assert!(i != 5, 0);
-    │               ------------------ abort happened here with code 0x0
+    │               ------ abort happened here with code 0x0
     ·
 101 │ ╭     spec t6_failure {
 102 │ │         // this will not hold when we increase the unroll count
@@ -54,7 +54,7 @@ error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/loop_unroll.move:128:5
     │
 124 │               assert!(i != 5, 0);
-    │               ------------------ abort happened here with code 0x0
+    │               ------ abort happened here with code 0x0
     ·
 128 │ ╭     spec t7_failure {
 129 │ │         pragma unroll = 6;

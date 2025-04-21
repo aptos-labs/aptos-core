@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot freeze local `s` since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:13:9
+   │
+13 │         freeze(s);
+   │         ^^^^^^^^^ frozen here
+14 │         *f;
+   │         -- used here
+
+error: cannot freeze local `s` since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:20:9
+   │
+20 │         freeze(s);
+   │         ^^^^^^^^^ frozen here
+21 │         *f;
+   │         -- used here
+
+error: cannot freeze local `s` since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:27:9
+   │
+27 │         freeze(s);
+   │         ^^^^^^^^^ frozen here
+28 │         *x;
+   │         -- used here

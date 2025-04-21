@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_native_with_body.move:3:21
+  │
+3 │     native fun fn() {}
+  │                     ^
+  │                     │
+  │                     Unexpected '{'
+  │                     Expected ';'

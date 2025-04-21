@@ -90,6 +90,10 @@ resource "google_container_cluster" "aptos" {
     ]
   }
 
+  vertical_pod_autoscaling {
+    enabled = var.enable_vertical_pod_autoscaling
+  }
+
   dynamic "cluster_autoscaling" {
     for_each = var.gke_enable_node_autoprovisioning ? [1] : []
     content {

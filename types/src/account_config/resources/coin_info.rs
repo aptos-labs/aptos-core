@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::aggregator::{AggregatorV1Resource, OptionalAggregatorV1Resource};
 use crate::{
-    state_store::{state_key::StateKey, table::TableHandle},
-    utility_coin::APTOS_COIN_TYPE,
+    state_store::state_key::StateKey,
     write_set::{WriteOp, WriteSet, WriteSetMut},
+    CoinType,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -14,62 +15,30 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{Deserialize, Serialize};
-use std::string::FromUtf8Error;
+use std::{marker::PhantomData, string::FromUtf8Error, u128};
 
-/// Rust representation of Aggregator Move struct.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Aggregator {
-    handle: AccountAddress,
-    key: AccountAddress,
-    limit: u128,
-}
-
-impl Aggregator {
-    pub fn new(handle: AccountAddress, key: AccountAddress, limit: u128) -> Self {
-        Self { handle, key, limit }
-    }
-
-    /// Helper function to return the state key where the actual value is stored.
-    pub fn state_key(&self) -> StateKey {
-        StateKey::table_item(&TableHandle(self.handle), self.key.as_ref())
-    }
-}
-
-/// Rust representation of Integer Move struct.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Integer {
-    pub value: u128,
-    limit: u128,
-}
-
-/// Rust representation of OptionalAggregator Move struct.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OptionalAggregator {
-    pub aggregator: Option<Aggregator>,
-    pub integer: Option<Integer>,
-}
-
-/// Rust representation of CoinInfo Move resource.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CoinInfoResource {
+pub struct CoinInfoResource<C: CoinType> {
     name: Vec<u8>,
     symbol: Vec<u8>,
     decimals: u8,
-    supply: Option<OptionalAggregator>,
+    supply: Option<OptionalAggregatorV1Resource>,
+    #[serde(skip)]
+    phantom_data: PhantomData<C>,
 }
 
-impl MoveStructType for CoinInfoResource {
+impl<C: CoinType> MoveStructType for CoinInfoResource<C> {
     const MODULE_NAME: &'static IdentStr = ident_str!("coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CoinInfo");
 
     fn type_args() -> Vec<TypeTag> {
-        vec![APTOS_COIN_TYPE.clone()]
+        vec![C::type_tag()]
     }
 }
 
-impl MoveResource for CoinInfoResource {}
+impl<C: CoinType> MoveResource for CoinInfoResource<C> {}
 
-impl CoinInfoResource {
+impl<C: CoinType> CoinInfoResource<C> {
     pub fn symbol(&self) -> Result<String, FromUtf8Error> {
         String::from_utf8(self.symbol.clone())
     }
@@ -78,7 +47,7 @@ impl CoinInfoResource {
         self.decimals
     }
 
-    pub fn supply(&self) -> &Option<OptionalAggregator> {
+    pub fn supply(&self) -> &Option<OptionalAggregatorV1Resource> {
         &self.supply
     }
 
@@ -88,14 +57,14 @@ impl CoinInfoResource {
     pub fn random(limit: u128) -> Self {
         let handle = AccountAddress::random();
         let key = AccountAddress::random();
-        CoinInfoResource::new(handle, key, limit)
+        Self::new(handle, key, limit)
     }
 
     /// Returns a new CoinInfo instance. This function is useful if we want to
     /// add CoinInfo to the fake data store.
     pub fn new(handle: AccountAddress, key: AccountAddress, limit: u128) -> Self {
-        let aggregator = OptionalAggregator {
-            aggregator: Some(Aggregator::new(handle, key, limit)),
+        let aggregator = OptionalAggregatorV1Resource {
+            aggregator: Some(AggregatorV1Resource::new(handle, key, limit)),
             integer: None,
         };
         Self {
@@ -103,25 +72,28 @@ impl CoinInfoResource {
             symbol: "APT".to_string().into_bytes(),
             decimals: 8,
             supply: Some(aggregator),
+            phantom_data: PhantomData,
         }
     }
 
-    /// Returns a writeset corresponding to the creation of CoinInfo in Move.
-    /// This can be passed to data store for testing total supply.
-    pub fn to_writeset(&self, supply: u128) -> anyhow::Result<WriteSet> {
-        let value_state_key = self
-            .supply
+    pub fn supply_aggregator_state_key(&self) -> StateKey {
+        self.supply
             .as_ref()
             .unwrap()
             .aggregator
             .as_ref()
             .unwrap()
-            .state_key();
+            .state_key()
+    }
 
+    /// Returns a writeset corresponding to the creation of CoinInfo in Move.
+    /// This can be passed to data store for testing total supply.
+    pub fn to_writeset(&self, supply: u128) -> anyhow::Result<WriteSet> {
+        let value_state_key = self.supply_aggregator_state_key();
         // We store CoinInfo and aggregatable value separately.
         let write_set = vec![
             (
-                StateKey::resource_typed::<CoinInfoResource>(&AccountAddress::ONE)?,
+                StateKey::resource_typed::<Self>(&C::coin_info_address())?,
                 WriteOp::legacy_modification(bcs::to_bytes(&self).unwrap().into()),
             ),
             (

@@ -51,8 +51,16 @@ resource "helm_release" "validator" {
       }
       validator = {
         name = var.validator_name
+        config = {
+          storage = {
+            rocksdb_configs = {
+              enable_storage_sharding = var.enable_storage_sharding
+            }
+          }
+        }
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
+          size  = var.validator_storage_size
         }
         nodeSelector = var.validator_instance_enable_taint ? {
           "cloud.google.com/gke-nodepool" = "validators"
@@ -64,8 +72,16 @@ resource "helm_release" "validator" {
         }]
       }
       fullnode = {
+        config = {
+          storage = {
+            rocksdb_configs = {
+              enable_storage_sharding = var.enable_storage_sharding
+            }
+          }
+        }
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
+          size  = var.validator_storage_size
         }
         nodeSelector = var.validator_instance_enable_taint ? {
           "cloud.google.com/gke-nodepool" = "validators"

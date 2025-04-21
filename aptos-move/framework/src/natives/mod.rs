@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
+
+pub mod account_abstraction;
 pub mod aggregator_natives;
 pub mod code;
 pub mod consensus_config;
@@ -15,6 +17,7 @@ pub mod function_info;
 pub mod hash;
 pub mod object;
 pub mod object_code_deployment;
+pub mod permissioned_signer;
 pub mod randomness;
 pub mod state_storage;
 pub mod string_utils;
@@ -90,6 +93,14 @@ pub fn all_natives(
     add_natives_from_module!(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)
+    );
+    add_natives_from_module!(
+        "permissioned_signer",
+        permissioned_signer::make_all(builder)
+    );
+    add_natives_from_module!(
+        "account_abstraction",
+        account_abstraction::make_all(builder)
     );
 
     if inject_create_signer_for_gov_sim {

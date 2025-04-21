@@ -3,19 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    attr_derivation::add_attributes_for_flavor,
-    cfgir,
     command_line::{DEFAULT_OUTPUT_DIR, MOVE_COMPILED_INTERFACES_DIR},
     compiled_unit,
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::{codes::Severity, *},
-    expansion, hlir, inlining, interface_generator, naming, parser,
+    expansion, interface_generator, parser,
     parser::{comments::*, *},
     shared::{
         ast_debug, CompilationEnv, Flags, IndexedPackagePath, NamedAddressMap, NamedAddressMaps,
         NumericalAddress, PackagePaths,
     },
-    to_bytecode, typing, unit_test, verification,
+    unit_test, verification,
 };
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
@@ -57,23 +55,11 @@ pub type Pass = u8;
 pub const EMPTY_COMPILER: Pass = 0;
 pub const PASS_PARSER: Pass = 1;
 pub const PASS_EXPANSION: Pass = 2;
-pub const PASS_NAMING: Pass = 3;
-pub const PASS_TYPING: Pass = 4;
-pub const PASS_INLINING: Pass = 5;
-pub const PASS_HLIR: Pass = 6;
-pub const PASS_CFGIR: Pass = 7;
-pub const PASS_COMPILATION: Pass = 8;
 
 #[derive(Debug)]
 enum PassResult {
     Parser(parser::ast::Program),
     Expansion(expansion::ast::Program),
-    Naming(naming::ast::Program),
-    Typing(typing::ast::Program),
-    Inlining(typing::ast::Program),
-    HLIR(hlir::ast::Program),
-    CFGIR(cfgir::ast::Program),
-    Compilation(Vec<AnnotatedCompiledUnit>, /* warnings */ Diagnostics),
 }
 
 #[derive(Clone)]
@@ -82,12 +68,6 @@ pub struct FullyCompiledProgram {
     pub files: FilesSourceText,
     pub parser: parser::ast::Program,
     pub expansion: expansion::ast::Program,
-    pub naming: naming::ast::Program,
-    pub typing: typing::ast::Program,
-    pub inlining: typing::ast::Program,
-    pub hlir: hlir::ast::Program,
-    pub cfgir: cfgir::ast::Program,
-    pub compiled: Vec<AnnotatedCompiledUnit>,
 }
 
 //**************************************************************************************************
@@ -212,14 +192,13 @@ impl<'a> Compiler<'a> {
             pre_compiled_lib,
             compiled_module_named_address_mapping,
             flags,
-            mut known_attributes,
+            known_attributes,
         } = self;
         generate_interface_files_for_deps(
             &mut deps,
             interface_files_dir_opt,
             &compiled_module_named_address_mapping,
         )?;
-        add_attributes_for_flavor(&flags, &mut known_attributes);
         let mut compilation_env = CompilationEnv::new(flags, known_attributes);
         let (source_text, pprog_and_comments_res) =
             parse_program(&mut compilation_env, maps, targets, deps)?;
@@ -230,37 +209,6 @@ impl<'a> Compiler<'a> {
         });
         Ok((source_text, res))
     }
-
-    pub fn check(self) -> anyhow::Result<(FilesSourceText, Result<(), Diagnostics>)> {
-        let (files, res) = self.run::<PASS_COMPILATION>()?;
-        Ok((files, res.map(|_| ())))
-    }
-
-    pub fn check_and_report(self) -> anyhow::Result<FilesSourceText> {
-        let (files, res) = self.check()?;
-        unwrap_or_report_diagnostics(&files, res);
-        Ok(files)
-    }
-
-    pub fn build(
-        self,
-    ) -> anyhow::Result<(
-        FilesSourceText,
-        Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics>,
-    )> {
-        let (files, res) = self.run::<PASS_COMPILATION>()?;
-        Ok((
-            files,
-            res.map(|(_comments, stepped)| stepped.into_compiled_units()),
-        ))
-    }
-
-    pub fn build_and_report(self) -> anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)> {
-        let (files, units_res) = self.build()?;
-        let (units, warnings) = unwrap_or_report_diagnostics(&files, units_res);
-        report_warnings(&files, warnings);
-        Ok((files, units))
-    }
 }
 
 impl<'a, const P: Pass> SteppedCompiler<'a, P> {
@@ -269,7 +217,7 @@ impl<'a, const P: Pass> SteppedCompiler<'a, P> {
         assert!(self.program.is_some());
         assert!(self.program.as_ref().unwrap().equivalent_pass() == P);
         assert!(
-            P <= PASS_COMPILATION,
+            P <= PASS_EXPANSION,
             "Invalid pass for run_to. Initial pass is too large."
         );
         assert!(
@@ -358,33 +306,6 @@ macro_rules! ast_stepped_compilers {
                     };
                     (next, ast)
                 }
-
-                pub fn check(self) -> Result<(), Diagnostics> {
-                    self.run::<PASS_COMPILATION>()?;
-                    Ok(())
-                }
-
-                pub fn build(
-                    self
-                ) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics> {
-                    let units = self.run::<PASS_COMPILATION>()?.into_compiled_units();
-                    Ok(units)
-                }
-
-                pub fn check_and_report(self, files: &FilesSourceText)  {
-                    let errors_result = self.check();
-                    unwrap_or_report_diagnostics(&files, errors_result);
-                }
-
-                pub fn build_and_report(
-                    self,
-                    files: &FilesSourceText,
-                ) -> Vec<AnnotatedCompiledUnit> {
-                    let units_result = self.build();
-                    let (units, warnings) = unwrap_or_report_diagnostics(&files, units_result);
-                    report_warnings(&files, warnings);
-                    units
-                }
             }
         )*
     };
@@ -398,126 +319,8 @@ ast_stepped_compilers!(
         Expansion,
         at_expansion,
         new_at_expansion
-    ),
-    (PASS_NAMING, naming, Naming, at_naming, new_at_naming),
-    (PASS_TYPING, typing, Typing, at_typing, new_at_typing),
-    (
-        PASS_INLINING,
-        typing,
-        Inlining,
-        at_inlining,
-        new_at_inlining
-    ),
-    (PASS_HLIR, hlir, HLIR, at_hlir, new_at_hlir),
-    (PASS_CFGIR, cfgir, CFGIR, at_cfgir, new_at_cfgir)
-);
-
-impl<'a> SteppedCompiler<'a, PASS_COMPILATION> {
-    pub fn into_compiled_units(self) -> (Vec<AnnotatedCompiledUnit>, Diagnostics) {
-        let Self {
-            compilation_env: _,
-            pre_compiled_lib: _,
-            program,
-        } = self;
-        match program {
-            Some(PassResult::Compilation(units, warnings)) => (units, warnings),
-            _ => panic!(),
-        }
-    }
-}
-
-/// Given a set of dependencies, precompile them and save the ASTs so that they can be used again
-/// to compile against without having to recompile these dependencies
-pub fn construct_pre_compiled_lib<
-    Paths: Into<Symbol> + Debug,
-    NamedAddress: Into<Symbol> + Debug,
->(
-    targets: Vec<PackagePaths<Paths, NamedAddress>>,
-    interface_files_dir_opt: Option<String>,
-    flags: Flags,
-    known_attributes: &BTreeSet<String>,
-) -> anyhow::Result<Result<FullyCompiledProgram, (FilesSourceText, Diagnostics)>> {
-    let (files, pprog_and_comments_res) = Compiler::from_package_paths(
-        targets,
-        Vec::<PackagePaths<Paths, NamedAddress>>::new(),
-        flags,
-        known_attributes,
     )
-    .set_interface_files_dir_opt(interface_files_dir_opt)
-    .run::<PASS_PARSER>()?;
-
-    let (_comments, stepped) = match pprog_and_comments_res {
-        Err(errors) => return Ok(Err((files, errors))),
-        Ok(res) => res,
-    };
-
-    let (empty_compiler, ast) = stepped.into_ast();
-    let mut compilation_env = empty_compiler.compilation_env;
-    let start = PassResult::Parser(ast);
-    let mut parser = None;
-    let mut expansion = None;
-    let mut naming = None;
-    let mut typing = None;
-    let mut inlining = None;
-    let mut hlir = None;
-    let mut cfgir = None;
-    let mut compiled = None;
-
-    let save_result = |cur: &PassResult, _env: &CompilationEnv| match cur {
-        PassResult::Parser(prog) => {
-            assert!(parser.is_none());
-            parser = Some(prog.clone())
-        },
-        PassResult::Expansion(eprog) => {
-            assert!(expansion.is_none());
-            expansion = Some(eprog.clone())
-        },
-        PassResult::Naming(nprog) => {
-            assert!(naming.is_none());
-            naming = Some(nprog.clone())
-        },
-        PassResult::Typing(tprog) => {
-            assert!(typing.is_none());
-            typing = Some(tprog.clone())
-        },
-        PassResult::Inlining(tprog) => {
-            assert!(inlining.is_none());
-            inlining = Some(tprog.clone())
-        },
-        PassResult::HLIR(hprog) => {
-            assert!(hlir.is_none());
-            hlir = Some(hprog.clone());
-        },
-        PassResult::CFGIR(cprog) => {
-            assert!(cfgir.is_none());
-            cfgir = Some(cprog.clone());
-        },
-        PassResult::Compilation(units, _final_diags) => {
-            assert!(compiled.is_none());
-            compiled = Some(units.clone())
-        },
-    };
-    match run(
-        &mut compilation_env,
-        None,
-        start,
-        PASS_COMPILATION,
-        save_result,
-    ) {
-        Err(errors) => Ok(Err((files, errors))),
-        Ok(_) => Ok(Ok(FullyCompiledProgram {
-            files,
-            parser: parser.unwrap(),
-            expansion: expansion.unwrap(),
-            naming: naming.unwrap(),
-            typing: typing.unwrap(),
-            inlining: inlining.unwrap(),
-            hlir: hlir.unwrap(),
-            cfgir: cfgir.unwrap(),
-            compiled: compiled.unwrap(),
-        })),
-    }
-}
+);
 
 //**************************************************************************************************
 // Utils
@@ -753,12 +556,6 @@ impl PassResult {
         match self {
             PassResult::Parser(_) => PASS_PARSER,
             PassResult::Expansion(_) => PASS_EXPANSION,
-            PassResult::Naming(_) => PASS_NAMING,
-            PassResult::Typing(_) => PASS_TYPING,
-            PassResult::Inlining(_) => PASS_INLINING,
-            PassResult::HLIR(_) => PASS_HLIR,
-            PassResult::CFGIR(_) => PASS_CFGIR,
-            PassResult::Compilation(_, _) => PASS_COMPILATION,
         }
     }
 }
@@ -771,7 +568,7 @@ fn run(
     mut result_check: impl FnMut(&PassResult, &CompilationEnv),
 ) -> Result<PassResult, Diagnostics> {
     assert!(
-        until <= PASS_COMPILATION,
+        until <= PASS_EXPANSION,
         "Invalid pass for run_to. Target is greater than maximum pass"
     );
     result_check(&cur, compilation_env);
@@ -806,105 +603,8 @@ fn run(
                 result_check,
             )
         },
-        PassResult::Expansion(eprog) => {
-            let nprog = naming::translate::program(compilation_env, pre_compiled_lib, eprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
-            if compilation_env.flags().debug() {
-                eprintln!(
-                    "After naming: program = {}",
-                    ast_debug::display_verbose(&nprog)
-                )
-            };
-            run(
-                compilation_env,
-                pre_compiled_lib,
-                PassResult::Naming(nprog),
-                until,
-                result_check,
-            )
+        PassResult::Expansion(_) => {
+            unreachable!("ICE Pass::Compilation is >= all passes")
         },
-        PassResult::Naming(nprog) => {
-            let tprog = typing::translate::program(compilation_env, pre_compiled_lib, nprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
-            if compilation_env.flags().debug() {
-                eprintln!(
-                    "After typing: program = {}",
-                    ast_debug::display_verbose(&tprog)
-                )
-            };
-            run(
-                compilation_env,
-                pre_compiled_lib,
-                PassResult::Typing(tprog),
-                until,
-                result_check,
-            )
-        },
-        PassResult::Typing(mut tprog) => {
-            inlining::translate::run_inlining(compilation_env, pre_compiled_lib, &mut tprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
-            if compilation_env.flags().debug() {
-                eprintln!(
-                    "After inlining: program = {}",
-                    ast_debug::display_verbose(&tprog)
-                )
-            };
-            run(
-                compilation_env,
-                pre_compiled_lib,
-                PassResult::Inlining(tprog),
-                until,
-                result_check,
-            )
-        },
-        PassResult::Inlining(tprog) => {
-            let hprog = hlir::translate::program(compilation_env, pre_compiled_lib, tprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
-            if compilation_env.flags().debug() {
-                eprintln!(
-                    "After hlir: program = {}",
-                    ast_debug::display_verbose(&hprog)
-                )
-            };
-            run(
-                compilation_env,
-                pre_compiled_lib,
-                PassResult::HLIR(hprog),
-                until,
-                result_check,
-            )
-        },
-        PassResult::HLIR(hprog) => {
-            let cprog = cfgir::translate::program(compilation_env, pre_compiled_lib, hprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::NonblockingError)?;
-            if compilation_env.flags().debug() {
-                eprintln!(
-                    "After cfgir: program = {}",
-                    ast_debug::display_verbose(&cprog)
-                )
-            };
-            run(
-                compilation_env,
-                pre_compiled_lib,
-                PassResult::CFGIR(cprog),
-                until,
-                result_check,
-            )
-        },
-        PassResult::CFGIR(cprog) => {
-            let compiled_units =
-                to_bytecode::translate::program(compilation_env, pre_compiled_lib, cprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::NonblockingError)?;
-            let warnings = compilation_env.take_final_warning_diags();
-            assert!(until == PASS_COMPILATION);
-            run(
-                compilation_env,
-                pre_compiled_lib,
-                PassResult::Compilation(compiled_units, warnings),
-                PASS_COMPILATION,
-                result_check,
-            )
-        },
-        PassResult::Compilation(_, _) => unreachable!("ICE Pass::Compilation is >= all passes"),
     }
 }

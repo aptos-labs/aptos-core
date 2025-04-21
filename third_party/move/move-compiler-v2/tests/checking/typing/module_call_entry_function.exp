@@ -49,3 +49,49 @@ module 0x2::M {
         M::f_script()
     }
 } // end 0x2::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x2::Y {
+    friend 0x2::M;
+    friend fun f_friend() {
+    }
+}
+module 0x2::X {
+    public fun f_public() {
+    }
+    public entry fun f_script() {
+    }
+}
+module 0x2::M {
+    use 0x2::Y;
+    use 0x2::X;
+    friend fun f_friend() {
+    }
+    public fun f_public() {
+    }
+    public entry fun f_script() {
+    }
+    fun f_private() {
+    }
+    public entry fun f_script_call_friend() {
+        Y::f_friend()
+    }
+    public entry fun f_script_call_public() {
+        X::f_public()
+    }
+    public entry fun f_script_call_script() {
+        X::f_script()
+    }
+    public entry fun f_script_call_self_friend() {
+        f_friend()
+    }
+    public entry fun f_script_call_self_private() {
+        f_private()
+    }
+    public entry fun f_script_call_self_public() {
+        f_public()
+    }
+    public entry fun f_script_call_self_script() {
+        f_script()
+    }
+}

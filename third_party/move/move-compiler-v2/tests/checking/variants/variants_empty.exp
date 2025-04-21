@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: enum type `T` must have at least one variant.
+  ┌─ tests/checking/variants/variants_empty.move:2:5
+  │
+2 │     enum T{}
+  │     ^^^^^^^^

@@ -27,6 +27,8 @@ use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
     chain_id::ChainId,
+    jwks::patch::IssuerJWK,
+    keyless::Groth16VerificationKey,
     on_chain_config::{
         Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig,
@@ -166,7 +168,11 @@ impl ValidatorNodeConfig {
         // Init safety rules
         let validator_identity_file = self.dir.join(VALIDATOR_IDENTITY);
         config.consensus.safety_rules.initial_safety_rules_config =
-            InitialSafetyRulesConfig::from_file(validator_identity_file, waypoint_config.clone());
+            InitialSafetyRulesConfig::from_file(
+                validator_identity_file,
+                vec![],
+                waypoint_config.clone(),
+            );
         config.base.waypoint = waypoint_config;
     }
 
@@ -437,6 +443,8 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    pub initial_jwks: Vec<IssuerJWK>,
+    pub keyless_groth16_vk: Option<Groth16VerificationKey>,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut NodeConfig) + Send + Sync>;
@@ -658,6 +666,8 @@ impl Builder {
             initial_features_override: None,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
+            initial_jwks: vec![],
+            keyless_groth16_vk: None,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

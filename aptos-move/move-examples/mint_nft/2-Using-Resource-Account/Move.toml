@@ -3,8 +3,8 @@ name = "Examples"
 version = "0.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
-AptosToken = { local = "../../../framework/aptos-token" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
+AptosToken = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-token", rev = "mainnet" }
 
 [addresses]
 aptos_framework = "0x1"

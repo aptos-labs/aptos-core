@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod cargo_runner;
 pub mod extensions;
 pub mod test_reporter;
 pub mod test_runner;
@@ -12,20 +11,21 @@ use clap::*;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
     self,
-    diagnostics::{self, codes::Severity},
-    shared::{self, known_attributes::KnownAttribute, NumericalAddress},
-    unit_test::{self, TestPlan},
-    Compiler, Flags, PASS_CFGIR,
+    shared::{self, NumericalAddress},
+    unit_test::TestPlan,
 };
+use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::compilation::compiled_package::build_and_report_v2_driver;
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use move_vm_test_utils::gas_schedule::CostTable;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     marker::Send,
     sync::Mutex,
 };
+use test_reporter::UnitTestFactory;
 
 /// The default value bounding the amount of gas consumed in a test.
 const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
@@ -33,10 +33,6 @@ const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
 #[derive(Debug, Parser, Clone)]
 #[clap(author, version, about)]
 pub struct UnitTestingConfig {
-    /// Bound the gas limit for any one test. If using custom gas table, this is the max number of instructions.
-    #[clap(name = "gas_limit", short = 'i', long = "gas_limit")]
-    pub gas_limit: Option<u64>,
-
     /// A filter string to determine which unit tests to run
     #[clap(name = "filter", short = 'f', long = "filter")]
     pub filter: Option<String>,
@@ -106,12 +102,6 @@ pub struct UnitTestingConfig {
     /// Verbose mode
     #[clap(short = 'v', long = "verbose")]
     pub verbose: bool,
-
-    /// Use the EVM-based execution backend.
-    /// Does not work with --stackless.
-    #[cfg(feature = "evm-backend")]
-    #[clap(long = "evm")]
-    pub evm: bool,
 }
 
 fn format_module_id(module_id: &ModuleId) -> String {
@@ -122,11 +112,9 @@ fn format_module_id(module_id: &ModuleId) -> String {
     )
 }
 
-impl UnitTestingConfig {
-    /// Create a unit testing config for use with `register_move_unit_tests`
-    pub fn default_with_bound(bound: Option<u64>) -> Self {
+impl Default for UnitTestingConfig {
+    fn default() -> Self {
         Self {
-            gas_limit: bound.or(Some(DEFAULT_EXECUTION_BOUND)),
             filter: None,
             num_threads: 8,
             report_statistics: false,
@@ -139,12 +127,11 @@ impl UnitTestingConfig {
             verbose: false,
             list: false,
             named_address_values: vec![],
-
-            #[cfg(feature = "evm-backend")]
-            evm: false,
         }
     }
+}
 
+impl UnitTestingConfig {
     pub fn with_named_addresses(
         mut self,
         named_address_values: BTreeMap<String, NumericalAddress>,
@@ -161,38 +148,25 @@ impl UnitTestingConfig {
     ) -> Option<TestPlan> {
         let addresses =
             verify_and_create_named_address_mapping(self.named_address_values.clone()).ok()?;
-        let (files, comments_and_compiler_res) = Compiler::from_files(
-            source_files,
-            deps,
-            addresses,
-            Flags::testing().set_skip_attribute_checks(false),
-            KnownAttribute::get_all_attribute_names(),
-        )
-        .run::<PASS_CFGIR>()
-        .unwrap();
-        let (_, compiler) =
-            diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
-
-        let (mut compiler, cfgir) = compiler.into_ast();
-        let compilation_env = compiler.compilation_env();
-        let test_plan = unit_test::plan_builder::construct_test_plan(compilation_env, None, &cfgir);
-
-        if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
-            if self.ignore_compile_warnings {
-                Severity::NonblockingError
-            } else {
-                Severity::Warning
-            },
-        ) {
-            diagnostics::report_diagnostics(&files, diags);
-        }
-
-        let compilation_result = compiler.at_cfgir(cfgir).build();
-
-        let (units, warnings) =
-            diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-        diagnostics::report_warnings(&files, warnings);
-        test_plan.map(|tests| TestPlan::new(tests, files, units))
+        let (test_plan, files, units) = {
+            let options = move_compiler_v2::Options {
+                compile_test_code: true,
+                testing: true,
+                sources: source_files,
+                dependencies: deps,
+                compiler_version: Some(CompilerVersion::latest_stable()),
+                language_version: Some(LanguageVersion::latest_stable()),
+                named_address_mapping: addresses
+                    .iter()
+                    .map(|(string, num_addr)| format!("{}={}", string, num_addr))
+                    .collect(),
+                ..Default::default()
+            };
+            let (files, units, env) = build_and_report_v2_driver(options).unwrap();
+            let test_plan = plan_builder_v2::construct_test_plan(&env, None);
+            (test_plan, files, units)
+        };
+        test_plan.map(|tests| TestPlan::new(tests, files, units, vec![]))
     }
 
     /// Build a test plan from a unit test config
@@ -211,15 +185,16 @@ impl UnitTestingConfig {
 
     /// Public entry point to Move unit testing as a library
     /// Returns `true` if all unit tests passed. Otherwise, returns `false`.
-    pub fn run_and_report_unit_tests<W: Write + Send>(
+    pub fn run_and_report_unit_tests<W: Write + Send, F: UnitTestFactory + Send>(
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
-        cost_table: Option<CostTable>,
         writer: W,
+        factory: F,
     ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
+        let shared_options = Mutex::new(factory);
 
         if self.list {
             for (module_id, test_plan) in &test_plan.module_tests {
@@ -237,17 +212,13 @@ impl UnitTestingConfig {
 
         writeln!(shared_writer.lock().unwrap(), "Running Move unit tests")?;
         let mut test_runner = TestRunner::new(
-            self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
             self.num_threads,
             self.report_storage_on_error,
             self.report_stacktrace_on_abort,
             test_plan,
             native_function_table,
             genesis_state,
-            cost_table,
             self.verbose,
-            #[cfg(feature = "evm-backend")]
-            self.evm,
         )
         .unwrap();
 
@@ -255,7 +226,7 @@ impl UnitTestingConfig {
             test_runner.filter(filter_str)
         }
 
-        let test_results = test_runner.run(&shared_writer).unwrap();
+        let test_results = test_runner.run(&shared_writer, &shared_options).unwrap();
         if self.report_statistics {
             test_results.report_statistics(&shared_writer)?;
         }

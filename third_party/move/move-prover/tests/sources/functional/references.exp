@@ -13,6 +13,7 @@ error: function does not abort under this condition
    =     at tests/sources/functional/references.move:50: mut_b
    =         b = <redacted>
    =     at tests/sources/functional/references.move:51: mut_b
+   =     at tests/sources/functional/references.move:50: mut_b
    =         b = <redacted>
    =     at tests/sources/functional/references.move:52: mut_b
    =     at tests/sources/functional/references.move:72: mut_ref_incorrect

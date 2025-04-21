@@ -4,7 +4,7 @@ task 1 'run'. lines 6-10:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
     sub_status: None,
-    location: undefined,
+    location: script,
     indices: [],
     offsets: [],
 }

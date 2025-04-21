@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/positional_fields/struct_postfix_ability_decl_invalid.move:2:25
+  │
+2 │     struct S has drop {};
+  │                         ^
+  │                         │
+  │                         Unexpected ';'
+  │                         Expected a module member: 'spec', 'use', 'friend', 'const', 'fun', 'inline', or 'struct'

@@ -7,13 +7,15 @@
 use crate::account::AccountData;
 use aptos_types::{
     account_config::CoinInfoResource,
+    chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig},
     state_store::{
-        errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, TStateView,
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},
+    AptosCoinType,
 };
 use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
@@ -105,7 +107,7 @@ impl FakeDataStore {
 
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
-        let coin_info = CoinInfoResource::random(u128::MAX);
+        let coin_info = CoinInfoResource::<AptosCoinType>::random(u128::MAX);
         let write_set = coin_info.to_writeset(0).expect("access path in test");
         self.add_write_set(&write_set)
     }
@@ -117,6 +119,14 @@ impl FakeDataStore {
         self.set(
             StateKey::module_id(module_id),
             StateValue::new_legacy(blob.into()),
+        );
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: ChainId) {
+        let bytes = bcs::to_bytes(&chain_id).expect("Chain id should always be serializable");
+        self.set(
+            StateKey::resource(ChainId::address(), &ChainId::struct_tag()).unwrap(),
+            StateValue::new_legacy(bytes.into()),
         );
     }
 
@@ -133,20 +143,16 @@ impl FakeDataStore {
 impl TStateView for FakeDataStore {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateViewError> {
         Ok(self.state_data.get(state_key).cloned())
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         let mut usage = StateStorageUsage::new_untracked();
         for (k, v) in self.state_data.iter() {
             usage.add_item(k.size() + v.size())
         }
         Ok(usage)
-    }
-
-    fn as_in_memory_state_view(&self) -> InMemoryStateView {
-        InMemoryStateView::new(self.state_data.clone())
     }
 }
 

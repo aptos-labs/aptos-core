@@ -5,7 +5,9 @@ use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
         fund::FundWithFaucet,
-        key_rotation::{LookupAddress, RotateKey, RotateSummary},
+        key_rotation::{
+            LookupAddress, NewAuthKeyOptions, NewProfileOptions, RotateKey, RotateSummary,
+        },
         list::{ListAccount, ListQuery},
         transfer::{TransferCoins, TransferSummary},
     },
@@ -13,11 +15,12 @@ use crate::{
         init::{InitTool, Network},
         types::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
-            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
-            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
-            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
+            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageOptions, OptionalPoolAddressArgs,
+            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -50,6 +53,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey,
 };
+use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
@@ -264,10 +268,16 @@ impl CliTestFramework {
                 prompt_options: PromptOptions::yes(),
                 ..Default::default()
             },
-            new_private_key: Some(new_private_key),
-            save_to_profile: None,
-            new_private_key_file: None,
-            skip_saving_profile: true,
+            new_auth_key_options: NewAuthKeyOptions {
+                new_private_key: Some(new_private_key),
+                new_private_key_file: None,
+                new_derivation_path: None,
+                new_derivation_index: None,
+            },
+            new_profile_options: NewProfileOptions {
+                skip_saving_profile: true,
+                save_to_profile: None,
+            },
         }
         .execute()
         .await?;
@@ -528,9 +538,10 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
-            txn_options: self.transaction_options(operator_index, None),
+            txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
             operator_config_file_args: OperatorConfigFileArgs {
                 operator_config_file: None,
@@ -548,8 +559,10 @@ impl CliTestFramework {
         InitTool {
             network: Some(Network::Custom),
             rest_url: Some(self.endpoint.clone()),
-            faucet_url: Some(self.faucet_endpoint.clone()),
-            faucet_auth_token: None,
+            faucet_options: FaucetOptions {
+                faucet_url: Some(self.faucet_endpoint.clone()),
+                faucet_auth_token: None,
+            },
             rng_args: RngArgs::from_seed([0; 32]),
             private_key_options: PrivateKeyInputOptions::from_private_key(private_key)?,
             profile_options: Default::default(),
@@ -842,6 +855,7 @@ impl CliTestFramework {
         CompilePackage {
             move_options: self.move_options(account_strs),
             save_metadata: false,
+            fetch_deps_only: false,
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
@@ -882,6 +896,14 @@ impl CliTestFramework {
             },
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
+            },
+            chunked_publish_option: ChunkedPublishOption {
+                chunked_publish: false,
+                large_packages_module_address: AccountAddress::from_str(
+                    LARGE_PACKAGES_MODULE_ADDRESS,
+                )
+                .unwrap(),
+                chunk_size: CHUNK_SIZE_IN_BYTES,
             },
         }
         .execute()
@@ -1035,7 +1057,7 @@ impl CliTestFramework {
                 script_path: Some(source_path),
                 compiled_script_path: None,
                 framework_package_args,
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
@@ -1058,13 +1080,12 @@ impl CliTestFramework {
             txn_options: self.transaction_options(index, None),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args },
@@ -1085,19 +1106,12 @@ impl CliTestFramework {
             .join("aptos-framework")
     }
 
-    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
-        MovePackageDir {
+    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageOptions {
+        MovePackageOptions {
             dev: true,
-            package_dir: Some(self.move_dir()),
-            output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
-            override_std: None,
-            skip_fetch_latest_git_deps: true,
-            bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
-            skip_attribute_checks: false,
-            check_test_code: false,
+            package_dir: Some(self.move_dir()),
+            ..MovePackageOptions::new()
         }
     }
 
@@ -1196,13 +1210,12 @@ impl CliTestFramework {
                 is_multi_step,
                 compile_proposal_args: CompileScriptFunction {
                     script_path: Some(script_path),
-                    compiled_script_path: None,
                     framework_package_args: FrameworkPackageArgs {
                         framework_git_rev: None,
                         framework_local_dir: Some(Self::aptos_framework_dir()),
                         skip_fetch_latest_git_deps: false,
                     },
-                    bytecode_version: None,
+                    ..CompileScriptFunction::default()
                 },
             },
         }
@@ -1242,13 +1255,12 @@ impl CliTestFramework {
             proposal_id,
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             rest_options: self.rest_options(),
             profile: Default::default(),

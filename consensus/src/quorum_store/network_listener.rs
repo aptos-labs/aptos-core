@@ -16,7 +16,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
-    network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+    network_msg_rx: aptos_channel::Receiver<PeerId, (PeerId, VerifiedEvent)>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
     proof_manager_tx: Sender<ProofManagerCommand>,
@@ -24,7 +24,7 @@ pub(crate) struct NetworkListener {
 
 impl NetworkListener {
     pub(crate) fn new(
-        network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        network_msg_rx: aptos_channel::Receiver<PeerId, (PeerId, VerifiedEvent)>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
         remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
         proof_manager_tx: Sender<ProofManagerCommand>,
@@ -39,11 +39,15 @@ impl NetworkListener {
 
     pub async fn start(mut self) {
         info!("QS: starting networking");
-        while let Some(msg) = self.network_msg_rx.next().await {
+        let mut next_batch_coordinator_idx = 0;
+        while let Some((sender, msg)) = self.network_msg_rx.next().await {
             monitor!("qs_network_listener_main_loop", {
                 match msg {
                     // TODO: does the assumption have to be that network listener is shutdown first?
                     VerifiedEvent::Shutdown(ack_tx) => {
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["NetworkListener::shutdown"])
+                            .inc();
                         info!("QS: shutdown network listener received");
                         ack_tx
                             .send(())
@@ -51,31 +55,47 @@ impl NetworkListener {
                         break;
                     },
                     VerifiedEvent::SignedBatchInfo(signed_batch_infos) => {
-                        let cmd = ProofCoordinatorCommand::AppendSignature(*signed_batch_infos);
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["NetworkListener::signedbatchinfo"])
+                            .inc();
+                        let cmd =
+                            ProofCoordinatorCommand::AppendSignature(sender, *signed_batch_infos);
                         self.proof_coordinator_tx
                             .send(cmd)
                             .await
                             .expect("Could not send signed_batch_info to proof_coordinator");
                     },
                     VerifiedEvent::BatchMsg(batch_msg) => {
-                        let author = batch_msg.author();
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["NetworkListener::batchmsg"])
+                            .inc();
+                        // Batch msg verify function alreay ensures that the batch_msg is not empty.
+                        let author = batch_msg.author().expect("Empty batch message");
                         let batches = batch_msg.take();
                         counters::RECEIVED_BATCH_MSG_COUNT.inc();
 
-                        let idx =
-                            author.to_vec()[0] as usize % self.remote_batch_coordinator_tx.len();
+                        // Round-robin assignment to batch coordinator.
+                        let idx = next_batch_coordinator_idx;
+                        next_batch_coordinator_idx = (next_batch_coordinator_idx + 1)
+                            % self.remote_batch_coordinator_tx.len();
                         trace!(
                             "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
                             author,
                             self.remote_batch_coordinator_tx.len(),
                             idx
                         );
+                        counters::BATCH_COORDINATOR_NUM_BATCH_REQS
+                            .with_label_values(&[&idx.to_string()])
+                            .inc();
                         self.remote_batch_coordinator_tx[idx]
                             .send(BatchCoordinatorCommand::NewBatches(author, batches))
                             .await
                             .expect("Could not send remote batch");
                     },
                     VerifiedEvent::ProofOfStoreMsg(proofs) => {
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["NetworkListener::proofofstore"])
+                            .inc();
                         let cmd = ProofManagerCommand::ReceiveProofs(*proofs);
                         self.proof_manager_tx
                             .send(cmd)

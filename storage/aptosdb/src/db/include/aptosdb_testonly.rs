@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::buffered_state::BufferedState;
-use aptos_config::config::{ BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
-use aptos_infallible::Mutex;
-use aptos_types::state_store::create_empty_sharded_state_updates;
+use aptos_config::config::{BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
 use std::default::Default;
+use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
+use aptos_executor_types::transactions_with_output::TransactionsToKeep;
+use aptos_storage_interface::state_store::state_summary::ProvableStateSummary;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -88,43 +88,10 @@ impl AptosDB {
         )
     }
 
-    /// This gets the current buffered_state in StateStore.
-    pub fn buffered_state(&self) -> &Mutex<BufferedState> {
-        self.state_store.buffered_state()
-    }
-
+    #[cfg(test)]
     pub(crate) fn state_merkle_db(&self) -> Arc<StateMerkleDb> {
         self.state_store.state_db.state_merkle_db.clone()
     }
-}
-
-pub fn gather_state_updates_until_last_checkpoint(
-    first_version: Version,
-    latest_in_memory_state: &StateDelta,
-    txns_to_commit: &[TransactionToCommit],
-) -> Option<ShardedStateUpdates> {
-    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
-        if latest_checkpoint_version >= first_version {
-            let idx = (latest_checkpoint_version - first_version) as usize;
-            assert!(
-                    txns_to_commit[idx].has_state_checkpoint_hash(),
-                    "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
-                    latest_checkpoint_version,
-                    first_version + idx as u64
-                );
-            let mut sharded_state_updates = create_empty_sharded_state_updates();
-            sharded_state_updates.par_iter_mut().enumerate().for_each(
-                |(shard_id, state_updates_shard)| {
-                    txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
-                        state_updates_shard.extend(txn_to_commit.state_updates()[shard_id].clone());
-                    })
-                },
-            );
-            return Some(sharded_state_updates);
-        }
-    }
-
-    None
 }
 
 /// Test only methods for the DB
@@ -133,25 +100,63 @@ impl AptosDB {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
-        base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: StateDelta,
     ) -> Result<()> {
-        let state_updates_until_last_checkpoint = gather_state_updates_until_last_checkpoint(
+        let (transactions, transaction_outputs, transaction_infos) = Self::disassemble_txns_to_commit(txns_to_commit);
+        let is_reconfig = transaction_outputs
+            .iter()
+            .rev()
+            .flat_map(TransactionOutput::events)
+            .any(ContractEvent::is_new_epoch_event);
+        let transactions_to_keep = TransactionsToKeep::make(first_version, transactions, transaction_outputs, is_reconfig);
+
+        let current = self.state_store.current_state_locked().clone();
+        let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
+        let (new_state, reads) = current.ledger_state().update_with_db_reader(
+            &persisted_state,
+            hot_state,
+            transactions_to_keep.state_update_refs(),
+            self.state_store.clone(),
+        )?;
+        let persisted_summary = self.state_store.get_persisted_state_summary()?;
+        let new_state_summary = current.ledger_state_summary().update(
+            &ProvableStateSummary::new(persisted_summary, self),
+            transactions_to_keep.state_update_refs(),
+        )?;
+
+        let chunk = ChunkToCommit {
             first_version,
-            &latest_in_memory_state,
-            txns_to_commit,
-        );
-        self.save_transactions(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
-            None,
-        )
+            transactions: &transactions_to_keep.transactions,
+            transaction_outputs: &transactions_to_keep.transaction_outputs,
+            transaction_infos: &transaction_infos,
+            state: &new_state,
+            state_summary: &new_state_summary,
+            state_update_refs: transactions_to_keep.state_update_refs(),
+            state_reads: &reads,
+            is_reconfig,
+        };
+
+        self.save_transactions( Some(chunk), ledger_info_with_sigs, sync_commit)
+    }
+
+    fn disassemble_txns_to_commit(txns_to_commit: &[TransactionToCommit]) -> (
+        Vec<Transaction>, Vec<TransactionOutput>, Vec<TransactionInfo>
+    ) {
+        txns_to_commit.iter().map(|txn_to_commit| {
+            let TransactionToCommit {
+                transaction, transaction_info, write_set, events, is_reconfig: _, transaction_auxiliary_data
+            } = txn_to_commit;
+
+            let transaction_output = TransactionOutput::new(
+                write_set.clone(),
+                events.clone(),
+                transaction_info.gas_used(),
+                TransactionStatus::Keep(transaction_info.status().clone()),
+                transaction_auxiliary_data.clone(),
+            );
+
+            (transaction.clone(), transaction_output, transaction_info.clone())
+        }).multiunzip()
     }
 }

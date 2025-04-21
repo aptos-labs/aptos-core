@@ -10,15 +10,6 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-      with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
-    # Install nextest
-    - uses: taiki-e/install-action@v1.5.6
-      with:
-        tool: nextest
-
     # Run a postgres database
     - name: Run postgres database
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -37,9 +28,10 @@ runs:
     # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
     - name: Upload smoke test logs for failed and flaky tests
       if: ${{ failure() || success() }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: failed-smoke-test-logs
+        include-hidden-files: true
         # Retain all smoke test data except for the db (which may be large).
         path: |
           /tmp/.tmp*

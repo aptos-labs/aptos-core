@@ -1,90 +1,71 @@
 
 Diagnostics:
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow `M::R` since it is already borrowed
   ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:6:18
   │
 5 │         let r1 = borrow_global_mut<R>(addr);
-  │                  -------------------------- previous mutable global borrow
+  │                  -------------------------- struct `M::R` previously mutably borrowed here
 6 │         let r2 = borrow_global_mut<R>(addr);
   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 7 │         r1.f = r2.f
-  │         ----   ---- requirement enforced here
-  │         │
-  │         conflicting reference `r1` used here
+  │         ---- conflicting reference `r1` used here
 
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow `M::R` since it is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:12:18
    │
 11 │         let f = &mut borrow_global_mut<R>(addr).f;
-   │                 ---------------------------------
-   │                 │    │
-   │                 │    previous mutable global borrow
-   │                 used by mutable field borrow
+   │                 --------------------------------- struct `M::R` previously mutably borrowed here
 12 │         let r2 = borrow_global_mut<R>(addr);
    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 13 │         *f = r2.f
-   │         ---------
-   │         │    │
-   │         │    requirement enforced here
-   │         conflicting reference `f` used here
+   │         --------- conflicting reference `f` used here
 
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow `M::R` since it is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:18:22
    │
 17 │         let r1 = borrow_global_mut<R>(addr);
-   │                  -------------------------- previous mutable global borrow
+   │                  -------------------------- struct `M::R` previously mutably borrowed here
 18 │         let f = &mut borrow_global_mut<R>(addr).f;
    │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 19 │         r1.f = *f
-   │         ----   -- requirement enforced here
-   │         │
-   │         conflicting reference `r1` used here
+   │         ---- conflicting reference `r1` used here
 
-error: cannot immutably borrow since mutable references exist
+error: cannot borrow `M::R` since it is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:24:18
    │
 23 │         let r1 = borrow_global_mut<R>(addr);
-   │                  -------------------------- previous mutable global borrow
+   │                  -------------------------- struct `M::R` previously mutably borrowed here
 24 │         let r2 = borrow_global<R>(addr);
-   │                  ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow attempted here
+   │                  ^^^^^^^^^^^^^^^^^^^^^^ borrow attempted here
 25 │         r1.f = r2.f
-   │         ----   ---- requirement enforced here
-   │         │
-   │         conflicting reference `r1` used here
+   │         ---- conflicting reference `r1` used here
 
-error: cannot mutably borrow since immutable references exist
+error: cannot mutably borrow `M::R` since it is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:30:18
    │
 29 │         let f = &borrow_global<R>(addr).f;
-   │                 -------------------------
-   │                 ││
-   │                 │previous global borrow
-   │                 used by field borrow
+   │                 ------------------------- struct `M::R` previously borrowed here
 30 │         let r2 = borrow_global_mut<R>(addr);
    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 31 │         r2.f = *f
-   │                -- requirement enforced here
+   │                -- conflicting reference `f` used here
 
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow `M::R` since it is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:36:18
    │
 35 │         let r1 = borrow_global_mut<R>(addr);
-   │                  -------------------------- previous mutable global borrow
+   │                  -------------------------- struct `M::R` previously mutably borrowed here
 36 │         let f = &borrow_global_mut<R>(addr).f;
    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 37 │         r1.f = *f
-   │         ----   -- requirement enforced here
-   │         │
-   │         conflicting reference `r1` used here
+   │         ---- conflicting reference `r1` used here
 
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow `M::R` since it is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:43:18
    │
 42 │         let r1; if (cond) r1 = borrow_global_mut<R>(addr) else r1 = &mut r;
-   │                                -------------------------- previous mutable global borrow
+   │                                -------------------------- struct `M::R` previously mutably borrowed here
 43 │         let f = &borrow_global_mut<R>(addr).f;
    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 44 │         r1.f = *f;
-   │         ----   -- requirement enforced here
-   │         │
-   │         conflicting reference `r1` used here
+   │         ---- conflicting reference `r1` used here

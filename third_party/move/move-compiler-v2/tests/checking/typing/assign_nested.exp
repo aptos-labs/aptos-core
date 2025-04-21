@@ -1,7 +1,7 @@
 
 Diagnostics:
-error: the left-hand side has 3 items but the right-hand side provided 4
-   ┌─ tests/checking/typing/assign_nested.move:14:9
+error: invalid assignment
+   ┌─ tests/checking/typing/assign_nested.move:14:19
    │
-14 │         (_, x, _) = four();
-   │         ^^^^^^^^^
+14 │         (_, x, _, s.f) = four();
+   │                   ^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

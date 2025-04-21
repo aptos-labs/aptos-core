@@ -13,8 +13,10 @@ fun <SELF>_0::main() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-  0: $t2 := +($t0, $t1)
-  1: return ()
+     var $t3: u64
+  0: $t3 := infer($t0)
+  1: $t2 := +($t3, $t1)
+  2: return ()
 }
 
 
@@ -23,7 +25,7 @@ error: use of unassigned local `x`
   ┌─ tests/uninit-use-checker/uses_before_assign.move:5:13
   │
 5 │     let z = x + y;
-  │             ^^^^^
+  │             ^
 
 error: use of unassigned local `y`
   ┌─ tests/uninit-use-checker/uses_before_assign.move:5:13
@@ -38,8 +40,11 @@ fun <SELF>_0::main() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
+     var $t3: u64
+     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
+  0: $t3 := infer($t0)
      # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
-  0: $t2 := +($t0, $t1)
+  1: $t2 := +($t3, $t1)
      # before: { no: $t0, $t1 }, after: { no: $t0, $t1 }
-  1: return ()
+  2: return ()
 }

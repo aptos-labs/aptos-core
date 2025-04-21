@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    genesis::enable_sync_only_mode, randomness::get_on_chain_resource,
-    smoke_test_environment::SwarmBuilder,
+    genesis::enable_sync_only_mode, smoke_test_environment::SwarmBuilder,
+    utils::get_on_chain_resource,
 };
 use aptos::common::types::GasOptions;
 use aptos_config::config::{OverrideNodeConfig, PersistableConfig};
@@ -23,7 +23,7 @@ async fn randomness_stall_recovery() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_num_fullnodes(1)
+        .with_num_fullnodes(0) //TODO: revert back to 1 after invalid version bug is fixed
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;

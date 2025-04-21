@@ -1,0 +1,25 @@
+processed 3 tasks
+
+task 1 'publish'. lines 12-28:
+warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
+   ┌─ TEMPFILE1:18:28
+   │
+18 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
+   │                            ^
+
+warning: Unused parameter `g`. Consider removing or prefixing with an underscore: `_g`
+   ┌─ TEMPFILE1:18:45
+   │
+18 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
+   │                                             ^
+
+warning: Unused parameter `i`. Consider removing or prefixing with an underscore: `_i`
+   ┌─ TEMPFILE1:18:57
+   │
+18 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
+   │                                                         ^
+
+
+
+task 2 'run'. lines 30-30:
+return values: 5280

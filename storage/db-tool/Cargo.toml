@@ -14,8 +14,10 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-backup-cli = { workspace = true }
+aptos-block-executor = { workspace = true }
 aptos-config = { workspace = true }
 aptos-db = { workspace = true, features = ["db-debugger"] }
+aptos-db-indexer = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-logger = { workspace = true }
@@ -26,9 +28,12 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
+rayon = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true, features = ["testing"] }
 aptos-backup-service = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }

@@ -53,5 +53,32 @@ module 0x8675::M {
     }
 } // end 0x8675::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675::M {
+    public fun test(): u64 {
+        let (r) = (10);
+        let t = r;
+        let t2 = 0;
+        while (r > 0) {
+            let x = r;
+            r = r - 1;
+            t2 = t2 + x;
+        };
+        let t3 = r + t + t2;
+        t3
+    }
+    inline fun test1(r: u64): u64 {
+        let t = r;
+        let t2 = 0;
+        while (r > 0) {
+            let x = r;
+            r = r - 1;
+            t2 = t2 + x;
+        };
+        let t3 = r + t + t2;
+        t3
+    }
+}
+
 
 ============ bytecode verification succeeded ========

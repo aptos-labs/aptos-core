@@ -32,5 +32,3 @@ return values: 88, 10
 
 task 11 'run'. lines 128-128:
 return values: 83, 53
-
-==> Compiler v2 delivered same results!

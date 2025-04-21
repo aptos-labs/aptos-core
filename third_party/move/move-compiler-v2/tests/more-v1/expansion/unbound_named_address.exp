@@ -1,0 +1,55 @@
+
+Diagnostics:
+error: unbound module
+  ┌─ tests/more-v1/expansion/unbound_named_address.move:3:9
+  │
+3 │     use B::X;
+  │         ^^^^ Invalid 'use'. Unbound module: '(B=0x42)::X'
+
+error: address with no value
+  ┌─ tests/more-v1/expansion/unbound_named_address.move:5:12
+  │
+5 │     friend C::M;
+  │            ^ address 'C' is not assigned a value
+
+error: address with no value
+  ┌─ tests/more-v1/expansion/unbound_named_address.move:6:12
+  │
+6 │     friend D::M::foo;
+  │            ^ address 'D' is not assigned a value
+
+error: unexpected name in this position
+  ┌─ tests/more-v1/expansion/unbound_named_address.move:6:18
+  │
+6 │     friend D::M::foo;
+  │                  ^^^ Unexpected module member access. Expected a module identifier only
+
+error: address with no value
+  ┌─ tests/more-v1/expansion/unbound_named_address.move:9:12
+  │
+9 │         x: E::M::S,
+  │            ^ address 'E' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/expansion/unbound_named_address.move:13:17
+   │
+13 │         let x = F::M::S {};
+   │                 ^ address 'F' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/expansion/unbound_named_address.move:14:9
+   │
+14 │         G::M::foo();
+   │         ^ address 'G' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/expansion/unbound_named_address.move:15:17
+   │
+15 │         let c = H::M::C;
+   │                 ^ address 'H' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/expansion/unbound_named_address.move:16:18
+   │
+16 │         let a = @I; // suggests declaration
+   │                  ^ address 'I' is not assigned a value. Try assigning it a value when calling the compiler

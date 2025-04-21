@@ -11,7 +11,7 @@ use aptos_executor_test_helpers::{
     },
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_storage_interface::state_view::DbStateViewAtVersion;
+use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
@@ -25,6 +25,7 @@ use aptos_types::{
     validator_config::ValidatorConfig,
     validator_signer::ValidatorSigner,
 };
+use std::sync::Arc;
 
 #[test]
 fn test_genesis() {
@@ -79,7 +80,7 @@ fn test_reconfiguration() {
     let parent_block_id = executor.committed_block_id();
     let signer = ValidatorSigner::new(
         validators[0].data.owner_address,
-        validators[0].consensus_key.clone(),
+        Arc::new(validators[0].consensus_key.clone()),
     );
     let validator_account = signer.author();
 

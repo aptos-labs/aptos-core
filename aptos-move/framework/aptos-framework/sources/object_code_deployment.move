@@ -47,6 +47,8 @@ module aptos_framework::object_code_deployment {
     const ENOT_CODE_OBJECT_OWNER: u64 = 2;
     /// `code_object` does not exist.
     const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 3;
+    /// Current permissioned signer cannot deploy object code.
+    const ENO_CODE_PERMISSION: u64 = 4;
 
     const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: vector<u8> = b"aptos_framework::object_code_deployment";
 
@@ -84,6 +86,7 @@ module aptos_framework::object_code_deployment {
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
     ) {
+        code::check_code_publishing_permission(publisher);
         assert!(
             features::is_object_code_deployment_enabled(),
             error::unavailable(EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED),
@@ -120,6 +123,7 @@ module aptos_framework::object_code_deployment {
         code: vector<vector<u8>>,
         code_object: Object<PackageRegistry>,
     ) acquires ManagingRefs {
+        code::check_code_publishing_permission(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
             object::is_owner(code_object, publisher_address),

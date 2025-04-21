@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/factor_valid_2.move:24:20
+   │
+23 │         let eps = foo(&x1, &x2);
+   │                   -------------
+   │                   │   │
+   │                   │   previous local borrow
+   │                   used by call result
+24 │         baz(freeze(&mut x1), eps);
+   │         -----------^^^^^^^-------
+   │         │          │
+   │         │          mutable borrow attempted here
+   │         requirement enforced here

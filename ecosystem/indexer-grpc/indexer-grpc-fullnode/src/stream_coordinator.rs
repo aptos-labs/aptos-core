@@ -32,7 +32,7 @@ use tonic::Status;
 type EndVersion = u64;
 
 const SERVICE_TYPE: &str = "indexer_fullnode";
-const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 1_000_000;
+const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 100_000;
 
 // Basically a handler for a single GRPC stream request
 pub struct IndexerStreamCoordinator {
@@ -475,7 +475,7 @@ impl IndexerStreamCoordinator {
                 .iter()
                 .map(|(state_key, write_op)| WriteOpSizeInfo {
                     key_bytes: Self::ser_size_u32(state_key),
-                    value_bytes: write_op.size() as u32,
+                    value_bytes: write_op.bytes_size() as u32,
                 })
                 .collect(),
         }
@@ -500,7 +500,17 @@ impl IndexerStreamCoordinator {
 
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
-        self.highest_known_version = info.ledger_version.0;
+        let latest_table_info_version = self
+            .context
+            .indexer_reader
+            .as_ref()
+            .expect("Table info reader not set")
+            .get_latest_table_info_ledger_version()?
+            .expect("Table info ledger version not set");
+
+        self.highest_known_version =
+            std::cmp::min(info.ledger_version.0, latest_table_info_version);
+
         Ok(())
     }
 

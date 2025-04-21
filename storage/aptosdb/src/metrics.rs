@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter, register_int_gauge,
-    register_int_gauge_vec, HistogramVec, IntCounter, IntGauge, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -155,24 +156,13 @@ pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) static STATE_KV_DB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+/// Rocksdb metrics
+pub static ROCKSDB_SHARD_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
-        "aptos_state_kv_db_properties",
+        "aptos_rocksdb_shard_properties",
         // metric description
-        "StateKvDb rocksdb integer properties",
-        // metric labels (dimensions)
-        &["shard_id", "cf_name", "property_name",]
-    )
-    .unwrap()
-});
-
-pub(crate) static STATE_MERKLE_DB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        // metric name
-        "aptos_state_merkle_db_properties",
-        // metric description
-        "StateMerkleDb rocksdb integer properties",
+        "sharded rocksdb integer properties",
         // metric labels (dimensions)
         &["shard_id", "cf_name", "property_name",]
     )
@@ -236,6 +226,31 @@ pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         "Various timers for performance analysis.",
         &["name"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_api_concurrency",
+        "Call concurrency by API.",
+        &["name"]
+    )
+    .unwrap()
+});
+
+pub static GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!("aptos_storage_gauge", "Various gauges", &["name"]).unwrap()
+});
+
+pub static COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        // metric name
+        "aptos_storage_counter",
+        // metric description
+        "Various counters for Aptos DB / storage.",
+        // metric labels (dimensions)
+        &["name"],
     )
     .unwrap()
 });

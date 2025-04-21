@@ -12,6 +12,8 @@ use std::{fmt::Display, path::PathBuf};
 
 /// Represents a standard library.
 pub enum StdLib {
+    AptosTokenObjects,
+    AptosToken,
     AptosFramework,
     AptosStdlib,
     MoveStdlib,
@@ -19,29 +21,43 @@ pub enum StdLib {
 
 impl StdLib {
     /// The well-known git URL for the standard library.
-    const STD_GIT_URL: &'static str = "https://github.com/aptos-labs/aptos-core.git";
+    const STD_GIT_URL: &'static str = "https://github.com/aptos-labs/aptos-framework.git";
 
     /// Returns the dependency for the standard library with the given version.
     pub fn dependency(&self, version: &StdVersion) -> Dependency {
-        let local = git_repo_cache_path(Self::STD_GIT_URL, version.rev());
-        Dependency {
-            local: local.join(self.sub_dir()),
-            subst: None,
-            version: None,
-            digest: None,
-            git_info: Some(GitInfo {
-                git_url: Symbol::from(StdLib::STD_GIT_URL),
-                git_rev: Symbol::from(version.rev()),
-                subdir: PathBuf::from(self.sub_dir()),
-                download_to: local,
-            }),
-            node_info: None,
+        if let StdVersion::Local(path) = version {
+            Dependency {
+                local: PathBuf::from(path).join(self.sub_dir()),
+                subst: None,
+                version: None,
+                digest: None,
+                git_info: None,
+                node_info: None,
+            }
+        } else {
+            let rev = version.rev().expect("non-local version");
+            let local = git_repo_cache_path(Self::STD_GIT_URL, rev);
+            Dependency {
+                local: local.join(self.sub_dir()),
+                subst: None,
+                version: None,
+                digest: None,
+                git_info: Some(GitInfo {
+                    git_url: Symbol::from(StdLib::STD_GIT_URL),
+                    git_rev: Symbol::from(rev),
+                    subdir: PathBuf::from(self.sub_dir()),
+                    download_to: local,
+                }),
+                node_info: None,
+            }
         }
     }
 
     /// Returns the name of the standard library.
     pub fn as_str(&self) -> &'static str {
         match self {
+            StdLib::AptosToken => "AptosToken",
+            StdLib::AptosTokenObjects => "AptosTokenObjects",
             StdLib::AptosFramework => "AptosFramework",
             StdLib::AptosStdlib => "AptosStdlib",
             StdLib::MoveStdlib => "MoveStdlib",
@@ -51,6 +67,8 @@ impl StdLib {
     /// Returns the standard library from the given package name, or `None` if the package name is not a standard library.
     pub fn from_package_name(package_name: Symbol) -> Option<StdLib> {
         match package_name.as_str() {
+            "AptosToken" => Some(StdLib::AptosToken),
+            "AptosTokenObjects" => Some(StdLib::AptosTokenObjects),
             "AptosFramework" => Some(StdLib::AptosFramework),
             "AptosStdlib" => Some(StdLib::AptosStdlib),
             "MoveStdlib" => Some(StdLib::MoveStdlib),
@@ -61,9 +79,11 @@ impl StdLib {
     /// Returns the subdirectory of the standard library in the git repository.
     fn sub_dir(&self) -> &'static str {
         match self {
-            StdLib::AptosFramework => "aptos-move/framework/aptos-framework",
-            StdLib::AptosStdlib => "aptos-move/framework/aptos-stdlib",
-            StdLib::MoveStdlib => "aptos-move/framework/move-stdlib",
+            StdLib::AptosToken => "aptos-token",
+            StdLib::AptosTokenObjects => "aptos-token-objects",
+            StdLib::AptosFramework => "aptos-framework",
+            StdLib::AptosStdlib => "aptos-stdlib",
+            StdLib::MoveStdlib => "move-stdlib",
         }
     }
 }
@@ -75,6 +95,8 @@ pub enum StdVersion {
     Mainnet,
     Testnet,
     Devnet,
+    #[clap(skip)]
+    Local(String),
 }
 
 impl StdVersion {
@@ -83,15 +105,18 @@ impl StdVersion {
     const TESTNET: &'static str = "testnet";
 
     /// Returns the rev name of the standard library version.
-    pub fn rev(&self) -> &'static str {
+    /// Returns `None` for a local version.
+    pub fn rev(&self) -> Option<&'static str> {
         match self {
-            StdVersion::Mainnet => StdVersion::MAINNET,
-            StdVersion::Testnet => StdVersion::TESTNET,
-            StdVersion::Devnet => StdVersion::DEVNET,
+            StdVersion::Mainnet => Some(StdVersion::MAINNET),
+            StdVersion::Testnet => Some(StdVersion::TESTNET),
+            StdVersion::Devnet => Some(StdVersion::DEVNET),
+            StdVersion::Local(_) => None,
         }
     }
 
-    /// Returns the standard library version from the given rev name, or `None` if the string is not a standard library version.
+    /// Returns the standard library version from the given rev name,
+    /// or `None` if the string is not a standard library version.
     pub fn from_rev(version: &str) -> Option<StdVersion> {
         match version {
             StdVersion::MAINNET => Some(Self::Mainnet),
@@ -104,6 +129,10 @@ impl StdVersion {
 
 impl Display for StdVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.rev())
+        if let StdVersion::Local(path) = self {
+            write!(f, "local={}", path)
+        } else {
+            write!(f, "{}", self.rev().expect("non-local"))
+        }
     }
 }

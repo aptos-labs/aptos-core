@@ -3,25 +3,20 @@ Diagnostics:
 error: cannot move local `y` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows_invalid.move:16:9
    │
-14 │         let y_ref = &mut y;
-   │                     ------ previous mutable local borrow
 15 │         let r = take_imm_mut_give_mut(move x_ref, move y_ref);
-   │                 --------------------------------------------- used by mutable call result
+   │                 --------------------------------------------- local `y` previously mutably borrowed here
 16 │         move y;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 17 │         *r = 1;
    │         ------ conflicting reference `r` used here
 
 error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows_invalid.move:26:9
    │
-23 │         let x_ref = &x;
-   │                     -- previous local borrow
-24 │         let y_ref = &mut y;
 25 │         let r = take_imm_mut_give_imm(move x_ref, move y_ref);
-   │                 --------------------------------------------- used by call result
+   │                 --------------------------------------------- local `x` previously borrowed here
 26 │         move x;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 27 │         move y;
 28 │         *r;
    │         -- conflicting reference `r` used here
@@ -29,12 +24,10 @@ error: cannot move local `x` which is still borrowed
 error: cannot move local `y` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows_invalid.move:27:9
    │
-24 │         let y_ref = &mut y;
-   │                     ------ previous mutable local borrow
 25 │         let r = take_imm_mut_give_imm(move x_ref, move y_ref);
-   │                 --------------------------------------------- used by call result
+   │                 --------------------------------------------- local `y` previously borrowed here
 26 │         move x;
 27 │         move y;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 28 │         *r;
    │         -- conflicting reference `r` used here

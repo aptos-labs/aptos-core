@@ -45,7 +45,7 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
             tag if &**tag == Lazy::force(&str_tag) => Format::Seq(Box::new(Format::U8)),
             _ => type_not_allowed(type_tag),
         },
-        Signer => type_not_allowed(type_tag),
+        Signer | Function(..) => type_not_allowed(type_tag),
     }
 }
 
@@ -122,7 +122,7 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             tag if &**tag == Lazy::force(&str_tag) => "string".into(),
             _ => type_not_allowed(type_tag),
         },
-        Signer => type_not_allowed(type_tag),
+        Signer | Function(..) => type_not_allowed(type_tag),
     }
 }
 

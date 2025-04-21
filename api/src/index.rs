@@ -33,7 +33,6 @@ impl IndexApi {
         self.context
             .check_api_output_enabled("Get ledger info", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
-
         let node_role = self.context.node_role();
 
         api_spawn_blocking(move || match accept_type {

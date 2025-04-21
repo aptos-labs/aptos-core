@@ -23,7 +23,7 @@ pub mod transaction;
 mod view;
 mod wrappers;
 
-pub use account::AccountData;
+pub use account::{AccountData, AssetType};
 pub use address::Address;
 pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
@@ -45,17 +45,17 @@ pub use state::RawStateValueRequest;
 use std::str::FromStr;
 pub use table::{RawTableItemRequest, TableItemRequest};
 pub use transaction::{
-    AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
-    DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
-    FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
-    MultiAgentSignature, MultiEd25519Signature, MultiKeySignature, MultisigPayload,
-    MultisigTransactionPayload, PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet,
-    Signature, SingleKeySignature, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    AbstractionSignature, AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource,
+    DeleteTableItem, DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest,
+    EntryFunctionPayload, Event, FeePayerSignature, GasEstimation, GasEstimationBcs,
+    GenesisPayload, GenesisTransaction, MultiAgentSignature, MultiEd25519Signature,
+    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, NoAccountSignature,
+    PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet, Signature, SingleKeySignature,
+    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
+    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
+    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
+    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use view::{ViewFunction, ViewRequest};
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};

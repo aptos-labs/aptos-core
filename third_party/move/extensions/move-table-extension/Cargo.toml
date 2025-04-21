@@ -11,16 +11,16 @@ publish = false
 [dependencies]
 better_any = { workspace = true }
 bytes = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
-move-core-types = { path = "../../move-core/types" }
-move-vm-runtime = { path = "../../move-vm/runtime" }
-move-vm-types = { path = "../../move-vm/types" }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 sha3 = { workspace = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]
-move-cli = { path = "../../tools/move-cli" }
-move-package = { path = "../../tools/move-package" }
+move-cli = { workspace = true }
+move-package = { workspace = true }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
-move-unit-test = { path = "../../tools/move-unit-test", features = ["table-extension"] }
+move-unit-test = { workspace = true, features = ["table-extension"] }
 tempfile = { workspace = true }

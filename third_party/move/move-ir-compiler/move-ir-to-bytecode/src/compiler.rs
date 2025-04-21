@@ -6,16 +6,18 @@ use crate::context::{CompiledDependency, Context, MaterializedPools, TABLE_MAX_S
 use anyhow::{bail, format_err, Result};
 use move_binary_format::{
     file_format::{
-        Ability, AbilitySet, Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript,
-        Constant, FieldDefinition, FunctionDefinition, FunctionSignature, ModuleHandle, Signature,
-        SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructHandleIndex, StructTypeParameter, TableIndex, TypeParameterIndex, TypeSignature,
-        Visibility,
+        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant, FieldDefinition,
+        FunctionDefinition, FunctionSignature, ModuleHandle, Signature, SignatureToken,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        StructTypeParameter, TableIndex, TypeParameterIndex, TypeSignature, Visibility,
     },
     file_format_common::VERSION_DEFAULT,
 };
 use move_bytecode_source_map::source_map::SourceMap;
-use move_core_types::value::{MoveTypeLayout, MoveValue};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    value::{MoveTypeLayout, MoveValue},
+};
 use move_ir_types::{
     ast::{self, Bytecode as IRBytecode, Bytecode_ as IRBytecode_, *},
     sp,

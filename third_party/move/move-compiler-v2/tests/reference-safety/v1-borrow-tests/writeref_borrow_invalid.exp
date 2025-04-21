@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: cannot write local `g_mut` since it is borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/writeref_borrow_invalid.move:10:9
+   │
+ 6 │         let v_mut = &mut root.g.v;
+   │                     ------------- field `v` previously mutably borrowed here
+   ·
+10 │         *g_mut = G { v: 0 };
+   │         ^^^^^^^^^^^^^^^^^^^ write attempted here
+11 │         v_mut;
+   │         ----- conflicting reference `v_mut` used here

@@ -170,7 +170,7 @@ fn view_request(
                 .as_converter(context.db.clone(), context.indexer_reader.clone())
                 .function_return_types(&view_function)
                 .and_then(|tys| {
-                    tys.into_iter()
+                    tys.iter()
                         .map(TypeTag::try_from)
                         .collect::<anyhow::Result<Vec<_>>>()
                 })

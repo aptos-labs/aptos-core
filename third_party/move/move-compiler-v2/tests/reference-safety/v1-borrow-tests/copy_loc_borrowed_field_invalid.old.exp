@@ -1,0 +1,14 @@
+
+Diagnostics:
+error: cannot copy local `x` which is still mutably borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/copy_loc_borrowed_field_invalid.move:7:9
+  │
+6 │         let r1 = &mut x.f;
+  │                  --------
+  │                  │    │
+  │                  │    previous mutable local borrow
+  │                  used by mutable field borrow
+7 │         copy x;
+  │         ^^^^^^ copied here
+8 │         r1;
+  │         -- conflicting reference `r1` used here

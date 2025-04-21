@@ -1,0 +1,151 @@
+
+=== Processing m::f =====================================================
+--- Source
+public fun f(length: u64): u64 {
+        assert!(length > 0, 1);
+        assert!(length < 100, 2);
+        let counter = 0;
+        while (counter < length) counter += 1;
+        counter
+    }
+
+--- Stackless Bytecode
+public fun m::f($t0|length: u64): u64 {
+     var $t1|$t3: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: bool
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t2 := copy($t0)
+  1: $t3 := 0
+  2: $t4 := >($t2, $t3)
+  3: if ($t4) goto 4 else goto 30
+  4: label L1
+  5: $t5 := copy($t0)
+  6: $t6 := 100
+  7: $t7 := <($t5, $t6)
+  8: if ($t7) goto 9 else goto 27
+  9: label L3
+ 10: $t8 := 0
+ 11: $t1 := $t8
+ 12: goto 13
+ 13: label L6
+ 14: $t9 := copy($t1)
+ 15: $t10 := copy($t0)
+ 16: $t11 := <($t9, $t10)
+ 17: if ($t11) goto 18 else goto 24
+ 18: label L5
+ 19: $t12 := move($t1)
+ 20: $t13 := 1
+ 21: $t14 := +($t12, $t13)
+ 22: $t1 := $t14
+ 23: goto 13
+ 24: label L4
+ 25: $t15 := move($t1)
+ 26: return $t15
+ 27: label L2
+ 28: $t16 := 2
+ 29: abort($t16)
+ 30: label L0
+ 31: $t17 := 1
+ 32: abort($t17)
+}
+
+--- Raw Generated AST
+_t2: u64 = length;
+_t3: u64 = 0;
+_t4: bool = Gt(_t2, _t3);
+loop {
+  if (_t4) break;
+  _t17: u64 = 1;
+  Abort(_t17)
+};
+_t5: u64 = length;
+_t6: u64 = 100;
+_t7: bool = Lt(_t5, _t6);
+loop {
+  if (_t7) break;
+  _t16: u64 = 2;
+  Abort(_t16)
+};
+_t8: u64 = 0;
+_t1: u64 = _t8;
+loop {
+  _t9: u64 = _t1;
+  _t10: u64 = length;
+  _t11: bool = Lt(_t9, _t10);
+  if (Not(_t11)) break;
+  _t12: u64 = _t1;
+  _t13: u64 = 1;
+  _t14: u64 = Add(_t12, _t13);
+  _t1: u64 = _t14;
+  continue
+};
+_t15: u64 = _t1;
+return _t15
+
+--- Assign-Transformed Generated AST
+loop {
+  if (Gt(length, 0)) break;
+  Abort(1)
+};
+loop {
+  if (Lt(length, 100)) break;
+  Abort(2)
+};
+_t1: u64 = 0;
+loop {
+  if (Not(Lt(_t1, length))) break;
+  _t1: u64 = Add(_t1, 1);
+  continue
+};
+return _t1
+
+--- If-Transformed Generated AST
+if (Not(Gt(length, 0))) Abort(1);
+if (Not(Lt(length, 100))) Abort(2);
+_t1: u64 = 0;
+loop {
+  if (Not(Lt(_t1, length))) break;
+  _t1: u64 = Add(_t1, 1);
+  continue
+};
+return _t1
+
+--- Var-Bound Generated AST
+{
+  let _t1: u64;
+  if (Not(Gt(length, 0))) Abort(1);
+  if (Not(Lt(length, 100))) Abort(2);
+  _t1: u64 = 0;
+  loop {
+    if (Not(Lt(_t1, length))) break;
+    _t1: u64 = Add(_t1, 1);
+    continue
+  };
+  return _t1
+}
+
+=== Sourcified Output ============================================
+module 0x815::m {
+    public fun f(length: u64): u64 {
+        let _t1;
+        if (!(length > 0)) abort 1;
+        if (!(length < 100)) abort 2;
+        _t1 = 0;
+        while (_t1 < length) _t1 = _t1 + 1;
+        _t1
+    }
+}

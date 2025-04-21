@@ -4,9 +4,9 @@ error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:13:9
    │
 12 │         let f = &x;
-   │                 -- previous local borrow
+   │                 -- local `x` previously borrowed here
 13 │         move x;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 14 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -14,9 +14,9 @@ error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:18:9
    │
 17 │         let f = &mut x;
-   │                 ------ previous mutable local borrow
+   │                 ------ local `x` previously mutably borrowed here
 18 │         move x;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 19 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -24,12 +24,9 @@ error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:23:9
    │
 22 │         let f = id(&x);
-   │                 ------
-   │                 │  │
-   │                 │  previous local borrow
-   │                 used by call result
+   │                 ------ local `x` previously borrowed here
 23 │         move x;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 24 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -37,11 +34,8 @@ error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:28:9
    │
 27 │         let f = id_mut(&mut x);
-   │                 --------------
-   │                 │      │
-   │                 │      previous mutable local borrow
-   │                 used by mutable call result
+   │                 -------------- local `x` previously mutably borrowed here
 28 │         move x;
-   │         ^^^^^^ moved here
+   │         ^^^^^^ move attempted here
 29 │         *f;
    │         -- conflicting reference `f` used here

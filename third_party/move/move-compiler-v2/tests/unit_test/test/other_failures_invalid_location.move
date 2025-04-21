@@ -31,6 +31,10 @@ module 0x1::m {
     fun u2() { }
 
     #[test]
+    #[expected_failure(out_of_gas, location=0x1::m)]
+    fun u2_correct() { }
+
+    #[test]
     #[expected_failure(major_status=4004, location=self)]
     fun u3() { }
 

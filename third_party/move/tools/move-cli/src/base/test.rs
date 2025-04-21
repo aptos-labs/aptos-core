@@ -8,10 +8,8 @@ use clap::*;
 use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_compiler::{
-    diagnostics::{self, codes::Severity},
     shared::{NumberFormat, NumericalAddress},
-    unit_test::{plan_builder::construct_test_plan, TestPlan},
-    PASS_CFGIR,
+    unit_test::TestPlan,
 };
 use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::effects::ChangeSet;
@@ -20,7 +18,10 @@ use move_package::{
     compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
     BuildConfig,
 };
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{
+    test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
+    UnitTestingConfig,
+};
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
@@ -84,12 +85,6 @@ pub struct Test {
     /// Collect coverage information for later use with the various `move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
-
-    /// Use the EVM-based execution backend.
-    /// Does not work with --stackless.
-    #[cfg(feature = "evm-backend")]
-    #[clap(long = "evm")]
-    pub evm: bool,
 }
 
 impl Test {
@@ -113,11 +108,8 @@ impl Test {
             check_stackless_vm,
             verbose_mode,
             compute_coverage,
-            #[cfg(feature = "evm-backend")]
-            evm,
         } = self;
         let unit_test_config = UnitTestingConfig {
-            gas_limit,
             filter,
             list,
             num_threads,
@@ -126,10 +118,7 @@ impl Test {
             check_stackless_vm,
             verbose: verbose_mode,
             ignore_compile_warnings,
-            #[cfg(feature = "evm-backend")]
-            evm,
-
-            ..UnitTestingConfig::default_with_bound(None)
+            ..UnitTestingConfig::default()
         };
         let result = run_move_unit_tests(
             &rerooted_path,
@@ -137,6 +126,7 @@ impl Test {
             unit_test_config,
             natives,
             genesis,
+            gas_limit,
             cost_table,
             compute_coverage,
             &mut std::io::stdout(),
@@ -159,17 +149,37 @@ pub enum UnitTestResult {
 
 pub fn run_move_unit_tests<W: Write + Send>(
     pkg_path: &Path,
-    mut build_config: move_package::BuildConfig,
-    mut unit_test_config: UnitTestingConfig,
+    build_config: move_package::BuildConfig,
+    unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
     genesis: ChangeSet,
+    gas_limit: Option<u64>,
     cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
 ) -> Result<UnitTestResult> {
-    let mut test_plan = None;
-    let mut test_plan_v2 = None;
+    run_move_unit_tests_with_factory(
+        pkg_path,
+        build_config,
+        unit_test_config,
+        natives,
+        genesis,
+        compute_coverage,
+        writer,
+        UnitTestFactoryWithCostTable::new(cost_table, gas_limit),
+    )
+}
 
+pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Send>(
+    pkg_path: &Path,
+    mut build_config: move_package::BuildConfig,
+    mut unit_test_config: UnitTestingConfig,
+    natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
+    compute_coverage: bool,
+    writer: &mut W,
+    factory: F,
+) -> Result<UnitTestResult> {
     build_config.test_mode = true;
     build_config.dev_mode = true;
     build_config.generate_move_model = test_validation::needs_validation();
@@ -211,45 +221,23 @@ pub fn run_move_unit_tests<W: Write + Send>(
         .collect();
     let root_package = resolution_graph.root_package.package.name;
     let build_plan = BuildPlan::create(resolution_graph)?;
+    let mut test_plan = None;
     // Compile the package. We need to intercede in the compilation, process being performed by the
     // Move package system, to first grab the compilation env, construct the test plan from it, and
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
-    let (_compiled_package, model_opt) = build_plan.compile_with_driver(
+    let (compiled_package, model_opt) = build_plan.compile_with_driver(
         writer,
         &build_config.compiler_config,
-        |compiler| {
-            let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
-            let (_, compiler) =
-                diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
-            let (mut compiler, cfgir) = compiler.into_ast();
-            let compilation_env = compiler.compilation_env();
-            let built_test_plan = construct_test_plan(compilation_env, Some(root_package), &cfgir);
-            if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
-                if unit_test_config.ignore_compile_warnings {
-                    Severity::NonblockingError
-                } else {
-                    Severity::Warning
-                },
-            ) {
-                diagnostics::report_diagnostics_exit_on_error(&files, diags);
-            }
-
-            let compilation_result = compiler.at_cfgir(cfgir).build();
-
-            let (units, _) = diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-            test_plan = Some((built_test_plan, files.clone(), units.clone()));
-            Ok((files, units, None))
-        },
+        vec![],
         |options| {
-            let (files, units, opt_env) = build_and_report_v2_driver(options).unwrap();
-            let env = opt_env.expect("v2 driver should return env");
+            let (files, units, env) = build_and_report_v2_driver(options).unwrap();
             let root_package_in_model = env.symbol_pool().make(root_package.deref());
             let built_test_plan =
                 plan_builder_v2::construct_test_plan(&env, Some(root_package_in_model));
 
-            test_plan_v2 = Some((built_test_plan, files.clone(), units.clone()));
-            Ok((files, units, Some(env)))
+            test_plan = Some((built_test_plan, files.clone(), units.clone()));
+            Ok((files, units, env))
         },
     )?;
 
@@ -269,17 +257,16 @@ pub fn run_move_unit_tests<W: Write + Send>(
         }
     }
 
-    let test_plan = if test_plan.is_some() {
-        test_plan
-    } else {
-        test_plan_v2
-    };
-
     let (test_plan, mut files, units) = test_plan.unwrap();
     files.extend(dep_file_map);
     let test_plan = test_plan.unwrap();
     let no_tests = test_plan.is_empty();
-    let test_plan = TestPlan::new(test_plan, files, units);
+    let test_plan = TestPlan::new(
+        test_plan,
+        files,
+        units,
+        compiled_package.bytecode_deps.into_values().collect(),
+    );
 
     let trace_path = pkg_path.join(".trace");
     let coverage_map_path = pkg_path
@@ -302,7 +289,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), cost_table, writer)
+        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), writer, factory)
         .unwrap()
         .1
     {
@@ -316,9 +303,10 @@ pub fn run_move_unit_tests<W: Write + Send>(
             let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
             buf_writer.flush().unwrap();
         }
-        let coverage_map = CoverageMap::from_trace_file(trace_path);
-        output_map_to_file(coverage_map_path, &coverage_map).unwrap();
+        let coverage_map = CoverageMap::from_trace_file(&trace_path)?;
+        output_map_to_file(&coverage_map_path, &coverage_map)?;
     }
+    cleanup_trace();
     Ok(UnitTestResult::Success)
 }
 

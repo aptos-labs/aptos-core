@@ -34,7 +34,6 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
-        seeds: {}
         identity: {}
         inbound_rate_limit_config:
         outbound_rate_limit_config:
@@ -52,11 +51,11 @@ image:
 
 resources:
   limits:
-    cpu: 14
-    memory: 56Gi
+    cpu: 30
+    memory: 60Gi
   requests:
-    cpu: 14
-    memory: 56Gi
+    cpu: 30
+    memory: 60Gi
 
 nodeSelector: {}
 tolerations: []
@@ -67,6 +66,8 @@ storage:
   class:
   # -- Size of fullnode persistent storage
   size: 1000Gi
+  # -- The name of a VolumeSnapshot to restore from. In unset, the fullnode will start from scratch.
+  snapshotRefForRestore:
 
 service:
   # -- The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally
@@ -117,11 +118,11 @@ backup:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 4
+      cpu: 6
       memory: 8Gi
     requests:
       cpu: 4
-      memory: 8Gi
+      memory: 4Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -134,6 +135,9 @@ backup:
       bucket:
     gcs:
       bucket:
+    r2:
+      bucket:
+      endpoint_url:
     azure:
       account:
       container:
@@ -142,20 +146,24 @@ backup:
     state_snapshot_interval_epochs: 2
     # -- Transaction batch size
     transaction_batch_size: 1000000
+    # -- Number of concurrent requests to the PFN backup port
+    concurrent_data_requests:
 
 backup_verify:
   # -- The schedule for backup verification
   schedule: "@daily"
   resources:
     limits:
-      cpu: 8
-      memory: 32Gi
+      cpu: 32
+      memory: 60Gi
     requests:
-      cpu: 4
-      memory: 16Gi
+      cpu: 8
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  config:
+    concurrent_downloads: 50
 
 backup_compaction:
   # -- The schedule for backup compaction

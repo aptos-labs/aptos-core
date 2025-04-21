@@ -10,7 +10,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
-use aptos_executor_types::StateComputeResult;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     account_address::AccountAddress,
@@ -21,10 +21,11 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
+use std::sync::Arc;
 
 /// Helper function for test to blindly bootstrap without waypoint.
-pub fn bootstrap_genesis<V: VMExecutor>(
+pub fn bootstrap_genesis<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
 ) -> anyhow::Result<Waypoint> {
@@ -49,7 +50,7 @@ pub fn gen_ledger_info_with_sigs(
             0, /* round */
             commit_block_id,
             output.root_hash(),
-            output.version(),
+            output.expect_last_version(),
             0, /* timestamp */
             output.epoch_state().clone(),
         ),
@@ -62,7 +63,7 @@ pub fn extract_signer(config: &mut NodeConfig) -> ValidatorSigner {
     let sr_test = config.consensus.safety_rules.test.as_ref().unwrap();
     ValidatorSigner::new(
         sr_test.author,
-        sr_test.consensus_key.as_ref().unwrap().private_key(),
+        Arc::new(sr_test.consensus_key.as_ref().unwrap().private_key()),
     )
 }
 

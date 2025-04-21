@@ -5,7 +5,7 @@
 use codespan_reporting::term::termcolor::Buffer;
 #[allow(unused_imports)]
 use log::debug;
-use move_prover::{cli::Options, run_move_prover};
+use move_prover::{cli::Options, run_move_prover_v2};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use std::{
     collections::BTreeSet,
@@ -64,7 +64,7 @@ fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     };
 
     let mut error_writer = Buffer::no_color();
-    match run_move_prover(&mut error_writer, options) {
+    match run_move_prover_v2(&mut error_writer, options) {
         Ok(()) => {
             for abi_path in get_abi_paths_under_dir(&temp_path)?.iter() {
                 let mut contents = String::new();

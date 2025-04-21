@@ -1,6 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_23,
+    gas_params::natives::aptos_framework::RANDOMNESS_FETCH_AND_INC_COUNTER,
+};
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
@@ -55,6 +59,10 @@ pub fn fetch_and_increment_txn_counter(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if context.gas_feature_version() >= RELEASE_V1_23 {
+        context.charge(RANDOMNESS_FETCH_AND_INC_COUNTER)?;
+    }
+
     let ctx = context.extensions_mut().get_mut::<RandomnessContext>();
     if !ctx.is_unbiasable() {
         return Err(SafeNativeError::Abort {
@@ -62,7 +70,6 @@ pub fn fetch_and_increment_txn_counter(
         });
     }
 
-    // TODO: charge gas?
     let ret = ctx.txn_local_state.to_vec();
     ctx.increment();
     Ok(smallvec![Value::vector_u8(ret)])

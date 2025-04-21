@@ -6,10 +6,8 @@ use crate::{
     diag,
     diagnostics::Diagnostics,
     expansion::ast::{ModuleIdent, ModuleIdent_, SpecId},
-    hlir::ast as H,
-    parser::ast::{FunctionName, ModuleName, Var},
-    shared::{unique_map::UniqueMap, Name, NumericalAddress},
-    typing::ast as T,
+    parser::ast::{ModuleName, Var},
+    shared::{Name, NumericalAddress},
 };
 use move_binary_format::file_format as F;
 use move_bytecode_source_map::source_map::SourceMap;
@@ -26,17 +24,8 @@ use std::collections::BTreeMap;
 //**************************************************************************************************
 
 #[derive(Debug, Clone)]
-pub struct VarInfo {
-    pub type_: H::SingleType,
-    pub index: F::LocalIndex,
-}
-
-#[derive(Debug, Clone)]
 pub struct SpecInfo {
     pub offset: F::CodeOffset,
-    pub origin: T::SpecIdent,
-    // Free locals that are used but not declared in the block
-    pub used_locals: UniqueMap<Var, VarInfo>,
     // Re-mapped function pointer names
     pub used_lambda_funs: BTreeMap<Symbol, (Symbol, Vec<Var>)>,
 }
@@ -71,7 +60,6 @@ pub struct AnnotatedCompiledModule {
     pub module_name_loc: Loc,
     pub address_name: Option<Name>,
     pub named_module: NamedCompiledModule,
-    pub function_infos: UniqueMap<FunctionName, FunctionInfo>,
 }
 
 #[derive(Debug, Clone)]

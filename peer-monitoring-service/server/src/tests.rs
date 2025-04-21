@@ -37,7 +37,7 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringMetadata, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
 };
-use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, LedgerSummary, Order};
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
@@ -681,7 +681,7 @@ mod database_mock {
 
             fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-            fn get_synced_version(&self) -> Result<Version>;
+            fn get_synced_version(&self) -> Result<Option<Version>>;
 
             fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
@@ -718,7 +718,7 @@ mod database_mock {
                 version: Version,
             ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
-            fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+            fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
 
             fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
 

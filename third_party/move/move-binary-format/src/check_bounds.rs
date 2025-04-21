@@ -9,18 +9,17 @@ use crate::{
         PartialVMError, PartialVMResult,
     },
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant,
-        FieldDefinition, FieldHandle, FieldInstantiation, FunctionDefinition,
-        FunctionDefinitionIndex, FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle,
-        Signature, SignatureIndex, SignatureToken, StructDefInstantiation, StructDefinition,
-        StructFieldInformation, StructHandle, StructVariantHandle, StructVariantInstantiation,
-        TableIndex, TypeParameterIndex, VariantFieldHandle, VariantFieldInstantiation,
-        VariantIndex,
+        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant, FieldDefinition,
+        FieldHandle, FieldInstantiation, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiation, StructDefinition, StructFieldInformation,
+        StructHandle, StructVariantHandle, StructVariantInstantiation, TableIndex,
+        TypeParameterIndex, VariantFieldHandle, VariantFieldInstantiation, VariantIndex,
     },
     internals::ModuleIndex,
     IndexKind,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ability::AbilitySet, vm_status::StatusCode};
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
@@ -97,8 +96,6 @@ impl<'a> BoundsChecker<'a> {
         self.check_function_instantiations()?;
         self.check_field_instantiations()?;
         self.check_struct_defs()?;
-        self.check_function_defs()?;
-        // Since bytecode version 7
         self.check_table(
             self.view.variant_field_handles(),
             Self::check_variant_field_handle,
@@ -115,6 +112,7 @@ impl<'a> BoundsChecker<'a> {
             self.view.struct_variant_instantiations(),
             Self::check_struct_variant_instantiation,
         )?;
+        self.check_function_defs()?;
         Ok(())
     }
 
@@ -272,6 +270,13 @@ impl<'a> BoundsChecker<'a> {
 
     fn check_variant_field_handle(&self, field_handle: &VariantFieldHandle) -> PartialVMResult<()> {
         check_bounds_impl_opt(&self.view.struct_defs(), field_handle.struct_index)?;
+        if field_handle.variants.is_empty() {
+            return Err(verification_error(
+                StatusCode::ZERO_VARIANTS_ERROR,
+                IndexKind::MemberCount,
+                field_handle.field,
+            ));
+        }
         let struct_def = self.view.struct_def_at(field_handle.struct_index)?;
         for variant in &field_handle.variants {
             Self::check_variant_index(struct_def, *variant)?;
@@ -385,8 +390,11 @@ impl<'a> BoundsChecker<'a> {
                 }
             },
             StructFieldInformation::DeclaredVariants(variants) => {
-                for field in variants.iter().flat_map(|v| v.fields.iter()) {
-                    self.check_field_def(type_param_count, field)?;
+                for variant in variants {
+                    check_bounds_impl(self.view.identifiers(), variant.name)?;
+                    for field in &variant.fields {
+                        self.check_field_def(type_param_count, field)?;
+                    }
                 }
                 if variants.is_empty() {
                     // Empty variants are not allowed
@@ -537,12 +545,12 @@ impl<'a> BoundsChecker<'a> {
                         )?;
                     }
                 },
-                Call(idx) => self.check_code_unit_bounds_impl(
+                Call(idx) | PackClosure(idx, _) => self.check_code_unit_bounds_impl(
                     self.view.function_handles(),
                     *idx,
                     bytecode_offset,
                 )?,
-                CallGeneric(idx) => {
+                CallGeneric(idx) | PackClosureGeneric(idx, _) => {
                     self.check_code_unit_bounds_impl(
                         self.view.function_instantiations(),
                         *idx,
@@ -641,7 +649,8 @@ impl<'a> BoundsChecker<'a> {
                 },
 
                 // Instructions that refer to a signature
-                VecPack(idx, _)
+                CallClosure(idx)
+                | VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
                 | VecMutBorrow(idx)
@@ -675,7 +684,7 @@ impl<'a> BoundsChecker<'a> {
         for ty in ty.preorder_traversal() {
             match ty {
                 Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TypeParameter(_)
-                | Reference(_) | MutableReference(_) | Vector(_) => (),
+                | Reference(_) | MutableReference(_) | Vector(_) | Function(..) => (),
                 Struct(idx) => {
                     check_bounds_impl(self.view.struct_handles(), *idx)?;
                     if let Some(sh) = self.view.struct_handles().get(idx.into_index()) {

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid assignment
+  ┌─ tests/more-v1/expansion/invalid_unpack_assign_mdot_no_struct.move:4:9
+  │
+4 │         Self::f() = 0;
+  │         ^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

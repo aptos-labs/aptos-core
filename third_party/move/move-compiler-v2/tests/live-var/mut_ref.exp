@@ -2,11 +2,11 @@
 
 [variant baseline]
 fun m::f1_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
+     var $t2: &mut 0x42::m::R
   0: $t1 := 0
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
   2: $t2 := borrow_local($t0)
   3: m::some($t2)
   4: m::some($t2)
@@ -16,12 +16,12 @@ fun m::f1_ok() {
 
 [variant baseline]
 fun m::f1a_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: 0x42::m::R
   0: $t1 := 0
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
   2: $t2 := borrow_local($t0)
   3: $t3 := read_ref($t2)
   4: m::some($t2)
@@ -32,12 +32,12 @@ fun m::f1a_ok() {
 
 [variant baseline]
 fun m::f1b_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: 0x42::m::R
   0: $t1 := 0
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
   2: $t2 := borrow_local($t0)
   3: m::some($t2)
   4: $t3 := read_ref($t2)
@@ -48,25 +48,27 @@ fun m::f1b_ok() {
 
 [variant baseline]
 fun m::f2_fail() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
   0: $t1 := 0
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
   2: $t2 := borrow_local($t0)
-  3: m::some2($t2, $t2)
-  4: return ()
+  3: $t3 := infer($t2)
+  4: m::some2($t3, $t2)
+  5: return ()
 }
 
 
 [variant baseline]
 fun m::f3_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: &mut m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
   0: $t1 := 0
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
   2: $t2 := borrow_local($t0)
   3: m::some($t2)
   4: $t3 := borrow_local($t0)
@@ -78,12 +80,12 @@ fun m::f3_ok() {
 
 [variant baseline]
 fun m::f4_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: &mut m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
   0: $t1 := 0
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
   2: $t2 := borrow_local($t0)
   3: $t3 := m::id($t2)
   4: $t2 := infer($t3)
@@ -94,12 +96,12 @@ fun m::f4_ok() {
 
 [variant baseline]
 fun m::f5_fail($t0: bool) {
-     var $t1: m::R
+     var $t1: 0x42::m::R
      var $t2: u64
-     var $t3: &mut m::R
-     var $t4: &mut m::R
+     var $t3: &mut 0x42::m::R
+     var $t4: &mut 0x42::m::R
   0: $t2 := 0
-  1: $t1 := pack m::R($t2)
+  1: $t1 := pack 0x42::m::R($t2)
   2: $t3 := borrow_local($t1)
   3: $t4 := infer($t3)
   4: if ($t0) goto 5 else goto 9
@@ -116,21 +118,21 @@ fun m::f5_fail($t0: bool) {
 
 
 [variant baseline]
-fun m::id($t0: &mut m::R): &mut m::R {
-     var $t1: &mut m::R
+fun m::id($t0: &mut 0x42::m::R): &mut 0x42::m::R {
+     var $t1: &mut 0x42::m::R
   0: $t1 := infer($t0)
   1: return $t1
 }
 
 
 [variant baseline]
-fun m::some($t0: &mut m::R) {
+fun m::some($t0: &mut 0x42::m::R) {
   0: return ()
 }
 
 
 [variant baseline]
-fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
+fun m::some2($t0: &mut 0x42::m::R, $t1: &mut 0x42::m::R) {
   0: return ()
 }
 
@@ -138,13 +140,13 @@ fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
 
 [variant baseline]
 fun m::f1_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
+     var $t2: &mut 0x42::m::R
      # live vars:
   0: $t1 := 0
      # live vars: $t1
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
      # live vars: $t0
   2: $t2 := borrow_local($t0)
      # live vars: $t2
@@ -158,14 +160,14 @@ fun m::f1_ok() {
 
 [variant baseline]
 fun m::f1a_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: 0x42::m::R
      # live vars:
   0: $t1 := 0
      # live vars: $t1
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
      # live vars: $t0
   2: $t2 := borrow_local($t0)
      # live vars: $t2
@@ -181,14 +183,14 @@ fun m::f1a_ok() {
 
 [variant baseline]
 fun m::f1b_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: 0x42::m::R
      # live vars:
   0: $t1 := 0
      # live vars: $t1
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
      # live vars: $t0
   2: $t2 := borrow_local($t0)
      # live vars: $t2
@@ -204,32 +206,35 @@ fun m::f1b_ok() {
 
 [variant baseline]
 fun m::f2_fail() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
      # live vars:
   0: $t1 := 0
      # live vars: $t1
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
      # live vars: $t0
   2: $t2 := borrow_local($t0)
      # live vars: $t2
-  3: m::some2($t2, $t2)
+  3: $t3 := infer($t2)
+     # live vars: $t2, $t3
+  4: m::some2($t3, $t2)
      # live vars:
-  4: return ()
+  5: return ()
 }
 
 
 [variant baseline]
 fun m::f3_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: &mut m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
      # live vars:
   0: $t1 := 0
      # live vars: $t1
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
      # live vars: $t0
   2: $t2 := borrow_local($t0)
      # live vars: $t0, $t2
@@ -247,14 +252,14 @@ fun m::f3_ok() {
 
 [variant baseline]
 fun m::f4_ok() {
-     var $t0: m::R
+     var $t0: 0x42::m::R
      var $t1: u64
-     var $t2: &mut m::R
-     var $t3: &mut m::R
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
      # live vars:
   0: $t1 := 0
      # live vars: $t1
-  1: $t0 := pack m::R($t1)
+  1: $t0 := pack 0x42::m::R($t1)
      # live vars: $t0
   2: $t2 := borrow_local($t0)
      # live vars: $t2
@@ -270,14 +275,14 @@ fun m::f4_ok() {
 
 [variant baseline]
 fun m::f5_fail($t0: bool) {
-     var $t1: m::R
+     var $t1: 0x42::m::R
      var $t2: u64
-     var $t3: &mut m::R
-     var $t4: &mut m::R
+     var $t3: &mut 0x42::m::R
+     var $t4: &mut 0x42::m::R
      # live vars: $t0
   0: $t2 := 0
      # live vars: $t0, $t2
-  1: $t1 := pack m::R($t2)
+  1: $t1 := pack 0x42::m::R($t2)
      # live vars: $t0, $t1
   2: $t3 := borrow_local($t1)
      # live vars: $t0, $t3
@@ -306,8 +311,8 @@ fun m::f5_fail($t0: bool) {
 
 
 [variant baseline]
-fun m::id($t0: &mut m::R): &mut m::R {
-     var $t1: &mut m::R
+fun m::id($t0: &mut 0x42::m::R): &mut 0x42::m::R {
+     var $t1: &mut 0x42::m::R
      # live vars: $t0
   0: $t1 := infer($t0)
      # live vars: $t1
@@ -316,14 +321,233 @@ fun m::id($t0: &mut m::R): &mut m::R {
 
 
 [variant baseline]
-fun m::some($t0: &mut m::R) {
+fun m::some($t0: &mut 0x42::m::R) {
      # live vars: $t0
   0: return ()
 }
 
 
 [variant baseline]
-fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
+fun m::some2($t0: &mut 0x42::m::R, $t1: &mut 0x42::m::R) {
      # live vars: $t0, $t1
   0: return ()
 }
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f1_ok() {
+     var $t0: 0x42::m::R
+     var $t1: u64
+     var $t2: &mut 0x42::m::R
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::R($t1)
+     # live vars: $t0
+  2: $t2 := borrow_local($t0)
+     # live vars: $t2
+  3: m::some($t2)
+     # live vars: $t2
+  4: m::some($t2)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun m::f1a_ok() {
+     var $t0: 0x42::m::R
+     var $t1: u64
+     var $t2: &mut 0x42::m::R
+     var $t3: 0x42::m::R
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::R($t1)
+     # live vars: $t0
+  2: $t2 := borrow_local($t0)
+     # live vars: $t2
+  3: $t3 := read_ref($t2)
+     # live vars: $t2
+  4: m::some($t2)
+     # live vars: $t2
+  5: m::some($t2)
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
+fun m::f1b_ok() {
+     var $t0: 0x42::m::R
+     var $t1: u64
+     var $t2: &mut 0x42::m::R
+     var $t3: 0x42::m::R
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::R($t1)
+     # live vars: $t0
+  2: $t2 := borrow_local($t0)
+     # live vars: $t2
+  3: m::some($t2)
+     # live vars: $t2
+  4: $t3 := read_ref($t2)
+     # live vars: $t2
+  5: m::some($t2)
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
+fun m::f2_fail() {
+     var $t0: 0x42::m::R
+     var $t1: u64
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::R($t1)
+     # live vars: $t0
+  2: $t2 := borrow_local($t0)
+     # live vars: $t2
+  3: $t3 := infer($t2)
+     # live vars: $t2, $t3
+  4: m::some2($t3, $t2)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun m::f3_ok() {
+     var $t0: 0x42::m::R
+     var $t1: u64
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::R($t1)
+     # live vars: $t0
+  2: $t2 := borrow_local($t0)
+     # live vars: $t0, $t2
+  3: m::some($t2)
+     # live vars: $t0
+  4: $t3 := borrow_local($t0)
+     # live vars: $t3
+  5: $t2 := infer($t3)
+     # live vars: $t2
+  6: m::some($t2)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun m::f4_ok() {
+     var $t0: 0x42::m::R
+     var $t1: u64
+     var $t2: &mut 0x42::m::R
+     var $t3: &mut 0x42::m::R
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::R($t1)
+     # live vars: $t0
+  2: $t2 := borrow_local($t0)
+     # live vars: $t2
+  3: $t3 := m::id($t2)
+     # live vars: $t3
+  4: $t2 := infer($t3)
+     # live vars: $t2
+  5: m::some($t2)
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
+fun m::f5_fail($t0: bool) {
+     var $t1: 0x42::m::R
+     var $t2: u64
+     var $t3: &mut 0x42::m::R
+     var $t4: &mut 0x42::m::R
+     # live vars: $t0
+  0: $t2 := 0
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x42::m::R($t2)
+     # live vars: $t0, $t1
+  2: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  3: $t4 := infer($t3)
+     # live vars: $t0, $t3, $t4
+  4: if ($t0) goto 5 else goto 9
+     # live vars: $t3, $t4
+  5: label L0
+     # live vars: $t3, $t4
+  6: m::some($t3)
+     # live vars: $t4
+  7: m::some($t4)
+     # live vars:
+  8: goto 12
+     # live vars: $t3, $t4
+  9: label L1
+     # live vars: $t3, $t4
+ 10: m::some($t4)
+     # live vars: $t3
+ 11: m::some($t3)
+     # live vars:
+ 12: label L2
+     # live vars:
+ 13: return ()
+}
+
+
+[variant baseline]
+fun m::id($t0: &mut 0x42::m::R): &mut 0x42::m::R {
+     var $t1: &mut 0x42::m::R
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::some($t0: &mut 0x42::m::R) {
+     # live vars: $t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::some2($t0: &mut 0x42::m::R, $t1: &mut 0x42::m::R) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+Diagnostics:
+error: cannot transfer mutable local `x` since it is borrowed
+   ┌─ tests/live-var/mut_ref.move:41:9
+   │
+41 │         some2(x, x); // expected error because multiple use
+   │         ^^^^^^^^^^^
+   │         │     │
+   │         │     previously mutably borrowed here
+   │         transfer attempted here
+
+error: cannot transfer mutable local `x` since it is borrowed
+   ┌─ tests/live-var/mut_ref.move:64:13
+   │
+62 │         let y = x; // expected error because of implicit copy
+   │                 - previously mutably borrowed here
+63 │         if (cond) {
+64 │             some(x);
+   │             ^^^^^^^ transfer attempted here
+65 │             some(y)
+   │             ------- conflicting reference `y` used here

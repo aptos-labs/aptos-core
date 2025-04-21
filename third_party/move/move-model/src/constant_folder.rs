@@ -221,6 +221,27 @@ impl<'env> ConstantFolder<'env> {
         }
     }
 
+    /// Check the RHS of a shift: `rhs` should be less than result type size.
+    fn shift_rhs_check(
+        &mut self,
+        rhs: &BigInt,
+        result_ty_size: &BigInt,
+        id: NodeId,
+        binop_name: &str,
+    ) -> Option<()> {
+        if rhs < result_ty_size {
+            Some(())
+        } else {
+            self.constant_folding_error(id, |_| {
+                format!(
+                    "Operand on the right is too large for `{}`, should be less than `{}`",
+                    binop_name, result_ty_size
+                )
+                .to_owned()
+            })
+        }
+    }
+
     fn checked_shl(a: &BigInt, b: &BigInt) -> Option<BigInt> {
         b.to_u16().map(|b| a.shl(b))
     }
@@ -237,7 +258,7 @@ impl<'env> ConstantFolder<'env> {
             .unwrap_or_else(|| BigInt::from(256))
     }
 
-    /// Try constant folding of a non-tuple binary operation `oper` applied to arguements `arg0` and
+    /// Try constant folding of a non-tuple binary operation `oper` applied to arguments `arg0` and
     /// `arg1`, returning `Some(exp)` where `exp` is a ExpData::Value(id, ..)` expression if
     /// constant folding is possible.  Operation result type may be obtained from `id`.
     ///
@@ -282,14 +303,32 @@ impl<'env> ConstantFolder<'env> {
                     O::Shl => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.binop_num(name(), Self::checked_shl, id, result_pty, val0, val1)
-                            .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
+                        self.shift_rhs_check(val1, &arg0_size, id, name())
+                            .and_then(|_| {
+                                self.binop_num(
+                                    name(),
+                                    Self::checked_shl,
+                                    id,
+                                    result_pty,
+                                    val0,
+                                    val1,
+                                )
+                            })
                     },
                     O::Shr => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.binop_num(name(), Self::checked_shr, id, result_pty, val0, val1)
-                            .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
+                        self.shift_rhs_check(val1, &arg0_size, id, name())
+                            .and_then(|_| {
+                                self.binop_num(
+                                    name(),
+                                    Self::checked_shr,
+                                    id,
+                                    result_pty,
+                                    val0,
+                                    val1,
+                                )
+                            })
                     },
                     O::BitAnd => Some(V(id, Number(val0.bitand(val1))).into_exp()),
                     O::BitOr => Some(V(id, Number(val0.bitor(val1))).into_exp()),
@@ -328,9 +367,17 @@ impl<'env> ConstantFolder<'env> {
                     O::Neq => val0
                         .equivalent(val1)
                         .map(|equivalence| V(id, Bool(!equivalence)).into_exp()),
-                    _ => self.constant_folding_error(id, |_| {
-                        "Unknown binary expression in `const`".to_owned()
-                    }),
+                    _ => {
+                        if oper.is_binop() {
+                            self.constant_folding_error(id, |_| {
+                                "Constant folding failed due to incomplete evaluation".to_owned()
+                            })
+                        } else {
+                            self.constant_folding_error(id, |_| {
+                                "Unknown binary expression in `const`".to_owned()
+                            })
+                        }
+                    },
                 }
             }
         } else {

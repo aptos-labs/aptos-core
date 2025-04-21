@@ -5,6 +5,13 @@ module 0x42::vector {
     }
 } // end 0x42::vector
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::vector {
+    fun create(): vector<u64> {
+        vector[1, 2, 3]
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
@@ -15,4 +22,15 @@ fun vector::create(): vector<u64> {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.vector {
+
+
+create(): vector<u64> /* def_idx: 0 */ {
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: Ret
+}
+}
 ============ bytecode verification succeeded ========

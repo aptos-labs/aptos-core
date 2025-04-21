@@ -9,7 +9,7 @@ use aptos_db_indexer_schemas::{
     schema::transaction_by_account::TransactionByAccountSchema,
     utils::AccountTransactionVersionIter,
 };
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
@@ -82,7 +82,7 @@ impl TransactionStore {
     pub fn prune_transaction_by_account(
         &self,
         transactions: &[Transaction],
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
             if let Some(txn) = transaction.try_as_signed_user_txn() {

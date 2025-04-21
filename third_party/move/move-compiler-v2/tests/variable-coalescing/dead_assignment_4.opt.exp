@@ -63,13 +63,13 @@ public fun m::test4($t0: u64): u64 {
 
 
 Diagnostics:
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ tests/variable-coalescing/dead_assignment_4.move:9:17
   │
 9 │         let x = y;
   │                 ^
 
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ tests/variable-coalescing/dead_assignment_4.move:14:17
    │
 14 │         let x = y;
@@ -232,7 +232,7 @@ public fun m::test4($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
@@ -241,17 +241,17 @@ B0:
 	0: LdU64(3)
 	1: Ret
 }
-public test2(Arg0: u64): u64 /* def_idx: 1 */ {
+public test2(y: u64): u64 /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: u64)
+	0: MoveLoc[0](y: u64)
 	1: Ret
 }
-public test3(Arg0: u64): u64 /* def_idx: 2 */ {
+public test3(y: u64): u64 /* def_idx: 2 */ {
 B0:
 	0: LdU64(8)
 	1: Ret
 }
-public test4(Arg0: u64): u64 /* def_idx: 3 */ {
+public test4(y: u64): u64 /* def_idx: 3 */ {
 B0:
 	0: LdU64(1)
 	1: Ret

@@ -13,6 +13,7 @@ use move_table_extension::NativeTableContext;
 use move_vm_runtime::native_extensions::NativeContextExtensions;
 #[cfg(feature = "table-extension")]
 use move_vm_test_utils::BlankStorage;
+use move_vm_types::value_serde::FunctionValueExtension;
 use once_cell::sync::Lazy;
 use std::{fmt::Write, sync::Mutex};
 
@@ -50,22 +51,32 @@ pub(crate) fn new_extensions<'a>() -> NativeContextExtensions<'a> {
 
 /// Print the change sets for available native context extensions.
 #[allow(unused)]
-pub(crate) fn print_change_sets<W: Write>(_w: &mut W, mut extensions: NativeContextExtensions) {
+pub(crate) fn print_change_sets<W: Write>(
+    w: &mut W,
+    native_extensions: &mut NativeContextExtensions,
+    function_value_extension: &impl FunctionValueExtension,
+) {
     #[cfg(feature = "table-extension")]
-    print_table_extension(_w, &mut extensions);
+    print_table_extension(w, native_extensions, function_value_extension);
 }
 
 // =============================================================================================
 // Table Extensions
 
 #[cfg(feature = "table-extension")]
-fn create_table_extension(extensions: &mut NativeContextExtensions) {
-    extensions.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
+fn create_table_extension(native_extensions: &mut NativeContextExtensions) {
+    native_extensions.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
 }
 
 #[cfg(feature = "table-extension")]
-fn print_table_extension<W: Write>(w: &mut W, extensions: &mut NativeContextExtensions) {
-    let cs = extensions.remove::<NativeTableContext>().into_change_set();
+fn print_table_extension<W: Write>(
+    w: &mut W,
+    native_extensions: &mut NativeContextExtensions,
+    function_value_extension: &impl FunctionValueExtension,
+) {
+    let cs = native_extensions
+        .remove::<NativeTableContext>()
+        .into_change_set(function_value_extension);
     if let Ok(cs) = cs {
         if !cs.new_tables.is_empty() {
             writeln!(

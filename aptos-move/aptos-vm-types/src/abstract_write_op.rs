@@ -111,7 +111,7 @@ impl AbstractResourceWriteOp {
 
     /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.
     /// So this method is needed to be able to update metadata generically across different variants.
-    pub fn get_metadata_mut(&mut self) -> &mut StateValueMetadata {
+    pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
         use AbstractResourceWriteOp::*;
         match self {
             Write(write_op)
@@ -119,7 +119,7 @@ impl AbstractResourceWriteOp {
             | WriteResourceGroup(GroupWrite {
                 metadata_op: write_op,
                 ..
-            }) => write_op.get_metadata_mut(),
+            }) => write_op.metadata_mut(),
             InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp { metadata, .. })
             | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
                 metadata,

@@ -14,6 +14,15 @@ module 0x42::m {
     }
 } // end 0x42::m
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    fun invalid<T: drop + key>(addr: address) {
+        if (exists<T>(addr)) () else abort 0;
+        let _ = borrow_global<T>(addr);
+        move_from<T>(addr);
+    }
+}
+
 
 Diagnostics:
 error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'

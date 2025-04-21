@@ -19,6 +19,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    function::ClosureMask,
     gas_algebra::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
         InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
@@ -107,18 +108,18 @@ static ZERO_COST_SCHEDULE: Lazy<CostTable> = Lazy::new(zero_cost_schedule);
 /// Provide all the proper guarantees about gas metering in the Move VM.
 ///
 /// Every client must use an instance of this type to interact with the Move VM.
-pub struct GasStatus<'a> {
-    cost_table: &'a CostTable,
+pub struct GasStatus {
+    cost_table: CostTable,
     gas_left: InternalGas,
     charge: bool,
 }
 
-impl<'a> GasStatus<'a> {
+impl GasStatus {
     /// Initialize the gas state with metering enabled.
     ///
     /// Charge for every operation and fail when there is no more gas to pay for operations.
     /// This is the instantiation that must be used when executing a user script.
-    pub fn new(cost_table: &'a CostTable, gas_left: Gas) -> Self {
+    pub fn new(cost_table: CostTable, gas_left: Gas) -> Self {
         Self {
             gas_left: gas_left.to_unit(),
             cost_table,
@@ -133,14 +134,14 @@ impl<'a> GasStatus<'a> {
     pub fn new_unmetered() -> Self {
         Self {
             gas_left: InternalGas::new(0),
-            cost_table: &ZERO_COST_SCHEDULE,
+            cost_table: ZERO_COST_SCHEDULE.clone(),
             charge: false,
         }
     }
 
     /// Return the `CostTable` behind this `GasStatus`.
     pub fn cost_table(&self) -> &CostTable {
-        self.cost_table
+        &self.cost_table
     }
 
     /// Return the gas left.
@@ -197,7 +198,7 @@ impl<'a> GasStatus<'a> {
     }
 }
 
-impl<'b> GasMeter for GasStatus<'b> {
+impl GasMeter for GasStatus {
     fn balance_internal(&self) -> InternalGas {
         self.gas_left
     }
@@ -521,6 +522,10 @@ impl<'b> GasMeter for GasStatus<'b> {
     ) -> PartialVMResult<()> {
         Ok(())
     }
+
+    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 pub fn new_from_instructions(mut instrs: Vec<(Bytecode, GasCost)>) -> CostTable {
@@ -688,6 +693,15 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
             TestVariantGeneric(StructVariantInstantiationIndex::new(0)),
             GasCost::new(0, 0),
         ),
+        (
+            PackClosure(FunctionHandleIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (
+            PackClosureGeneric(FunctionInstantiationIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (CallClosure(SignatureIndex::new(0)), GasCost::new(0, 0)),
         (Nop, GasCost::new(0, 0)),
         (VecPack(SignatureIndex::new(0), 0), GasCost::new(0, 0)),
         (VecLen(SignatureIndex::new(0)), GasCost::new(0, 0)),
@@ -861,6 +875,15 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
             TestVariantGeneric(StructVariantInstantiationIndex::new(0)),
             GasCost::new(2, 1),
         ),
+        (
+            PackClosure(FunctionHandleIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (
+            PackClosureGeneric(FunctionInstantiationIndex::new(0), ClosureMask::new(0)),
+            GasCost::new(2, 1),
+        ),
+        (CallClosure(SignatureIndex::new(0)), GasCost::new(1132, 1)),
         (Nop, GasCost::new(1, 1)),
         (VecPack(SignatureIndex::new(0), 0), GasCost::new(84, 1)),
         (VecLen(SignatureIndex::new(0)), GasCost::new(98, 1)),

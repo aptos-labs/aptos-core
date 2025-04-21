@@ -5,8 +5,8 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_core_types::value::{MoveTypeLayout, MoveValue};
-
 mod utils;
+use utils::helpers::is_valid_layout;
 
 #[derive(Arbitrary, Debug)]
 struct FuzzData {
@@ -15,7 +15,7 @@ struct FuzzData {
 }
 
 fuzz_target!(|fuzz_data: FuzzData| {
-    if !utils::is_valid_layout(&fuzz_data.layout) {
+    if !is_valid_layout(&fuzz_data.layout) {
         return;
     }
 

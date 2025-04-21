@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.pack_unpack {
 struct S {
 	f1: u8,
@@ -8,77 +8,101 @@ struct S {
 	f3: u8
 }
 
-pack1(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 0 */ {
+pack1(x: u8, y: u8, z: u8): S /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: MoveLoc[1](Arg1: u8)
-	2: MoveLoc[2](Arg2: u8)
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: MoveLoc[2](z: u8)
 	3: Pack[0](S)
 	4: Ret
 }
-pack2(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 1 */ {
-L3:	loc0: u8
-L4:	loc1: u8
+pack2(x: u8, y: u8, z: u8): S /* def_idx: 1 */ {
+L3:	$f3: u8
+L4:	$f1: u8
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: StLoc[4](loc1: u8)
-	4: MoveLoc[3](loc0: u8)
-	5: MoveLoc[2](Arg2: u8)
-	6: MoveLoc[4](loc1: u8)
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: StLoc[3]($f3: u8)
+	3: StLoc[4]($f1: u8)
+	4: MoveLoc[4]($f1: u8)
+	5: MoveLoc[2](z: u8)
+	6: MoveLoc[3]($f3: u8)
 	7: Pack[0](S)
 	8: Ret
 }
-pack3(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 2 */ {
-L3:	loc0: u8
+pack3(x: u8, y: u8, z: u8): S /* def_idx: 2 */ {
+L3:	$t5: u8
+L4:	$f2: u8
+L5:	$t6: u8
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: MoveLoc[3](loc0: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: Pack[0](S)
-	6: Ret
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: StLoc[3]($t5: u8)
+	3: StLoc[4]($f2: u8)
+	4: MoveLoc[4]($f2: u8)
+	5: StLoc[5]($t6: u8)
+	6: MoveLoc[3]($t5: u8)
+	7: MoveLoc[5]($t6: u8)
+	8: MoveLoc[2](z: u8)
+	9: Pack[0](S)
+	10: Ret
 }
-pack4(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 3 */ {
-L3:	loc0: u8
-L4:	loc1: u8
+pack4(x: u8, y: u8, z: u8): S /* def_idx: 3 */ {
+L3:	$t6: u8
+L4:	$f3: u8
+L5:	$f2: u8
+L6:	$t7: u8
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: StLoc[4](loc1: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: MoveLoc[3](loc0: u8)
-	6: MoveLoc[4](loc1: u8)
-	7: Pack[0](S)
-	8: Ret
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: MoveLoc[2](z: u8)
+	3: StLoc[3]($t6: u8)
+	4: StLoc[4]($f3: u8)
+	5: StLoc[5]($f2: u8)
+	6: MoveLoc[5]($f2: u8)
+	7: StLoc[6]($t7: u8)
+	8: MoveLoc[3]($t6: u8)
+	9: MoveLoc[6]($t7: u8)
+	10: MoveLoc[4]($f3: u8)
+	11: Pack[0](S)
+	12: Ret
 }
-pack5(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 4 */ {
-L3:	loc0: u8
+pack5(x: u8, y: u8, z: u8): S /* def_idx: 4 */ {
+L3:	$t6: u8
+L4:	$t5: u8
+L5:	$f3: u8
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: MoveLoc[2](Arg2: u8)
-	4: MoveLoc[3](loc0: u8)
-	5: Pack[0](S)
-	6: Ret
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: MoveLoc[2](z: u8)
+	3: StLoc[3]($t6: u8)
+	4: StLoc[4]($t5: u8)
+	5: StLoc[5]($f3: u8)
+	6: MoveLoc[4]($t5: u8)
+	7: MoveLoc[3]($t6: u8)
+	8: MoveLoc[5]($f3: u8)
+	9: Pack[0](S)
+	10: Ret
 }
-pack6(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 5 */ {
-L3:	loc0: u8
-L4:	loc1: u8
+pack6(x: u8, y: u8, z: u8): S /* def_idx: 5 */ {
+L3:	$t6: u8
+L4:	$f2: u8
+L5:	$t7: u8
+L6:	$f3: u8
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: StLoc[4](loc1: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: MoveLoc[4](loc1: u8)
-	6: MoveLoc[3](loc0: u8)
-	7: Pack[0](S)
-	8: Ret
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: MoveLoc[2](z: u8)
+	3: StLoc[3]($t6: u8)
+	4: StLoc[4]($f2: u8)
+	5: MoveLoc[4]($f2: u8)
+	6: StLoc[5]($t7: u8)
+	7: StLoc[6]($f3: u8)
+	8: MoveLoc[3]($t6: u8)
+	9: MoveLoc[5]($t7: u8)
+	10: MoveLoc[6]($f3: u8)
+	11: Pack[0](S)
+	12: Ret
 }
 }
 ============ bytecode verification succeeded ========

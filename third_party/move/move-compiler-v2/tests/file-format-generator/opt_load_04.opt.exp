@@ -1,0 +1,28 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+bar(_x: &mut u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](_x: &mut u64)
+	1: Pop
+	2: Ret
+}
+baz(_x: u64, _y: u64, _z: u64) /* def_idx: 1 */ {
+B0:
+	0: Ret
+}
+public foo(x: u64) /* def_idx: 2 */ {
+B0:
+	0: MutBorrowLoc[0](x: u64)
+	1: Call bar(&mut u64)
+	2: MoveLoc[0](x: u64)
+	3: LdU64(1)
+	4: LdU64(2)
+	5: Call baz(u64, u64, u64)
+	6: Ret
+}
+}
+============ bytecode verification succeeded ========

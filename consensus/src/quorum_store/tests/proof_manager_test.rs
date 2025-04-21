@@ -7,16 +7,17 @@ use crate::quorum_store::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
-use std::collections::HashSet;
+use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -53,18 +54,17 @@ async fn get_proposal(
 ) -> Payload {
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
-    let req = GetPayloadCommand::GetPayloadRequest(
-        max_txns,
-        max_txns,
-        max_txns,
-        1000000,
-        max_txns / 2,
-        100000,
-        true,
-        PayloadFilter::InQuorumStore(filter_set),
-        callback_tx,
-        aptos_infallible::duration_since_epoch(),
-    );
+    let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
+        max_txns: PayloadTxnsSize::new(max_txns, 1000000),
+        max_txns_after_filtering: max_txns,
+        soft_max_txns_after_filtering: max_txns,
+        max_inline_txns: PayloadTxnsSize::new(max(max_txns / 2, 1), 100000),
+        filter: PayloadFilter::InQuorumStore(filter_set),
+        callback: callback_tx,
+        block_timestamp: aptos_infallible::duration_since_epoch(),
+        return_non_full: true,
+        maybe_optqs_payload_pull_params: None,
+    });
     proof_manager.handle_proposal_request(req);
     let GetPayloadResponse::GetPayloadResponse(payload) = callback_rx.await.unwrap().unwrap();
     payload
@@ -74,6 +74,7 @@ fn assert_payload_response(
     payload: Payload,
     expected: &[ProofOfStore],
     max_txns_from_block_to_execute: Option<u64>,
+    expected_block_gas_limit: Option<u64>,
 ) {
     match payload {
         Payload::InQuorumStore(proofs) => {
@@ -96,7 +97,17 @@ fn assert_payload_response(
             }
             assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
         },
-        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
+        Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(
+                execution_limits.max_txns_to_execute(),
+                max_txns_from_block_to_execute
+            );
+            assert_eq!(execution_limits.block_gas_limit(), expected_block_gas_limit);
+        },
         _ => panic!("Unexpected variant"),
     }
 }
@@ -110,6 +121,7 @@ async fn get_proposal_and_assert(
     assert_payload_response(
         get_proposal(proof_manager, max_txns, filter).await,
         expected,
+        None,
         None,
     );
 }
@@ -134,10 +146,15 @@ async fn test_max_txns_from_block_to_execute() {
     let payload = get_proposal(&mut proof_manager, 100, &[]).await;
     // convert payload to v2 format and assert
     let max_txns_from_block_to_execute = 10;
+    let block_gas_limit = 10_000;
     assert_payload_response(
-        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute)),
+        payload.transform_to_quorum_store_v2(
+            Some(max_txns_from_block_to_execute),
+            Some(block_gas_limit),
+        ),
         &vec![proof],
         Some(max_txns_from_block_to_execute),
+        Some(block_gas_limit),
     );
 }
 

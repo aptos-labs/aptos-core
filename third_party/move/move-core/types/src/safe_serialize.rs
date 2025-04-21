@@ -4,14 +4,11 @@
 
 //! Custom serializers which track recursion nesting with a thread local,
 //! and otherwise delegate to the derived serializers.
-//!
-//! This is currently only implemented for type tags, but can be easily
-//! generalized, as the only type-tag specific thing is the allowed nesting.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::RefCell;
 
-pub(crate) const MAX_TYPE_TAG_NESTING: u8 = 9;
+pub(crate) const MAX_TYPE_TAG_NESTING: u8 = 8;
 
 thread_local! {
     static TYPE_TAG_DEPTH: RefCell<u8> = const { RefCell::new(0) };
@@ -24,10 +21,13 @@ where
 {
     use serde::ser::Error;
 
+    // For testability, we allow to serialize one more level than deserialize.
+    const MAX_TYPE_TAG_NESTING_WHEN_SERIALIZING: u8 =
+        MAX_TYPE_TAG_NESTING + if cfg!(test) { 1 } else { 0 };
+
     TYPE_TAG_DEPTH.with(|depth| {
         let mut r = depth.borrow_mut();
-        if *r >= MAX_TYPE_TAG_NESTING {
-            // for testability, we allow one level more
+        if *r >= MAX_TYPE_TAG_NESTING_WHEN_SERIALIZING {
             return Err(S::Error::custom(
                 "type tag nesting exceeded during serialization",
             ));
@@ -51,8 +51,7 @@ where
     use serde::de::Error;
     TYPE_TAG_DEPTH.with(|depth| {
         let mut r = depth.borrow_mut();
-        // For testability, we allow to serialize one more level than deserialize.
-        if *r >= MAX_TYPE_TAG_NESTING - 1 {
+        if *r >= MAX_TYPE_TAG_NESTING {
             return Err(D::Error::custom(
                 "type tag nesting exceeded during deserialization",
             ));

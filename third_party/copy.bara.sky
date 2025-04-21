@@ -1,4 +1,4 @@
-moveUrl = "https://github.com/move-language/move.git"
+moveUrl = "https://github.com/move-language/move-on-aptos.git"
 aptosUrl = "https://github.com/aptos-labs/aptos-core.git"
 
 # Workflow to pull from Move to Aptos. This creates a draft PR at the fixed branch `from_move`
@@ -7,7 +7,7 @@ core.workflow(
     name = "pull_move",
     origin = git.github_origin(
         url = moveUrl,
-        ref = "aptos-main",
+        ref = "main",
     ),
     destination = git.destination(
         url = "NOT_SET", # use --git-destination-url to set this
@@ -33,7 +33,7 @@ core.workflow(
     ),
     destination = git.destination(
         url = "NOT_SET", # use --git-destination-url to set this
-        fetch = "aptos-main",
+        fetch = "main",
         push = "to_move",
         integrates = [],
     ),
@@ -55,7 +55,7 @@ core.workflow(
     ),
     destination = git.github_destination(
         url = moveUrl,
-        push = "aptos-main",
+        push = "main",
     ),
     mode = "ITERATIVE",
     origin_files = glob(["third_party/move/**"]),

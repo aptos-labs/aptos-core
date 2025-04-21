@@ -64,4 +64,23 @@ async fn test_abi() {
 
         assert_eq!(function["is_view"], false);
     }
+
+    // Confirm that MyEvent is considered an event.
+    let structs = modules.as_array().unwrap()[0]["abi"]["structs"]
+        .as_array()
+        .unwrap();
+    let my_event = structs
+        .iter()
+        .find(|s| s["name"].as_str().unwrap() == "MyEvent")
+        .unwrap();
+
+    assert_eq!(my_event["is_event"], true);
+
+    // Confirm that State is not considered an event.
+    let my_struct = structs
+        .iter()
+        .find(|s| s["name"].as_str().unwrap() == "State")
+        .unwrap();
+
+    assert_eq!(my_struct["is_event"], false);
 }

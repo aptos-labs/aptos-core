@@ -4,7 +4,10 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
+use move_vm_types::loaded_data::{
+    runtime_types::{AbilityInfo, Type},
+    struct_name_indexing::StructNameIndex,
+};
 use triomphe::Arc as TriompheArc;
 
 /// Converts a signature token into the in memory type representation used by the MoveVM.
@@ -13,6 +16,11 @@ pub fn intern_type(
     tok: &SignatureToken,
     struct_name_table: &[StructNameIndex],
 ) -> PartialVMResult<Type> {
+    let list = |toks: &[SignatureToken]| {
+        toks.iter()
+            .map(|tok| intern_type(module, tok, struct_name_table))
+            .collect::<PartialVMResult<Vec<_>>>()
+    };
     let res = match tok {
         SignatureToken::Bool => Type::Bool,
         SignatureToken::U8 => Type::U8,
@@ -27,6 +35,11 @@ pub fn intern_type(
         SignatureToken::Vector(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
             Type::Vector(TriompheArc::new(inner_type))
+        },
+        SignatureToken::Function(args, results, abilities) => Type::Function {
+            args: list(args)?,
+            results: list(results)?,
+            abilities: *abilities,
         },
         SignatureToken::Reference(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
@@ -44,10 +57,7 @@ pub fn intern_type(
             }
         },
         SignatureToken::StructInstantiation(sh_idx, tys) => {
-            let type_args: Vec<_> = tys
-                .iter()
-                .map(|tok| intern_type(module, tok, struct_name_table))
-                .collect::<PartialVMResult<_>>()?;
+            let type_args: Vec<_> = list(tys)?;
             let struct_handle = module.struct_handle_at(*sh_idx);
             Type::StructInstantiation {
                 idx: struct_name_table[sh_idx.0 as usize],

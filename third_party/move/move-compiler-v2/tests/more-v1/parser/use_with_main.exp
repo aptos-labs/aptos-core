@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: unbound module
+  ┌─ tests/more-v1/parser/use_with_main.move:3:5
+  │
+3 │ use 0x0::Module;
+  │     ^^^^^^^^^^^ Invalid 'use'. Unbound module: '0x0::Module'
+
+error: unbound module
+  ┌─ tests/more-v1/parser/use_with_main.move:4:5
+  │
+4 │ use 0xaBcD::Module as M;
+  │     ^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '0xABCD::Module'
+
+error: unbound module
+  ┌─ tests/more-v1/parser/use_with_main.move:5:5
+  │
+5 │ use 0x0000::Z;
+  │     ^^^^^^^^^ Invalid 'use'. Unbound module: '0x0::Z'

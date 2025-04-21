@@ -1,0 +1,7 @@
+
+Diagnostics:
+bug: unexpected type: _
+   ┌─ tests/file-format-generator/bug_16057.move:32:16
+   │
+32 │     public fun test() {
+   │                ^^^^

@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: not supported before language version `2.0-unstable`: receiver style function calls
+error: not supported before language version `2.0`: receiver style function calls
    ┌─ tests/checking-lang-v1/receiver_calls.move:24:9
    │
 24 │         s.receiver(1);
    │         ^^^^^^^^^^^^^
 
-error: not supported before language version `2.0-unstable`: receiver style function calls
+error: not supported before language version `2.0`: receiver style function calls
    ┌─ tests/checking-lang-v1/receiver_calls.move:25:9
    │
 25 │         s.receiver_ref(1);
    │         ^^^^^^^^^^^^^^^^^
 
-error: not supported before language version `2.0-unstable`: receiver style function calls
+error: not supported before language version `2.0`: receiver style function calls
    ┌─ tests/checking-lang-v1/receiver_calls.move:26:9
    │
 26 │         s.receiver_ref_mut(1);
    │         ^^^^^^^^^^^^^^^^^^^^^
 
-error: not supported before language version `2.0-unstable`: receiver style function calls
+error: not supported before language version `2.0`: receiver style function calls
    ┌─ tests/checking-lang-v1/receiver_calls.move:27:9
    │
 27 │         s.inline_receiver_ref_mut(1)

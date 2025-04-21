@@ -4,9 +4,9 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, MatchArm, ModuleName, Operation,
-        Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex,
-        Value,
+        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, MatchArm,
+        ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier,
+        RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -25,22 +25,29 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
+    well_known::{BORROW_MUT_NAME, BORROW_NAME},
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self, Ability, AbilitySet};
+use move_binary_format::file_format::{self};
 use move_compiler::{
-    expansion::ast as EA,
-    hlir::ast as HA,
-    naming::ast as NA,
-    parser::{ast as PA, ast::CallKind},
-    shared::{Identifier, Name},
+    expansion::ast::{self as EA},
+    parser::ast::{self as PA, CallKind, Field},
+    shared::{unique_map::UniqueMap, Identifier, Name},
 };
-use move_core_types::{account_address::AccountAddress, value::MoveValue};
-use move_ir_types::location::{sp, Spanned};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
+    function::ClosureMask,
+};
+use move_ir_types::{
+    location::{sp, Spanned},
+    sp,
+};
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
     mem,
 };
@@ -78,7 +85,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// `accessed_locals`. See also documentation of function `mark_context_scopes`.
     pub outer_context_scopes: usize,
     /// A flag to indicate whether errors have been generated so far.
-    pub had_errors: bool,
+    pub had_errors: RefCell<bool>,
     /// Set containing all the functions called during translation.
     pub called_spec_funs: BTreeSet<(ModuleId, SpecFunId)>,
     /// A mapping from SpecId to SpecBlock (expansion ast)
@@ -88,6 +95,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub placeholder_map: BTreeMap<NodeId, ExpPlaceholder>,
     /// A flag to indicate whether to insert freeze operation
     pub insert_freeze: bool,
+    /// A stack of open loops and their optional label
+    pub loop_stack: Vec<Option<PA::Label>>,
 }
 
 #[derive(Debug)]
@@ -150,11 +159,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             node_counter_start,
             accessed_locals: BTreeSet::new(),
             outer_context_scopes: 0,
-            had_errors: false,
+            had_errors: RefCell::default(),
             called_spec_funs: BTreeSet::new(),
             spec_block_map: BTreeMap::new(),
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
+            loop_stack: vec![],
         }
     }
 
@@ -171,16 +181,28 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         et
     }
 
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
-        if !self.env().language_version().is_at_least(version_min) {
-            self.env().error(
-                loc,
-                &format!(
-                    "not supported before language version `{}`: {}",
-                    version_min, feature
-                ),
-            )
-        }
+    /// Returns `true` if language version is ok. Otherwise,
+    /// issues an error message and returns `false`.
+    pub fn test_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
+        self.parent.test_language_version(loc, feature, version_min)
+    }
+
+    /// Returns `Some(())` if language version checks out.  Otherwise,
+    /// issues an error message and returns `None`.
+    pub fn check_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> Option<()> {
+        self.parent
+            .test_language_version(loc, feature, version_min)
+            .then_some(())
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
@@ -265,19 +287,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Shortcut for reporting an error.
-    pub fn error(&mut self, loc: &Loc, msg: &str) {
+    pub fn error(&self, loc: &Loc, msg: &str) {
         self.error_with_notes(loc, msg, vec![])
     }
 
     /// Shortcut for reporting an error.
-    pub fn error_with_notes(&mut self, loc: &Loc, msg: &str, notes: Vec<String>) {
-        self.had_errors = true;
+    pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        *self.had_errors.borrow_mut() = true;
         self.parent.parent.error_with_notes(loc, msg, notes);
     }
 
     /// Shortcut for reporting an error.
-    pub fn error_with_labels(&mut self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
-        self.had_errors = true;
+    pub fn error_with_labels(&self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
+        *self.had_errors.borrow_mut() = true;
         self.env().error_with_labels(loc, msg, labels);
     }
 
@@ -289,13 +311,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         notes: Vec<String>,
         labels: Vec<(Loc, String)>,
     ) {
-        self.had_errors = true;
+        *self.had_errors.borrow_mut() = true;
         self.env()
             .diag_with_primary_notes_and_labels(Severity::Error, loc, msg, "", notes, labels);
     }
 
     /// Shortcut for reporting a bug
-    pub fn bug(&mut self, loc: &Loc, msg: &str) {
+    pub fn bug(&self, loc: &Loc, msg: &str) {
         self.env().diag(Severity::Bug, loc, msg)
     }
 
@@ -378,7 +400,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Finalizes types in this translator, producing errors if some could not be inferred
     /// and remained incomplete.
     pub fn finalize_types(&mut self) {
-        if !self.had_errors {
+        if !*self.had_errors.borrow() {
             let mut reported_vars = BTreeSet::new();
             for i in self.node_counter_start..self.env().next_free_node_number() {
                 let node_id = NodeId::new(i);
@@ -407,7 +429,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         reported_vars: &mut BTreeSet<u32>,
     ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
-        let loc = self.env().get_node_loc(node_id);
         let mut incomplete = false;
         let mut visitor = |t: &Type| {
             use Type::*;
@@ -420,13 +441,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         };
         ty.visit(&mut visitor);
         if incomplete {
-            self.error(
-                &loc,
-                &format!(
-                    "unable to infer instantiation of type `{}` (consider providing type arguments or annotating the type)",
-                    ty.display(&self.type_display_context())
-                ),
-            );
+            let displayed_ty = format!("{}", ty.display(&self.type_display_context()));
+            // Skip displaying the error message if there is already an error in the type;
+            // we must have another message about it already.
+            if !displayed_ty.contains("*error*") {
+                let loc = self.env().get_node_loc(node_id);
+                self.error(
+                    &loc,
+                    &format!(
+                        "unable to infer instantiation of type `{}` \
+                        (consider providing type arguments or annotating the type)",
+                        displayed_ty
+                    ),
+                );
+            }
         }
         ty
     }
@@ -629,6 +657,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         None
     }
 
+    pub fn lookup_struct_entry(&self, name: &QualifiedSymbol) -> &StructEntry {
+        self.parent.parent.lookup_struct_entry_by_name(name)
+    }
+
     /// Analyzes the sequence of type parameters as they are provided via the source AST and enters
     /// them into the environment. Returns a vector for representing them in the target AST.
     pub fn analyze_and_add_type_params<'a, I>(&mut self, type_params: I) -> Vec<TypeParameter>
@@ -669,23 +701,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
+        let is_lang_version_2_1 = self
+            .env()
+            .language_version
+            .is_at_least(LanguageVersion::V2_1);
         params
             .iter()
             .enumerate()
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
-                let sym = self.symbol_pool().make(v.0.value.as_str());
+                let var_str = v.0.value.as_str();
+                let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
-                self.define_local(
-                    &loc,
-                    sym,
-                    ty.clone(),
-                    None,
-                    // If this is for a proper Move function (not spec function), add the
-                    // index so we can resolve this to a `Temporary` expression instead of
-                    // a `LocalVar`.
-                    if for_move_fun { Some(idx) } else { None },
-                );
+
+                if !is_lang_version_2_1 || var_str != "_" {
+                    self.define_local(
+                        &loc,
+                        sym,
+                        ty.clone(),
+                        None,
+                        // If this is for a proper Move function (not spec function), add the
+                        // index so we can resolve this to a `Temporary` expression instead of
+                        // a `LocalVar`.
+                        if for_move_fun { Some(idx) } else { None },
+                    );
+                }
                 Parameter(sym, ty, loc)
             })
             .collect_vec()
@@ -750,11 +790,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 impl<'env, 'builder, 'module_builder> UnificationContext
     for ExpTranslator<'env, 'builder, 'module_builder>
 {
-    fn get_struct_field_map(
+    fn get_struct_field_decls(
         &self,
         id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool) {
-        self.parent.parent.lookup_struct_fields(id)
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
+        self.parent.parent.lookup_struct_field_decl(id, field_name)
+    }
+
+    fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {
+        self.parent.parent.get_function_wrapper_type(id)
     }
 
     fn get_receiver_function(
@@ -768,7 +813,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             .lookup_receiver_function(ty, name)
             .cloned()
         {
-            let type_inst = self.fresh_type_vars(entry.type_params.len());
+            let type_params = entry.type_params.clone();
+            let type_inst = self.fresh_type_vars(type_params.len());
             let arg_types = entry
                 .params
                 .iter()
@@ -777,6 +823,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             let result_type = entry.result_type.instantiate(&type_inst);
             Some(ReceiverFunctionInstance {
                 id: entry.module_id.qualified(entry.fun_id),
+                fun_name: name,
+                type_params,
                 type_inst,
                 arg_types,
                 result_type,
@@ -825,94 +873,6 @@ impl<'env, 'builder, 'module_builder> AbilityContext
 /// # Type Translation
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
-    /// Translates an hlir type into a target AST type.
-    pub fn translate_hlir_single_type(&mut self, ty: &HA::SingleType) -> Type {
-        use HA::SingleType_::*;
-        match &ty.value {
-            Ref(is_mut, ty) => {
-                let ty = self.translate_hlir_base_type(ty);
-                if ty == Type::Error {
-                    Type::Error
-                } else {
-                    Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(ty))
-                }
-            },
-            Base(ty) => self.translate_hlir_base_type(ty),
-        }
-    }
-
-    fn translate_hlir_base_type(&mut self, ty: &HA::BaseType) -> Type {
-        use HA::{BaseType_::*, TypeName_::*};
-        use NA::{BuiltinTypeName_::*, TParam};
-        match &ty.value {
-            Param(TParam {
-                user_specified_name,
-                ..
-            }) => {
-                let sym = self.symbol_pool().make(user_specified_name.value.as_str());
-                self.type_params_table[&sym].clone()
-            },
-            Apply(_, type_name, args) => {
-                let loc = self.to_loc(&type_name.loc);
-                match &type_name.value {
-                    Builtin(builtin_type_name) => match &builtin_type_name.value {
-                        Address => Type::new_prim(PrimitiveType::Address),
-                        Signer => Type::new_prim(PrimitiveType::Signer),
-                        U8 => Type::new_prim(PrimitiveType::U8),
-                        U16 => Type::new_prim(PrimitiveType::U16),
-                        U32 => Type::new_prim(PrimitiveType::U32),
-                        U64 => Type::new_prim(PrimitiveType::U64),
-                        U128 => Type::new_prim(PrimitiveType::U128),
-                        U256 => Type::new_prim(PrimitiveType::U256),
-                        Vector => Type::Vector(Box::new(self.translate_hlir_base_type(&args[0]))),
-                        Bool => Type::new_prim(PrimitiveType::Bool),
-                        Fun => Type::Fun(
-                            Box::new(Type::tuple(
-                                self.translate_hlir_base_types(&args[0..args.len() - 1]),
-                            )),
-                            Box::new(self.translate_hlir_base_type(&args[args.len() - 1])),
-                        ),
-                    },
-                    ModuleType(m, n) => {
-                        let addr_bytes = self.parent.parent.resolve_address(&loc, &m.value.address);
-                        let module_name = ModuleName::from_address_bytes_and_name(
-                            addr_bytes,
-                            self.symbol_pool().make(m.value.module.0.value.as_str()),
-                        );
-                        let symbol = self.symbol_pool().make(n.0.value.as_str());
-                        let qsym = QualifiedSymbol {
-                            module_name,
-                            symbol,
-                        };
-                        let rty = self.parent.parent.lookup_type(&loc, &qsym);
-                        if !args.is_empty() {
-                            // Replace type instantiation.
-                            if let Type::Struct(mid, sid, _) = &rty {
-                                let arg_types = self.translate_hlir_base_types(args);
-                                if arg_types.iter().any(|x| *x == Type::Error) {
-                                    Type::Error
-                                } else {
-                                    Type::Struct(*mid, *sid, arg_types)
-                                }
-                            } else {
-                                Type::Error
-                            }
-                        } else {
-                            rty
-                        }
-                    },
-                }
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    fn translate_hlir_base_types(&mut self, tys: &[HA::BaseType]) -> Vec<Type> {
-        tys.iter()
-            .map(|t| self.translate_hlir_base_type(t))
-            .collect()
-    }
-
     /// Translates a source AST type into a target AST type.
     pub fn translate_type(&mut self, ty: &EA::Type) -> Type {
         use EA::Type_::*;
@@ -1041,9 +1001,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ReferenceKind::from_is_mut(*is_mut),
                 Box::new(self.translate_type(ty)),
             ),
-            Fun(args, result) => Type::Fun(
-                Box::new(Type::tuple(self.translate_types(args.as_ref()))),
-                Box::new(self.translate_type(result)),
+            Fun(args, result, abilities) => Type::function(
+                Type::tuple(self.translate_types(args.as_ref())),
+                self.translate_type(result),
+                self.parent.translate_abilities(abilities),
             ),
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
@@ -1127,16 +1088,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &loc,
                 "read/write access specifiers. Try `acquires` instead.",
                 LanguageVersion::V2_0,
-            )
+            )?;
         } else if *negated {
-            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)
+            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)?;
         } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
             self.check_language_version(
                 &loc,
                 "access specifier type instantiation. Try removing the type instantiation.",
                 LanguageVersion::V2_0,
-            )
-        }
+            )?;
+        };
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1228,8 +1189,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &loc,
                 "address and wildcard access specifiers. Only resource type names can be provided.",
                 LanguageVersion::V2_0,
-            );
-        }
+            )?;
+        };
         let address = self.translate_address_specifier(address)?;
         Some(AccessSpecifier {
             loc: loc.clone(),
@@ -1252,7 +1213,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "wildcard address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 (loc, AddressSpecifier::Any)
             },
             EA::AddressSpecifier_::Literal(addr) => {
@@ -1260,7 +1221,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "literal address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 (
                     loc,
                     AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
@@ -1271,7 +1232,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "named address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
                 self.translate_name(
@@ -1291,7 +1252,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "derived address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
@@ -1358,6 +1319,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Translates an expression, with given expected type, which might be a type variable.
     pub fn translate_exp(&mut self, exp: &EA::Exp, expected_type: &Type) -> ExpData {
         self.translate_exp_in_context(exp, expected_type, &ErrorMessageContext::General)
+    }
+
+    /// Translates LambdaCaptureKind
+    pub fn translate_lambda_capture_kind(kind: PA::LambdaCaptureKind) -> LambdaCaptureKind {
+        match kind {
+            PA::LambdaCaptureKind::Default => LambdaCaptureKind::Default,
+            PA::LambdaCaptureKind::Copy => LambdaCaptureKind::Copy,
+            PA::LambdaCaptureKind::Move => LambdaCaptureKind::Move,
+        }
     }
 
     /// Translates an expression in a specific error message context.
@@ -1475,9 +1445,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ExpData::Call(id, Operation::Vector, elems)
             },
             EA::Exp_::Call(maccess, kind, type_params, args) => {
-                if !self.parent.check_no_variant(maccess) {
-                    self.new_error_exp()
-                } else if *kind == CallKind::Macro {
+                if *kind == CallKind::Macro {
                     self.translate_macro_call(maccess, type_params, args, expected_type, context)
                 } else {
                     // Need to make a &[&Exp] out of args.
@@ -1493,20 +1461,29 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     )
                 }
             },
-            EA::Exp_::Pack(maccess, generics, fields) => {
-                if let Some(exp) = self.translate_pack(
+            EA::Exp_::ExpCall(efexp, args) => {
+                let args_ref: Vec<_> = args.value.iter().collect();
+                let (arg_types, args) = self.translate_exp_list(&args_ref);
+                let fun_t = self.fresh_type_var_constr(
+                    loc.clone(),
+                    WideningOrder::LeftToRight,
+                    Constraint::SomeFunctionValue(Type::tuple(arg_types), expected_type.clone()),
+                );
+                let fexp = self.translate_exp(efexp, &fun_t);
+                let id = self.new_node_id_with_type_loc(expected_type, &loc);
+                ExpData::Invoke(id, fexp.into_exp(), args)
+            },
+            EA::Exp_::Pack(maccess, generics, fields) => self
+                .translate_pack(
                     &loc,
                     maccess,
                     generics,
                     Some(fields),
                     expected_type,
                     context,
-                ) {
-                    exp
-                } else {
-                    self.new_error_exp()
-                }
-            },
+                    false,
+                )
+                .unwrap_or_else(|| self.new_error_exp()),
             EA::Exp_::IfElse(cond, then, else_) => {
                 let try_freeze_if_else = |et: &mut ExpTranslator,
                                           expected_ty: &Type,
@@ -1548,10 +1525,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Match(discriminator, arms) => {
                 self.translate_match(loc, context, expected_type, discriminator, arms)
             },
-            EA::Exp_::While(cond, body) => {
+            EA::Exp_::While(label, cond, body) => {
                 let cond = self.translate_exp(cond, &Type::new_prim(PrimitiveType::Bool));
                 let body_type = self.check_type(&loc, &Type::unit(), expected_type, context);
+                self.push_loop_label(label);
                 let body = self.translate_exp(body, &body_type);
+                self.pop_loop_label();
                 let id = self.new_node_id_with_type_loc(&body_type, &loc);
                 ExpData::Loop(
                     id,
@@ -1559,16 +1538,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         id,
                         cond.into_exp(),
                         body.into_exp(),
-                        ExpData::LoopCont(id, false).into_exp(),
+                        ExpData::LoopCont(id, 0, false).into_exp(),
                     )
                     .into_exp(),
                 )
             },
-            EA::Exp_::Loop(body) => {
+            EA::Exp_::Loop(label, body) => {
+                self.push_loop_label(label);
                 let body = self.translate_exp(body, &Type::unit());
+                self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_loop_exit() {
+                let loop_type = if body.branches_to(0..usize::MAX) {
                     self.check_type(&loc, &Type::unit(), expected_type, context)
                 } else {
                     expected_type.clone()
@@ -1576,20 +1557,27 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&loop_type, &loc);
                 ExpData::Loop(id, body.into_exp())
             },
-            EA::Exp_::Break => {
+            EA::Exp_::Break(label) => {
+                let nest = self.find_loop_nest(label);
                 // Type of `break` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, false)
+                ExpData::LoopCont(id, nest, false)
             },
-            EA::Exp_::Continue => {
+            EA::Exp_::Continue(label) => {
+                let nest = self.find_loop_nest(label);
                 // Type of `continue` is arbitrary
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::LoopCont(id, true)
+                ExpData::LoopCont(id, nest, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
-            EA::Exp_::Lambda(bindings, exp) => {
-                self.translate_lambda(&loc, bindings, exp, expected_type, context)
-            },
+            EA::Exp_::Lambda(bindings, exp, capture_kind) => self.translate_lambda(
+                &loc,
+                bindings,
+                exp,
+                expected_type,
+                context,
+                Self::translate_lambda_capture_kind(*capture_kind),
+            ),
             EA::Exp_::Quant(kind, ranges, triggers, condition, body) => self.translate_quant(
                 &loc,
                 *kind,
@@ -1795,7 +1783,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         return call;
                     }
                 }
-                let target_exp = self.translate_exp(exp, &target_ty);
+                let target_exp = if let EA::Exp_::ExpDotted(exp) = &exp.value {
+                    self.translate_dotted(exp, &target_ty, *mutable, context)
+                } else {
+                    self.translate_exp(exp, &target_ty)
+                };
                 if self.subs.specialize(&target_ty).is_reference() {
                     self.error(&loc, "cannot borrow from a reference")
                 }
@@ -1838,6 +1830,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     vec![exp.into_exp()],
                 )
             },
+            EA::Exp_::Test(exp, tys) => self.translate_test(&loc, exp, tys, expected_type, context),
             EA::Exp_::Annotate(exp, typ) => {
                 let ty = self.translate_type(typ);
                 let exp =
@@ -1873,6 +1866,55 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn find_loop_nest(&self, label: &Option<PA::Label>) -> usize {
+        if let Some(label) = label {
+            let label_sym = label.value();
+            self.loop_stack
+                .iter()
+                .rev()
+                .position(|s| s.map(|s| s.value()) == Some(label_sym))
+                .unwrap_or_else(|| {
+                    self.error(
+                        &self.to_loc(&label.loc()),
+                        &format!("label `{}` undefined", label.value().as_str()),
+                    );
+                    0
+                })
+        } else {
+            0
+        }
+    }
+
+    fn push_loop_label(&mut self, label: &Option<PA::Label>) {
+        if let Some(label) = label {
+            let label_sym = label.value();
+            if let Some(Some(outer)) = self
+                .loop_stack
+                .iter()
+                .find(|s| s.map(|s| s.value()) == Some(label_sym))
+            {
+                self.error_with_labels(
+                    &self.to_loc(&label.loc()),
+                    &format!(
+                        "label `{}` already used by outer loop",
+                        label.value().as_str()
+                    ),
+                    vec![(
+                        self.to_loc(&outer.loc()),
+                        "outer definition of label".to_string(),
+                    )],
+                );
+            }
+        }
+        self.loop_stack.push(*label)
+    }
+
+    fn pop_loop_label(&mut self) {
+        self.loop_stack
+            .pop()
+            .expect("expected loop stack to be balanced");
+    }
+
     /// Returns a map representing the current locals in scope and their associated declaration
     /// location, type and temp index.
     fn get_locals(&self) -> BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)> {
@@ -1890,7 +1932,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         locals
     }
 
-    /// Returns true if the struct with the name `struct_name` is originally an empty struct
+    /// Returns true if the struct with the name `struct_name` is originally an empty struct.
+    /// During translation, for downwards compatibility we are adding a dummy field to empty
+    /// structs, this allows us to distinguish whether it was originally empty.
     fn is_empty_struct(&self, struct_name: &QualifiedSymbol) -> bool {
         self.parent
             .parent
@@ -1945,38 +1989,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 field_name,
                             } => {
                                 // Resolve a field selection into the inferred struct type.
-                                if let Type::Struct(mid, sid, _) = self
+                                if let Type::Struct(mid, sid, inst) = self
                                     .subs
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
-                                    let field = field_name.display(self.symbol_pool()).to_string();
-                                    let struct_name =
-                                        self.parent.parent.get_struct_name(mid.qualified(*sid));
-                                    if self.is_empty_struct(struct_name) {
-                                        self.error(
-                                            &loc,
-                                            &format!(
-                                                "empty struct `{}` cannot access the field `{}`",
-                                                struct_name.display(self.env()),
-                                                field
-                                            ),
-                                        );
-                                        return RewriteResult::Rewritten(
-                                            self.new_error_exp().into_exp(),
-                                        );
-                                    }
+                                    let oper = self.create_select_oper(
+                                        &loc,
+                                        &mid.qualified_inst(*sid, inst.clone()),
+                                        *field_name,
+                                    );
                                     RewriteResult::RewrittenAndDescend(
-                                        ExpData::Call(
-                                            id,
-                                            Operation::Select(
-                                                *mid,
-                                                *sid,
-                                                FieldId::new(*field_name),
-                                            ),
-                                            args,
-                                        )
-                                        .into_exp(),
+                                        ExpData::Call(id, oper, args).into_exp(),
                                     )
                                 } else {
                                     RewriteResult::Rewritten(self.new_error_exp().into_exp())
@@ -2032,7 +2056,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Pattern::Struct(sid, std, variant, patterns) => {
                     let mut new_inst = vec![];
                     for ty in &std.inst {
-                        let nty = subs.specialize(ty);
+                        // use `specialize_with_defaults` to get type info from constraints
+                        let nty: Type = subs.specialize_with_defaults(ty);
                         new_inst.push(nty);
                     }
                     let mut new_std = std.clone();
@@ -2057,7 +2082,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         receiver_arg_ty: &Type,
         inst: ReceiverFunctionInstance,
     ) -> RewriteResult {
-        let receiver_param_type = inst.arg_types.first().expect("argument").clone();
+        let mut receiver_param_type = inst.arg_types.first().expect("argument").clone();
         // Determine whether an automatic borrow needs to be inserted
         // and it's kind.
         let borrow_kind_opt = inst.receiver_needs_borrow(receiver_arg_ty);
@@ -2105,13 +2130,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &inst.result_type,
                 )
                 .map_err(|_| ok = false);
-            // `type.inst` is now unified with the actual types,
-            // annotate the instance. Since this post processor
+            // `type_inst` is now unified with the actual types,
+            // annotate the instance.  Since this post processor
             // is run after type finalization, we need to finalize
             // it to report any un-inferred type errors. However,
             // to avoid follow-up errors, only do if unification
             // succeeded
             if ok {
+                receiver_param_type = subs.specialize(&receiver_param_type);
                 self.subs = subs;
                 let inst = inst
                     .type_inst
@@ -2270,6 +2296,61 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ExpData::Match(id, discr_exp.into_exp(), translate_arms)
     }
 
+    fn translate_typed_lvalue_list(
+        &mut self,
+        list: &EA::TypedLValueList,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        match_locals: bool,
+        context: &ErrorMessageContext,
+    ) -> Pattern {
+        // Shortcut for single element case
+        if list.value.len() == 1 {
+            return self.translate_typed_lvalue(
+                list.value.first().unwrap(),
+                expected_type,
+                expected_order,
+                match_locals,
+                context,
+            );
+        }
+        let loc = self.to_loc(&list.loc);
+        // Ensure to maximize precision of expected type for elements
+        let expected_type = self.subs.specialize(expected_type);
+        let elem_expected_types = if let Type::Tuple(tys) = expected_type {
+            tys
+        } else {
+            let vars = self.fresh_type_vars(list.value.len());
+            // Just bind the variables
+            self.check_type_with_order(
+                expected_order,
+                &loc,
+                &Type::Tuple(vars.clone()),
+                &expected_type,
+                context,
+            );
+            vars
+        };
+        if elem_expected_types.len() != list.value.len() {
+            self.error(
+                &loc,
+                &context.arity_mismatch(false, elem_expected_types.len(), list.value.len()),
+            );
+            return self.new_error_pat(&loc);
+        }
+        let mut args = vec![];
+        let mut elem_types = vec![];
+        for (lv, expected) in list.value.iter().zip(elem_expected_types.iter()) {
+            let value =
+                self.translate_typed_lvalue(lv, expected, expected_order, match_locals, context);
+            elem_types.push(self.get_node_type(value.node_id()));
+            args.push(value)
+        }
+        let ty = Type::Tuple(elem_types);
+        let id = self.new_node_id_with_type_loc(&ty, &loc);
+        Pattern::Tuple(id, args)
+    }
+
     fn translate_lvalue_list(
         &mut self,
         list: &EA::LValueList,
@@ -2340,6 +2421,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn translate_typed_lvalue(
+        &mut self,
+        tlv: &EA::TypedLValue,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        match_locals: bool,
+        context: &ErrorMessageContext,
+    ) -> Pattern {
+        use move_ir_types::sp;
+        let sp!(loc, EA::TypedLValue_(lv, opt_ty)) = tlv;
+        match opt_ty {
+            Some(ty) => {
+                let loc = self.to_loc(loc);
+                let bound_type = self.translate_type(ty);
+                self.check_type_with_order(
+                    expected_order,
+                    &loc,
+                    &bound_type, // is this arg ordering right?
+                    expected_type,
+                    context,
+                );
+                self.translate_lvalue(lv, &bound_type, expected_order, match_locals, context)
+            },
+            None => self.translate_lvalue(lv, expected_type, expected_order, match_locals, context),
+        }
+    }
+
     fn translate_lvalue(
         &mut self,
         lv: &EA::LValue,
@@ -2404,6 +2512,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             maccess,
                             generics,
                             None,
+                            &None,
                         ) {
                             pat
                         } else {
@@ -2412,7 +2521,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     },
                 }
             },
-            EA::LValue_::Unpack(maccess, generics, args) => {
+            EA::LValue_::Unpack(maccess, generics, args, dotdot) => {
                 if let Some(pat) = self.translate_lvalue_unpack(
                     expected_type,
                     expected_order,
@@ -2422,11 +2531,104 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     maccess,
                     generics,
                     Some(args),
+                    dotdot,
                 ) {
                     pat
                 } else {
                     self.new_error_pat(loc)
                 }
+            },
+            EA::LValue_::PositionalUnpack(maccess, generics, args) => {
+                let expected_type = &self.subs.specialize(expected_type);
+                let Some((struct_id, variant)) = self.translate_constructor_name(
+                    expected_type,
+                    expected_order,
+                    context,
+                    loc,
+                    maccess,
+                    generics,
+                ) else {
+                    return self.new_error_pat(loc);
+                };
+                let arity = self
+                    .get_struct_arity(struct_id.to_qualified_id(), variant)
+                    .expect("arity");
+                let dotdot_loc = args
+                    .value
+                    .iter()
+                    .filter_map(|arg| {
+                        if let sp!(loc, EA::LValueOrDotDot_::DotDot) = arg {
+                            Some(*loc)
+                        } else {
+                            None
+                        }
+                    })
+                    .next();
+                if dotdot_loc.is_none() && args.value.len() != arity
+                    || dotdot_loc.is_some() && args.value.len() - 1 > arity
+                {
+                    self.error(
+                        loc,
+                        &ErrorMessageContext::PositionalUnpackArgument.arity_mismatch(
+                            false,
+                            args.value.len(),
+                            arity,
+                        ),
+                    );
+                    return self.new_error_pat(loc);
+                }
+                let mut fields = UniqueMap::new();
+                // the index of the field to be processed as in the user provided arguments
+                let mut arg_idx = 0;
+                // the offset of the field to be processed
+                let mut field_offset = 0;
+                let mut remaining = arity;
+                while remaining > 0 {
+                    let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
+                    match arg {
+                        EA::LValueOrDotDot_::LValue(lval) => {
+                            let field_name = Name::new(
+                                *arg_loc,
+                                move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                            );
+                            let field_name = Field(field_name);
+                            fields
+                                .add(field_name, (field_offset, lval.clone()))
+                                .expect("duplicate keys");
+                            remaining -= 1;
+                            field_offset += 1;
+                        },
+                        EA::LValueOrDotDot_::DotDot => {
+                            let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
+                                arity + 1 - args.value.len()
+                            } else {
+                                0
+                            };
+                            for _ in 0..fields_to_expand {
+                                let field_name = Name::new(
+                                    *arg_loc,
+                                    move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                                );
+                                let field_name = Field(field_name);
+                                fields
+                                    .add(field_name, (field_offset, EA::wild_card(*arg_loc)))
+                                    .expect("duplicate keys");
+                                remaining -= 1;
+                                field_offset += 1;
+                            }
+                        },
+                    }
+                    arg_idx += 1;
+                }
+                let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
+                let unpack = Spanned::new(lv.loc, unpack_);
+                self.translate_lvalue(
+                    &unpack,
+                    expected_type,
+                    expected_order,
+                    match_locals,
+                    context,
+                )
             },
         }
     }
@@ -2441,19 +2643,177 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: Option<&EA::Fields<EA::LValue>>,
+        dotdot: &Option<EA::DotDot>,
     ) -> Option<Pattern> {
-        // Check whether the requested type is a reference. If so, we remember this and
-        // the target type of the reference. The reference expectation is pushed down
-        // to the arguments of the unpack if needed.
-        let (ref_expected, expected_type) =
-            if let Type::Reference(kind, ty) = self.subs.specialize(expected_type) {
-                (Some(kind), *ty)
-            } else {
-                (None, expected_type.clone())
-            };
+        // Translate constructor name
+        let expected_type = self.subs.specialize(expected_type);
+        let (
+            QualifiedInstId {
+                module_id,
+                id,
+                inst,
+            },
+            variant,
+        ) = self.translate_constructor_name(
+            &expected_type,
+            expected_order,
+            context,
+            loc,
+            maccess,
+            generics,
+        )?;
+        let struct_name_loc = self.to_loc(&maccess.loc);
+        let struct_name = self
+            .parent
+            .parent
+            .get_struct_name(module_id.qualified(id))
+            .clone();
+        let ref_expected = expected_type.try_reference_kind();
 
-        // Determine whether expected type has variants
-        let variant_struct_info = if let Type::Struct(mid, sid, _) = &expected_type {
+        // Process argument list
+        let mut args = BTreeMap::new();
+        let (field_decls, _is_positional) =
+            self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
+        let field_decls = field_decls.clone();
+
+        if let Some(fields) = fields {
+            // Check whether all fields are covered.
+            let missing_fields =
+                self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
+            if let Some(dotdot) = dotdot {
+                for uncovered_field in missing_fields {
+                    if let Some(field_data) = field_decls.get(&uncovered_field) {
+                        let field_ty = field_data.ty.instantiate(&inst);
+                        let expected_field_ty = if let Some(kind) = ref_expected {
+                            Type::Reference(kind, Box::new(field_ty.clone()))
+                        } else {
+                            field_ty.clone()
+                        };
+                        let lvalue = EA::wild_card(dotdot.loc);
+                        let translated = self.translate_lvalue(
+                            &lvalue,
+                            &expected_field_ty,
+                            expected_order,
+                            match_locals,
+                            context,
+                        );
+                        args.insert(field_data.offset, translated);
+                    }
+                }
+            } else {
+                self.report_missing_fields(&missing_fields, loc)
+            }
+            // Translate fields
+            for (_, name, (_, value)) in fields.iter() {
+                let field_name = self.symbol_pool().make(name);
+                if let Some(field_data) = field_decls.get(&field_name) {
+                    let field_ty = field_data.ty.instantiate(&inst);
+                    let expected_field_ty = if let Some(kind) = ref_expected {
+                        Type::Reference(kind, Box::new(field_ty.clone()))
+                    } else {
+                        field_ty.clone()
+                    };
+                    let translated = self.translate_lvalue(
+                        value,
+                        &expected_field_ty,
+                        expected_order,
+                        match_locals,
+                        context,
+                    );
+                    args.insert(field_data.offset, translated);
+                }
+            }
+        } else {
+            let expected_args = if variant.is_some() {
+                field_decls.len()
+            } else {
+                // For structs need to account for the dummy field added by v1 compiler
+                field_decls
+                    .iter()
+                    .filter(|d| d.0 != &self.parent.dummy_field_name())
+                    .count()
+            };
+            if expected_args != 0 {
+                self.error(
+                    loc,
+                    &format!("no arguments provided for pack, expected {}", expected_args),
+                )
+            }
+        }
+
+        let mut args = args
+            .into_iter()
+            .sorted_by_key(|(i, _)| *i)
+            .map(|(_, value)| value)
+            .collect_vec();
+        if variant.is_none() && args.is_empty() {
+            // The v1 move compiler inserts a dummy field with the value of false
+            // for structs with no fields. We simulate this here for now.
+            let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
+            args.push(Pattern::Wildcard(id))
+        }
+
+        let struct_id = module_id.qualified_inst(id, inst);
+        let node_ty = if let Some(kind) = ref_expected {
+            Type::Reference(kind, Box::new(struct_id.to_type()))
+        } else {
+            struct_id.to_type()
+        };
+        let node_id = self.new_node_id_with_type_loc(&node_ty, loc);
+        Some(Pattern::Struct(node_id, struct_id, variant, args))
+    }
+
+    /// Translates a constructor name based on the given module access and
+    /// optional generic type arguments, using the expected_type for name
+    /// resolution.
+    fn translate_constructor_name(
+        &mut self,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        context: &ErrorMessageContext,
+        loc: &Loc,
+        maccess: &EA::ModuleAccess,
+        generics: &Option<Vec<EA::Type>>,
+    ) -> Option<(QualifiedInstId<StructId>, Option<Symbol>)> {
+        let expected_type = self.subs.specialize(expected_type).drop_reference();
+
+        let (struct_name, variant, struct_entry) =
+            self.resolve_struct_access(&expected_type, maccess, true)?;
+
+        // Resolve type instantiation.
+        let name_loc = self.to_loc(&maccess.loc);
+        let instantiation = self.make_instantiation_or_report(
+            &name_loc,
+            true,
+            struct_name.symbol,
+            &struct_entry.type_params,
+            generics,
+        )?;
+
+        // Verify type derived from reference with expected type.
+        let struct_id = struct_entry
+            .module_id
+            .qualified_inst(struct_entry.struct_id, instantiation);
+        let ty = struct_id.to_type();
+        let ty = self.check_type_with_order(expected_order, loc, &ty, &expected_type, context);
+        // Convert the unified type back to struct id
+        let mut struct_id = struct_id;
+        if let Type::Struct(_, _, types) = ty {
+            struct_id.inst = types;
+        }
+
+        Some((struct_id, variant))
+    }
+
+    fn resolve_struct_access(
+        &mut self,
+        expected_type: &Type,
+        maccess: &EA::ModuleAccess,
+        report_error: bool,
+    ) -> Option<(QualifiedSymbol, Option<Symbol>, StructEntry)> {
+        // Determine whether expected type is known to have variants (at this
+        // point during inference). If so, they are used for name resolution.
+        let variant_struct_info = if let Type::Struct(mid, sid, _) = expected_type {
             let entry = self.parent.parent.lookup_struct_entry(mid.qualified(*sid));
             if let StructLayout::Variants(variants) = &entry.layout {
                 Some((
@@ -2484,98 +2844,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (struct_name, variant) =
                     self.parent.module_access_to_qualified_with_variant(maccess);
                 let struct_name_loc = self.to_loc(&maccess.loc);
-                let struct_entry =
-                    self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
+                let struct_entry = if report_error {
+                    self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?
+                } else {
+                    self.parent.parent.struct_table.get(&struct_name).cloned()?
+                };
+
                 (struct_name, variant, struct_entry)
             },
         };
-
-        // Resolve type instantiation.
-        let instantiation = self.make_instantiation_or_report(
-            loc,
-            true,
-            struct_name.symbol,
-            &struct_entry.type_params,
-            generics,
-        )?;
-
-        // If this is a struct variant, check whether it exists.
-        if let Some(v) = variant {
-            if !self.check_variant_declared(&struct_name, &struct_entry, &struct_name_loc, v) {
+        if let Some(variant) = variant.filter(|_| report_error) {
+            if !self.check_variant_declared(&struct_name, &struct_entry, &struct_name_loc, variant)
+            {
                 return None;
             }
         }
-
-        // Process argument list
-        let mut args = BTreeMap::new();
-        let field_decls = self
-            .get_field_decls_for_pack_unpack(
-                &struct_entry,
-                &struct_name,
-                &struct_name_loc,
-                variant,
-            )?
-            .clone();
-        if let Some(fields) = fields {
-            // Check whether all fields are covered.
-            self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
-            // Translate fields
-            for (_, name, (_, value)) in fields.iter() {
-                let field_name = self.symbol_pool().make(name);
-                if let Some(field_data) = field_decls.get(&field_name) {
-                    let field_ty = field_data.ty.instantiate(&instantiation);
-                    let expected_field_ty = if let Some(kind) = ref_expected {
-                        Type::Reference(kind, Box::new(field_ty.clone()))
-                    } else {
-                        field_ty.clone()
-                    };
-                    let translated = self.translate_lvalue(
-                        value,
-                        &expected_field_ty,
-                        expected_order,
-                        match_locals,
-                        context,
-                    );
-                    args.insert(field_data.offset, translated);
-                }
-            }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for unpack, expected {}",
-                    field_decls.len()
-                ),
-            )
-        }
-
-        let struct_id = struct_entry
-            .module_id
-            .qualified_inst(struct_entry.struct_id, instantiation);
-        let mut args = args
-            .into_iter()
-            .sorted_by_key(|(i, _)| *i)
-            .map(|(_, value)| value)
-            .collect_vec();
-        if variant.is_none() && args.is_empty() {
-            // The v1 move compiler inserts a dummy field with the value of false
-            // for structs with no fields. We simulate this here for now.
-            let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
-            args.push(Pattern::Wildcard(id))
-        }
-        let ty = struct_id.to_type();
-        let ty = self.check_type_with_order(expected_order, loc, &ty, &expected_type, context);
-        let node_ty = if let Some(kind) = ref_expected {
-            Type::Reference(kind, Box::new(ty.clone()))
-        } else {
-            ty.clone()
-        };
-        let id = self.new_node_id_with_type_loc(&node_ty, loc);
-        let mut std = struct_id;
-        if let Type::Struct(_, _, types) = ty {
-            std.inst = types;
-        }
-        Some(Pattern::Struct(id, std, variant, args))
+        Some((struct_name, variant, struct_entry))
     }
 
     fn new_error_pat(&mut self, loc: &Loc) -> Pattern {
@@ -2753,8 +3037,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // Treat this as a call to a global function.
-        self.parent.check_no_variant(maccess);
-        let (module_name, name, _) = self.parent.module_access_to_parts(maccess);
+        let (no_variant, maccess) = self.parent.check_no_variant_and_convert_maccess(maccess);
+        if !no_variant {
+            return self.new_error_exp();
+        }
+        let (module_name, name, _) = self.parent.module_access_to_parts(&maccess);
 
         // Process `old(E)` scoping
         let is_old =
@@ -2791,6 +3078,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         result
     }
 
+    /// Checks whether the given name can be resolved to a struct or struct variant
+    fn can_resolve_to_struct(&mut self, expected_type: &Type, maccess: &EA::ModuleAccess) -> bool {
+        (maccess.value.is_valid_struct_constant_or_schema_name()
+            || ModuleBuilder::is_variant(maccess))
+            && self
+                .resolve_struct_access(expected_type, maccess, false)
+                .is_some()
+    }
+
     fn translate_fun_call_special_cases(
         &mut self,
         expected_type: &Type,
@@ -2809,6 +3105,32 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return None;
         }
 
+        // handles call of struct/variant with positional fields
+        let expected_type = &self.subs.specialize(expected_type);
+        if self.can_resolve_to_struct(expected_type, maccess) {
+            self.check_language_version(loc, "positional fields", LanguageVersion::V2_0)?;
+            // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
+            let fields: EA::Fields<_> =
+                EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
+                    let field_name = move_symbol_pool::Symbol::from(i.to_string());
+                    let loc = arg.loc;
+                    let field = PA::Field(Spanned::new(loc, field_name));
+                    (field, (i, arg.clone()))
+                }))
+                .expect("duplicate keys");
+            return self
+                .translate_pack(
+                    loc,
+                    maccess,
+                    generics,
+                    Some(&fields),
+                    expected_type,
+                    context,
+                    true,
+                )
+                .or_else(|| Some(self.new_error_exp()));
+        }
+
         // Check for builtin specification functions.
         if self.is_spec_mode() {
             if let EA::ModuleAccess_::Name(n) = &maccess.value {
@@ -2822,14 +3144,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
             // Check whether this is an Invoke on a function value.
             if let Some(entry) = self.lookup_local(sym, false) {
-                // Check whether the local has the expected function type.
+                // Add constraint on expected function type of local
                 let sym_ty = entry.type_.clone();
                 let (arg_types, args) = self.translate_exp_list(args);
-                let fun_t = Type::Fun(
-                    Box::new(Type::tuple(arg_types)),
-                    Box::new(expected_type.clone()),
+                self.add_constraint_and_report(
+                    loc,
+                    context,
+                    &sym_ty,
+                    Constraint::SomeFunctionValue(Type::tuple(arg_types), expected_type.clone()),
+                    None,
                 );
-                let sym_ty = self.check_type(loc, &sym_ty, &fun_t, context);
+
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var = ExpData::LocalVar(local_id, sym);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
@@ -2932,8 +3257,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// translated expression.
     pub fn translate_exp_free(&mut self, exp: &EA::Exp) -> (Type, ExpData) {
         let tvar = self.fresh_type_var();
-        let exp = self.translate_exp(exp, &tvar);
-        (self.subs.specialize(&tvar), exp)
+        let exp_out = self.translate_exp(exp, &tvar);
+        let tsub = self.subs.specialize(&tvar);
+        (tsub, exp_out)
     }
 
     /// Translates a sequence expression.
@@ -3100,6 +3426,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
+        let expected_type = &self.subs.specialize(expected_type);
+        // Try to resolve as argument-less construction of struct variant
+        if self.can_resolve_to_struct(expected_type, maccess) {
+            return self
+                .translate_pack(loc, maccess, type_args, None, expected_type, context, false)
+                .unwrap_or_else(|| self.new_error_exp());
+        }
+
         let global_var_sym = match &maccess.value {
             EA::ModuleAccess_::ModuleAccess(..) => self.parent.module_access_to_qualified(maccess),
             EA::ModuleAccess_::Name(name) => {
@@ -3155,6 +3489,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let instantiation = self.translate_types(type_args.as_slice());
             let ty = ty.instantiate(&instantiation);
             let ty = self.check_type(loc, &ty, expected_type, context);
+
             // Create expression global<GhostMem>(@0).v which backs up the ghost variable.
             let ghost_mem_id = StructId::new(
                 self.parent
@@ -3184,6 +3519,50 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 vec![global_access.into_exp()],
             );
         }
+
+        if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
+            let module_id = entry.module_id;
+            let fun_id = entry.fun_id;
+            let result_type = entry.result_type.clone();
+            let type_params = entry.type_params.clone();
+            let param_types = entry
+                .params
+                .iter()
+                .map(|param| param.get_type())
+                .collect_vec();
+            let Some(instantiation) = self.make_instantiation_or_report(
+                loc,
+                false,
+                global_var_sym.symbol,
+                &type_params,
+                type_args,
+            ) else {
+                return self.new_error_exp();
+            };
+            let fun_type = self.fresh_type_var_constr(
+                loc.clone(),
+                WideningOrder::LeftToRight,
+                Constraint::SomeFunctionValue(
+                    Type::tuple(
+                        param_types
+                            .iter()
+                            .map(|t| t.instantiate(&instantiation))
+                            .collect(),
+                    ),
+                    result_type.instantiate(&instantiation),
+                ),
+            );
+            let fun_type = self.check_type(loc, &fun_type, expected_type, context);
+
+            let id = self.env().new_node(loc.clone(), fun_type);
+            self.env().set_node_instantiation(id, instantiation);
+            return ExpData::Call(
+                id,
+                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                vec![],
+            );
+        }
+
         // If a qualified name is not explicitly specified, do not print it out
         let qualified_display = if let EA::ModuleAccess_::ModuleAccess(..) = maccess.value {
             global_var_sym.display(self.env())
@@ -3281,32 +3660,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
         let type_opt = convert_name_to_type(&resource_ty_exp.loc, resource_ty_exp.clone().value);
         if let Some(ty) = type_opt {
-            let resource_ty = self.translate_type(&ty);
-            let ref_t = Type::Reference(
-                ReferenceKind::from_is_mut(mutable),
-                Box::new(resource_ty.clone()),
-            );
-            let ty = self.check_type(loc, &ref_t, expected_type, context);
-            if ty.is_error() {
-                return self.new_error_exp();
-            }
-            let addr = self.translate_exp_in_context(
-                addr_exp,
-                &Type::Primitive(PrimitiveType::Address),
-                context,
-            );
-            let node = self.new_node_id_with_type_loc(
-                &Type::Reference(
-                    ReferenceKind::from_is_mut(mutable),
-                    Box::new(resource_ty.clone()),
-                ),
+            let name = if mutable {
+                self.symbol_pool().make("borrow_global_mut")
+            } else {
+                self.symbol_pool().make("borrow_global")
+            };
+            self.translate_call(
                 loc,
-            );
-            self.set_node_instantiation(node, vec![resource_ty.clone()]);
-            ExpData::Call(
-                node,
-                Operation::BorrowGlobal(ReferenceKind::from_is_mut(mutable)),
-                vec![addr.into()],
+                &self.to_loc(&resource_ty_exp.loc),
+                CallKind::Regular,
+                &Some(self.parent.parent.builtin_module()),
+                name,
+                &Some(vec![ty]),
+                &[addr_exp],
+                expected_type,
+                context,
             )
         } else {
             self.new_error_exp()
@@ -3348,12 +3716,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         } else {
             expected_type.clone()
         };
-        let ref_vec_exp_e = &sp(
-            vec_exp.loc,
-            EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
-        );
+        let (ty, _) = self.translate_exp_free(vec_exp);
+        let ref_vec_exp_e = if ty.is_reference() {
+            vec_exp.clone()
+        } else {
+            sp(
+                vec_exp.loc,
+                EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
+            )
+        };
         let vec_exp_e = self.translate_exp_in_context(
-            ref_vec_exp_e,
+            &ref_vec_exp_e,
             &Type::Reference(
                 ReferenceKind::from_is_mut(mutable),
                 Box::new(Type::Vector(Box::new(inner_ty.clone()))),
@@ -3362,26 +3735,49 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         );
         let idx_exp_e =
             self.translate_exp_in_context(idx_exp, &Type::Primitive(PrimitiveType::U64), context);
-        if self.had_errors {
+        if *self.had_errors.borrow() {
             return self.new_error_exp();
         }
+        let instantiated_inner = self.subs.specialize(&inner_ty);
+        let node_id = self.env().new_node(
+            loc.clone(),
+            Type::Reference(
+                ReferenceKind::from_is_mut(mutable),
+                Box::new(instantiated_inner.clone()),
+            ),
+        );
+        self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
         if let (Some(mid), Some(fid)) = self.get_vector_borrow(mutable) {
-            let instantiated_inner = self.subs.specialize(&inner_ty);
-            let node_id = self.env().new_node(
-                loc.clone(),
-                Type::Reference(
-                    ReferenceKind::from_is_mut(mutable),
-                    Box::new(instantiated_inner.clone()),
-                ),
-            );
-            self.set_node_instantiation(node_id, vec![inner_ty.clone()]);
             let call = ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
                 vec_exp_e.into_exp(),
                 idx_exp_e.clone().into_exp(),
             ]);
             return call;
+        } else {
+            // To use index notation in vector module
+            let borrow_fun_name = if mutable {
+                BORROW_MUT_NAME
+            } else {
+                BORROW_NAME
+            };
+            if let Some(borrow_symbol) = self
+                .parent
+                .parent
+                .vector_receiver_functions
+                .get(&self.env().symbol_pool.make(borrow_fun_name))
+            {
+                if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
+                    let mid = borrow_fun_entry.module_id;
+                    let fid = borrow_fun_entry.fun_id;
+                    return ExpData::Call(node_id, Operation::MoveFunction(mid, fid), vec![
+                        vec_exp_e.into_exp(),
+                        idx_exp_e.clone().into_exp(),
+                    ]);
+                }
+            }
         }
-        ExpData::Invalid(self.env().new_node_id())
+        self.error(loc, "cannot find vector module");
+        self.new_error_exp()
     }
 
     /// Try to translate a resource or vector Index expression
@@ -3409,7 +3805,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 .struct_table
                 .contains_key(&global_var_sym)
             {
-                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0);
+                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0)?;
                 if self
                     .parent
                     .parent
@@ -3439,7 +3835,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         }
         if !self.is_spec_mode() {
-            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0);
+            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0)?;
             // Translate to vector indexing in impl mode if the target is not a resource or a spec schema
             // spec mode is handled in `translate_index`
             if call.is_none() {
@@ -3509,7 +3905,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         dotted: &EA::ExpDotted,
         expected_type: &Type,
-        index_mutate: bool,
+        index_mutate: bool, // type of reference for type checking of index expression
         context: &ErrorMessageContext,
     ) -> ExpData {
         match &dotted.value {
@@ -3547,20 +3943,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 self.set_node_instantiation(id, vec![ty.clone()]);
-                let oper = if let Type::Struct(mid, sid, _inst) = self.subs.specialize(&ty) {
-                    let struct_name = self.parent.parent.get_struct_name(mid.qualified(sid));
-                    if self.is_empty_struct(struct_name) {
-                        self.error(
-                            &loc,
-                            &format!(
-                                "empty struct `{}` cannot access the field `{}`",
-                                struct_name.display(self.env()),
-                                n.value.as_str()
-                            ),
-                        );
-                    }
+                let oper = if let Type::Struct(mid, sid, inst) = self.subs.specialize(&ty) {
                     // Struct known at this point
-                    Operation::Select(mid, sid, FieldId::new(field_name))
+                    self.create_select_oper(&loc, &mid.qualified_inst(sid, inst), field_name)
                 } else {
                     // Create a placeholder for later resolution.
                     self.placeholder_map
@@ -3572,6 +3957,49 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])
             },
+        }
+    }
+
+    /// Creates a select operation for the given field name, the kind depending on whether
+    /// variant fields or struct fields are selected.
+    fn create_select_oper(
+        &mut self,
+        loc: &Loc,
+        id: &QualifiedInstId<StructId>,
+        field_name: Symbol,
+    ) -> Operation {
+        let struct_name = self.parent.parent.get_struct_name(id.to_qualified_id());
+        if self.is_empty_struct(struct_name) {
+            self.error(
+                loc,
+                &format!(
+                    "empty struct `{}` cannot access the field `{}`",
+                    struct_name.display(self.env()),
+                    field_name.display(self.symbol_pool())
+                ),
+            );
+        }
+        let (decls, is_variant) = self.parent.parent.lookup_struct_field_decl(id, field_name);
+        let field_ids = decls
+            .into_iter()
+            .map(|(variant, _)| {
+                if let Some(v) = variant {
+                    // Selects a field variant, the id is qualified by the variant name.
+                    let pool = self.symbol_pool();
+                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(v).as_str(),
+                        pool.string(field_name).as_str(),
+                    )))
+                } else {
+                    FieldId::new(field_name)
+                }
+            })
+            .collect_vec();
+        if is_variant {
+            Operation::SelectVariants(id.module_id, id.id, field_ids)
+        } else {
+            assert!(field_ids.len() == 1);
+            Operation::Select(id.module_id, id.id, field_ids[0])
         }
     }
 
@@ -3603,14 +4031,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let struct_exp = self.translate_exp(args[0], expected_type);
             let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
-                // field_map contains the instantiated field type.
-                let (field_map, _) = self
-                    .parent
-                    .parent
-                    .lookup_struct_fields(&mid.qualified_inst(sid, inst));
                 let field_name = self.symbol_pool().make(name.value.as_str());
-                let expected_field_type =
-                    field_map.get(&field_name).cloned().unwrap_or(Type::Error); // this error is reported via type unification
+                let (field_decls, _) = self
+                    .parent
+                    .parent
+                    .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
+                let expected_field_type = if let Some((_, ty)) = field_decls.into_iter().next() {
+                    ty
+                } else {
+                    Type::Error // this error is reported via type unification
+                };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
                         .into_iter()
@@ -3649,6 +4079,75 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn translate_test(
+        &mut self,
+        loc: &Loc,
+        exp: &EA::Exp,
+        tys: &[EA::Type],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let (exp_ty, exp) = self.translate_exp_free(exp);
+        let exp_ty = self.subs.specialize(&exp_ty);
+        let mut variants = vec![];
+        let mut struct_id = None;
+        for ty in tys {
+            let ty_loc = self.to_loc(&ty.loc);
+            if let EA::Type_::Apply(maccess, generics) = &ty.value {
+                if let Some((inferred_struct_id, variant)) = self.translate_constructor_name(
+                    &exp_ty,
+                    WideningOrder::LeftToRight,
+                    context,
+                    &ty_loc,
+                    maccess,
+                    &Some(generics.clone()),
+                ) {
+                    if let Some(variant) = variant {
+                        // Any time in the loop is the same if type unification succeeds, so
+                        // we can take the first
+                        struct_id.get_or_insert(inferred_struct_id);
+                        variants.push(variant);
+                    } else {
+                        self.error(
+                            &ty_loc,
+                            &format!(
+                                "expected variant of enum type but found type `{}`",
+                                self.env().display(&inferred_struct_id)
+                            ),
+                        )
+                    }
+                } else {
+                    // Error reported by call to `translate_constructor_name`
+                }
+            }
+        }
+        self.check_type(
+            loc,
+            &Type::new_prim(PrimitiveType::Bool),
+            expected_type,
+            context,
+        );
+        if let Some(QualifiedInstId {
+            module_id,
+            id,
+            inst,
+        }) = struct_id
+        {
+            let node_id = self.new_node_id_with_type_loc(expected_type, loc);
+            if !inst.is_empty() {
+                self.set_node_instantiation(node_id, inst)
+            }
+            ExpData::Call(
+                node_id,
+                Operation::TestVariants(module_id, id, variants),
+                vec![exp.into_exp()],
+            )
+        } else {
+            // Error report
+            self.new_error_exp()
+        }
+    }
+
     /// Translates a call, performing overload resolution. Reports an error if the function cannot be found.
     /// This is used to resolve both calls to user functions and builtin operators.
     fn translate_call(
@@ -3663,8 +4162,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Translate arguments.
-        let (arg_types, translated_args) = self.translate_exp_list(args);
+        // Translate arguments: arg_types is needed to do candidate matching.
+        let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
 
         // Special handling of receiver call functions
         if kind == CallKind::Receiver {
@@ -3672,6 +4171,50 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 module.is_none(),
                 "unexpected qualified name in receiver call"
             );
+            debug_assert!(
+                !args.is_empty(),
+                "receiver call needs to have at least one parameter"
+            );
+            let receiver_call_opt = self.get_receiver_function(&arg_types[0], name);
+            if let Some(receiver_call) = receiver_call_opt {
+                if let EA::Exp_::ExpDotted(dotted) = &args[0].value {
+                    // we need a special case for the receiver call S[x].f.fun(&mut...)
+                    // when the first argument is a dotted expression with index notation:
+                    // S[x].y because the reference type is by default set immutable ref
+                    if receiver_call.arg_types[0].is_mutable_reference() {
+                        let first_arg = self.translate_dotted(
+                            dotted,
+                            &arg_types[0],
+                            true,
+                            &ErrorMessageContext::General,
+                        );
+                        translated_args[0] = first_arg.into_exp();
+                    }
+                } else if let EA::Exp_::Index(target, index) = &args[0].value {
+                    // special case for the receiver call S[x].fun(&...), S[x].fun(&mut...)
+                    // so that it behaves the same as (&S[x]).fun(&...), (&mut S[x]).fun(&mut...)
+                    if receiver_call.arg_types[0].is_reference() {
+                        let index_mutate = receiver_call.arg_types[0].is_mutable_reference();
+                        if let Some(first_arg) = self.try_resource_or_vector_index(
+                            loc,
+                            target,
+                            index,
+                            &ErrorMessageContext::General,
+                            &Type::Reference(
+                                ReferenceKind::from_is_mut(index_mutate),
+                                Box::new(arg_types[0].clone()),
+                            ),
+                            index_mutate,
+                        ) {
+                            translated_args[0] = first_arg.into_exp();
+                            arg_types[0] = Type::Reference(
+                                ReferenceKind::from_is_mut(index_mutate),
+                                Box::new(arg_types[0].clone()),
+                            );
+                        }
+                    }
+                }
+            }
             return self.translate_receiver_call(
                 loc,
                 name,
@@ -3718,6 +4261,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, &format!("no function named `{}` found", display));
             return self.new_error_exp();
         }
+
         // Partition candidates in those which matched and which have been outruled.
         let mut outruled = vec![];
         let mut matching = vec![];
@@ -3777,6 +4321,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     continue;
                 }
             }
+
             // Process arguments
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
@@ -3863,6 +4408,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (cand, subs, instantiation) = matching.remove(0);
                 let (_, _, result_type) = cand.get_signature();
                 let result_type = result_type.instantiate(&instantiation);
+
                 // Commit the candidate substitution to this expression translator.
                 self.subs = subs;
 
@@ -3903,8 +4449,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .add_used_spec_fun(module_id.qualified(spec_fun_id));
                     self.called_spec_funs.insert((module_id, spec_fun_id));
                 }
+
                 let translated_args = self.add_conversions(cand, &instantiation, translated_args);
                 let specialized_expected_type = self.subs.specialize(expected_type);
+
                 let call_exp = ExpData::Call(id, oper, translated_args).into_exp();
                 // Insert freeze for the return value
                 let call_exp = if let (Type::Tuple(ref result_tys), Type::Tuple(expected_tys)) =
@@ -4047,7 +4595,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         args: Vec<Exp>,
         expected_type: &Type,
     ) -> ExpData {
-        self.check_language_version(loc, "receiver style function calls", LanguageVersion::V2_0);
+        if !self.test_language_version(loc, "receiver style function calls", LanguageVersion::V2_0)
+        {
+            let id = self.new_node_id_with_type_loc(&Type::Error, loc);
+            return ExpData::Invalid(id);
+        }
         let generics = generics
             .as_ref()
             .map(|tys| self.translate_types_with_loc(tys));
@@ -4080,16 +4632,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Translate a list of expressions and deliver them together with their types.
     fn translate_exp_list(&mut self, exps: &[&EA::Exp]) -> (Vec<Type>, Vec<Exp>) {
-        let mut types = vec![];
-        let exps = exps
-            .iter()
+        exps.iter()
             .map(|e| {
                 let (t, e) = self.translate_exp_free(e);
-                types.push(t);
-                e.into_exp()
+                (t, e.into_exp())
             })
-            .collect_vec();
-        (types, exps)
+            .unzip()
     }
 
     /// Creates a type instantiation using optionally provided type arguments.
@@ -4231,27 +4779,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         fields: Option<&EA::Fields<EA::Exp>>,
         expected_type: &Type,
         context: &ErrorMessageContext,
+        expected_positional_constructor: bool,
     ) -> Option<ExpData> {
         // Resolve reference to struct
-        let (struct_name, variant) = self.parent.module_access_to_qualified_with_variant(maccess);
-        let struct_name_loc = self.to_loc(&maccess.loc);
-        let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
-
-        // Resolve type instantiation
-        let instantiation = self.make_instantiation_or_report(
-            &self.to_loc(&maccess.loc),
-            true,
-            struct_name.symbol,
-            &struct_entry.type_params,
+        // Translate constructor name
+        let expected_type = self.subs.specialize(expected_type);
+        let (struct_inst_id, variant) = self.translate_constructor_name(
+            &expected_type,
+            WideningOrder::LeftToRight,
+            context,
+            loc,
+            maccess,
             generics,
         )?;
-
-        // If this is a struct variant, check whether it exists.
-        if let Some(v) = variant {
-            if !self.check_variant_declared(&struct_name, &struct_entry, &struct_name_loc, v) {
-                return None;
-            }
-        }
+        let struct_name = self
+            .parent
+            .parent
+            .get_struct_name(struct_inst_id.to_qualified_id())
+            .clone();
 
         // Process argument list.
         // given pack<S>{ f_p(1): e_1, ... }, where p is a permutation of the fields
@@ -4264,20 +4809,48 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // is equivalent.
         let mut bindings = BTreeMap::new();
         let mut args = BTreeMap::new();
-        let field_decls = self
-            .get_field_decls_for_pack_unpack(
-                &struct_entry,
-                &struct_name,
-                &struct_name_loc,
-                variant,
-            )?
-            .clone();
+        let struct_name_loc = self.to_loc(&maccess.loc);
+        let (field_decls, is_positional_constructor) =
+            self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
+        let field_decls = field_decls.clone();
+        if fields.is_some() && is_positional_constructor != expected_positional_constructor {
+            let struct_name_display = struct_name.display(self.env());
+            let variant_name_display = variant
+                .map(|v| format!("::{}", v.display(self.symbol_pool())))
+                .unwrap_or_default();
+            self.error(
+                loc,
+                &format!(
+                    "expected {} for {} `{}`",
+                    if is_positional_constructor {
+                        format!(
+                            "positional constructor `{}{}(..)`",
+                            struct_name_display, variant_name_display
+                        )
+                    } else {
+                        format!(
+                            "struct constructor `{}{} {{ .. }}`",
+                            struct_name_display, variant_name_display
+                        )
+                    },
+                    if variant.is_some() {
+                        "struct variant"
+                    } else {
+                        "struct"
+                    },
+                    struct_name_display
+                ),
+            );
+            return None;
+        }
         if let Some(fields) = fields {
-            self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+            let missing_fields =
+                self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
+            self.report_missing_fields(&missing_fields, loc);
             let in_order_fields = self.in_order_fields(&field_decls, fields);
             for (_, name, (exp_idx, field_exp)) in fields.iter() {
                 let (def_idx, field_name, translated_field_exp) =
-                    self.translate_exp_field(&field_decls, name, &instantiation, field_exp);
+                    self.translate_exp_field(&field_decls, name, &struct_inst_id.inst, field_exp);
                 if in_order_fields.contains(&def_idx) {
                     args.insert(def_idx, translated_field_exp);
                 } else {
@@ -4293,18 +4866,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     bindings.insert(*exp_idx, (var, translated_field_exp));
                 }
             }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for pack, expected {}",
-                    field_decls.len()
-                ),
-            )
+        } else {
+            let expected_args = if variant.is_some() {
+                field_decls.len()
+            } else {
+                // For structs need to account for the dummy field added by v1 compiler
+                field_decls
+                    .iter()
+                    .filter(|d| d.0 != &self.parent.dummy_field_name())
+                    .count()
+            };
+            if expected_args != 0 {
+                self.error(
+                    loc,
+                    &format!("no arguments provided for pack, expected {}", expected_args),
+                )
+            }
         }
-        let struct_id = struct_entry
-            .module_id
-            .qualified_inst(struct_entry.struct_id, instantiation);
         let bindings = bindings
             .into_iter()
             .sorted_by_key(|(i, _)| *i)
@@ -4316,8 +4894,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|(_, value)| value)
             .collect_vec();
 
-        let struct_ty = struct_id.to_type();
-        let struct_ty = self.check_type(loc, &struct_ty, expected_type, context);
+        let struct_ty = struct_inst_id.to_type();
+        let struct_ty = self.check_type(loc, &struct_ty, &expected_type, context);
         let mut field_args = args.into_iter().map(|e| e.into_exp()).collect_vec();
         if variant.is_none() && field_args.is_empty() {
             // The move compiler inserts a dummy field with the value of false
@@ -4330,10 +4908,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             field_args.push(ExpData::Value(id, Value::Bool(false)).into_exp());
         }
         let id = self.new_node_id_with_type_loc(&struct_ty, loc);
-        self.set_node_instantiation(id, struct_id.inst);
+        self.set_node_instantiation(id, struct_inst_id.inst);
         let body = ExpData::Call(
             id,
-            Operation::Pack(struct_id.module_id, struct_id.id, variant),
+            Operation::Pack(struct_inst_id.module_id, struct_inst_id.id, variant),
             field_args,
         );
         // Fold the bindings and the body into result exp
@@ -4389,7 +4967,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ),
                 )
             },
-            StructLayout::Singleton(_) | StructLayout::None => self.error(
+            StructLayout::Singleton(..) | StructLayout::None => self.error(
                 loc,
                 &format!(
                     "struct `{}` has no variants",
@@ -4400,23 +4978,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         false
     }
 
-    fn get_field_decls_for_pack_unpack<'a>(
-        &'a mut self,
-        s: &'a StructEntry,
+    fn get_field_decls_for_pack_unpack(
+        &mut self,
         struct_name: &QualifiedSymbol,
         struct_name_loc: &Loc,
         variant: Option<Symbol>,
-    ) -> Option<&BTreeMap<Symbol, FieldData>> {
-        match (&s.layout, variant) {
-            (StructLayout::Singleton(fields), None) => Some(fields),
+    ) -> Option<(&BTreeMap<Symbol, FieldData>, bool)> {
+        let struct_entry = self.lookup_struct_entry(struct_name);
+        match (&struct_entry.layout, variant) {
+            (StructLayout::Singleton(fields, is_positional), None) => {
+                Some((fields, *is_positional))
+            },
             (StructLayout::Variants(variants), Some(name)) => {
                 if let Some(variant) = variants.iter().find(|v| v.name == name) {
-                    Some(&variant.fields)
+                    Some((&variant.fields, variant.is_positional))
                 } else {
                     self.error(
                         struct_name_loc,
                         &format!(
-                            "struct `{}` has no variant named `{}`",
+                            "enum `{}` has no variant named `{}`",
                             struct_name.display(self.env()),
                             name.display(self.symbol_pool())
                         ),
@@ -4424,20 +5004,68 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     None
                 }
             },
-            _ => {
-                self.bug(struct_name_loc, "inconsistent struct definition");
+            (StructLayout::Singleton(..), Some(_)) => {
+                self.error(
+                    struct_name_loc,
+                    &format!(
+                        "struct `{}` does not have variants",
+                        struct_name.display(self.env())
+                    ),
+                );
+                None
+            },
+            (StructLayout::Variants(..), None) => {
+                self.error(
+                    struct_name_loc,
+                    &format!(
+                        "enum `{}` must be used with one of its variants",
+                        struct_name.display(self.env())
+                    ),
+                );
+                None
+            },
+            (StructLayout::None, _) => {
+                self.error(
+                    struct_name_loc,
+                    &format!(
+                        "native struct `{}` has no fields",
+                        struct_name.display(self.env())
+                    ),
+                );
                 None
             },
         }
     }
 
+    fn get_struct_arity(
+        &self,
+        struct_id: QualifiedId<StructId>,
+        variant: Option<Symbol>,
+    ) -> Option<usize> {
+        let struct_entry = self.parent.parent.lookup_struct_entry(struct_id);
+        match (&struct_entry.layout, variant) {
+            (StructLayout::Singleton(fields, _), None) => Some(
+                if struct_entry.is_empty_struct {
+                    0
+                } else {
+                    fields.len()
+                },
+            ),
+            (StructLayout::Variants(variants), Some(name)) => variants
+                .iter()
+                .find(|v| v.name == name)
+                .map(|v| v.fields.len()),
+            _ => None,
+        }
+    }
+
+    /// Checks for undeclared fields and return the set of missing fields
     fn check_missing_or_undeclared_fields<T>(
         &mut self,
-        loc: &Loc,
         struct_name: QualifiedSymbol,
         field_decls: &BTreeMap<Symbol, FieldData>,
         fields: &EA::Fields<T>,
-    ) -> Option<()> {
+    ) -> Option<BTreeSet<Symbol>> {
         let mut succeed = true;
         let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
         // Exclude from the covered fields the dummy_field added by legacy compiler
@@ -4464,6 +5092,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 succeed = false;
             }
         }
+        if succeed {
+            Some(fields_not_covered)
+        } else {
+            None
+        }
+    }
+
+    fn report_missing_fields(&mut self, fields_not_covered: &BTreeSet<Symbol>, loc: &Loc) {
         if !fields_not_covered.is_empty() {
             self.error(
                 loc,
@@ -4480,12 +5116,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .join(", ")
                 ),
             );
-            succeed = false;
-        }
-        if succeed {
-            Some(())
-        } else {
-            None
         }
     }
 
@@ -4543,14 +5173,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn translate_lambda(
         &mut self,
         loc: &Loc,
-        args: &EA::LValueList,
+        args: &EA::TypedLValueList,
         body: &EA::Exp,
         expected_type: &Type,
         context: &ErrorMessageContext,
+        capture_kind: LambdaCaptureKind,
     ) -> ExpData {
         // Translate the argument list
         let arg_type = self.fresh_type_var();
-        let pat = self.translate_lvalue_list(
+        let pat = self.translate_typed_lvalue_list(
             args,
             &arg_type,
             WideningOrder::LeftToRight,
@@ -4564,17 +5195,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Create a fresh type variable for the body and check expected type before analyzing
         // body. This aids type inference for the lambda parameters.
-        let ty = self.fresh_type_var();
-        let rty = self.check_type(
+        let result_ty = self.fresh_type_var();
+
+        // Create a function value type constraint. Note we do not know the abilities
+        // of the lambda, so can't build a full function type here.
+        self.add_constraint_and_report(
             loc,
-            &Type::Fun(Box::new(arg_type), Box::new(ty.clone())),
-            expected_type,
             context,
+            expected_type,
+            Constraint::SomeFunctionValue(arg_type.clone(), result_ty.clone()),
+            None,
         );
-        let rbody = self.translate_exp(body, &ty);
+
+        // Translate body
+        let rbody = self.translate_exp(body, &result_ty);
         self.exit_scope();
-        let id = self.new_node_id_with_type_loc(&rty, loc);
-        ExpData::Lambda(id, pat, rbody.into_exp())
+
+        let id = self.new_node_id_with_type_loc(expected_type, loc);
+        ExpData::Lambda(id, pat, rbody.into_exp(), capture_kind)
     }
 
     fn translate_quant(
@@ -4669,6 +5307,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
     }
 
+    /// Unify types with order `LeftToRight` and shallow variance
     pub fn check_type(
         &mut self,
         loc: &Loc,
@@ -4679,6 +5318,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.check_type_with_order(WideningOrder::LeftToRight, loc, ty, expected, context)
     }
 
+    /// Unify types with order `Join` and shallow variance, and specified error message override
     pub fn join_type(
         &mut self,
         loc: &Loc,
@@ -4689,6 +5329,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.check_type_with_order(WideningOrder::Join, loc, ty1, ty2, context)
     }
 
+    /// Unify types with shallow variance, and specified error message override
     fn check_type_with_order(
         &mut self,
         order: WideningOrder,
@@ -4705,6 +5346,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             })
     }
 
+    /// Unify types with specified variance and order
     fn unify_types(
         &mut self,
         variance: Variance,
@@ -4731,85 +5373,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.error_with_notes_and_labels(&loc, &msg, hints, labels)
     }
 
-    pub fn translate_from_move_value(&mut self, loc: &Loc, ty: &Type, value: &MoveValue) -> Value {
-        match (ty, value) {
-            (_, MoveValue::U8(n)) => Value::Number(BigInt::from_u8(*n).unwrap()),
-            (_, MoveValue::U16(n)) => Value::Number(BigInt::from_u16(*n).unwrap()),
-            (_, MoveValue::U32(n)) => Value::Number(BigInt::from_u32(*n).unwrap()),
-            (_, MoveValue::U64(n)) => Value::Number(BigInt::from_u64(*n).unwrap()),
-            (_, MoveValue::U128(n)) => Value::Number(BigInt::from_u128(*n).unwrap()),
-            (_, MoveValue::U256(n)) => Value::Number(BigInt::from(n)),
-            (_, MoveValue::Bool(b)) => Value::Bool(*b),
-            (_, MoveValue::Address(a)) => Value::Address(Address::Numerical(*a)),
-            (_, MoveValue::Signer(a)) => Value::Address(Address::Numerical(*a)),
-            (Type::Vector(inner), MoveValue::Vector(vs)) => match **inner {
-                Type::Primitive(PrimitiveType::U8) => {
-                    let b = vs
-                        .iter()
-                        .filter_map(|v| match v {
-                            MoveValue::U8(n) => Some(*n),
-                            _ => {
-                                self.error(loc, &format!("Expected u8 type, buf found: {:?}", v));
-                                None
-                            },
-                        })
-                        .collect::<Vec<u8>>();
-                    Value::ByteArray(b)
-                },
-                Type::Primitive(PrimitiveType::Address) => {
-                    let b = vs
-                        .iter()
-                        .filter_map(|v| match v {
-                            MoveValue::Address(a) => Some(Address::Numerical(*a)),
-                            _ => {
-                                self.error(
-                                    loc,
-                                    &format!("Expected address type, but found: {:?}", v),
-                                );
-                                None
-                            },
-                        })
-                        .collect::<Vec<Address>>();
-                    Value::AddressArray(b)
-                },
-                _ => {
-                    let b = vs
-                        .iter()
-                        .map(|v| self.translate_from_move_value(loc, inner, v))
-                        .collect::<Vec<Value>>();
-                    Value::Vector(b)
-                },
-            },
-            (Type::Primitive(_), MoveValue::Vector(_))
-            | (Type::Primitive(_), MoveValue::Struct(_))
-            | (Type::Tuple(_), MoveValue::Vector(_))
-            | (Type::Tuple(_), MoveValue::Struct(_))
-            | (Type::Vector(_), MoveValue::Struct(_))
-            | (Type::Struct(_, _, _), MoveValue::Vector(_))
-            | (Type::Struct(_, _, _), MoveValue::Struct(_))
-            | (Type::TypeParameter(_), MoveValue::Vector(_))
-            | (Type::TypeParameter(_), MoveValue::Struct(_))
-            | (Type::Reference(_, _), MoveValue::Vector(_))
-            | (Type::Reference(_, _), MoveValue::Struct(_))
-            | (Type::Fun(_, _), MoveValue::Vector(_))
-            | (Type::Fun(_, _), MoveValue::Struct(_))
-            | (Type::TypeDomain(_), MoveValue::Vector(_))
-            | (Type::TypeDomain(_), MoveValue::Struct(_))
-            | (Type::ResourceDomain(_, _, _), MoveValue::Vector(_))
-            | (Type::ResourceDomain(_, _, _), MoveValue::Struct(_))
-            | (Type::Error, MoveValue::Vector(_))
-            | (Type::Error, MoveValue::Struct(_))
-            | (Type::Var(_), MoveValue::Vector(_))
-            | (Type::Var(_), MoveValue::Struct(_)) => {
-                self.error(
-                    loc,
-                    &format!("Not yet supported constant value: {:?}", value),
-                );
-                Value::Bool(false)
-            },
-        }
-    }
-
     fn translate_macro_call(
         &mut self,
         maccess: &EA::ModuleAccess,
@@ -4823,10 +5386,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, "macro invocation cannot have type arguments");
             self.new_error_exp()
         } else if let EA::ModuleAccess_::Name(name) = &maccess.value {
-            let expansion = self
-                .parent
-                .parent
-                .expand_macro(maccess.loc, name.value.as_str(), args);
+            let expansion = self.expand_macro(maccess.loc, name.value.as_str(), args);
             self.translate_exp(&expansion, expected_type)
         } else {
             let qsym = self.parent.module_access_to_qualified(maccess);

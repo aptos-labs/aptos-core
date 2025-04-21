@@ -110,7 +110,7 @@ also required from <code>T</code>.
 Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any</a></code> representation. This aborts if the value has not the expected type <code>T</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(x: <a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): T
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(self: <a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): T
 </code></pre>
 
 
@@ -119,9 +119,9 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(x: <a href="copyable_any.md#0x1_copyable_any_Any">Any</a>): T {
-    <b>assert</b>!(<a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() == x.type_name, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="copyable_any.md#0x1_copyable_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>));
-    from_bytes&lt;T&gt;(x.data)
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(self: <a href="copyable_any.md#0x1_copyable_any_Any">Any</a>): T {
+    <b>assert</b>!(<a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() == self.type_name, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="copyable_any.md#0x1_copyable_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>));
+    from_bytes&lt;T&gt;(self.data)
 }
 </code></pre>
 
@@ -136,7 +136,7 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 Returns the type name of this Any
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(x: &<a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(self: &<a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -145,8 +145,8 @@ Returns the type name of this Any
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(x: &<a href="copyable_any.md#0x1_copyable_any_Any">Any</a>): &String {
-    &x.type_name
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(self: &<a href="copyable_any.md#0x1_copyable_any_Any">Any</a>): &String {
+    &self.type_name
 }
 </code></pre>
 
@@ -186,14 +186,14 @@ Returns the type name of this Any
 ### Function `unpack`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(x: <a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): T
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_unpack">unpack</a>&lt;T&gt;(self: <a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): T
 </code></pre>
 
 
 
 
 <pre><code><b>include</b> <a href="copyable_any.md#0x1_copyable_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt;;
-<b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;T&gt;(x.data);
+<b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;T&gt;(self.data);
 </code></pre>
 
 
@@ -203,9 +203,9 @@ Returns the type name of this Any
 
 
 <pre><code><b>schema</b> <a href="copyable_any.md#0x1_copyable_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt; {
-    x: <a href="copyable_any.md#0x1_copyable_any_Any">Any</a>;
-    <b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != x.type_name;
-    <b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);
+    self: <a href="copyable_any.md#0x1_copyable_any_Any">Any</a>;
+    <b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != self.type_name;
+    <b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(self.data);
 }
 </code></pre>
 
@@ -216,14 +216,14 @@ Returns the type name of this Any
 ### Function `type_name`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(x: &<a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="copyable_any.md#0x1_copyable_any_type_name">type_name</a>(self: &<a href="copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == x.type_name;
+<b>ensures</b> result == self.type_name;
 </code></pre>
 
 

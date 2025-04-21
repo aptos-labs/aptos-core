@@ -148,6 +148,14 @@ impl<'a> InstantiationLoopChecker<'a> {
                     type_params.insert(*idx);
                 },
                 Vector(ty) => rec(type_params, ty),
+                Function(args, result, _) => {
+                    for ty in args {
+                        rec(type_params, ty);
+                    }
+                    for ty in result {
+                        rec(type_params, ty);
+                    }
+                },
                 Reference(ty) | MutableReference(ty) => rec(type_params, ty),
                 StructInstantiation(_, tys) => {
                     for ty in tys {

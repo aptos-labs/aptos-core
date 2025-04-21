@@ -94,15 +94,16 @@ MOVE_CRATES="\
   -p move-bytecode-verifier\
   -p move-binary-format\
   -p move-compiler\
-  -p move-compiler-transactional-tests\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-ir-compiler-transactional-tests\
+  -p move-linter\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
   -p move-vm-types\
+  -p move-ast-generator-tests\
 "
 
 # This is a list of crates for integration testing which depends on the
@@ -111,13 +112,11 @@ MOVE_CRATES_V2_ENV_DEPENDENT="\
   -p aptos-transactional-test-harness \
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
-  -p move-async-vm \
   -p move-cli \
   -p move-model \
   -p move-package \
   -p move-prover-bytecode-pipeline \
   -p move-stackless-bytecode \
-  -p move-to-yul \
   -p move-transactional-test-runner \
   -p move-unit-test \
   -p move-vm-transactional-tests \
@@ -146,11 +145,12 @@ if [ ! -z "$CHECK" ]; then
     cargo xclippy
     cargo +nightly fmt
     cargo sort --grouped --workspace
+    cargo machete
   )
 fi
 
 CARGO_OP_PARAMS="--profile $MOVE_PR_PROFILE"
-CARGO_NEXTEST_PARAMS="--profile $MOVE_PR_NEXTEST_PROFILE --cargo-profile $MOVE_PR_PROFILE"
+CARGO_NEXTEST_PARAMS="--profile $MOVE_PR_NEXTEST_PROFILE --cargo-profile $MOVE_PR_PROFILE $MOVE_PR_NEXTEST_ARGS"
 
 # Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then
@@ -195,10 +195,10 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
   echo "*************** [move-pr] Running integration tests with compiler v2"
   (
     cd $BASE
-    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true cargo build $CARGO_OP_PARAMS \
+    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true MOVE_LANGUAGE_V2=true cargo build $CARGO_OP_PARAMS \
        $MOVE_CRATES_V2_ENV_DEPENDENT
     MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc \
-       MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
+       MOVE_COMPILER_V2=true MOVE_LANGUAGE_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi

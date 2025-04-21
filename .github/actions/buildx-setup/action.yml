@@ -3,7 +3,7 @@ description: Sets up buildx for docker builds
 
 runs:
   using: composite
-  steps: 
+  steps:
     - name: setup docker context for buildx
       id: buildx-context
       shell: bash

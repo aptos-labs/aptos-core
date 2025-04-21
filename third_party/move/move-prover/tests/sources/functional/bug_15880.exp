@@ -1,0 +1,80 @@
+Move prover returns: exiting with verification errors
+error: base case of the loop invariant does not hold
+   ┌─ tests/sources/functional/bug_15880.move:11:17
+   │
+11 │                 invariant v == vector[1, 2, 3]; // this should not verify
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bug_15880.move:5: test1
+   =         i = <redacted>
+   =     at tests/sources/functional/bug_15880.move:6: test1
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:7: test1
+   =         _v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:8: test1
+   =     at tests/sources/functional/bug_15880.move:10: test1
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:11: test1
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/bug_15880.move:54:18
+   │
+54 │                  assert v == vector[1, 2, 3]; // this should not verify
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bug_15880.move:47: test3
+   =         i = <redacted>
+   =     at tests/sources/functional/bug_15880.move:48: test3
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:49: test3
+   =         _v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:51: test3
+   =     enter loop, variable(s) i, v havocked and reassigned
+   =         i = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:50: test3
+   =     at tests/sources/functional/bug_15880.move:53: test3
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:54: test3
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/bug_15880.move:62:21
+   │
+62 │                     assert v == vector[1, 2, 3]; // this should not verify
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bug_15880.move:47: test3
+   =         i = <redacted>
+   =     at tests/sources/functional/bug_15880.move:48: test3
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:49: test3
+   =         _v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:51: test3
+   =     enter loop, variable(s) i, v havocked and reassigned
+   =         i = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:50: test3
+   =     at tests/sources/functional/bug_15880.move:53: test3
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:54: test3
+   =     at tests/sources/functional/bug_15880.move:56: test3
+   =     at tests/sources/functional/bug_15880.move:57: test3
+   =     at tests/sources/functional/bug_15880.move:61: test3
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:62: test3
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/bug_15880.move:75:13
+   │
+75 │             assert v == vector[1, 2, 3]; // this should not verify
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bug_15880.move:69: test4
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:70: test4
+   =         _v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:71: test4
+   =     at tests/sources/functional/bug_15880.move:72: test4
+   =     at tests/sources/functional/bug_15880.move:74: test4
+   =         v = <redacted>
+   =     at tests/sources/functional/bug_15880.move:75: test4

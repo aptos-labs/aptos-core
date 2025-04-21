@@ -7,16 +7,14 @@
 use crate::cli::Options;
 use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
+use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_abigen::Abigen;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
-    code_writer::CodeWriter, model::GlobalEnv, parse_addresses_from_options,
-    run_model_builder_with_options,
+    code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
 };
 use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
@@ -28,7 +26,7 @@ use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use std::{
     fs,
     path::{Path, PathBuf},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub mod cli;
@@ -38,32 +36,7 @@ pub mod cli;
 
 pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-    run_move_prover(&mut error_writer, options)
-}
-
-pub fn run_move_prover<W: WriteColor>(
-    error_writer: &mut W,
-    options: Options,
-) -> anyhow::Result<()> {
-    let now = Instant::now();
-    let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
-    let mut env = run_model_builder_with_options(
-        vec![PackagePaths {
-            name: None,
-            paths: options.move_sources.clone(),
-            named_address_map: addrs.clone(),
-        }],
-        vec![],
-        vec![PackagePaths {
-            name: None,
-            paths: options.move_deps.clone(),
-            named_address_map: addrs,
-        }],
-        options.model_builder.clone(),
-        options.skip_attribute_checks,
-        KnownAttribute::get_all_attribute_names(),
-    )?;
-    run_move_prover_with_model(&mut env, error_writer, options, Some(now))
+    run_move_prover_v2(&mut error_writer, options)
 }
 
 pub fn run_move_prover_v2<W: WriteColor>(
@@ -71,18 +44,26 @@ pub fn run_move_prover_v2<W: WriteColor>(
     options: Options,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    let cloned_options = options.clone();
+    let mut env = create_move_prover_v2_model(error_writer, options.clone())?;
+    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+}
+
+pub fn create_move_prover_v2_model<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+) -> anyhow::Result<GlobalEnv> {
     let compiler_options = move_compiler_v2::Options {
-        dependencies: cloned_options.move_deps,
-        named_address_mapping: cloned_options.move_named_address_values,
-        output_dir: cloned_options.output_path,
-        language_version: cloned_options.language_version,
+        dependencies: options.move_deps,
+        named_address_mapping: options.move_named_address_values,
+        output_dir: options.output_path,
+        language_version: options.language_version,
+        compiler_version: Some(LATEST_STABLE_COMPILER_VERSION_VALUE),
         skip_attribute_checks: true,
         known_attributes: Default::default(),
-        testing: cloned_options.backend.stable_test_output,
+        testing: options.backend.stable_test_output,
         experiments: vec![],
         experiment_cache: Default::default(),
-        sources: cloned_options.move_sources,
+        sources: options.move_sources,
         sources_deps: vec![],
         warn_deprecated: false,
         warn_of_deprecation_use_in_aptos_libs: false,
@@ -90,10 +71,10 @@ pub fn run_move_prover_v2<W: WriteColor>(
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
+        external_checks: vec![],
     };
 
-    let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
-    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)
 }
 
 /// Create the initial number operation state for each function and struct
@@ -112,33 +93,10 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
     env.set_extension(global_state);
 }
 
-pub fn run_move_prover_with_model<W: WriteColor>(
-    env: &mut GlobalEnv,
-    error_writer: &mut W,
-    options: Options,
-    timer: Option<Instant>,
-) -> anyhow::Result<()> {
-    let now = timer.unwrap_or_else(Instant::now);
-    debug!("global env before prover run: {}", env.dump_env_all());
-
-    // Run the compiler v2 checking and rewriting pipeline
-    let compiler_options = move_compiler_v2::Options::default()
-        .set_experiment(Experiment::OPTIMIZE, false)
-        .set_experiment(Experiment::SPEC_REWRITE, true);
-    env.set_extension(compiler_options.clone());
-    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
-        &compiler_options,
-        true,
-        RewritingScope::Everything,
-    );
-    pipeline.run(env);
-    run_move_prover_with_model_v2(env, error_writer, options, now)
-}
-
 pub fn run_move_prover_with_model_v2<W: WriteColor>(
     env: &mut GlobalEnv,
     error_writer: &mut W,
-    options: Options,
+    mut options: Options,
     start_time: Instant,
 ) -> anyhow::Result<()> {
     let build_duration = start_time.elapsed();
@@ -148,7 +106,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
         error_writer,
         "exiting with model building errors",
     )?;
-    env.report_diag(error_writer, options.prover.report_severity);
 
     // Add the prover options as an extension to the environment, so they can be accessed
     // from there.
@@ -187,33 +144,56 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
         "exiting with bytecode transformation errors",
     )?;
 
-    // Generate boogie code
-    let now = Instant::now();
-    let code_writer = generate_boogie(env, &options, &targets)?;
-    let gen_duration = now.elapsed();
-    check_errors(
-        env,
-        &options,
-        error_writer,
-        "exiting with condition generation errors",
-    )?;
+    let mut gen_durations = vec![];
+    let mut verify_durations = vec![];
+    let has_shards = options.backend.shards > 1;
+    let output_base_file = options.output_path.clone();
+    for shard in 0..options.backend.shards {
+        // If there are shards, modify the output name
+        if has_shards {
+            options.output_path = Path::new(&output_base_file)
+                .with_extension(format!("shard_{}.bpl", shard + 1))
+                .to_string_lossy()
+                .to_string();
+        }
+        // Generate boogie code.
+        let now = Instant::now();
+        let code_writer = generate_boogie(
+            env,
+            &options,
+            if has_shards { Some(shard) } else { None },
+            &targets,
+        )?;
+        gen_durations.push(now.elapsed());
+        check_errors(
+            env,
+            &options,
+            error_writer,
+            "exiting with condition generation errors",
+        )?;
 
-    // Verify boogie code.
-    let now = Instant::now();
-    verify_boogie(env, &options, &targets, code_writer)?;
-    let verify_duration = now.elapsed();
-
+        // Verify boogie code.
+        let now = Instant::now();
+        verify_boogie(env, &options, &targets, code_writer)?;
+        verify_durations.push(now.elapsed());
+    }
+    options.output_path = output_base_file;
     // Report durations.
+    let dur_list = |ds: &[Duration]| {
+        ds.iter()
+            .map(|d| format!("{:.2}", d.as_secs_f64()))
+            .join("/")
+    };
     info!(
-        "{:.3}s build, {:.3}s trafo, {:.3}s gen, {:.3}s verify, total {:.3}s",
+        "{:.2}s build, {:.2}s trafo, {}s gen, {}s verify, total {:.2}s",
         build_duration.as_secs_f64(),
         trafo_duration.as_secs_f64(),
-        gen_duration.as_secs_f64(),
-        verify_duration.as_secs_f64(),
+        dur_list(&gen_durations),
+        dur_list(&verify_durations),
         build_duration.as_secs_f64()
             + trafo_duration.as_secs_f64()
-            + gen_duration.as_secs_f64()
-            + verify_duration.as_secs_f64()
+            + gen_durations.iter().sum::<Duration>().as_secs_f64()
+            + verify_durations.iter().sum::<Duration>().as_secs_f64()
     );
     check_errors(
         env,
@@ -240,11 +220,12 @@ pub fn check_errors<W: WriteColor>(
 pub fn generate_boogie(
     env: &GlobalEnv,
     options: &Options,
+    shard: Option<usize>,
     targets: &FunctionTargetsHolder,
 ) -> anyhow::Result<CodeWriter> {
     let writer = CodeWriter::new(env.internal_loc());
     add_prelude(env, &options.backend, &writer)?;
-    let mut translator = BoogieTranslator::new(env, &options.backend, targets, &writer);
+    let mut translator = BoogieTranslator::new(env, &options.backend, shard, targets, &writer);
     translator.translate();
     Ok(writer)
 }
@@ -318,6 +299,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             &dump_file_base,
             options.prover.dump_cfg,
             &|_| {},
+            || true,
         )
     } else {
         pipeline.run(env, &mut targets);

@@ -25,15 +25,15 @@ fn naive_view_layers<K: Ord, V>(layers: impl Iterator<Item = Vec<(K, V)>>) -> BT
 
 fn arb_test_case() -> impl Strategy<Value = (Vec<Vec<(HashCollide, u8)>>, usize, usize, usize)> {
     vec(vec(any::<(u8, u8)>(), 0..100), 1..100).prop_flat_map(|items_per_layer| {
-        let num_layers = items_per_layer.len();
-        let items_per_layer = items_per_layer.clone();
-        vec(0..num_layers, 3).prop_map(move |mut layer_indices| {
+        let num_overlay_layers = items_per_layer.len();
+        let items_per_update = items_per_layer.clone();
+        vec(0..=num_overlay_layers, 3).prop_map(move |mut layer_indices| {
             layer_indices.sort();
             let ancestor = layer_indices[0];
-            let bottom = layer_indices[1];
+            let base = layer_indices[1];
             let top = layer_indices[2];
 
-            let items_per_layer = items_per_layer
+            let items_per_update = items_per_update
                 .iter()
                 .map(|items| {
                     items
@@ -43,30 +43,31 @@ fn arb_test_case() -> impl Strategy<Value = (Vec<Vec<(HashCollide, u8)>>, usize,
                 })
                 .collect_vec();
 
-            (items_per_layer, ancestor, bottom, top)
+            (items_per_update, ancestor, base, top)
         })
     })
 }
 
 fn layers(
-    items_per_layer: &[Vec<(HashCollide, u8)>],
+    items_per_update: &[Vec<(HashCollide, u8)>],
     max_base_layer: u64,
 ) -> Vec<MapLayer<HashCollide, u8>> {
     let mut base_layer = MapLayer::new_family("test");
     let mut latest_layer = base_layer.clone();
 
     let mut base_layer_idx = 0;
-    let mut layers = Vec::new();
+    let mut layers = vec![base_layer.clone()];
 
-    for (layer_idx, layer_items) in items_per_layer.iter().enumerate() {
+    for (prev_layer_idx, layer_items) in items_per_update.iter().enumerate() {
+        let layer_idx = prev_layer_idx + 1;
         let items_vec: Vec<_> = layer_items.iter().map(|(k, v)| (*k, *v)).collect();
         latest_layer = latest_layer
-            .view_layers_since(&base_layer)
+            .view_layers_after(&base_layer)
             .new_layer(&items_vec);
         layers.push(latest_layer.clone());
 
         // advance base layer occasionally to expose more edge cases
-        if base_layer_idx < max_base_layer as usize && layer_idx % 2 == 1 {
+        if base_layer_idx < max_base_layer as usize && layer_idx % 2 == 0 {
             base_layer_idx += 1;
             base_layer = layers[base_layer_idx].clone();
         }
@@ -78,22 +79,26 @@ fn layers(
 proptest! {
     #[test]
     fn test_layered_map_get(
-        (mut items_per_layer, ancestor, bottom, top) in arb_test_case()
+        (mut items_per_update, ancestor, base, top) in arb_test_case()
     ) {
-        let (_ancestor_layer, bottom_layer, top_layer) = {
-            let layers = layers(&items_per_layer, ancestor as u64);
-            (layers[ancestor].clone(), layers[bottom].clone(), layers[top].clone())
+        let (_ancestor_layer, base_layer, top_layer) = {
+            let layers = layers(&items_per_update, ancestor as u64);
+            (layers[ancestor].clone(), layers[base].clone(), layers[top].clone())
         };
 
-        let layered_map = top_layer.into_layers_view_since(bottom_layer);
+        let layered_map = top_layer.into_layers_view_after(base_layer);
 
-        for (key, value_opt) in naive_view_layers(
-            items_per_layer.drain(bottom..=top)
-        ) {
-            prop_assert_eq!(layered_map.get(&key), Some(value_opt));
+        // n.b. notice items_per_update doesn't have a placeholder for the root layer
+        let all = naive_view_layers(items_per_update.drain(base..top));
+
+        // get() individually
+        for (k, v) in &all {
+            prop_assert_eq!(layered_map.get(k), Some(*v));
         }
 
-        // TODO(aldenhu): test that layered_map doesn't have any unexpected keys -- need ability to traverse
+        // traversed via iterator
+        let traversed = layered_map.iter().collect();
+        prop_assert_eq!(all, traversed);
     }
 
     #[test]

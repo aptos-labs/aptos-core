@@ -1,0 +1,102 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+use 0000000000000000000000000000000000000000000000000000000000000001::option;
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+struct T has copy, drop, store {
+	issuer: vector<u8>,
+	version: u64
+}
+struct J has copy, drop, store {
+	variant: u64
+}
+struct S has copy, drop, store {
+	entries: vector<T>
+}
+
+test(s: &mut S, issuer: vector<u8>): Option<T> /* def_idx: 0 */ {
+L2:	v: &vector<T>
+L3:	find: bool
+L4:	found_index: u64
+L5:	len: u64
+L6:	i: u64
+L7:	index: u64
+L8:	found: bool
+L9:	ret: Option<T>
+B0:
+	0: CopyLoc[0](s: &mut S)
+	1: ImmBorrowField[0](S.entries: vector<T>)
+	2: StLoc[2](v: &vector<T>)
+	3: LdFalse
+	4: StLoc[3](find: bool)
+	5: LdU64(0)
+	6: StLoc[4](found_index: u64)
+	7: LdU64(0)
+	8: CopyLoc[2](v: &vector<T>)
+	9: VecLen(2)
+	10: StLoc[5](len: u64)
+	11: StLoc[6](i: u64)
+B1:
+	12: CopyLoc[6](i: u64)
+	13: CopyLoc[5](len: u64)
+	14: Lt
+	15: BrFalse(35)
+B2:
+	16: CopyLoc[2](v: &vector<T>)
+	17: CopyLoc[6](i: u64)
+	18: VecImmBorrow(2)
+	19: ImmBorrowField[1](T.issuer: vector<u8>)
+	20: ReadRef
+	21: CopyLoc[1](issuer: vector<u8>)
+	22: Eq
+	23: BrFalse(30)
+B3:
+	24: LdTrue
+	25: StLoc[3](find: bool)
+	26: MoveLoc[6](i: u64)
+	27: StLoc[4](found_index: u64)
+	28: Branch(37)
+B4:
+	29: Branch(30)
+B5:
+	30: MoveLoc[6](i: u64)
+	31: LdU64(1)
+	32: Add
+	33: StLoc[6](i: u64)
+	34: Branch(36)
+B6:
+	35: Branch(37)
+B7:
+	36: Branch(12)
+B8:
+	37: Nop
+	38: MoveLoc[2](v: &vector<T>)
+	39: Pop
+	40: MoveLoc[3](find: bool)
+	41: MoveLoc[4](found_index: u64)
+	42: StLoc[7](index: u64)
+	43: StLoc[8](found: bool)
+	44: MoveLoc[8](found: bool)
+	45: BrFalse(53)
+B9:
+	46: MoveLoc[0](s: &mut S)
+	47: MutBorrowField[0](S.entries: vector<T>)
+	48: MoveLoc[7](index: u64)
+	49: Call vector::remove<T>(&mut vector<T>, u64): T
+	50: Call option::some<T>(T): Option<T>
+	51: StLoc[9](ret: Option<T>)
+	52: Branch(57)
+B10:
+	53: MoveLoc[0](s: &mut S)
+	54: Pop
+	55: Call option::none<T>(): Option<T>
+	56: StLoc[9](ret: Option<T>)
+B11:
+	57: MoveLoc[9](ret: Option<T>)
+	58: Ret
+}
+}
+============ bytecode verification succeeded ========

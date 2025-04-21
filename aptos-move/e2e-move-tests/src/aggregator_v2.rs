@@ -77,17 +77,25 @@ fn initialize_harness(
     let mut harness = MoveHarness::new_with_executor(executor);
     // Reduce gas scaling, so that smaller differences in gas are caught in comparison testing.
     harness.modify_gas_scaling(1000);
+
+    let common_features = vec![
+        FeatureFlag::AGGREGATOR_V2_API,
+        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+        FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
+    ];
+
     if aggregator_execution_enabled {
         harness.enable_features(
-            vec![
-                FeatureFlag::AGGREGATOR_V2_API,
+            [common_features, vec![
                 FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
                 FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
-            ],
+            ]]
+            .concat(),
             vec![],
         );
     } else {
-        harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
+        harness.enable_features(common_features, vec![
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);

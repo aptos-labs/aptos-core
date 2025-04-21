@@ -34,6 +34,7 @@ module aptos_framework::voting {
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::permissioned_signer;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
     use aptos_std::from_bcs;
@@ -63,6 +64,8 @@ module aptos_framework::voting {
     const ESINGLE_STEP_PROPOSAL_CANNOT_HAVE_NEXT_EXECUTION_HASH: u64 = 11;
     /// Cannot call `is_multi_step_proposal_in_execution()` on single-step proposals.
     const EPROPOSAL_IS_SINGLE_STEP: u64 = 12;
+    /// Cannot call `is_multi_step_proposal_in_execution()` on single-step proposals.
+    const ENO_VOTE_PERMISSION: u64 = 13;
 
     /// ProposalStateEnum representing proposal state.
     const PROPOSAL_STATE_PENDING: u64 = 0;
@@ -188,7 +191,23 @@ module aptos_framework::voting {
         num_votes: u64,
     }
 
+    struct VotePermission has copy, drop, store {}
+
+    /// Permissions
+    inline fun check_vote_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, VotePermission {}),
+            error::permission_denied(ENO_VOTE_PERMISSION),
+        );
+    }
+
+    /// Grant permission to vote on behalf of the master signer.
+    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, VotePermission {})
+    }
+
     public fun register<ProposalType: store>(account: &signer) {
+        check_vote_permission(account);
         let addr = signer::address_of(account);
         assert!(!exists<VotingForum<ProposalType>>(addr), error::already_exists(EVOTING_FORUM_ALREADY_REGISTERED));
 
@@ -210,14 +229,15 @@ module aptos_framework::voting {
                     proposal_type_info: type_info::type_of<ProposalType>(),
                 },
             );
+        } else {
+            event::emit_event<RegisterForumEvent>(
+                &mut voting_forum.events.register_forum_events,
+                RegisterForumEvent {
+                    hosting_account: addr,
+                    proposal_type_info: type_info::type_of<ProposalType>(),
+                },
+            );
         };
-        event::emit_event<RegisterForumEvent>(
-            &mut voting_forum.events.register_forum_events,
-            RegisterForumEvent {
-                hosting_account: addr,
-                proposal_type_info: type_info::type_of<ProposalType>(),
-            },
-        );
 
         move_to(account, voting_forum);
     }
@@ -305,7 +325,7 @@ module aptos_framework::voting {
             simple_map::add(&mut metadata, is_multi_step_in_execution_key, to_bytes(&false));
             // If the proposal is a single-step proposal, we check if the metadata passed by the client has the IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY key.
             // If they have the key, we will remove it, because a single-step proposal that doesn't need this key.
-        } else if (simple_map::contains_key(&mut metadata, &is_multi_step_in_execution_key)) {
+        } else if (simple_map::contains_key(&metadata, &is_multi_step_in_execution_key)) {
             simple_map::remove(&mut metadata, &is_multi_step_in_execution_key);
         };
 
@@ -335,19 +355,19 @@ module aptos_framework::voting {
                     min_vote_threshold,
                 },
             );
+        } else {
+            event::emit_event<CreateProposalEvent>(
+                &mut voting_forum.events.create_proposal_events,
+                CreateProposalEvent {
+                    proposal_id,
+                    early_resolution_vote_threshold,
+                    execution_hash,
+                    expiration_secs,
+                    metadata,
+                    min_vote_threshold,
+                },
+            );
         };
-        event::emit_event<CreateProposalEvent>(
-            &mut voting_forum.events.create_proposal_events,
-            CreateProposalEvent {
-                proposal_id,
-                early_resolution_vote_threshold,
-                execution_hash,
-                expiration_secs,
-                metadata,
-                min_vote_threshold,
-            },
-        );
-
         proposal_id
     }
 
@@ -399,11 +419,12 @@ module aptos_framework::voting {
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(Vote { proposal_id, num_votes });
+        } else {
+            event::emit_event<VoteEvent>(
+                &mut voting_forum.events.vote_events,
+                VoteEvent { proposal_id, num_votes },
+            );
         };
-        event::emit_event<VoteEvent>(
-            &mut voting_forum.events.vote_events,
-            VoteEvent { proposal_id, num_votes },
-        );
     }
 
     /// Common checks on if a proposal is resolvable, regardless if the proposal is single-step or multi-step.
@@ -467,16 +488,17 @@ module aptos_framework::voting {
                     resolved_early,
                 },
             );
+        } else {
+            event::emit_event<ResolveProposal>(
+                &mut voting_forum.events.resolve_proposal_events,
+                ResolveProposal {
+                    proposal_id,
+                    yes_votes: proposal.yes_votes,
+                    no_votes: proposal.no_votes,
+                    resolved_early,
+                },
+            );
         };
-        event::emit_event<ResolveProposal>(
-            &mut voting_forum.events.resolve_proposal_events,
-            ResolveProposal {
-                proposal_id,
-                yes_votes: proposal.yes_votes,
-                no_votes: proposal.no_votes,
-                resolved_early,
-            },
-        );
 
         option::extract(&mut proposal.execution_content)
     }
@@ -556,17 +578,17 @@ module aptos_framework::voting {
                     resolved_early,
                 },
             );
+        } else {
+            event::emit_event(
+                &mut voting_forum.events.resolve_proposal_events,
+                ResolveProposal {
+                    proposal_id,
+                    yes_votes: proposal.yes_votes,
+                    no_votes: proposal.no_votes,
+                    resolved_early,
+                },
+            );
         };
-        event::emit_event(
-            &mut voting_forum.events.resolve_proposal_events,
-            ResolveProposal {
-                proposal_id,
-                yes_votes: proposal.yes_votes,
-                no_votes: proposal.no_votes,
-                resolved_early,
-            },
-        );
-
     }
 
     #[view]

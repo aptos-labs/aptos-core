@@ -42,26 +42,26 @@ where
     /// This is the core method that should be implemented by any filter
     /// This is the method that should be called by any parent filter to determine if an item is allowed
     /// *If a filter doesn't explicitly prevent an item, then it should be allowed*
-    /// This forces the logic of `if !child_filter.is_allowed(item) { return false; }` for any parent filter
-    fn is_allowed(&self, item: &T) -> bool;
+    /// This forces the logic of `if !child_filter.matches(item) { return false; }` for any parent filter
+    fn matches(&self, item: &T) -> bool;
 
     #[inline]
-    fn is_allowed_vec(&self, items: &[T]) -> bool {
-        items.iter().all(|item| self.is_allowed(item))
+    fn matches_vec(&self, items: &[T]) -> bool {
+        items.iter().any(|item| self.matches(item))
     }
 
     #[inline]
-    fn is_allowed_opt(&self, item: &Option<T>) -> bool {
+    fn matches_opt(&self, item: &Option<T>) -> bool {
         match item {
-            Some(item) => self.is_allowed(item),
+            Some(item) => self.matches(item),
             None => false,
         }
     }
 
     #[inline]
-    fn is_allowed_opt_vec(&self, items: &Option<&Vec<T>>) -> bool {
+    fn matches_opt_vec(&self, items: &Option<&Vec<T>>) -> bool {
         match items {
-            Some(items) => self.is_allowed_vec(items),
+            Some(items) => self.matches_vec(items),
             None => false,
         }
     }
@@ -70,7 +70,7 @@ where
     fn filter_vec(&self, items: Vec<T>) -> Vec<T> {
         items
             .into_iter()
-            .filter(|item| self.is_allowed(item))
+            .filter(|item| self.matches(item))
             .collect()
     }
 }
@@ -89,17 +89,17 @@ where
     }
 
     #[inline]
-    fn is_allowed(&self, item: &T) -> bool {
+    fn matches(&self, item: &T) -> bool {
         match self {
-            Some(filter) => filter.is_allowed(item),
+            Some(filter) => filter.matches(item),
             None => true,
         }
     }
 
     #[inline]
-    fn is_allowed_opt(&self, item: &Option<T>) -> bool {
+    fn matches_opt(&self, item: &Option<T>) -> bool {
         match self {
-            Some(filter) => filter.is_allowed_opt(item),
+            Some(filter) => filter.matches_opt(item),
             None => true,
         }
     }
@@ -112,7 +112,7 @@ impl Filterable<String> for Option<String> {
     }
 
     #[inline]
-    fn is_allowed(&self, item: &String) -> bool {
+    fn matches(&self, item: &String) -> bool {
         match self {
             Some(filter) => filter == item,
             None => true,
@@ -127,7 +127,7 @@ impl Filterable<i32> for Option<i32> {
     }
 
     #[inline]
-    fn is_allowed(&self, item: &i32) -> bool {
+    fn matches(&self, item: &i32) -> bool {
         match self {
             Some(filter) => filter == item,
             None => true,
@@ -142,7 +142,7 @@ impl Filterable<bool> for Option<bool> {
     }
 
     #[inline]
-    fn is_allowed(&self, item: &bool) -> bool {
+    fn matches(&self, item: &bool) -> bool {
         match self {
             Some(filter) => filter == item,
             None => true,
@@ -165,7 +165,7 @@ mod test {
             Err(anyhow!("This is a test error!").into())
         }
 
-        fn is_allowed(&self, _item: &InnerStruct) -> bool {
+        fn matches(&self, _item: &InnerStruct) -> bool {
             true
         }
     }
@@ -181,8 +181,8 @@ mod test {
             Ok(())
         }
 
-        fn is_allowed(&self, item: &InnerStruct) -> bool {
-            self.inner.is_allowed(item)
+        fn matches(&self, item: &InnerStruct) -> bool {
+            self.inner.matches(item)
         }
     }
 

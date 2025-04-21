@@ -1,7 +1,7 @@
 processed 3 tasks
 
 task 0 'print-bytecode'. lines 1-9:
-// Move bytecode v6
+// Move bytecode v7
 module 2d20.M {
 struct T {
 	u: u64

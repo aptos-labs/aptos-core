@@ -54,11 +54,29 @@ pub enum AssertionSignature {
     },
 }
 
+/// Custom arbitrary implementation for fuzzing
+/// as the `secp256r1_ecdsa::Signature` type is an external dependency
+/// p256::ecdsa::Signature
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for AssertionSignature {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate a fixed-length byte array for the signature
+        let bytes: [u8; aptos_crypto::secp256r1_ecdsa::Signature::LENGTH] = u.arbitrary()?;
+
+        // Create a signature without validating it
+        let signature = aptos_crypto::secp256r1_ecdsa::Signature::from_bytes_unchecked(&bytes)
+            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+
+        Ok(AssertionSignature::Secp256r1Ecdsa { signature })
+    }
+}
+
 /// `PartialAuthenticatorAssertionResponse` includes a subset of the fields returned from
 /// an [`AuthenticatorAssertionResponse`](passkey_types::webauthn::AuthenticatorAssertionResponse)
 ///
 /// See <https://www.w3.org/TR/webauthn-3/#authenticatorassertionresponse>
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct PartialAuthenticatorAssertionResponse {
     /// This attribute contains the raw signature returned from the authenticator.
     /// NOTE: Many signatures returned from WebAuthn assertions are not raw signatures.
@@ -125,6 +143,49 @@ impl PartialAuthenticatorAssertionResponse {
 
         // Check if expected challenge and actual challenge match. If there's no match, throw error
         verify_expected_challenge_from_message_matches_actual(message, challenge_bytes.as_slice())?;
+
+        // Generates binary concatenation of authenticator_data and hash(client_data_json)
+        let verification_data = generate_verification_data(
+            self.authenticator_data.as_slice(),
+            self.client_data_json.as_slice(),
+        );
+
+        // Note: We must call verify_arbitrary_msg instead of verify here. We do NOT want to
+        // use verify because it BCS serializes and prefixes the message with a hash
+        // via the signing_message function invocation
+        match (&public_key, &self.signature) {
+            (
+                AnyPublicKey::Secp256r1Ecdsa { public_key },
+                AssertionSignature::Secp256r1Ecdsa { signature },
+            ) => signature.verify_arbitrary_msg(&verification_data, public_key),
+            _ => Err(anyhow!(
+                "WebAuthn verification failure, invalid key, signature pairing"
+            )),
+        }
+    }
+
+    /// In our adaptation of WebAuthn, the `challenge` provided to `authenticatorGetAssertion`
+    /// is the SHA3-256 digest of the `RawTransaction`.
+    ///
+    /// This function should do the following:
+    /// 1. Verify `actual_challenge` and expected challenge from message are equal
+    /// 2. Construct `verification_data` as the binary concatenation of
+    ///    authenticator_data and SHA-256(client_data_json)
+    /// 3. Signature verification
+    ///
+    /// See WebAuthn §6.3.3 `authenticatorGetAssertion` for more info
+    pub fn verify_arbitrary_msg(&self, message: &[u8], public_key: &AnyPublicKey) -> Result<()> {
+        let collected_client_data: CollectedClientData =
+            serde_json::from_slice(self.client_data_json.as_slice())?;
+        let challenge_bytes = Bytes::try_from(collected_client_data.challenge.as_str())
+            .map_err(|e| anyhow!("Failed to decode challenge bytes {:?}", e))?;
+
+        // Check if expected challenge and actual challenge match. If there's no match, throw error
+        challenge_bytes
+            .as_slice()
+            .eq(message)
+            .then_some(())
+            .ok_or(CryptoMaterialError::ValidationError)?;
 
         // Generates binary concatenation of authenticator_data and hash(client_data_json)
         let verification_data = generate_verification_data(

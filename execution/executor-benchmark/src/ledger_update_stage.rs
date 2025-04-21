@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{CommitBlockMessage, LedgerUpdateMessage};
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_types::transaction::Version;
+use aptos_vm::VMBlockExecutor;
 use std::sync::{mpsc, Arc};
 
 pub enum CommitProcessing {
@@ -18,54 +18,65 @@ pub enum CommitProcessing {
 pub struct LedgerUpdateStage<V> {
     executor: Arc<BlockExecutor<V>>,
     commit_processing: CommitProcessing,
-    version: Version,
+    allow_aborts: bool,
+    allow_discards: bool,
+    allow_retries: bool,
 }
 
 impl<V> LedgerUpdateStage<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,
         commit_processing: CommitProcessing,
-        version: Version,
+        allow_aborts: bool,
+        allow_discards: bool,
+        allow_retries: bool,
     ) -> Self {
         Self {
             executor,
-            version,
             commit_processing,
+            allow_aborts,
+            allow_discards,
+            allow_retries,
         }
     }
 
     pub fn ledger_update(&mut self, ledger_update_message: LedgerUpdateMessage) {
         // let ledger_update_start_time = Instant::now();
         let LedgerUpdateMessage {
+            first_block_start_time,
             current_block_start_time,
-            execution_time,
             partition_time,
+            execution_time,
             block_id,
             parent_block_id,
-            state_checkpoint_output,
-            first_block_start_time,
+            num_input_txns,
         } = ledger_update_message;
 
         let output = self
             .executor
-            .ledger_update(block_id, parent_block_id, state_checkpoint_output)
+            .ledger_update(block_id, parent_block_id)
             .unwrap();
-
-        self.version += output.transactions_to_commit_len() as Version;
+        output.execution_output.check_aborts_discards_retries(
+            self.allow_aborts,
+            self.allow_discards,
+            self.allow_retries,
+        );
+        if !self.allow_retries {
+            assert_eq!(output.num_transactions_to_commit(), num_input_txns + 1);
+        }
 
         match &self.commit_processing {
             CommitProcessing::SendToQueue(commit_sender) => {
                 let msg = CommitBlockMessage {
                     block_id,
-                    root_hash: output.root_hash(),
                     first_block_start_time,
                     current_block_start_time,
                     partition_time,
                     execution_time,
-                    num_txns: output.transactions_to_commit_len(),
+                    output,
                 };
                 commit_sender.send(msg).unwrap();
             },
@@ -73,11 +84,10 @@ where
                 let ledger_info_with_sigs = super::transaction_committer::gen_li_with_sigs(
                     block_id,
                     output.root_hash(),
-                    self.version,
+                    output.expect_last_version(),
                 );
-                self.executor
-                    .commit_blocks(vec![block_id], ledger_info_with_sigs)
-                    .unwrap();
+                self.executor.pre_commit_block(block_id).unwrap();
+                self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
             },
             CommitProcessing::Skip => {},
         }

@@ -18,6 +18,7 @@ pub enum OnChainExecutionConfig {
     Missing,
     // Reminder: Add V4 and future versions here, after Missing (order matters for enums).
     V4(ExecutionConfigV4),
+    V5(ExecutionConfigV5),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -30,6 +31,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -45,13 +47,26 @@ impl OnChainExecutionConfig {
                 .block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
             OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
+            OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
+        }
+    }
+
+    pub fn enable_per_block_gas_limit(&self) -> bool {
+        match &self {
+            OnChainExecutionConfig::Missing
+            | OnChainExecutionConfig::V1(_)
+            | OnChainExecutionConfig::V2(_)
+            | OnChainExecutionConfig::V3(_)
+            | OnChainExecutionConfig::V4(_) => false,
+            OnChainExecutionConfig::V5(config) => config.enable_per_block_gas_limit,
         }
     }
 
     pub fn block_executor_onchain_config(&self) -> BlockExecutorConfigFromOnchain {
-        BlockExecutorConfigFromOnchain {
-            block_gas_limit_type: self.block_gas_limit_type(),
-        }
+        BlockExecutorConfigFromOnchain::new(
+            self.block_gas_limit_type(),
+            self.enable_per_block_gas_limit(),
+        )
     }
 
     /// The type of the transaction deduper being used.
@@ -63,15 +78,17 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V4(ExecutionConfigV4 {
+        OnChainExecutionConfig::V5(ExecutionConfigV5 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
+            enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
     }
@@ -142,17 +159,21 @@ pub struct ExecutionConfigV4 {
     pub transaction_deduper_type: TransactionDeduperType,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV5 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub enable_per_block_gas_limit: bool,
+    pub transaction_deduper_type: TransactionDeduperType,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
-    DeprecatedFairness {
-        sender_conflict_window_size: u32,
-        module_conflict_window_size: u32,
-        entry_fun_conflict_window_size: u32,
-    },
+    DeprecatedFairness,
     UseCaseAware {
         sender_spread_factor: usize,
         platform_use_case_spread_factor: usize,
@@ -166,6 +187,19 @@ impl TransactionShufflerType {
             sender_spread_factor: 32,
             platform_use_case_spread_factor: 0,
             user_use_case_spread_factor: 4,
+        }
+    }
+
+    pub fn user_use_case_spread_factor(&self) -> Option<usize> {
+        match self {
+            TransactionShufflerType::NoShuffling
+            | TransactionShufflerType::DeprecatedSenderAwareV1(_)
+            | TransactionShufflerType::SenderAwareV2(_)
+            | TransactionShufflerType::DeprecatedFairness => None,
+            TransactionShufflerType::UseCaseAware {
+                user_use_case_spread_factor,
+                ..
+            } => Some(*user_use_case_spread_factor),
         }
     }
 }
@@ -398,7 +432,11 @@ mod test {
     #[test]
     fn test_config_onchain_payload() {
         let execution_config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                platform_use_case_spread_factor: 0,
+                user_use_case_spread_factor: 0,
+            },
         });
 
         let mut configs = HashMap::new();
@@ -413,13 +451,20 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
+            TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                ..
+            }
         ));
 
         // V2 test with random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                platform_use_case_spread_factor: 0,
+                user_use_case_spread_factor: 0,
+            },
             block_gas_limit: Some(rand_gas_limit),
         });
 
@@ -435,7 +480,10 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
+            TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                ..
+            }
         ));
         assert_eq!(
             result.block_gas_limit_type(),
@@ -444,7 +492,11 @@ mod test {
 
         // V2 test with no per-block gas limit
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                platform_use_case_spread_factor: 0,
+                user_use_case_spread_factor: 0,
+            },
             block_gas_limit: None,
         });
 
@@ -460,7 +512,10 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV2(32)
+            TransactionShufflerType::UseCaseAware {
+                sender_spread_factor: 32,
+                ..
+            }
         ));
         assert_eq!(result.block_gas_limit_type(), BlockGasLimitType::NoLimit);
     }

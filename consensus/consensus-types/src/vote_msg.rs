@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{sync_info::SyncInfo, vote::Vote};
+use crate::{common::Author, sync_info::SyncInfo, vote::Vote};
 use anyhow::ensure;
 use aptos_crypto::HashValue;
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -54,7 +54,13 @@ impl VoteMsg {
         self.vote.vote_data().proposed().id()
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(&self, sender: Author, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            self.vote().author() == sender,
+            "Vote author {:?} is different from the sender {:?}",
+            self.vote().author(),
+            sender,
+        );
         ensure!(
             self.vote().epoch() == self.sync_info.epoch(),
             "VoteMsg has different epoch"

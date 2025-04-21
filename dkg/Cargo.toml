@@ -28,6 +28,7 @@ aptos-metrics-core = { workspace = true }
 aptos-network = { workspace = true }
 aptos-reliable-broadcast = { workspace = true }
 aptos-runtimes = { workspace = true }
+aptos-safety-rules = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }

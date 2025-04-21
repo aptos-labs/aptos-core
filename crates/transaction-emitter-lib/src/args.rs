@@ -5,7 +5,7 @@ use anyhow::{bail, format_err, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
+use aptos_transaction_generator_lib::AccountType;
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -129,39 +129,6 @@ pub struct EmitArgs {
     #[clap(long, default_value_t = 60)]
     pub duration: u64,
 
-    #[clap(
-        long,
-        value_enum,
-        default_value = "coin-transfer",
-        num_args = 1..,
-        ignore_case = true
-    )]
-    pub transaction_type: Vec<TransactionTypeArg>,
-
-    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
-    pub account_type: AccountType,
-
-    /// Number of copies of the modules that will be published,
-    /// under separate accounts, creating independent contracts,
-    /// removing contention.
-    /// For example for NFT minting, setting to 1 will be equivalent
-    /// to minting from single collection,
-    /// setting to 20 means minting from 20 collections in parallel.
-    #[clap(long)]
-    pub module_working_set_size: Option<usize>,
-
-    /// Whether to use burner accounts for the sender.
-    /// For example when transaction can only be done once per account.
-    /// (pool needs to be populated by account-creation transactions)
-    #[clap(long)]
-    pub sender_use_account_pool: Option<bool>,
-
-    #[clap(long, num_args = 0..)]
-    pub transaction_weights: Vec<usize>,
-
-    #[clap(long, num_args = 0..)]
-    pub transaction_phases: Vec<usize>,
-
     #[clap(long)]
     pub gas_price: Option<u64>,
 
@@ -218,6 +185,27 @@ pub struct EmitArgs {
 
     #[clap(long)]
     pub coins_per_account_override: Option<u64>,
+
+    #[clap(flatten)]
+    pub account_type_args: AccountTypeArgs,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+pub struct AccountTypeArgs {
+    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
+    pub account_type: AccountType,
+
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, requires = "proof_file_path", requires = "epk_expiry_date_secs", requires = "keyless_jwt")]
+    pub keyless_ephem_secret_key: Option<ConfigKey<Ed25519PrivateKey>>,
+
+    #[clap(long)]
+    pub proof_file_path: Option<String>,
+
+    #[clap(long)]
+    pub epk_expiry_date_secs: Option<u64>,
+
+    #[clap(long)]
+    pub keyless_jwt: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
@@ -234,6 +222,12 @@ pub struct CreateAccountsArgs {
     /// used and printed.
     #[clap(long)]
     pub account_minter_seed: Option<String>,
+
+    #[clap(long)]
+    pub keyless_jwt: Option<String>,
+
+    #[clap(long)]
+    pub proof_file_path: Option<String>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

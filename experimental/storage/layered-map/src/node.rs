@@ -26,7 +26,18 @@ pub(crate) enum LeafContent<K, V> {
 }
 
 impl<K, V> LeafContent<K, V> {
-    fn into_iter(self, layer: u64) -> impl Iterator<Item = (K, CollisionCell<V>)> {
+    pub fn into_iter(self, base_layer: u64) -> impl Iterator<Item = (K, V)> {
+        match self {
+            LeafContent::UniqueLatest { key, value } => Either::Left(std::iter::once((key, value))),
+            LeafContent::Collision(map) => {
+                Either::Right(map.into_iter().filter_map(move |(key, cell)| {
+                    (cell.layer > base_layer).then_some((key, cell.value))
+                }))
+            },
+        }
+    }
+
+    fn into_cell_iter(self, layer: u64) -> impl Iterator<Item = (K, CollisionCell<V>)> {
         match self {
             LeafContent::UniqueLatest { key, value } => {
                 Either::Left(std::iter::once((key, CollisionCell { value, layer })))
@@ -42,6 +53,9 @@ impl<K, V> LeafContent<K, V> {
     {
         use LeafContent::*;
 
+        assert!(layer < other_layer);
+        assert!(base_layer < other_layer);
+
         match (self, other) {
             // Collision should be rare, this is likely.
             (UniqueLatest { key: old_key, .. }, UniqueLatest { key, value }) if old_key == key => {
@@ -51,10 +65,10 @@ impl<K, V> LeafContent<K, V> {
                 let _timer = TIMER.timer_with(&["_", "leaf_content_collision"]);
 
                 let map: BTreeMap<_, _> = myself
-                    .into_iter(layer)
-                    .chain(other.into_iter(other_layer))
-                    // retire entries that's older than the base_layer
-                    .filter(|(_key, cell)| cell.layer >= base_layer)
+                    .into_cell_iter(layer)
+                    .chain(other.into_cell_iter(other_layer))
+                    // retire entries that's at base_layer or even older
+                    .filter(|(_key, cell)| cell.layer > base_layer)
                     .collect();
 
                 assert!(!map.is_empty());
@@ -72,7 +86,7 @@ impl<K, V> LeafContent<K, V> {
         }
     }
 
-    fn get(&self, key: &K, min_layer: u64) -> Option<&V>
+    fn get(&self, key: &K, base_layer: u64) -> Option<&V>
     where
         K: Eq + Ord,
     {
@@ -87,7 +101,7 @@ impl<K, V> LeafContent<K, V> {
                 }
             },
             Collision(map) => map.get(key).and_then(|cell| {
-                if cell.layer >= min_layer {
+                if cell.layer > base_layer {
                     Some(&cell.value)
                 } else {
                     None
@@ -105,15 +119,15 @@ pub(crate) struct LeafNode<K, V> {
 }
 
 impl<K, V> LeafNode<K, V> {
-    pub fn get_value(&self, key: &K, min_layer: u64) -> Option<&V>
+    pub fn get_value(&self, key: &K, base_layer: u64) -> Option<&V>
     where
         K: Eq + Ord,
     {
-        self.content.get(key, min_layer)
+        self.content.get(key, base_layer)
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) enum NodeRef<K, V> {
     Empty,
     Leaf(Ref<LeafNode<K, V>>),
@@ -133,13 +147,13 @@ impl<K, V> NodeRef<K, V> {
         Self::Internal(Ref::Strong(Arc::new(InternalNode { left, right, layer })))
     }
 
-    pub fn get_strong_with_min_layer(&self, min_layer: u64) -> NodeStrongRef<K, V> {
+    pub fn get_strong(&self, base_layer: u64) -> NodeStrongRef<K, V> {
         match self {
             NodeRef::Empty => NodeStrongRef::Empty,
             NodeRef::Leaf(leaf) => match leaf.try_get_strong() {
                 None => NodeStrongRef::Empty,
                 Some(leaf) => {
-                    if leaf.layer >= min_layer {
+                    if leaf.layer > base_layer {
                         NodeStrongRef::Leaf(leaf)
                     } else {
                         NodeStrongRef::Empty
@@ -149,7 +163,7 @@ impl<K, V> NodeRef<K, V> {
             NodeRef::Internal(internal) => match internal.try_get_strong() {
                 None => NodeStrongRef::Empty,
                 Some(internal) => {
-                    if internal.layer >= min_layer {
+                    if internal.layer > base_layer {
                         NodeStrongRef::Internal(internal)
                     } else {
                         NodeStrongRef::Empty
@@ -158,12 +172,15 @@ impl<K, V> NodeRef<K, V> {
             },
         }
     }
+}
 
-    pub fn take_for_drop(&mut self) -> Self {
-        let mut ret = Self::Empty;
-        std::mem::swap(self, &mut ret);
-
-        ret
+impl<K, V> Clone for NodeRef<K, V> {
+    fn clone(&self) -> Self {
+        match self {
+            NodeRef::Empty => NodeRef::Empty,
+            NodeRef::Leaf(leaf) => NodeRef::Leaf(leaf.clone()),
+            NodeRef::Internal(internal) => NodeRef::Internal(internal.clone()),
+        }
     }
 }
 
@@ -192,6 +209,25 @@ impl<K, V> NodeStrongRef<K, V> {
             NodeStrongRef::Internal(internal) => {
                 NodeRef::Internal(Ref::Weak(Arc::downgrade(internal)))
             },
+        }
+    }
+
+    pub fn children(&self, depth: usize, base_layer: u64) -> (Self, Self) {
+        use NodeStrongRef::*;
+
+        match self {
+            Empty => (Empty, Empty),
+            Leaf(leaf) => {
+                if leaf.key_hash.bit(depth) {
+                    (Empty, self.clone())
+                } else {
+                    (self.clone(), Empty)
+                }
+            },
+            Internal(internal) => (
+                internal.left.get_strong(base_layer),
+                internal.right.get_strong(base_layer),
+            ),
         }
     }
 }

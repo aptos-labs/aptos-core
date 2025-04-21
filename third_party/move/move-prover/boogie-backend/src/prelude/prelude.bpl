@@ -24,6 +24,18 @@ options provided to the prover.
 {% include "custom-natives" %}
 {%- endif %}
 
+
+// Uninterpreted function for all types
+
+{% for instance in uninterpreted_instances %}
+
+{%- set S = "'" ~ instance.suffix ~ "'" -%}
+{%- set T = instance.name -%}
+
+function $Arbitrary_value_of{{S}}(): {{T}};
+
+{% endfor %}
+
 // ============================================================================================
 // Primitive Types
 
@@ -1090,13 +1102,25 @@ procedure {:inline 1} $1_Account_create_signer(
 // Native Signer
 
 datatype $signer {
-    $signer($addr: int)
+    $signer($addr: int),
+    $permissioned_signer($addr: int, $permission_addr: int)
 }
+
 function {:inline} $IsValid'signer'(s: $signer): bool {
-    $IsValid'address'(s->$addr)
+    if s is $signer then
+        $IsValid'address'(s->$addr)
+    else
+        $IsValid'address'(s->$addr) &&
+        $IsValid'address'(s->$permission_addr)
 }
+
 function {:inline} $IsEqual'signer'(s1: $signer, s2: $signer): bool {
-    s1 == s2
+    if s1 is $signer && s2 is $signer then
+        s1 == s2
+    else if s1 is $permissioned_signer && s2 is $permissioned_signer then
+        s1 == s2
+    else
+        false
 }
 
 procedure {:inline 1} $1_signer_borrow_address(signer: $signer) returns (res: int) {

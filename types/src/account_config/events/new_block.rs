@@ -14,7 +14,6 @@ use move_core_types::{
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a NewBlockEvent.
@@ -103,14 +102,6 @@ impl MoveStructType for NewBlockEvent {
 pub fn new_block_event_key() -> EventKey {
     EventKey::new(3, CORE_CODE_ADDRESS)
 }
-
-/// The path to the new block event handle under a Block::BlockResource resource.
-pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
-    let mut path = BlockResource::resource_path();
-    // it can be anything as long as it's referenced in AccountState::get_event_handle_by_query_path
-    path.extend_from_slice(b"/new_block_event/");
-    path
-});
 
 /// Should be kept in-sync with BlockResource move struct in block.move.
 #[derive(Deserialize, Serialize)]

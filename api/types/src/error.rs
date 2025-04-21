@@ -53,7 +53,7 @@ impl AptosError {
 
 /// These codes provide more granular error information beyond just the HTTP
 /// status code of the response.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Enum)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Enum)]
 #[oai(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 #[repr(u32)]

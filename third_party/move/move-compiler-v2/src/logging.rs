@@ -34,10 +34,15 @@
 //! use the boolean macro `log_enabled!(log::Level::Debug)` to check whether a given
 //! level is enabled.
 //!
-//! In general it is good to keep INFO and higher severity log messages in the code. They
-//! may help to debug customer issues in production. However, for keeping the code base clean,
-//! uses of the `debug!` and lower logging level should be kept minimal and possibly removed
-//! eliminated. Its a judgement call where and for how long to leave them in code.
+//! General practice is to use, besides `warn!`, `info!` for progress messages,
+//! and `debug!` for helping to debug problems with ready code. `debug!` can also be used
+//! during development of a module, but should then be made conditional as in:
+//!
+//! ```ignore
+//! const DEBUG: bool = false;
+//! ...
+//! if DEBUG { debug!(..) }
+//! ```
 
 use flexi_logger::{DeferredNow, FileSpec, LogSpecification, Logger};
 use log::Record;

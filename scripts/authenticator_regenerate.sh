@@ -37,19 +37,6 @@ cd $repodir
   cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json
 )
 
-(
-  echo
-  echo "Regenerating Typescript SDK (in `pwd`)"
-  # Typescript SDK client files
-  cd ecosystem/typescript/sdk
-  pnpm install
-  pnpm generate-client
-
-  # Typescript SDK docs
-  pnpm generate-ts-docs
-  cd ..
-)
-
 echo
 echo "WARNING: If you are adding a new transaction authenticator..."
 echo " 1. Check out https://github.com/aptos-labs/aptos-core/blob/main/testsuite/generate-format/README.md"

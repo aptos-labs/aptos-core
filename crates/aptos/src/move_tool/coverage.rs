@@ -1,16 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir};
+use crate::{
+    common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions},
+    move_tool::fix_bytecode_version,
+};
 use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_coverage::{
-    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
-    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
+    coverage_map::CoverageMap,
+    format_csv_summary, format_human_summary,
+    source_coverage::{ColorChoice, SourceCoverageBuilder, TextIndicator},
+    summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
 
 /// Display a coverage summary for all modules in a package
@@ -29,7 +35,7 @@ pub struct SummaryCoverage {
     #[clap(long, short)]
     pub filter: Option<String>,
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 impl SummaryCoverage {
@@ -87,10 +93,20 @@ impl CliCommand<()> for SummaryCoverage {
 /// Display coverage information about the module against source code
 #[derive(Debug, Parser)]
 pub struct SourceCoverage {
+    /// Show coverage for the given module
     #[clap(long = "module")]
     pub module_name: String,
+
+    /// Colorize output based on coverage
+    #[clap(long, default_value_t = ColorChoice::Default)]
+    pub color: ColorChoice,
+
+    /// Tag each line with a textual indication of coverage
+    #[clap(long, default_value_t = TextIndicator::Explicit)]
+    pub tag: TextIndicator,
+
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 #[async_trait]
@@ -103,16 +119,24 @@ impl CliCommand<()> for SourceCoverage {
         let (coverage_map, package) = compile_coverage(self.move_options)?;
         let unit = package.get_module_by_name_from_root(&self.module_name)?;
         let source_path = &unit.source_path;
-        let (module, source_map) = match &unit.unit {
-            CompiledUnit::Module(NamedCompiledModule {
-                module, source_map, ..
-            }) => (module, source_map),
+        let source_map = match &unit.unit {
+            CompiledUnit::Module(NamedCompiledModule { source_map, .. }) => source_map,
             _ => panic!("Should all be modules"),
         };
-        let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
-        source_coverage
-            .compute_source_coverage(source_path)
-            .output_source_coverage(&mut std::io::stdout())
+        let root_modules: Vec<_> = package
+            .root_modules()
+            .map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule {
+                    module, source_map, ..
+                }) => (module, source_map),
+                _ => unreachable!("Should all be modules"),
+            })
+            .collect();
+        let source_coverage = SourceCoverageBuilder::new(&coverage_map, source_map, root_modules);
+        let source_coverage = source_coverage.compute_source_coverage(source_path);
+        let output_result =
+            source_coverage.output_source_coverage(&mut std::io::stdout(), self.color, self.tag);
+        output_result
             .map_err(|err| CliError::UnexpectedError(format!("Failed to get coverage {}", err)))
     }
 }
@@ -123,7 +147,7 @@ pub struct BytecodeCoverage {
     #[clap(long = "module")]
     pub module_name: String,
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 #[async_trait]
@@ -143,23 +167,36 @@ impl CliCommand<()> for BytecodeCoverage {
 }
 
 fn compile_coverage(
-    move_options: MovePackageDir,
+    move_options: MovePackageOptions,
 ) -> CliTypedResult<(CoverageMap, CompiledPackage)> {
     let config = BuildConfig {
         dev_mode: move_options.dev,
         additional_named_addresses: move_options.named_addresses(),
         test_mode: false,
+        full_model_generation: !move_options.skip_checks_on_test_code,
         install_dir: move_options.output_dir.clone(),
+        skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
         compiler_config: CompilerConfig {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            skip_attribute_checks: false,
-            ..Default::default()
+            skip_attribute_checks: move_options.skip_attribute_checks,
+            bytecode_version: fix_bytecode_version(
+                move_options.bytecode_version,
+                move_options.language_version,
+            ),
+            compiler_version: move_options
+                .compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
+            language_version: move_options
+                .language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
+            experiments: move_options.compute_experiments(),
         },
         ..Default::default()
     };
+
     let path = move_options.get_package_path()?;
     let coverage_map =
-        CoverageMap::from_binary_file(path.join(".coverage_map.mvcov")).map_err(|err| {
+        CoverageMap::from_binary_file(&path.join(".coverage_map.mvcov")).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to retrieve coverage map {}", err))
         })?;
     let package = config

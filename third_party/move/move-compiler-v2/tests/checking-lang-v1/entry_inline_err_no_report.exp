@@ -12,3 +12,16 @@ module 0x123::b {
         b::a()
     }
 } // end 0x123::b
+
+// -- Sourcified model before bytecode pipeline
+module 0x123::a {
+    friend entry fun a() {
+    }
+}
+module 0x123::b {
+    entry fun a() {
+    }
+    fun b() {
+        a()
+    }
+}

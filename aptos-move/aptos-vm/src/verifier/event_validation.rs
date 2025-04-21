@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::SessionExt;
 use aptos_framework::RuntimeModuleMetadataV1;
+use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{Location, PartialVMError, VMError, VMResult},
@@ -34,7 +34,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Extract the event metadata
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
 pub(crate) fn validate_module_events(
-    session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     modules: &[CompiledModule],
 ) -> VMResult<()> {
     for module in modules {
@@ -49,7 +49,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, module)?;
 
         let original_event_structs =
-            extract_event_metadata_from_module(session, &module.self_id())?;
+            extract_event_metadata_from_module(module_storage, &module.self_id())?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -117,18 +117,14 @@ pub(crate) fn validate_emit_calls(
 
 /// Given a module id extract all event metadata
 pub(crate) fn extract_event_metadata_from_module(
-    session: &mut SessionExt,
+    module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
 ) -> VMResult<HashSet<String>> {
-    let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-    });
-
-    if let Ok(Ok(Some(metadata))) = metadata {
+    // TODO(loader_v2): We can optimize metadata calls as well.
+    let metadata = module_storage
+        .fetch_deserialized_module(module_id.address(), module_id.name())?
+        .map(|module| aptos_framework::get_metadata_from_compiled_module(module.as_ref()));
+    if let Some(Some(metadata)) = metadata {
         extract_event_metadata(&metadata)
     } else {
         Ok(HashSet::new())

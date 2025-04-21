@@ -1,4 +1,6 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
 AccountAddress:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -19,6 +21,16 @@ EntryABI:
       EntryFunction:
         NEWTYPE:
           TYPENAME: ScriptFunctionABI
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 Identifier:
   NEWTYPESTRUCT: STR
 ModuleId:
@@ -92,3 +104,7 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag

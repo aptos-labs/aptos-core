@@ -1,0 +1,103 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
+     var $t5: 0xc0ffee::m::Wrap
+     var $t6: &0xc0ffee::m::S
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: &u64
+  0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
+  1: $t7 := infer($t0)
+  2: $t8 := infer($t1)
+  3: $t9 := infer($t2)
+  4: $t11 := borrow_field<0xc0ffee::m::S>.x($t6)
+  5: $t10 := read_ref($t11)
+  6: $t12 := infer($t4)
+  7: $t14 := borrow_field<0xc0ffee::m::S>.y($t6)
+  8: $t13 := read_ref($t14)
+  9: $t5 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10, $t12, $t13)
+ 10: return $t5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
+     var $t5: 0xc0ffee::m::Wrap
+     var $t6: &0xc0ffee::m::S
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64
+     var $t11: &u64
+     var $t12: u64 [unused]
+     var $t13: u64
+     var $t14: &u64 [unused]
+     # live vars: $t0, $t1, $t2, $t3, $t4
+  0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  1: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  3: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  4: $t11 := borrow_field<0xc0ffee::m::S>.x($t6)
+     # live vars: $t0, $t1, $t2, $t4, $t6, $t11
+  5: $t10 := read_ref($t11)
+     # live vars: $t0, $t1, $t2, $t4, $t6, $t10
+  6: $t4 := move($t4)
+     # live vars: $t0, $t1, $t2, $t4, $t6, $t10
+  7: $t11 := borrow_field<0xc0ffee::m::S>.y($t6)
+     # live vars: $t0, $t1, $t2, $t4, $t10, $t11
+  8: $t13 := read_ref($t11)
+     # live vars: $t0, $t1, $t2, $t4, $t10, $t13
+  9: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t10, $t4, $t13)
+     # live vars: $t5
+ 10: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+struct S has key {
+	x: u64,
+	y: u64
+}
+struct Wrap {
+	a: u64,
+	b: u64,
+	c: u64,
+	d: u64,
+	e: u64,
+	f: u64
+}
+
+public make(a: u64, b: u64, c: u64, d: address, e: u64): Wrap /* def_idx: 0 */ {
+L5:	ref: &S
+B0:
+	0: MoveLoc[3](d: address)
+	1: ImmBorrowGlobal[0](S)
+	2: StLoc[5](ref: &S)
+	3: MoveLoc[0](a: u64)
+	4: MoveLoc[1](b: u64)
+	5: MoveLoc[2](c: u64)
+	6: CopyLoc[5](ref: &S)
+	7: ImmBorrowField[0](S.x: u64)
+	8: ReadRef
+	9: MoveLoc[4](e: u64)
+	10: MoveLoc[5](ref: &S)
+	11: ImmBorrowField[1](S.y: u64)
+	12: ReadRef
+	13: Pack[1](Wrap)
+	14: Ret
+}
+}
+============ bytecode verification succeeded ========

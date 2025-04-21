@@ -1,179 +1,173 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.operators {
 
 
-arithm(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
-L2:	loc0: u64
-L3:	loc1: u64
+arithm(x: u64, y: u64): u64 /* def_idx: 0 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: CopyLoc[1](Arg1: u64)
-	2: Sub
-	3: StLoc[2](loc0: u64)
-	4: CopyLoc[1](Arg1: u64)
-	5: MoveLoc[2](loc0: u64)
-	6: Div
-	7: MoveLoc[1](Arg1: u64)
-	8: Mul
-	9: CopyLoc[0](Arg0: u64)
-	10: Mod
-	11: StLoc[3](loc1: u64)
-	12: MoveLoc[0](Arg0: u64)
-	13: MoveLoc[3](loc1: u64)
-	14: Add
-	15: Ret
+	0: CopyLoc[0](x: u64)
+	1: CopyLoc[1](y: u64)
+	2: CopyLoc[0](x: u64)
+	3: CopyLoc[1](y: u64)
+	4: Sub
+	5: Div
+	6: MoveLoc[1](y: u64)
+	7: Mul
+	8: MoveLoc[0](x: u64)
+	9: Mod
+	10: Add
+	11: Ret
 }
-bits(Arg0: u64, Arg1: u8): u64 /* def_idx: 1 */ {
+bits(x: u64, y: u8): u64 /* def_idx: 1 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: CopyLoc[1](Arg1: u8)
+	0: CopyLoc[0](x: u64)
+	1: CopyLoc[1](y: u8)
 	2: Shl
-	3: CopyLoc[0](Arg0: u64)
+	3: CopyLoc[0](x: u64)
 	4: BitAnd
-	5: CopyLoc[0](Arg0: u64)
-	6: MoveLoc[1](Arg1: u8)
+	5: CopyLoc[0](x: u64)
+	6: MoveLoc[1](y: u8)
 	7: Shr
-	8: MoveLoc[0](Arg0: u64)
+	8: MoveLoc[0](x: u64)
 	9: Xor
 	10: BitOr
 	11: Ret
 }
-bools(Arg0: bool, Arg1: bool): bool /* def_idx: 2 */ {
-L2:	loc0: bool
-L3:	loc1: bool
-L4:	loc2: bool
-L5:	loc3: bool
+bools(x: bool, y: bool): bool /* def_idx: 2 */ {
+L2:	$t5: bool
+L3:	$t4: bool
+L4:	$t3: bool
+L5:	return: bool
 B0:
-	0: CopyLoc[0](Arg0: bool)
+	0: CopyLoc[0](x: bool)
 	1: BrFalse(5)
 B1:
-	2: CopyLoc[1](Arg1: bool)
-	3: StLoc[2](loc0: bool)
+	2: CopyLoc[1](y: bool)
+	3: StLoc[2]($t5: bool)
 	4: Branch(7)
 B2:
 	5: LdFalse
-	6: StLoc[2](loc0: bool)
+	6: StLoc[2]($t5: bool)
 B3:
-	7: MoveLoc[2](loc0: bool)
+	7: MoveLoc[2]($t5: bool)
 	8: BrFalse(12)
 B4:
 	9: LdTrue
-	10: StLoc[3](loc1: bool)
+	10: StLoc[3]($t4: bool)
 	11: Branch(20)
 B5:
-	12: CopyLoc[0](Arg0: bool)
+	12: CopyLoc[0](x: bool)
 	13: BrFalse(18)
 B6:
-	14: CopyLoc[1](Arg1: bool)
+	14: CopyLoc[1](y: bool)
 	15: Not
-	16: StLoc[3](loc1: bool)
+	16: StLoc[3]($t4: bool)
 	17: Branch(20)
 B7:
 	18: LdFalse
-	19: StLoc[3](loc1: bool)
+	19: StLoc[3]($t4: bool)
 B8:
-	20: MoveLoc[3](loc1: bool)
+	20: MoveLoc[3]($t4: bool)
 	21: BrFalse(25)
 B9:
 	22: LdTrue
-	23: StLoc[4](loc2: bool)
+	23: StLoc[4]($t3: bool)
 	24: Branch(33)
 B10:
-	25: CopyLoc[0](Arg0: bool)
+	25: CopyLoc[0](x: bool)
 	26: Not
 	27: BrFalse(31)
 B11:
-	28: CopyLoc[1](Arg1: bool)
-	29: StLoc[4](loc2: bool)
+	28: CopyLoc[1](y: bool)
+	29: StLoc[4]($t3: bool)
 	30: Branch(33)
 B12:
 	31: LdFalse
-	32: StLoc[4](loc2: bool)
+	32: StLoc[4]($t3: bool)
 B13:
-	33: MoveLoc[4](loc2: bool)
+	33: MoveLoc[4]($t3: bool)
 	34: BrFalse(38)
 B14:
 	35: LdTrue
-	36: StLoc[5](loc3: bool)
+	36: StLoc[5](return: bool)
 	37: Branch(47)
 B15:
-	38: MoveLoc[0](Arg0: bool)
+	38: MoveLoc[0](x: bool)
 	39: Not
 	40: BrFalse(45)
 B16:
-	41: MoveLoc[1](Arg1: bool)
+	41: MoveLoc[1](y: bool)
 	42: Not
-	43: StLoc[5](loc3: bool)
+	43: StLoc[5](return: bool)
 	44: Branch(47)
 B17:
 	45: LdFalse
-	46: StLoc[5](loc3: bool)
+	46: StLoc[5](return: bool)
 B18:
-	47: MoveLoc[5](loc3: bool)
+	47: MoveLoc[5](return: bool)
 	48: Ret
 }
-equality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
+equality<T: drop>(x: T, y: T): bool /* def_idx: 3 */ {
 B0:
-	0: MoveLoc[0](Arg0: Ty0)
-	1: MoveLoc[1](Arg1: Ty0)
+	0: MoveLoc[0](x: T)
+	1: MoveLoc[1](y: T)
 	2: Eq
 	3: Ret
 }
-inequality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
+inequality<T: drop>(x: T, y: T): bool /* def_idx: 4 */ {
 B0:
-	0: MoveLoc[0](Arg0: Ty0)
-	1: MoveLoc[1](Arg1: Ty0)
+	0: MoveLoc[0](x: T)
+	1: MoveLoc[1](y: T)
 	2: Neq
 	3: Ret
 }
-order(Arg0: u64, Arg1: u64): bool /* def_idx: 5 */ {
-L2:	loc0: bool
-L3:	loc1: bool
-L4:	loc2: bool
+order(x: u64, y: u64): bool /* def_idx: 5 */ {
+L2:	$t4: bool
+L3:	$t3: bool
+L4:	return: bool
 B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: CopyLoc[1](Arg1: u64)
+	0: CopyLoc[0](x: u64)
+	1: CopyLoc[1](y: u64)
 	2: Lt
 	3: BrFalse(9)
 B1:
-	4: CopyLoc[0](Arg0: u64)
-	5: CopyLoc[1](Arg1: u64)
+	4: CopyLoc[0](x: u64)
+	5: CopyLoc[1](y: u64)
 	6: Le
-	7: StLoc[2](loc0: bool)
+	7: StLoc[2]($t4: bool)
 	8: Branch(11)
 B2:
 	9: LdFalse
-	10: StLoc[2](loc0: bool)
+	10: StLoc[2]($t4: bool)
 B3:
-	11: MoveLoc[2](loc0: bool)
+	11: MoveLoc[2]($t4: bool)
 	12: BrFalse(19)
 B4:
-	13: CopyLoc[0](Arg0: u64)
-	14: CopyLoc[1](Arg1: u64)
+	13: CopyLoc[0](x: u64)
+	14: CopyLoc[1](y: u64)
 	15: Gt
 	16: Not
-	17: StLoc[3](loc1: bool)
+	17: StLoc[3]($t3: bool)
 	18: Branch(21)
 B5:
 	19: LdFalse
-	20: StLoc[3](loc1: bool)
+	20: StLoc[3]($t3: bool)
 B6:
-	21: MoveLoc[3](loc1: bool)
+	21: MoveLoc[3]($t3: bool)
 	22: BrFalse(29)
 B7:
-	23: MoveLoc[0](Arg0: u64)
-	24: MoveLoc[1](Arg1: u64)
+	23: MoveLoc[0](x: u64)
+	24: MoveLoc[1](y: u64)
 	25: Ge
 	26: Not
-	27: StLoc[4](loc2: bool)
+	27: StLoc[4](return: bool)
 	28: Branch(31)
 B8:
 	29: LdFalse
-	30: StLoc[4](loc2: bool)
+	30: StLoc[4](return: bool)
 B9:
-	31: MoveLoc[4](loc2: bool)
+	31: MoveLoc[4](return: bool)
 	32: Ret
 }
 }

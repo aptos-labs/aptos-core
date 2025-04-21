@@ -1,4 +1,19 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
+AbstractionAuthData:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
+    1:
+      DerivableV1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - abstract_signature: BYTES
+          - abstract_public_key: BYTES
 AccessPath:
   STRUCT:
     - address:
@@ -35,6 +50,15 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+    4:
+      NoAccountAuthenticator: UNIT
+    5:
+      Abstraction:
+        STRUCT:
+          - function_info:
+              TYPENAME: FunctionInfo
+          - auth_data:
+              TYPENAME: AbstractionAuthData
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -74,6 +98,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: KeylessPublicKey
+    4:
+      FederatedKeyless:
+        STRUCT:
+          - public_key:
+              TYPENAME: FederatedKeylessPublicKey
 AnySignature:
   ENUM:
     0:
@@ -248,6 +277,16 @@ BlockMetadataWithRandomness:
         OPTION:
           TYPENAME: Randomness
 BlockRetrievalRequest:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequestV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequestV2
+BlockRetrievalRequestV1:
   STRUCT:
     - block_id:
         TYPENAME: HashValue
@@ -255,6 +294,12 @@ BlockRetrievalRequest:
     - target_block_id:
         OPTION:
           TYPENAME: HashValue
+BlockRetrievalRequestV2:
+  STRUCT:
+    - block_id:
+        TYPENAME: HashValue
+    - num_blocks: U64
+    - target_round: U64
 BlockRetrievalResponse:
   STRUCT:
     - status:
@@ -339,9 +384,9 @@ CommitVote:
 ConsensusMsg:
   ENUM:
     0:
-      BlockRetrievalRequest:
+      DeprecatedBlockRetrievalRequest:
         NEWTYPE:
-          TYPENAME: BlockRetrievalRequest
+          TYPENAME: BlockRetrievalRequestV1
     1:
       BlockRetrievalResponse:
         NEWTYPE:
@@ -414,6 +459,14 @@ ConsensusMsg:
       OrderVoteMsg:
         NEWTYPE:
           TYPENAME: OrderVoteMsg
+    19:
+      RoundTimeoutMsg:
+        NEWTYPE:
+          TYPENAME: RoundTimeoutMsg
+    20:
+      BlockRetrievalRequest:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequest
 ContractEvent:
   ENUM:
     0:
@@ -523,6 +576,28 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+FederatedKeylessPublicKey:
+  STRUCT:
+    - jwk_addr:
+        TYPENAME: AccountAddress
+    - pk:
+        TYPENAME: KeylessPublicKey
+FunctionInfo:
+  STRUCT:
+    - module_address:
+        TYPENAME: AccountAddress
+    - module_name: STR
+    - function_name: STR
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -712,6 +787,16 @@ Payload:
       OptQuorumStore:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayload
+    5:
+      QuorumStoreInlineHybridV2:
+        TUPLE:
+          - SEQ:
+              TUPLE:
+                - TYPENAME: BatchInfo
+                - SEQ:
+                    TYPENAME: SignedTransaction
+          - TYPENAME: ProofWithData
+          - TYPENAME: PayloadExecutionLimit
 PayloadExecutionLimit:
   ENUM:
     0:
@@ -719,6 +804,10 @@ PayloadExecutionLimit:
     1:
       MaxTransactionsToExecute:
         NEWTYPE: U64
+    2:
+      TxnAndGasLimits:
+        NEWTYPE:
+          TYPENAME: TxnAndGasLimits
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -815,6 +904,35 @@ RawTransaction:
     - expiration_timestamp_secs: U64
     - chain_id:
         TYPENAME: ChainId
+RoundTimeout:
+  STRUCT:
+    - timeout:
+        TYPENAME: TwoChainTimeout
+    - author:
+        TYPENAME: AccountAddress
+    - reason:
+        TYPENAME: RoundTimeoutReason
+    - signature:
+        TYPENAME: Signature
+RoundTimeoutMsg:
+  STRUCT:
+    - round_timeout:
+        TYPENAME: RoundTimeout
+    - sync_info:
+        TYPENAME: SyncInfo
+RoundTimeoutReason:
+  ENUM:
+    0:
+      Unknown: UNIT
+    1:
+      ProposalNotReceived: UNIT
+    2:
+      PayloadUnavailable:
+        STRUCT:
+          - missing_authors:
+              TYPENAME: BitVec
+    3:
+      NoQC: UNIT
 Script:
   STRUCT:
     - code: BYTES
@@ -1060,6 +1178,12 @@ TwoChainTimeoutCertificate:
         TYPENAME: TwoChainTimeout
     - signatures_with_rounds:
         TYPENAME: AggregateSignatureWithRounds
+TxnAndGasLimits:
+  STRUCT:
+    - transaction_limit:
+        OPTION: U64
+    - gas_limit:
+        OPTION: U64
 TypeTag:
   ENUM:
     0:
@@ -1088,6 +1212,10 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag
 ValidatorConsensusInfo:
   STRUCT:
     - address:

@@ -129,6 +129,12 @@ return true.
 -  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
 -  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
 -  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
+-  [Function `get_transaction_simulation_enhancement_feature`](#0x1_features_get_transaction_simulation_enhancement_feature)
+-  [Function `transaction_simulation_enhancement_enabled`](#0x1_features_transaction_simulation_enhancement_enabled)
+-  [Function `get_collection_owner_feature`](#0x1_features_get_collection_owner_feature)
+-  [Function `is_collection_owner_enabled`](#0x1_features_is_collection_owner_enabled)
+-  [Function `get_native_memory_operations_feature`](#0x1_features_get_native_memory_operations_feature)
+-  [Function `is_native_memory_operations_enabled`](#0x1_features_is_native_memory_operations_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -351,9 +357,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_COLLECTION_OWNER"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>: u64 = 79;
+</code></pre>
+
+
+
 <a id="0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES"></a>
 
-Whether gas fees are collected and distributed to the block proposers.
+Deprecated feature
 Lifetime: transient
 
 
@@ -657,6 +672,15 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_NATIVE_MEMORY_OPERATIONS"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_MEMORY_OPERATIONS">NATIVE_MEMORY_OPERATIONS</a>: u64 = 80;
+</code></pre>
+
+
+
 <a id="0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE"></a>
 
 Lifetime: transient
@@ -862,6 +886,20 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_CONTEXT_EXTENSION">TRANSACTION_CONTEXT_EXTENSION</a>: u64 = 59;
+</code></pre>
+
+
+
+<a id="0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT"></a>
+
+Whether the simulation enhancement is enabled. This enables the simulation without an authentication check,
+the sponsored transaction simulation when the fee payer is set to 0x0, and the multisig transaction
+simulation consistnet with the execution.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a>: u64 = 78;
 </code></pre>
 
 
@@ -1088,9 +1126,11 @@ Lifetime: transient
 
 ## Function `get_collect_and_distribute_gas_fees_feature`
 
+Deprecated feature
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64
 </code></pre>
 
 
@@ -1112,7 +1152,8 @@ Lifetime: transient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool
 </code></pre>
 
 
@@ -1121,8 +1162,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_collect_and_distribute_gas_fees">collect_and_distribute_gas_fees</a>(): bool {
+    <b>false</b>
 }
 </code></pre>
 
@@ -3153,6 +3194,144 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_transaction_simulation_enhancement_feature"></a>
+
+## Function `get_transaction_simulation_enhancement_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_simulation_enhancement_feature">get_transaction_simulation_enhancement_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_transaction_simulation_enhancement_feature">get_transaction_simulation_enhancement_feature</a>(): u64 { <a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_transaction_simulation_enhancement_enabled"></a>
+
+## Function `transaction_simulation_enhancement_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_simulation_enhancement_enabled">transaction_simulation_enhancement_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_simulation_enhancement_enabled">transaction_simulation_enhancement_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_collection_owner_feature"></a>
+
+## Function `get_collection_owner_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collection_owner_feature">get_collection_owner_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collection_owner_feature">get_collection_owner_feature</a>(): u64 { <a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_collection_owner_enabled"></a>
+
+## Function `is_collection_owner_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_native_memory_operations_feature"></a>
+
+## Function `get_native_memory_operations_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_native_memory_operations_feature">get_native_memory_operations_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_native_memory_operations_feature">get_native_memory_operations_feature</a>(): u64 { <a href="features.md#0x1_features_NATIVE_MEMORY_OPERATIONS">NATIVE_MEMORY_OPERATIONS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_native_memory_operations_enabled"></a>
+
+## Function `is_native_memory_operations_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_native_memory_operations_enabled">is_native_memory_operations_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_native_memory_operations_enabled">is_native_memory_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NATIVE_MEMORY_OPERATIONS">NATIVE_MEMORY_OPERATIONS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -3574,6 +3753,28 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a id="0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled">spec_new_accounts_default_to_fa_apt_store_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a>)
+}
+</code></pre>
+
+
+
+
+<a id="0x1_features_spec_simulation_enhancement_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_simulation_enhancement_enabled">spec_simulation_enhancement_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a>)
+}
+</code></pre>
+
+
+
 <a id="@Specification_1_abort_if_multisig_payload_mismatch_enabled"></a>
 
 ### Function `abort_if_multisig_payload_mismatch_enabled`
@@ -3717,17 +3918,6 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_fee_payer_enabled">spec_fee_payer_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>)
-}
-</code></pre>
-
-
-
-
-<a id="0x1_features_spec_collect_and_distribute_gas_fees_enabled"></a>
-
-
-<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">spec_collect_and_distribute_gas_fees_enabled</a>(): bool {
-   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
 }
 </code></pre>
 

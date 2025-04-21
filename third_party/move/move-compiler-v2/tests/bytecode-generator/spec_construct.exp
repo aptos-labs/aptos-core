@@ -5,29 +5,63 @@ module 0x42::m {
         k: u8,
     }
     struct S {
-        data: vector<m::E>,
+        data: vector<E>,
     }
-    public fun foo(v: &m::S): u8 {
-        select m::E.k<&m::E>(vector::borrow<m::E>(Borrow(Immutable)(select m::S.data<&m::S>(v)), 0))
+    public fun foo(v: &S): u8 {
+        select m::E.k<&E>(vector::borrow<E>(Borrow(Immutable)(select m::S.data<&S>(v)), 0))
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct E {
+        k: u8,
+    }
+    struct S {
+        data: vector<E>,
+    }
+    public fun foo(v: &S): u8 {
+        0x1::vector::borrow<E>(&v.data, 0).k
+    }
+}
 
 ============ initial bytecode ================
 
 [variant baseline]
-public fun m::foo($t0: &m::S): u8 {
+public fun m::foo($t0: &0x42::m::S): u8 {
      var $t1: u8
-     var $t2: &m::E
-     var $t3: &vector<m::E>
+     var $t2: &0x42::m::E
+     var $t3: &vector<0x42::m::E>
      var $t4: u64
      var $t5: &u8
-  0: $t3 := borrow_field<m::S>.data($t0)
+  0: $t3 := borrow_field<0x42::m::S>.data($t0)
   1: $t4 := 0
-  2: $t2 := vector::borrow<m::E>($t3, $t4)
-  3: $t5 := borrow_field<m::E>.k($t2)
+  2: $t2 := vector::borrow<0x42::m::E>($t3, $t4)
+  3: $t5 := borrow_field<0x42::m::E>.k($t2)
   4: $t1 := read_ref($t5)
   5: return $t1
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.m {
+struct E {
+	k: u8
+}
+struct S {
+	data: vector<E>
+}
+
+public foo(v: &S): u8 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](v: &S)
+	1: ImmBorrowField[0](S.data: vector<E>)
+	2: LdU64(0)
+	3: VecImmBorrow(2)
+	4: ImmBorrowField[1](E.k: u8)
+	5: ReadRef
+	6: Ret
+}
+}
 ============ bytecode verification succeeded ========

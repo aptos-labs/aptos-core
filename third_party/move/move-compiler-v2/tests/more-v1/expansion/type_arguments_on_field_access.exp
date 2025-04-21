@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/expansion/type_arguments_on_field_access.move:6:17
+  │
+6 │         x.f<u64>;
+  │                 ^
+  │                 │
+  │                 Unexpected ';'
+  │                 Expected an expression term

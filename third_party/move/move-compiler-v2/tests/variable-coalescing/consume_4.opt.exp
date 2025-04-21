@@ -7,7 +7,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: m::W) {
+fun m::consume_($t0: 0xc0ffee::m::W) {
   0: return ()
 }
 
@@ -25,9 +25,9 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: m::W) {
-     var $t1: m::W
-     var $t2: m::W
+public fun m::test_struct($t0: 0xc0ffee::m::W) {
+     var $t1: 0xc0ffee::m::W
+     var $t2: 0xc0ffee::m::W
   0: $t1 := copy($t0)
   1: $t2 := move($t1)
   2: m::consume_($t2)
@@ -44,7 +44,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: m::W) {
+fun m::consume_($t0: 0xc0ffee::m::W) {
   0: return ()
 }
 
@@ -62,9 +62,9 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: m::W) {
-     var $t1: m::W
-     var $t2: m::W
+public fun m::test_struct($t0: 0xc0ffee::m::W) {
+     var $t1: 0xc0ffee::m::W
+     var $t2: 0xc0ffee::m::W
   0: $t1 := copy($t0)
   1: $t2 := move($t1)
   2: m::consume_($t2)
@@ -83,7 +83,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: m::W) {
+fun m::consume_($t0: 0xc0ffee::m::W) {
      # live vars: $t0
      # events: b:$t0, e:$t0
   0: return ()
@@ -112,9 +112,9 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: m::W) {
-     var $t1: m::W
-     var $t2: m::W
+public fun m::test_struct($t0: 0xc0ffee::m::W) {
+     var $t1: 0xc0ffee::m::W
+     var $t2: 0xc0ffee::m::W
      # live vars: $t0
      # events: b:$t0, b:$t1
   0: $t1 := copy($t0)
@@ -140,7 +140,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: m::W) {
+fun m::consume_($t0: 0xc0ffee::m::W) {
   0: return ()
 }
 
@@ -158,9 +158,9 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: m::W) {
-     var $t1: m::W
-     var $t2: m::W [unused]
+public fun m::test_struct($t0: 0xc0ffee::m::W) {
+     var $t1: 0xc0ffee::m::W
+     var $t2: 0xc0ffee::m::W [unused]
   0: $t1 := copy($t0)
   1: $t1 := move($t1)
   2: m::consume_($t1)
@@ -177,7 +177,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: m::W) {
+fun m::consume_($t0: 0xc0ffee::m::W) {
   0: return ()
 }
 
@@ -194,9 +194,9 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_struct($t0: m::W) {
-     var $t1: m::W
-     var $t2: m::W [unused]
+public fun m::test_struct($t0: 0xc0ffee::m::W) {
+     var $t1: 0xc0ffee::m::W
+     var $t2: 0xc0ffee::m::W [unused]
   0: $t1 := copy($t0)
   1: m::consume_($t1)
   2: m::consume_($t0)
@@ -205,41 +205,35 @@ public fun m::test_struct($t0: m::W) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct W has copy, drop {
 	m: u32
 }
 
-consume(Arg0: u32) /* def_idx: 0 */ {
+consume(_x: u32) /* def_idx: 0 */ {
 B0:
 	0: Ret
 }
-consume_(Arg0: W) /* def_idx: 1 */ {
+consume_(_x: W) /* def_idx: 1 */ {
 B0:
 	0: Ret
 }
-public test(Arg0: u32) /* def_idx: 2 */ {
-L1:	loc0: u32
+public test(a: u32) /* def_idx: 2 */ {
 B0:
-	0: CopyLoc[0](Arg0: u32)
-	1: StLoc[1](loc0: u32)
-	2: MoveLoc[1](loc0: u32)
+	0: CopyLoc[0](a: u32)
+	1: Call consume(u32)
+	2: MoveLoc[0](a: u32)
 	3: Call consume(u32)
-	4: MoveLoc[0](Arg0: u32)
-	5: Call consume(u32)
-	6: Ret
+	4: Ret
 }
-public test_struct(Arg0: W) /* def_idx: 3 */ {
-L1:	loc0: W
+public test_struct(a: W) /* def_idx: 3 */ {
 B0:
-	0: CopyLoc[0](Arg0: W)
-	1: StLoc[1](loc0: W)
-	2: MoveLoc[1](loc0: W)
+	0: CopyLoc[0](a: W)
+	1: Call consume_(W)
+	2: MoveLoc[0](a: W)
 	3: Call consume_(W)
-	4: MoveLoc[0](Arg0: W)
-	5: Call consume_(W)
-	6: Ret
+	4: Ret
 }
 }
 ============ bytecode verification succeeded ========

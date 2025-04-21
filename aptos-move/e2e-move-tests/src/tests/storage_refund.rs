@@ -159,7 +159,7 @@ fn assert_result(
     for (_state_key, write_op) in txn_out.write_set() {
         match write_op {
             WriteOp::Creation { .. } => creates += 1,
-            WriteOp::Deletion { metadata } => {
+            WriteOp::Deletion(metadata) => {
                 if metadata.is_none() {
                     panic!("This test expects all deletions to have metadata")
                 }

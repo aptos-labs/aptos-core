@@ -197,13 +197,6 @@ impl FileEntry {
             .first()
             .expect("Cannot build empty file")
             .version;
-        let transactions_count = transactions.len();
-        if transactions_count % FILE_ENTRY_TRANSACTION_COUNT as usize != 0 {
-            panic!("The number of transactions to upload has to be a multiple of FILE_ENTRY_TRANSACTION_COUNT.")
-        }
-        if starting_version % FILE_ENTRY_TRANSACTION_COUNT != 0 {
-            panic!("Starting version has to be a multiple of FILE_ENTRY_TRANSACTION_COUNT.")
-        }
         match storage_format {
             StorageFormat::Lz4CompressedProto => {
                 let t = TransactionsInStorage {

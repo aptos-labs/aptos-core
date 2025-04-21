@@ -45,6 +45,10 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
 
+    let enable_location_labels = env::var("FEATURE_LOCATION_LABELS_ENABLED")
+        .map(|val| val.parse::<bool>().unwrap_or(false))
+        .unwrap_or(false);
+
     let enable_random_label = env::var("FEATURE_RANDOM_LABEL_ENABLED")
         .map(|val| val.parse::<bool>().unwrap_or(false))
         .unwrap_or(false);
@@ -53,17 +57,16 @@ pub async fn handle_metrics_ingest(
         .map(|val| val.parse::<i32>().unwrap_or(20))
         .unwrap_or(20);
 
-    let extra_labels = [
-        claims_to_extra_labels(
-            &claims,
-            context
-                .peer_identities()
-                .get(&claims.chain_id)
-                .and_then(|peers| peers.get(&claims.peer_id)),
-        ),
-        peer_location_labels(&context, &claims.peer_id),
-    ]
-    .concat();
+    let mut extra_labels = claims_to_extra_labels(
+        &claims,
+        context
+            .peer_identities()
+            .get(&claims.chain_id)
+            .and_then(|peers| peers.get(&claims.peer_id)),
+    );
+    if enable_location_labels {
+        extra_labels.extend_from_slice(&peer_location_labels(&context, &claims.peer_id));
+    }
 
     let extra_labels_with_random_label = if enable_random_label {
         let random_num = rand::thread_rng().gen_range(0, max_random_value);

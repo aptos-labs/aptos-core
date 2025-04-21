@@ -1,0 +1,142 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: signer, $t1: address) {
+     var $t2: &mut 0xc0ffee::m::Wrap
+     var $t3: &signer
+     var $t4: &mut u64
+     var $t5: 0xc0ffee::m::Wrap
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t2 := borrow_global<0xc0ffee::m::Wrap>($t1)
+  1: $t3 := borrow_local($t0)
+  2: $t4 := borrow_field<0xc0ffee::m::Wrap>.a($t2)
+  3: $t6 := 0
+  4: $t7 := 0
+  5: $t9 := 0
+  6: $t8 := m::zero($t9)
+  7: $t10 := 0
+  8: $t5 := pack 0xc0ffee::m::Wrap($t6, $t7, $t8, $t10)
+  9: m::bar($t3, $t4, $t5)
+ 10: return ()
+}
+
+
+[variant baseline]
+fun m::zero($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := 0
+  1: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+     # live vars: $t0, $t1, $t2
+  0: drop($t0)
+     # live vars: $t1
+  1: drop($t1)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: signer, $t1: address) {
+     var $t2: &mut 0xc0ffee::m::Wrap
+     var $t3: &signer
+     var $t4: &mut u64
+     var $t5: 0xc0ffee::m::Wrap
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64 [unused]
+     var $t9: u64
+     var $t10: u64
+     # live vars: $t0, $t1
+  0: $t2 := borrow_global<0xc0ffee::m::Wrap>($t1)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_local($t0)
+     # live vars: $t2, $t3
+  2: $t4 := borrow_field<0xc0ffee::m::Wrap>.a($t2)
+     # live vars: $t3, $t4
+  3: $t6 := 0
+     # live vars: $t3, $t4, $t6
+  4: $t7 := 0
+     # live vars: $t3, $t4, $t6, $t7
+  5: $t9 := 0
+     # live vars: $t3, $t4, $t6, $t7, $t9
+  6: $t9 := m::zero($t9)
+     # live vars: $t3, $t4, $t6, $t7, $t9
+  7: $t10 := 0
+     # live vars: $t3, $t4, $t6, $t7, $t9, $t10
+  8: $t5 := pack 0xc0ffee::m::Wrap($t6, $t7, $t9, $t10)
+     # live vars: $t3, $t4, $t5
+  9: m::bar($t3, $t4, $t5)
+     # live vars:
+ 10: return ()
+}
+
+
+[variant baseline]
+fun m::zero($t0: u64): u64 {
+     var $t1: u64 [unused]
+     # live vars: $t0
+  0: $t0 := 0
+     # live vars: $t0
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+struct Wrap has drop, key {
+	a: u64,
+	b: u64,
+	c: u64,
+	d: u64
+}
+
+bar(_x: &signer, _y: &mut u64, _w: Wrap) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](_x: &signer)
+	1: Pop
+	2: MoveLoc[1](_y: &mut u64)
+	3: Pop
+	4: Ret
+}
+public test(x: signer, a: address) /* def_idx: 1 */ {
+L2:	ref: &mut Wrap
+B0:
+	0: MoveLoc[1](a: address)
+	1: MutBorrowGlobal[0](Wrap)
+	2: StLoc[2](ref: &mut Wrap)
+	3: ImmBorrowLoc[0](x: signer)
+	4: MoveLoc[2](ref: &mut Wrap)
+	5: MutBorrowField[0](Wrap.a: u64)
+	6: LdU64(0)
+	7: LdU64(0)
+	8: LdU64(0)
+	9: Call zero(u64): u64
+	10: LdU64(0)
+	11: Pack[0](Wrap)
+	12: Call bar(&signer, &mut u64, Wrap)
+	13: Ret
+}
+zero(_y: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(0)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

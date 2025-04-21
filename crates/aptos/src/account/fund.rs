@@ -13,20 +13,20 @@ use clap::Parser;
 ///
 /// This will create an account if it doesn't exist with the faucet.  This is mostly useful
 /// for local development and devnet.
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct FundWithFaucet {
     /// Address to fund
     ///
     /// If the account wasn't previously created, it will be created when being funded
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
-    pub(crate) account: Option<AccountAddress>,
+    pub account: Option<AccountAddress>,
 
     /// Number of Octas to fund the account from the faucet
     ///
     /// The amount added to the account may be limited by the faucet, and may be less
     /// than the amount requested.
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
-    pub(crate) amount: u64,
+    pub amount: u64,
 
     #[clap(flatten)]
     pub(crate) faucet_options: FaucetOptions,

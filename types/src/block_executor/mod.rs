@@ -4,3 +4,4 @@
 
 pub mod config;
 pub mod partitioner;
+pub mod transaction_slice_metadata;

@@ -498,6 +498,10 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         // TODO(#13806): implement
                         panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
                     },
+                    PackClosure(..) | PackClosureGeneric(..) | CallClosure(..) => {
+                        // TODO(#15664): implement
+                        panic!("Closure bytecode NYI: {:?}", code[bytecode_idx])
+                    },
                 };
 
                 code[bytecode_idx] = new_bytecode;
@@ -557,7 +561,10 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
         | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
 
-        PackVariant(_)
+        PackClosure(..)
+        | PackClosureGeneric(..)
+        | CallClosure(..)
+        | PackVariant(_)
         | PackVariantGeneric(_)
         | UnpackVariant(_)
         | UnpackVariantGeneric(_)

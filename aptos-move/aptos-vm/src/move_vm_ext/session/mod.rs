@@ -21,24 +21,25 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
     state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext,
+    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
-    storage::change_set_configs::ChangeSetConfigs,
+    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWrite, storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
-    language_storage::StructTag,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    session::Session, AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
+use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -56,8 +57,8 @@ pub(crate) enum ResourceGroupChangeSet {
     // Granular ops to individual resources within a group.
     V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
 }
-type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
-type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
+type AccountChangeSet = AccountChanges<BytesWithResourceLayout>;
+type ChangeSet = Changes<BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
@@ -72,6 +73,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         move_vm: &'l MoveVM,
         chain_id: ChainId,
         features: &Features,
+        vm_config: &VMConfig,
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
     ) -> Self {
@@ -88,7 +90,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         extensions.add(NativeAggregatorContext::new(
             txn_hash,
             resolver,
-            move_vm.vm_config().delayed_field_optimization_enabled,
+            vm_config.delayed_field_optimization_enabled,
             resolver,
         ));
         extensions.add(RandomnessContext::new());
@@ -98,14 +100,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             chain_id.id() as u8,
             maybe_user_transaction_context,
         ));
-        extensions.add(NativeCodeContext::default());
+        extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));
         extensions.add(NativeEventContext::default());
         extensions.add(NativeObjectContext::default());
-
-        // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
-        // cache needs to be flushed to work around those bugs.
-        move_vm.flush_loader_cache_if_invalidated();
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
@@ -115,8 +113,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
-        let move_vm = self.inner.get_move_vm();
+    pub fn finish(
+        self,
+        configs: &ChangeSetConfigs,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<VMChangeSet> {
+        let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,
                                   layout: MoveTypeLayout,
@@ -126,13 +128,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                serialize_and_allow_delayed_values(&value, &layout)?
+                ValueSerDeContext::new()
+                    .with_delayed_fields_serde()
+                    .with_func_args_deserialization(&function_extension)
+                    .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
-                value
-                    .simple_serialize(&layout)
+                ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_extension)
+                    .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
             };
             serialization_result.ok_or_else(|| {
@@ -143,15 +149,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let (change_set, mut extensions) = self
             .inner
-            .finish_with_extensions_with_custom_effects(&resource_converter)?;
+            .finish_with_extensions_with_custom_effects(&resource_converter, module_storage)?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.resolver, change_set)
+            Self::split_and_merge_resource_groups(self.resolver, module_storage, change_set)
                 .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
-            .into_change_set()
+            .into_change_set(&function_extension)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
@@ -164,7 +170,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
 
-        let (change_set, module_write_set) = Self::convert_change_set(
+        let change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -175,12 +181,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
-        Ok((change_set, module_write_set))
+        Ok(change_set)
     }
 
+    /// Returns the publish request if it exists. If the provided flag is set to true, disables any
+    /// subsequent module publish requests.
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
         let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
-        ctx.requested_module_bundle.take()
+        ctx.extract_publish_request()
     }
 
     fn populate_v0_resource_group_change_set(
@@ -257,8 +265,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
-        runtime: &MoveVM,
         resolver: &dyn AptosMoveResolver,
+        module_storage: &impl ModuleStorage,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -285,13 +293,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
             > = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
-            let (modules, resources) = account_changeset.into_inner();
+            let resources = account_changeset.into_resources();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group_tag = runtime
-                    .with_module_metadata(&struct_tag.module_id(), |md| {
-                        get_resource_group_member_from_metadata(&struct_tag, md)
-                    });
+                let resource_group_tag = {
+                    let metadata = module_storage
+                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .map_err(|e| e.to_partial())?;
+                    get_resource_group_member_from_metadata(&struct_tag, &metadata)
+                };
 
                 if let Some(resource_group_tag) = resource_group_tag {
                     if resource_groups
@@ -308,10 +318,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             change_set_filtered
-                .add_account_changeset(
-                    addr,
-                    AccountChangeSet::from_modules_resources(modules, resources_filtered),
-                )
+                .add_account_changeset(addr, AccountChangeSet::from_resources(resources_filtered))
                 .map_err(|_| common_error())?;
 
             for (resource_group_tag, resources) in resource_groups {
@@ -359,18 +366,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         legacy_resource_creation_as_modification: bool,
-    ) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
+    ) -> PartialVMResult<VMChangeSet> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
-
-        let mut has_modules_published_to_special_address = false;
-        let mut module_write_ops = BTreeMap::new();
 
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
-            let (modules, resources) = account_changeset.into_inner();
+            let resources = account_changeset.into_resources();
             for (struct_tag, blob_and_layout_op) in resources {
                 let state_key = resource_state_key(&addr, &struct_tag)?;
                 let op = woc.convert_resource(
@@ -380,15 +384,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 )?;
 
                 resource_write_set.insert(state_key, op);
-            }
-
-            for (name, blob_op) in modules {
-                if addr.is_special() {
-                    has_modules_published_to_special_address = true;
-                }
-                let state_key = StateKey::module(&addr, &name);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_write_ops.insert(state_key, op);
             }
         }
 
@@ -455,11 +450,21 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             group_reads_needing_change,
             events,
         )?;
-        let module_write_set =
-            ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
 
-        Ok((change_set, module_write_set))
+        Ok(change_set)
     }
+}
+
+/// Converts module bytes and their compiled representation extracted from publish request into
+/// write ops. Only used by V2 loader implementation.
+pub fn convert_modules_into_write_ops(
+    resolver: &impl AptosMoveResolver,
+    features: &Features,
+    module_storage: &impl AptosModuleStorage,
+    verified_module_bundle: VerifiedModuleBundle<ModuleId, Bytes>,
+) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
+    let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
+    woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
 }
 
 impl<'r, 'l> Deref for SessionExt<'r, 'l> {

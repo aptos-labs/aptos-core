@@ -24,11 +24,11 @@ error: missing fields `y`, `z`
 40 │       S{x: x}
    │       ^^^^^^^
 
-error: cannot return `G<u64>` from a function with result type `G<bool>`
-   ┌─ tests/checking/specs/structs_err.move:45:7
+error: expected `bool` but found a value of type `u64`
+   ┌─ tests/checking/specs/structs_err.move:45:12
    │
 45 │       G{x: x, y: y}
-   │       ^^^^^^^^^^^^^
+   │            ^
 
 error: expected 1 type argument but 2 were provided
    ┌─ tests/checking/specs/structs_err.move:50:7

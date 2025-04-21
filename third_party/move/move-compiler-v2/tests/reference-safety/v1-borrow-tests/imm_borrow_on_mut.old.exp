@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut.move:30:31
+   │
+25 │         let field_ref = set_and_pick(account, point_ref);
+   │                         -------------------------------- previous mutable call result
+26 │         let returned_ref = bump_and_give(field_ref);
+   │                            ------------------------ used by call result
+   ·
+30 │             (*returned_ref == point_ref.x) &&
+   │                               ^^^^^^^^^^^
+   │                               │
+   │                               immutable borrow attempted here
+   │                               requirement enforced here
+31 │             (*returned_ref != point_ref.y),
+   │              ------------- conflicting reference `returned_ref` used here
+   ·
+34 │         returned_ref
+   │         ------------ conflicting reference `returned_ref` used here
+
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut.move:31:31
+   │
+25 │         let field_ref = set_and_pick(account, point_ref);
+   │                         -------------------------------- previous mutable call result
+26 │         let returned_ref = bump_and_give(field_ref);
+   │                            ------------------------ used by call result
+   ·
+31 │             (*returned_ref != point_ref.y),
+   │                               ^^^^^^^^^^^
+   │                               │
+   │                               immutable borrow attempted here
+   │                               requirement enforced here
+   ·
+34 │         returned_ref
+   │         ------------ conflicting reference `returned_ref` used here

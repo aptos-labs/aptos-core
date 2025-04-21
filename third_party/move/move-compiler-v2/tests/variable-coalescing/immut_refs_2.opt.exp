@@ -25,7 +25,7 @@ fun m::test($t0: u64): u64 {
 
 
 Diagnostics:
-warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
   ┌─ tests/variable-coalescing/immut_refs_2.move:4:17
   │
 4 │         let a = &p;
@@ -116,22 +116,17 @@ fun m::test($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
-test(Arg0: u64): u64 /* def_idx: 0 */ {
-L1:	loc0: &u64
-L2:	loc1: u64
+test(p: u64): u64 /* def_idx: 0 */ {
+L1:	a: &u64
 B0:
-	0: ImmBorrowLoc[0](Arg0: u64)
-	1: StLoc[1](loc0: &u64)
-	2: MoveLoc[1](loc0: &u64)
-	3: Pop
-	4: MoveLoc[0](Arg0: u64)
-	5: StLoc[2](loc1: u64)
-	6: MoveLoc[2](loc1: u64)
-	7: Ret
+	0: ImmBorrowLoc[0](p: u64)
+	1: Pop
+	2: MoveLoc[0](p: u64)
+	3: Ret
 }
 }
 ============ bytecode verification succeeded ========

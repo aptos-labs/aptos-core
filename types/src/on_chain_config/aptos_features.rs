@@ -12,7 +12,8 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
-/// The feature flags define in the Move source. This must stay aligned with the constants there.
+
+/// The feature flags defined in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
@@ -21,7 +22,7 @@ pub enum FeatureFlag {
     SHA_512_AND_RIPEMD_160_NATIVES = 3,
     APTOS_STD_CHAIN_ID_NATIVES = 4,
     VM_BINARY_FORMAT_V6 = 5,
-    COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
+    _DEPRECATED_COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
     BLAKE2B_256_NATIVE = 8,
     RESOURCE_GROUPS = 9,
@@ -60,10 +61,10 @@ pub enum FeatureFlag {
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
-    RECONFIGURE_WITH_DKG = 45,
+    _DEPRECATED_RECONFIGURE_WITH_DKG = 45,
     KEYLESS_ACCOUNTS = 46,
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
-    REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48, // This feature is not used
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
@@ -92,6 +93,40 @@ pub enum FeatureFlag {
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    FEDERATED_KEYLESS = 77,
+    TRANSACTION_SIMULATION_ENHANCEMENT = 78,
+    COLLECTION_OWNER = 79,
+    /// covers mem::swap and vector::move_range
+    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
+    NATIVE_MEMORY_OPERATIONS = 80,
+    /// The feature was used to gate the rollout of new loader used by Move VM. It was enabled on
+    /// mainnet and can no longer be disabled.
+    _ENABLE_LOADER_V2 = 81,
+    /// Prior to this feature flag, it was possible to attempt 'init_module' to publish modules
+    /// that results in a new package created but without any code. With this feature, it is no
+    /// longer possible and an explicit error is returned if publishing is attempted. The feature
+    /// was enabled on mainnet and will not be disabled.
+    _DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
+    /// We keep the Call Tree cache and instruction (per-instruction)
+    /// cache together here.  Generally, we could allow Call Tree
+    /// cache and disallow instruction cache, however there's little
+    /// benefit of such approach: First, instruction cache requires
+    /// call-tree cache to be enabled, and provides relatively little
+    /// overhead in terms of memory footprint. On the other side,
+    /// providing separate choices could lead to code bloat, as the
+    /// dynamic config is converted into multiple different
+    /// implementations. If required in the future, we can add a flag
+    /// to explicitly disable the instruction cache.
+    ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
+    /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
+    PERMISSIONED_SIGNER = 84,
+    ACCOUNT_ABSTRACTION = 85,
+    /// Enables bytecode version v8
+    VM_BINARY_FORMAT_V8 = 86,
+    BULLETPROOFS_BATCH_NATIVES = 87,
+    DOMAIN_ACCOUNT_ABSTRACTION = 88,
+    /// Whether function values are enabled.
+    ENABLE_FUNCTION_VALUES = 89,
 }
 
 impl FeatureFlag {
@@ -114,9 +149,12 @@ impl FeatureFlag {
             FeatureFlag::BLS12_381_STRUCTURES,
             FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
             FeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
+            FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
@@ -139,8 +177,8 @@ impl FeatureFlag {
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
             FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
             FeatureFlag::WEBAUTHN_SIGNATURE,
-            // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
@@ -155,7 +193,6 @@ impl FeatureFlag {
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
-            FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
@@ -167,6 +204,16 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+            FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
+            FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::VM_BINARY_FORMAT_V8,
+            FeatureFlag::ENABLE_FUNCTION_VALUES,
         ]
     }
 }
@@ -187,7 +234,6 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-
         features
     }
 }
@@ -243,6 +289,14 @@ impl Features {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
     }
 
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
+    }
+
+    pub fn is_domain_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION)
+    }
+
     pub fn is_module_event_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::MODULE_EVENT)
     }
@@ -292,8 +346,8 @@ impl Features {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
-    pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
+    pub fn is_federated_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
     }
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
@@ -302,6 +356,18 @@ impl Features {
 
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn is_native_memory_operations_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
+    }
+
+    pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
@@ -313,7 +379,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
+            file_format_common::VERSION_8
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
             file_format_common::VERSION_7
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             file_format_common::VERSION_6
@@ -361,13 +429,13 @@ mod test {
     #[test]
     fn test_min_max_binary_format() {
         // Ensure querying max binary format implementation is correct and checks
-        // versions 5 to 7.
+        // versions 5 to 8.
         assert_eq!(
             file_format_common::VERSION_5,
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_7,
+            file_format_common::VERSION_8,
             file_format_common::VERSION_MAX
         );
     }

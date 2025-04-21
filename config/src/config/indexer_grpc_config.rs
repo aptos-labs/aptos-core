@@ -90,10 +90,15 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             return Ok(());
         }
 
-        if !node_config.storage.enable_indexer && !node_config.indexer_table_info.enabled {
+        if !node_config.storage.enable_indexer
+            && !node_config
+                .indexer_table_info
+                .table_info_service_mode
+                .is_enabled()
+        {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer or indexer_table_info.enabled must be true if indexer_grpc.enabled is true".to_string(),
+                "storage.enable_indexer must be true or indexer_table_info.table_info_service_mode must be IndexingOnly if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())
@@ -120,7 +125,7 @@ impl ConfigOptimizer for IndexerGrpcConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{IndexerTableInfoConfig, StorageConfig};
+    use crate::config::{IndexerTableInfoConfig, StorageConfig, TableInfoServiceMode};
 
     #[test]
     fn test_sanitize_enable_indexer() {
@@ -128,7 +133,7 @@ mod tests {
         let mut storage_config = StorageConfig::default();
         let mut table_info_config = IndexerTableInfoConfig::default();
         storage_config.enable_indexer = false;
-        table_info_config.enabled = false;
+        table_info_config.table_info_service_mode = TableInfoServiceMode::Disabled;
 
         // Create a node config with the indexer enabled, but the storage indexer disabled
         let mut node_config = NodeConfig {
@@ -170,7 +175,7 @@ mod tests {
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
 
         // Enable the table info service
-        node_config.indexer_table_info.enabled = true;
+        node_config.indexer_table_info.table_info_service_mode = TableInfoServiceMode::IndexingOnly;
 
         // Sanitize the config and verify that it now succeeds
         IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))

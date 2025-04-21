@@ -2,6 +2,117 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // @generated
+impl serde::Serialize for AbstractionSignature {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.function_info.is_empty() {
+            len += 1;
+        }
+        if !self.signature.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AbstractionSignature", len)?;
+        if !self.function_info.is_empty() {
+            struct_ser.serialize_field("functionInfo", &self.function_info)?;
+        }
+        if !self.signature.is_empty() {
+            struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for AbstractionSignature {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "function_info",
+            "functionInfo",
+            "signature",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            FunctionInfo,
+            Signature,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "functionInfo" | "function_info" => Ok(GeneratedField::FunctionInfo),
+                            "signature" => Ok(GeneratedField::Signature),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = AbstractionSignature;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.AbstractionSignature")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<AbstractionSignature, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut function_info__ = None;
+                let mut signature__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::FunctionInfo => {
+                            if function_info__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("functionInfo"));
+                            }
+                            function_info__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::Signature => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("signature"));
+                            }
+                            signature__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(AbstractionSignature {
+                    function_info: function_info__.unwrap_or_default(),
+                    signature: signature__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.AbstractionSignature", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for AccountSignature {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -36,6 +147,9 @@ impl serde::Serialize for AccountSignature {
                 account_signature::Signature::MultiKeySignature(v) => {
                     struct_ser.serialize_field("multiKeySignature", v)?;
                 }
+                account_signature::Signature::Abstraction(v) => {
+                    struct_ser.serialize_field("abstraction", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -56,6 +170,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             "singleKeySignature",
             "multi_key_signature",
             "multiKeySignature",
+            "abstraction",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -65,6 +180,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             MultiEd25519,
             SingleKeySignature,
             MultiKeySignature,
+            Abstraction,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -91,6 +207,7 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
                             "singleKeySignature" | "single_key_signature" => Ok(GeneratedField::SingleKeySignature),
                             "multiKeySignature" | "multi_key_signature" => Ok(GeneratedField::MultiKeySignature),
+                            "abstraction" => Ok(GeneratedField::Abstraction),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -148,6 +265,13 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::MultiKeySignature)
 ;
                         }
+                        GeneratedField::Abstraction => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("abstraction"));
+                            }
+                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::Abstraction)
+;
+                        }
                     }
                 }
                 Ok(AccountSignature {
@@ -171,6 +295,7 @@ impl serde::Serialize for account_signature::Type {
             Self::MultiEd25519 => "TYPE_MULTI_ED25519",
             Self::SingleKey => "TYPE_SINGLE_KEY",
             Self::MultiKey => "TYPE_MULTI_KEY",
+            Self::Abstraction => "TYPE_ABSTRACTION",
         };
         serializer.serialize_str(variant)
     }
@@ -187,6 +312,7 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
             "TYPE_MULTI_ED25519",
             "TYPE_SINGLE_KEY",
             "TYPE_MULTI_KEY",
+            "TYPE_ABSTRACTION",
         ];
 
         struct GeneratedVisitor;
@@ -234,6 +360,7 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
                     "TYPE_MULTI_ED25519" => Ok(account_signature::Type::MultiEd25519),
                     "TYPE_SINGLE_KEY" => Ok(account_signature::Type::SingleKey),
                     "TYPE_MULTI_KEY" => Ok(account_signature::Type::MultiKey),
+                    "TYPE_ABSTRACTION" => Ok(account_signature::Type::Abstraction),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -366,6 +493,7 @@ impl serde::Serialize for any_public_key::Type {
             Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
             Self::Secp256r1Ecdsa => "TYPE_SECP256R1_ECDSA",
             Self::Keyless => "TYPE_KEYLESS",
+            Self::FederatedKeyless => "TYPE_FEDERATED_KEYLESS",
         };
         serializer.serialize_str(variant)
     }
@@ -382,6 +510,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
             "TYPE_SECP256K1_ECDSA",
             "TYPE_SECP256R1_ECDSA",
             "TYPE_KEYLESS",
+            "TYPE_FEDERATED_KEYLESS",
         ];
 
         struct GeneratedVisitor;
@@ -429,6 +558,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
                     "TYPE_SECP256K1_ECDSA" => Ok(any_public_key::Type::Secp256k1Ecdsa),
                     "TYPE_SECP256R1_ECDSA" => Ok(any_public_key::Type::Secp256r1Ecdsa),
                     "TYPE_KEYLESS" => Ok(any_public_key::Type::Keyless),
+                    "TYPE_FEDERATED_KEYLESS" => Ok(any_public_key::Type::FederatedKeyless),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -4162,6 +4292,9 @@ impl serde::Serialize for MoveStruct {
         if self.is_native {
             len += 1;
         }
+        if self.is_event {
+            len += 1;
+        }
         if !self.abilities.is_empty() {
             len += 1;
         }
@@ -4177,6 +4310,9 @@ impl serde::Serialize for MoveStruct {
         }
         if self.is_native {
             struct_ser.serialize_field("isNative", &self.is_native)?;
+        }
+        if self.is_event {
+            struct_ser.serialize_field("isEvent", &self.is_event)?;
         }
         if !self.abilities.is_empty() {
             let v = self.abilities.iter().cloned().map(|v| {
@@ -4204,6 +4340,8 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             "name",
             "is_native",
             "isNative",
+            "is_event",
+            "isEvent",
             "abilities",
             "generic_type_params",
             "genericTypeParams",
@@ -4214,6 +4352,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
         enum GeneratedField {
             Name,
             IsNative,
+            IsEvent,
             Abilities,
             GenericTypeParams,
             Fields,
@@ -4240,6 +4379,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                         match value {
                             "name" => Ok(GeneratedField::Name),
                             "isNative" | "is_native" => Ok(GeneratedField::IsNative),
+                            "isEvent" | "is_event" => Ok(GeneratedField::IsEvent),
                             "abilities" => Ok(GeneratedField::Abilities),
                             "genericTypeParams" | "generic_type_params" => Ok(GeneratedField::GenericTypeParams),
                             "fields" => Ok(GeneratedField::Fields),
@@ -4264,6 +4404,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             {
                 let mut name__ = None;
                 let mut is_native__ = None;
+                let mut is_event__ = None;
                 let mut abilities__ = None;
                 let mut generic_type_params__ = None;
                 let mut fields__ = None;
@@ -4280,6 +4421,12 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                                 return Err(serde::de::Error::duplicate_field("isNative"));
                             }
                             is_native__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::IsEvent => {
+                            if is_event__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("isEvent"));
+                            }
+                            is_event__ = Some(map.next_value()?);
                         }
                         GeneratedField::Abilities => {
                             if abilities__.is_some() {
@@ -4304,6 +4451,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                 Ok(MoveStruct {
                     name: name__.unwrap_or_default(),
                     is_native: is_native__.unwrap_or_default(),
+                    is_event: is_event__.unwrap_or_default(),
                     abilities: abilities__.unwrap_or_default(),
                     generic_type_params: generic_type_params__.unwrap_or_default(),
                     fields: fields__.unwrap_or_default(),

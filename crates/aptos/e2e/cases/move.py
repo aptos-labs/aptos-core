@@ -107,6 +107,28 @@ def test_move_compile_dev_mode(run_helper: RunHelper, test_name=None):
 
 
 @test_case
+def test_move_compile_fetch_deps_only(run_helper: RunHelper, test_name=None):
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
+    account_info = run_helper.get_account_info()
+
+    # Compile the module. Compilation should not be invoked, and return should be [].
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "compile",
+            "--package-dir",
+            package_dir,
+            "--fetch-deps-only"
+        ],
+    )
+
+    if f"{account_info.account_address}::cli_e2e_tests" in response.stdout:
+        raise TestError("Module compilation should not be invoked")
+
+
+@test_case
 def test_move_compile_script(run_helper: RunHelper, test_name=None):
     package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
     account_info = run_helper.get_account_info()

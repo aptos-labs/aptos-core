@@ -1,6 +1,7 @@
 from contextlib import ExitStack
 import json
 import os
+import textwrap
 import unittest
 import tempfile
 from datetime import datetime, timezone, timedelta
@@ -14,6 +15,8 @@ from unittest.mock import patch
 
 import forge
 from forge import (
+    BEGIN_JUNIT,
+    END_JUNIT,
     ForgeCluster,
     ForgeConfigBackend,
     ForgeContext,
@@ -29,6 +32,7 @@ from forge import (
     find_recent_images,
     find_recent_images_by_profile_or_features,
     format_comment,
+    format_junit_xml,
     format_pre_comment,
     format_report,
     get_all_forge_jobs,
@@ -148,6 +152,8 @@ def fake_context(
             forge_namespace_reuse="false",
             forge_namespace_keep="false",
             forge_enable_haproxy="false",
+            forge_enable_indexer="false",
+            forge_deployer_profile="",
             cargo_args=["--cargo-arg"],
             forge_cli_args=["--forge-cli-arg"],
             test_args=["--test-arg"],
@@ -164,6 +170,8 @@ def fake_context(
         forge_test_suite="banana",
         forge_username="banana-eater",
         forge_blocking=True,
+        forge_retain_debug_logs="true",
+        forge_junit_xml_path=None,
         github_actions="false",
         github_job_url="https://banana",
     )
@@ -657,6 +665,25 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         result.state = ForgeState.FAIL
         output = result.format(context)
         self.assertFixture(output, "testPossibleAuthFailureMessage.fixture")
+
+    def testFormatJunitXml(self) -> None:
+        result = ForgeResult.empty()
+        context = fake_context()
+
+        result.set_output(
+            textwrap.dedent(
+                f"""
+        {BEGIN_JUNIT}
+        <testsuites>
+        blah
+        </testsuites>
+        {END_JUNIT}
+        """
+            )
+        )
+
+        output = format_junit_xml(context, result)
+        self.assertFixture(output, "testFormatJunitXml.fixture")
 
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constraint `integer` does not have required ability `key`
+  ┌─ tests/ability-check/v1-typing/pack_constraint_not_satisfied2.move:7:27
+  │
+7 │         R {r:_ } = R { r: 0 };
+  │                           ^

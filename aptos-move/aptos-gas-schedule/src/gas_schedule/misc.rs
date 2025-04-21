@@ -125,6 +125,11 @@ where
         self.offset = 1;
         true
     }
+
+    #[inline]
+    fn visit_closure(&mut self, depth: usize, len: usize) -> bool {
+        self.inner.visit_closure(depth, len)
+    }
 }
 
 struct AbstractValueSizeVisitor<'a> {
@@ -196,6 +201,13 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
 
     #[inline]
     fn visit_struct(&mut self, _depth: usize, _len: usize) -> bool {
+        self.size += self.params.struct_;
+        true
+    }
+
+    #[inline]
+    fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
+        // TODO(#15664): introduce a dedicated gas parameter?
         self.size += self.params.struct_;
         true
     }
@@ -367,6 +379,13 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
+            fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
+                // TODO(#15664): independent gas parameter for closures?
+                self.res = Some(self.params.struct_);
+                false
+            }
+
+            #[inline]
             fn visit_vec(&mut self, _depth: usize, _len: usize) -> bool {
                 self.res = Some(self.params.vector);
                 false
@@ -505,6 +524,13 @@ impl AbstractValueSizeGasParameters {
 
             #[inline]
             fn visit_struct(&mut self, _depth: usize, _len: usize) -> bool {
+                self.res = Some(self.params.struct_);
+                false
+            }
+
+            #[inline]
+            fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
+                // TODO(#15664): independent gas parameter
                 self.res = Some(self.params.struct_);
                 false
             }

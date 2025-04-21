@@ -4,12 +4,12 @@
 use crate::{ledger_db::transaction_db::TransactionDb, AptosDB};
 use aptos_crypto::hash::CryptoHash;
 use aptos_proptest_helpers::Index;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
 use aptos_types::{
     proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen},
-    transaction::{Transaction, TransactionToCommit, Version},
+    transaction::{Transaction, Version},
 };
 use proptest::{collection::vec, prelude::*};
 
@@ -112,8 +112,8 @@ proptest! {
 
         {
             prop_assert!(transaction_db.get_transaction(0).is_ok());
-            let batch = SchemaBatch::new();
-            transaction_db.prune_transactions(0, 1, &batch).unwrap();
+            let mut batch = SchemaBatch::new();
+            transaction_db.prune_transactions(0, 1, &mut batch).unwrap();
             transaction_db.write_schemas(batch).unwrap();
             prop_assert!(transaction_db.get_transaction(0).is_err());
         }
@@ -121,8 +121,8 @@ proptest! {
         {
             prop_assert!(transaction_db.get_transaction(1).is_ok());
             prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), Some(1));
-            let batch = SchemaBatch::new();
-            transaction_db.prune_transaction_by_hash_indices(&[txns[1].clone()], &batch).unwrap();
+            let mut batch = SchemaBatch::new();
+            transaction_db.prune_transaction_by_hash_indices(&[txns[1].clone()], &mut batch).unwrap();
             transaction_db.write_schemas(batch).unwrap();
             prop_assert!(transaction_db.get_transaction(1).is_ok());
             prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), None);
@@ -145,17 +145,7 @@ pub(crate) fn init_db(
     assert!(transaction_db.get_transaction(0).is_err());
 
     transaction_db
-        .commit_transactions(
-            &txns
-                .iter()
-                .map(|transaction| TransactionToCommit {
-                    transaction: transaction.clone(),
-                    ..TransactionToCommit::dummy()
-                })
-                .collect::<Vec<_>>(),
-            0,
-            /*skip_index=*/ false,
-        )
+        .commit_transactions(0, &txns, /*skip_index=*/ false)
         .unwrap();
 
     txns

@@ -30,6 +30,26 @@ pub struct MoveStructTagFilter {
     pub name: Option<String>,
 }
 
+impl From<aptos_protos::indexer::v1::MoveStructTagFilter> for MoveStructTagFilter {
+    fn from(proto_filter: aptos_protos::indexer::v1::MoveStructTagFilter) -> Self {
+        Self {
+            address: proto_filter.address,
+            module: proto_filter.module,
+            name: proto_filter.name,
+        }
+    }
+}
+
+impl From<MoveStructTagFilter> for aptos_protos::indexer::v1::MoveStructTagFilter {
+    fn from(move_struct_tag_filter: MoveStructTagFilter) -> Self {
+        Self {
+            address: move_struct_tag_filter.address,
+            module: move_struct_tag_filter.module,
+            name: move_struct_tag_filter.name,
+        }
+    }
+}
+
 impl Filterable<MoveStructTag> for MoveStructTagFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -40,9 +60,9 @@ impl Filterable<MoveStructTag> for MoveStructTagFilter {
     }
 
     #[inline]
-    fn is_allowed(&self, struct_tag: &MoveStructTag) -> bool {
-        self.address.is_allowed(&struct_tag.address)
-            && self.module.is_allowed(&struct_tag.module)
-            && self.name.is_allowed(&struct_tag.name)
+    fn matches(&self, struct_tag: &MoveStructTag) -> bool {
+        self.address.matches(&struct_tag.address)
+            && self.module.matches(&struct_tag.module)
+            && self.name.matches(&struct_tag.name)
     }
 }

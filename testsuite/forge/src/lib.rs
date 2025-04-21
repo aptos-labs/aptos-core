@@ -9,16 +9,19 @@ pub use anyhow::Result;
 mod interface;
 pub use interface::*;
 
+pub mod observer;
 mod runner;
 pub use runner::*;
 
 mod backend;
 pub use aptos_transaction_emitter_lib::*;
 pub use aptos_transaction_generator_lib::*;
+pub use aptos_transaction_workloads_lib::*;
 pub use backend::*;
 
 mod report;
 pub use report::*;
+pub mod result;
 
 mod github;
 pub use github::*;
@@ -29,3 +32,6 @@ pub use slack::*;
 pub mod success_criteria;
 
 pub mod test_utils;
+
+pub mod config;
+pub use config::ForgeConfig;

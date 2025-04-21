@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: undeclared `_`
+   ┌─ tests/checking-lang-v1/underscore.move:38:9
+   │
+38 │         _  // undefined
+   │         ^
+
+error: duplicate declaration of `_`
+   ┌─ tests/checking-lang-v1/underscore.move:41:30
+   │
+41 │     public fun test8(_: u64, _: u64): u64 {
+   │                      -       ^
+   │                      │
+   │                      previous declaration of `_`
+
+error: duplicate declaration of `_`
+   ┌─ tests/checking-lang-v1/underscore.move:46:37
+   │
+46 │     inline fun fun9(x: u64, _: u64, _: u64): u64 {
+   │                             -       ^
+   │                             │
+   │                             previous declaration of `_`
+
+error: duplicate declaration of `_`
+   ┌─ tests/checking-lang-v1/underscore.move:54:38
+   │
+54 │     inline fun fun10(x: u64, _: u64, _: |u64|u64): u64 {
+   │                              -       ^
+   │                              │
+   │                              previous declaration of `_`
+
+error: cannot pass `integer` to a function which expects argument of type `|u64|u64`
+   ┌─ tests/checking-lang-v1/underscore.move:59:21
+   │
+59 │         fun10(4, 3, 2)
+   │                     ^

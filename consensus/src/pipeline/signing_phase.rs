@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::pipeline_phase::StatelessPipeline;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::bls12381;
 use aptos_safety_rules::Error;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
@@ -20,6 +21,7 @@ use std::{
 pub struct SigningRequest {
     pub ordered_ledger_info: LedgerInfoWithSignatures,
     pub commit_ledger_info: LedgerInfo,
+    pub blocks: Vec<PipelinedBlock>,
 }
 
 impl Debug for SigningRequest {
@@ -72,12 +74,26 @@ impl StatelessPipeline for SigningPhase {
         let SigningRequest {
             ordered_ledger_info,
             commit_ledger_info,
+            blocks,
         } = req;
 
+        let signature_result = if let Some(fut) = blocks
+            .last()
+            .expect("Blocks can't be empty")
+            .pipeline_futs()
+        {
+            fut.commit_vote_fut
+                .clone()
+                .await
+                .map(|vote| vote.signature().clone())
+                .map_err(|e| Error::InternalError(e.to_string()))
+        } else {
+            self.safety_rule_handle
+                .sign_commit_vote(ordered_ledger_info, commit_ledger_info.clone())
+        };
+
         SigningResponse {
-            signature_result: self
-                .safety_rule_handle
-                .sign_commit_vote(ordered_ledger_info, commit_ledger_info.clone()),
+            signature_result,
             commit_ledger_info,
         }
     }

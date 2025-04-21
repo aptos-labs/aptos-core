@@ -10,9 +10,11 @@ use crate::{
     model::{Parameter, TypeParameter, TypeParameterKind},
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
-use move_binary_format::file_format::{Ability, AbilitySet};
-use move_compiler::parser::ast::{self as PA};
-use move_core_types::u256::U256;
+use move_compiler::parser::ast as PA;
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    u256::U256,
+};
 use num::BigInt;
 use std::collections::BTreeMap;
 

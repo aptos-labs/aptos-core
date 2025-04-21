@@ -22,12 +22,12 @@ pub const GENESIS_HELM_RELEASE_NAME: &str = "genesis";
 pub const APTOS_NODE_HELM_CHART_PATH: &str = "terraform/helm/aptos-node";
 pub const GENESIS_HELM_CHART_PATH: &str = "terraform/helm/genesis";
 
-// cleanup namespaces after 30 minutes unless "keep = true"
+// cleanup namespaces after 30 minutes unless "keep = true" or they have a cleanup time set
 pub const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 1800;
 // Leave a buffer of around 20 minutes for test provisioning and cleanup to be done before cleaning
 // up underlying resources.
 pub const NAMESPACE_CLEANUP_DURATION_BUFFER_SECS: u64 = 1200;
-pub const POD_CLEANUP_THRESHOLD_SECS: u64 = 86400;
+pub const ORPHAN_POD_CLEANUP_THRESHOLD_SECS: u64 = 300;
 pub const MANAGEMENT_CONFIGMAP_PREFIX: &str = "forge-management";
 
 // this is the port on the validator service itself, as opposed to 80 on the validator haproxy service

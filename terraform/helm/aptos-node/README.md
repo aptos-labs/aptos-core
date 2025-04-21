@@ -20,14 +20,15 @@ Aptos blockchain node deployment
 | cluster_name | string | `"unknown"` |  |
 | enablePrivilegedMode | bool | `false` | TEST ONLY: Enable running as root for profiling |
 | fullnode.affinity | object | `{}` |  |
-| fullnode.config | object | `{"full_node_networks":[{"network_id":"public","seeds":{}}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
+| fullnode.config | object | `{"full_node_networks":[{"network_id":"public"}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
 | fullnode.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
 | fullnode.groups | list | `[{"dns_name":"vfn","name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
 | fullnode.nodeSelector | object | `{}` |  |
-| fullnode.resources.limits.cpu | int | `14` |  |
-| fullnode.resources.limits.memory | string | `"56Gi"` |  |
-| fullnode.resources.requests.cpu | int | `14` |  |
-| fullnode.resources.requests.memory | string | `"56Gi"` |  |
+| fullnode.podAnnotations | string | `nil` |  |
+| fullnode.resources.limits.cpu | int | `30` |  |
+| fullnode.resources.limits.memory | string | `"60Gi"` |  |
+| fullnode.resources.requests.cpu | int | `30` |  |
+| fullnode.resources.requests.memory | string | `"60Gi"` |  |
 | fullnode.rust_log | string | `"info"` | Log level for the fullnode |
 | fullnode.storage.class | string | `nil` | Kubernetes storage class to use for fullnode persistent storage |
 | fullnode.storage.size | string | `"2048Gi"` | Size of fullnode persistent storage |
@@ -64,14 +65,17 @@ Aptos blockchain node deployment
 | service.fullnode.enableRestApi | bool | `true` | Enable the REST API on fullnodes |
 | service.fullnode.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for fullnodes' HAProxy |
 | service.fullnode.externalTrafficPolicy | string | `"Local"` | The externalTrafficPolicy for the fullnode service |
+| service.fullnode.internal.annotations | object | `{}` |  |
 | service.fullnode.internal.headless | bool | `false` |  |
 | service.fullnode.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for fullnodes |
 | service.fullnode.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs |
+| service.internalDomain | string | `nil` | If set, the base domain name to use for internal LBs |
 | service.validator.enableAdminPort | bool | `false` | Enable the admin port on the validator |
 | service.validator.enableMetricsPort | bool | `false` | Enable the metrics port on the validator |
 | service.validator.enableRestApi | bool | `true` | Enable the REST API on the validator |
 | service.validator.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for validator's HAProxy |
 | service.validator.externalTrafficPolicy | string | `"Local"` | The externalTrafficPolicy for the validator service |
+| service.validator.internal.annotations | object | `{}` |  |
 | service.validator.internal.headless | bool | `false` |  |
 | service.validator.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for validator |
 | service.validator.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs |
@@ -79,21 +83,23 @@ Aptos blockchain node deployment
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
 | validator.affinity | object | `{}` |  |
 | validator.config | object | `{}` | Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
-| validator.enableNetworkPolicy | bool | `true` | Lock down network ingress and egress with Kubernetes NetworkPolicy |
+| validator.enableNetworkPolicy | bool | `false` | Lock down network ingress and egress with Kubernetes NetworkPolicy |
 | validator.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
 | validator.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for validator images |
 | validator.image.repo | string | `"aptoslabs/validator"` | Image repo to use for validator images |
 | validator.image.tag | string | `nil` | Image tag to use for validator images. If set, overrides `imageTag` |
 | validator.name | string | `nil` | Internal: name of your validator for use in labels |
 | validator.nodeSelector | object | `{}` |  |
-| validator.resources.limits.cpu | int | `14` |  |
-| validator.resources.limits.memory | string | `"56Gi"` |  |
-| validator.resources.requests.cpu | int | `14` |  |
-| validator.resources.requests.memory | string | `"56Gi"` |  |
+| validator.podAnnotations | string | `nil` |  |
+| validator.resources.limits.cpu | int | `30` |  |
+| validator.resources.limits.memory | string | `"60Gi"` |  |
+| validator.resources.requests.cpu | int | `30` |  |
+| validator.resources.requests.memory | string | `"60Gi"` |  |
 | validator.rust_log | string | `"info"` | Log level for the validator |
 | validator.storage.class | string | `nil` | Kubernetes storage class to use for validator persistent storage |
 | validator.storage.size | string | `"2048Gi"` | Size of validator persistent storage |
 | validator.tolerations | list | `[]` |  |
+| validator.useConsensusHealthCheckAsStartupProbe | bool | `false` |  |
 
 ## Resource Descriptions
 
@@ -180,9 +186,8 @@ You may also deploy multiple fullnodes into the cluster via `.Values.numFullnode
 
 ### Era
 
-The `.Values.chain.era` is a number that is incremented every time the validator's storage is wiped. This is ueful for testnets when the network is wiped.
+The `.Values.chain.era` is a number that is incremented every time the validator's storage is wiped. This is useful for testnets when the network is wiped.
 
 ### Privileged Mode
 
 For debugging purposes, it's sometimes useful to run the validator as root (privileged mode). This is enabled by `.Values.enablePrivilegedMode`.
-

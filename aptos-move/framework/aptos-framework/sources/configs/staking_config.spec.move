@@ -58,6 +58,7 @@ spec aptos_framework::staking_config {
     spec module {
         use aptos_framework::chain_status;
         invariant [suspendable] chain_status::is_operating() ==> exists<StakingConfig>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==> exists<StakingRewardsConfig>(@aptos_framework);
         pragma verify = true;
         pragma aborts_if_is_strict;
     }
@@ -106,6 +107,7 @@ spec aptos_framework::staking_config {
     ) {
         use std::signer;
         let addr = signer::address_of(aptos_framework);
+        requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         /// [high-level-req-1.1]
         aborts_if addr != @aptos_framework;
         aborts_if minimum_stake > maximum_stake || maximum_stake == 0;
@@ -117,7 +119,9 @@ spec aptos_framework::staking_config {
         aborts_if rewards_rate > MAX_REWARDS_RATE;
         aborts_if rewards_rate > rewards_rate_denominator;
         aborts_if exists<StakingConfig>(addr);
+        aborts_if exists<StakingRewardsConfig>(addr);
         ensures exists<StakingConfig>(addr);
+        ensures exists<StakingRewardsConfig>(addr);
     }
 
     /// Caller must be @aptos_framework.

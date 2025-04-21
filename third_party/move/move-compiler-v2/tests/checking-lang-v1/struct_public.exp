@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid modifier
+  ┌─ tests/checking-lang-v1/struct_public.move:3:5
+  │
+3 │     public struct Foo {}
+  │     ^^^^^^ Invalid struct declaration. Structs cannot have visibility modifiers as they are always 'public'

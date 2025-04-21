@@ -3,15 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    parser::{parse_struct_tag, parse_type_tag},
+    parser::{parse_module_id, parse_struct_tag, parse_type_tag},
     safe_serialize,
 };
+use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::ToOwned,
     fmt::{Display, Formatter},
     str::FromStr,
 };
@@ -21,9 +24,14 @@ pub const RESOURCE_TAG: u8 = 1;
 
 /// Hex address: 0x1
 pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
+pub const TOKEN_ADDRESS: AccountAddress = AccountAddress::THREE;
+pub const TOKEN_OBJECTS_ADDRESS: AccountAddress = AccountAddress::FOUR;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum TypeTag {
     // alias for compatibility with old json serialized data.
     #[serde(rename = "bool", alias = "Bool")]
@@ -62,6 +70,15 @@ pub enum TypeTag {
     U32,
     #[serde(rename = "u256", alias = "U256")]
     U256,
+
+    // NOTE: added in bytecode version v8
+    Function(
+        #[serde(
+            serialize_with = "safe_serialize::type_tag_recursive_serialize",
+            deserialize_with = "safe_serialize::type_tag_recursive_deserialize"
+        )]
+        Box<FunctionTag>,
+    ),
 }
 
 impl TypeTag {
@@ -77,6 +94,7 @@ impl TypeTag {
     /// to change and should not be used inside stable code.
     pub fn to_canonical_string(&self) -> String {
         use TypeTag::*;
+
         match self {
             Bool => "bool".to_owned(),
             U8 => "u8".to_owned(),
@@ -89,6 +107,67 @@ impl TypeTag {
             Signer => "signer".to_owned(),
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
             Struct(s) => s.to_canonical_string(),
+            Function(f) => {
+                let fmt_list = |l: &[TypeTag]| -> String {
+                    l.iter()
+                        .map(|t| t.to_canonical_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                };
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities,
+                } = f.as_ref();
+                format!(
+                    "|{}|{}{}",
+                    fmt_list(args),
+                    fmt_list(results),
+                    abilities.display_postfix()
+                )
+            },
+        }
+    }
+
+    pub fn struct_tag(&self) -> Option<&StructTag> {
+        use TypeTag::*;
+        match self {
+            Struct(struct_tag) => Some(struct_tag.as_ref()),
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_)
+            | Function(_) => None,
+        }
+    }
+
+    pub fn preorder_traversal_iter(&self) -> impl Iterator<Item = &TypeTag> {
+        TypeTagPreorderTraversalIter { stack: vec![self] }
+    }
+}
+
+struct TypeTagPreorderTraversalIter<'a> {
+    stack: Vec<&'a TypeTag>,
+}
+
+impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
+    type Item = &'a TypeTag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use TypeTag::*;
+
+        match self.stack.pop() {
+            Some(ty) => {
+                match ty {
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 => (),
+                    Vector(ty) => self.stack.push(ty),
+                    Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
+                    Function(fun_tag) => {
+                        let FunctionTag { args, results, .. } = fun_tag.as_ref();
+                        self.stack
+                            .extend(results.iter().rev().chain(args.iter().rev()))
+                    },
+                }
+                Some(ty)
+            },
+            None => None,
         }
     }
 }
@@ -102,7 +181,10 @@ impl FromStr for TypeTag {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct StructTag {
@@ -185,6 +267,19 @@ impl FromStr for StructTag {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub struct FunctionTag {
+    pub args: Vec<TypeTag>,
+    pub results: Vec<TypeTag>,
+    pub abilities: AbilitySet,
+}
+
 /// Represents the initial key into global storage where we first index by the address, and then
 /// the struct tag
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
@@ -212,7 +307,10 @@ impl ResourceKey {
 /// Represents the initial key into global storage where we first index by the address, and then
 /// the struct tag. The struct fields are public to support pattern matching.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct ModuleId {
@@ -223,6 +321,29 @@ pub struct ModuleId {
 impl From<ModuleId> for (AccountAddress, Identifier) {
     fn from(module_id: ModuleId) -> Self {
         (module_id.address, module_id.name)
+    }
+}
+
+static SCRIPT_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| ModuleId {
+    address: AccountAddress::from_str_strict(
+        // This is generated using sha256sum on 10k of bytes from /dev/urandom
+        "0x8bd18359a7ebb84407b6defa7bc5da9aca34a3d1ce764ddfb4d0adcc663430b4",
+    )
+    .expect("parsing of script address constant"),
+    name: Identifier::new("__script__").expect("valid identifier for script"),
+});
+
+/// Returns a pseudo module id which can be used for scripts and is distinct
+/// from regular module ids.
+pub fn pseudo_script_module_id() -> &'static ModuleId {
+    &SCRIPT_MODULE_ID
+}
+
+impl FromStr for ModuleId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_module_id(s)
     }
 }
 
@@ -301,6 +422,7 @@ impl Display for TypeTag {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             TypeTag::Struct(s) => write!(f, "{}", s),
+            TypeTag::Function(_) => write!(f, "{}", self.to_canonical_string()),
             TypeTag::Vector(ty) => write!(f, "vector<{}>", ty),
             TypeTag::U8 => write!(f, "u8"),
             TypeTag::U16 => write!(f, "u16"),
@@ -312,6 +434,12 @@ impl Display for TypeTag {
             TypeTag::Signer => write!(f, "signer"),
             TypeTag::Bool => write!(f, "bool"),
         }
+    }
+}
+
+impl Display for FunctionTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        TypeTag::Function(Box::new(self.clone())).fmt(f)
     }
 }
 
@@ -342,7 +470,27 @@ mod tests {
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
         mem,
+        str::FromStr,
     };
+
+    #[test]
+    fn test_tag_iter() {
+        let tag = TypeTag::from_str("vector<0x1::a::A<u8, 0x2::b::B, vector<vector<0x3::c::C>>>>")
+            .unwrap();
+        let actual_tags = tag.preorder_traversal_iter().collect::<Vec<_>>();
+        let expected_tags = [
+            tag.clone(),
+            TypeTag::from_str("0x1::a::A<u8, 0x2::b::B, vector<vector<0x3::c::C>>>").unwrap(),
+            TypeTag::from_str("u8").unwrap(),
+            TypeTag::from_str("0x2::b::B").unwrap(),
+            TypeTag::from_str("vector<vector<0x3::c::C>>").unwrap(),
+            TypeTag::from_str("vector<0x3::c::C>").unwrap(),
+            TypeTag::from_str("0x3::c::C").unwrap(),
+        ];
+        for (actual_tag, expected_tag) in actual_tags.into_iter().zip(expected_tags) {
+            assert_eq!(actual_tag, &expected_tag);
+        }
+    }
 
     #[test]
     fn test_type_tag_serde() {
@@ -362,7 +510,7 @@ mod tests {
     fn test_nested_type_tag_struct_serde() {
         let mut type_tags = vec![make_type_tag_struct(TypeTag::U8)];
 
-        let limit = MAX_TYPE_TAG_NESTING - 1;
+        let limit = MAX_TYPE_TAG_NESTING;
         while type_tags.len() < limit.into() {
             type_tags.push(make_type_tag_struct(type_tags.last().unwrap().clone()));
         }
@@ -386,7 +534,7 @@ mod tests {
     fn test_nested_type_tag_vector_serde() {
         let mut type_tags = vec![make_type_tag_struct(TypeTag::U8)];
 
-        let limit = MAX_TYPE_TAG_NESTING - 1;
+        let limit = MAX_TYPE_TAG_NESTING;
         while type_tags.len() < limit.into() {
             type_tags.push(make_type_tag_vector(type_tags.last().unwrap().clone()));
         }

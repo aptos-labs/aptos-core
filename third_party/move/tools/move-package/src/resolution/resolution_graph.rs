@@ -64,7 +64,7 @@ pub struct ResolvingNamedAddress {
 /// 2. Can be left unassigned in the declaring package. In this case it can receive its value
 ///    through unification across the package graph.
 ///
-/// Named addresses can also be renamed in a package and will be re-exported under thes new names in this case.
+/// Named addresses can also be renamed in a package and will be re-exported under these new names in this case.
 #[derive(Debug, Clone)]
 pub struct ResolutionGraph<T> {
     pub root_package_path: PathBuf,
@@ -98,14 +98,9 @@ impl ResolvingGraph {
     pub fn new<W: Write>(
         root_package: SourceManifest,
         root_package_path: PathBuf,
-        mut build_options: BuildConfig,
+        build_options: BuildConfig,
         writer: &mut W,
     ) -> Result<ResolvingGraph> {
-        if build_options.architecture.is_none() {
-            if let Some(info) = &root_package.build {
-                build_options.architecture = info.architecture;
-            }
-        }
         let mut resolution_graph = Self {
             root_package_path: root_package_path.clone(),
             build_options: build_options.clone(),

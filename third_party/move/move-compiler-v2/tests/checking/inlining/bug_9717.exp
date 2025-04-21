@@ -169,5 +169,80 @@ module 0xcafe::vectors {
     }
 } // end 0xcafe::vectors
 
+// -- Sourcified model before bytecode pipeline
+module 0xcafe::vectors {
+    public entry fun guess_flips(flips: vector<u8>) {
+        {
+            let (flips) = (&flips);
+            let i = 0;
+            while (i < 0x1::vector::length<u8>(flips)) {
+                if (*0x1::vector::borrow<u8>(flips, i) != 0u8) break;
+                i = i + 1;
+            };
+        };
+        let _v = copy flips;
+        let _v2 = flips;
+    }
+    public entry fun guess_flips_directly(flips: vector<u8>) {
+        let i = 0;
+        while (i < 0x1::vector::length<u8>(&flips)) {
+            if (*0x1::vector::borrow<u8>(&flips, i) != 0u8) break;
+            i = i + 1;
+        };
+        let _v = copy flips;
+        let _v2 = flips;
+    }
+    public entry fun guess_with_break_without_inline(flips: vector<u8>) {
+        loops_with_break_no_inline(&flips);
+        let _v = copy flips;
+        let _v2 = flips;
+    }
+    public entry fun guess_without_break_with_inline(flips: vector<u8>) {
+        {
+            let (flips) = (&flips);
+            let i = 0;
+            while (i < 0x1::vector::length<u8>(flips)) {
+                if (*0x1::vector::borrow<u8>(flips, i) == 0u8) () else abort 3;
+                i = i + 1;
+            };
+        };
+        let _v = flips;
+        let _v2 = copy flips;
+    }
+    inline fun loops_with_break(flips: &vector<u8>) {
+        let i = 0;
+        while (i < 0x1::vector::length<u8>(flips)) {
+            if (*0x1::vector::borrow<u8>(flips, i) != 0u8) break;
+            i = i + 1;
+        };
+    }
+    fun loops_with_break_no_inline(flips: &vector<u8>) {
+        let i = 0;
+        while (i < 0x1::vector::length<u8>(flips)) {
+            if (*0x1::vector::borrow<u8>(flips, i) != 0u8) break;
+            i = i + 1;
+        };
+    }
+    inline fun loops_without_break(flips: &vector<u8>) {
+        let i = 0;
+        while (i < 0x1::vector::length<u8>(flips)) {
+            if (*0x1::vector::borrow<u8>(flips, i) == 0u8) () else abort 3;
+            i = i + 1;
+        };
+    }
+    fun test_guess_directly() {
+        guess_flips_directly(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+    fun test_guess_with_break_no_inline() {
+        guess_with_break_without_inline(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+    fun test_guess_with_inline_break() {
+        guess_flips(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+    fun test_guess_without_break() {
+        guess_without_break_with_inline(vector[0u8, 0u8, 0u8, 0u8]);
+    }
+}
+
 
 ============ bytecode verification succeeded ========

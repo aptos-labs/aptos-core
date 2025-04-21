@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot select field `1` since it has different types in variants of enum `Foo`
+  ┌─ tests/checking/positional_fields/invalid_common_access.move:8:9
+  │
+8 │         x.1
+  │         ^
+  │
+  = field `1` has type `u8` in variant `B` and type `bool` in variant `A`

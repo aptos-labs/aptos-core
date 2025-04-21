@@ -7,18 +7,22 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     var $t5: u64
+     var $t6: u64
   0: $t1 := 1
   1: $t2 := 2
-  2: $t3 := +($t1, $t2)
-  3: $t1 := infer($t3)
-  4: $t4 := infer($t2)
-  5: $t0 := +($t4, $t2)
-  6: return $t0
+  2: $t4 := infer($t1)
+  3: $t3 := +($t4, $t2)
+  4: $t1 := infer($t3)
+  5: $t5 := infer($t2)
+  6: $t6 := infer($t5)
+  7: $t0 := +($t6, $t2)
+  8: return $t0
 }
 
 
 Diagnostics:
-warning: Unused assignment to `t`. Consider removing or prefixing with an underscore: `_t`
+warning: Unused assignment/binding to `t`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_t`), or binding to `_`
   ┌─ tests/variable-coalescing/intermingled_1.move:5:9
   │
 5 │         t = t + u;
@@ -33,12 +37,16 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     var $t5: u64
+     var $t6: u64
   0: $t1 := 1
   1: $t2 := 2
-  2: $t3 := +($t1, $t2)
-  3: $t4 := copy($t2)
-  4: $t0 := +($t4, $t2)
-  5: return $t0
+  2: $t4 := move($t1)
+  3: $t3 := +($t4, $t2)
+  4: $t5 := copy($t2)
+  5: $t6 := move($t5)
+  6: $t0 := +($t6, $t2)
+  7: return $t0
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -50,6 +58,8 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     var $t5: u64
+     var $t6: u64
      # live vars:
      # events: b:$t1
   0: $t1 := 1
@@ -57,17 +67,23 @@ fun m::test(): u64 {
      # events: b:$t2
   1: $t2 := 2
      # live vars: $t1, $t2
-     # events: e:$t1, e:$t3, b:$t3
-  2: $t3 := +($t1, $t2)
-     # live vars: $t2
-     # events: b:$t4
-  3: $t4 := copy($t2)
+     # events: e:$t1, b:$t4
+  2: $t4 := move($t1)
      # live vars: $t2, $t4
-     # events: e:$t2, e:$t4, b:$t0
-  4: $t0 := +($t4, $t2)
+     # events: e:$t3, e:$t4, b:$t3
+  3: $t3 := +($t4, $t2)
+     # live vars: $t2
+     # events: b:$t5
+  4: $t5 := copy($t2)
+     # live vars: $t2, $t5
+     # events: e:$t5, b:$t6
+  5: $t6 := move($t5)
+     # live vars: $t2, $t6
+     # events: e:$t2, e:$t6, b:$t0
+  6: $t0 := +($t6, $t2)
      # live vars: $t0
      # events: e:$t0
-  5: return $t0
+  7: return $t0
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -79,12 +95,16 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
   0: $t1 := 1
   1: $t2 := 2
-  2: $t1 := +($t1, $t2)
-  3: $t3 := copy($t2)
-  4: $t2 := +($t3, $t2)
-  5: return $t2
+  2: $t1 := move($t1)
+  3: $t1 := +($t1, $t2)
+  4: $t3 := copy($t2)
+  5: $t3 := move($t3)
+  6: $t2 := +($t3, $t2)
+  7: return $t2
 }
 
 ============ after DeadStoreElimination: ================
@@ -96,38 +116,37 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
   0: $t1 := 1
   1: $t2 := 2
-  2: $t1 := +($t1, $t2)
-  3: $t3 := copy($t2)
-  4: $t2 := +($t3, $t2)
-  5: return $t2
+  2: $t1 := move($t1)
+  3: $t1 := +($t1, $t2)
+  4: $t3 := copy($t2)
+  5: $t3 := move($t3)
+  6: $t2 := +($t3, $t2)
+  7: return $t2
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 
 test(): u64 /* def_idx: 0 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	u: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(2)
-	2: StLoc[0](loc0: u64)
-	3: CopyLoc[0](loc0: u64)
+	2: StLoc[0](u: u64)
+	3: CopyLoc[0](u: u64)
 	4: Add
-	5: CopyLoc[0](loc0: u64)
-	6: StLoc[1](loc1: u64)
-	7: MoveLoc[1](loc1: u64)
-	8: MoveLoc[0](loc0: u64)
-	9: Add
-	10: StLoc[0](loc0: u64)
-	11: Pop
-	12: MoveLoc[0](loc0: u64)
-	13: Ret
+	5: Pop
+	6: CopyLoc[0](u: u64)
+	7: MoveLoc[0](u: u64)
+	8: Add
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========

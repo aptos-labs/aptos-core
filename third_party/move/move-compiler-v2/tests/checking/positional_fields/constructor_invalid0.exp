@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/positional_fields/constructor_invalid0.move:5:13
+  │
+5 │         S { 0: 42, 1: 42 };
+  │             ^
+  │             │
+  │             Unexpected '0'
+  │             Expected an identifier

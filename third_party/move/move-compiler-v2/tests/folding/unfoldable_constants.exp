@@ -1,94 +1,124 @@
 
 Diagnostics:
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u8`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `8`
   ┌─ tests/folding/unfoldable_constants.move:3:22
   │
 3 │     const SHL0: u8 = 1 << 8;
   │                      ^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u64`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `64`
   ┌─ tests/folding/unfoldable_constants.move:4:23
   │
 4 │     const SHL1: u64 = 1 << 64;
   │                       ^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u128`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `128`
   ┌─ tests/folding/unfoldable_constants.move:5:24
   │
 5 │     const SHL2: u128 = 1 << 128;
   │                        ^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u16`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `16`
   ┌─ tests/folding/unfoldable_constants.move:6:23
   │
 6 │     const SHL3: u16 = 1 << 16;
   │                       ^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u32`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `32`
   ┌─ tests/folding/unfoldable_constants.move:7:23
   │
 7 │     const SHL4: u32 = 1 << 32;
   │                       ^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u8`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `8`
   ┌─ tests/folding/unfoldable_constants.move:9:25
   │
 9 │     const SHL0B: u32 = (1u8 << 8 as u32);
   │                         ^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u64`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `64`
    ┌─ tests/folding/unfoldable_constants.move:10:26
    │
 10 │     const SHL1B: u128 = ((1u64 << 64) as u128);
    │                          ^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u128`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `128`
    ┌─ tests/folding/unfoldable_constants.move:11:26
    │
 11 │     const SHL2B: u256 = ((1u128 << 128) as u256);
    │                          ^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u16`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `16`
    ┌─ tests/folding/unfoldable_constants.move:12:25
    │
 12 │     const SHL3B: u32 = ((1u16 << 16) as u32);
    │                         ^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Operator `<<` result value out of range for `u32`
+error: Invalid expression in `const`. Operand on the right is too large for `<<`, should be less than `32`
    ┌─ tests/folding/unfoldable_constants.move:13:25
    │
 13 │     const SHL4B: u64 = ((1u32 << 32) as u64);
    │                         ^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:21:24
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `8`
+   ┌─ tests/folding/unfoldable_constants.move:15:22
+   │
+15 │     const SHR0: u8 = 0 >> 8;
+   │                      ^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `64`
+   ┌─ tests/folding/unfoldable_constants.move:16:23
+   │
+16 │     const SHR1: u64 = 0 >> 64;
+   │                       ^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `128`
+   ┌─ tests/folding/unfoldable_constants.move:17:24
+   │
+17 │     const SHR2: u128 = 0 >> 128;
+   │                        ^^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `16`
+   ┌─ tests/folding/unfoldable_constants.move:18:23
+   │
+18 │     const SHR3: u16 = 0 >> 16;
+   │                       ^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `32`
+   ┌─ tests/folding/unfoldable_constants.move:19:23
+   │
+19 │     const SHR4: u32 = 0 >> 32;
+   │                       ^^^^^^^
+
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `8`
+   ┌─ tests/folding/unfoldable_constants.move:21:25
    │
 21 │     const SHR0B: u32 = ((0u8 >> 8) as u32);
-   │                        ^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:22:25
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `64`
+   ┌─ tests/folding/unfoldable_constants.move:22:26
    │
 22 │     const SHR1B: u128 = ((0u64 >> 64) as u128);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^
+   │                          ^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:23:25
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `128`
+   ┌─ tests/folding/unfoldable_constants.move:23:26
    │
 23 │     const SHR2B: u256 = ((0u128 >> 128) as u256);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │                          ^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:24:24
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `16`
+   ┌─ tests/folding/unfoldable_constants.move:24:25
    │
 24 │     const SHR3B: u32 = ((0u16 >> 16) as u32);
-   │                        ^^^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:25:24
+error: Invalid expression in `const`. Operand on the right is too large for `>>`, should be less than `32`
+   ┌─ tests/folding/unfoldable_constants.move:25:25
    │
 25 │     const SHR4B: u64 = ((0u32 >> 32) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator `/` result value out of range for `u8`
    ┌─ tests/folding/unfoldable_constants.move:27:22

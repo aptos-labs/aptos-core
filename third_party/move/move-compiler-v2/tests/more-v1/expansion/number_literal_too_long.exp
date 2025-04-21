@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid number literal
+  ┌─ tests/more-v1/expansion/number_literal_too_long.move:3:9
+  │
+3 │         0x1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal is too large to fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+  ┌─ tests/more-v1/expansion/number_literal_too_long.move:4:9
+  │
+4 │         340282366920938463463374607431768211456340282366920938463463374607431768211456340282366920938463463374607431768211456;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal is too large to fit into the largest possible integer type, 'u256'

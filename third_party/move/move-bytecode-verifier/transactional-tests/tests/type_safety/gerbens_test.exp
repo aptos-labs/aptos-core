@@ -1,10 +1,11 @@
 processed 1 task
 
 task 0 'publish'. lines 1-93:
-Error: error[E04024]: invalid usage of function type
-  ┌─ TEMPFILE:9:62
+Error: compilation errors:
+ error: Only inline functions may have function-typed parameters, but non-inline function `test_case::for_each_ref` has a function parameter:
+  ┌─ TEMPFILE:9:16
   │
 9 │     public fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
-  │                                                              ^^^^^^^^^^ function type only allowed for inline function arguments
+  │                ^^^^^^^^^^^^                               - Parameter `f` has function-valued type `|&Element|`.
 
 

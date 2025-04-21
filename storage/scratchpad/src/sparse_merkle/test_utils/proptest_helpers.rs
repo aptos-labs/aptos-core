@@ -7,9 +7,11 @@ use crate::{
     test_utils::{naive_smt::NaiveSmt, proof_reader::ProofReader},
     SparseMerkleTree,
 };
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_drop_helper::ArcAsyncDrop;
-use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
+use aptos_types::state_store::state_value::StateValue;
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,
@@ -74,12 +76,9 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
 
 pub fn test_smt_correctness_impl(input: Vec<Action>) {
     let mut naive_q = VecDeque::new();
-    naive_q.push_back(NaiveSmt::new::<StateValue>(&[]));
+    naive_q.push_back(NaiveSmt::new(&[]));
     let mut updater_q = VecDeque::new();
-    updater_q.push_back(SparseMerkleTree::new(
-        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-        StateStorageUsage::zero(),
-    ));
+    updater_q.push_back(SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH));
 
     for action in input {
         match action {
@@ -95,7 +94,7 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
                     .flat_map(|txn_updates| {
                         txn_updates
                             .iter()
-                            .map(|(k, v)| (*k, v.as_ref()))
+                            .map(|(k, v)| (*k, v.as_ref().map(CryptoHash::hash)))
                             .collect::<Vec<_>>()
                     })
                     .collect::<Vec<_>>();
@@ -107,13 +106,15 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
                     .collect();
                 let proof_reader = ProofReader::new(proofs);
 
-                let mut naive_smt = naive_q.back().unwrap().clone().update(&updates_flat_batch);
+                let naive_smt = naive_q.back().unwrap().clone().update(&updates_flat_batch);
 
                 let updater_smt = updater_q
                     .back()
                     .unwrap()
-                    .batch_update(updates_flat_batch, &proof_reader)
-                    .unwrap();
+                    .freeze(updater_q.front().unwrap())
+                    .batch_update(updates_flat_batch.iter(), &proof_reader)
+                    .unwrap()
+                    .unfreeze();
                 updater_q.back().unwrap().assert_no_external_strong_ref();
 
                 assert_eq!(updater_smt.root_hash(), naive_smt.get_root_hash());
@@ -129,13 +130,13 @@ trait AssertNoExternalStrongRef {
     fn assert_no_external_strong_ref(&self);
 }
 
-impl<V: ArcAsyncDrop> AssertNoExternalStrongRef for SparseMerkleTree<V> {
+impl AssertNoExternalStrongRef for SparseMerkleTree {
     fn assert_no_external_strong_ref(&self) {
         assert_subtree_sole_strong_ref(self.inner.root());
     }
 }
 
-fn assert_subtree_sole_strong_ref<V: ArcAsyncDrop>(subtree: &SubTree<V>) {
+fn assert_subtree_sole_strong_ref(subtree: &SubTree) {
     if let SubTree::NonEmpty {
         root: NodeHandle::Shared(arc),
         ..

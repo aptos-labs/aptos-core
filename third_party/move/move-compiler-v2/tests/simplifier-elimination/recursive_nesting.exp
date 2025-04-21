@@ -39,5 +39,35 @@ module 0x42::test {
     }
 } // end 0x42::test
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::mathtest {
+    public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
+        (a as u128) * (b as u128) / (c as u128) as u64
+    }
+}
+module 0x42::mathtest2 {
+    use 0x42::mathtest;
+    public inline fun mul_div2(a: u64, b: u64, c: u64): u64 {
+        let (a,b,c) = (b, a, c);
+        (a as u128) * (b as u128) / (c as u128) as u64
+    }
+}
+module 0x42::mathtest3 {
+    use 0x42::mathtest2;
+    public inline fun mul_div3(a: u64, b: u64, c: u64): u64 {
+        let (a,b,c) = (b, a, c);
+        let (a,b,c) = (b, a, c);
+        (a as u128) * (b as u128) / (c as u128) as u64
+    }
+}
+module 0x42::test {
+    use 0x42::mathtest;
+    use 0x42::mathtest2;
+    use 0x42::mathtest3;
+    fun test_nested_mul_div() {
+        if (true) () else abort 0;
+    }
+}
+
 
 ============ bytecode verification succeeded ========

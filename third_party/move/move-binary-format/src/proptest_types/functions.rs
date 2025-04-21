@@ -4,15 +4,15 @@
 
 use crate::{
     file_format::{
-        AbilitySet, AccessSpecifier, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex,
-        FieldHandle, FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex,
-        FunctionDefinition, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
-        FunctionInstantiationIndex, IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature,
-        SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
-        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandle,
-        StructVariantHandle, StructVariantHandleIndex, StructVariantInstantiation,
-        StructVariantInstantiationIndex, TableIndex, VariantFieldHandle, VariantFieldHandleIndex,
-        VariantFieldInstantiation, VariantFieldInstantiationIndex, VariantIndex, Visibility,
+        AccessSpecifier, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex, FieldHandle,
+        FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinition,
+        FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
+        IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
+        StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructHandle, StructVariantHandle,
+        StructVariantHandleIndex, StructVariantInstantiation, StructVariantInstantiationIndex,
+        TableIndex, VariantFieldHandle, VariantFieldHandleIndex, VariantFieldInstantiation,
+        VariantFieldInstantiationIndex, VariantIndex, Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -21,7 +21,7 @@ use crate::{
         TableSize,
     },
 };
-use move_core_types::u256::U256;
+use move_core_types::{ability::AbilitySet, u256::U256};
 use proptest::{
     collection::{vec, SizeRange},
     option::of,
@@ -228,6 +228,7 @@ impl FunctionHandleGen {
             return_: return_idx,
             type_parameters,
             access_specifiers: self.access_specifiers,
+            attributes: vec![],
         })
     }
 }
@@ -438,6 +439,7 @@ impl FunctionDefinitionGen {
             return_: return_idx,
             type_parameters: vec![],
             access_specifiers: None,
+            attributes: vec![],
         };
         let function_handle = state.add_function_handle(handle);
         let mut acquires_set = BTreeSet::new();
@@ -1066,6 +1068,10 @@ impl BytecodeGen {
             Vector(element_token) => BytecodeGen::check_signature_token(element_token),
             StructInstantiation(_, type_arguments) => type_arguments
                 .iter()
+                .all(BytecodeGen::check_signature_token),
+            Function(params, results, _) => params
+                .iter()
+                .chain(results)
                 .all(BytecodeGen::check_signature_token),
             Reference(_) | MutableReference(_) => false,
         }

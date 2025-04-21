@@ -16,21 +16,24 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-use anyhow::anyhow;
+use crate::utils::ensure_max_open_files_limit;
+use anyhow::{anyhow, Context};
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{
-    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
-};
+use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
+use aptos_genesis::builder::GenesisConfiguration;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
+use aptos_types::{
+    chain_id::ChainId, keyless::Groth16VerificationKey, on_chain_config::OnChainJWKConsensusConfig,
+};
 use clap::Parser;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
+use serde_json::Value;
 use std::{
     env, fs,
     io::Write,
@@ -211,11 +214,21 @@ pub struct AptosHandle {
     _indexer_db_runtime: Option<Runtime>,
 }
 
-/// Start an Aptos node
 pub fn start(
     config: NodeConfig,
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
+) -> anyhow::Result<()> {
+    start_and_report_ports(config, log_file, create_global_rayon_pool, None, None)
+}
+
+/// Start an Aptos node
+pub fn start_and_report_ports(
+    config: NodeConfig,
+    log_file: Option<PathBuf>,
+    create_global_rayon_pool: bool,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<()> {
     // Setup panic handler
     aptos_crash_handler::setup_panic_handler();
@@ -228,6 +241,12 @@ pub fn start(
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+
+    // Ensure `ulimit -n`.
+    ensure_max_open_files_limit(
+        config.storage.ensure_rlimit_nofile,
+        config.storage.assert_rlimit_nofile,
+    );
 
     assert!(
         !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
@@ -254,8 +273,13 @@ pub fn start(
     }
 
     // Set up the node environment and start it
-    let _node_handle =
-        setup_environment_and_start_node(config, remote_log_receiver, Some(logger_filter_update))?;
+    let _node_handle = setup_environment_and_start_node(
+        config,
+        remote_log_receiver,
+        Some(logger_filter_update),
+        api_port_tx,
+        indexer_grpc_port_tx,
+    )?;
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
         thread::park();
@@ -560,13 +584,26 @@ where
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
             genesis_config.recurring_lockup_duration_secs = 7200;
-            genesis_config.jwk_consensus_config_override = match env::var("INITIALIZE_JWK_CONSENSUS") {
+
+            match env::var("ENABLE_KEYLESS_DEFAULT") {
                 Ok(val) if val.as_str() == "1" => {
-                    let config = OnChainJWKConsensusConfig::default_enabled();
-                    println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
-                    Some(config)
+                    let response = ureq::get("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey").call();
+                    let json: Value = response.into_json().expect("Failed to parse JSON");
+                    configure_keyless_with_vk(genesis_config, json).unwrap();
                 },
-                _ => None,
+                _ => {},
+            };
+
+            if let Ok(url) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
+                let response = ureq::get(&url).call();
+                let json: Value = response.into_json().expect("Failed to parse JSON");
+                configure_keyless_with_vk(genesis_config, json).unwrap();
+            };
+
+            if let Ok(path) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_PATH") {
+                let file_content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read verification key file: {}", path));
+                let json: Value = serde_json::from_str(&file_content).expect("Failed to parse JSON");
+                configure_keyless_with_vk(genesis_config, json).unwrap();
             };
         })))
         .with_randomize_first_validator_ports(random_ports);
@@ -594,11 +631,62 @@ where
     Ok(node_config)
 }
 
+fn configure_keyless_with_vk(
+    genesis_config: &mut GenesisConfiguration,
+    json: Value,
+) -> anyhow::Result<()> {
+    let vk = parse_groth16_vk_from_json(&json)?;
+    genesis_config.keyless_groth16_vk = Some(vk);
+    genesis_config.jwk_consensus_config_override =
+        Some(OnChainJWKConsensusConfig::default_enabled());
+    Ok(())
+}
+
+fn parse_groth16_vk_from_json(json: &Value) -> Result<Groth16VerificationKey, anyhow::Error> {
+    println!(
+        "Loading verification key from JSON:\n{}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
+    let vk_data = json["data"].clone();
+    let gamma_abc_g1 = vk_data["gamma_abc_g1"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|val| {
+            let hex_str = val.as_str().unwrap();
+            let cleaned_hex = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+            hex::decode(cleaned_hex).expect("Failed to decode gamma_abc_g1 hex")
+        })
+        .collect::<Vec<Vec<u8>>>();
+
+    Ok(Groth16VerificationKey {
+        alpha_g1: decode_hex_field(&vk_data, "alpha_g1").unwrap(),
+        beta_g2: decode_hex_field(&vk_data, "beta_g2").unwrap(),
+        gamma_g2: decode_hex_field(&vk_data, "gamma_g2").unwrap(),
+        delta_g2: decode_hex_field(&vk_data, "delta_g2").unwrap(),
+        gamma_abc_g1,
+    })
+}
+
+fn decode_hex_field(json: &Value, field: &str) -> Result<Vec<u8>, anyhow::Error> {
+    let hex_str = json[field]
+        .as_str()
+        .ok_or_else(|| anyhow!("Missing or invalid {} in verification key file", field))?;
+
+    // Strip "0x" prefix if present
+    let cleaned_hex = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+
+    // Decode hex string
+    hex::decode(cleaned_hex).with_context(|| format!("Failed to decode hex for field {}", field))
+}
+
 /// Initializes the node environment and starts the node
 pub fn setup_environment_and_start_node(
     mut node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
     node_config.log_all_configs();
@@ -607,7 +695,7 @@ pub fn setup_environment_and_start_node(
     let mut admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -689,7 +777,19 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id, indexer_db_opt)?;
+        mempool_client_sender,
+    ) = services::bootstrap_api_and_indexer(
+        &node_config,
+        db_rw.clone(),
+        chain_id,
+        indexer_db_opt,
+        update_receiver,
+        api_port_tx,
+        indexer_grpc_port_tx,
+    )?;
+
+    // Set mempool client sender in order to enable the Mempool API in the admin service
+    admin_service.set_mempool_client_sender(mempool_client_sender);
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -702,17 +802,6 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
-
-    // Ensure consensus key in secure DB.
-    if !matches!(
-        node_config
-            .consensus
-            .safety_rules
-            .initial_safety_rules_config,
-        InitialSafetyRulesConfig::None
-    ) {
-        aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
-    }
 
     // Create the DKG runtime and get the VTxn pool
     let (vtxn_pool, dkg_runtime) =
@@ -731,9 +820,16 @@ pub fn setup_environment_and_start_node(
     state_sync_runtimes.block_until_initialized();
     debug!("State sync initialization complete.");
 
-    // Create the consensus observer publisher (if enabled)
-    let (consensus_publisher_runtime, consensus_publisher) =
-        consensus::create_consensus_publisher(&node_config, &consensus_observer_network_interfaces);
+    // Create the consensus observer and publisher (if enabled)
+    let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =
+        consensus::create_consensus_observer_and_publisher(
+            &node_config,
+            consensus_observer_network_interfaces,
+            consensus_notifier.clone(),
+            consensus_to_mempool_sender.clone(),
+            db_rw.clone(),
+            consensus_observer_reconfig_subscription,
+        );
 
     // Create the consensus runtime (if enabled)
     let consensus_runtime = consensus::create_consensus_runtime(
@@ -746,17 +842,6 @@ pub fn setup_environment_and_start_node(
         vtxn_pool,
         consensus_publisher.clone(),
         &mut admin_service,
-    );
-
-    // Create the consensus observer runtime (if enabled)
-    let consensus_observer_runtime = consensus::create_consensus_observer_runtime(
-        &node_config,
-        consensus_observer_network_interfaces,
-        consensus_publisher,
-        consensus_notifier,
-        consensus_to_mempool_sender,
-        db_rw,
-        consensus_observer_reconfig_subscription,
     );
 
     Ok(AptosHandle {

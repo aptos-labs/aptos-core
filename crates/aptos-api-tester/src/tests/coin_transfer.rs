@@ -204,11 +204,11 @@ async fn check_account_balance(
     address: AccountAddress,
 ) -> Result<(), TestFailure> {
     // expected
-    let expected = U64(TRANSFER_AMOUNT);
+    let expected = TRANSFER_AMOUNT;
 
     // actual
-    let actual = match client.get_account_balance(address).await {
-        Ok(response) => response.into_inner().coin.value,
+    let actual = match client.view_apt_account_balance(address).await {
+        Ok(response) => response.into_inner(),
         Err(e) => {
             error!(
                 "test: coin_transfer part: check_account_balance ERROR: {}, with error {:?}",
@@ -236,14 +236,14 @@ async fn check_account_balance_at_version(
     transaction_version: u64,
 ) -> Result<(), TestFailure> {
     // expected
-    let expected = U64(0);
+    let expected = 0;
 
     // actual
     let actual = match client
-        .get_account_balance_at_version(address, transaction_version - 1)
+        .view_apt_account_balance_at_version(address, transaction_version - 1)
         .await
     {
-        Ok(response) => response.into_inner().coin.value,
+        Ok(response) => response.into_inner(),
         Err(e) => {
             error!(
                 "test: coin_transfer part: check_account_balance_at_version ERROR: {}, with error {:?}",

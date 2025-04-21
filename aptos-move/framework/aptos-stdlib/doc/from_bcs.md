@@ -5,7 +5,7 @@
 
 This module provides a number of functions to convert _primitive_ types from their representation in <code>std::bcs</code>
 to values. This is the opposite of <code><a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a></code>. Note that it is not safe to define a generic public <code>from_bytes</code>
-function because this can violate implicit struct invariants, therefore only primitive types are offerred. If
+function because this can violate implicit struct invariants, therefore only primitive types are offered. If
 a general conversion back-and-force is needed, consider the <code>aptos_std::Any</code> type which preserves invariants.
 
 Example:
@@ -305,6 +305,8 @@ Package private native function to deserialize a type T.
 Note that this function does not put any constraint on <code>T</code>. If code uses this function to
 deserialize a linear value, its their responsibility that the data they deserialize is
 owned.
+
+Function would abort if T has signer in it.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T

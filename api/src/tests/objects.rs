@@ -3,10 +3,7 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_types::{
-    account_address::{self, AccountAddress},
-    event::EventKey,
-};
+use aptos_types::account_address::{self, AccountAddress};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -74,8 +71,6 @@ async fn test_gen_object() {
         .unwrap();
     assert_eq!(owner, user_addr);
 
-    let (before_event_key, before_event_seq) = transfer_events(&hero_map);
-
     context
         .api_execute_entry_function(
             &mut user,
@@ -94,19 +89,6 @@ async fn test_gen_object() {
         .parse()
         .unwrap();
     assert_eq!(owner, token_addr);
-
-    let (after_event_key, after_event_seq) = transfer_events(&hero_map);
-    assert_eq!(after_event_key, before_event_key);
-    assert_eq!(after_event_seq, before_event_seq + 1);
-
-    let handle = context
-        .gen_events_by_handle(&token_addr, object_resource, "transfer_events")
-        .await;
-    let creation_num = context
-        .gen_events_by_creation_num(&token_addr, after_event_key.get_creation_number())
-        .await;
-    assert_eq!(handle, creation_num);
-    assert_eq!(handle.as_array().unwrap().len(), 1);
 }
 
 fn to_object(value: Value) -> BTreeMap<String, Value> {
@@ -121,21 +103,4 @@ fn to_object(value: Value) -> BTreeMap<String, Value> {
             )
         })
         .collect()
-}
-
-fn transfer_events(object: &BTreeMap<String, Value>) -> (EventKey, u64) {
-    let transfer_events = object["0x1::object::ObjectCore"].as_object().unwrap()["transfer_events"]
-        .as_object()
-        .unwrap();
-    let counter = transfer_events["counter"]
-        .as_str()
-        .unwrap()
-        .parse()
-        .unwrap();
-    let guid = transfer_events["guid"].as_object().unwrap()["id"]
-        .as_object()
-        .unwrap();
-    let creation_num = guid["creation_num"].as_str().unwrap().parse().unwrap();
-    let addr = guid["addr"].as_str().unwrap().parse().unwrap();
-    (EventKey::new(creation_num, addr), counter)
 }

@@ -8,10 +8,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ModelBuilderOptions {
-    /// Whether compilation of the Move code into bytecode should be handled via
-    /// the model builder.
-    pub compile_via_model: bool,
-
     /// The language version to use.
     pub language_version: LanguageVersion,
 

@@ -24,6 +24,7 @@ spec aptos_std::secp256k1 {
         recovery_id: u8,
         signature: &ECDSASignature,
     ): Option<ECDSARawPublicKey> {
+        aborts_if recovery_id > 3;
         aborts_if ecdsa_recover_internal_abort_condition(message, recovery_id, signature.bytes);
         let pk = spec_ecdsa_recover_internal_result_1(message, recovery_id, signature.bytes);
         let success = spec_ecdsa_recover_internal_result_2(message, recovery_id, signature.bytes);

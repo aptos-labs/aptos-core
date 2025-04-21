@@ -17,9 +17,9 @@ module 0x42::borrow {
     struct S {
         f: u64,
     }
-    private fun field(s: &borrow::S): u64 {
+    private fun field(s: &S): u64 {
         {
-          let r: &u64 = Borrow(Immutable)(select borrow::S.f<&borrow::S>(s));
+          let r: &u64 = Borrow(Immutable)(select borrow::S.f<&S>(s));
           Deref(r)
         }
     }
@@ -35,9 +35,9 @@ module 0x42::borrow {
           Deref(r)
         }
     }
-    private fun mut_field(s: &mut borrow::S): u64 {
+    private fun mut_field(s: &mut S): u64 {
         {
-          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f<&mut borrow::S>(s));
+          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f<&mut S>(s));
           r = 22;
           Deref(r)
         }
@@ -61,13 +61,48 @@ module 0x42::borrow {
     }
 } // end 0x42::borrow
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::borrow {
+    struct S {
+        f: u64,
+    }
+    fun field(s: &S): u64 {
+        let r = &s.f;
+        *r
+    }
+    fun local(param: u64): u64 {
+        let r = &33;
+        *r
+    }
+    fun param(param: u64): u64 {
+        let r = &param;
+        *r
+    }
+    fun mut_field(s: &mut S): u64 {
+        let r = &mut s.f;
+        *r = 22;
+        *r
+    }
+    fun mut_local(param: u64): u64 {
+        let local = 33;
+        let r = &mut local;
+        *r = 22;
+        *r
+    }
+    fun mut_param(param: u64): u64 {
+        let r = &mut param;
+        *r = 22;
+        *r
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
-fun borrow::field($t0: &borrow::S): u64 {
+fun borrow::field($t0: &0x42::borrow::S): u64 {
      var $t1: u64
      var $t2: &u64
-  0: $t2 := borrow_field<borrow::S>.f($t0)
+  0: $t2 := borrow_field<0x42::borrow::S>.f($t0)
   1: $t1 := read_ref($t2)
   2: return $t1
 }
@@ -96,11 +131,11 @@ fun borrow::param($t0: u64): u64 {
 
 
 [variant baseline]
-fun borrow::mut_field($t0: &mut borrow::S): u64 {
+fun borrow::mut_field($t0: &mut 0x42::borrow::S): u64 {
      var $t1: u64
      var $t2: &mut u64
      var $t3: u64
-  0: $t2 := borrow_field<borrow::S>.f($t0)
+  0: $t2 := borrow_field<0x42::borrow::S>.f($t0)
   1: $t3 := 22
   2: write_ref($t2, $t3)
   3: $t1 := read_ref($t2)
@@ -136,4 +171,74 @@ fun borrow::mut_param($t0: u64): u64 {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.borrow {
+struct S {
+	f: u64
+}
+
+field(s: &S): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](s: &S)
+	1: ImmBorrowField[0](S.f: u64)
+	2: ReadRef
+	3: Ret
+}
+local(param: u64): u64 /* def_idx: 1 */ {
+L1:	$t3: u64
+B0:
+	0: LdU64(33)
+	1: StLoc[1]($t3: u64)
+	2: ImmBorrowLoc[1]($t3: u64)
+	3: ReadRef
+	4: Ret
+}
+param(param: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: ImmBorrowLoc[0](param: u64)
+	1: ReadRef
+	2: Ret
+}
+mut_field(s: &mut S): u64 /* def_idx: 3 */ {
+L1:	r: &mut u64
+B0:
+	0: MoveLoc[0](s: &mut S)
+	1: MutBorrowField[0](S.f: u64)
+	2: StLoc[1](r: &mut u64)
+	3: LdU64(22)
+	4: CopyLoc[1](r: &mut u64)
+	5: WriteRef
+	6: MoveLoc[1](r: &mut u64)
+	7: ReadRef
+	8: Ret
+}
+mut_local(param: u64): u64 /* def_idx: 4 */ {
+L1:	local: u64
+L2:	r: &mut u64
+B0:
+	0: LdU64(33)
+	1: StLoc[1](local: u64)
+	2: MutBorrowLoc[1](local: u64)
+	3: StLoc[2](r: &mut u64)
+	4: LdU64(22)
+	5: CopyLoc[2](r: &mut u64)
+	6: WriteRef
+	7: MoveLoc[2](r: &mut u64)
+	8: ReadRef
+	9: Ret
+}
+mut_param(param: u64): u64 /* def_idx: 5 */ {
+L1:	r: &mut u64
+B0:
+	0: MutBorrowLoc[0](param: u64)
+	1: StLoc[1](r: &mut u64)
+	2: LdU64(22)
+	3: CopyLoc[1](r: &mut u64)
+	4: WriteRef
+	5: MoveLoc[1](r: &mut u64)
+	6: ReadRef
+	7: Ret
+}
+}
 ============ bytecode verification succeeded ========

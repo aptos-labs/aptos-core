@@ -1,0 +1,65 @@
+
+Diagnostics:
+error: cannot move local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/move_combo_invalid.move:14:9
+   │
+13 │         if (cond) f = &s.f else f = &s.g;
+   │                       ----          ----
+   │                       ││            ││
+   │                       ││            │previous local borrow
+   │                       ││            used by field borrow
+   │                       │previous local borrow
+   │                       used by field borrow
+14 │         move s;
+   │         ^^^^^^ moved here
+15 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot move local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/move_combo_invalid.move:22:9
+   │
+21 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       --------
+   │                       │    │
+   │                       │    previous mutable local borrow
+   │                       used by mutable field borrow
+22 │         move s;
+   │         ^^^^^^ moved here
+23 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot move local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/move_combo_invalid.move:30:9
+   │
+29 │         if (cond) f = &mut s else f = other;
+   │                       ------ previous mutable local borrow
+30 │         move s;
+   │         ^^^^^^ moved here
+31 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot move local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/move_combo_invalid.move:38:9
+   │
+37 │         if (cond) f = id_mut(&mut s) else f = other;
+   │                       --------------
+   │                       │      │
+   │                       │      previous mutable local borrow
+   │                       used by mutable call result
+38 │         move s;
+   │         ^^^^^^ moved here
+39 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot move local `s` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/move_combo_invalid.move:45:21
+   │
+44 │         let f = &s.f;
+   │                 ----
+   │                 ││
+   │                 │previous local borrow
+   │                 used by field borrow
+45 │         if (cond) { move s; };
+   │                     ^^^^^^ moved here
+46 │         *f;
+   │         -- conflicting reference `f` used here

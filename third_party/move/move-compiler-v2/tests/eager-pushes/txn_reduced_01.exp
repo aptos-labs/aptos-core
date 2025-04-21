@@ -1,0 +1,187 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::call_other($t0: &signer, $t1: address, $t2: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
+     var $t3: u64
+     var $t4: &vector<address>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: &address
+     var $t9: &vector<address>
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: &signer
+     var $t13: address
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t4 := borrow_local($t1)
+  1: $t3 := vector::length<address>($t4)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 21
+  7: label L2
+  8: $t9 := borrow_local($t1)
+  9: $t8 := vector::borrow<address>($t9, $t5)
+ 10: $t11 := borrow_local($t2)
+ 11: $t10 := vector::borrow<u64>($t11, $t5)
+ 12: $t12 := infer($t0)
+ 13: $t13 := read_ref($t8)
+ 14: $t14 := read_ref($t10)
+ 15: m::call_other($t12, $t13, $t14)
+ 16: $t16 := infer($t5)
+ 17: $t17 := 1
+ 18: $t15 := +($t16, $t17)
+ 19: $t5 := infer($t15)
+ 20: goto 23
+ 21: label L3
+ 22: goto 25
+ 23: label L4
+ 24: goto 3
+ 25: label L1
+ 26: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::call_other($t0: &signer, $t1: address, $t2: u64) {
+     # live vars: $t0, $t1, $t2
+  0: drop($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
+     var $t3: u64
+     var $t4: &vector<address>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: &address
+     var $t9: &vector<address> [unused]
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: &signer
+     var $t13: address
+     var $t14: u64 [unused]
+     var $t15: u64 [unused]
+     var $t16: u64 [unused]
+     var $t17: u64
+     # live vars: $t0, $t1, $t2
+  0: $t4 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t4
+  1: $t3 := vector::length<address>($t4)
+     # live vars: $t0, $t1, $t2, $t3
+  2: $t5 := 0
+     # live vars: $t0, $t1, $t2, $t3, $t5
+  3: label L0
+     # live vars: $t0, $t1, $t2, $t3, $t5
+  4: $t7 := copy($t5)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t7
+  5: $t6 := <($t7, $t3)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t6
+  6: if ($t6) goto 7 else goto 21
+     # live vars: $t0, $t1, $t2, $t3, $t5
+  7: label L2
+     # live vars: $t0, $t1, $t2, $t3, $t5
+  8: $t4 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  9: $t8 := vector::borrow<address>($t4, $t5)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8
+ 10: $t11 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t11
+ 11: $t10 := vector::borrow<u64>($t11, $t5)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t10
+ 12: $t12 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t10, $t12
+ 13: $t13 := read_ref($t8)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t10, $t12, $t13
+ 14: $t7 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t7, $t12, $t13
+ 15: m::call_other($t12, $t13, $t7)
+     # live vars: $t0, $t1, $t2, $t3, $t5
+ 16: $t7 := move($t5)
+     # live vars: $t0, $t1, $t2, $t3, $t7
+ 17: $t17 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t7, $t17
+ 18: $t7 := +($t7, $t17)
+     # live vars: $t0, $t1, $t2, $t3, $t7
+ 19: $t5 := move($t7)
+     # live vars: $t0, $t1, $t2, $t3, $t5
+ 20: goto 3
+     # live vars: $t0, $t1, $t2, $t3, $t5
+ 21: label L3
+     # live vars: $t0
+ 22: drop($t0)
+     # live vars:
+ 23: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+call_other(_from: &signer, _to: address, _amount: u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](_from: &signer)
+	1: Pop
+	2: Ret
+}
+public test(from: &signer, to_vec: vector<address>, amount_vec: vector<u64>) /* def_idx: 1 */ {
+L3:	len: u64
+L4:	i: u64
+L5:	to: &address
+L6:	amount: &u64
+B0:
+	0: ImmBorrowLoc[1](to_vec: vector<address>)
+	1: VecLen(3)
+	2: StLoc[3](len: u64)
+	3: LdU64(0)
+	4: StLoc[4](i: u64)
+B1:
+	5: CopyLoc[4](i: u64)
+	6: CopyLoc[3](len: u64)
+	7: Lt
+	8: BrFalse(28)
+B2:
+	9: ImmBorrowLoc[1](to_vec: vector<address>)
+	10: CopyLoc[4](i: u64)
+	11: VecImmBorrow(3)
+	12: StLoc[5](to: &address)
+	13: ImmBorrowLoc[2](amount_vec: vector<u64>)
+	14: CopyLoc[4](i: u64)
+	15: VecImmBorrow(4)
+	16: StLoc[6](amount: &u64)
+	17: CopyLoc[0](from: &signer)
+	18: MoveLoc[5](to: &address)
+	19: ReadRef
+	20: MoveLoc[6](amount: &u64)
+	21: ReadRef
+	22: Call call_other(&signer, address, u64)
+	23: MoveLoc[4](i: u64)
+	24: LdU64(1)
+	25: Add
+	26: StLoc[4](i: u64)
+	27: Branch(5)
+B3:
+	28: MoveLoc[0](from: &signer)
+	29: Pop
+	30: Ret
+}
+}
+============ bytecode verification succeeded ========

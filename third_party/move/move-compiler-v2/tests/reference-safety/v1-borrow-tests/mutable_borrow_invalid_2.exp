@@ -1,17 +1,12 @@
 
 Diagnostics:
-error: cannot mutably borrow since mutable references exist
+error: cannot write value since it is borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/mutable_borrow_invalid_2.move:9:9
    │
  6 │         let x = if (cond) &mut root.f else &mut root.g;
-   │                           -----------      ----------- previous mutable field borrow
-   │                           │
-   │                           previous mutable field borrow
+   │                           ----------- previously mutably borrowed here
    ·
  9 │         root.f = 1;
-   │         ^^^^^^----
-   │         │
-   │         requirement enforced here
-   │         mutable borrow attempted here
+   │         ^^^^^^^^^^ write attempted here
 10 │         *x;
    │         -- conflicting reference `x` used here

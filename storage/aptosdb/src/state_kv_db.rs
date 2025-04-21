@@ -4,30 +4,36 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    common::NUM_STATE_SHARDS,
-    db_options::{
-        gen_state_kv_cfds, state_kv_db_column_families, state_kv_db_new_key_column_families,
-    },
+    db_options::gen_state_kv_shard_cfds,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         state_value::StateValueSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
-    utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
+    utils::{
+        truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
+        ShardedStateKvSchemaBatch,
+    },
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::hash::CryptoHash;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
+use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_storage_interface::Result;
+use aptos_schemadb::{
+    batch::{SchemaBatch, WriteBatch},
+    ReadOptions, DB,
+};
+use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use arr_macro::arr;
+use itertools::Itertools;
+use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -59,19 +65,13 @@ impl StateKvDb {
             });
         }
 
-        Self::open(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            readonly,
-            sharding,
-        )
+        Self::open_sharded(db_paths, rocksdb_configs.state_kv_db_config, readonly)
     }
 
-    pub(crate) fn open(
+    pub(crate) fn open_sharded(
         db_paths: &StorageDirPaths,
         state_kv_db_config: RocksdbConfig,
         readonly: bool,
-        enable_sharding: bool,
     ) -> Result<Self> {
         let state_kv_metadata_db_path =
             Self::metadata_db_path(db_paths.state_kv_db_metadata_root_path());
@@ -81,7 +81,6 @@ impl StateKvDb {
             STATE_KV_METADATA_DB_NAME,
             &state_kv_db_config,
             readonly,
-            enable_sharding,
         )?);
 
         info!(
@@ -89,15 +88,22 @@ impl StateKvDb {
             "Opened state kv metadata db!"
         );
 
-        let mut shard_id: usize = 0;
-        let state_kv_db_shards = {
-            arr![{
+        let state_kv_db_shards = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
                 let shard_root_path = db_paths.state_kv_db_shard_root_path(shard_id as u8);
-                let db = Self::open_shard(shard_root_path, shard_id as u8, &state_kv_db_config, readonly, enable_sharding)?;
-                shard_id += 1;
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id as u8,
+                    &state_kv_db_config,
+                    readonly,
+                )
+                .unwrap_or_else(|e| panic!("Failed to open state kv db shard {shard_id}: {e:?}."));
                 Arc::new(db)
-            }; 16]
-        };
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         let state_kv_db = Self {
             state_kv_metadata_db,
@@ -105,45 +111,55 @@ impl StateKvDb {
             enabled_sharding: true,
         };
 
-        if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
-            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
+        if !readonly {
+            if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
+                truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
+            }
         }
 
         Ok(state_kv_db)
     }
 
+    pub(crate) fn new_sharded_native_batches(&self) -> ShardedStateKvSchemaBatch {
+        (0..NUM_STATE_SHARDS)
+            .map(|shard_id| self.db_shard(shard_id as u8).new_native_batch())
+            .collect_vec()
+            .try_into()
+            .expect("known to be 16 shards")
+    }
+
     pub(crate) fn commit(
         &self,
         version: Version,
-        state_kv_metadata_batch: SchemaBatch,
-        sharded_state_kv_batches: [SchemaBatch; NUM_STATE_SHARDS],
+        state_kv_metadata_batch: Option<SchemaBatch>,
+        sharded_state_kv_batches: ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_kv_db__commit"])
             .start_timer();
-        THREAD_MANAGER.get_io_pool().scope(|s| {
+        {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["state_kv_db__commit_shards"])
                 .start_timer();
-            let mut batches = sharded_state_kv_batches.into_iter();
-            for shard_id in 0..NUM_STATE_SHARDS {
-                let state_kv_batch = batches
-                    .next()
-                    .expect("Not sufficient number of sharded state kv batches");
-                s.spawn(move |_| {
-                    // TODO(grao): Consider propagating the error instead of panic, if necessary.
-                    self.commit_single_shard(version, shard_id as u8, state_kv_batch)
-                        .unwrap_or_else(|err| panic!("Failed to commit shard {shard_id}: {err}."));
-                });
-            }
-        });
-
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_kv_db__commit_metadata"])
-                .start_timer();
-            self.state_kv_metadata_db
-                .write_schemas(state_kv_metadata_batch)?;
+            THREAD_MANAGER.get_io_pool().scope(|s| {
+                let mut batches = sharded_state_kv_batches.into_iter();
+                for shard_id in 0..NUM_STATE_SHARDS {
+                    let state_kv_batch = batches
+                        .next()
+                        .expect("Not sufficient number of sharded state kv batches");
+                    s.spawn(move |_| {
+                        // TODO(grao): Consider propagating the error instead of panic, if necessary.
+                        self.commit_single_shard(version, shard_id as u8, state_kv_batch)
+                            .unwrap_or_else(|err| {
+                                panic!("Failed to commit shard {shard_id}: {err}.")
+                            });
+                    });
+                }
+            });
+        }
+        if let Some(batch) = state_kv_metadata_batch {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit_metadata"]);
+            self.state_kv_metadata_db.write_schemas(batch)?;
         }
 
         self.write_progress(version)
@@ -168,11 +184,10 @@ impl StateKvDb {
         cp_root_path: impl AsRef<Path>,
     ) -> Result<()> {
         // TODO(grao): Support path override here.
-        let state_kv_db = Self::open(
+        let state_kv_db = Self::open_sharded(
             &StorageDirPaths::from_path(db_root_path),
             RocksdbConfig::default(),
             false,
-            true,
         )?;
         let cp_state_kv_db_path = cp_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
 
@@ -196,6 +211,10 @@ impl StateKvDb {
 
     pub(crate) fn metadata_db(&self) -> &DB {
         &self.state_kv_metadata_db
+    }
+
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.state_kv_metadata_db)
     }
 
     pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
@@ -226,7 +245,7 @@ impl StateKvDb {
         &self,
         version: Version,
         shard_id: u8,
-        batch: SchemaBatch,
+        mut batch: impl WriteBatch,
     ) -> Result<()> {
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvShardCommitProgress(shard_id as usize),
@@ -240,7 +259,6 @@ impl StateKvDb {
         shard_id: u8,
         state_kv_db_config: &RocksdbConfig,
         readonly: bool,
-        enable_sharding: bool,
     ) -> Result<DB> {
         let db_name = format!("state_kv_db_shard_{}", shard_id);
         Self::open_db(
@@ -248,7 +266,6 @@ impl StateKvDb {
             &db_name,
             state_kv_db_config,
             readonly,
-            enable_sharding,
         )
     }
 
@@ -257,25 +274,20 @@ impl StateKvDb {
         name: &str,
         state_kv_db_config: &RocksdbConfig,
         readonly: bool,
-        enable_sharding: bool,
     ) -> Result<DB> {
         Ok(if readonly {
             DB::open_cf_readonly(
                 &gen_rocksdb_options(state_kv_db_config, true),
                 path,
                 name,
-                if enable_sharding {
-                    state_kv_db_new_key_column_families()
-                } else {
-                    state_kv_db_column_families()
-                },
+                gen_state_kv_shard_cfds(state_kv_db_config),
             )?
         } else {
             DB::open_cf(
                 &gen_rocksdb_options(state_kv_db_config, false),
                 path,
                 name,
-                gen_state_kv_cfds(state_kv_db_config, enable_sharding),
+                gen_state_kv_shard_cfds(state_kv_db_config),
             )?
         })
     }

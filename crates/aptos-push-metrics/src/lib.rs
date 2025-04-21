@@ -46,7 +46,7 @@ impl MetricsPusher {
         } else {
             let mut request = ureq::post(push_metrics_endpoint);
             if let Some(token) = api_token {
-                request.set("Authorization", format!("Bearer {}", token).as_str());
+                request.set("apikey", token);
             }
             push_metrics_extra_labels.iter().for_each(|label| {
                 request.query("extra_label", label);
@@ -164,6 +164,7 @@ impl MetricsPusher {
             "metrics_source=unknown".into(),
             "kubernetes_pod_name=unknown".into(),
             "role=unknown".into(),
+            format!("run_uuid={:x}", rand::random::<u64>()),
             format!("namespace={}", namespace),
         ]
     }

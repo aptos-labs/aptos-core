@@ -11,6 +11,14 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    public fun test() {
+        let x;
+        let (_,_) = (x, x);
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]

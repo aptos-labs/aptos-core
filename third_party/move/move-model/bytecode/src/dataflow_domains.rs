@@ -10,9 +10,8 @@ use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    ops::{Deref, DerefMut},
+    ops::{BitOrAssign, Deref, DerefMut},
 };
-
 // ================================================================================================
 // Abstract Domains
 
@@ -36,6 +35,12 @@ impl JoinResult {
             (Unchanged, Unchanged) => Unchanged,
             _ => Changed,
         }
+    }
+}
+
+impl BitOrAssign for JoinResult {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = self.combine(rhs)
     }
 }
 

@@ -1,0 +1,61 @@
+processed 3 tasks
+
+task 0 'publish'. lines 1-8:
+Error: compilation errors:
+ error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'
+  ┌─ TEMPFILE:4:17
+  │
+4 │         assert!(exists<T>(addr), 0);
+  │                 ^^^^^^^^^^^^^^^
+  │                 │
+  │                 Invalid call to exists<T>.
+
+error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'
+  ┌─ TEMPFILE:5:17
+  │
+5 │         let _ = borrow_global<T>(addr);
+  │                 ^^^^^^^^^^^^^^^^^^^^^^
+  │                 │
+  │                 Invalid call to BorrowGlobal(Immutable)<T>.
+
+error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'
+  ┌─ TEMPFILE:6:9
+  │
+6 │         move_from<T>(addr);
+  │         ^^^^^^^^^^^^^^^^^^
+  │         │
+  │         Invalid call to MoveFrom<T>.
+
+
+
+task 1 'publish'. lines 10-22:
+Error: compilation errors:
+ error: no function named `invalid` found
+   ┌─ TEMPFILE1:14:9
+   │
+14 │         invalid<R>(@0x41)
+   │         ^^^^^^^^^^^^^^^^^
+
+error: expected a struct with field `f` but found `()`
+   ┌─ TEMPFILE1:18:9
+   │
+18 │         my_borrow().f;
+   │         ^^^^^^^^^^^
+
+
+
+task 2 'run'. lines 24-30:
+Error: compilation errors:
+ error: unbound module
+   ┌─ TEMPFILE2:26:9
+   │
+26 │     use 0x42::M;
+   │         ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+
+error: unbound module
+   ┌─ TEMPFILE2:28:9
+   │
+28 │         M::test_resource(&account)
+   │         ^ Unbound module or type alias 'M'
+
+

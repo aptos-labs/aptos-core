@@ -1,0 +1,90 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::foo(): (u64, u64, u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: $t1 := 2
+     # live vars: $t0, $t1
+  2: $t2 := 3
+     # live vars: $t0, $t1, $t2
+  3: $t3 := 4
+     # live vars: $t0, $t1, $t2, $t3
+  4: return ($t0, $t1, $t2, $t3)
+}
+
+
+[variant baseline]
+fun m::take($t0: u64, $t1: u64, $t2: u64, $t3: u64) {
+     # live vars: $t0, $t1, $t2, $t3
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # flush: $t0
+     # live vars:
+  0: ($t0, $t1, $t2, $t3) := m::foo()
+     # live vars: $t0, $t1, $t2, $t3
+  1: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2, $t3
+  2: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t3
+  3: $t3 := move($t3)
+     # live vars: $t0, $t1, $t2, $t3
+  4: m::take($t1, $t2, $t3, $t0)
+     # live vars:
+  5: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+foo(): u64 * u64 * u64 * u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: LdU64(4)
+	4: Ret
+}
+take(_x: u64, _y: u64, _z: u64, _w: u64) /* def_idx: 1 */ {
+B0:
+	0: Ret
+}
+public test() /* def_idx: 2 */ {
+L0:	d: u64
+L1:	c: u64
+L2:	b: u64
+L3:	a: u64
+B0:
+	0: Call foo(): u64 * u64 * u64 * u64
+	1: StLoc[0](d: u64)
+	2: StLoc[1](c: u64)
+	3: StLoc[2](b: u64)
+	4: StLoc[3](a: u64)
+	5: MoveLoc[2](b: u64)
+	6: MoveLoc[1](c: u64)
+	7: MoveLoc[0](d: u64)
+	8: MoveLoc[3](a: u64)
+	9: Call take(u64, u64, u64, u64)
+	10: Ret
+}
+}
+============ bytecode verification succeeded ========

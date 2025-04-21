@@ -70,7 +70,7 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                 if let RewriteState::Def(def) = target.get_env_state(env) {
                     let mut spec_callees = BTreeSet::new();
                     def.visit_inline_specs(&mut |spec| {
-                        spec_callees.extend(spec.called_funs_with_callsites().into_keys());
+                        spec_callees.extend(spec.used_funs_with_uses().into_keys());
                         true // keep going
                     });
                     spec_callees
@@ -78,10 +78,9 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                     BTreeSet::new()
                 }
             },
-            RewriteTarget::SpecFun(_) | RewriteTarget::SpecBlock(_) => target
-                .called_funs_with_call_sites(env)
-                .into_keys()
-                .collect(),
+            RewriteTarget::SpecFun(_) | RewriteTarget::SpecBlock(_) => {
+                target.used_funs_with_uses(env).into_keys().collect()
+            },
         };
         for callee in callees {
             called_funs.insert(callee);
@@ -255,6 +254,7 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
         body,
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
+        insts_using_generic_type_reflection: Default::default(),
     };
     env.add_spec_function_def(fun_id.module_id, decl)
 }
@@ -376,7 +376,7 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                     .into_exp()
                 },
                 // Deal with removing various occurrences of Abort and spec blocks
-                Call(id, Abort, _) | SpecBlock(id, ..) => {
+                SpecBlock(id, ..) => {
                     // Replace direct call by unit
                     Call(*id, Tuple, vec![]).into_exp()
                 },

@@ -184,6 +184,27 @@ pub fn add_prelude(
         sh_instances = vec![];
         bv_instances = vec![];
     }
+
+    let mut all_types = mono_info
+        .all_types
+        .iter()
+        .filter(|ty| ty.can_be_type_argument())
+        .map(|ty| TypeInfo::new(env, options, ty, false))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect_vec();
+    let mut bv_all_types = mono_info
+        .all_types
+        .iter()
+        .filter(|ty| ty.can_be_type_argument())
+        .map(|ty| TypeInfo::new(env, options, ty, true))
+        .filter(|ty_info| !all_types.contains(ty_info))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect_vec();
+    all_types.append(&mut bv_all_types);
+    context.insert("uninterpreted_instances", &all_types);
+
     context.insert("sh_instances", &sh_instances);
     context.insert("bv_instances", &bv_instances);
     let mut vec_instances = mono_info

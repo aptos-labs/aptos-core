@@ -196,7 +196,7 @@ variable "utility_instance_type" {
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
   type        = string
-  default     = "t2d-standard-16"
+  default     = "t2d-standard-60"
 }
 
 variable "utility_instance_enable_taint" {
@@ -208,7 +208,7 @@ variable "utility_instance_enable_taint" {
 variable "validator_instance_enable_taint" {
   description = "Whether to taint instances in the validator nodegroup"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "gke_enable_node_autoprovisioning" {
@@ -239,6 +239,12 @@ variable "gke_autoscaling_max_node_count" {
   description = "Maximum number of nodes for GKE nodepool autoscaling"
   type        = number
   default     = 250
+}
+
+variable "enable_vertical_pod_autoscaling" {
+  description = "Enable vertical pod autoscaling"
+  type        = bool
+  default     = false
 }
 
 ### Naming overrides
@@ -299,6 +305,18 @@ variable "num_fullnode_groups" {
   description = "The number of fullnode groups to create"
   type        = number
   default     = 1
+}
+
+variable "validator_storage_size" {
+  description = "Disk size for validators and validator fullnodes"
+  type        = string
+  default     = "2048Gi"
+}
+
+variable "enable_storage_sharding" {
+  description = "Enable storage sharding for VN and VFN nodes"
+  type        = bool
+  default     = true
 }
 
 variable "gke_maintenance_policy" {

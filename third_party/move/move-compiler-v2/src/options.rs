@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::experiments::{DefaultValue, EXPERIMENTS};
+use crate::{
+    experiments::{DefaultValue, EXPERIMENTS},
+    external_checks::ExternalChecks,
+};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -14,11 +17,12 @@ use move_compiler::{
         warn_of_deprecation_use_in_aptos_libs_env_var,
     },
 };
-use move_model::metadata::LanguageVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
+    sync::Arc,
 };
 
 /// Defines options for a run of the compiler.
@@ -47,6 +51,10 @@ pub struct Options {
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
+    /// The compiler version to use.
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    pub compiler_version: Option<CompilerVersion>,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
@@ -62,8 +70,9 @@ pub struct Options {
     pub testing: bool,
 
     /// Active experiments. Experiments alter default behavior of the compiler.
+    /// Each element is `name[=on/off]` to enable/disable experiment `name`.
     /// See `Experiment` struct.
-    #[clap(short)]
+    #[clap(short, hide(true))]
     #[clap(
         long = "experiment",
         num_args = 0..
@@ -77,17 +86,18 @@ pub struct Options {
     /// Sources to compile (positional arg, therefore last).
     /// Each source should be a path to either (1) a Move file or (2) a directory containing Move
     /// files, all to be compiled (e.g., not the root directory of a package---which contains
-    /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
+    /// Move.toml---but a specific subdirectory such as `sources`, `scripts`, and/or `tests`,
     /// depending on compilation mode).
     pub sources: Vec<String>,
 
     /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
     /// Each source_dep should be a path to either (1) a Move file or (2) a directory containing
     /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
-    /// Move.toml---but a specific subdirectorysuch as `sources`).
+    /// Move.toml---but a specific subdirectory such as `sources`).
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 
+    /// Warn about use of deprecated functions, modules, etc.
     #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     pub warn_deprecated: bool,
@@ -95,7 +105,7 @@ pub struct Options {
     /// Show warnings about use of deprecated usage in the Aptos libraries,
     /// which we should generally not bother users with.
     /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
+    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
@@ -115,6 +125,10 @@ pub struct Options {
     /// Whether to compile #[verify_only] code
     #[clap(skip)]
     pub compile_verify_code: bool,
+
+    /// External checks to be performed.
+    #[clap(skip)]
+    pub external_checks: Vec<Arc<dyn ExternalChecks>>,
 }
 
 impl Default for Options {
@@ -228,6 +242,13 @@ impl Options {
     pub fn set_warn_unused(self, value: bool) -> Self {
         Self {
             warn_unused: value,
+            ..self
+        }
+    }
+
+    pub fn set_external_checks(self, value: Vec<Arc<dyn ExternalChecks>>) -> Self {
+        Self {
+            external_checks: value,
             ..self
         }
     }

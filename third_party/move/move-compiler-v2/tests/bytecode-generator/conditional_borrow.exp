@@ -47,39 +47,39 @@ module 0x8675::M {
           }
         }
     }
-    private fun test1b(r: M::S): u64 {
+    private fun test1b(r: S): u64 {
         {
-          let x: M::S = pack M::S(3);
+          let x: S = pack M::S(3);
           {
-            let tref: &mut M::S = Borrow(Mutable)(if Lt<u64>(select M::S.f<M::S>(r), 4) {
+            let tref: &mut S = Borrow(Mutable)(if Lt<u64>(select M::S.f<S>(r), 4) {
               r
             } else {
               x
             });
-            select M::S.f<M::S>(Deref(tref)) = 10;
+            select M::S.f<S>(Deref(tref)) = 10;
             {
-              let y: M::S = r;
+              let y: S = r;
               {
-                let tref2: &mut M::S = Borrow(Mutable)(y);
-                select M::S.f<M::S>(Deref(tref2)) = Add<u64>(select M::S.f<M::S>(Deref(tref2)), 1);
+                let tref2: &mut S = Borrow(Mutable)(y);
+                select M::S.f<S>(Deref(tref2)) = Add<u64>(select M::S.f<S>(Deref(tref2)), 1);
                 {
-                  let z: M::S = y;
+                  let z: S = y;
                   {
-                    let tref3: &mut u64 = Borrow(Mutable)(select M::S.f<M::S>(z));
+                    let tref3: &mut u64 = Borrow(Mutable)(select M::S.f<S>(z));
                     tref3 = Add<u64>(Deref(tref3), 1);
                     {
-                      let a: M::S = z;
+                      let a: S = z;
                       {
-                        let tref4: &mut u64 = Borrow(Mutable)(select M::S.f<M::S>(a));
+                        let tref4: &mut u64 = Borrow(Mutable)(select M::S.f<S>(a));
                         tref4 = Add<u64>(Deref(tref4), 1);
                         {
-                          let tref5: &mut u64 = Borrow(Mutable)(select M::S.f<M::S>(a));
+                          let tref5: &mut u64 = Borrow(Mutable)(select M::S.f<S>(a));
                           tref5 = Add<u64>(Deref(tref5), 8);
                           {
                             let tref6: &mut u64 = Borrow(Mutable)(3;
-                            select M::S.f<M::S>(a));
+                            select M::S.f<S>(a));
                             tref6 = Add<u64>(Deref(tref6), 16);
-                            select M::S.f<M::S>(a)
+                            select M::S.f<S>(a)
                           }
                         }
                       }
@@ -95,6 +95,62 @@ module 0x8675::M {
         Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
     }
 } // end 0x8675::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    public fun test(): u64 {
+        test1(7) + test1(2)
+    }
+    fun test1(r: u64): u64 {
+        let tref = &mut (if (r < 4) r else 3);
+        *tref = 10;
+        let y = r;
+        let tref2 = &mut y;
+        *tref2 = *tref2 + 1;
+        let z = y;
+        let tref3 = &mut (z + 0);
+        *tref3 = *tref3 + 2;
+        let a = z;
+        let tref4 = &mut a;
+        *tref4 = *tref4 + 4;
+        let tref5 = &mut a;
+        *tref5 = *tref5 + 8;
+        let tref6 = &mut {
+            3;
+            a
+        };
+        *tref6 = *tref6 + 16;
+        a
+    }
+    fun test1b(r: S): u64 {
+        let x = S{f: 3};
+        let tref = &mut (if (r.f < 4) r else x);
+        (*tref).f = 10;
+        let y = r;
+        let tref2 = &mut y;
+        (*tref2).f = (*tref2).f + 1;
+        let z = y;
+        let tref3 = &mut z.f;
+        *tref3 = *tref3 + 1;
+        let a = z;
+        let tref4 = &mut a.f;
+        *tref4 = *tref4 + 1;
+        let tref5 = &mut a.f;
+        *tref5 = *tref5 + 8;
+        let tref6 = &mut {
+            3;
+            a.f
+        };
+        *tref6 = *tref6 + 16;
+        a.f
+    }
+    public fun testb(): u64 {
+        test1b(S{f: 7}) + test1b(S{f: 2})
+    }
+}
 
 ============ initial bytecode ================
 
@@ -123,129 +179,133 @@ fun M::test1($t0: u64): u64 {
      var $t5: u64
      var $t6: u64
      var $t7: u64
-     var $t8: &mut u64
-     var $t9: u64
+     var $t8: u64
+     var $t9: &mut u64
      var $t10: u64
      var $t11: u64
      var $t12: u64
-     var $t13: &mut u64
-     var $t14: u64
+     var $t13: u64
+     var $t14: &mut u64
      var $t15: u64
      var $t16: u64
      var $t17: u64
      var $t18: u64
      var $t19: u64
-     var $t20: &mut u64
+     var $t20: u64
      var $t21: u64
-     var $t22: u64
+     var $t22: &mut u64
      var $t23: u64
      var $t24: u64
-     var $t25: &mut u64
+     var $t25: u64
      var $t26: u64
-     var $t27: u64
+     var $t27: &mut u64
      var $t28: u64
      var $t29: u64
-     var $t30: &mut u64
+     var $t30: u64
      var $t31: u64
-     var $t32: u64
+     var $t32: &mut u64
      var $t33: u64
      var $t34: u64
      var $t35: u64
-  0: $t5 := 4
-  1: $t4 := <($t0, $t5)
-  2: if ($t4) goto 3 else goto 6
-  3: label L0
-  4: $t3 := infer($t0)
-  5: goto 8
-  6: label L1
-  7: $t3 := 3
-  8: label L2
-  9: $t2 := borrow_local($t3)
- 10: $t6 := 10
- 11: write_ref($t2, $t6)
- 12: $t7 := infer($t0)
- 13: $t8 := borrow_local($t7)
- 14: $t10 := read_ref($t8)
- 15: $t11 := 1
- 16: $t9 := +($t10, $t11)
- 17: write_ref($t8, $t9)
- 18: $t12 := infer($t7)
- 19: $t15 := 0
- 20: $t14 := +($t12, $t15)
- 21: $t13 := borrow_local($t14)
- 22: $t17 := read_ref($t13)
- 23: $t18 := 2
- 24: $t16 := +($t17, $t18)
- 25: write_ref($t13, $t16)
- 26: $t19 := infer($t12)
- 27: $t21 := infer($t19)
- 28: $t20 := borrow_local($t21)
- 29: $t23 := read_ref($t20)
- 30: $t24 := 4
- 31: $t22 := +($t23, $t24)
- 32: write_ref($t20, $t22)
- 33: $t26 := infer($t19)
- 34: $t25 := borrow_local($t26)
- 35: $t28 := read_ref($t25)
- 36: $t29 := 8
- 37: $t27 := +($t28, $t29)
- 38: write_ref($t25, $t27)
- 39: $t32 := 3
- 40: $t31 := infer($t19)
- 41: $t30 := borrow_local($t31)
- 42: $t34 := read_ref($t30)
- 43: $t35 := 16
- 44: $t33 := +($t34, $t35)
- 45: write_ref($t30, $t33)
- 46: $t1 := infer($t19)
- 47: return $t1
+     var $t36: u64
+     var $t37: u64
+  0: $t5 := infer($t0)
+  1: $t6 := 4
+  2: $t4 := <($t5, $t6)
+  3: if ($t4) goto 4 else goto 7
+  4: label L0
+  5: $t3 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t3 := 3
+  9: label L2
+ 10: $t2 := borrow_local($t3)
+ 11: $t7 := 10
+ 12: write_ref($t2, $t7)
+ 13: $t8 := infer($t0)
+ 14: $t9 := borrow_local($t8)
+ 15: $t11 := read_ref($t9)
+ 16: $t12 := 1
+ 17: $t10 := +($t11, $t12)
+ 18: write_ref($t9, $t10)
+ 19: $t13 := infer($t8)
+ 20: $t16 := infer($t13)
+ 21: $t17 := 0
+ 22: $t15 := +($t16, $t17)
+ 23: $t14 := borrow_local($t15)
+ 24: $t19 := read_ref($t14)
+ 25: $t20 := 2
+ 26: $t18 := +($t19, $t20)
+ 27: write_ref($t14, $t18)
+ 28: $t21 := infer($t13)
+ 29: $t23 := infer($t21)
+ 30: $t22 := borrow_local($t23)
+ 31: $t25 := read_ref($t22)
+ 32: $t26 := 4
+ 33: $t24 := +($t25, $t26)
+ 34: write_ref($t22, $t24)
+ 35: $t28 := infer($t21)
+ 36: $t27 := borrow_local($t28)
+ 37: $t30 := read_ref($t27)
+ 38: $t31 := 8
+ 39: $t29 := +($t30, $t31)
+ 40: write_ref($t27, $t29)
+ 41: $t34 := 3
+ 42: $t33 := infer($t21)
+ 43: $t32 := borrow_local($t33)
+ 44: $t36 := read_ref($t32)
+ 45: $t37 := 16
+ 46: $t35 := +($t36, $t37)
+ 47: write_ref($t32, $t35)
+ 48: $t1 := infer($t21)
+ 49: return $t1
 }
 
 
 [variant baseline]
-fun M::test1b($t0: M::S): u64 {
+fun M::test1b($t0: 0x8675::M::S): u64 {
      var $t1: u64
-     var $t2: M::S
+     var $t2: 0x8675::M::S
      var $t3: u64
-     var $t4: &mut M::S
-     var $t5: M::S
+     var $t4: &mut 0x8675::M::S
+     var $t5: 0x8675::M::S
      var $t6: bool
      var $t7: u64
-     var $t8: &M::S
+     var $t8: &0x8675::M::S
      var $t9: &u64
      var $t10: u64
      var $t11: u64
      var $t12: &mut u64
-     var $t13: M::S
-     var $t14: &mut M::S
-     var $t15: M::S
-     var $t16: &mut M::S
+     var $t13: 0x8675::M::S
+     var $t14: &mut 0x8675::M::S
+     var $t15: 0x8675::M::S
+     var $t16: &mut 0x8675::M::S
      var $t17: u64
      var $t18: u64
-     var $t19: M::S
-     var $t20: &M::S
+     var $t19: 0x8675::M::S
+     var $t20: &0x8675::M::S
      var $t21: &u64
      var $t22: u64
      var $t23: &mut u64
-     var $t24: M::S
-     var $t25: &mut M::S
-     var $t26: M::S
+     var $t24: 0x8675::M::S
+     var $t25: &mut 0x8675::M::S
+     var $t26: 0x8675::M::S
      var $t27: &mut u64
-     var $t28: &mut M::S
+     var $t28: &mut 0x8675::M::S
      var $t29: u64
      var $t30: u64
      var $t31: u64
-     var $t32: M::S
+     var $t32: 0x8675::M::S
      var $t33: &mut u64
      var $t34: u64
-     var $t35: &M::S
+     var $t35: &0x8675::M::S
      var $t36: &u64
      var $t37: u64
      var $t38: u64
      var $t39: u64
      var $t40: &mut u64
      var $t41: u64
-     var $t42: &M::S
+     var $t42: &0x8675::M::S
      var $t43: &u64
      var $t44: u64
      var $t45: u64
@@ -253,17 +313,17 @@ fun M::test1b($t0: M::S): u64 {
      var $t47: &mut u64
      var $t48: u64
      var $t49: u64
-     var $t50: &M::S
+     var $t50: &0x8675::M::S
      var $t51: &u64
      var $t52: u64
      var $t53: u64
      var $t54: u64
-     var $t55: &M::S
+     var $t55: &0x8675::M::S
      var $t56: &u64
   0: $t3 := 3
-  1: $t2 := pack M::S($t3)
+  1: $t2 := pack 0x8675::M::S($t3)
   2: $t8 := borrow_local($t0)
-  3: $t9 := borrow_field<M::S>.f($t8)
+  3: $t9 := borrow_field<0x8675::M::S>.f($t8)
   4: $t7 := read_ref($t9)
   5: $t10 := 4
   6: $t6 := <($t7, $t10)
@@ -278,30 +338,30 @@ fun M::test1b($t0: M::S): u64 {
  15: $t11 := 10
  16: $t13 := read_ref($t4)
  17: $t14 := borrow_local($t13)
- 18: $t12 := borrow_field<M::S>.f($t14)
+ 18: $t12 := borrow_field<0x8675::M::S>.f($t14)
  19: write_ref($t12, $t11)
  20: $t15 := infer($t0)
  21: $t16 := borrow_local($t15)
  22: $t19 := read_ref($t16)
  23: $t20 := borrow_local($t19)
- 24: $t21 := borrow_field<M::S>.f($t20)
+ 24: $t21 := borrow_field<0x8675::M::S>.f($t20)
  25: $t18 := read_ref($t21)
  26: $t22 := 1
  27: $t17 := +($t18, $t22)
  28: $t24 := read_ref($t16)
  29: $t25 := borrow_local($t24)
- 30: $t23 := borrow_field<M::S>.f($t25)
+ 30: $t23 := borrow_field<0x8675::M::S>.f($t25)
  31: write_ref($t23, $t17)
  32: $t26 := infer($t15)
  33: $t28 := borrow_local($t26)
- 34: $t27 := borrow_field<M::S>.f($t28)
+ 34: $t27 := borrow_field<0x8675::M::S>.f($t28)
  35: $t30 := read_ref($t27)
  36: $t31 := 1
  37: $t29 := +($t30, $t31)
  38: write_ref($t27, $t29)
  39: $t32 := infer($t26)
  40: $t35 := borrow_local($t32)
- 41: $t36 := borrow_field<M::S>.f($t35)
+ 41: $t36 := borrow_field<0x8675::M::S>.f($t35)
  42: $t34 := read_ref($t36)
  43: $t33 := borrow_local($t34)
  44: $t38 := read_ref($t33)
@@ -309,7 +369,7 @@ fun M::test1b($t0: M::S): u64 {
  46: $t37 := +($t38, $t39)
  47: write_ref($t33, $t37)
  48: $t42 := borrow_local($t32)
- 49: $t43 := borrow_field<M::S>.f($t42)
+ 49: $t43 := borrow_field<0x8675::M::S>.f($t42)
  50: $t41 := read_ref($t43)
  51: $t40 := borrow_local($t41)
  52: $t45 := read_ref($t40)
@@ -318,7 +378,7 @@ fun M::test1b($t0: M::S): u64 {
  55: write_ref($t40, $t44)
  56: $t49 := 3
  57: $t50 := borrow_local($t32)
- 58: $t51 := borrow_field<M::S>.f($t50)
+ 58: $t51 := borrow_field<0x8675::M::S>.f($t50)
  59: $t48 := read_ref($t51)
  60: $t47 := borrow_local($t48)
  61: $t53 := read_ref($t47)
@@ -326,7 +386,7 @@ fun M::test1b($t0: M::S): u64 {
  63: $t52 := +($t53, $t54)
  64: write_ref($t47, $t52)
  65: $t55 := borrow_local($t32)
- 66: $t56 := borrow_field<M::S>.f($t55)
+ 66: $t56 := borrow_field<0x8675::M::S>.f($t55)
  67: $t1 := read_ref($t56)
  68: return $t1
 }
@@ -336,20 +396,245 @@ fun M::test1b($t0: M::S): u64 {
 public fun M::testb(): u64 {
      var $t0: u64
      var $t1: u64
-     var $t2: M::S
+     var $t2: 0x8675::M::S
      var $t3: u64
      var $t4: u64
-     var $t5: M::S
+     var $t5: 0x8675::M::S
      var $t6: u64
   0: $t3 := 7
-  1: $t2 := pack M::S($t3)
+  1: $t2 := pack 0x8675::M::S($t3)
   2: $t1 := M::test1b($t2)
   3: $t6 := 2
-  4: $t5 := pack M::S($t6)
+  4: $t5 := pack 0x8675::M::S($t6)
   5: $t4 := M::test1b($t5)
   6: $t0 := +($t1, $t4)
   7: return $t0
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v8
+module 8675.M {
+struct S has copy, drop {
+	f: u64
+}
+
+public test(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(7)
+	1: Call test1(u64): u64
+	2: LdU64(2)
+	3: Call test1(u64): u64
+	4: Add
+	5: Ret
+}
+test1(r: u64): u64 /* def_idx: 1 */ {
+L1:	$t3: u64
+L2:	$t5: u64
+L3:	tref: &mut u64
+L4:	y: u64
+L5:	$t15: u64
+L6:	$t23: u64
+L7:	$t28: u64
+L8:	$t33: u64
+B0:
+	0: CopyLoc[0](r: u64)
+	1: LdU64(4)
+	2: Lt
+	3: BrFalse(67)
+B1:
+	4: CopyLoc[0](r: u64)
+	5: StLoc[1]($t3: u64)
+B2:
+	6: MutBorrowLoc[1]($t3: u64)
+	7: StLoc[3](tref: &mut u64)
+	8: LdU64(10)
+	9: MoveLoc[3](tref: &mut u64)
+	10: WriteRef
+	11: MoveLoc[0](r: u64)
+	12: StLoc[4](y: u64)
+	13: MutBorrowLoc[4](y: u64)
+	14: StLoc[3](tref: &mut u64)
+	15: CopyLoc[3](tref: &mut u64)
+	16: ReadRef
+	17: LdU64(1)
+	18: Add
+	19: MoveLoc[3](tref: &mut u64)
+	20: WriteRef
+	21: MoveLoc[4](y: u64)
+	22: StLoc[2]($t5: u64)
+	23: CopyLoc[2]($t5: u64)
+	24: LdU64(0)
+	25: Add
+	26: StLoc[5]($t15: u64)
+	27: MutBorrowLoc[5]($t15: u64)
+	28: StLoc[3](tref: &mut u64)
+	29: CopyLoc[3](tref: &mut u64)
+	30: ReadRef
+	31: LdU64(2)
+	32: Add
+	33: MoveLoc[3](tref: &mut u64)
+	34: WriteRef
+	35: CopyLoc[2]($t5: u64)
+	36: StLoc[6]($t23: u64)
+	37: MutBorrowLoc[6]($t23: u64)
+	38: StLoc[3](tref: &mut u64)
+	39: CopyLoc[3](tref: &mut u64)
+	40: ReadRef
+	41: LdU64(4)
+	42: Add
+	43: MoveLoc[3](tref: &mut u64)
+	44: WriteRef
+	45: CopyLoc[2]($t5: u64)
+	46: StLoc[7]($t28: u64)
+	47: MutBorrowLoc[7]($t28: u64)
+	48: StLoc[3](tref: &mut u64)
+	49: CopyLoc[3](tref: &mut u64)
+	50: ReadRef
+	51: LdU64(8)
+	52: Add
+	53: MoveLoc[3](tref: &mut u64)
+	54: WriteRef
+	55: CopyLoc[2]($t5: u64)
+	56: StLoc[8]($t33: u64)
+	57: MutBorrowLoc[8]($t33: u64)
+	58: StLoc[3](tref: &mut u64)
+	59: CopyLoc[3](tref: &mut u64)
+	60: ReadRef
+	61: LdU64(16)
+	62: Add
+	63: MoveLoc[3](tref: &mut u64)
+	64: WriteRef
+	65: MoveLoc[2]($t5: u64)
+	66: Ret
+B3:
+	67: LdU64(3)
+	68: StLoc[1]($t3: u64)
+	69: Branch(6)
+}
+test1b(r: S): u64 /* def_idx: 2 */ {
+L1:	x: S
+L2:	$t5: S
+L3:	tref: &mut S
+L4:	$t13: S
+L5:	y: S
+L6:	$t19: S
+L7:	$t24: S
+L8:	z: S
+L9:	$t12: &mut u64
+L10:	a: S
+L11:	$t34: u64
+L12:	$t41: u64
+L13:	$t48: u64
+B0:
+	0: LdU64(3)
+	1: Pack[0](S)
+	2: StLoc[1](x: S)
+	3: ImmBorrowLoc[0](r: S)
+	4: ImmBorrowField[0](S.f: u64)
+	5: ReadRef
+	6: LdU64(4)
+	7: Lt
+	8: BrFalse(91)
+B1:
+	9: CopyLoc[0](r: S)
+	10: StLoc[2]($t5: S)
+B2:
+	11: MutBorrowLoc[2]($t5: S)
+	12: StLoc[3](tref: &mut S)
+	13: LdU64(10)
+	14: MoveLoc[3](tref: &mut S)
+	15: ReadRef
+	16: StLoc[4]($t13: S)
+	17: MutBorrowLoc[4]($t13: S)
+	18: MutBorrowField[0](S.f: u64)
+	19: WriteRef
+	20: MoveLoc[0](r: S)
+	21: StLoc[5](y: S)
+	22: MutBorrowLoc[5](y: S)
+	23: StLoc[3](tref: &mut S)
+	24: CopyLoc[3](tref: &mut S)
+	25: ReadRef
+	26: StLoc[6]($t19: S)
+	27: ImmBorrowLoc[6]($t19: S)
+	28: ImmBorrowField[0](S.f: u64)
+	29: ReadRef
+	30: LdU64(1)
+	31: Add
+	32: MoveLoc[3](tref: &mut S)
+	33: ReadRef
+	34: StLoc[7]($t24: S)
+	35: MutBorrowLoc[7]($t24: S)
+	36: MutBorrowField[0](S.f: u64)
+	37: WriteRef
+	38: MoveLoc[5](y: S)
+	39: StLoc[8](z: S)
+	40: MutBorrowLoc[8](z: S)
+	41: MutBorrowField[0](S.f: u64)
+	42: StLoc[9]($t12: &mut u64)
+	43: CopyLoc[9]($t12: &mut u64)
+	44: ReadRef
+	45: LdU64(1)
+	46: Add
+	47: MoveLoc[9]($t12: &mut u64)
+	48: WriteRef
+	49: MoveLoc[8](z: S)
+	50: StLoc[10](a: S)
+	51: ImmBorrowLoc[10](a: S)
+	52: ImmBorrowField[0](S.f: u64)
+	53: ReadRef
+	54: StLoc[11]($t34: u64)
+	55: MutBorrowLoc[11]($t34: u64)
+	56: StLoc[9]($t12: &mut u64)
+	57: CopyLoc[9]($t12: &mut u64)
+	58: ReadRef
+	59: LdU64(1)
+	60: Add
+	61: MoveLoc[9]($t12: &mut u64)
+	62: WriteRef
+	63: ImmBorrowLoc[10](a: S)
+	64: ImmBorrowField[0](S.f: u64)
+	65: ReadRef
+	66: StLoc[12]($t41: u64)
+	67: MutBorrowLoc[12]($t41: u64)
+	68: StLoc[9]($t12: &mut u64)
+	69: CopyLoc[9]($t12: &mut u64)
+	70: ReadRef
+	71: LdU64(8)
+	72: Add
+	73: MoveLoc[9]($t12: &mut u64)
+	74: WriteRef
+	75: ImmBorrowLoc[10](a: S)
+	76: ImmBorrowField[0](S.f: u64)
+	77: ReadRef
+	78: StLoc[13]($t48: u64)
+	79: MutBorrowLoc[13]($t48: u64)
+	80: StLoc[9]($t12: &mut u64)
+	81: CopyLoc[9]($t12: &mut u64)
+	82: ReadRef
+	83: LdU64(16)
+	84: Add
+	85: MoveLoc[9]($t12: &mut u64)
+	86: WriteRef
+	87: ImmBorrowLoc[10](a: S)
+	88: ImmBorrowField[0](S.f: u64)
+	89: ReadRef
+	90: Ret
+B3:
+	91: MoveLoc[1](x: S)
+	92: StLoc[2]($t5: S)
+	93: Branch(11)
+}
+public testb(): u64 /* def_idx: 3 */ {
+B0:
+	0: LdU64(7)
+	1: Pack[0](S)
+	2: Call test1b(S): u64
+	3: LdU64(2)
+	4: Pack[0](S)
+	5: Call test1b(S): u64
+	6: Add
+	7: Ret
+}
+}
 ============ bytecode verification succeeded ========

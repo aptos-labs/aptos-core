@@ -48,4 +48,13 @@ impl BlockEndInfo {
             } => *block_gas_limit_reached || *block_output_limit_reached,
         }
     }
+
+    pub fn block_effective_gas_units(&self) -> u64 {
+        match self {
+            Self::V0 {
+                block_effective_block_gas_units,
+                ..
+            } => *block_effective_block_gas_units,
+        }
+    }
 }

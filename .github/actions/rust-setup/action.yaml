@@ -8,11 +8,17 @@ inputs:
     description: "An optional additional key to pass to rust-cache"
     required: false
     default: ""
+  macos:
+    description: "If the machine is using macOS"
+    required: false
+    default: false
 
 runs:
   using: composite
   steps:
-    - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
+    - if: ${{inputs.macos != 'true'}}
+      name: Linux - Setup dependencies
+      run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
       shell: bash
 
     - uses: dsherret/rust-toolchain-file@v1
@@ -20,13 +26,19 @@ runs:
     # rust-cache action will cache ~/.cargo and ./target
     # https://github.com/Swatinem/rust-cache#cache-details
     - name: Run cargo cache
-      uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
+      uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # pin@v2.7.3
       with:
         key: ${{ inputs.ADDITIONAL_KEY }}
 
-    - name: install protoc and related tools
+    - if: ${{inputs.macos != 'true'}}
+      name: Linux - install protoc and related tools
       shell: bash
       run: scripts/dev_setup.sh -b -r -y -P -J -t
+
+    - if: ${{inputs.macos == 'true'}}
+      name: Mac - install protoc and related tools
+      shell: bash
+      run: scripts/dev_setup.sh -b -t -k
 
     - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
       shell: bash

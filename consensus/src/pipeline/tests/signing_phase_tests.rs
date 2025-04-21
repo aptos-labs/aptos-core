@@ -65,6 +65,7 @@ fn add_signing_phase_test_cases(
         SigningRequest {
             ordered_ledger_info: ordered_ledger_info.clone(),
             commit_ledger_info: commit_ledger_info.clone(),
+            blocks: vecblocks.clone(),
         },
         Box::new(move |resp| {
             assert!(resp.signature_result.is_ok());
@@ -82,6 +83,7 @@ fn add_signing_phase_test_cases(
         SigningRequest {
             ordered_ledger_info: ordered_ledger_info.clone(),
             commit_ledger_info: inconsistent_commit_ledger_info,
+            blocks: vecblocks.clone(),
         },
         Box::new(move |resp| {
             assert!(matches!(
@@ -96,6 +98,7 @@ fn add_signing_phase_test_cases(
         SigningRequest {
             ordered_ledger_info: executed_ledger_info.clone(),
             commit_ledger_info: executed_ledger_info.ledger_info().clone(),
+            blocks: vecblocks.clone(),
         },
         Box::new(move |resp| {
             assert!(resp.signature_result.is_ok());
@@ -111,6 +114,7 @@ fn add_signing_phase_test_cases(
                 AggregateSignature::empty(),
             ),
             commit_ledger_info: executed_ledger_info.ledger_info().clone(),
+            blocks: vecblocks.clone(),
         },
         Box::new(move |resp| {
             assert!(matches!(

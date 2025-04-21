@@ -6,7 +6,7 @@ module 0x8675309::M {
     private fun t0() {
         0;
         {
-          let (x: u64, b: bool, M::R{ f }): (u64, bool, M::R) = Tuple(0, false, pack M::R(0));
+          let (x: u64, b: bool, M::R{ f }): (u64, bool, R) = Tuple(0, false, pack M::R(0));
           0;
           false;
           0;
@@ -14,3 +14,17 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    fun t0() {
+        0;
+        let (x,b,R{f: f}) = (0, false, R{f: 0});
+        0;
+        false;
+        0;
+    }
+}

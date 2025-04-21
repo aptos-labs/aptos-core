@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ambassador = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-gas-algebra = { workspace = true }

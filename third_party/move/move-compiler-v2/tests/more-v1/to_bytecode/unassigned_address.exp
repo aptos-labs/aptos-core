@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: address with no value
+  ┌─ tests/more-v1/to_bytecode/unassigned_address.move:4:9
+  │
+4 │ address UNASSIGNED {
+  │         ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value
+
+error: address with no value
+  ┌─ tests/more-v1/to_bytecode/unassigned_address.move:8:8
+  │
+8 │ module UNASSIGNED::M {
+  │        ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value. Try assigning it a value when calling the compiler
+
+error: address with no value
+   ┌─ tests/more-v1/to_bytecode/unassigned_address.move:10:12
+   │
+10 │     friend UNASSIGNED::N;
+   │            ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/to_bytecode/unassigned_address.move:14:8
+   │
+14 │ module UNASSIGNED::N {
+   │        ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value. Try assigning it a value when calling the compiler
+
+error: address with no value
+   ┌─ tests/more-v1/to_bytecode/unassigned_address.move:15:16
+   │
+15 │     fun bar(): UNASSIGNED::M::S {
+   │                ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/to_bytecode/unassigned_address.move:16:9
+   │
+16 │         UNASSIGNED::M::foo(@UNASSIGNED)
+   │         ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value
+
+error: address with no value
+   ┌─ tests/more-v1/to_bytecode/unassigned_address.move:16:29
+   │
+16 │         UNASSIGNED::M::foo(@UNASSIGNED)
+   │                             ^^^^^^^^^^ address 'UNASSIGNED' is not assigned a value. Try assigning it a value when calling the compiler

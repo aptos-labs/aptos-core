@@ -1,0 +1,41 @@
+
+Diagnostics:
+error: type `T` is missing required ability `store`
+   ┌─ tests/checking/typing/bug_15274.move:16:30
+   │
+16 │         unwrap_non_receiver(&Wrapper<T>[account])
+   │                              ^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T:copy` of struct `Wrapper`
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `T` is missing required ability `store`
+   ┌─ tests/checking/typing/bug_15274.move:20:9
+   │
+20 │         Wrapper<T>[account].unwrap()
+   │         ^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T:copy` of struct `Wrapper`
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `T` is missing required ability `copy`
+   ┌─ tests/checking/typing/bug_15274.move:23:39
+   │
+ 3 │     struct Wrapper<T: copy> has drop, key, store, copy {
+   │                    - declaration of type parameter `T`
+   ·
+23 │     fun test_vec<T>(v: vector<Wrapper<T>>): T {
+   │                                       ^
+   │
+   = required by instantiating type parameter `T:copy` of struct `Wrapper`
+
+error: type `T` is missing required ability `copy`
+   ┌─ tests/checking/typing/bug_15274.move:24:9
+   │
+ 7 │     fun unwrap<T: copy>(self: &Wrapper<T>): T {
+   │                - declaration of type parameter `T`
+   ·
+24 │         v[0].unwrap()
+   │         ^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T:copy` of function `unwrap`

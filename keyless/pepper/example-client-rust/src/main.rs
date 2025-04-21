@@ -66,6 +66,9 @@ fn get_jwt_or_path() -> String {
 
 #[tokio::main]
 async fn main() {
+    // if let Ok(x) = std::env::var("V0_VERIFY") {
+    //     test_v0_verify();
+    // }
     println!();
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();

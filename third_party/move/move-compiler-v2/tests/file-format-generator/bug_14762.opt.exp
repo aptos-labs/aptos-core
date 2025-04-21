@@ -1,0 +1,94 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+use 0000000000000000000000000000000000000000000000000000000000000001::option;
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+struct T has copy, drop, store {
+	issuer: vector<u8>,
+	version: u64
+}
+struct J has copy, drop, store {
+	variant: u64
+}
+struct S has copy, drop, store {
+	entries: vector<T>
+}
+
+test(s: &mut S, issuer: vector<u8>): Option<T> /* def_idx: 0 */ {
+L2:	v: &vector<T>
+L3:	find: bool
+L4:	found_index: u64
+L5:	i: u64
+L6:	len: u64
+L7:	$t12: u64
+L8:	ret: Option<T>
+B0:
+	0: CopyLoc[0](s: &mut S)
+	1: ImmBorrowField[0](S.entries: vector<T>)
+	2: StLoc[2](v: &vector<T>)
+	3: LdFalse
+	4: StLoc[3](find: bool)
+	5: LdU64(0)
+	6: StLoc[4](found_index: u64)
+	7: LdU64(0)
+	8: StLoc[5](i: u64)
+	9: CopyLoc[2](v: &vector<T>)
+	10: VecLen(2)
+	11: StLoc[6](len: u64)
+B1:
+	12: CopyLoc[5](i: u64)
+	13: CopyLoc[6](len: u64)
+	14: Lt
+	15: BrTrue(17)
+B2:
+	16: Branch(29)
+B3:
+	17: CopyLoc[2](v: &vector<T>)
+	18: CopyLoc[5](i: u64)
+	19: VecImmBorrow(2)
+	20: ImmBorrowField[1](T.issuer: vector<u8>)
+	21: ReadRef
+	22: CopyLoc[1](issuer: vector<u8>)
+	23: Eq
+	24: BrFalse(49)
+B4:
+	25: LdTrue
+	26: StLoc[3](find: bool)
+	27: MoveLoc[5](i: u64)
+	28: StLoc[4](found_index: u64)
+B5:
+	29: Nop
+	30: MoveLoc[2](v: &vector<T>)
+	31: Pop
+	32: MoveLoc[3](find: bool)
+	33: MoveLoc[4](found_index: u64)
+	34: StLoc[7]($t12: u64)
+	35: BrFalse(44)
+B6:
+	36: MoveLoc[0](s: &mut S)
+	37: MutBorrowField[0](S.entries: vector<T>)
+	38: MoveLoc[7]($t12: u64)
+	39: Call vector::remove<T>(&mut vector<T>, u64): T
+	40: Call option::some<T>(T): Option<T>
+	41: StLoc[8](ret: Option<T>)
+B7:
+	42: MoveLoc[8](ret: Option<T>)
+	43: Ret
+B8:
+	44: MoveLoc[0](s: &mut S)
+	45: Pop
+	46: Call option::none<T>(): Option<T>
+	47: StLoc[8](ret: Option<T>)
+	48: Branch(42)
+B9:
+	49: MoveLoc[5](i: u64)
+	50: LdU64(1)
+	51: Add
+	52: StLoc[5](i: u64)
+	53: Branch(12)
+}
+}
+============ bytecode verification succeeded ========

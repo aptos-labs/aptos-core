@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/positional_fields/invalid_anonymous_field2.move:5:11
+  │
+5 │         x.0u8;
+  │           ^^^
+  │           │
+  │           Unexpected '0u8'
+  │           Expected an identifier or a positional field `0`, `1`, ...

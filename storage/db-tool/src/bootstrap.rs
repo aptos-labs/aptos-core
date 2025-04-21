@@ -11,7 +11,7 @@ use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::calculate_genesis;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use clap::Parser;
 use std::{
     fs::File,
@@ -62,22 +62,23 @@ impl Command {
         .expect("Failed to open DB.");
         let db = DbReaderWriter::new(db);
 
-        let executed_trees = db
+        let ledger_summary = db
             .reader
-            .get_latest_executed_trees()
+            .get_pre_committed_ledger_summary()
             .with_context(|| format_err!("Failed to get latest tree state."))?;
-        println!("Db has {} transactions", executed_trees.num_transactions());
+        println!("Db has {} transactions", ledger_summary.next_version());
         if let Some(waypoint) = self.waypoint_to_verify {
             ensure!(
-                waypoint.version() == executed_trees.num_transactions(),
+                waypoint.version() == ledger_summary.next_version(),
                 "Trying to generate waypoint at version {}, but DB has {} transactions.",
                 waypoint.version(),
-                executed_trees.num_transactions(),
+                ledger_summary.next_version(),
             )
         }
 
-        let committer = calculate_genesis::<AptosVM>(&db, executed_trees, &genesis_txn)
-            .with_context(|| format_err!("Failed to calculate genesis."))?;
+        let committer =
+            calculate_genesis::<AptosVMBlockExecutor>(&db, ledger_summary, &genesis_txn)
+                .with_context(|| format_err!("Failed to calculate genesis."))?;
         println!(
             "Successfully calculated genesis. Got waypoint: {}",
             committer.waypoint()

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/expansion/invalid_unpack_assign_lhs_other_value.move:3:11
+  │
+3 │         0 {} = 0;
+  │           ^
+  │           │
+  │           Unexpected '{'
+  │           Expected ';'

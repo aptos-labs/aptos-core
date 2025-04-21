@@ -40,6 +40,9 @@ pub struct ApiConfig {
     /// Enables BCS output of APIs that support it
     #[serde(default = "default_enabled")]
     pub bcs_output_enabled: bool,
+    /// Enables compression middleware for API responses
+    #[serde(default = "default_enabled")]
+    pub compression_enabled: bool,
     /// Enables encode submission API
     #[serde(default = "default_enabled")]
     pub encode_submission_enabled: bool,
@@ -121,6 +124,7 @@ impl Default for ApiConfig {
             failpoints_enabled: default_disabled(),
             bcs_output_enabled: default_enabled(),
             json_output_enabled: default_enabled(),
+            compression_enabled: default_enabled(),
             encode_submission_enabled: default_enabled(),
             transaction_submission_enabled: default_enabled(),
             transaction_simulation_enabled: default_enabled(),
