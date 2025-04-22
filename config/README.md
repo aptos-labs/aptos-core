@@ -17,7 +17,7 @@ blockchain or performing transactions.
 
 For a more detailed summary of the differences between a Validator and a
 Fullnode, see this [blog
-post](https://aptos.dev/blog/2020/01/23/full-node-basics).
+post](https://aptos.dev/en/build/apis/fullnode-rest-api).
 
 ## Organization
 
