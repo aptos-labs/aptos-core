@@ -56,7 +56,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 const MAX_TXNS: u64 = 1_000_000_000;
 
 // TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
-pub const EXPECTED_GAS_PER_TRANSFER: u64 = 22;
+pub const EXPECTED_GAS_PER_TRANSFER: u64 = 50;
 pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 1100 + 20;
 
 const MAX_RETRIES: usize = 12;
