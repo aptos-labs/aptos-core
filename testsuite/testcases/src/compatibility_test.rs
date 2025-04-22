@@ -26,7 +26,7 @@ impl Test for SimpleValidatorUpgrade {
 impl NetworkTest for SimpleValidatorUpgrade {
     async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
         let upgrade_wait_for_healthy = true;
-        let upgrade_node_delay = Duration::from_secs(60);
+        let upgrade_node_delay = Duration::from_secs(300);
         let upgrade_max_wait = Duration::from_secs(40);
 
         let epoch_duration = Duration::from_secs(Self::EPOCH_DURATION_SECS);

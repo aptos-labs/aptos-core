@@ -31,7 +31,7 @@ impl TransactionStore {
     }
 
     /// Gets the version of a transaction by the sender `address` and `sequence_number`.
-    pub fn get_account_transaction_version(
+    pub fn get_account_ordered_transaction_version(
         &self,
         address: AccountAddress,
         sequence_number: u64,
@@ -56,7 +56,7 @@ impl TransactionStore {
     /// `version <= ledger_version`.
     /// Guarantees that the returned sequence numbers are sequential, i.e.,
     /// `seq_num_{i} + 1 = seq_num_{i+1}`.
-    pub fn get_account_transaction_version_iter(
+    pub fn get_account_ordered_transactions_iter(
         &self,
         address: AccountAddress,
         min_seq_num: u64,

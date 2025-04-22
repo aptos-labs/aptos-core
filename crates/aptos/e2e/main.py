@@ -31,6 +31,7 @@ import pathlib
 import platform
 import shutil
 import sys
+import time
 
 from cases.account import (
     test_account_create_and_transfer,
@@ -179,6 +180,7 @@ async def run_tests(run_helper):
     """
 
     # Run node subcommand group tests.
+    time.sleep(5)
     test_node_show_validator_set(run_helper)
     test_node_update_consensus_key(run_helper)
     test_node_update_validator_network_address(run_helper)

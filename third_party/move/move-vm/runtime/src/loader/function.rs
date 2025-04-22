@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{access_specifier_loader::load_access_specifier, Module, Resolver, Script},
+    loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
@@ -31,7 +31,6 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
-    resolver::ResourceResolver,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
@@ -415,21 +414,6 @@ impl LoadedFunction {
             ),
         }
     }
-
-    pub(crate) fn get_resolver<'a>(
-        &self,
-        module_storage: &'a impl ModuleStorage,
-        resource_resolver: &'a impl ResourceResolver,
-    ) -> Resolver<'a> {
-        match &self.owner {
-            LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(module.clone(), module_storage, resource_resolver)
-            },
-            LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(script.clone(), module_storage, resource_resolver)
-            },
-        }
-    }
 }
 
 impl Debug for Function {
@@ -593,14 +577,6 @@ impl Function {
         })
     }
 }
-
-//
-// Internal structures that are saved at the proper index in the proper tables to access
-// execution information (interpreter).
-// The following structs are internal to the loader and never exposed out.
-// The `Loader` will create those struct and the proper table when loading a module.
-// The `Resolver` uses those structs to return information to the `Interpreter`.
-//
 
 // A function instantiation.
 #[derive(Clone, Debug)]

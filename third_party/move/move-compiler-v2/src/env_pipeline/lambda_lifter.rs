@@ -77,10 +77,10 @@ pub struct LambdaLiftingOptions {
 
 /// Performs lambda lifting for all target modules in the environment.
 pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
-    // Go over target modules one by one. Since in each iteration
-    // we need to mutate the module, iterate over a vector of plain ids.
+    // Go over target modules and transitive closures one by one.
+    // Since in each iteration we need to mutate the module, iterate over a vector of plain ids.
     for module_id in env
-        .get_target_modules()
+        .get_target_modules_transitive_closure()
         .into_iter()
         .map(|me| me.get_id())
         .collect_vec()
@@ -565,6 +565,17 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         //      a mapping from index there to index in the params list; other free vars are
         //      substituted automatically by using the same symbol for the param
         let (mut params, closure_args, param_index_mapping) = self.get_params_for_freevars()?;
+
+        if closure_args.len() > ClosureMask::MAX_ARGS {
+            env.error(
+                &env.get_node_loc(id),
+                &format!(
+                    "too many arguments captured in lambda (can only capture up to a maximum of `{}`, but captured `{}`)",
+                    ClosureMask::MAX_ARGS, closure_args.len()
+                ),
+            );
+            return None;
+        }
 
         // Add lambda args. For dealing with patterns in lambdas (`|S{..}|e`) we need
         // to collect a list of bindings.

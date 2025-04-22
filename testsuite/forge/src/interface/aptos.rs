@@ -103,7 +103,7 @@ impl<'t> AptosContext<'t> {
             .await
     }
 
-    pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
+    pub async fn get_balance(&self, address: AccountAddress) -> u64 {
         self.public_info.get_balance(address).await
     }
 
@@ -248,14 +248,12 @@ impl AptosPublicInfo {
         execution_hash
     }
 
-    pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
-        let balance = self
-            .rest_client
+    pub async fn get_balance(&self, address: AccountAddress) -> u64 {
+        self.rest_client
             .get_account_balance(address, "0x1::aptos_coin::AptosCoin")
             .await
             .unwrap()
-            .into_inner();
-        Some(balance)
+            .into_inner()
     }
 
     pub async fn account_exists(&self, address: AccountAddress) -> Result<()> {
@@ -343,7 +341,7 @@ pub async fn submit_and_wait_reconfig(
     let result = client.submit_and_wait(&last_txn).await;
     if let Err(e) = result {
         let last_transactions = client
-            .get_account_transactions(last_txn.sender(), None, None)
+            .get_account_ordered_transactions(last_txn.sender(), None, None)
             .await
             .map(|result| {
                 result
