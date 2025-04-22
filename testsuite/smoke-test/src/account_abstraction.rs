@@ -7,11 +7,12 @@ use aptos_crypto::SigningKey;
 use aptos_forge::Swarm;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::function_info::FunctionInfo;
-use ethers::core::rand::rngs::OsRng;
-use ethers::signers::{LocalWallet, Signer};
-use ethers::types::Address;
-use ethers::types::H256;
-use ethers::utils::keccak256;
+use ethers::{
+    core::rand::rngs::OsRng,
+    signers::{LocalWallet, Signer},
+    types::{Address, H256},
+    utils::keccak256,
+};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use serde::Serialize;
@@ -147,7 +148,6 @@ async fn test_solana_derivable_account() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_ethereum_derivable_account() {
-
     let swarm = SwarmBuilder::new_local(1).with_aptos().build().await;
     let mut info = swarm.aptos_public_info();
 
@@ -165,7 +165,7 @@ async fn test_ethereum_derivable_account() {
     let domain = "aptos.com";
     let account_identity = bcs::to_bytes(&SIWEAbstractPublicKey {
         ethereum_address: address_str.as_bytes().to_vec(),
-        domain: domain.as_bytes().to_vec()
+        domain: domain.as_bytes().to_vec(),
     })
     .unwrap();
 
