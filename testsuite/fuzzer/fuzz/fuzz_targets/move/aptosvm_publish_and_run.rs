@@ -7,6 +7,7 @@ use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
     chain_id::ChainId,
+    on_chain_config::Features,
     transaction::{
         EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
         TransactionStatus,
@@ -14,6 +15,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::AptosVM;
+use aptos_vm_environment::prod_configs;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -21,7 +23,6 @@ use move_binary_format::{
     errors::VMError,
     file_format::{CompiledModule, CompiledScript, SignatureToken},
 };
-use move_bytecode_verifier::VerifierConfig;
 use move_core_types::vm_status::{StatusCode, StatusType};
 use once_cell::sync::Lazy;
 use std::{
@@ -97,7 +98,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // filter modules
     filter_modules(&input)?;
 
-    let verifier_config = VerifierConfig::production();
+    let verifier_config = prod_configs::aptos_prod_verifier_config(&Features::default());
     let deserializer_config = DeserializerConfig::new(8, 255);
 
     for m in input.dep_modules.iter_mut() {

@@ -4,8 +4,9 @@
 
 #![no_main]
 use libfuzzer_sys::{fuzz_target, Corpus};
+use aptos_vm_environment::prod_configs;
+use aptos_types::on_chain_config::Features;
 use move_binary_format::errors::VMError;
-use move_bytecode_verifier::VerifierConfig;
 use move_core_types::vm_status::StatusType;
 mod utils;
 use utils::vm::RunnableState;
@@ -22,7 +23,7 @@ fn check_for_invariant_violation_vmerror(e: VMError) {
 }
 
 fuzz_target!(|fuzz_data: RunnableState| -> Corpus {
-    let verifier_config = VerifierConfig::production();
+    let verifier_config = prod_configs::aptos_prod_verifier_config(&Features::default());
 
     for m in fuzz_data.dep_modules.iter() {
         if let Err(e) = move_bytecode_verifier::verify_module_with_config(&verifier_config, m) {
