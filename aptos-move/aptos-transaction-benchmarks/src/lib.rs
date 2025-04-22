@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-
+#![cfg(unix)]
 mod benchmark_runner;
 pub mod measurement;
 pub mod transaction_bench_state;

@@ -3,8 +3,6 @@
 
 use anyhow::{Context, Result};
 use bollard::Docker;
-#[cfg(unix)]
-use bollard::API_DEFAULT_VERSION;
 use tracing::{info, warn};
 use version_compare::Version;
 
@@ -42,8 +40,9 @@ pub async fn get_docker() -> Result<Docker> {
                         .join("docker.sock");
                     info!("Looking for Docker socket at {}", path.display());
                     let path = path.to_str().context(format!("{} (path)", ERROR_MESSAGE))?;
-                    let docker = Docker::connect_with_socket(path, 120, API_DEFAULT_VERSION)
-                        .context(format!("{} (init_home)", ERROR_MESSAGE))?;
+                    let docker =
+                        Docker::connect_with_socket(path, 120, bollard::API_DEFAULT_VERSION)
+                            .context(format!("{} (init_home)", ERROR_MESSAGE))?;
                     let version = docker
                         .version()
                         .await
