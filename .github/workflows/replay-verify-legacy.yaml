@@ -82,7 +82,7 @@ jobs:
       # replay-verify config
       BUCKET: ${{ inputs.MAINNET_BUCKET || 'aptos-mainnet-backup' }}
       SUB_DIR: e1
-      HISTORY_START: 518000000
+      HISTORY_START: 1731000000
       #TXNS_TO_SKIP: 12253479 12277499 148358668
       TXNS_TO_SKIP: "0"
       # 1197378568-1198492648: https://github.com/aptos-labs/aptos-core/pull/13832
@@ -103,7 +103,7 @@ jobs:
       # replay-verify config
       BUCKET: ${{ inputs.TESTNET_BUCKET || 'aptos-testnet-backup' }}
       SUB_DIR: e1
-      HISTORY_START: 862000000
+      HISTORY_START: 6010000000
       # to see historical TXNS_TO_SKIP, check out ce6158ac2764ee9d4c8738a85f3bcdc6bd0cadc1
       TXNS_TO_SKIP: "0"
       # 1195000000-1220000000: https://github.com/aptos-labs/aptos-core/pull/13832
