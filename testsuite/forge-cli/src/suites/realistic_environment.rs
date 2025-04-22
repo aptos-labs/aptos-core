@@ -18,6 +18,7 @@ use aptos_forge::{
         SuccessCriteria, SystemMetricsThreshold,
     },
     EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
+    ReplayProtectionType,
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
@@ -111,15 +112,36 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
-            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
-            TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
-            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
-                .with_transactions_per_account(1),
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
-                .with_unique_senders(),
+            TransactionWorkload::new(
+                TransactionTypeArg::CoinTransfer,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::NoOp,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            )
+            .with_num_modules(100),
+            TransactionWorkload::new(
+                TransactionTypeArg::ModifyGlobalResource,
+                ReplayProtectionType::SequenceNumber,
+                6000,
+            )
+            .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::TokenV2AmbassadorMint,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            )
+            .with_unique_senders(),
             // TODO(ibalajiarun): this is disabled due to Forge Stable failure on PosToProposal latency.
-            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::PublishPackage,
+                ReplayProtectionType::SequenceNumber,
+                200,
+            )
+            .with_transactions_per_account(1),
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
@@ -170,11 +192,20 @@ pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
             // Very high gas
             TransactionWorkload::new(
                 TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
+                ReplayProtectionType::SequenceNumber,
                 100000,
             ),
-            TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 20000),
-            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 4000)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::VectorPicture30k,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::SmartTablePicture1MWith256Change,
+                ReplayProtectionType::SequenceNumber,
+                4000,
+            )
+            .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(
@@ -189,25 +220,44 @@ pub(crate) fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // do account generation first, to fill up a storage a bit.
-            TransactionWorkload::new_const_tps(TransactionTypeArg::AccountGeneration, 2 * 7000),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::AccountGeneration,
+                ReplayProtectionType::SequenceNumber,
+                2 * 7000,
+            ),
             // Very high gas
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
+                ReplayProtectionType::SequenceNumber,
                 3 * 1800,
             ),
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::SmartTablePicture1MWith256Change,
+                ReplayProtectionType::SequenceNumber,
                 3 * 14,
             ),
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit,
+                ReplayProtectionType::SequenceNumber,
                 3 * 12,
             ),
-            TransactionWorkload::new_const_tps(TransactionTypeArg::VectorPicture30k, 3 * 150),
-            TransactionWorkload::new_const_tps(TransactionTypeArg::ModifyGlobalFlagAggV2, 3 * 3500),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::VectorPicture30k,
+                ReplayProtectionType::SequenceNumber,
+                3 * 150,
+            ),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::ModifyGlobalFlagAggV2,
+                ReplayProtectionType::SequenceNumber,
+                3 * 3500,
+            ),
             // publishing package - executes sequentially
-            TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::PublishPackage,
+                ReplayProtectionType::SequenceNumber,
+                3 * 150,
+            )
+            .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(

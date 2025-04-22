@@ -7,18 +7,19 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
         transaction_by_hash::TransactionByHashSchema,
+        transaction_summaries_by_account::TransactionSummariesByAccountSchema,
     },
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
-use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
+use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
     batch::{NativeBatch, SchemaBatch, WriteBatch},
     DB,
 };
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::transaction::{IndexedTransactionSummary, ReplayProtector, Transaction, Version};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -135,15 +136,97 @@ impl TransactionDb {
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
-                batch.put::<TransactionByAccountSchema>(
-                    &(txn.sender(), txn.sequence_number()),
-                    &version,
-                )?;
+                if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                    batch.put::<OrderedTransactionByAccountSchema>(
+                        &(txn.sender(), seq_num),
+                        &version,
+                    )?;
+                }
             }
         }
+
+        // Question[Orderless]: Instead of committing the transaction summary here, creating a separate thread in
+        // calculate_and_commit_ledger_and_state_kv function to commit the transaction summary. Is this the right approach?
+
+        // if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
+        //     let txn_summary = IndexedTransactionSummary {
+        //         sender: signed_txn.sender(),
+        //         replay_protector: signed_txn.replay_protector(),
+        //         version,
+        //         // TODO[Orderless]: Check if there is a way to get the hash without recomputing it.
+        //         transaction_hash: transaction.hash(),
+        //     };
+        //     batch.put::<TransactionSummariesByAccountSchema>(
+        //         &(signed_txn.sender(), version),
+        //         &txn_summary,
+        //     )?;
+        // }
         batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
         batch.put::<TransactionSchema>(&version, transaction)?;
 
+        Ok(())
+    }
+
+    pub(crate) fn commit_transaction_summaries(
+        &self,
+        first_version: Version,
+        transactions: &[Transaction],
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_summaries"]);
+        let chunk_size = transactions.len() / 4 + 1;
+        let batches = transactions
+            .par_chunks(chunk_size)
+            .enumerate()
+            .map(|(chunk_index, txns_in_chunk)| -> Result<NativeBatch> {
+                let mut batch = self.db().new_native_batch();
+                let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
+                txns_in_chunk
+                    .iter()
+                    .enumerate()
+                    .try_for_each(|(i, txn)| -> Result<()> {
+                        self.put_transaction_summary(
+                            chunk_first_version + i as u64,
+                            txn,
+                            &mut batch,
+                        )?;
+                        Ok(())
+                    })?;
+                Ok(batch)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Commit batches one by one for now because committing them in parallel will cause gaps. Although
+        // it might be acceptable because we are writing the progress, we want to play on the safer
+        // side unless this really becomes the bottleneck on production.
+        {
+            let _timer =
+                OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_summaries___commit"]);
+            for batch in batches {
+                self.db().write_schemas(batch)?
+            }
+            Ok(())
+        }
+    }
+
+    pub(crate) fn put_transaction_summary(
+        &self,
+        version: Version,
+        transaction: &Transaction,
+        batch: &mut impl WriteBatch,
+    ) -> Result<()> {
+        if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
+            let txn_summary = IndexedTransactionSummary::V1 {
+                sender: signed_txn.sender(),
+                replay_protector: signed_txn.replay_protector(),
+                version,
+                // TODO[Orderless]: Check if there is a way to get the hash without recomputing it.
+                transaction_hash: transaction.hash(),
+            };
+            batch.put::<TransactionSummariesByAccountSchema>(
+                &(signed_txn.sender(), version),
+                &txn_summary,
+            )?;
+        }
         Ok(())
     }
 
@@ -163,11 +246,11 @@ impl TransactionDb {
     /// Deletes TransactionByHash indices given a list of transactions.
     pub(crate) fn prune_transaction_by_hash_indices(
         &self,
-        transactions: &[Transaction],
+        transaction_hashes: &[HashValue],
         db_batch: &mut SchemaBatch,
     ) -> Result<()> {
-        for transaction in transactions {
-            db_batch.delete::<TransactionByHashSchema>(&transaction.hash())?;
+        for hash in transaction_hashes {
+            db_batch.delete::<TransactionByHashSchema>(hash)?;
         }
         Ok(())
     }

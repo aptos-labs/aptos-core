@@ -15,10 +15,13 @@ use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::{
     transaction::v1::{
-        self as transaction, any_signature, validator_transaction,
-        validator_transaction::observed_jwk_update::exported_provider_jw_ks::{
-            jwk::{JwkType, Rsa, UnsupportedJwk},
-            Jwk as ProtoJwk,
+        self as transaction, any_signature,
+        validator_transaction::{
+            self,
+            observed_jwk_update::exported_provider_jw_ks::{
+                jwk::{JwkType, Rsa, UnsupportedJwk},
+                Jwk as ProtoJwk,
+            },
         },
         Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
     },
@@ -155,6 +158,7 @@ pub fn convert_entry_function_id(
 
 pub fn convert_transaction_payload(
     payload: &TransactionPayload,
+    nonce: Option<u64>,
 ) -> transaction::TransactionPayload {
     match payload {
         TransactionPayload::EntryFunctionPayload(sfp) => transaction::TransactionPayload {
@@ -164,18 +168,43 @@ pub fn convert_transaction_payload(
                     convert_entry_function_payload(sfp),
                 ),
             ),
+            extra_config: Some(
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                    transaction::ExtraConfigV1 {
+                        multisig_address: None,
+                        replay_protection_nonce: nonce,
+                    },
+                ),
+            ),
         },
         TransactionPayload::ScriptPayload(sp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::ScriptPayload as i32,
             payload: Some(transaction::transaction_payload::Payload::ScriptPayload(
                 convert_script_payload(sp),
             )),
+            extra_config: Some(
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                    transaction::ExtraConfigV1 {
+                        multisig_address: None,
+                        replay_protection_nonce: nonce,
+                    },
+                ),
+            ),
         },
+        // Once indexer can handle extra config, retrun TransactionPayload::EntryFunction instead.
         TransactionPayload::MultisigPayload(mp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::MultisigPayload as i32,
             payload: Some(transaction::transaction_payload::Payload::MultisigPayload(
                 convert_multisig_payload(mp),
             )),
+            extra_config: Some(
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                    transaction::ExtraConfigV1 {
+                        multisig_address: Some(mp.multisig_address.to_string()),
+                        replay_protection_nonce: nonce,
+                    },
+                ),
+            ),
         },
 
         // Deprecated.
@@ -496,6 +525,23 @@ pub fn convert_multisig_payload(
     }
 }
 
+// pub fn convert_extra_config(
+//     extra_config: &TransactionExtraConfig,
+// ) -> transaction::transaction_payload::ExtraConfig {
+//     match extra_config {
+//         TransactionExtraConfig::V1(TransactionExtraConfigV1 {
+//             multisig_address,
+//             replay_protection_nonce,
+//         }) => transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+//             transaction::ExtraConfigV1 {
+//                 multisig_address: multisig_address
+//                     .map(|multisig_address| multisig_address.to_string()),
+//                 replay_protection_nonce: *replay_protection_nonce,
+//             },
+//         ),
+//     }
+// }
+
 pub fn convert_event(event: &Event) -> transaction::Event {
     let event_key: aptos_types::event::EventKey = event.guid.into();
     transaction::Event {
@@ -808,7 +854,10 @@ pub fn convert_transaction(
                     max_gas_amount: ut.request.max_gas_amount.0,
                     gas_unit_price: ut.request.gas_unit_price.0,
                     expiration_timestamp_secs,
-                    payload: Some(convert_transaction_payload(&ut.request.payload)),
+                    payload: Some(convert_transaction_payload(
+                        &ut.request.payload,
+                        ut.request.replay_protection_nonce.map(|n| n.into()),
+                    )),
                     signature: convert_transaction_signature(&ut.request.signature),
                 }),
                 events: convert_events(&ut.events),

@@ -99,7 +99,7 @@ pub fn get_throughput_from_samples(
         // Need 2 sample points for calculation.
         // TODO(grao): Consider doing interpolation here.
         if index + 1 < progress.samples.len() {
-            let sample_a = progress.samples[index];
+            let sample_a = &progress.samples[index];
             let sample_b = progress.samples.last().unwrap();
             let time_diff = timestamp_to_unixtime(sample_b.timestamp.as_ref().unwrap())
                 - timestamp_to_unixtime(sample_a.timestamp.as_ref().unwrap());

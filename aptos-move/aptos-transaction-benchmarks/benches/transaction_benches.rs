@@ -14,14 +14,34 @@ use proptest::prelude::*;
 //
 
 fn peer_to_peer<M: Measurement + 'static>(c: &mut Criterion<M>) {
-    c.bench_function("peer_to_peer", |b| {
+    c.bench_function("peer_to_peer seq number", |b| {
         let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
-        bencher.bench(b)
+        bencher.bench(b, false, false)
     });
 
-    c.bench_function("peer_to_peer_parallel", |b| {
+    c.bench_function("peer_to_peer seq number payload v2 format", |b| {
         let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
-        bencher.bench_parallel(b)
+        bencher.bench(b, true, false)
+    });
+
+    c.bench_function("peer_to_peer orderless", |b| {
+        let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
+        bencher.bench(b, true, true)
+    });
+
+    c.bench_function("peer_to_peer_parallel seq number", |b| {
+        let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
+        bencher.bench_parallel(b, false, false)
+    });
+
+    c.bench_function("peer_to_peer_parallel seq number payload v2 format", |b| {
+        let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
+        bencher.bench_parallel(b, true, false)
+    });
+
+    c.bench_function("peer_to_peer_parallel orderless", |b| {
+        let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
+        bencher.bench_parallel(b, true, true)
     });
 }
 

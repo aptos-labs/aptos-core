@@ -29,14 +29,16 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
     keyless::{Groth16Proof, Pepper, ZeroKnowledgeSig, ZKP},
     state_store::state_key::StateKey,
-    transaction::{authenticator::EphemeralSignature, SignedTransaction},
+    transaction::{
+        authenticator::EphemeralSignature, IndexedTransactionSummary, SignedTransaction,
+    },
 };
 use move_core_types::{
     ident_str,
@@ -1095,7 +1097,7 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn get_account_transactions_bcs(
+    pub async fn get_account_ordered_transactions_bcs(
         &self,
         address: AccountAddress,
         start: Option<u64>,
@@ -1593,6 +1595,53 @@ impl Client {
         let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
         let response = self.get_bcs(url).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: Option<u16>,
+    ) -> AptosResult<Response<Vec<IndexedTransactionSummary>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/transaction_summaries",
+            address.to_hex()
+        ))?;
+
+        let mut request = self.inner.get(url).header(ACCEPT, BCS);
+        if let Some(start_version) = start_version {
+            request = request.query(&[("start_version", start_version)])
+        }
+
+        if let Some(end_version) = end_version {
+            request = request.query(&[("end_version", end_version)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+        match self.check_and_parse_bcs_response(response).await {
+            Ok(response) => match response.and_then(|inner| bcs::from_bytes(&inner)) {
+                Ok(resp) => {
+                    let txns: &Vec<IndexedTransactionSummary> = resp.inner();
+                    for txn in txns {
+                        info!("Got account transaction summaries successfully. (address: {:?}, replay_protector: {:?})", txn.sender(), txn.replay_protector());
+                    }
+                    Ok(resp)
+                },
+                Err(e) => {
+                    error!("Failed to deserialize account transaction summaries: {:?}, address: {:?}, start_version: {:?}", e, address, start_version);
+                    Err(e)?
+                },
+            },
+            Err(e) => {
+                error!("Failed to get account transaction summaries: {:?}", e);
+                Err(e)
+            },
+        }
     }
 
     pub async fn estimate_gas_price(&self) -> AptosResult<Response<GasEstimation>> {

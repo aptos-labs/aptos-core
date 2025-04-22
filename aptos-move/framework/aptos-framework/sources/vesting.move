@@ -1215,6 +1215,8 @@ module aptos_framework::vesting {
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     use aptos_std::math64::min;
+    #[test_only]
+    use aptos_framework::aptos_coin;
 
     #[test_only]
     const MIN_STAKE: u64 = 100000000000000; // 1M APT coins with 8 decimals.

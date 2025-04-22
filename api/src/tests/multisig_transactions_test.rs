@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
+// Note[Orderless]: Done
+use super::new_test_context_with_orderless_flags;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_types::{
     account_address::AccountAddress,
@@ -12,10 +13,27 @@ use move_core_types::{
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     value::{serialize_values, MoveValue},
 };
+use proptest::num::usize;
+use rstest::rstest;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_payload_succeeds() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_payload_succeeds(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let owner_account_3 = &mut context.create_account().await;
@@ -50,8 +68,23 @@ async fn test_multisig_transaction_with_payload_succeeds() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_existing_account() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_existing_account(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let multisig_account = &mut context.create_account().await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
@@ -103,8 +136,23 @@ async fn test_multisig_transaction_with_existing_account() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_to_update_owners() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_to_update_owners(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let owner_account_3 = &mut context.create_account().await;
@@ -189,8 +237,23 @@ async fn test_multisig_transaction_to_update_owners() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_update_signature_threshold() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_update_signature_threshold(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let multisig_account = context
@@ -231,8 +294,23 @@ async fn test_multisig_transaction_update_signature_threshold() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_insufficient_balance_to_cover_gas() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_insufficient_balance_to_cover_gas(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     // Owner 2 has no APT balance.
     let owner_account_2 = &mut context.gen_account();
@@ -256,8 +334,23 @@ async fn test_multisig_transaction_with_insufficient_balance_to_cover_gas() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_payload_and_failing_execution() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_payload_and_failing_execution(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
@@ -279,8 +372,23 @@ async fn test_multisig_transaction_with_payload_and_failing_execution() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_payload_hash() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_payload_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
@@ -310,8 +418,23 @@ async fn test_multisig_transaction_with_payload_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_payload_hash_and_failing_execution() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_payload_hash_and_failing_execution(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
@@ -344,8 +467,23 @@ async fn test_multisig_transaction_with_payload_hash_and_failing_execution() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_payload_not_matching_hash() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_payload_not_matching_hash(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
@@ -374,8 +512,24 @@ async fn test_multisig_transaction_with_payload_not_matching_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_matching_payload() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+
+async fn test_multisig_transaction_with_matching_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
@@ -401,8 +555,23 @@ async fn test_multisig_transaction_with_matching_payload() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_with_mismatching_payload() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_with_mismatching_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
@@ -441,8 +610,23 @@ async fn test_multisig_transaction_with_mismatching_payload() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_simulation() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_simulation(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let owner_account_3 = &mut context.create_account().await;
@@ -490,8 +674,23 @@ async fn test_multisig_transaction_simulation() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_simulation_2_of_3() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_simulation_2_of_3(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let owner_account_3 = &mut context.create_account().await;
@@ -543,8 +742,23 @@ async fn test_multisig_transaction_simulation_2_of_3() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_simulation_fail() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_simulation_fail(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let owner_account_3 = &mut context.create_account().await;
@@ -588,8 +802,23 @@ async fn test_multisig_transaction_simulation_fail() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multisig_transaction_simulation_fail_2_of_3_insufficient_approvals() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_multisig_transaction_simulation_fail_2_of_3_insufficient_approvals(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account_1 = &mut context.create_account().await;
     let owner_account_2 = &mut context.create_account().await;
     let owner_account_3 = &mut context.create_account().await;
@@ -627,8 +856,23 @@ async fn test_multisig_transaction_simulation_fail_2_of_3_insufficient_approvals
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_simulate_multisig_transaction_should_charge_gas_against_sender() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_simulate_multisig_transaction_should_charge_gas_against_sender(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
     let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(

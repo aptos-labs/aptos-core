@@ -76,7 +76,7 @@ async fn transfer_to_existing_account() {
 
     // Create a new account and fund it with 10 APT.
     let new_account =
-        h.new_account_with_balance_and_sequence_number(10_0000_0000 /* 10 APT */, 0);
+        h.new_account_with_balance_and_sequence_number(10_0000_0000 /* 10 APT */, Some(0));
 
     // Transfer 1 APT to the existing account.
     let status = h.run_entry_function(
@@ -110,7 +110,7 @@ async fn transfer_from_existing_account() {
 
     // Create a new account.
     let new_account =
-        h.new_account_with_balance_and_sequence_number(10_0000_0000 /* 10 APT */, 0);
+        h.new_account_with_balance_and_sequence_number(10_0000_0000 /* 10 APT */, Some(0));
 
     // Rotate the authentication key of the existing account so that we can authenticate transactions
     // without using or exposing the real private key.
