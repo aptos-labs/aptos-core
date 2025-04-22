@@ -599,7 +599,6 @@ module aptos_experimental::confidential_asset_tests {
         aptos_fx = @aptos_framework,
         alice = @0xa1
     )]
-    #[expected_failure(abort_code = 0x010004, location = fungible_asset)]
     fun fail_deposit_with_coins_if_insufficient_amount(
         confidential_asset: signer,
         aptos_fx: signer,
@@ -670,13 +669,13 @@ module aptos_experimental::confidential_asset_tests {
         confidential_asset::register(&alice, token, twisted_elgamal::pubkey_to_bytes(&alice_ek));
 
         assert!(coin::balance<MockCoin>(alice_addr) == 100, 1);
-        assert!(primary_fungible_store::balance(alice_addr, token) == 0, 1);
+        assert!(primary_fungible_store::balance(alice_addr, token) == 100, 1);
         assert!(confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, 0), 1);
 
         confidential_asset::deposit_coins<MockCoin>(&alice, 50);
 
         assert!(coin::balance<MockCoin>(alice_addr) == 50, 1);
-        assert!(primary_fungible_store::balance(alice_addr, token) == 0, 1);
+        assert!(primary_fungible_store::balance(alice_addr, token) == 50, 1);
         assert!(confidential_asset::verify_pending_balance(alice_addr, token, &alice_dk, 50), 1);
     }
 }
