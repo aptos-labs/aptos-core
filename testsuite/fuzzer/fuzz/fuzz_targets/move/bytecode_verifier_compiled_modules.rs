@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![no_main]
-use libfuzzer_sys::{fuzz_target, Corpus};
-use aptos_vm_environment::prod_configs;
 use aptos_types::on_chain_config::Features;
+use aptos_vm_environment::prod_configs;
+use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::StatusType;
 mod utils;
