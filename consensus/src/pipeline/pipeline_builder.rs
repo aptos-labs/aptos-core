@@ -28,6 +28,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -49,6 +50,46 @@ use std::{
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
 
+/// Status to help synchornize the pipeline and sync_manager
+/// It is used to track the round of the block that could be pre-committed and sync manager decides
+/// whether to enter state sync or not and pause pre-commit during state sync to avoid race condition
+/// that state sync starts but pre-commit runs over the target.
+pub struct PreCommitStatus {
+    round: Round,
+    paused: bool,
+    is_enabled: bool,
+}
+
+impl PreCommitStatus {
+    pub fn new(round: Round, is_enabled: bool) -> Self {
+        Self {
+            round,
+            paused: false,
+            is_enabled,
+        }
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.is_enabled && !self.paused
+    }
+
+    pub fn pause(&mut self) {
+        self.paused = true;
+    }
+
+    pub fn resume(&mut self) {
+        self.paused = false;
+    }
+
+    pub fn round(&self) -> Round {
+        self.round
+    }
+
+    pub fn update_round(&mut self, round: Round) {
+        self.round = std::cmp::max(self.round, round);
+    }
+}
+
 /// The pipeline builder is responsible for constructing the pipeline structure for a block.
 /// Each phase is represented as a shared future, takes in other futures as pre-condition.
 /// Future returns a TaskResult<T>, which error can be either a user error or task error (e.g. cancellation).
@@ -69,7 +110,7 @@ pub struct PipelineBuilder {
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
     txn_notifier: Arc<dyn TxnNotifier>,
-    enable_pre_commit: bool,
+    pre_commit_status: Arc<Mutex<PreCommitStatus>>,
 }
 
 fn spawn_shared_fut<
@@ -198,8 +239,12 @@ impl PipelineBuilder {
             state_sync_notifier,
             payload_manager,
             txn_notifier,
-            enable_pre_commit,
+            pre_commit_status: Arc::new(Mutex::new(PreCommitStatus::new(0, enable_pre_commit))),
         }
+    }
+
+    pub fn pre_commit_status(&self) -> Arc<Mutex<PreCommitStatus>> {
+        self.pre_commit_status.clone()
     }
 
     fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
@@ -353,7 +398,7 @@ impl PipelineBuilder {
                 commit_proof_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
-                self.enable_pre_commit,
+                self.pre_commit_status(),
             ),
             Some(&mut abort_handles),
         );
@@ -665,7 +710,7 @@ impl PipelineBuilder {
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
-        enable_pre_commit: bool,
+        pre_commit_status: Arc<Mutex<PreCommitStatus>>,
     ) -> TaskResult<PreCommitResult> {
         let mut tracker = Tracker::start_waiting("pre_commit", &block);
         let (compute_result, _, _) = ledger_update_fut.await?;
@@ -673,8 +718,20 @@ impl PipelineBuilder {
 
         order_proof_fut.await?;
 
-        if compute_result.has_reconfiguration() || !enable_pre_commit {
+        let wait_for_proof = {
+            let mut status_guard = pre_commit_status.lock();
+            let wait_for_proof = compute_result.has_reconfiguration() || !status_guard.is_active();
+            // it's a bit ugly here, but we want to make the check and update atomic in the pre_commit case
+            // to avoid race that check returns active, sync manager pauses pre_commit and round gets updated
+            if !wait_for_proof {
+                status_guard.update_round(block.round());
+            }
+            wait_for_proof
+        };
+
+        if wait_for_proof {
             commit_proof_fut.await?;
+            pre_commit_status.lock().update_round(block.round());
         }
 
         tracker.start_working();
