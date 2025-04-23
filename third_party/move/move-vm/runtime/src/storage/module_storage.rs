@@ -59,7 +59,10 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
-    fn fetch_module_size_in_bytes(
+    ///
+    /// Note: this API is not metered! It is only used to get the size of a module so that metering
+    /// can actually be implemented before loading a module.
+    fn unmetered_get_module_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -274,7 +277,7 @@ where
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
-    fn fetch_module_size_in_bytes(
+    fn unmetered_get_module_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
