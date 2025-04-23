@@ -4,10 +4,15 @@
 
 use crate::{
     data_cache::TransactionDataCache,
+    dispatch_loader,
     interpreter::Interpreter,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
-    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    storage::{
+        loader::traits::Loader,
+        ty_depth_checker::TypeDepthChecker,
+        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    },
     AsFunctionValueExtension, LoadedFunction, ModuleStorage,
 };
 use move_binary_format::{
@@ -61,6 +66,32 @@ impl MoveVM {
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
+        dispatch_loader!(module_storage, loader, {
+            Self::execute_loaded_function_impl(
+                function,
+                serialized_args,
+                data_cache,
+                &loader,
+                gas_meter,
+                traversal_context,
+                extensions,
+                module_storage,
+                resource_resolver,
+            )
+        })
+    }
+
+    pub fn execute_loaded_function_impl(
+        function: LoadedFunction,
+        serialized_args: Vec<impl Borrow<[u8]>>,
+        data_cache: &mut TransactionDataCache,
+        loader: &impl Loader,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        extensions: &mut NativeContextExtensions,
+        module_storage: &impl ModuleStorage,
+        resource_resolver: &impl ResourceResolver,
+    ) -> VMResult<SerializedReturnValues> {
         let vm_config = module_storage.runtime_environment().vm_config();
         let ty_builder = &vm_config.ty_builder;
 
@@ -80,11 +111,13 @@ impl MoveVM {
 
         let return_values = {
             let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
+            let ty_depth_checker = TypeDepthChecker::new(loader);
             Interpreter::entrypoint(
                 function,
                 deserialized_args,
                 data_cache,
                 module_storage,
+                &ty_depth_checker,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
