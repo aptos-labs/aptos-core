@@ -16,8 +16,7 @@ Clients are any service interested in learning about the state of the
 blockchain or performing transactions.
 
 For a more detailed summary of the differences between a Validator and a
-Fullnode, see this [blog
-post](https://aptos.dev/en/build/apis/fullnode-rest-api).
+Fullnode, see these [docs](https://aptos.dev/en/build/apis/fullnode-rest-api/).
 
 ## Organization
 
