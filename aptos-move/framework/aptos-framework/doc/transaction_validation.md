@@ -1677,7 +1677,7 @@ If there is no fee_payer, fee_payer = sender
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, txn_id: <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionId">scheduled_txns::TransactionId</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, scheduling_deposit: u64, gas_units_remaining: u64)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, scheduling_deposit: u64, gas_units_remaining: u64)
 </code></pre>
 
 
@@ -1689,7 +1689,7 @@ If there is no fee_payer, fee_payer = sender
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(
     deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
-    txn_id: TransactionId,
+    txn_key: ScheduleMapKey,
     storage_fee_refunded: u64,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
@@ -1731,7 +1731,7 @@ If there is no fee_payer, fee_payer = sender
     // Increment sequence number
     <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(<a href="account.md#0x1_account">account</a>);
 
-    <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_id);
+    <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_key);
 }
 </code></pre>
 
@@ -1745,7 +1745,7 @@ If there is no fee_payer, fee_payer = sender
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_id: <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionId">scheduled_txns::TransactionId</a>)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>)
 </code></pre>
 
 
@@ -1754,8 +1754,8 @@ If there is no fee_payer, fee_payer = sender
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_id: TransactionId) {
-    <a href="scheduled_txns.md#0x1_scheduled_txns_finish_execution">scheduled_txns::finish_execution</a>(txn_id);
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_key: ScheduleMapKey) {
+    <a href="scheduled_txns.md#0x1_scheduled_txns_finish_execution">scheduled_txns::finish_execution</a>(txn_key);
 }
 </code></pre>
 
