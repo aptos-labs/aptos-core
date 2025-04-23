@@ -30,7 +30,7 @@ module aptos_framework::ethereum_derivable_account {
     use std::string_utils;
     use std::transaction_context;
     use std::vector;
-    use std::string::String;
+    use std::string::{Self, String};
 
     /// Signature failed to verify.
     const EINVALID_SIGNATURE: u64 = 1;
@@ -61,8 +61,8 @@ module aptos_framework::ethereum_derivable_account {
     /// serialized `SIWEAbstractPublicKey`.
     fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>): SIWEAbstractPublicKey {
         let stream = bcs_stream::new(*abstract_public_key);
-        let ethereum_address = *bcs_stream::deserialize_string(&mut stream).bytes();
-        let domain = *bcs_stream::deserialize_string(&mut stream).bytes();
+        let ethereum_address = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+        let domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
         SIWEAbstractPublicKey { ethereum_address, domain }
     }
 
@@ -72,9 +72,9 @@ module aptos_framework::ethereum_derivable_account {
         let stream = bcs_stream::new(*abstract_signature);
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
         if (signature_type == 0x00) {
-            let issued_at = bcs_stream::deserialize_string(&mut stream);
+            let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature }
+            SIWEAbstractSignature::EIP1193DerivedSignature { issued_at: string::utf8(issued_at), signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
