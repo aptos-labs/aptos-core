@@ -249,8 +249,19 @@ impl FakeExecutor {
         executor
     }
 
-    pub fn from_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
-        let rest_client = aptos_rest_client::Client::builder(network_url).build();
+    fn from_remote_state_impl(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: Option<&str>,
+    ) -> Self {
+        let mut builder = aptos_rest_client::Client::builder(network_url);
+        if let Some(api_key) = api_key {
+            builder = builder
+                .api_key(api_key)
+                .expect("failed to configure API key")
+        }
+        let rest_client = builder.build();
+
         let debugger = Arc::new(RestDebuggerInterface::new(rest_client));
         let debugger_state_view = DebuggerStateView::new(debugger, txn_id);
         let state_store =
@@ -278,6 +289,29 @@ impl FakeExecutor {
             executor_mode: None,
             allow_block_executor_fallback: true,
         }
+    }
+
+    /// Creates a [`FakeExecutor`] from a remote network state at the version specified by the
+    /// transaction id, with support for a custom API key to access node APIs.
+    ///
+    /// Simulations based on remote states rely heavily on API calls, which can easily run into
+    /// rate limits if executed repeatedly or in parallel.
+    /// Providing an API key raises these limits significantly.
+    ///
+    /// If you hit rate limits, you can create a free Aptos Build account and generate an API key:
+    /// - https://build.aptoslabs.com/docs/start#api-quick-start
+    pub fn from_remote_state_with_api_key(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: &str,
+    ) -> Self {
+        Self::from_remote_state_impl(network_url, txn_id, Some(api_key))
+    }
+
+    /// Creates a [`FakeExecutor`] from a remote network state at the version specified by the
+    /// transaction id.
+    pub fn from_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
+        Self::from_remote_state_impl(network_url, txn_id, None)
     }
 
     pub fn set_executor_mode(mut self, mode: ExecutorMode) -> Self {

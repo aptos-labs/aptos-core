@@ -137,10 +137,28 @@ impl MoveHarness {
         }
     }
 
-    pub fn new_with_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
+    /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
+    /// transaction id, with support for a custom API key to access node APIs.
+    ///
+    /// Simulations based on remote states rely heavily on API calls, which can easily run into
+    /// rate limits if executed repeatedly or in parallel.
+    /// Providing an API key raises these limits significantly.
+    ///
+    /// If you hit rate limits, you can create a free Aptos Build account and generate an API key:
+    /// - https://build.aptoslabs.com/docs/start#api-quick-start
+    fn new_with_remote_state_impl(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: Option<&str>,
+    ) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
 
-        let executor = FakeExecutor::from_remote_state(network_url, txn_id);
+        let executor = match api_key {
+            Some(api_key) => {
+                FakeExecutor::from_remote_state_with_api_key(network_url, txn_id, api_key)
+            },
+            None => FakeExecutor::from_remote_state(network_url, txn_id),
+        };
 
         let gas_schedule: GasScheduleV2 = executor.state_store().get_on_chain_config().unwrap();
         let feature_version = gas_schedule.feature_version;
@@ -156,6 +174,20 @@ impl MoveHarness {
             default_gas_unit_price: gas_params.vm.txn.min_price_per_gas_unit.into(),
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
+    }
+
+    /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
+    /// transaction id.
+    pub fn new_with_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
+        Self::new_with_remote_state_impl(network_url, txn_id, None)
+    }
+
+    pub fn new_with_remote_state_with_api_key(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: &str,
+    ) -> Self {
+        Self::new_with_remote_state_impl(network_url, txn_id, Some(api_key))
     }
 
     pub fn new_with_features(
