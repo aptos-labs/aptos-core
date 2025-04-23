@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_schedule::{gas_feature_versions::RELEASE_V1_15, AptosGasParameters};
+use aptos_gas_schedule::{
+    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30},
+    AptosGasParameters,
+};
 use aptos_types::{
     on_chain_config::{
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
@@ -106,6 +109,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
 /// Returns [VMConfig] used by the Aptos blockchain in production, based on the set of feature
 /// flags.
 pub fn aptos_prod_vm_config(
+    gas_feature_version: u64,
     features: &Features,
     timed_features: &TimedFeatures,
     ty_builder: TypeBuilder,
@@ -117,12 +121,20 @@ pub fn aptos_prod_vm_config(
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(features);
 
+    let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
+        512
+    } else {
+        256
+    };
+
     VMConfig {
         verifier_config,
         deserializer_config,
         paranoid_type_checks,
         check_invariant_in_swap_loc,
         max_value_nest_depth: Some(128),
+        layout_max_size,
+        layout_max_depth: 128,
         // 5000 limits type tag total size < 5000 bytes and < 50 nodes.
         type_max_cost: 5000,
         type_base_cost: 100,
