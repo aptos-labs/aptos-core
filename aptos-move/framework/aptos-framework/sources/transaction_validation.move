@@ -15,7 +15,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::create_signer;
     use aptos_framework::permissioned_signer;
     use aptos_framework::scheduled_txns;
-    use aptos_framework::scheduled_txns::TransactionId;
+    use aptos_framework::scheduled_txns::{TransactionId, ScheduleMapKey};
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -863,7 +863,7 @@ module aptos_framework::transaction_validation {
     fun scheduled_txn_epilogue(
         deposit_store_owner: &signer,
         account: address,
-        txn_id: TransactionId,
+        txn_key: ScheduleMapKey,
         storage_fee_refunded: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
@@ -905,18 +905,18 @@ module aptos_framework::transaction_validation {
         // Increment sequence number
         account::increment_sequence_number(account);
 
-        scheduled_txn_cleanup(txn_id);
+        scheduled_txn_cleanup(txn_key);
     }
 
-    fun scheduled_txn_cleanup(txn_id: TransactionId) {
-        scheduled_txns::finish_execution(txn_id);
+    fun scheduled_txn_cleanup(txn_key: ScheduleMapKey) {
+        scheduled_txns::finish_execution(txn_key);
     }
 
     #[test_only]
     public fun scheduled_txn_epilogue_test_helper(
         deposit_store_owner: &signer,
         account: address,
-        txn_id: TransactionId,
+        txn_key: ScheduleMapKey,
         storage_fee_refunded: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
@@ -926,7 +926,7 @@ module aptos_framework::transaction_validation {
         scheduled_txn_epilogue(
             deposit_store_owner,
             account,
-            txn_id,
+            txn_key,
             storage_fee_refunded,
             txn_gas_price,
             txn_max_gas_units,
