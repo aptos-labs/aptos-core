@@ -102,7 +102,7 @@ where
 
     while let Some((addr, name)) = stack.pop() {
         let size = module_storage
-            .fetch_module_size_in_bytes(addr, name)?
+            .unmetered_get_module_size(addr, name)?
             .ok_or_else(|| module_linker_error!(addr, name))?;
         gas_meter
             .charge_dependency(false, addr, name, NumBytes::new(size as u64))

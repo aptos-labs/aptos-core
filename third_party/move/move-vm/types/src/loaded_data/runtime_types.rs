@@ -32,7 +32,6 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
 ///
 /// It has the form of `max(CBase, T1 + C1, T2 + C2, ..)` where `Ti` is the depth of the ith type parameter
@@ -40,6 +39,7 @@ use triomphe::Arc as TriompheArc;
 ///
 /// This form has a special property: when you compute the max of multiple formulae, you can normalize
 /// them into a single formula.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 pub struct DepthFormula {
     pub terms: Vec<(TypeParameterIndex, u64)>, // Ti + Ci
     pub constant: Option<u64>,                 // Cbase
@@ -93,14 +93,13 @@ impl DepthFormula {
             formulas.push(DepthFormula::constant(*constant))
         }
         for (t_i, c_i) in terms {
-            let Some(mut u_form) = map.remove(t_i) else {
+            let Some(u_form) = map.remove(t_i) else {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("{t_i:?} missing mapping")),
                 );
             };
-            u_form.scale(*c_i);
-            formulas.push(u_form)
+            formulas.push(u_form.scale(*c_i))
         }
         Ok(DepthFormula::normalize(formulas))
     }
@@ -114,14 +113,15 @@ impl DepthFormula {
         depth
     }
 
-    pub fn scale(&mut self, c: u64) {
-        let Self { terms, constant } = self;
+    pub fn scale(mut self, c: u64) -> Self {
+        let Self { terms, constant } = &mut self;
         for (_t_i, c_i) in terms {
             *c_i = (*c_i).saturating_add(c);
         }
         if let Some(cbase) = constant.as_mut() {
             *cbase = (*cbase).saturating_add(c);
         }
+        self
     }
 }
 
