@@ -14,13 +14,6 @@
 /// Nonce: <digest>
 /// Issued At: <issued_at>
 ///
-/// Before signing, check that you are signing this message from <domain>
-///
-/// Account: <address>
-/// Function: <function>
-/// Aptos Network: <network_name> (<chain_id>)
-/// Hash: <aptos_txn_digest>
-///
 /// 2. The abstract public key is a BCS serialized `SIWEAbstractPublicKey`.
 /// 3. The abstract signature is a BCS serialized `SIWEAbstractSignature`.
 /// 4. This module has been tested for the following wallets:
@@ -52,6 +45,7 @@ module aptos_framework::ethereum_derivable_account {
 
     enum SIWEAbstractSignature has drop {
         EIP1193DerivedSignature {
+            issued_at: String,
             signature: vector<u8>,
         },
     }
@@ -78,8 +72,9 @@ module aptos_framework::ethereum_derivable_account {
         let stream = bcs_stream::new(*abstract_signature);
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
         if (signature_type == 0x00) {
+            let issued_at = bcs_stream::deserialize_string(&mut stream);
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::EIP1193DerivedSignature { signature }
+            SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -92,22 +87,29 @@ module aptos_framework::ethereum_derivable_account {
         domain: &vector<u8>,
         entry_function_name: &vector<u8>,
         digest_utf8: &vector<u8>,
+        issued_at: &vector<u8>,
     ): vector<u8> {
         let message = &mut vector[];
-        message.append(b"Before signing, check that you are signing this message from ");
         message.append(*domain);
-        message.append(b"\n\nAccount: ");
+        message.append(b" wants you to sign in with your Ethereum account:\n");
         message.append(*ethereum_address);
-        message.append(b"\nFunction:");
+        message.append(b"\n\nTo execute transaction ");
         message.append(*entry_function_name);
-        message.append(b"\nAptos Network: ");
+        message.append(b" on Aptos blockchain");
         let network_name = network_name();
-        message.append(network_name);
         message.append(b" (");
-        message.append(*string_utils::to_string(&chain_id::get()).bytes());
+        message.append(network_name);
         message.append(b")");
-        message.append(b"\nHash: ");
+        message.append(b".");
+        message.append(b"\n\nURI: ");
+        message.append(*domain);
+        message.append(b"\nVersion: 1");
+        message.append(b"\nChain ID: ");
+        message.append(*string_utils::to_string(&chain_id::get()).bytes());
+        message.append(b"\nNonce: ");
         message.append(*digest_utf8);
+        message.append(b"\nIssued At: ");
+        message.append(*issued_at);
 
         let msg_len = vector::length(message);
 
@@ -158,7 +160,8 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_public_key = deserialize_abstract_public_key(derivable_abstract_public_key);
         let digest_utf8 = string_utils::to_string(aa_auth_data.digest()).bytes();
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
-        let message = construct_message(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8);
+        let issued_at = abstract_signature.issued_at.bytes();
+        let message = construct_message(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at);
         let hashed_message = aptos_hash::keccak256(message);
         let public_key_bytes = recover_public_key(&abstract_signature.signature, &hashed_message);
 
@@ -205,8 +208,8 @@ module aptos_framework::ethereum_derivable_account {
     }
 
     #[test_only]
-    fun create_raw_signature(signature: vector<u8>): vector<u8> {
-        let abstract_signature = SIWEAbstractSignature::EIP1193DerivedSignature { signature };
+    fun create_raw_signature(issued_at: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature };
         bcs::to_bytes(&abstract_signature)
     }
 
@@ -229,11 +232,12 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let abstract_signature = create_raw_signature(signature_bytes);
+        let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
         let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
         assert!(siwe_abstract_signature is SIWEAbstractSignature::EIP1193DerivedSignature);
         match (siwe_abstract_signature) {
             SIWEAbstractSignature::EIP1193DerivedSignature { signature, issued_at } => {
+                assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
                 assert!(signature == signature_bytes);
             },
         };
@@ -247,8 +251,9 @@ module aptos_framework::ethereum_derivable_account {
         let domain = b"localhost:3001";
         let entry_function_name = b"0x1::aptos_account::transfer";
         let digest_utf8 = b"0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd";
-        let message = construct_message(&ethereum_address, &domain, &entry_function_name, &digest_utf8);
-        let expected_message = b"\x19Ethereum Signed Message:\n342Before signing, check that you are signing this message from localhost:3001\nAccount: 0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a\nFunction: 0x1::aptos_account::transfer\nAptos Network: local (4)\nHash: 0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd";
+        let issued_at = b"2025-01-01T00:00:00.000Z";
+        let message = construct_message(&ethereum_address, &domain, &entry_function_name, &digest_utf8, &issued_at);
+        let expected_message = b"\x19Ethereum Signed Message:\n342localhost:3001 wants you to sign in with your Ethereum account:\n0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a\n\nTo execute transaction 0x1::aptos_account::transfer on Aptos blockchain (local).\n\nURI: localhost:3001\nVersion: 1\nChain ID: 4\nNonce: 0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd\nIssued At: 2025-01-01T00:00:00.000Z";
         assert!(message == expected_message);
     }
 
@@ -259,7 +264,8 @@ module aptos_framework::ethereum_derivable_account {
         let domain = b"localhost:3001";
         let entry_function_name = b"0x1::aptos_account::transfer";
         let digest = b"0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd";
-        let message = construct_message(&ethereum_address, &domain, &entry_function_name, &digest);
+        let issued_at = b"2025-01-01T00:00:00.000Z";
+        let message = construct_message(&ethereum_address, &domain, &entry_function_name, &digest, &issued_at);
         let hashed_message = aptos_hash::keccak256(message);
         let signature_bytes = vector[
             249, 247, 194, 250, 31, 233, 100, 234, 109, 142, 6, 193, 203, 33, 147, 199,
@@ -290,7 +296,7 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let abstract_signature = create_raw_signature(signature);
+        let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature);
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
         let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
@@ -312,7 +318,7 @@ module aptos_framework::ethereum_derivable_account {
             58, 209, 105, 56, 204, 253, 73, 82, 201, 197, 201, 139, 201, 19, 65, 215,
             28
         ];
-        let abstract_signature = create_raw_signature(signature);
+        let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature);
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
         let domain = b"localhost:3001";
         let abstract_public_key = create_abstract_public_key(ethereum_address, domain);
