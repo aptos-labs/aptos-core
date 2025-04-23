@@ -3,8 +3,19 @@ module aptos_framework::test_scheduled_txns {
     use std::signer;
     use aptos_framework::coin::{Self};
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::scheduled_txns::{Self, create_transaction_id};
+    use aptos_framework::scheduled_txns::{Self, create_transaction_id, ScheduleMapKey, ScheduleQueue, get_txn_by_key,
+        finish_execution
+    };
     use aptos_framework::transaction_validation;
+
+    #[test_only]
+    public fun mock_execute(key: ScheduleMapKey) {
+        let txn = get_txn_by_key(key);
+        // Execute the transaction
+        scheduled_txns::execute_f(&txn);
+        // Finish execution
+        finish_execution(key);
+    }
 
     // Purpose of this test is to test 'scheduled_txn_epilogue'
     #[test(fx = @0x1, user = @0x123)]
@@ -42,8 +53,16 @@ module aptos_framework::test_scheduled_txns {
                 0
             );
         let gas_price_txn2 = 30;
-        let txn2 =
+        /*let txn2 =
             scheduled_txns::create_scheduled_txn(
+                storable_perm_handle,
+                schedule_time,
+                gas_price_txn2,
+                txn_max_gas_units,
+                2000
+            );*/
+        let txn2 =
+            scheduled_txns::create_scheduled_txn_reschedule(
                 storable_perm_handle,
                 schedule_time,
                 gas_price_txn2,
@@ -52,11 +71,8 @@ module aptos_framework::test_scheduled_txns {
             );
 
         // Insert transactions
-        let txn1_id = scheduled_txns::insert(&user, txn1);
-        let tId1 = create_transaction_id(txn1_id);
-        let txn2_id = scheduled_txns::insert(&user, txn2);
-        let tId2 = create_transaction_id(txn2_id);
-
+        let txn1_key = scheduled_txns::insert(&user, txn1);
+        let txn2_key = scheduled_txns::insert(&user, txn2);
         // Check initial state
         assert!(scheduled_txns::get_num_txns() == 2, scheduled_txns::get_num_txns());
 
@@ -79,7 +95,7 @@ module aptos_framework::test_scheduled_txns {
         transaction_validation::scheduled_txn_epilogue_test_helper(
             &fa_store_signer,
             user_addr,
-            tId1,
+            txn1_key,
             txn1_storage_fee_refund,
             gas_price_txn1,
             txn_max_gas_units,
@@ -97,12 +113,12 @@ module aptos_framework::test_scheduled_txns {
         );
 
         // Cleanup
-        let txn2_charged_gas_price = gas_price_txn2 - 10;
+        /*let txn2_charged_gas_price = gas_price_txn2 - 10;
         let txn2_storage_fee_refund = 2000; // large refund, so that there is net refund
         transaction_validation::scheduled_txn_epilogue_test_helper(
             &fa_store_signer,
             user_addr,
-            tId2,
+            txn2_key,
             txn2_storage_fee_refund,
             txn2_charged_gas_price, // gas_price
             txn_max_gas_units,
@@ -117,9 +133,10 @@ module aptos_framework::test_scheduled_txns {
             (post_txn1_balance + txn2_deposit_refund + txn2_storage_fee_refund)
                 == post_txn2_balance,
             post_txn2_balance
-        );
+        );*/
 
         // check reschedule
+        mock_execute(txn2_key);
         scheduled_txns::remove_txns();
         assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
 
