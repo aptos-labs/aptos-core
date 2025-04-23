@@ -174,6 +174,34 @@ pub enum EntryFunctionCall {
     /// authority of the new authentication key.
     AccountSetOriginatingAddress {},
 
+    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+    ///
+    /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
+    /// is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
+    ///
+    /// # Arguments
+    /// * `account` - The signer representing the keyless account
+    /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
+    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_key_proof` - A signature from the backup key proving ownership
+    ///
+    /// # Aborts
+    /// * If the any of inputs deserialize incorrectly
+    /// * If the provided public key is not a keyless public key
+    /// * If the keyless public key is not the original public key of the account
+    /// * If the backup key proof signature is invalid
+    ///
+    /// # Events
+    /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+    AccountUpsertEd25519BackupKeyOnKeylessAccount {
+        keyless_public_key: Vec<u8>,
+        backup_public_key: Vec<u8>,
+        backup_key_proof: Vec<u8>,
+    },
+
     /// Add dispatchable authentication function that enables account abstraction via this function.
     /// Note: it is a private entry function that can only be called directly from transaction.
     AccountAbstractionAddAuthenticationFunction {
@@ -1291,6 +1319,15 @@ impl EntryFunctionCall {
                 cap_update_table,
             ),
             AccountSetOriginatingAddress {} => account_set_originating_address(),
+            AccountUpsertEd25519BackupKeyOnKeylessAccount {
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+            } => account_upsert_ed25519_backup_key_on_keyless_account(
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+            ),
             AccountAbstractionAddAuthenticationFunction {
                 module_address,
                 module_name,
@@ -2244,6 +2281,51 @@ pub fn account_set_originating_address() -> TransactionPayload {
         ident_str!("set_originating_address").to_owned(),
         vec![],
         vec![],
+    ))
+}
+
+/// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+/// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+/// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+/// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+///
+/// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
+/// is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
+///
+/// # Arguments
+/// * `account` - The signer representing the keyless account
+/// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
+/// * `backup_public_key` - The ED25519 public key to add as a backup
+/// * `backup_key_proof` - A signature from the backup key proving ownership
+///
+/// # Aborts
+/// * If the any of inputs deserialize incorrectly
+/// * If the provided public key is not a keyless public key
+/// * If the keyless public key is not the original public key of the account
+/// * If the backup key proof signature is invalid
+///
+/// # Events
+/// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+pub fn account_upsert_ed25519_backup_key_on_keyless_account(
+    keyless_public_key: Vec<u8>,
+    backup_public_key: Vec<u8>,
+    backup_key_proof: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("upsert_ed25519_backup_key_on_keyless_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keyless_public_key).unwrap(),
+            bcs::to_bytes(&backup_public_key).unwrap(),
+            bcs::to_bytes(&backup_key_proof).unwrap(),
+        ],
     ))
 }
 
@@ -5534,6 +5616,22 @@ mod decoder {
         }
     }
 
+    pub fn account_upsert_ed25519_backup_key_on_keyless_account(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountUpsertEd25519BackupKeyOnKeylessAccount {
+                    keyless_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    backup_public_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    backup_key_proof: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn account_abstraction_add_authentication_function(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7415,6 +7513,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_set_originating_address".to_string(),
             Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
+            "account_upsert_ed25519_backup_key_on_keyless_account".to_string(),
+            Box::new(decoder::account_upsert_ed25519_backup_key_on_keyless_account),
         );
         map.insert(
             "account_abstraction_add_authentication_function".to_string(),

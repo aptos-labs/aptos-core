@@ -353,7 +353,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
