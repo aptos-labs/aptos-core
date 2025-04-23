@@ -48,6 +48,7 @@ impl AptosDebugger {
     pub fn db<P: AsRef<Path> + Clone>(db_root_path: P) -> anyhow::Result<Self> {
         Ok(Self::new(Arc::new(DBDebuggerInterface::open(
             db_root_path,
+            true,
         )?)))
     }
 

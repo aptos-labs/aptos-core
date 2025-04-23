@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commands::{build_debugger, RestAPI},
+    commands::{build_debugger, build_debugger_with_db, RestAPI},
     workload::TransactionBlock,
 };
 use anyhow::{anyhow, bail};
@@ -16,6 +16,12 @@ use tokio::fs;
 pub struct DownloadCommand {
     #[clap(flatten)]
     rest_api: RestAPI,
+
+    #[clap(long, help = "Path to the txn database")]
+    db_path: Option<String>,
+
+    #[clap(long, help = "Whether to use the txn database")]
+    use_db: bool,
 
     #[clap(
         long,
@@ -45,7 +51,11 @@ impl DownloadCommand {
             );
         }
 
-        let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
+        let debugger = if self.use_db {
+            build_debugger_with_db(self.db_path.unwrap())?
+        } else {
+            build_debugger(self.rest_api.rest_endpoint.unwrap(), self.rest_api.api_key)?
+        };
 
         // Explicitly get transaction corresponding to the end, so we can verify that blocks are
         // fully selected.

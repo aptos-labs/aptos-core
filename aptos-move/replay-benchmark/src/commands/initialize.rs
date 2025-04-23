@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commands::{build_debugger, init_logger_and_metrics, RestAPI},
+    commands::{build_debugger, build_debugger_with_db, init_logger_and_metrics, RestAPI},
     generator::InputOutputDiffGenerator,
     overrides::OverrideConfig,
     workload::TransactionBlock,
@@ -62,6 +62,12 @@ pub struct InitializeCommand {
         help = "List of space-separated paths to compiled / built packages with Move code"
     )]
     override_packages: Vec<String>,
+
+    #[clap(long, help = "Path to the txn database")]
+    db_path: Option<String>,
+
+    #[clap(long, help = "Whether to use the txn database")]
+    use_db: bool,
 }
 
 impl InitializeCommand {
@@ -88,7 +94,12 @@ impl InitializeCommand {
             self.override_packages,
         )?;
 
-        let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
+        let debugger = if self.use_db {
+            build_debugger_with_db(self.db_path.unwrap())?
+        } else {
+            build_debugger(self.rest_api.rest_endpoint.unwrap(), self.rest_api.api_key)?
+        };
+
         let inputs =
             InputOutputDiffGenerator::generate(debugger, override_config, txn_blocks).await?;
 
