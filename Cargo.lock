@@ -8690,6 +8690,7 @@ dependencies = [
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "arbitrary",
  "base64 0.13.1",
  "bcs 0.1.4",
