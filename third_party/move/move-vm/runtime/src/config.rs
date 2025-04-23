@@ -19,6 +19,11 @@ pub struct VMConfig {
     pub check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs.
     pub max_value_nest_depth: Option<u64>,
+    /// Maximum allowed number of nodes in a type layout. This includes the types of fields for
+    /// struct types.
+    pub layout_max_size: u64,
+    /// Maximum depth (in number of nodes) of the type layout tree.
+    pub layout_max_depth: u64,
     pub type_max_cost: u64,
     pub type_base_cost: u64,
     pub type_byte_cost: u64,
@@ -35,6 +40,8 @@ impl Default for VMConfig {
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
             max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
+            layout_max_size: 256,
+            layout_max_depth: 128,
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
