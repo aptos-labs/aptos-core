@@ -15,7 +15,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::create_signer;
     use aptos_framework::permissioned_signer;
     use aptos_framework::scheduled_txns;
-    use aptos_framework::scheduled_txns::{TransactionId, ScheduleMapKey};
+    use aptos_framework::scheduled_txns::ScheduleMapKey;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;

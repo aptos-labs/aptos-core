@@ -2,9 +2,10 @@ module aptos_framework::scheduled_txns {
     use std::bcs;
     use std::error;
     use std::hash::sha3_256;
+    use std::option::Option;
     use std::signer;
     use std::vector;
-    use aptos_std::debug;
+    use aptos_std::from_bcs;
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::account;
@@ -12,15 +13,10 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::coin;
     use aptos_framework::coin::ensure_paired_metadata;
-    use aptos_framework::permissioned_signer;
-    use aptos_framework::permissioned_signer::StorablePermissionedHandle;
+    use aptos_framework::event;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
-    #[test_only]
-    use aptos_framework::fungible_asset::Metadata;
-    #[test_only]
-    use aptos_framework::object::Object;
     #[test_only]
     use aptos_framework::transaction_fee;
 
@@ -35,6 +31,9 @@ module aptos_framework::scheduled_txns {
     /// Scheduled time is in the past
     const EINVALID_TIME: u64 = 2;
 
+    /// Scheduling is stopped
+    const EUNAVAILABLE: u64 = 3;
+
     const U64_MAX: u64 = 18446744073709551615;
 
     /// Conversion factor between our time granularity (100ms) and microseconds
@@ -46,6 +45,16 @@ module aptos_framework::scheduled_txns {
     /// If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will abort the txn
     const EXPIRY_DELTA: u64 = 100;
 
+    /// The maximum number of scheduled transactions that can be run in a block
+    const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
+
+    /// The maximum number of transactions that can be cancelled in a block during shutdown
+    const SHUTDOWN_CANCEL_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
+
+    /// The maximum number of transactions that are removed from the queue in a block
+    /// Even if there is a backlog of things to be removed, this will eventually catch-up.
+    const REMOVE_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
+
     /// SHA3-256 produces 32 bytes
     const TXN_ID_SIZE: u16 = 32;
 
@@ -56,37 +65,28 @@ module aptos_framework::scheduled_txns {
     // Todo: Confirm this is a reasonable estimate
     /// The maximum size of a function in bytes
     const AVG_FUNC_SIZE: u16 = 1000;
-    const AVG_SCHED_TXN_SIZE: u16 = 128 + AVG_FUNC_SIZE; // strictly it is 112 + AVG_FUNC_SIZE
+    const AVG_SCHED_TXN_SIZE: u16 = 56 + AVG_FUNC_SIZE; // strictly it is 112 + AVG_FUNC_SIZE
 
     /// ScheduledTransaction with permission signer handle, scheduled_time, gas params, and function
     struct ScheduledTransaction has copy, drop, store {
-        /// 72 bytes (32 + 32 + 8)
-        sender_handle: StorablePermissionedHandle,
+        /// 32 bytes
+        sender_addr: address,
         /// 100ms granularity
         scheduled_time: u64,
         /// Maximum gas to spend for this transaction
         max_gas_amount: u64,
         /// Charged @ lesser of {max_gas_unit_price, max_gas_unit_price other than this in the block executed}
         max_gas_unit_price: u64,
-        /// txn to be rescheduled at scheduled_time + next_schedule_delta_time.
-        /// Note: (1) Once set, the txn will be rescheduled at the same delta interval next time, and so on.
-        ///       (2) Can be cancelled, with the same id returned in insert(), to stop the perpetual rescheduling.
-        ///       (3) If one rescheduled fails or is expired, the perpetual rescheduling chain will be broken.
-        ///       (4) If scheduled_time + next_schedule_delta_time < current_time, the txn reschedule will fail.
-        next_schedule_delta_time: u64,
-        /// Variables are captured in the closure; no arguments passed; no return
-        f: ||
+        /// Option to pass a signer to the function
+        pass_signer: bool,
+        /// Variables are captured in the closure; optionally a signer is passed; no return
+        f: |Option<signer>| has copy + store + drop,
     }
 
     /// We pass the id around instead re-computing it
-    struct ScheduledTransactionWithKey has copy, drop, store {
+    struct ScheduledTransactionWithKey has drop {
         txn: ScheduledTransaction,
         key: ScheduleMapKey
-    }
-
-    /// SHA3-256
-    struct TransactionId has copy, drop, store {
-        hash: vector<u8>
     }
 
     /// First sorted in ascending order of time, then on gas priority, and finally on txn_id
@@ -96,28 +96,27 @@ module aptos_framework::scheduled_txns {
     struct ScheduleMapKey has copy, drop, store {
         time: u64,
         gas_priority: u64,
-        txn_id: TransactionId
+        /// SHA3-256
+        txn_id: vector<u8>
     }
-
-    /// Dummy struct to use as a value type in BigOrderedMap
-    struct Empty has copy, drop, store {}
 
     struct ScheduleQueue has key {
         /// key_size = 48 bytes; value_size = key_size + AVG_SCHED_TXN_SIZE
+        // todo: since key already has time and gas_priority, we don't have to store them in ScheduleTransaction
         schedule_map: BigOrderedMap<ScheduleMapKey, ScheduledTransaction>,
     }
 
     /// BigOrderedMap has MAX_NODE_BYTES = 409600 (400KB), MAX_DEGREE = 4096, DEFAULT_TARGET_NODE_SIZE = 4096;
     const BIG_ORDRD_MAP_TGT_ND_SZ: u16 = 4096;
     const SCHEDULE_MAP_KEY_SIZE: u16 = 48;
-    // Leaf node size = 48 * 80 (leaf_degree) = 3840 bytes (<= DEFAULT_TARGET_NODE_SIZE)
-    // todo: check if it can be DEFAULT_TARGET_NODE_SIZE/SCHEDULE_MAP_KEY_SIZE; check if value size is indeed 0
-    const SCHEDULE_MAP_LEAF_DEGREE: u16 = 80;
 
     /// Signer for the store for gas fee deposits
-    // todo: check if this is secure
-    struct GasFeeDepositStoreSignerCap has key {
-        cap: account::SignerCapability
+    struct AuxiliaryData has key {
+        // todo: check if this is secure
+        gas_fee_deposit_store_signer_cap: account::SignerCapability,
+        stop_scheduling: bool,
+        // todo: check if we need to track if stop is progress before re-starting.
+        //       I assume, any restart means we start fresh with new queue and other persistent data
     }
 
     /// We want reduce the contention while scheduled txns are being executed
@@ -127,14 +126,30 @@ module aptos_framework::scheduled_txns {
         remove_tbl: Table<u16, vector<ScheduleMapKey>>
     }
 
-    enum Result<T> has copy, drop {
-        Ok(T),
-        Err(u64)
+    enum CancelledTxnCode has drop, store {
+        /// Scheduling service is stopped
+        Shutdown,
+        /// Transaction was expired
+        Expired,
     }
 
-    struct KeySignerPair has drop {
+    #[event]
+    struct TransactionExpiredEvent has drop, store {
         key: ScheduleMapKey,
-        signer: signer,
+        sender_addr: address,
+        cancelled_txn_code: CancelledTxnCode,
+    }
+
+    #[event]
+    struct ShutdownEvent has drop, store {
+        complete: bool,
+    }
+
+    // temporary non persistent struct
+    struct KeyAndTxnInfo has drop {
+        key: ScheduleMapKey,
+        account_addr: address,
+        deposit_amt: u64,
     }
 
     /// Can be called only by the framework
@@ -153,7 +168,7 @@ module aptos_framework::scheduled_txns {
         );
 
         // Store the capability
-        move_to(framework, GasFeeDepositStoreSignerCap { cap: owner_cap });
+        move_to(framework, AuxiliaryData { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: false });
 
         // Initialize queue
         let queue = ScheduleQueue {
@@ -177,37 +192,51 @@ module aptos_framework::scheduled_txns {
     /// Stop, remove and refund all scheduled txns; can be called only by the framework
     public fun shutdown(
         framework: &signer
-    ) acquires ScheduleQueue, ToRemoveTbl, GasFeeDepositStoreSignerCap {
+    ) acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
         system_addresses::assert_aptos_framework(framework);
 
+        // set stop_scheduling flag
+        let aux_data = borrow_global_mut<AuxiliaryData>(signer::address_of(framework));
+        aux_data.stop_scheduling = true;
+
+        let txns_to_cancel = vector::empty<KeyAndTxnInfo>();
         // Make a list of txns to cancel with their keys and signers
-        let txns_to_cancel = vector::empty<KeySignerPair>();
-        let queue = borrow_global<ScheduleQueue>(signer::address_of(framework));
+        {
+            let queue = borrow_global<ScheduleQueue>(signer::address_of(framework));
 
-        // Iterate through schedule_map to get all transactions
-        let iter = queue.schedule_map.new_begin_iter();
-        while (!iter.iter_is_end(&queue.schedule_map)) {
-            let key = iter.iter_borrow_key();
-            let txn = iter.iter_borrow(&queue.schedule_map);
-            let schedule_txn_signer = permissioned_signer::signer_from_storable_permissioned_handle(
-                &txn.sender_handle
-            );
-            txns_to_cancel.push_back(KeySignerPair {
-                key: *key,
-                signer: schedule_txn_signer
-            });
-            iter = iter.iter_next(&queue.schedule_map);
+            // Iterate through schedule_map to get all transactions
+            let iter = queue.schedule_map.new_begin_iter();
+            let cancel_count = 0;
+            while ((!iter.iter_is_end(&queue.schedule_map)) && (cancel_count < SHUTDOWN_CANCEL_LIMIT)) {
+                let key = iter.iter_borrow_key();
+                let txn = iter.iter_borrow(&queue.schedule_map);
+                let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
+                txns_to_cancel.push_back(KeyAndTxnInfo {
+                    key: *key,
+                    account_addr: txn.sender_addr,
+                    deposit_amt
+                });
+                cancel_count = cancel_count + 1;
+                iter = iter.iter_next(&queue.schedule_map);
+            };
         };
 
-        // Cancel all transactions
+        // Cancel transactions
         while (!txns_to_cancel.is_empty()) {
-            let KeySignerPair { key, signer } = txns_to_cancel.pop_back();
-            cancel(&signer, key);
+            let KeyAndTxnInfo { key, account_addr, deposit_amt } = txns_to_cancel.pop_back();
+            cancel_internal(account_addr, key, deposit_amt);
+            event::emit(TransactionExpiredEvent {
+                key,
+                sender_addr: account_addr,
+                cancelled_txn_code: CancelledTxnCode::Shutdown
+            });
         };
 
-        // Remove and destroy resource
-        let ScheduleQueue { schedule_map } = move_from<ScheduleQueue>(signer::address_of(framework));
-        schedule_map.destroy(|_| {});
+        // Remove and destroy schedule_map if empty
+        let queue = borrow_global<ScheduleQueue>(signer::address_of(framework));
+        if (queue.schedule_map.is_empty()) {
+            event::emit(ShutdownEvent { complete: true });
+        };
 
         // Clean up ToRemoveTbl
         let ToRemoveTbl { remove_tbl } = borrow_global_mut<ToRemoveTbl>(signer::address_of(framework));
@@ -220,32 +249,42 @@ module aptos_framework::scheduled_txns {
         };
     }
 
-    /// todo: Do we need a function to pause ???
-    ///
-    /*public fun create_scheduled_txn(
-        s: &signer,
-        f: ||,
-    ): ScheduledTransaction {
+    /// todo: Do we need a function to pause/unpause without issuing refund of deposit ???
 
-    }*/
+    /// Constructor
+    public fun new_scheduled_transaction(
+        sender_addr: address,
+        scheduled_time: u64,
+        max_gas_amount: u64,
+        max_gas_unit_price: u64,
+        pass_signer: bool,
+        f: |Option<signer>| has copy + store + drop,
+    ): ScheduledTransaction {
+        ScheduledTransaction {
+            sender_addr,
+            scheduled_time,
+            max_gas_amount,
+            max_gas_unit_price,
+            pass_signer,
+            f,
+        }
+    }
 
     /// Insert a scheduled transaction into the queue. Txn_id is returned to user, which can be used to cancel the txn.
     public fun insert(
         sender: &signer,
         txn: ScheduledTransaction
-    ): ScheduleMapKey acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
+    ): ScheduleMapKey acquires ScheduleQueue, AuxiliaryData {
+        // If scheduling is shutdown, we cannot schedule any more transactions
+        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        assert!(!aux_data.stop_scheduling, error::unavailable(EUNAVAILABLE));
+
         // Generate unique transaction ID
-        let txn_id = TransactionId {
-            hash: sha3_256(bcs::to_bytes(&txn))
-        };
+        let txn_id = sha3_256(bcs::to_bytes(&txn));
 
         // we expect the sender to be a permissioned signer
-        let schedule_txn_signer =
-            permissioned_signer::signer_from_storable_permissioned_handle(
-                &txn.sender_handle
-            );
         assert!(
-            signer::address_of(sender) == signer::address_of(&schedule_txn_signer),
+            signer::address_of(sender) == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
 
@@ -268,9 +307,9 @@ module aptos_framework::scheduled_txns {
         // Collect deposit
         // Get owner signer from capability
         let gas_deposit_store_cap =
-            borrow_global<GasFeeDepositStoreSignerCap>(@aptos_framework);
+            borrow_global<AuxiliaryData>(@aptos_framework);
         let gas_deposit_store_signer =
-            account::create_signer_with_capability(&gas_deposit_store_cap.cap);
+            account::create_signer_with_capability(&gas_deposit_store_cap.gas_fee_deposit_store_signer_cap);
         let gas_deposit_store_addr = signer::address_of(&gas_deposit_store_signer);
 
         coin::transfer<AptosCoin>(
@@ -286,8 +325,12 @@ module aptos_framework::scheduled_txns {
     public fun cancel(
         sender: &signer,
         key: ScheduleMapKey
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
-        let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
+    ) acquires ScheduleQueue, AuxiliaryData {
+        // If scheduling is shutdown, we cannot schedule any more transactions
+        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        assert!(!aux_data.stop_scheduling, error::unavailable(EUNAVAILABLE));
+
+        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         if (!queue.schedule_map.contains(&key)) {
             return
         };
@@ -295,15 +338,22 @@ module aptos_framework::scheduled_txns {
         let txn = *queue.schedule_map.borrow(&key);
         let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
 
-        // we expect the sender to be a permissioned signer
-        let schedule_txn_signer =
-            permissioned_signer::signer_from_storable_permissioned_handle(
-                &txn.sender_handle
-            );
+        // verify sender
         assert!(
-            signer::address_of(sender) == signer::address_of(&schedule_txn_signer),
+            signer::address_of(sender) == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
+        cancel_internal(signer::address_of(sender), key, deposit_amt);
+    }
+
+    /// Internal cancel function that takes an address instead of signer. No signer verification, assumes key is present
+    /// in the schedule_map.
+    fun cancel_internal(
+        account_addr: address,
+        key: ScheduleMapKey,
+        deposit_amt: u64,
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
 
         // Remove the transaction from schedule_map
         queue.schedule_map.remove(&key);
@@ -311,33 +361,39 @@ module aptos_framework::scheduled_txns {
         // Refund the deposit
         // Get owner signer from capability
         let gas_deposit_store_cap =
-            borrow_global<GasFeeDepositStoreSignerCap>(@aptos_framework);
+            borrow_global<AuxiliaryData>(@aptos_framework);
         let gas_deposit_store_signer =
-            account::create_signer_with_capability(&gas_deposit_store_cap.cap);
+            account::create_signer_with_capability(&gas_deposit_store_cap.gas_fee_deposit_store_signer_cap);
 
         // Refund deposit from owner's store to sender
         coin::transfer<AptosCoin>(
             &gas_deposit_store_signer,
-            signer::address_of(sender),
+            account_addr,
             deposit_amt
         );
     }
 
     /// Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
     fun get_ready_transactions(
-        timestamp: u64, limit: u64
-    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
+        timestamp: u64
+    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, AuxiliaryData {
+        // If scheduling is shutdown, we cannot schedule any more transactions
+        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        if (aux_data.stop_scheduling) {
+            return vector::empty<ScheduledTransactionWithKey>();
+        };
+
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         let block_time = timestamp / MILLI_CONVERSION_FACTOR;
         let scheduled_txns = vector::empty<ScheduledTransactionWithKey>();
         let count = 0;
-        let txns_to_expire = vector::empty<KeySignerPair>();
+        let txns_to_expire = vector::empty<KeyAndTxnInfo>();
 
         let iter = queue.schedule_map.new_begin_iter();
-        while (!iter.iter_is_end(&queue.schedule_map) && count < limit) {
+        while (!iter.iter_is_end(&queue.schedule_map) && count < GET_READY_TRANSACTIONS_LIMIT) {
             let key = iter.iter_borrow_key();
             if (key.time > block_time) {
-                return scheduled_txns;
+                break;
             };
             let txn = *iter.iter_borrow(&queue.schedule_map);
             let scheduled_txn_with_id = ScheduledTransactionWithKey {
@@ -347,24 +403,33 @@ module aptos_framework::scheduled_txns {
 
             if (key.time + EXPIRY_DELTA < block_time) {
                 // Transaction has expired
-                let schedule_txn_signer = permissioned_signer::signer_from_storable_permissioned_handle(
-                    &txn.sender_handle
-                );
-                txns_to_expire.push_back(KeySignerPair {
+                let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
+                txns_to_expire.push_back(KeyAndTxnInfo {
                     key: *key,
-                    signer: schedule_txn_signer
+                    account_addr: txn.sender_addr,
+                    deposit_amt
                 });
             } else {
                 scheduled_txns.push_back(scheduled_txn_with_id);
-                count = count + 1;
             };
+            // we do not want an unbounded size of ready or expirable txns; hence we increment either way
+            count = count + 1;
             iter = iter.iter_next(&queue.schedule_map);
         };
 
         // Cancel expired transactions
         while (!txns_to_expire.is_empty()) {
-            let KeySignerPair { key, signer } = txns_to_expire.pop_back();
-            cancel(&signer, key);
+            let KeyAndTxnInfo { key, account_addr, deposit_amt } = txns_to_expire.pop_back();
+            cancel_internal(
+                account_addr,
+                key,
+                deposit_amt
+            );
+            event::emit(TransactionExpiredEvent {
+                key,
+                sender_addr: account_addr,
+                cancelled_txn_code: CancelledTxnCode::Expired
+            });
         };
 
         scheduled_txns
@@ -374,15 +439,17 @@ module aptos_framework::scheduled_txns {
     /// IMP: Make sure this does not affect parallel execution of txns
     public(friend) fun finish_execution(key: ScheduleMapKey) acquires ToRemoveTbl {
         // Get first 8 bytes of the hash as u64 and then mod
-        let hash_bytes = key.txn_id.hash;
+        let hash_bytes = key.txn_id;
         assert!(hash_bytes.length() == 32, hash_bytes.length()); // SHA3-256 produces 32 bytes
 
         // Take first 8 bytes and convert to u64
-        let value =
-            ((hash_bytes[0] as u64) << 56) | ((hash_bytes[1] as u64) << 48)
-                | ((hash_bytes[2] as u64) << 40) | ((hash_bytes[3] as u64) << 32)
-                | ((hash_bytes[4] as u64) << 24) | ((hash_bytes[5] as u64) << 16)
-                | ((hash_bytes[6] as u64) << 8) | (hash_bytes[7] as u64);
+        let hash_first_8_bytes = vector::empty();
+        let idx = 0;
+        while (idx < 8) {
+            hash_first_8_bytes.push_back(hash_bytes[idx]);
+            idx = idx + 1;
+        };
+        let value = from_bcs::to_u64(hash_first_8_bytes);
 
         // Calculate table index using hash
         let tbl_idx = ((value % TO_REMOVE_PARALLELISM) as u16);
@@ -402,24 +469,26 @@ module aptos_framework::scheduled_txns {
     public(friend) fun remove_txns() acquires ToRemoveTbl, ScheduleQueue {
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
-        let idx: u16 = 0;
+        let tbl_idx: u16 = 0;
 
-        while ((idx as u64) < TO_REMOVE_PARALLELISM) {
-            if (to_remove.remove_tbl.contains(idx)) {
-                let keys = to_remove.remove_tbl.remove(idx);
-                let keys_len = keys.length();
-                let key_idx = 0;
+        let remove_count = 0;
+        while (((tbl_idx as u64) < TO_REMOVE_PARALLELISM) && (remove_count < REMOVE_LIMIT)) {
+            if (to_remove.remove_tbl.contains(tbl_idx)) {
+                let keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
 
-                while (key_idx < keys_len) {
-                    let key = keys[key_idx];
+                while (!keys.is_empty()) {
+                    let key = keys.pop_back();
                     if (queue.schedule_map.contains(&key)) {
                         // Remove transaction from schedule_map
+                        remove_count = remove_count + 1;
                         queue.schedule_map.remove(&key);
+                        if (remove_count >= REMOVE_LIMIT) {
+                            break;
+                        };
                     };
-                    key_idx = key_idx + 1;
                 };
             };
-            idx = idx + 1;
+            tbl_idx = tbl_idx + 1;
         };
     }
 
@@ -433,196 +502,32 @@ module aptos_framework::scheduled_txns {
 
     #[test_only]
     public fun get_ready_transactions_test(
-        timestamp: u64, limit: u64
-    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
-        get_ready_transactions(timestamp, limit)
+        timestamp: u64
+    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, AuxiliaryData {
+        get_ready_transactions(timestamp)
     }
 
     #[test_only]
-    public fun create_transaction_id(hash: vector<u8>): TransactionId {
-        let txn_id = TransactionId { hash };
-        txn_id
-    }
-
-    #[test_only]
-    public fun get_deposit_owner_signer(): signer acquires GasFeeDepositStoreSignerCap {
-        let owner_cap = borrow_global<GasFeeDepositStoreSignerCap>(@aptos_framework);
-        let owner_signer = account::create_signer_with_capability(&owner_cap.cap);
+    public fun get_deposit_owner_signer(): signer acquires AuxiliaryData {
+        let owner_cap = borrow_global<AuxiliaryData>(@aptos_framework);
+        let owner_signer = account::create_signer_with_capability(&owner_cap.gas_fee_deposit_store_signer_cap);
         owner_signer
     }
 
     #[test_only]
-    public fun get_metadata_for_AptosCoin(): Object<Metadata> {
-        coin::ensure_paired_metadata<AptosCoin>()
-    }
-
-    struct State has copy, drop, store {
-        count: u64
-    }
-
-    #[persistent]
-    fun step(state: State, _val: u64) {
-        if (state.count < 10) {
-            state.count = state.count + 1;
-        }
-    }
-
-    #[persistent]
-    fun self_rescheduling_func(
-        storable_perm_handle: StorablePermissionedHandle,
-        scheduled_time: u64,
-        max_gas_unit_price: u64,
-        max_gas_amount: u64,
-        delta_time: u64,
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
-        // do work
-
-        // reschedule
-        //let new_scheduled_time = scheduled_time + delta_time;
-        let storable_perm_handle_copy = storable_perm_handle;
-        let next_txn = {
-            let foo = || self_rescheduling_func(
-                storable_perm_handle_copy,
-                scheduled_time,  // Update scheduled time here
-                max_gas_unit_price,
-                max_gas_amount,
-                delta_time
-            );
-            ScheduledTransaction {
-                sender_handle: storable_perm_handle,
-                scheduled_time: scheduled_time + delta_time,
-                max_gas_amount,
-                max_gas_unit_price,
-                next_schedule_delta_time: 0,
-                f: foo
-            }
-        };
-        // Get signer from handle
-        let signer = permissioned_signer::signer_from_storable_permissioned_handle(&storable_perm_handle_copy);
-
-        // Schedule next execution
-        insert(&signer, next_txn);
-    }
-
-    /*#[persistent]
-    fun self_rescheduling_func(
-        storable_perm_handle: StorablePermissionedHandle,
-        scheduled_time: u64,
-        max_gas_unit_price: u64,
-        max_gas_amount: u64,
-        delta_time: u64,
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
-        // Perform the work
-        //do_work();
-
-        // Prepare the next transaction
-        let next_scheduled_time = scheduled_time + delta_time;
-        let next_txn = ScheduledTransaction {
-            sender_handle: storable_perm_handle,
-            scheduled_time: next_scheduled_time,
-            max_gas_amount,
-            max_gas_unit_price,
-            next_schedule_delta_time: delta_time,
-            f: || defer_reschedule(
-                storable_perm_handle,
-                next_scheduled_time,
-                max_gas_unit_price,
-                max_gas_amount,
-                delta_time
-            )
-        };
-
-        // Get the signer from the handle
-        let signer = permissioned_signer::signer_from_storable_permissioned_handle(&storable_perm_handle);
-
-        // Insert the next transaction into the queue
-        insert(&signer, next_txn);
-    }
-
-    fun defer_reschedule(
-        storable_perm_handle: StorablePermissionedHandle,
-        scheduled_time: u64,
-        max_gas_unit_price: u64,
-        max_gas_amount: u64,
-        delta_time: u64,
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap, store {
-        // Reschedule the transaction
-        self_rescheduling_func(
-            storable_perm_handle,
-            scheduled_time,
-            max_gas_unit_price,
-            max_gas_amount,
-            delta_time
-        );
-    }*/
-
-    #[test_only]
-    public fun get_txn_by_key(
+    public fun get_func_from_txn_key(
         key: ScheduleMapKey
-    ): ScheduledTransaction acquires ScheduleQueue {
+    ): |Option<signer>| has copy acquires ScheduleQueue {
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         assert!(queue.schedule_map.contains(&key), 0);
         let txn = *queue.schedule_map.borrow(&key);
-        txn
-    }
-
-    #[test_only]
-    public fun execute_f(txn: &ScheduledTransaction) {
-        (txn.f)();
-    }
-
-    #[test_only]
-    public fun create_scheduled_txn_reschedule(
-        storable_perm_handle: StorablePermissionedHandle,
-        scheduled_time: u64,
-        max_gas_unit_price: u64,
-        max_gas_amount: u64,
-        next_schedule_delta_time: u64,
-    ): ScheduledTransaction acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
-        let state = State { count: 8 };
-        let foo = || self_rescheduling_func(
-            storable_perm_handle,
-            scheduled_time,
-            max_gas_unit_price,
-            max_gas_amount,
-            next_schedule_delta_time
-        );
-
-        ScheduledTransaction {
-            sender_handle: storable_perm_handle,
-            scheduled_time,
-            max_gas_amount,
-            max_gas_unit_price,
-            next_schedule_delta_time,
-            f: foo
-        }
-    }
-
-    #[test_only]
-    public fun create_scheduled_txn(
-        storable_perm_handle: StorablePermissionedHandle,
-        scheduled_time: u64,
-        max_gas_unit_price: u64,
-        max_gas_amount: u64,
-        next_schedule_delta_time: u64,
-    ): ScheduledTransaction {
-        let state = State { count: 8 };
-        let foo = || step(state, 5);
-
-        ScheduledTransaction {
-            sender_handle: storable_perm_handle,
-            scheduled_time,
-            max_gas_amount,
-            max_gas_unit_price,
-            next_schedule_delta_time,
-            f: foo
-        }
+        txn.f
     }
 
     #[test_only]
     public fun shutdown_test(
         fx: &signer
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap, ToRemoveTbl {
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
         shutdown(fx);
     }
 
@@ -647,114 +552,98 @@ module aptos_framework::scheduled_txns {
         coin::destroy_mint_cap(mint);
     }
 
-    #[test_only]
-    public fun setup_permissions(user: &signer): StorablePermissionedHandle {
-        let storable_perm_handle =
-            permissioned_signer::create_storable_permissioned_handle(user, 60);
-        let perm_signer =
-            permissioned_signer::signer_from_storable_permissioned_handle(
-                &storable_perm_handle
-            );
-        let metadata = coin::ensure_paired_metadata<AptosCoin>();
-        primary_fungible_store::grant_permission(user, &perm_signer, metadata, 1000000);
-        storable_perm_handle
+    struct State has copy, drop, store {
+        count: u64
     }
 
-    #[test_only]
-    public fun mock_execute(key: ScheduleMapKey) acquires ScheduleQueue, ToRemoveTbl {
-        let txn = {
-            let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-            assert!(queue.schedule_map.contains(&key), 0);
-            *queue.schedule_map.borrow(&key)
-        };
-        // Execute the transaction
-        (txn.f)();
-        // Finish execution
-        finish_execution(key);
+    #[persistent]
+    fun step(state: State, _s: Option<signer>) {
+        if (state.count < 10) {
+            state.count = state.count + 1;
+        }
     }
 
     #[test(fx = @0x1, user = @0x1234)]
     fun test_basic(
         fx: &signer, user: signer
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap, ToRemoveTbl {
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+        let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         // Setup test environment
         setup_test_env(fx, &user, curr_mock_time_micro_s);
 
-        // Create permissioned handle and set permissions
-        let storable_perm_handle = setup_permissions(&user);
-
         // Create transactions with same scheduled_time but different gas prices
+        let state = State { count: 8 };
+        let foo = |s: Option<signer>| step(state, s);
         let schedule_time1 = curr_mock_time_micro_s / 1000 + 1000;
         let schedule_time2 = schedule_time1 * 2;
         let schedule_time3 = schedule_time1 * 4;
-        let reschedule_delta = schedule_time3 + 10000;
-        let txn1 = create_scheduled_txn(
-            storable_perm_handle,
+        let txn1 = new_scheduled_transaction(
+            user_addr,
             schedule_time1,
+            100,
             20,
-            100,
-            0
+            false,
+            foo
         ); // time: 1s, gas: 20
-        let txn2 = create_scheduled_txn(
-            storable_perm_handle,
+        let txn2 = new_scheduled_transaction(
+            user_addr,
             schedule_time1,
+            100,
             30,
-            100,
-            0
+            false,
+            foo
         ); // time: 1s, gas: 30
-        let txn3 = create_scheduled_txn(
-            storable_perm_handle,
+        let txn3 = new_scheduled_transaction(
+            user_addr,
             schedule_time1,
-            10,
             100,
-            0
+            10,
+            false,
+            foo
         ); // time: 1s, gas: 10
 
         // Create transactions with same scheduled_time and gas price
-        let txn4 = create_scheduled_txn(
-            storable_perm_handle,
+        let txn4 = new_scheduled_transaction(
+            user_addr,
             schedule_time2,
-            20,
             1000,
-            0
+            20,
+            false,
+            foo
         ); // time: 2s, gas: 20
-        /*let txn5 =
-            create_scheduled_txn(
-                storable_perm_handle,
-                schedule_time2,
-                20,
-                100,
-                reschedule_delta
-            );*/ // time: 2s, gas: 20
-        let txn5 = create_scheduled_txn_reschedule(
-            storable_perm_handle,
+        let txn5 = new_scheduled_transaction(
+            user_addr,
             schedule_time2,
-            20,
             100,
-            reschedule_delta
-        );
-        let txn6 = create_scheduled_txn(
-            storable_perm_handle,
-            schedule_time2,
             20,
+            false,
+            foo
+        );
+        let txn6 = new_scheduled_transaction(
+            user_addr,
+            schedule_time2,
             200,
-            0
+            20,
+            false,
+            foo
         ); // time: 2s, gas: 20
 
-        let txn7 = create_scheduled_txn(
-            storable_perm_handle,
+        let txn7 = new_scheduled_transaction(
+            user_addr,
             schedule_time3,
-            20,
             100,
-            0
-        ); // time: 2s, gas: 20
-        let txn8 = create_scheduled_txn(
-            storable_perm_handle,
-            schedule_time3,
             20,
+            false,
+            foo
+        ); // time: 2s, gas: 20
+        let txn8 = new_scheduled_transaction(
+            user_addr,
+            schedule_time3,
             200,
-            0
+            20,
+            false,
+            foo
         ); // time: 2s, gas: 20
 
         // Insert all transactions
@@ -762,7 +651,7 @@ module aptos_framework::scheduled_txns {
         let txn2_key = insert(&user, txn2);
         let txn3_key = insert(&user, txn3);
         let txn4_key = insert(&user, txn4);
-        let txn5_key = insert(&user, txn5);
+        let _txn5_key = insert(&user, txn5);
         let txn6_key = insert(&user, txn6);
         let txn7_key = insert(&user, txn7);
         let txn8_key = insert(&user, txn8);
@@ -770,16 +659,13 @@ module aptos_framework::scheduled_txns {
         assert!(get_num_txns() == 8, get_num_txns());
 
         // Test get_ready_transactions at t < schedule_time1 (should return empty)
-        let ready_txns = get_ready_transactions(schedule_time1 - 1000, 10);
+        let ready_txns = get_ready_transactions(schedule_time1 - 1000);
         assert!(ready_txns.length() == 0, ready_txns.length());
 
         // Test get_ready_transactions at t > schedule_time1 (should return first 3 txns)
-        let ready_txns = get_ready_transactions(schedule_time1 + 1000, 10);
+        let ready_txns = get_ready_transactions(schedule_time1 + 1000);
         assert!(ready_txns.length() == 3, ready_txns.length());
 
-        // Test the limit param of get_ready_transactions
-        ready_txns = get_ready_transactions(schedule_time1 + 1000, 2);
-        assert!(ready_txns.length() == 2, ready_txns.length());
         // Check the order of transactions
         assert!(ready_txns[0].key.txn_id == txn2_key.txn_id, 1);
         assert!(ready_txns[1].key.txn_id == txn1_key.txn_id, 2);
@@ -792,7 +678,7 @@ module aptos_framework::scheduled_txns {
         assert!(get_num_txns() == 5, get_num_txns());
 
         // Test get_ready_transactions at t > schedule_time2 (should return next 3 txns)
-        let ready_txns = get_ready_transactions(schedule_time2 + 1000, 10);
+        let ready_txns = get_ready_transactions(schedule_time2 + 1000);
         assert!(ready_txns.length() == 3, ready_txns.length());
 
         // Execute and remove 2 transactions
@@ -801,34 +687,27 @@ module aptos_framework::scheduled_txns {
         remove_txns(); // Should remove 2 txns
         assert!(get_num_txns() == 3, get_num_txns());
 
-        let ready_txns = get_ready_transactions(schedule_time2 + 1000, 10);
+        let ready_txns = get_ready_transactions(schedule_time2 + 1000);
         assert!(ready_txns.length() == 1, ready_txns.length());
 
-        // Execute and remove last 3 transactions
-        mock_execute(txn5_key); // we expect txn5 to reschedule itself
+        // Execute and remove txns 7 and 8; lets expire txn 5
         finish_execution(txn7_key);
         finish_execution(txn8_key);
 
-        remove_txns(); // Should remove all but txn which has to be rescheduled
+        remove_txns();
         assert!(get_num_txns() == 1, get_num_txns());
-        assert!(
-            get_ready_transactions(schedule_time2, 10).length() == 0,
-            get_ready_transactions(schedule_time2, 10).length()
-        );
-        assert!(
-            get_ready_transactions(schedule_time2 + reschedule_delta, 10).length() == 1,
-            get_ready_transactions(schedule_time2 + reschedule_delta, 10).length()
-        );
 
         // try expiring a txn by getting it late
         let expired_time =
-            schedule_time2 + reschedule_delta + EXPIRY_DELTA * MILLI_CONVERSION_FACTOR
+            schedule_time2 + EXPIRY_DELTA * MILLI_CONVERSION_FACTOR
                 + 1000;
         assert!(
-            get_ready_transactions(expired_time, 10).length() == 0,
-            get_ready_transactions(expired_time, 10).length()
+            get_ready_transactions(expired_time).length() == 0,
+            get_ready_transactions(expired_time).length()
         );
         assert!(get_num_txns() == 0, get_num_txns());
+
+        shutdown(fx);
     }
 
     #[test(fx = @0x1, user = @0x1234)]
@@ -836,14 +715,16 @@ module aptos_framework::scheduled_txns {
     // error::invalid_argument(EINVALID_TIME)
     fun test_insert_past_time(
         fx: &signer, user: signer
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         setup_test_env(fx, &user, curr_mock_time_micro_s);
-        let storable_perm_handle = setup_permissions(&user);
 
         // Try to schedule transaction in the past
         let past_time = curr_mock_time_micro_s / 1000 - 100;
-        let txn = create_scheduled_txn(storable_perm_handle, past_time, 20, 100, 0);
+        let state = State { count: 8 };
+        let foo = |s: Option<signer>| step(state, s);
+        let txn = new_scheduled_transaction(user_addr, past_time, 100, 20, false, foo);
 
         // Create a signer from the handle to use for insert
         insert(&user, txn); // Should fail with EINVALID_TIME since time is in the past
@@ -854,14 +735,16 @@ module aptos_framework::scheduled_txns {
     // error::permission_denied(EINVALID_SIGNER)
     fun test_insert_wrong_user(
         fx: &signer, user: signer, other_user: signer
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
         let curr_mock_time = 1000000;
         setup_test_env(fx, &user, curr_mock_time);
-        let storable_perm_handle = setup_permissions(&user);
 
         // Try to schedule transaction with wrong user
         let future_time = curr_mock_time + 1000;
-        let txn = create_scheduled_txn(storable_perm_handle, future_time, 20, 100, 0);
+        let state = State { count: 8 };
+        let foo = |s: Option<signer>| step(state, s);
+        let txn = new_scheduled_transaction(user_addr, future_time, 100, 20, false, foo);
         insert(&other_user, txn); // Should fail with EINVALID_SIGNER
     }
 
@@ -870,17 +753,122 @@ module aptos_framework::scheduled_txns {
     // error::permission_denied(EINVALID_SIGNER)
     fun test_cancel_wrong_user(
         fx: &signer, user: signer, other_user: signer
-    ) acquires ScheduleQueue, GasFeeDepositStoreSignerCap {
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
         let curr_mock_time = 1000000;
         setup_test_env(fx, &user, curr_mock_time);
-        let storable_perm_handle = setup_permissions(&user);
 
         // Schedule a valid transaction
         let future_time = curr_mock_time + 1000;
-        let txn = create_scheduled_txn(storable_perm_handle, future_time, 20, 100, 0);
+        let state = State { count: 8 };
+        let foo = |s: Option<signer>| step(state, s);
+        let txn = new_scheduled_transaction(user_addr, future_time, 100, 20, false, foo);
         let txn_id = insert(&user, txn);
 
         // Try to cancel the transaction with wrong user
         cancel(&other_user, txn_id); // Should fail with EINVALID_SIGNER
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    #[expected_failure(abort_code = 851971)] // error::unavailable(EUNAVAILABLE)
+    fun test_insert_when_stopped(
+        fx: &signer,
+        user: signer
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+
+        // Setup test environment
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        // Stop scheduling
+        shutdown(fx);
+
+        // Try to insert a transaction after shutdown
+        let future_time = curr_mock_time_micro_s / 1000 + 1000;
+        let state = State { count: 8 };
+        let foo = |s: Option<signer>| step(state, s);
+        let txn = new_scheduled_transaction(
+            user_addr,
+            future_time,
+            100,
+            20,
+            false,
+            foo
+        );
+
+        // This should fail with EUNAVAILABLE
+        insert(&user, txn);
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    fun test_exceeding_limits(
+        fx: &signer,
+        user: signer
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let total_txns = GET_READY_TRANSACTIONS_LIMIT * 5; // Exceeds both limits
+        let txn_keys = vector::empty<ScheduleMapKey>();
+
+        // Insert more transactions than both limits
+        let i = 0;
+        while (i < total_txns) {
+            let state = State { count: 8 };
+            let foo = |s: Option<signer>| step(state, s);
+            let txn = new_scheduled_transaction(
+                user_addr,
+                curr_mock_time_micro_s / 1000 + 1000 + i, // Different times to ensure unique ordering
+                100,
+                20,
+                false,
+                foo
+            );
+            let key = insert(&user, txn);
+            txn_keys.push_back(key);
+            i = i + 1;
+        };
+
+        assert!(get_num_txns() == total_txns, get_num_txns());
+
+        // Test GET_READY_TRANSACTIONS_LIMIT
+        let time_for_all = curr_mock_time_micro_s / 1000 + total_txns + 1000;
+        let ready_txns = get_ready_transactions(time_for_all);
+        assert!(ready_txns.length() == GET_READY_TRANSACTIONS_LIMIT, ready_txns.length());
+
+        // Verify transactions are ordered by time
+        let prev_time = 0;
+        let i = 0;
+        while (i < ready_txns.length()) {
+            let txn = ready_txns.borrow(i);
+            assert!(txn.key.time >= prev_time, 0);
+            prev_time = txn.key.time;
+            i = i + 1;
+        };
+
+        // Mark more transactions than REMOVE_LIMIT for removal
+        i = 0;
+        while (i < txn_keys.length()) {
+            finish_execution(txn_keys[i]);
+            i = i + 1;
+        };
+
+        // Verify REMOVE_LIMIT behavior
+        let initial_count = get_num_txns();
+        remove_txns();
+        let removed_count = initial_count - get_num_txns();
+        assert!(removed_count == REMOVE_LIMIT, removed_count);
+
+        // Verify SHUTDOWN_CANCEL_LIMIT behavior
+        let pre_shutdown_count = get_num_txns();
+        shutdown(fx);
+        let post_shutdown_count = get_num_txns();
+        let cancelled_count = pre_shutdown_count - post_shutdown_count;
+        assert!(cancelled_count == SHUTDOWN_CANCEL_LIMIT, cancelled_count);
+
+        // Verify that next call to shutdown complete without error
+        shutdown(fx);
     }
 }

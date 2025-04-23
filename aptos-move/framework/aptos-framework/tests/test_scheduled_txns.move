@@ -1,20 +1,63 @@
 #[test_only]
 module aptos_framework::test_scheduled_txns {
+    use std::option::{Option, some};
     use std::signer;
     use aptos_framework::coin::{Self};
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::scheduled_txns::{Self, create_transaction_id, ScheduleMapKey, ScheduleQueue, get_txn_by_key,
-        finish_execution
-    };
+    use aptos_framework::scheduled_txns::{Self, ScheduleMapKey, finish_execution};
+    use aptos_framework::timestamp;
     use aptos_framework::transaction_validation;
 
+    #[persistent]
+    fun simpleFunc(_state: u64, _s: Option<signer>) {
+        if (_state < 10) {
+            _state = _state + 1;
+        }
+    }
+
     #[test_only]
-    public fun mock_execute(key: ScheduleMapKey) {
-        let txn = get_txn_by_key(key);
-        // Execute the transaction
-        scheduled_txns::execute_f(&txn);
+    public fun mock_execute(key: ScheduleMapKey, signer: signer) {
+        let f = scheduled_txns::get_func_from_txn_key(key);
+        f(some<signer>(signer));
         // Finish execution
         finish_execution(key);
+    }
+
+    #[persistent]
+    fun self_rescheduling_func(
+        scheduling_acc_signer: Option<signer>,
+        max_gas_amount: u64,
+        max_gas_unit_price: u64,
+        delta_time: u64
+    ) {
+        // do work
+
+        // reschedule
+        // Get current time in microseconds
+        let current_time = timestamp::now_microseconds() / 1000;
+
+        let next_txn = {
+            let foo =
+                |signer: Option<signer>| self_rescheduling_func(
+                    signer,
+                    max_gas_amount,
+                    max_gas_unit_price,
+                    delta_time
+                );
+            let signer = scheduling_acc_signer.borrow();
+            let scheduling_acc_addr = signer::address_of(signer);
+            scheduled_txns::new_scheduled_transaction(
+                scheduling_acc_addr,
+                current_time + delta_time,
+                max_gas_amount,
+                max_gas_unit_price,
+                true,
+                foo
+            )
+        };
+        // Schedule next execution
+        let signer = scheduling_acc_signer.extract();
+        scheduled_txns::insert(&signer, next_txn);
     }
 
     // Purpose of this test is to test 'scheduled_txn_epilogue'
@@ -35,39 +78,38 @@ module aptos_framework::test_scheduled_txns {
         let user_addr = signer::address_of(&user);
         let pre_balance = coin::balance<AptosCoin>(user_addr);
 
-        // Create permissioned handle and set permissions
-        let storable_perm_handle = scheduled_txns::setup_permissions(&user);
-
         let schedule_time = curr_mock_time_micro_s / 1000 + 1000;
         let txn_max_gas_units = 100;
         let gas_units_remaining = 50;
 
         // Create test transactions
+        let foo = |signer: Option<signer>| simpleFunc(5, signer);
         let gas_price_txn1 = 20;
         let txn1 =
-            scheduled_txns::create_scheduled_txn(
-                storable_perm_handle,
+            scheduled_txns::new_scheduled_transaction(
+                user_addr,
                 schedule_time,
-                gas_price_txn1,
                 txn_max_gas_units,
-                0
+                gas_price_txn1,
+                false,
+                foo
             );
         let gas_price_txn2 = 30;
-        /*let txn2 =
-            scheduled_txns::create_scheduled_txn(
-                storable_perm_handle,
-                schedule_time,
+        let rescheduling_foo =
+            |signer: Option<signer>| self_rescheduling_func(
+                signer,
                 gas_price_txn2,
                 txn_max_gas_units,
-                2000
-            );*/
+                3000
+            );
         let txn2 =
-            scheduled_txns::create_scheduled_txn_reschedule(
-                storable_perm_handle,
+            scheduled_txns::new_scheduled_transaction(
+                user_addr,
                 schedule_time,
-                gas_price_txn2,
                 txn_max_gas_units,
-                2000
+                gas_price_txn2,
+                true,
+                rescheduling_foo
             );
 
         // Insert transactions
@@ -86,8 +128,9 @@ module aptos_framework::test_scheduled_txns {
         );
 
         // Move time forward and get ready transactions
-        let ready_txns =
-            scheduled_txns::get_ready_transactions_test(schedule_time + 1000, 10);
+        let ready_txns = scheduled_txns::get_ready_transactions_test(
+            schedule_time + 1000
+        );
         assert!(ready_txns.length() == 2, ready_txns.length());
 
         // Execute and verify transaction epilogue
@@ -113,7 +156,7 @@ module aptos_framework::test_scheduled_txns {
         );
 
         // Cleanup
-        /*let txn2_charged_gas_price = gas_price_txn2 - 10;
+        let txn2_charged_gas_price = gas_price_txn2 - 10;
         let txn2_storage_fee_refund = 2000; // large refund, so that there is net refund
         transaction_validation::scheduled_txn_epilogue_test_helper(
             &fa_store_signer,
@@ -133,12 +176,17 @@ module aptos_framework::test_scheduled_txns {
             (post_txn1_balance + txn2_deposit_refund + txn2_storage_fee_refund)
                 == post_txn2_balance,
             post_txn2_balance
-        );*/
+        );
 
         // check reschedule
-        mock_execute(txn2_key);
+        mock_execute(txn2_key, user);
         scheduled_txns::remove_txns();
         assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
+        assert!(
+            scheduled_txns::get_ready_transactions_test(schedule_time + 2000).length()
+                == 1,
+            scheduled_txns::get_num_txns()
+        );
 
         // Shutdown should cancel all transactions and refund all deposits
         scheduled_txns::shutdown_test(fx);
