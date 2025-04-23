@@ -5,7 +5,7 @@
 /// <domain> wants you to sign in with your Solana account:
 /// <base58_public_key>
 ///
-/// To execute transaction <entry_function_name> on Aptos blockchain (<network_name>).
+/// Please confirm you explicitly initiated this request from <domain>. You are approving to execute transaction <entry_function_name> on Aptos blockchain (<network_name>).
 ///
 /// Nonce: <aptos_txn_digest>
 ///
@@ -13,6 +13,9 @@
 /// 3. The abstract signature is a BCS serialized `SIWSAbstractSignature`.
 /// 4. This module has been tested for the following wallets:
 /// - Phantom
+/// - Solflare
+/// - Backpack
+/// - OKX
 module aptos_framework::solana_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_std::ed25519::{
@@ -104,7 +107,10 @@ module aptos_framework::solana_derivable_account {
         message.append(*domain);
         message.append(b" wants you to sign in with your Solana account:\n");
         message.append(*base58_public_key);
-        message.append(b"\n\nTo execute transaction ");
+        message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
+        message.append(*domain);
+        message.append(b".");
+        message.append(b" You are approving to execute transaction ");
         message.append(*entry_function_name);
         message.append(b" on Aptos blockchain");
         let network_name = network_name();
@@ -293,7 +299,7 @@ module aptos_framework::solana_derivable_account {
         let entry_function_name = b"0x1::coin::transfer";
         let digest_utf8 = b"0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279";
         let message = construct_message(&base58_public_key, &domain, &entry_function_name, &digest_utf8);
-        assert!(message == b"localhost:3000 wants you to sign in with your Solana account:\nG56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV\n\nTo execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279");
+        assert!(message == b"localhost:3000 wants you to sign in with your Solana account:\nG56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV\n\nPlease confirm you explicitly initiated this request from localhost:3000. You are approving to execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279");
     }
 
     #[test]
@@ -345,40 +351,32 @@ module aptos_framework::solana_derivable_account {
 
     #[test(framework = @0x1)]
     fun test_authenticate_auth_data(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
+        chain_id::initialize_for_test(framework, 4);
 
-        let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature = vector[129, 0, 6, 135, 53, 153, 88, 201, 243,
-        227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
-        83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
-        66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
-        128, 78, 62, 81, 73, 167, 235, 1];
+        let digest = x"9800ae3d949260dedd01573b2903e9de06abe914530ba5d21f068f8823bfdfa3";
+        let signature = vector[70, 135, 9, 250, 23, 189, 162, 119, 77, 133, 195, 66, 102, 105, 116, 86, 29, 118, 226, 100, 94, 120, 138, 219, 252, 134, 231, 139, 47, 77, 19, 201, 4, 88, 255, 64, 185, 96, 134, 50, 27, 30, 110, 125, 251, 89, 57, 156, 17, 170, 16, 102, 107, 40, 46, 234, 15, 162, 156, 69, 132, 70, 135, 11];
         let abstract_signature = create_message_v1_signature(signature);
-        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
-        let domain = b"localhost:3000";
+        let base58_public_key = b"Awrh7Cfvx5gc7Ua93hdmmni6KWvkJgH4HwMkixTxmxe";
+        let domain = b"localhost:3001";
         let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
-        let entry_function_name = b"0x1::coin::transfer";
+        let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
     }
 
     #[test(framework = @0x1)]
     #[expected_failure(abort_code = EINVALID_SIGNATURE)]
     fun test_authenticate_auth_data_invalid_signature(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
+        chain_id::initialize_for_test(framework, 4);
 
-        let digest = x"026a4f93c2010cbafbac45639e995410d0902d11a3c4f0fcd1c64a1d193f4866";
-        let signature = vector[128, 0, 6, 135, 53, 153, 88, 201, 243,
-        227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189,
-        83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237,
-        66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39,
-        128, 78, 62, 81, 73, 167, 235, 1];
+        let digest = x"9800ae3d949260dedd01573b2903e9de06abe914530ba5d21f068f8823bfdfa3";
+        let signature = vector[71, 135, 9, 250, 23, 189, 162, 119, 77, 133, 195, 66, 102, 105, 116, 86, 29, 118, 226, 100, 94, 120, 138, 219, 252, 134, 231, 139, 47, 77, 19, 201, 4, 88, 255, 64, 185, 96, 134, 50, 27, 30, 110, 125, 251, 89, 57, 156, 17, 170, 16, 102, 107, 40, 46, 234, 15, 162, 156, 69, 132, 70, 135, 11];
         let abstract_signature = create_message_v1_signature(signature);
-        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
-        let domain = b"localhost:3000";
+        let base58_public_key = b"Awrh7Cfvx5gc7Ua93hdmmni6KWvkJgH4HwMkixTxmxe";
+        let domain = b"localhost:3001";
         let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
-        let entry_function_name = b"0x1::coin::transfer";
+        let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
     }
 }
