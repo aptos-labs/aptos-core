@@ -3,7 +3,11 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [7.3.0]
+
 - Update boogie from 3.2.4 to 3.5.1.
+- Change behavior of `aptos init` to first look and see if the account has an APT balance rather than checking if the account exists
 
 ## [7.2.0]
 

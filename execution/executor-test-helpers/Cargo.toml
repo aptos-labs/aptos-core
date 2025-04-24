@@ -27,4 +27,5 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
+move-core-types = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }

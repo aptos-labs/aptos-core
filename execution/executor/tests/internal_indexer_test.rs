@@ -175,7 +175,7 @@ fn test_db_indexer_data() {
 
     let x = internal_indexer_db.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert_eq!(res.len(), 16);
+    assert_eq!(res.len(), 4);
 
     let core_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
@@ -185,7 +185,7 @@ fn test_db_indexer_data() {
         )
         .unwrap();
     let core_kv_res: Vec<_> = core_kv_iter.collect();
-    assert_eq!(core_kv_res.len(), 5);
+    assert_eq!(core_kv_res.len(), 4);
     let address_one_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
             &StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap()),
@@ -229,17 +229,19 @@ fn test_db_indexer_data() {
         ident_str!("account"),
         ident_str!("ed25519"),
         ident_str!("genesis"),
+        ident_str!("keyless"),
         ident_str!("math128"),
         ident_str!("version"),
         ident_str!("vesting"),
         ident_str!("bls12381"),
         ident_str!("chain_id"),
-        ident_str!("daa_siws"),
         ident_str!("features"),
         ident_str!("from_bcs"),
         ident_str!("pool_u64"),
         ident_str!("auth_data"),
+        ident_str!("multi_key"),
         ident_str!("secp256k1"),
+        ident_str!("secp256r1"),
         ident_str!("timestamp"),
         ident_str!("type_info"),
         ident_str!("aggregator"),
@@ -253,6 +255,7 @@ fn test_db_indexer_data() {
         ident_str!("math_fixed"),
         ident_str!("randomness"),
         ident_str!("simple_map"),
+        ident_str!("single_key"),
         ident_str!("ordered_map"),
         ident_str!("smart_table"),
         ident_str!("storage_gas"),
@@ -293,6 +296,7 @@ fn test_db_indexer_data() {
         ident_str!("resource_account"),
         ident_str!("staking_contract"),
         ident_str!("system_addresses"),
+        ident_str!("federated_keyless"),
         ident_str!("randomness_config"),
         ident_str!("table_with_length"),
         ident_str!("aggregator_factory"),
@@ -313,6 +317,7 @@ fn test_db_indexer_data() {
         ident_str!("randomness_api_v0_config"),
         ident_str!("randomness_config_seqnum"),
         ident_str!("reconfiguration_with_dkg"),
+        ident_str!("solana_derivable_account"),
         ident_str!("validator_consensus_info"),
         ident_str!("ristretto255_bulletproofs"),
         ident_str!("dispatchable_fungible_asset"),
@@ -363,8 +368,8 @@ fn test_db_indexer_data() {
         (false, "0x1::randomness_config::RandomnessConfig"),
         (false, "0x1::staking_config::StakingRewardsConfig"),
         (false, "0x1::aggregator_factory::AggregatorFactory"),
-        (false, "0x1::transaction_fee::AptosCoinCapabilities"),
         (false, "0x1::transaction_fee::AptosCoinMintCapability"),
+        (false, "0x1::transaction_fee::AptosFABurnCapabilities"),
         (false, "0x1::jwk_consensus_config::JWKConsensusConfig"),
         (false, "0x1::aptos_governance::ApprovedExecutionHashes"),
         (false, "0x1::aptos_governance::GovernanceResponsbility"),

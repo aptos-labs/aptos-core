@@ -12,6 +12,8 @@ use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
     executor::FakeExecutor,
 };
+use aptos_rest_client::AptosBaseUrl;
+use aptos_transaction_simulation::SimulationStateStore;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
@@ -133,6 +135,59 @@ impl MoveHarness {
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
+    }
+
+    /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
+    /// transaction id, with support for a custom API key to access node APIs.
+    ///
+    /// Simulations based on remote states rely heavily on API calls, which can easily run into
+    /// rate limits if executed repeatedly or in parallel.
+    /// Providing an API key raises these limits significantly.
+    ///
+    /// If you hit rate limits, you can create a free Aptos Build account and generate an API key:
+    /// - https://build.aptoslabs.com/docs/start#api-quick-start
+    fn new_with_remote_state_impl(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: Option<&str>,
+    ) -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+
+        let executor = match api_key {
+            Some(api_key) => {
+                FakeExecutor::from_remote_state_with_api_key(network_url, txn_id, api_key)
+            },
+            None => FakeExecutor::from_remote_state(network_url, txn_id),
+        };
+
+        let gas_schedule: GasScheduleV2 = executor.state_store().get_on_chain_config().unwrap();
+        let feature_version = gas_schedule.feature_version;
+        let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+            &gas_schedule.into_btree_map(),
+            feature_version,
+        )
+        .unwrap();
+
+        Self {
+            executor,
+            txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: gas_params.vm.txn.min_price_per_gas_unit.into(),
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+        }
+    }
+
+    /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
+    /// transaction id.
+    pub fn new_with_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
+        Self::new_with_remote_state_impl(network_url, txn_id, None)
+    }
+
+    pub fn new_with_remote_state_with_api_key(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: &str,
+    ) -> Self {
+        Self::new_with_remote_state_impl(network_url, txn_id, Some(api_key))
     }
 
     pub fn new_with_features(
@@ -259,6 +314,10 @@ impl MoveHarness {
         *seq_no_ref = seq_no + 1;
         account
             .transaction()
+            .chain_id(self.executor.get_chain_id())
+            .ttl(
+                self.executor.get_block_time() + 3_600_000_000, /* an hour after the current time */
+            )
             .sequence_number(seq_no)
             .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)

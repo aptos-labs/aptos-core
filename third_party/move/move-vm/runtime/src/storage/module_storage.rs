@@ -136,18 +136,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         let module = self
             .fetch_existing_verified_module(address, module_name)
             .map_err(|err| err.to_partial())?;
-        Ok(module
-            .struct_map
-            .get(struct_name)
-            .and_then(|idx| module.structs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Struct {}::{}::{} does not exist",
-                    address, module_name, struct_name
-                ))
-            })?
-            .definition_struct_type
-            .clone())
+        module
+            .get_struct(struct_name)
+            .map_err(|err| err.to_partial())
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
@@ -194,19 +185,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         let module = self.fetch_existing_verified_module(address, module_name)?;
-        let function = module
-            .function_map
-            .get(function_name)
-            .and_then(|idx| module.function_defs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!(
-                        "Function {}::{}::{} does not exist",
-                        address, module_name, function_name
-                    ))
-                    .finish(Location::Undefined)
-            })?
-            .clone();
+        let function = module.get_function(function_name)?;
         Ok((module, function))
     }
 
@@ -463,36 +442,6 @@ impl<T: ModuleStorage> AsFunctionValueExtension for T {
 }
 
 impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
-    fn get_function_arg_tys(
-        &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        substitution_ty_arg_tags: Vec<TypeTag>,
-    ) -> PartialVMResult<Vec<Type>> {
-        let substitution_ty_args = substitution_ty_arg_tags
-            .into_iter()
-            .map(|tag| self.module_storage.fetch_ty(&tag))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-
-        let (_, function) = self
-            .module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            .map_err(|err| err.to_partial())?;
-
-        let ty_builder = &self
-            .module_storage
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        function
-            .param_tys()
-            .iter()
-            .map(|ty_to_substitute| {
-                ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-    }
-
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,

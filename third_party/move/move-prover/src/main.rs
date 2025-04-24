@@ -30,5 +30,5 @@ fn run() -> anyhow::Result<()> {
     };
     options.setup_logging();
     let mut error_writer = StandardStream::stderr(color);
-    run_move_prover_v2(&mut error_writer, options)
+    run_move_prover_v2(&mut error_writer, options, vec![])
 }

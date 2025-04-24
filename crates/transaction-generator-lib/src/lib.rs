@@ -124,7 +124,7 @@ impl Default for TransactionType {
             invalid_transaction_ratio: 0,
             sender_use_account_pool: false,
             non_conflicting: false,
-            use_fa_transfer: false,
+            use_fa_transfer: true,
         }
     }
 }
