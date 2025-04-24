@@ -2,7 +2,7 @@
 module 0x8675309::M {
     public fun f() {
         {
-          let _x: |u64|u64 = closure#0M::__lambda__1__f();
+          let _x: |u64|u64 with drop = closure#0M::__lambda__1__f();
           Tuple()
         }
     }
