@@ -2411,15 +2411,25 @@ impl AptosVM {
                     traversal_context,
                     self.is_simulation,
                 )?;
-                transaction_validation::run_multisig_prologue(
-                    session,
-                    module_storage,
-                    txn_data,
-                    multisig_payload,
-                    self.features(),
-                    log_context,
-                    traversal_context,
-                )
+                // Once "simulation_enhancement" is enabled, the simulation path also validates the
+                // multisig transaction by running the multisig prologue.
+                if !self.is_simulation
+                    || self
+                        .features()
+                        .is_transaction_simulation_enhancement_enabled()
+                {
+                    transaction_validation::run_multisig_prologue(
+                        session,
+                        module_storage,
+                        txn_data,
+                        multisig_payload,
+                        self.features(),
+                        log_context,
+                        traversal_context,
+                    )
+                } else {
+                    Ok(())
+                }
             },
 
             // Deprecated.
