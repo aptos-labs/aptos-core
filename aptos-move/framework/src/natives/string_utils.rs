@@ -419,6 +419,7 @@ fn native_format_impl(
             let (fun, args) = val.value_as::<Closure>()?.unpack();
             let captured_layouts = context
                 .context
+                .loader_context()
                 .get_captured_layouts_for_string_utils(fun.as_ref())?;
             out.push_str(&fun.to_canonical_string());
             out.push('(');
@@ -456,17 +457,12 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
-    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
-    let (_, has_identifier_mappings) = context
-        .deref()
-        .type_to_type_layout_with_identifier_mappings(ty)?;
-    if has_identifier_mappings {
-        return Err(SafeNativeError::Abort {
-            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-        });
-    }
-
-    let layout = context.deref().type_to_fully_annotated_layout(ty)?;
+    let layout =
+        context
+            .type_to_fully_annotated_layout(ty)?
+            .ok_or_else(|| SafeNativeError::Abort {
+                abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+            })?;
     let mut format_context = FormatContext {
         context,
         should_charge_gas: false,
@@ -489,19 +485,11 @@ fn native_format(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
 
-    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
-    let (_, has_identifier_mappings) = context
-        .deref()
-        .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
-    if has_identifier_mappings {
-        return Err(SafeNativeError::Abort {
-            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-        });
-    }
-
     let ty = context
-        .deref()
-        .type_to_fully_annotated_layout(&ty_args[0])?;
+        .type_to_fully_annotated_layout(&ty_args[0])?
+        .ok_or_else(|| SafeNativeError::Abort {
+            abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+        })?;
     let include_int_type = safely_pop_arg!(arguments, bool);
     let single_line = safely_pop_arg!(arguments, bool);
     let canonicalize = safely_pop_arg!(arguments, bool);
@@ -587,16 +575,11 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
-                // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
-                let (_, has_identifier_mappings) = context
-                    .deref()
-                    .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
-                if has_identifier_mappings {
-                    return Err(SafeNativeError::Abort {
+                let ty = context
+                    .type_to_fully_annotated_layout(&ty_args[0])?
+                    .ok_or_else(|| SafeNativeError::Abort {
                         abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
-                    });
-                }
-                let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
+                    })?;
 
                 let mut format_context = FormatContext {
                     context,
