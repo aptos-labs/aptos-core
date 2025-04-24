@@ -10,6 +10,7 @@ use crate::{
         QuorumCertProcessGuard,
     },
     update_certifier::TUpdateCertifier,
+    TConsensusManager,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -35,7 +36,7 @@ use std::{
 
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
-pub struct JWKManager {
+pub struct IssuerLevelConsensusManager {
     /// Some useful metadata.
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
@@ -60,7 +61,7 @@ pub struct JWKManager {
     jwk_observers: Vec<JWKObserver>,
 }
 
-impl JWKManager {
+impl IssuerLevelConsensusManager {
     pub fn new(
         consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
@@ -82,9 +83,12 @@ impl JWKManager {
             jwk_observers: vec![],
         }
     }
+}
 
-    pub async fn run(
-        mut self,
+#[async_trait::async_trait]
+impl TConsensusManager for IssuerLevelConsensusManager {
+    async fn run(
+        self: Box<Self>,
         oidc_providers: Option<SupportedOIDCProviders>,
         observed_jwks: Option<ObservedJWKs>,
         mut jwk_updated_rx: aptos_channel::Receiver<(), ObservedJWKsUpdated>,
@@ -94,13 +98,14 @@ impl JWKManager {
         >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        self.reset_with_on_chain_state(observed_jwks.unwrap_or_default().into_providers_jwks())
+        let mut this = self;
+        this.reset_with_on_chain_state(observed_jwks.unwrap_or_default().into_providers_jwks())
             .unwrap();
 
         let (local_observation_tx, mut local_observation_rx) =
             aptos_channel::new(QueueStyle::KLAST, 100, None);
 
-        self.jwk_observers = oidc_providers
+        this.jwk_observers = oidc_providers
             .unwrap_or_default()
             .into_provider_vec()
             .into_iter()
@@ -110,8 +115,8 @@ impl JWKManager {
                 let maybe_config_url = String::from_utf8(config_url);
                 match (maybe_issuer, maybe_config_url) {
                     (Ok(issuer), Ok(config_url)) => Some(JWKObserver::spawn(
-                        self.epoch_state.epoch,
-                        self.my_addr,
+                        this.epoch_state.epoch,
+                        this.my_addr,
                         issuer,
                         config_url,
                         Duration::from_secs(10),
@@ -130,36 +135,38 @@ impl JWKManager {
 
         let mut close_rx = close_rx.into_stream();
 
-        while !self.stopped {
+        while !this.stopped {
             let handle_result = tokio::select! {
                 jwk_updated = jwk_updated_rx.select_next_some() => {
                     let ObservedJWKsUpdated { jwks, .. } = jwk_updated;
-                    self.reset_with_on_chain_state(jwks)
+                    this.reset_with_on_chain_state(jwks)
                 },
                 (_sender, msg) = rpc_req_rx.select_next_some() => {
-                    self.process_peer_request(msg)
+                    this.process_peer_request(msg)
                 },
-                qc_update = self.qc_update_rx.select_next_some() => {
-                    self.process_quorum_certified_update(qc_update)
+                qc_update = this.qc_update_rx.select_next_some() => {
+                    this.process_quorum_certified_update(qc_update)
                 },
                 (issuer, jwks) = local_observation_rx.select_next_some() => {
                     let jwks = jwks.into_iter().map(JWKMoveStruct::from).collect();
-                    self.process_new_observation(issuer, jwks)
+                    this.process_new_observation(issuer, jwks)
                 },
                 ack_tx = close_rx.select_next_some() => {
-                    self.tear_down(ack_tx.ok()).await
+                    this.tear_down(ack_tx.ok()).await
                 }
             };
 
             if let Err(e) = handle_result {
                 error!(
-                    epoch = self.epoch_state.epoch,
+                    epoch = this.epoch_state.epoch,
                     "JWKManager handling error: {}", e
                 );
             }
         }
     }
+}
 
+impl IssuerLevelConsensusManager {
     async fn tear_down(&mut self, ack_tx: Option<oneshot::Sender<()>>) -> Result<()> {
         self.stopped = true;
         let futures = std::mem::take(&mut self.jwk_observers)

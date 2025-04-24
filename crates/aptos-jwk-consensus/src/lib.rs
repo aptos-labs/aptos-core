@@ -2,16 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    epoch_manager::EpochManager, network::NetworkTask,
-    network_interface::JWKConsensusNetworkClient, types::JWKConsensusMsg,
+    epoch_manager::EpochManager,
+    network::{IncomingRpcRequest, NetworkTask},
+    network_interface::JWKConsensusNetworkClient,
+    types::JWKConsensusMsg,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::config::SafetyRulesConfig;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress,
+    jwks::{ObservedJWKs, ObservedJWKsUpdated, SupportedOIDCProviders},
+};
 use aptos_validator_transaction_pool::VTxnPoolState;
+use futures_channel::oneshot;
 use tokio::runtime::Runtime;
 
 #[allow(clippy::let_and_return)]
@@ -44,8 +51,8 @@ pub fn start_jwk_consensus_runtime(
 
 pub mod counters;
 pub mod epoch_manager;
-pub mod jwk_manager;
-// pub mod jwk_manager_per_key;
+pub mod jwk_manager; //TODO: rename to issuer_level_consensus
+pub mod jwk_manager_per_key; //TODO: rename to key_level_consensus
 pub mod jwk_observer;
 pub mod mode;
 pub mod network;
@@ -53,3 +60,18 @@ pub mod network_interface;
 pub mod observation_aggregation;
 pub mod types;
 pub mod update_certifier;
+
+#[async_trait::async_trait]
+trait TConsensusManager: Send + Sync {
+    async fn run(
+        self: Box<Self>,
+        oidc_providers: Option<SupportedOIDCProviders>,
+        observed_jwks: Option<ObservedJWKs>,
+        mut jwk_updated_rx: aptos_channel::Receiver<(), ObservedJWKsUpdated>,
+        mut rpc_req_rx: aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingRpcRequest),
+        >,
+        close_rx: oneshot::Receiver<oneshot::Sender<()>>,
+    );
+}
