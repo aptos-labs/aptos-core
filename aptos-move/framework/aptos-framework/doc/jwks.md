@@ -1466,9 +1466,9 @@ and its <code><a href="version.md#0x1_version">version</a></code> equals to the 
             <b>assert</b>!(cur_issuer_jwks.<a href="version.md#0x1_version">version</a> + 1 == proposed_provider_jwks.<a href="version.md#0x1_version">version</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EUNEXPECTED_VERSION">EUNEXPECTED_VERSION</a>));
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(proposed_provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, |jwk|{
                 <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&jwk.variant));
-                <b>let</b> is_delete = <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_RSA_JWK">0x1::jwks::RSA_JWK</a>") {
-                    <b>let</b> rsa_jwk = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_RSA_JWK">RSA_JWK</a>&gt;(jwk.variant);
-                    *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&rsa_jwk.n) == <a href="jwks.md#0x1_jwks_DELETE_COMMAND_INDICATOR">DELETE_COMMAND_INDICATOR</a>
+                <b>let</b> is_delete = <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_UnsupportedJWK">0x1::jwks::UnsupportedJWK</a>") {
+                    <b>let</b> repr = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a>&gt;(jwk.variant);
+                    &repr.payload == &<a href="jwks.md#0x1_jwks_DELETE_COMMAND_INDICATOR">DELETE_COMMAND_INDICATOR</a>
                 } <b>else</b> {
                     <b>false</b>
                 };

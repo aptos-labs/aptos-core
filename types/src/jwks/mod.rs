@@ -8,8 +8,8 @@ use self::{
 #[cfg(test)]
 use crate::move_any;
 use crate::{
-    aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
+    aggregate_signature::AggregateSignature, jwks::unsupported::UnsupportedJWK,
+    move_utils::as_move_value::AsMoveValue, on_chain_config::OnChainConfig,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -339,14 +339,12 @@ impl KeyLevelUpdate {
         }
     }
 
-    pub fn as_issuer_level_repr(&self) -> anyhow::Result<ProviderJWKs> {
-        let kid_str = String::from_utf8(self.kid.clone())
-            .context("KeyLevelUpdate::as_issuer_level_repr failed on kid")?;
+    pub fn try_as_issuer_level_repr(&self) -> anyhow::Result<ProviderJWKs> {
         let jwk_repr = self.to_upsert.clone().unwrap_or_else(|| {
-            JWK::RSA(RSA_JWK::new_256_aqab(
-                kid_str.as_str(),
-                DELETE_COMMAND_INDICATOR,
-            ))
+            JWK::Unsupported(UnsupportedJWK {
+                id: self.kid.clone(),
+                payload: DELETE_COMMAND_INDICATOR.as_bytes().to_vec(),
+            })
         });
         let version = self
             .base_version
@@ -375,7 +373,11 @@ impl KeyLevelUpdate {
             base_version,
             kid: jwk.id(),
             to_upsert: match jwk {
-                JWK::RSA(rsa) if rsa.n.as_str() == DELETE_COMMAND_INDICATOR => None,
+                JWK::Unsupported(unsupported)
+                    if unsupported.payload.as_slice() == DELETE_COMMAND_INDICATOR.as_bytes() =>
+                {
+                    None
+                },
                 _ => Some(jwk),
             },
         })
@@ -396,7 +398,7 @@ fn key_level_upsert_repr_conversions() {
         version: 790,
         jwks: vec![JWKMoveStruct::from(jwk)],
     };
-    let issuer_level = key_level.as_issuer_level_repr().unwrap();
+    let issuer_level = key_level.try_as_issuer_level_repr().unwrap();
     assert_eq!(expected_issuer_level, issuer_level);
     let key_level_another = KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).unwrap();
     assert_eq!(key_level, key_level_another);
@@ -413,12 +415,12 @@ fn key_level_delete_repr_conversions() {
     let expected_issuer_level = ProviderJWKs {
         issuer: issuer_from_str("issuer-alice"),
         version: 790,
-        jwks: vec![JWKMoveStruct::from(JWK::RSA(RSA_JWK::new_256_aqab(
-            "kid123",
-            DELETE_COMMAND_INDICATOR,
-        )))],
+        jwks: vec![JWKMoveStruct::from(JWK::Unsupported(UnsupportedJWK {
+            id: "kid123".as_bytes().to_vec(),
+            payload: DELETE_COMMAND_INDICATOR.as_bytes().to_vec(),
+        }))],
     };
-    let issuer_level = key_level.as_issuer_level_repr().unwrap();
+    let issuer_level = key_level.try_as_issuer_level_repr().unwrap();
     assert_eq!(expected_issuer_level, issuer_level);
     let key_level_another = KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).unwrap();
     assert_eq!(key_level, key_level_another);
@@ -432,7 +434,7 @@ fn repr_conversion_failures() {
         kid: "kid123".as_bytes().to_vec(),
         to_upsert: None,
     };
-    assert!(key_level.as_issuer_level_repr().is_err());
+    assert!(key_level.try_as_issuer_level_repr().is_err());
 
     let issuer_level = ProviderJWKs {
         issuer: issuer_from_str("issuer-alice"),
