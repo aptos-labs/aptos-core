@@ -33,10 +33,9 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
-    )
-    .unwrap();
-    if res != UnitTestResult::Success {
-        panic!("aborting because of Move unit test failures");
+    );
+    if res.is_err() || res.is_ok_and(|r| r == UnitTestResult::Failure) {
+        panic!("move unit tests failed")
     }
 }
 
