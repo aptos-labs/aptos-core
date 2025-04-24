@@ -1,0 +1,80 @@
+// -- Model dump before bytecode pipeline
+module 0x66::xx {
+    struct S {
+        dummy_field: bool,
+    }
+    private inline fun apply(f: |&mut u64|) {
+        {
+          let x: u64 = 0;
+          (f)(Borrow(Mutable)(x));
+          Tuple()
+        }
+    }
+    private inline fun apply_s(self: S,f: |&mut u64|) {
+        {
+          let x: u64 = 0;
+          (f)(Borrow(Mutable)(x));
+          Tuple()
+        }
+    }
+    private fun test() {
+        {
+          let x: u64 = 0;
+          {
+            let (x: &u64): (&u64) = Tuple(Freeze(false)(Borrow(Mutable)(x)));
+            Add<u64>(Deref(x), 1);
+            Tuple()
+          };
+          Tuple()
+        };
+        Tuple()
+    }
+    private fun test_s() {
+        {
+          let (self: S): (S) = Tuple(pack xx::S(false));
+          {
+            let x: u64 = 0;
+            {
+              let (x: &u64): (&u64) = Tuple(Freeze(false)(Borrow(Mutable)(x)));
+              Add<u64>(Deref(x), 1);
+              Tuple()
+            };
+            Tuple()
+          }
+        };
+        Tuple()
+    }
+} // end 0x66::xx
+
+// -- Sourcified model before bytecode pipeline
+module 0x66::xx {
+    struct S {
+    }
+    inline fun apply(f: |&mut u64|) {
+        let x = 0;
+        f(&mut x);
+    }
+    inline fun apply_s(self: S, f: |&mut u64|) {
+        let x = 0;
+        f(&mut x);
+    }
+    fun test() {
+        {
+            let x = 0;
+            {
+                let (x) = (/*freeze*/&mut x);
+                *x + 1;
+            };
+        };
+    }
+    fun test_s() {
+        {
+            let (self) = (S{});
+            let x = 0;
+            {
+                let (x) = (/*freeze*/&mut x);
+                *x + 1;
+            };
+        };
+    }
+}
