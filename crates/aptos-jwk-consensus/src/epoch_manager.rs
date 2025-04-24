@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jwk_manager::JWKManager,
+    jwk_manager::IssuerLevelConsensusManager,
     jwk_manager_per_key::KeyLevelConsensusManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::JWKConsensusNetworkClient,
@@ -234,8 +234,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         self.vtxn_pool.clone(),
                     ))
                 } else {
+                    //TODO: move this into IssuerLevelConsensusManager construction?
                     let update_certifier = UpdateCertifier::new(rb);
-                    Box::new(JWKManager::new(
+                    Box::new(IssuerLevelConsensusManager::new(
                         Arc::new(my_sk),
                         self.my_addr,
                         epoch_state.clone(),

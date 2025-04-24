@@ -36,7 +36,7 @@ use std::{
 
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
-pub struct JWKManager {
+pub struct IssuerLevelConsensusManager {
     /// Some useful metadata.
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
@@ -61,7 +61,7 @@ pub struct JWKManager {
     jwk_observers: Vec<JWKObserver>,
 }
 
-impl JWKManager {
+impl IssuerLevelConsensusManager {
     pub fn new(
         consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
@@ -86,7 +86,7 @@ impl JWKManager {
 }
 
 #[async_trait::async_trait]
-impl TConsensusManager for JWKManager {
+impl TConsensusManager for IssuerLevelConsensusManager {
     async fn run(
         self: Box<Self>,
         oidc_providers: Option<SupportedOIDCProviders>,
@@ -166,7 +166,7 @@ impl TConsensusManager for JWKManager {
     }
 }
 
-impl JWKManager {
+impl IssuerLevelConsensusManager {
     async fn tear_down(&mut self, ack_tx: Option<oneshot::Sender<()>>) -> Result<()> {
         self.stopped = true;
         let futures = std::mem::take(&mut self.jwk_observers)

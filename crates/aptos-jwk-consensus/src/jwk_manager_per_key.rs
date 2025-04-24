@@ -168,7 +168,7 @@ impl KeyLevelConsensusManager {
                         .context("process_new_observation failed at deletion consensus init")?;
                 },
                 (None, None) => {
-                    unreachable!()
+                    unreachable!("`kid` in `union(A, B)` but `kid` not in `A` and not in `B`?")
                 },
             }
         }

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jwk_manager::{ConsensusState, JWKManager, PerProviderState, QuorumCertProcessGuard},
+    jwk_manager::{
+        ConsensusState, IssuerLevelConsensusManager, PerProviderState, QuorumCertProcessGuard,
+    },
     mode::TConsensusMode,
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
@@ -57,7 +59,7 @@ async fn test_jwk_manager_state_transition() {
 
     let update_certifier = DummyUpdateCertifier::default();
     let vtxn_pool = VTxnPoolState::default();
-    let mut jwk_manager = JWKManager::new(
+    let mut jwk_manager = IssuerLevelConsensusManager::new(
         private_keys[0].clone(),
         addrs[0],
         Arc::new(epoch_state),

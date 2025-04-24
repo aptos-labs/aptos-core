@@ -51,8 +51,8 @@ pub fn start_jwk_consensus_runtime(
 
 pub mod counters;
 pub mod epoch_manager;
-pub mod jwk_manager;
-pub mod jwk_manager_per_key;
+pub mod jwk_manager; //TODO: rename to issuer_level_consensus
+pub mod jwk_manager_per_key; //TODO: rename to key_level_consensus
 pub mod jwk_observer;
 pub mod mode;
 pub mod network;
