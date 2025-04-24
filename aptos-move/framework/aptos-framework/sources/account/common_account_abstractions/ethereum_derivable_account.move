@@ -24,7 +24,6 @@
 /// - Backpack
 
 module aptos_framework::ethereum_derivable_account {
-    use aptos_framework::debug;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
     use aptos_std::secp256k1;
