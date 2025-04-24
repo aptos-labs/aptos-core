@@ -31,7 +31,11 @@ pub trait AptosTest: Test {
     /// Executes the test against the given context.
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()>;
 
-    async fn run_with_timeout<'t>(&self, ctx: &mut AptosContext<'t>, timeout: Duration) -> Result<()> {
+    async fn run_with_timeout<'t>(
+        &self,
+        ctx: &mut AptosContext<'t>,
+        timeout: Duration,
+    ) -> Result<()> {
         let timeout = tokio::time::timeout(timeout, self.run(ctx));
         timeout.await.map_err(|_| anyhow!("Test timed out"))?
     }

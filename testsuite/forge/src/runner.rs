@@ -281,20 +281,27 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let genesis_version = initial_version.clone();
             let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
+            let mut inner_rng = rng.clone();
 
-            let mut swarm = runtime.block_on(
-                tokio::time::timeout(self.global_duration, self.factory.launch_swarm(
-                &mut rng,
-                self.tests.initial_validator_count,
-                self.tests.initial_fullnode_count,
-                &initial_version,
-                &genesis_version,
-                self.tests.genesis_config.as_ref(),
-                self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
-                self.tests.genesis_helm_config_fn.clone(),
-                self.tests.build_node_helm_config_fn(retain_debug_logs),
-                self.tests.existing_db_tag.clone(),
-            )))??;
+            let mut swarm = runtime.block_on(async move {
+                tokio::time::timeout(
+                    self.global_duration,
+                    self.factory.launch_swarm(
+                        &mut inner_rng,
+                        self.tests.initial_validator_count,
+                        self.tests.initial_fullnode_count,
+                        &initial_version,
+                        &genesis_version,
+                        self.tests.genesis_config.as_ref(),
+                        self.global_duration
+                            + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                        self.tests.genesis_helm_config_fn.clone(),
+                        self.tests.build_node_helm_config_fn(retain_debug_logs),
+                        self.tests.existing_db_tag.clone(),
+                    ),
+                )
+                .await
+            })??;
 
             // Run AptosTests
             for test in self.filter_tests(&self.tests.aptos_tests) {
@@ -306,7 +313,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut report,
                 );
                 let result = process_test_result(
-                    runtime.block_on(test.run_with_timeout(&mut aptos_ctx, test_duration))
+                    runtime.block_on(test.run_with_timeout(&mut aptos_ctx, test_duration)),
                 );
                 report.report_text(result.to_string());
                 summary.handle_result(test.details(), result)?;
@@ -342,7 +349,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 let _handle_context = handle.enter();
                 let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle.clone());
                 let result = process_test_result(
-                    handle.block_on(test.run_with_timeout(network_ctx.clone(), test_duration))
+                    handle.block_on(test.run_with_timeout(network_ctx.clone(), test_duration)),
                 );
                 // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.
                 let NetworkContextSynchronizer { ctx, handle } = network_ctx;
