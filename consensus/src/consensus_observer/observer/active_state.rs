@@ -310,6 +310,8 @@ fn handle_committed_blocks(
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     ledger_info: LedgerInfoWithSignatures,
 ) {
+    // grab the lock for whole section to avoid inconsistent views
+    let mut root = root.lock();
     // Remove the committed blocks from the payload and pending stores
     block_payload_store.lock().remove_blocks_for_epoch_round(
         ledger_info.commit_info().epoch(),
@@ -320,7 +322,6 @@ fn handle_committed_blocks(
         .remove_blocks_for_commit(&ledger_info);
 
     // Verify the ledger info is for the same epoch
-    let mut root = root.lock();
     if ledger_info.commit_info().epoch() != root.commit_info().epoch() {
         warn!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(

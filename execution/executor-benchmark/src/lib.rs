@@ -133,7 +133,8 @@ pub fn run_benchmark<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
-) where
+) -> (Vec<OverallMeasurement>, OverallMeasurement)
+where
     V: VMBlockExecutor + 'static,
 {
     create_checkpoint(
@@ -288,7 +289,7 @@ pub fn run_benchmark<V>(
     info!("Done creating workload");
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
-    let num_pipeline_txns = pipeline.join();
+    let (num_pipeline_txns, staged_results) = pipeline.join();
 
     info!("Executed workload {}", workload_name);
 
@@ -298,7 +299,9 @@ pub fn run_benchmark<V>(
         num_pipeline_txns.unwrap_or_default()
     };
 
-    overall_measuring.print_end("Overall", num_txns);
+    let overall_results =
+        overall_measuring.elapsed("Overall".to_string(), "".to_string(), num_txns);
+    overall_results.print_end();
 
     if !pipeline_config.skip_commit {
         if verify_sequence_numbers {
@@ -309,6 +312,10 @@ pub fn run_benchmark<V>(
 
     // Assert there were no error log lines in the run.
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+
+    OverallMeasurement::print_end_table(&staged_results, &overall_results);
+
+    (staged_results, overall_results)
 }
 
 fn init_workload<V>(
@@ -685,99 +692,134 @@ impl OverallMeasuring {
         }
     }
 
-    pub fn print_end(self, prefix: &str, num_txns: u64) {
+    pub fn elapsed(self, prefix: String, metadata: String, num_txns: u64) -> OverallMeasurement {
         let elapsed = self.start_time.elapsed().as_secs_f64();
-        let num_txns = num_txns as f64;
         let delta_execution = self.start_execution.elapsed_delta();
         let delta_gas = self.start_gas.elapsed_delta();
 
+        OverallMeasurement {
+            prefix,
+            metadata,
+            elapsed,
+            num_txns,
+            delta_execution,
+            delta_gas,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OverallMeasurement {
+    prefix: String,
+    metadata: String,
+    elapsed: f64,
+    num_txns: u64,
+    delta_execution: ExecutionTimeMeasurement,
+    delta_gas: GasMeasurement,
+}
+
+impl OverallMeasurement {
+    pub fn print_end(&self) {
+        let num_txns = self.num_txns as f64;
+
+        info!("{}: {}", self.prefix, self.metadata);
+
         info!(
             "{} TPS: {} txn/s (over {} txns, in {} s)",
-            prefix,
-            num_txns / elapsed,
+            self.prefix,
+            num_txns / self.elapsed,
             num_txns,
-            elapsed
+            self.elapsed
         );
-        info!("{} GPS: {} gas/s", prefix, delta_gas.gas / elapsed);
+        info!(
+            "{} GPS: {} gas/s",
+            self.prefix,
+            self.delta_gas.gas / self.elapsed
+        );
         info!(
             "{} effectiveGPS: {} gas/s ({} effective block gas, in {} s)",
-            prefix,
-            delta_gas.effective_block_gas / elapsed,
-            delta_gas.effective_block_gas,
-            elapsed
+            self.prefix,
+            self.delta_gas.effective_block_gas / self.elapsed,
+            self.delta_gas.effective_block_gas,
+            self.elapsed
         );
         info!(
             "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
-            prefix,
-            delta_gas.speculative_abort_count as f64 / num_txns,
-            delta_gas.speculative_abort_count,
-            num_txns
+            self.prefix,
+            self.delta_gas.speculative_abort_count as f64 / num_txns,
+            self.delta_gas.speculative_abort_count,
+            self.num_txns
         );
-        info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
+        info!(
+            "{} ioGPS: {} gas/s",
+            self.prefix,
+            self.delta_gas.io_gas / self.elapsed
+        );
         info!(
             "{} executionGPS: {} gas/s",
-            prefix,
-            delta_gas.execution_gas / elapsed
+            self.prefix,
+            self.delta_gas.execution_gas / self.elapsed
         );
         info!(
             "{} GPT: {} gas/txn",
-            prefix,
-            delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
+            self.prefix,
+            self.delta_gas.gas / (self.delta_gas.gas_count as f64).max(1.0)
         );
         info!(
             "{} Storage fee: {} octas/txn",
-            prefix,
-            delta_gas.storage_fee / (delta_gas.gas_count as f64).max(1.0)
+            self.prefix,
+            self.delta_gas.storage_fee / (self.delta_gas.gas_count as f64).max(1.0)
         );
         info!(
             "{} approx_output: {} bytes/s",
-            prefix,
-            delta_gas.approx_block_output / elapsed
+            self.prefix,
+            self.delta_gas.approx_block_output / self.elapsed
         );
         info!(
             "{} output: {} bytes/s",
-            prefix,
-            delta_execution.output_size / elapsed
+            self.prefix,
+            self.delta_execution.output_size / self.elapsed
         );
 
         info!(
             "{} fraction of total: {:.4} in signature verification (component TPS: {:.1})",
-            prefix,
-            delta_execution.sig_verify_total_time / elapsed,
-            num_txns / delta_execution.sig_verify_total_time
+            self.prefix,
+            self.delta_execution.sig_verify_total_time / self.elapsed,
+            num_txns / self.delta_execution.sig_verify_total_time
         );
         info!(
             "{} fraction of total: {:.4} in partitioning (component TPS: {:.1})",
-            prefix,
-            delta_execution.partitioning_total_time / elapsed,
-            num_txns / delta_execution.partitioning_total_time
+            self.prefix,
+            self.delta_execution.partitioning_total_time / self.elapsed,
+            num_txns / self.delta_execution.partitioning_total_time
         );
         info!(
             "{} fraction of total: {:.4} in execution (component TPS: {:.1})",
-            prefix,
-            delta_execution.execution_total_time / elapsed,
-            num_txns / delta_execution.execution_total_time
+            self.prefix,
+            self.delta_execution.execution_total_time / self.elapsed,
+            num_txns / self.delta_execution.execution_total_time
         );
         info!(
             "{} fraction of execution {:.4} in get execution output by executing (component TPS: {:.1})",
-            prefix,
-            delta_execution.block_executor_total_time / delta_execution.execution_total_time,
-            num_txns / delta_execution.block_executor_total_time
+            self.prefix,
+            self.delta_execution.block_executor_total_time / self.delta_execution.execution_total_time,
+            num_txns / self.delta_execution.block_executor_total_time
         );
         info!(
             "{} fraction of execution {:.4} in inner block executor (component TPS: {:.1})",
-            prefix,
-            delta_execution.block_executor_inner_total_time / delta_execution.execution_total_time,
-            num_txns / delta_execution.block_executor_inner_total_time
+            self.prefix,
+            self.delta_execution.block_executor_inner_total_time
+                / self.delta_execution.execution_total_time,
+            num_txns / self.delta_execution.block_executor_inner_total_time
         );
-        for (prefix, top_level, other_label) in OTHER_LABELS {
-            let time_in_label = delta_execution.by_other.get(other_label).unwrap();
-            if *top_level || time_in_label / delta_execution.execution_total_time > 0.01 {
+        for (label_prefix, top_level, other_label) in OTHER_LABELS {
+            let time_in_label = self.delta_execution.by_other.get(other_label).unwrap();
+            if *top_level || time_in_label / self.delta_execution.execution_total_time > 0.01 {
                 info!(
                     "{} fraction of execution {:.4} in {} {} (component TPS: {:.1})",
-                    prefix,
-                    time_in_label / delta_execution.execution_total_time,
-                    prefix,
+                    self.prefix,
+                    time_in_label / self.delta_execution.execution_total_time,
+                    label_prefix,
                     other_label,
                     num_txns / time_in_label
                 );
@@ -786,17 +828,70 @@ impl OverallMeasuring {
 
         info!(
             "{} fraction of total: {:.4} in ledger update (component TPS: {:.1})",
-            prefix,
-            delta_execution.ledger_update_total / elapsed,
-            num_txns / delta_execution.ledger_update_total
+            self.prefix,
+            self.delta_execution.ledger_update_total / self.elapsed,
+            num_txns / self.delta_execution.ledger_update_total
         );
 
         info!(
             "{} fraction of total: {:.4} in commit (component TPS: {:.1})",
-            prefix,
-            delta_execution.commit_total_time / elapsed,
-            num_txns / delta_execution.commit_total_time
+            self.prefix,
+            self.delta_execution.commit_total_time / self.elapsed,
+            num_txns / self.delta_execution.commit_total_time
         );
+    }
+
+    fn print_end_table(stages: &[Self], overall: &Self) {
+        for v in stages.iter().chain(std::iter::once(overall)) {
+            println!("{}  {}", v.prefix, v.metadata);
+        }
+        fn print_one(
+            stages: &[OverallMeasurement],
+            overall: &OverallMeasurement,
+            name: &str,
+            fun: impl Fn(&OverallMeasurement) -> String,
+        ) {
+            println!(
+                "{: <12}{}",
+                name,
+                stages
+                    .iter()
+                    .chain(std::iter::once(overall))
+                    .map(fun)
+                    .collect::<String>()
+            );
+        }
+
+        print_one(stages, overall, "", |v| {
+            format!("{: >12}", v.prefix.replace("Staged execution: ", ""))
+        });
+        print_one(stages, overall, "TPS", |v| {
+            format!("{: >12.2}", v.num_txns as f64 / v.elapsed)
+        });
+        print_one(stages, overall, "GPS", |v| {
+            format!("{: >12.2}", v.delta_gas.gas / v.elapsed)
+        });
+        print_one(stages, overall, "effGPS", |v| {
+            format!("{: >12.2}", v.delta_gas.effective_block_gas / v.elapsed)
+        });
+        print_one(stages, overall, "GPT", |v| {
+            format!(
+                "{: >12.2}",
+                v.delta_gas.gas / (v.delta_gas.gas_count as f64).max(1.0)
+            )
+        });
+        print_one(stages, overall, "ioGPT", |v| {
+            format!(
+                "{: >12.2}",
+                v.delta_gas.io_gas / (v.delta_gas.gas_count as f64).max(1.0)
+            )
+        });
+        print_one(stages, overall, "exeGPT", |v| {
+            format!(
+                "{: >12.2}",
+                v.delta_gas.execution_gas / (v.delta_gas.gas_count as f64).max(1.0)
+            )
+        });
     }
 }
 
@@ -816,7 +911,7 @@ pub fn run_single_with_default_params(
     test_folder: impl AsRef<Path>,
     concurrency_level: usize,
     mode: SingleRunMode,
-) {
+) -> (Vec<OverallMeasurement>, OverallMeasurement) {
     aptos_logger::Logger::new().init();
 
     AptosVM::set_num_shards_once(1);
@@ -830,6 +925,10 @@ pub fn run_single_with_default_params(
 
     let verify_sequence_numbers = false;
     let is_keyless = false;
+    let print_transactions = match mode {
+        SingleRunMode::TEST => true,
+        SingleRunMode::BENCHMARK { .. } => false,
+    };
     let num_accounts = match mode {
         SingleRunMode::TEST => 100,
         SingleRunMode::BENCHMARK { .. } => 100000,
@@ -859,13 +958,14 @@ pub fn run_single_with_default_params(
 
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        print_transactions,
         ..Default::default()
     };
 
     create_db_with_accounts::<AptosVMBlockExecutor>(
-        num_accounts,   /* num_accounts */
-        10_000_000_000, /* init_account_balance */
-        10000,          /* block_size */
+        num_accounts,       /* num_accounts */
+        100000 * 100000000, /* init_account_balance */
+        10000,              /* block_size */
         &storage_dir,
         NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
         verify_sequence_numbers,
@@ -880,6 +980,7 @@ pub fn run_single_with_default_params(
     let execute_pipeline_config = PipelineConfig {
         generate_then_execute: true,
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        print_transactions,
         ..Default::default()
     };
 
@@ -898,7 +999,7 @@ pub fn run_single_with_default_params(
         execute_pipeline_config,
         features,
         is_keyless,
-    );
+    )
 }
 
 #[cfg(test)]
@@ -965,6 +1066,7 @@ mod tests {
         let mut non_fa_features = default_benchmark_features();
         non_fa_features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         non_fa_features.disable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+        non_fa_features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE);
         // non_fa_features.disable(FeatureFlag::MODULE_EVENT_MIGRATION);
         // non_fa_features.disable(FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION);
 
@@ -981,6 +1083,7 @@ mod tests {
         let mut fa_features = default_benchmark_features();
         fa_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         fa_features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+        fa_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE);
         fa_features.disable(FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE);
 
         test_compare_prod_and_another::<E>(values_match, fa_features.clone(), |address| {
@@ -1144,8 +1247,6 @@ mod tests {
                 assert_eq!(value, other_value, "different value for key: {:?}", key);
             }
         }
-        println!("{:?}", vm_writes);
-        println!("{:?}", other_writes);
         assert_eq!(vm_writes.len(), other_writes.len());
 
         if values_match {

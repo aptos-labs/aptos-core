@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    frame_type_cache::FrameTypeCache, interpreter::Stack, loader::Resolver, LoadedFunction,
+    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, LoadedFunction,
+    ModuleStorage,
 };
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
@@ -10,28 +11,28 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::StatusCode,
 };
-use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type, values::Locals};
+use move_vm_types::{
+    gas::UnmeteredGasMeter,
+    loaded_data::runtime_types::{Type, TypeBuilder},
+};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
     fn pre_execution_type_stack_transition(
-        local_tys: &[Type],
-        locals: &Locals,
-        ty_args: &[Type],
-        resolver: &Resolver,
+        frame: &Frame,
+        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
     /// Paranoid type checks to perform after instruction execution.
     fn post_execution_type_stack_transition(
-        local_tys: &[Type],
-        ty_args: &[Type],
-        resolver: &Resolver,
+        frame: &Frame,
+        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
     /// Paranoid check that operand and type stacks have the same size
@@ -78,7 +79,7 @@ fn verify_pack<'a>(
 }
 
 pub fn verify_pack_closure(
-    resolver: &Resolver,
+    ty_builder: &TypeBuilder,
     operand_stack: &mut Stack,
     func: &LoadedFunction,
     mask: ClosureMask,
@@ -98,7 +99,7 @@ pub fn verify_pack_closure(
         .into_iter()
         .zip(given_capture_tys.into_iter())
     {
-        with_instantiation(resolver, func, expected, |expected| {
+        with_instantiation(ty_builder, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities
             abilities = abilities.intersect(given.abilities()?);
             given.paranoid_check_assignable(expected)
@@ -108,12 +109,12 @@ pub fn verify_pack_closure(
     let args = mask
         .extract(func.param_tys(), false)
         .into_iter()
-        .map(|curried| with_owned_instantiation(resolver, func, curried, Ok))
+        .map(|curried| with_owned_instantiation(ty_builder, func, curried, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
     let results = func
         .return_tys()
         .iter()
-        .map(|ret| with_owned_instantiation(resolver, func, ret, Ok))
+        .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
     operand_stack.push_ty(Type::Function {
         args,
@@ -125,7 +126,7 @@ pub fn verify_pack_closure(
 }
 
 fn with_instantiation<R>(
-    resolver: &Resolver,
+    ty_builder: &TypeBuilder,
     func: &LoadedFunction,
     ty: &Type,
     action: impl FnOnce(&Type) -> PartialVMResult<R>,
@@ -133,16 +134,12 @@ fn with_instantiation<R>(
     if func.ty_args().is_empty() {
         action(ty)
     } else {
-        action(
-            &resolver
-                .ty_builder()
-                .create_ty_with_subst(ty, func.ty_args())?,
-        )
+        action(&ty_builder.create_ty_with_subst(ty, func.ty_args())?)
     }
 }
 
 fn with_owned_instantiation<R>(
-    resolver: &Resolver,
+    ty_builder: &TypeBuilder,
     func: &LoadedFunction,
     ty: &Type,
     action: impl FnOnce(Type) -> PartialVMResult<R>,
@@ -150,11 +147,7 @@ fn with_owned_instantiation<R>(
     if func.ty_args().is_empty() {
         action(ty.clone())
     } else {
-        action(
-            resolver
-                .ty_builder()
-                .create_ty_with_subst(ty, func.ty_args())?,
-        )
+        action(ty_builder.create_ty_with_subst(ty, func.ty_args())?)
     }
 }
 
@@ -163,24 +156,21 @@ pub(crate) struct FullRuntimeTypeCheck;
 
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
-        _local_tys: &[Type],
-        _locals: &Locals,
-        _ty_args: &[Type],
-        _resolver: &Resolver,
+        _frame: &Frame,
+        _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
-        _ty_cache: &mut FrameTypeCache,
         _instruction: &Bytecode,
+        _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
     fn post_execution_type_stack_transition(
-        _local_tys: &[Type],
-        _ty_args: &[Type],
-        _resolver: &Resolver,
+        _frame: &Frame,
+        _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
-        _ty_cache: &mut FrameTypeCache,
         _instruction: &Bytecode,
+        _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -199,13 +189,11 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// Note that most of the checks should happen after instruction execution, because gas charging will happen during
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
     fn pre_execution_type_stack_transition(
-        local_tys: &[Type],
-        locals: &Locals,
-        ty_args: &[Type],
-        resolver: &Resolver,
+        frame: &Frame,
+        _module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         match instruction {
             // Call instruction will be checked at execute_main.
@@ -218,29 +206,24 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // top of the stack. The argument types are checked when the frame
                 // is constructed in the interpreter, using the same code as for regular
                 // calls.
-                let (expected_ty, _) =
-                    ty_cache.get_signature_index_type(*sig_idx, resolver, ty_args)?;
+                let (expected_ty, _) = ty_cache.get_signature_index_type(*sig_idx, frame)?;
                 let given_ty = operand_stack.pop_ty()?;
                 given_ty.paranoid_check_assignable(expected_ty)?;
             },
             Bytecode::Branch(_) => (),
             Bytecode::Ret => {
-                for (idx, ty) in local_tys.iter().enumerate() {
-                    if !locals.is_invalid(idx)? {
-                        ty.paranoid_check_has_ability(Ability::Drop)?;
-                    }
-                }
+                frame.check_local_tys_have_drop_ability()?;
             },
             Bytecode::Abort => {
                 operand_stack.pop_ty()?;
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Bytecode::StLoc(idx) => {
-                let expected_ty = &local_tys[*idx as usize];
+                let expected_ty = frame.local_ty_at(*idx as usize);
                 let val_ty = operand_stack.pop_ty()?;
                 // For store, use assignability
                 val_ty.paranoid_check_assignable(expected_ty)?;
-                if !locals.is_invalid(*idx as usize)? {
+                if !frame.locals.is_invalid(*idx as usize)? {
                     expected_ty.paranoid_check_has_ability(Ability::Drop)?;
                 }
             },
@@ -338,14 +321,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// constitute the full type stack transition for the paranoid
     /// mode.
     fn post_execution_type_stack_transition(
-        local_tys: &[Type],
-        ty_args: &[Type],
-        resolver: &Resolver,
+        frame: &Frame,
+        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
-        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
-        let ty_builder = resolver.ty_builder();
+        let ty_builder = frame.ty_builder();
 
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
@@ -393,52 +375,52 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(bool_ty)?
             },
             Bytecode::LdConst(i) => {
-                let constant = resolver.constant_at(*i);
+                let constant = frame.constant_at(*i);
                 let ty = ty_builder.create_constant_ty(&constant.type_)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::CopyLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
+                let ty = frame.local_ty_at(*idx as usize).clone();
                 ty.paranoid_check_has_ability(Ability::Copy)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
+                let ty = frame.local_ty_at(*idx as usize).clone();
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
-                let ty = &local_tys[*idx as usize];
+                let ty = frame.local_ty_at(*idx as usize);
                 let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
                 operand_stack.push_ty(mut_ref_ty)?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
-                let ty = &local_tys[*idx as usize];
+                let ty = frame.local_ty_at(*idx as usize);
                 let ref_ty = ty_builder.create_ref_ty(ty, false)?;
                 operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
                 let ty = operand_stack.pop_ty()?;
-                let expected_ty = resolver.field_handle_to_struct(*fh_idx);
+                let expected_ty = frame.field_handle_to_struct(*fh_idx);
                 ty.paranoid_check_ref_eq(&expected_ty, false)?;
 
-                let field_ty = resolver.get_field_ty(*fh_idx)?;
+                let field_ty = frame.get_field_ty(*fh_idx)?;
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let ref_ty = operand_stack.pop_ty()?;
-                let expected_inner_ty = resolver.field_handle_to_struct(*fh_idx);
+                let expected_inner_ty = frame.field_handle_to_struct(*fh_idx);
                 ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
 
-                let field_ty = resolver.get_field_ty(*fh_idx)?;
+                let field_ty = frame.get_field_ty(*fh_idx)?;
                 let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
-                    ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                    ty_cache.get_field_type_and_struct_type(*idx, frame)?;
                 struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
 
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
@@ -447,7 +429,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
-                    ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                    ty_cache.get_field_type_and_struct_type(*idx, frame)?;
                 struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
 
                 let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
@@ -455,9 +437,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::ImmBorrowVariantField(fh_idx) | Bytecode::MutBorrowVariantField(fh_idx) => {
                 let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
-                let field_info = resolver.variant_field_info_at(*fh_idx);
+                let field_info = frame.variant_field_info_at(*fh_idx);
                 let ty = operand_stack.pop_ty()?;
-                let expected_ty = resolver.create_struct_ty(&field_info.definition_struct_type);
+                let expected_ty = frame.create_struct_ty(&field_info.definition_struct_type);
                 ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
                 let field_ty = &field_info.uninstantiated_field_ty;
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
@@ -468,38 +450,43 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let is_mut = matches!(instruction, Bytecode::MutBorrowVariantFieldGeneric(..));
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
-                    ty_cache.get_variant_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                    ty_cache.get_variant_field_type_and_struct_type(*idx, frame)?;
                 struct_ty.paranoid_check_ref_eq(expected_struct_ty, is_mut)?;
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::PackClosure(fh_idx, mask) => {
-                let function =
-                    resolver.build_loaded_function_from_handle_and_ty_args(*fh_idx, vec![])?;
-                verify_pack_closure(resolver, operand_stack, &function, *mask)?;
+                let function = frame.build_loaded_function_from_handle_and_ty_args(
+                    module_storage,
+                    *fh_idx,
+                    vec![],
+                )?;
+                verify_pack_closure(ty_builder, operand_stack, &function, *mask)?;
             },
             Bytecode::PackClosureGeneric(fh_idx, mask) => {
-                let ty_args = resolver.instantiate_generic_function(
+                let ty_args = frame.instantiate_generic_function(
                     Option::<&mut UnmeteredGasMeter>::None, // don't charge for paranoid mode
+                    *fh_idx,
+                )?;
+                let function = frame.build_loaded_function_from_instantiation_and_ty_args(
+                    module_storage,
                     *fh_idx,
                     ty_args,
                 )?;
-                let function = resolver
-                    .build_loaded_function_from_instantiation_and_ty_args(*fh_idx, ty_args)?;
-                verify_pack_closure(resolver, operand_stack, &function, *mask)?;
+                verify_pack_closure(ty_builder, operand_stack, &function, *mask)?;
             },
 
             Bytecode::Pack(idx) => {
-                let field_count = resolver.field_count(*idx);
-                let args_ty = resolver.get_struct(*idx)?;
+                let field_count = frame.field_count(*idx);
+                let args_ty = frame.get_struct(*idx);
                 let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
-                let output_ty = resolver.get_struct_ty(*idx);
+                let output_ty = frame.get_struct_ty(*idx);
                 verify_pack(operand_stack, field_count, field_tys, output_ty)?;
             },
             Bytecode::PackGeneric(idx) => {
-                let field_count = resolver.field_instantiation_count(*idx);
-                let output_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
-                let args_ty = ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
+                let field_count = frame.field_instantiation_count(*idx);
+                let output_ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
+                let args_ty = ty_cache.get_struct_fields_types(*idx, frame)?;
 
                 if field_count as usize != args_ty.len() {
                     // This is an inconsistency between the cache and the actual
@@ -521,8 +508,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
-                struct_ty.paranoid_check_eq(&resolver.get_struct_ty(*idx))?;
-                let struct_decl = resolver.get_struct(*idx)?;
+                struct_ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
+                let struct_decl = frame.get_struct(*idx);
                 for (_name, ty) in struct_decl.fields(None)?.iter() {
                     operand_stack.push_ty(ty.clone())?;
                 }
@@ -530,32 +517,27 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::UnpackGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
 
-                struct_ty
-                    .paranoid_check_eq(ty_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
+                struct_ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
 
-                let struct_fields_types =
-                    ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
+                let struct_fields_types = ty_cache.get_struct_fields_types(*idx, frame)?;
                 for (ty, _) in struct_fields_types {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
             Bytecode::PackVariant(idx) => {
-                let info = resolver.get_struct_variant_at(*idx);
+                let info = frame.get_struct_variant_at(*idx);
                 let field_tys = info
                     .definition_struct_type
                     .fields(Some(info.variant))?
                     .iter()
                     .map(|(_, ty)| ty);
-                let output_ty = resolver.create_struct_ty(&info.definition_struct_type);
+                let output_ty = frame.create_struct_ty(&info.definition_struct_type);
                 verify_pack(operand_stack, info.field_count, field_tys, output_ty)?;
             },
             Bytecode::PackVariantGeneric(idx) => {
-                let info = resolver.get_struct_variant_instantiation_at(*idx);
-                let output_ty = ty_cache
-                    .get_struct_variant_type(*idx, resolver, ty_args)?
-                    .0
-                    .clone();
-                let args_ty = ty_cache.get_struct_variant_fields_types(*idx, resolver, ty_args)?;
+                let info = frame.get_struct_variant_instantiation_at(*idx);
+                let output_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0.clone();
+                let args_ty = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
                 verify_pack(
                     operand_stack,
                     info.field_count,
@@ -564,8 +546,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 )?;
             },
             Bytecode::UnpackVariant(idx) => {
-                let info = resolver.get_struct_variant_at(*idx);
-                let expected_struct_ty = resolver.create_struct_ty(&info.definition_struct_type);
+                let info = frame.get_struct_variant_at(*idx);
+                let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
                 let actual_struct_ty = operand_stack.pop_ty()?;
                 actual_struct_ty.paranoid_check_eq(&expected_struct_ty)?;
                 for (_name, ty) in info
@@ -577,26 +559,23 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 }
             },
             Bytecode::UnpackVariantGeneric(idx) => {
-                let expected_struct_type =
-                    ty_cache.get_struct_variant_type(*idx, resolver, ty_args)?.0;
+                let expected_struct_type = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let actual_struct_type = operand_stack.pop_ty()?;
                 actual_struct_type.paranoid_check_eq(expected_struct_type)?;
-                let struct_fields_types =
-                    ty_cache.get_struct_variant_fields_types(*idx, resolver, ty_args)?;
+                let struct_fields_types = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
                 for (ty, _) in struct_fields_types {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
             Bytecode::TestVariant(idx) => {
-                let info = resolver.get_struct_variant_at(*idx);
-                let expected_struct_ty = resolver.create_struct_ty(&info.definition_struct_type);
+                let info = frame.get_struct_variant_at(*idx);
+                let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
                 let actual_struct_ty = operand_stack.pop_ty()?;
                 actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
                 operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
             Bytecode::TestVariantGeneric(idx) => {
-                let expected_struct_ty =
-                    ty_cache.get_struct_variant_type(*idx, resolver, ty_args)?.0;
+                let expected_struct_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let actual_struct_ty = operand_stack.pop_ty()?;
                 actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
                 operand_stack.push_ty(ty_builder.create_bool_ty())?;
@@ -682,7 +661,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::MutBorrowGlobal(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = resolver.get_struct_ty(*idx);
+                let struct_ty = frame.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
                 let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
@@ -690,7 +669,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::ImmBorrowGlobal(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = resolver.get_struct_ty(*idx);
+                let struct_ty = frame.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
                 let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
@@ -698,7 +677,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0;
+                let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
                 let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
@@ -706,7 +685,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0;
+                let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
                 let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
@@ -721,24 +700,24 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::MoveTo(idx) => {
                 let ty = operand_stack.pop_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(&resolver.get_struct_ty(*idx))?;
+                ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
                 ty.paranoid_check_has_ability(Ability::Key)?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = operand_stack.pop_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
+                ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
                 ty.paranoid_check_has_ability(Ability::Key)?;
             },
             Bytecode::MoveFrom(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_ty(*idx);
+                let ty = frame.get_struct_ty(*idx);
                 ty.paranoid_check_has_ability(Ability::Key)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
+                let ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
                 ty.paranoid_check_has_ability(Ability::Key)?;
                 operand_stack.push_ty(ty)?;
             },
@@ -755,7 +734,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::VecPack(si, num) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let elem_tys = operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
                     // For vector element types, use assignability
@@ -766,7 +745,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(vec_ty)?;
             },
             Bytecode::VecLen(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty::<false>(ty)?;
@@ -775,7 +754,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(u64_ty)?;
             },
             Bytecode::VecImmBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
@@ -784,7 +763,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecMutBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
@@ -792,7 +771,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecPushBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 // For pushing an element to a vector, use assignability
                 operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
                 operand_stack
@@ -800,15 +779,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
             Bytecode::VecPopBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let elem_ty = operand_stack
                     .pop_ty()?
                     .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
-                let (expected_elem_ty, _) =
-                    ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let vec_ty = operand_stack.pop_ty()?;
                 vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
                 for _ in 0..*num {
@@ -816,7 +794,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 }
             },
             Bytecode::VecSwap(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack

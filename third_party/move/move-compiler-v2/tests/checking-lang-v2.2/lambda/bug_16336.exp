@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: function returns value of type `()` but `|()|` was expected
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16336.move:4:10
+  │
+4 │         *(&mut x) = x();
+  │          ^^^^^^^^

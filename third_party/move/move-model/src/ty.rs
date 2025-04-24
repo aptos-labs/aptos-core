@@ -538,11 +538,7 @@ impl Constraint {
                     )?;
                     Ok(true)
                 } else {
-                    Err(TypeUnificationError::ConstraintsIncompatible(
-                        loc.clone(),
-                        self.clone(),
-                        other.clone(),
-                    ))
+                    Ok(false)
                 }
             },
             (
@@ -666,6 +662,11 @@ impl Constraint {
             AbilityCheckingScope::ExcludeTypeParams,
         ));
         result
+    }
+
+    /// Returns the constraints which need to be satisfied for function parameters.
+    pub fn for_fun_parameter() -> Vec<Constraint> {
+        vec![Constraint::NoPhantom, Constraint::NoTuple]
     }
 
     /// Returns the constraints which need to be satisfied for a local or
@@ -1846,7 +1847,7 @@ impl Substitution {
         ty: Type,
     ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
-        let ty = self.specialize(&ty);
+        let mut ty = self.specialize(&ty);
         if let Some(mut constrs) = self.constraints.remove(&var) {
             // Sort constraints to report primary errors first
             constrs.sort_by(|(_, _, c1), (_, _, c2)| c1.compare(c2).reverse());
@@ -1874,9 +1875,17 @@ impl Substitution {
                     },
                 }
             }
+            // New bindings could have been created, so specialize again.
+            ty = self.specialize(&ty)
         }
-        self.subs.insert(var, ty);
-        Ok(())
+
+        // Occurs check
+        if ty.get_vars().contains(&var) {
+            Err(TypeUnificationError::CyclicSubstitution(Type::Var(var), ty))
+        } else {
+            self.subs.insert(var, ty);
+            Ok(())
+        }
     }
 
     /// Evaluates whether the given type satisfies the constraint, discharging the constraint.
@@ -1906,7 +1915,7 @@ impl Substitution {
         if matches!(ty, Type::Error) {
             Ok(())
         } else if let Type::Var(other_var) = ty {
-            // Transfer constraint on to other variable, which we assert to be free
+            // Transfer constraint on to other variable which we assert to be free
             debug_assert!(!self.subs.contains_key(other_var));
             self.add_constraint(context, *other_var, loc.clone(), order, c, ctx_opt)
         } else if c.propagate_over_reference() && ty.is_reference() {
@@ -2415,44 +2424,42 @@ impl Substitution {
                     .map_err(TypeUnificationError::lift(order, t1, t2))?,
                 ));
             },
-            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2)) => {
+            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2))
+                // Abilities must be same if NoVariance requested
+                if variance != Variance::NoVariance || abilities1 == abilities2 =>
+            {
                 // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
                 // conversion for arguments. We also have contra-variance of arguments:
                 //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
                 // Intuitively, function f1 can safely _substitute_ function f2 if any argument
                 // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
                 // T2 is also a T1).
-                //
-                // We test for abilities match last, to give more intuitive error messages.
-                return Ok(Type::Fun(
-                    Box::new(
-                        self.unify(context, variance, order.swap(), a1, a2)
-                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?,
-                    ),
-                    Box::new(
-                        self.unify(context, variance, order, r1, r2)
-                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?,
-                    ),
-                    {
-                        // Widening/conversion can remove abilities, not add them.  So check that
-                        // the target has no more abilities than the source.
-                        let (missing_abilities, bad_ty) = match order {
-                            WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
-                            WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
-                            WideningOrder::Join => (AbilitySet::EMPTY, t1),
-                        };
-                        if missing_abilities.is_empty() {
-                            abilities1.intersect(*abilities2)
-                        } else {
-                            return Err(TypeUnificationError::MissingAbilities(
-                                Loc::default(),
-                                bad_ty.clone(),
-                                missing_abilities,
-                                None,
-                            ));
-                        }
-                    },
-                ));
+                let arg_ty = self
+                    .unify(context, variance, order.swap(), a1, a2)
+                    .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                let res_ty = self
+                    .unify(context, variance, order, r1, r2)
+                    .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                let abilities = {
+                    // Widening/conversion can remove abilities, not add them.  So check that
+                    // the target has no more abilities than the source.
+                    let (missing_abilities, bad_ty) = match order {
+                        WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
+                        WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
+                        WideningOrder::Join => (AbilitySet::EMPTY, t1),
+                    };
+                    if missing_abilities.is_empty() {
+                        abilities1.intersect(*abilities2)
+                    } else {
+                        return Err(TypeUnificationError::MissingAbilities(
+                            Loc::default(),
+                            bad_ty.clone(),
+                            missing_abilities,
+                            None,
+                        ));
+                    }
+                };
+                return Ok(Type::Fun(Box::new(arg_ty), Box::new(res_ty), abilities));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
@@ -2568,38 +2575,16 @@ impl Substitution {
                     break;
                 }
             }
-            // Skip the cycle check if we are unifying the same two variables.
+            // Skip binding if we are unifying the same two variables.
             if t1 == &t2 {
-                return Ok(Some(t1.clone()));
-            }
-            // Cycle check.
-            if !self.occurs_check(&t2, *v1) {
+                Ok(Some(t1.clone()))
+            } else {
                 self.bind(context, *v1, variance, order, t2.clone())?;
                 Ok(Some(t2))
-            } else {
-                Err(TypeUnificationError::CyclicSubstitution(
-                    self.specialize(t1),
-                    self.specialize(&t2),
-                ))
             }
         } else {
             Ok(None)
         }
-    }
-
-    /// Check whether the variables occurs in the type, or in any assignment to variables in the
-    /// type.
-    fn occurs_check(&self, ty: &Type, var: u32) -> bool {
-        ty.get_vars().iter().any(|v| {
-            if v == &var {
-                return true;
-            }
-            if let Some(sty) = self.subs.get(v) {
-                self.occurs_check(sty, var)
-            } else {
-                false
-            }
-        })
     }
 }
 
@@ -3398,10 +3383,9 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 if !t.is_unit() {
                     write!(f, "{}", t.display(self.context))?;
                 }
-                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                if !abilities.is_empty() {
                     // Default formatter for Abilities is not compact, manually convert here.
                     let abilities_as_str = abilities
-                        .setminus(AbilitySet::FUNCTIONS)
                         .iter()
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}+{}", l, r))

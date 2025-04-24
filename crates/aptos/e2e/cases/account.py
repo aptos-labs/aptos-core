@@ -3,6 +3,7 @@
 
 import json
 import secrets
+import time
 
 from common import OTHER_ACCOUNT_ONE, TestError
 from test_helpers import RunHelper
@@ -11,6 +12,11 @@ from test_results import test_case
 
 @test_case
 async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
+    old_balance = int(
+        await run_helper.api_client.account_balance(
+            run_helper.get_account_info().account_address
+        )
+    )
     amount_in_octa = 100000000000
 
     # Fund the account.
@@ -33,9 +39,9 @@ async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
             run_helper.get_account_info().account_address
         )
     )
-    if balance == amount_in_octa:
+    if balance != amount_in_octa + old_balance:
         raise TestError(
-            f"Account {run_helper.get_account_info().account_address} has balance {balance}, expected {amount_in_octa}"
+            f"Account {run_helper.get_account_info().account_address} has balance {balance}, expected {amount_in_octa + old_balance}"
         )
 
 
@@ -99,7 +105,7 @@ def test_account_list(run_helper: RunHelper, test_name=None):
             "account",
             "list",
             "--account",
-            OTHER_ACCOUNT_ONE.account_address,
+            run_helper.get_account_info().account_address,
         ],
     )
 
@@ -249,6 +255,7 @@ def test_account_resource_account(run_helper: RunHelper, test_name=None):
         )
 
     # List the resource account
+    time.sleep(5)
     result = run_helper.run_command(
         test_name,
         [

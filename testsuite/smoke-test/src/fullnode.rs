@@ -55,7 +55,6 @@ async fn test_indexer() {
 
     let account1 = swarm.aptos_public_info().random_account();
     let account2 = swarm.aptos_public_info().random_account();
-    println!("account1: {:?}", account1.address());
 
     let mut chain_info = swarm.chain_info().into_aptos_public_info();
     let factory = chain_info.transaction_factory();

@@ -608,12 +608,15 @@ fn group_events_by_event_key(
     event_key_to_events.into_iter().collect()
 }
 
-fn verify_account_txns(
+fn verify_account_ordered_txns(
     db: &AptosDB,
-    expected_txns_by_account: HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>>,
+    expected_ordered_txns_by_account: HashMap<
+        AccountAddress,
+        Vec<(Transaction, Vec<ContractEvent>)>,
+    >,
     ledger_info: &LedgerInfo,
 ) {
-    let actual_txns_by_account = expected_txns_by_account
+    let actual_ordered_txns_by_account = expected_ordered_txns_by_account
         .iter()
         .map(|(account, txns_and_events)| {
             let account = *account;
@@ -628,7 +631,7 @@ fn verify_account_txns(
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
-                .get_account_transactions(
+                .get_account_ordered_transactions(
                     account,
                     first_seq_num,
                     limit,
@@ -657,10 +660,13 @@ fn verify_account_txns(
         })
         .collect::<HashMap<_, _>>();
 
-    assert_eq!(actual_txns_by_account, expected_txns_by_account);
+    assert_eq!(
+        actual_ordered_txns_by_account,
+        expected_ordered_txns_by_account
+    );
 }
 
-fn group_txns_by_account(
+fn group_ordered_txns_by_account(
     txns_to_commit: &[TransactionToCommit],
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
@@ -796,7 +802,12 @@ pub fn verify_committed_transactions(
                 .unwrap();
 
             let txn_with_proof = db
-                .get_account_transaction(txn.sender(), txn.sequence_number(), true, ledger_version)
+                .get_account_ordered_transaction(
+                    txn.sender(),
+                    txn.sequence_number(),
+                    true,
+                    ledger_version,
+                )
                 .unwrap()
                 .expect("Should exist.");
             txn_with_proof
@@ -804,7 +815,7 @@ pub fn verify_committed_transactions(
                 .unwrap();
 
             let acct_txns_with_proof = db
-                .get_account_transactions(
+                .get_account_ordered_transactions(
                     txn.sender(),
                     txn.sequence_number(),
                     1,
@@ -852,7 +863,11 @@ pub fn verify_committed_transactions(
     );
 
     // Fetch and verify batch transactions by account
-    verify_account_txns(db, group_txns_by_account(txns_to_commit), ledger_info);
+    verify_account_ordered_txns(
+        db,
+        group_ordered_txns_by_account(txns_to_commit),
+        ledger_info,
+    );
 }
 
 pub fn put_transaction_infos(

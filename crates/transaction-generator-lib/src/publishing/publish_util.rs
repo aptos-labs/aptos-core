@@ -11,7 +11,7 @@ use aptos_sdk::{
         account_address::AccountAddress,
         transaction::{Script, TransactionPayload},
         vm::module_metadata::{
-            get_metadata_from_compiled_module, KnownAttribute, APTOS_METADATA_KEY,
+            get_metadata_from_compiled_code, KnownAttribute, APTOS_METADATA_KEY,
             APTOS_METADATA_KEY_V1,
         },
     },
@@ -276,7 +276,7 @@ fn update(
                 }
             }
         }
-        if let Some(mut metadata) = get_metadata_from_compiled_module(&new_module) {
+        if let Some(mut metadata) = get_metadata_from_compiled_code(&new_module) {
             metadata
                 .struct_attributes
                 .iter_mut()
