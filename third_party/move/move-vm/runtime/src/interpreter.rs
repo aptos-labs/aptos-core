@@ -21,7 +21,7 @@ use crate::{
     },
     storage::{
         dependencies_gas_charging::check_dependencies_and_charge_gas, loader::traits::Loader,
-        ty_depth_checker::TypeDepthChecker,
+        ty_depth_checker::TypeDepthChecker, ty_layout_converter::LayoutConverter,
     },
     trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
 };
@@ -99,6 +99,8 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     reentrancy_checker: ReentrancyChecker,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
+    /// Converts runtime types ([Type]) to layouts for (de)serialization.
+    layout_converter: &'ctx LayoutConverter<'ctx, LoaderImpl>,
 }
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
@@ -115,23 +117,28 @@ impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
 impl Interpreter {
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
-    pub(crate) fn entrypoint(
+    pub(crate) fn entrypoint<LoaderImpl>(
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
-        ty_depth_checker: &TypeDepthChecker<impl Loader>,
+        ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
+        layout_converter: &LayoutConverter<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-    ) -> VMResult<Vec<Value>> {
+    ) -> VMResult<Vec<Value>>
+    where
+        LoaderImpl: Loader,
+    {
         InterpreterImpl::entrypoint(
             function,
             args,
             data_cache,
             module_storage,
             ty_depth_checker,
+            layout_converter,
             resource_resolver,
             gas_meter,
             traversal_context,
@@ -152,6 +159,7 @@ where
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
+        layout_converter: &LayoutConverter<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -164,6 +172,7 @@ where
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
             ty_depth_checker,
+            layout_converter,
         };
 
         let function = Rc::new(function);
@@ -1085,11 +1094,14 @@ where
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
         let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+            self.layout_converter,
+            gas_meter,
+            traversal_context,
             module_storage,
             resource_resolver,
             &addr,
@@ -2283,7 +2295,7 @@ impl Frame {
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            module_storage,
+                            interpreter.layout_converter,
                             gas_meter,
                             traversal_context,
                             function.clone(),
@@ -2323,7 +2335,7 @@ impl Frame {
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            module_storage,
+                            interpreter.layout_converter,
                             gas_meter,
                             traversal_context,
                             function.clone(),
