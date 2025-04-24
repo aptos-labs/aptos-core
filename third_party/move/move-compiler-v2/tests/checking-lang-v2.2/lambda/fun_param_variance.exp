@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected function type has argument of type `&u64` but `&mut u64` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/fun_param_variance.move:10:15
+   │
+10 │         apply(func);
+   │               ^^^^

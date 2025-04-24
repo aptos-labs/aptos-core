@@ -31,7 +31,10 @@ use crate::{
         CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    ty::{
+        Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, Variance,
+        BOOL_TYPE,
+    },
     well_known, LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -1377,6 +1380,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     &field_ty_loc,
                     &ErrorMessageContext::General,
                     &field_ty,
+                    Variance::NoVariance,
                     ctr,
                     Some(ConstraintContext::default().for_field(field_sym)),
                 )
