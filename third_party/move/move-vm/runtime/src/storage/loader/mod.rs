@@ -3,6 +3,7 @@
 
 pub(crate) mod eager;
 pub(crate) mod lazy;
+pub(crate) mod native;
 #[cfg(test)]
 pub(crate) mod test_utils;
 pub(crate) mod traits;

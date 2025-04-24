@@ -4,7 +4,7 @@
 use crate::{
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    storage::{loader::native::NativeLoader, ty_layout_converter::LayoutConverter},
     LoadedFunction, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
@@ -27,11 +27,8 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    gas::{ImmutableTraversalContext, ModuleTraversalContext},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    gas::{ImmutableTraversalContext, ModuleTraversalContext, UnmeteredGasMeter},
+    loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -142,9 +139,12 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
 
-    /// Returns a struct type corresponding to the specified name. The module containing the struct
-    /// will be fetched and cached beforehand.
-    fn fetch_struct_ty(
+    /// Returns a struct definition corresponding to the specified name. The module containing the
+    /// struct will be fetched and cached beforehand. Returns an error if the module or struct does
+    /// not exist.
+    ///
+    /// Note: This API is not metered.
+    fn unmetered_get_struct_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -158,19 +158,6 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .map_err(|err| err.to_partial())
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name_ref(*idx)?;
-
-        self.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
-    }
-
     /// Returns a runtime type corresponding to the specified type tag (file format type
     /// representation). If a struct type is constructed, the module containing the struct
     /// definition is fetched and cached.
@@ -182,7 +169,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .vm_config()
             .ty_builder
             .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
+                self.unmetered_get_struct_definition(
                     &st.address,
                     st.module.as_ident_str(),
                     st.name.as_ident_str(),
@@ -587,7 +574,6 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
             LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
-                let ty_converter = StorageLayoutConverter::new(self.module_storage);
                 let ty_builder = &self
                     .module_storage
                     .runtime_environment()
@@ -604,32 +590,44 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                 // INVARIANT(assertion):
                 //    Captured arguments created during execution: by construction, their modules
                 //    also must have been loaded.
-                // TODO(lazy-loading):
-                //   Use the context to check the invariant that all modules for layout are indeed
-                //   loaded. Will be coupled with native loader (later PRs).
-                let _ctx = ImmutableTraversalContext::new(traversal_context);
+                let loader = NativeLoader::new(self.module_storage);
+                let layout_converter = LayoutConverter::new(&loader);
+                let mut gas_meter = UnmeteredGasMeter;
+                let mut ctx = ImmutableTraversalContext::new(traversal_context);
+
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()
                     .map(|ty| {
-                        let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
-                            ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
+                        let layout = if fun.ty_args.is_empty() {
+                            layout_converter.type_to_type_layout_with_delayed_fields(
+                                &mut gas_meter,
+                                &mut ctx,
+                                ty,
+                            )?
                         } else {
                             let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                            ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
+                            layout_converter.type_to_type_layout_with_delayed_fields(
+                                &mut gas_meter,
+                                &mut ctx,
+                                &ty,
+                            )?
                         };
 
                         // Do not allow delayed fields to be serialized.
-                        if contains_delayed_fields {
-                            let err = PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
-                                .with_message(
-                                "Function values that capture delayed fields cannot be serialized"
-                                    .to_string(),
-                            );
-                            return Err(err);
-                        }
-
-                        Ok(layout)
+                        layout
+                            .into_layout_when_has_no_delayed_fields()
+                            .ok_or_else(|| {
+                                let msg = format!(
+                                    "Function {}::{}::{} cannot have serialized data because it \
+                                 captures a value with delayed fields",
+                                    fun.module_or_script_id().address(),
+                                    fun.module_or_script_id().name(),
+                                    fun.name(),
+                                );
+                                PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                                    .with_message(msg)
+                            })
                     })
                     .collect::<PartialVMResult<Vec<_>>>()?;
 
