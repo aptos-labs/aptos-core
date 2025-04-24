@@ -72,12 +72,11 @@ struct TableData {
     tables: BTreeMap<TableHandle, Table>,
 }
 
-/// A structure containing information about the layout of a value stored in a
-/// table. Needed in order to replace aggregator and snapshot values with
-/// identifiers.
+/// A structure containing information about the layout of a value stored in a table. Needed in
+/// order to replace delayed fields.
 struct LayoutInfo {
     layout: Arc<MoveTypeLayout>,
-    has_identifier_mappings: bool,
+    contains_delayed_fields: bool,
 }
 
 /// A structure representing a single table.
@@ -213,11 +212,12 @@ impl TableData {
 
 impl LayoutInfo {
     fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
-        let (layout, has_identifier_mappings) =
-            context.type_to_type_layout_with_identifier_mappings(value_ty)?;
+        let (layout, contains_delayed_fields) = context
+            .type_to_type_layout_with_delayed_field_check(value_ty)?
+            .unpack();
         Ok(Self {
             layout: Arc::new(layout),
-            has_identifier_mappings,
+            contains_delayed_fields,
         })
     }
 }
@@ -239,7 +239,7 @@ impl Table {
                     .resolve_table_entry_bytes_with_layout(
                         &self.handle,
                         entry.key(),
-                        if self.value_layout_info.has_identifier_mappings {
+                        if self.value_layout_info.contains_delayed_fields {
                             Some(&self.value_layout_info.layout)
                         } else {
                             None
@@ -661,7 +661,7 @@ fn serialize_value(
     layout_info: &LayoutInfo,
     val: &Value,
 ) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
-    let serialization_result = if layout_info.has_identifier_mappings {
+    let serialization_result = if layout_info.contains_delayed_fields {
         // Value contains delayed fields, so we should be able to serialize it.
         ValueSerDeContext::new()
             .with_delayed_fields_serde()
@@ -686,7 +686,7 @@ fn deserialize_value(
     layout_info: &LayoutInfo,
 ) -> PartialVMResult<Value> {
     let layout = layout_info.layout.as_ref();
-    let deserialization_result = if layout_info.has_identifier_mappings {
+    let deserialization_result = if layout_info.contains_delayed_fields {
         ValueSerDeContext::new()
             .with_function_value_extension(function_value_extension, traversal_context)
             .with_delayed_fields_serde()
