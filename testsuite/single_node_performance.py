@@ -33,6 +33,8 @@ class Flow(Flag):
     RESOURCE_GROUPS = auto()
     # Test different executor types
     EXECUTORS = auto()
+    # Test Order Book
+    ORDER_BOOK = auto()
     # For when testing locally, quick inclusion of specific cases
     ADHOC = auto()
 
@@ -179,6 +181,12 @@ with open('testsuite/single_node_performance_values.tsv', 'r') as file:
 DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
+    # TODO move to the bottom after recalibrating
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("order-book-no-matches"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("order-book-balanced-matches25-pct"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("order-book-balanced-matches80-pct"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("order-book-balanced-size-skewed80-pct"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),

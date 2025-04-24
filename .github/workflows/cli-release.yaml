@@ -19,6 +19,12 @@ on:
         required: false
         default: true
         description: "Dry run - If checked, the release will not be created"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip checks - If checked, the release will skip version checks"
+
 
 jobs:
   # TODO: Deprecated, please use "Linux" instead as it's more straightforwardly named
@@ -31,7 +37,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -48,7 +54,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +71,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -82,7 +88,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -100,7 +106,7 @@ jobs:
   #       with:
   #         macos: true
   #     - name: Build CLI
-  #       run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
+  #       run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
   #     - name: Upload Binary
   #       uses: actions/upload-artifact@v4
   #       with:
@@ -118,7 +124,7 @@ jobs:
   #       with:
   #         macos: true
   #     - name: Build CLI
-  #       run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
+  #       run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
   #     - name: Upload Binary
   #       uses: actions/upload-artifact@v4
   #       with:

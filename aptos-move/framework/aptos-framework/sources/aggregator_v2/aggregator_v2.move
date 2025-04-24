@@ -67,8 +67,8 @@ module aptos_framework::aggregator_v2 {
     }
 
     /// Returns `max_value` exceeding which aggregator overflows.
-    public fun max_value<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>): IntElement {
-        aggregator.max_value
+    public fun max_value<IntElement: copy + drop>(self: &Aggregator<IntElement>): IntElement {
+        self.max_value
     }
 
     /// Creates new aggregator, with given 'max_value'.
@@ -79,7 +79,7 @@ module aptos_framework::aggregator_v2 {
 
     public fun create_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement, max_value: IntElement): Aggregator<IntElement> {
         let aggregator = create_aggregator(max_value);
-        add(&mut aggregator, start_value);
+        aggregator.add(start_value);
         aggregator
     }
 
@@ -92,7 +92,7 @@ module aptos_framework::aggregator_v2 {
 
     public fun create_unbounded_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement): Aggregator<IntElement> {
         let aggregator = create_unbounded_aggregator();
-        add(&mut aggregator, start_value);
+        aggregator.add(start_value);
         aggregator
     }
 
@@ -100,31 +100,31 @@ module aptos_framework::aggregator_v2 {
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
     ///
     /// Parallelism info: This operation enables speculative parallelism.
-    public native fun try_add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
+    public native fun try_add<IntElement>(self: &mut Aggregator<IntElement>, value: IntElement): bool;
 
     /// Adds `value` to aggregator, unconditionally.
     /// If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown.
     ///
     /// Parallelism info: This operation enables speculative parallelism.
-    public fun add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
-        assert!(try_add(aggregator, value), error::out_of_range(EAGGREGATOR_OVERFLOW));
+    public fun add<IntElement>(self: &mut Aggregator<IntElement>, value: IntElement) {
+        assert!(self.try_add(value), error::out_of_range(EAGGREGATOR_OVERFLOW));
     }
 
     /// Subtracts `value` from aggregator.
     /// If subtraction would result in a negative value, `false` is returned, and aggregator value is left unchanged.
     ///
     /// Parallelism info: This operation enables speculative parallelism.
-    public native fun try_sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
+    public native fun try_sub<IntElement>(self: &mut Aggregator<IntElement>, value: IntElement): bool;
 
     // Subtracts `value` to aggregator, unconditionally.
     // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown.
     ///
     /// Parallelism info: This operation enables speculative parallelism.
-    public fun sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
-        assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
+    public fun sub<IntElement>(self: &mut Aggregator<IntElement>, value: IntElement) {
+        assert!(self.try_sub(value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
-    native fun is_at_least_impl<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
+    native fun is_at_least_impl<IntElement>(self: &Aggregator<IntElement>, min_amount: IntElement): bool;
 
     /// Returns true if aggregator value is larger than or equal to the given `min_amount`, false otherwise.
     ///
@@ -134,9 +134,9 @@ module aptos_framework::aggregator_v2 {
     /// - for `is_equal(agg, value)`, you can do `is_at_least(value) && !is_at_least(value + 1)`
     ///
     /// Parallelism info: This operation enables speculative parallelism.
-    public fun is_at_least<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
+    public fun is_at_least<IntElement>(self: &Aggregator<IntElement>, min_amount: IntElement): bool {
         assert!(features::aggregator_v2_is_at_least_api_enabled(), EAGGREGATOR_API_V2_NOT_ENABLED);
-        is_at_least_impl(aggregator, min_amount)
+        self.is_at_least_impl(min_amount)
     }
 
     // TODO waiting for integer traits
@@ -159,13 +159,13 @@ module aptos_framework::aggregator_v2 {
     /// up to two times slower.
     ///
     /// Parallelism info: This operation *prevents* speculative parallelism.
-    public native fun read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement;
+    public native fun read<IntElement>(self: &Aggregator<IntElement>): IntElement;
 
     /// Returns a wrapper of a current value of an aggregator
     /// Unlike read(), it is fast and avoids sequential dependencies.
     ///
     /// Parallelism info: This operation enables parallelism.
-    public native fun snapshot<IntElement>(aggregator: &Aggregator<IntElement>): AggregatorSnapshot<IntElement>;
+    public native fun snapshot<IntElement>(self: &Aggregator<IntElement>): AggregatorSnapshot<IntElement>;
 
     /// Creates a snapshot of a given value.
     /// Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
@@ -177,7 +177,7 @@ module aptos_framework::aggregator_v2 {
     /// or has other read/write conflicts)
     ///
     /// Parallelism info: This operation *prevents* speculative parallelism.
-    public native fun read_snapshot<IntElement>(snapshot: &AggregatorSnapshot<IntElement>): IntElement;
+    public native fun read_snapshot<IntElement>(self: &AggregatorSnapshot<IntElement>): IntElement;
 
     /// Returns a value stored in this DerivedStringSnapshot.
     /// Note: This operation is resource-intensive, and reduces parallelism.
@@ -185,7 +185,7 @@ module aptos_framework::aggregator_v2 {
     /// or has other read/write conflicts)
     ///
     /// Parallelism info: This operation *prevents* speculative parallelism.
-    public native fun read_derived_string(snapshot: &DerivedStringSnapshot): String;
+    public native fun read_derived_string(self: &DerivedStringSnapshot): String;
 
     /// Creates a DerivedStringSnapshot of a given value.
     /// Useful for when object is sometimes created via string_concat(), and sometimes directly.

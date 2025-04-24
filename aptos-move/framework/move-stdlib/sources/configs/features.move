@@ -689,6 +689,21 @@ module std::features {
         is_enabled(DEFAULT_ACCOUNT_RESOURCE)
     }
 
+    /// If enabled, JWK consensus should run in per-key mode, where:
+    /// - The consensus is for key-level updates
+    ///   (e.g., "issuer A key 1 should be deleted", "issuer B key 2 should be upserted");
+    /// - transaction type `ValidatorTransaction::ObservedJWKUpdate` is reused;
+    /// - while a key-level update is mostly represented by a new type `KeyLevelUpdate` locally,
+    ///   For simplicity, it is represented by type `ProviderJWKs` (used to represent issuer-level update)
+    ///   in JWK Consensus messages, in validator transactions, and in Move.
+    const JWK_CONSENSUS_PER_KEY_MODE: u64 = 92;
+
+    public fun get_jwk_consensus_per_key_mode_feature(): u64 { JWK_CONSENSUS_PER_KEY_MODE }
+
+    public fun is_jwk_consensus_per_key_mode_enabled(): bool acquires Features {
+        is_enabled(JWK_CONSENSUS_PER_KEY_MODE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

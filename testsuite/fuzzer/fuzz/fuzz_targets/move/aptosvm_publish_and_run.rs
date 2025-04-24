@@ -7,6 +7,7 @@ use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
     chain_id::ChainId,
+    on_chain_config::Features,
     transaction::{
         EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
         TransactionStatus,
@@ -14,6 +15,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::AptosVM;
+use aptos_vm_environment::prod_configs;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -21,7 +23,6 @@ use move_binary_format::{
     errors::VMError,
     file_format::{CompiledModule, CompiledScript, SignatureToken},
 };
-use move_bytecode_verifier::VerifierConfig;
 use move_core_types::vm_status::{StatusCode, StatusType};
 use once_cell::sync::Lazy;
 use std::{
@@ -97,7 +98,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // filter modules
     filter_modules(&input)?;
 
-    let verifier_config = VerifierConfig::production();
+    let verifier_config = prod_configs::aptos_prod_verifier_config(&Features::default());
     let deserializer_config = DeserializerConfig::new(8, 255);
 
     for m in input.dep_modules.iter_mut() {
@@ -108,10 +109,10 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         let mut module_code: Vec<u8> = vec![];
         m.serialize(&mut module_code).map_err(|_| Corpus::Keep)?;
         let m_de = CompiledModule::deserialize_with_config(&module_code, &deserializer_config)
-            .map_err(|_| Corpus::Keep)?;
+            .map_err(|_| Corpus::Reject)?;
         move_bytecode_verifier::verify_module_with_config(&verifier_config, &m_de).map_err(|e| {
             check_for_invariant_violation_vmerror(e);
-            Corpus::Keep
+            Corpus::Reject
         })?
     }
 
@@ -125,17 +126,17 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         let mut script_code: Vec<u8> = vec![];
         s.serialize(&mut script_code).map_err(|_| Corpus::Keep)?;
         let s_de = CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
-            .map_err(|_| Corpus::Keep)?;
+            .map_err(|_| Corpus::Reject)?;
         move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(|e| {
             check_for_invariant_violation_vmerror(e);
-            Corpus::Keep
+            Corpus::Reject
         })?
     }
 
     // check no duplicates
     let mset: HashSet<_> = input.dep_modules.iter().map(|m| m.self_id()).collect();
     if mset.len() != input.dep_modules.len() {
-        return Err(Corpus::Keep);
+        return Err(Corpus::Reject);
     }
 
     // topologically order modules {
@@ -204,7 +205,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             let mut script_bytes = vec![];
             script
                 .serialize(&mut script_bytes)
-                .map_err(|_| Corpus::Keep)?;
+                .map_err(|_| Corpus::Reject)?;
             sender_acc
                 .transaction()
                 .gas_unit_price(100)
@@ -216,7 +217,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                     args.into_iter()
                         .map(|x| x.try_into())
                         .collect::<Result<Vec<TransactionArgument>, _>>()
-                        .map_err(|_| Corpus::Keep)?,
+                        .map_err(|_| Corpus::Reject)?,
                 )))
         },
         ExecVariant::CallFunction {
@@ -230,21 +231,21 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .dep_modules
                 .iter()
                 .find(|m| m.self_id() == module)
-                .ok_or(Corpus::Keep)?;
+                .ok_or(Corpus::Reject)?;
             let fhi = cm
                 .function_defs
                 .get(function.0 as usize)
-                .ok_or(Corpus::Keep)?
+                .ok_or(Corpus::Reject)?
                 .function;
             let function_identifier_index = cm
                 .function_handles
                 .get(fhi.0 as usize)
-                .ok_or(Corpus::Keep)?
+                .ok_or(Corpus::Reject)?
                 .name;
             let function_name = cm
                 .identifiers
                 .get(function_identifier_index.0 as usize)
-                .ok_or(Corpus::Keep)?
+                .ok_or(Corpus::Reject)?
                 .clone();
             // }
             sender_acc
@@ -264,7 +265,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let tx = match input.tx_auth_type {
         FuzzerRunnableAuthenticator::Ed25519 { sender: _ } => raw_tx
             .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
-            .map_err(|_| Corpus::Keep)?
+            .map_err(|_| Corpus::Reject)?
             .into_inner(),
         FuzzerRunnableAuthenticator::MultiAgent {
             sender: _,
@@ -272,7 +273,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         } => {
             // higher number here slows down fuzzer significatly due to slow signing process.
             if secondary_signers.len() > 10 {
-                return Err(Corpus::Keep);
+                return Err(Corpus::Reject);
             }
             let secondary_accs: Vec<_> = secondary_signers
                 .iter()
@@ -286,7 +287,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                     secondary_signers,
                     secondary_private_keys,
                 )
-                .map_err(|_| Corpus::Keep)?
+                .map_err(|_| Corpus::Reject)?
                 .into_inner()
         },
         FuzzerRunnableAuthenticator::FeePayer {
@@ -296,7 +297,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         } => {
             // higher number here slows down fuzzer significatly due to slow signing process.
             if secondary_signers.len() > 10 {
-                return Err(Corpus::Keep);
+                return Err(Corpus::Reject);
             }
             let secondary_accs: Vec<_> = secondary_signers
                 .iter()
@@ -314,7 +315,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                     *fee_payer_acc.address(),
                     &fee_payer_acc.privkey,
                 )
-                .map_err(|_| Corpus::Keep)?
+                .map_err(|_| Corpus::Reject)?
                 .into_inner()
         },
     };
