@@ -35,13 +35,33 @@ fn native_from_bytes(
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
 
-    // TODO(Gas): charge for getting the layout
-    let layout = context.type_to_type_layout(&ty_args[0])?;
+    // Do not allow serializing values with delayed fields.
+    // TODO(lazy-loading): remove feature gating after rolled out?
+    let (bytes, layout) = if context.get_feature_flags().is_lazy_loading_enabled() {
+        let bytes = safely_pop_arg!(args, Vec<u8>);
+        context.charge(
+            UTIL_FROM_BYTES_BASE + UTIL_FROM_BYTES_PER_BYTE * NumBytes::new(bytes.len() as u64),
+        )?;
 
-    let bytes = safely_pop_arg!(args, Vec<u8>);
-    context.charge(
-        UTIL_FROM_BYTES_BASE + UTIL_FROM_BYTES_PER_BYTE * NumBytes::new(bytes.len() as u64),
-    )?;
+        let layout = context
+            .type_to_type_layout_with_delayed_fields(&ty_args[0])?
+            .into_layout_when_has_no_delayed_fields()
+            .ok_or_else(|| SafeNativeError::Abort {
+                abort_code: EFROM_BYTES,
+            })?;
+
+        (bytes, layout)
+    } else {
+        let layout = context
+            .type_to_type_layout_with_delayed_fields(&ty_args[0])?
+            .unpack()
+            .0;
+        let bytes = safely_pop_arg!(args, Vec<u8>);
+        context.charge(
+            UTIL_FROM_BYTES_BASE + UTIL_FROM_BYTES_PER_BYTE * NumBytes::new(bytes.len() as u64),
+        )?;
+        (bytes, layout)
+    };
 
     let function_value_extension = context.function_value_extension();
     let val = match ValueSerDeContext::new()
