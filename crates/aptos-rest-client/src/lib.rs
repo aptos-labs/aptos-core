@@ -783,13 +783,6 @@ impl Client {
                     chain_timestamp_usecs = Some(state.timestamp_usecs);
                 },
                 Ok(WaitForTransactionResult::NotFound(error)) => {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(5)),
-                        warn!(
-                            "Cannot yet find transaction in mempool on {:?}, continuing to wait, error is {:?}.",
-                            self.path_prefix_string(), error
-                        )
-                    );
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
