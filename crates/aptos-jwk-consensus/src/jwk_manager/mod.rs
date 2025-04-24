@@ -3,11 +3,15 @@
 
 use crate::{
     jwk_observer::JWKObserver,
+    mode::per_issuer::PerIssuerMode,
     network::IncomingRpcRequest,
-    types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse},
+    types::{
+        ConsensusState, JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse,
+        QuorumCertProcessGuard,
+    },
     update_certifier::TUpdateCertifier,
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::{bls12381::PrivateKey, SigningKey};
 use aptos_logger::{debug, error, info, warn};
@@ -20,12 +24,9 @@ use aptos_types::{
     },
     validator_txn::{Topic, ValidatorTransaction},
 };
-use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
+use aptos_validator_transaction_pool::VTxnPoolState;
 use futures_channel::oneshot;
-use futures_util::{
-    future::{join_all, AbortHandle},
-    FutureExt, StreamExt,
-};
+use futures_util::{future::join_all, FutureExt, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -43,7 +44,7 @@ pub struct JWKManager {
     consensus_key: Arc<PrivateKey>,
 
     /// The sub-process that collects JWK updates from peers and aggregate them into a quorum-certified JWK update.
-    update_certifier: Arc<dyn TUpdateCertifier>,
+    update_certifier: Arc<dyn TUpdateCertifier<PerIssuerMode>>,
 
     /// When a quorum-certified JWK update is available, use this to put it into the validator transaction pool.
     vtxn_pool: VTxnPoolState,
@@ -64,7 +65,7 @@ impl JWKManager {
         consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        update_certifier: Arc<dyn TUpdateCertifier>,
+        update_certifier: Arc<dyn TUpdateCertifier<PerIssuerMode>>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         let (qc_update_tx, qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
@@ -194,12 +195,17 @@ impl JWKManager {
             let signature = self
                 .consensus_key
                 .sign(&observed)
-                .map_err(|e| anyhow!("crypto material error occurred duing signing: {e}"))?;
-            let abort_handle = self.update_certifier.start_produce(
-                self.epoch_state.clone(),
-                observed.clone(),
-                self.qc_update_tx.clone(),
-            );
+                .context("process_new_observation failed with signing error")?;
+            let abort_handle = self
+                .update_certifier
+                .start_produce(
+                    self.epoch_state.clone(),
+                    observed.clone(),
+                    self.qc_update_tx.clone(),
+                )
+                .context(
+                    "process_new_observation failed with update_certifier.start_produce failure",
+                )?;
             state.consensus_state = ConsensusState::InProgress {
                 my_proposal: ObservedUpdate {
                     author: self.my_addr,
@@ -345,107 +351,11 @@ impl JWKManager {
     }
 }
 
-/// An instance of this resource is created when `JWKManager` starts the QC update building process for an issuer.
-/// Then `JWKManager` needs to hold it. Once this resource is dropped, the corresponding QC update process will be cancelled.
-#[derive(Clone, Debug)]
-pub struct QuorumCertProcessGuard {
-    handle: AbortHandle,
-}
-
-impl QuorumCertProcessGuard {
-    pub fn new(handle: AbortHandle) -> Self {
-        Self { handle }
-    }
-
-    #[cfg(test)]
-    pub fn dummy() -> Self {
-        let (handle, _) = AbortHandle::new_pair();
-        Self { handle }
-    }
-}
-
-impl Drop for QuorumCertProcessGuard {
-    fn drop(&mut self) {
-        let QuorumCertProcessGuard { handle } = self;
-        handle.abort();
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum ConsensusState {
-    NotStarted,
-    InProgress {
-        my_proposal: ObservedUpdate,
-        abort_handle_wrapper: QuorumCertProcessGuard,
-    },
-    Finished {
-        vtxn_guard: TxnGuard,
-        my_proposal: ObservedUpdate,
-        quorum_certified: QuorumCertifiedUpdate,
-    },
-}
-
-impl PartialEq for ConsensusState {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ConsensusState::NotStarted, ConsensusState::NotStarted) => true,
-            (
-                ConsensusState::InProgress {
-                    my_proposal: update_0,
-                    ..
-                },
-                ConsensusState::InProgress {
-                    my_proposal: update_1,
-                    ..
-                },
-            ) if update_0 == update_1 => true,
-            (
-                ConsensusState::Finished {
-                    my_proposal: update_0,
-                    ..
-                },
-                ConsensusState::Finished {
-                    my_proposal: update_1,
-                    ..
-                },
-            ) if update_0 == update_1 => true,
-            _ => false,
-        }
-    }
-}
-
-impl Eq for ConsensusState {}
-
-impl ConsensusState {
-    pub fn name(&self) -> &str {
-        match self {
-            ConsensusState::NotStarted => "NotStarted",
-            ConsensusState::InProgress { .. } => "InProgress",
-            ConsensusState::Finished { .. } => "Finished",
-        }
-    }
-
-    #[cfg(test)]
-    pub fn my_proposal_cloned(&self) -> ObservedUpdate {
-        match self {
-            ConsensusState::InProgress { my_proposal, .. }
-            | ConsensusState::Finished { my_proposal, .. } => my_proposal.clone(),
-            _ => panic!("my_proposal unavailable"),
-        }
-    }
-}
-
-impl Default for ConsensusState {
-    fn default() -> Self {
-        Self::NotStarted
-    }
-}
-
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PerProviderState {
     pub on_chain: Option<ProviderJWKs>,
     pub observed: Option<Vec<JWKMoveStruct>>,
-    pub consensus_state: ConsensusState,
+    pub consensus_state: ConsensusState<ObservedUpdate>,
 }
 
 impl PerProviderState {

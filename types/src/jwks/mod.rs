@@ -330,6 +330,15 @@ pub struct KeyLevelUpdate {
 }
 
 impl KeyLevelUpdate {
+    pub fn unknown() -> Self {
+        Self {
+            issuer: issuer_from_str("unknown issuer"),
+            base_version: 999999999,
+            kid: "unknown kid".as_bytes().to_vec(),
+            to_upsert: None,
+        }
+    }
+
     pub fn as_issuer_level_repr(&self) -> anyhow::Result<ProviderJWKs> {
         let kid_str = String::from_utf8(self.kid.clone())
             .context("KeyLevelUpdate::as_issuer_level_repr failed on kid")?;
