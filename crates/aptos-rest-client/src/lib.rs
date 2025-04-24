@@ -29,7 +29,7 @@ use aptos_api_types::{
     UserTransaction, VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
