@@ -7,6 +7,8 @@
 
 -  [Function `hex_char_to_u8`](#0x1_base16_hex_char_to_u8)
 -  [Function `base16_utf8_to_vec_u8`](#0x1_base16_base16_utf8_to_vec_u8)
+-  [Specification](#@Specification_0)
+    -  [Function `base16_utf8_to_vec_u8`](#@Specification_0_base16_utf8_to_vec_u8)
 
 
 <pre><code></code></pre>
@@ -77,6 +79,35 @@
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+<a id="@Specification_0_base16_utf8_to_vec_u8"></a>
+
+### Function `base16_utf8_to_vec_u8`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="base16.md#0x1_base16_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="base16.md#0x1_base16_spec_base16_utf8_to_vec_u8">spec_base16_utf8_to_vec_u8</a>(str);
+</code></pre>
+
+
+
+
+<a id="0x1_base16_spec_base16_utf8_to_vec_u8"></a>
+
+
+<pre><code><b>fun</b> <a href="base16.md#0x1_base16_spec_base16_utf8_to_vec_u8">spec_base16_utf8_to_vec_u8</a>(str: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
