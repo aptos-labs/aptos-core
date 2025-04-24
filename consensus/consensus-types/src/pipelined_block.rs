@@ -487,3 +487,6 @@ pub struct ExecutionSummary {
     pub execution_time: Duration,
     pub root_hash: HashValue,
 }
+
+pub type StateComputerCommitCallBackType =
+    Box<dyn FnOnce(&[Arc<PipelinedBlock>], LedgerInfoWithSignatures) + Send + Sync>;

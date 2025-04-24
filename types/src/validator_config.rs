@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network_address::NetworkAddress;
+use crate::network_address::{DnsName, NetworkAddress};
 use aptos_crypto::bls12381;
 use move_core_types::{
     ident_str,
@@ -12,6 +12,7 @@ use move_core_types::{
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 
 impl MoveStructType for ValidatorConfig {
     const MODULE_NAME: &'static IdentStr = ident_str!("stake");
@@ -64,5 +65,25 @@ impl ValidatorConfig {
 
     pub fn validator_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
         bcs::from_bytes(&self.validator_network_addresses)
+    }
+
+    pub fn find_ip_addr(&self) -> Option<IpAddr> {
+        let network_addresses = self.validator_network_addresses().unwrap();
+        for network_address in network_addresses {
+            if let Some(ip_addr) = network_address.find_ip_addr() {
+                return Some(ip_addr);
+            }
+        }
+        None
+    }
+
+    pub fn find_dns_name(&self) -> Option<DnsName> {
+        let network_addresses = self.validator_network_addresses().unwrap();
+        for network_address in network_addresses {
+            if let Some(dns_name) = network_address.find_dns_name() {
+                return Some(dns_name);
+            }
+        }
+        None
     }
 }

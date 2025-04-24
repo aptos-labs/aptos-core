@@ -41,18 +41,24 @@ pub fn create_consensus_runtime(
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     consensus_network_interfaces: Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
+    qs_network_interfaces: Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
+    qs2_network_interfaces: Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     admin_service: &mut AdminService,
 ) -> Option<Runtime> {
+    let qs_network_interfaces = qs_network_interfaces.unwrap();
+    let qs2_network_interfaces = qs2_network_interfaces.unwrap();
     consensus_network_interfaces.map(|consensus_network_interfaces| {
         let (consensus_runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
             node_config,
             db_rw.clone(),
             consensus_reconfig_subscription,
             consensus_network_interfaces,
+            qs_network_interfaces,
+            qs2_network_interfaces,
             consensus_notifier.clone(),
             consensus_to_mempool_sender.clone(),
             vtxn_pool,

@@ -46,3 +46,17 @@ validator_network:
   identity:
     type: "from_file"
     path: /opt/aptos/genesis/validator-identity.yaml
+
+validator_network2:
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+  identity:
+    type: "from_file"
+    path: /opt/aptos/genesis/validator-identity.yaml
+
+validator_network3:
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+  identity:
+    type: "from_file"
+    path: /opt/aptos/genesis/validator-identity.yaml

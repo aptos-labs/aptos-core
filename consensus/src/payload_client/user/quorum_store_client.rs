@@ -18,7 +18,7 @@ use futures_channel::{mpsc, oneshot};
 use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 
-const NO_TXN_DELAY: u64 = 30;
+const NO_TXN_DELAY: u64 = 10;
 
 /// Client that pulls blocks from Quorum Store
 #[derive(Clone)]

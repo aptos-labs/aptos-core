@@ -371,6 +371,7 @@ pub enum BlockTransactionPayload {
         PayloadWithProofAndLimit,
         /* OptQS and Inline Batches */ Vec<BatchInfo>,
     ),
+    Raikou(PayloadWithProofAndLimit, Vec<BatchInfo>),
 }
 
 impl BlockTransactionPayload {
@@ -417,6 +418,16 @@ impl BlockTransactionPayload {
         Self::OptQuorumStore(proof_with_limit, batch_infos)
     }
 
+    pub fn new_raikou_payload(
+        transactions: Vec<SignedTransaction>,
+        proofs: Vec<ProofOfStore>,
+        batch_infos: Vec<BatchInfo>,
+    ) -> Self {
+        let payload_with_proof = PayloadWithProof::new(transactions, proofs);
+        let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, None);
+        Self::Raikou(proof_with_limit, batch_infos)
+    }
+
     #[cfg(test)]
     /// Returns an empty transaction payload (for testing)
     pub fn empty() -> Self {
@@ -443,6 +454,7 @@ impl BlockTransactionPayload {
                 payload.transaction_limit
             },
             BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
+            BlockTransactionPayload::Raikou(payload_with_proof_and_limit, vec) => None,
         }
     }
 
@@ -459,6 +471,9 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::OptQuorumStore(payload, _) => {
                 payload.payload_with_proof.proofs.clone()
             },
+            BlockTransactionPayload::Raikou(payload, vec) => {
+                payload.payload_with_proof.proofs.clone()
+            },
         }
     }
 
@@ -473,6 +488,9 @@ impl BlockTransactionPayload {
                 payload.payload_with_proof.transactions.clone()
             },
             BlockTransactionPayload::OptQuorumStore(payload, _) => {
+                payload.payload_with_proof.transactions.clone()
+            },
+            BlockTransactionPayload::Raikou(payload, vec) => {
                 payload.payload_with_proof.transactions.clone()
             },
         }
@@ -527,6 +545,7 @@ impl BlockTransactionPayload {
                 // Verify the transaction limit
                 self.verify_transaction_limit(opt_qs_payload.max_txns_to_execute())?;
             },
+            Payload::Raptr(raikou_payload) => unreachable!(),
         }
 
         Ok(())

@@ -34,6 +34,7 @@ proptest = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

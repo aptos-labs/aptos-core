@@ -3,7 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter_vec,
-    register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
+    register_int_gauge, register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Instant;
@@ -42,6 +43,7 @@ pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESSOR: &str = "commit_post_proces
 pub const STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER: &str = "state_snapshot_receiver";
 
 /// An enum representing the component currently executing
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExecutingComponent {
     Bootstrapper,
     Consensus,
@@ -105,6 +107,15 @@ pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge indicating whether consensus is currently executing
+pub static CONSENSUS_EXECUTING_GAUGE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_state_sync_consensus_executing_gauge",
+        "Gauge indicating whether consensus is currently executing"
+    )
+    .unwrap()
+});
+
 /// Gauge for state sync continuous syncer fallback mode
 pub static CONTINUOUS_SYNCER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -146,7 +157,7 @@ pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counters related to the currently executing component
+/// Counters related to the currently executing component in the main driver loop
 pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_executing_component_counters",

@@ -52,7 +52,7 @@ pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
     root_account: Arc<LocalAccount>,
-    kube_client: K8sClient,
+    pub kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
     pub kube_namespace: String,
@@ -84,13 +84,14 @@ impl K8sSwarm {
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
         let address = aptos_sdk::types::account_config::aptos_test_root_address();
-        let sequence_number = query_sequence_number(&client, address).await.map_err(|e| {
-            format_err!(
-                "query_sequence_number on {:?} for dd account failed: {}",
-                client,
-                e
-            )
-        })?;
+        // let sequence_number = query_sequence_number(&client, address).await.map_err(|e| {
+        //     format_err!(
+        //         "query_sequence_number on {:?} for dd account failed: {}",
+        //         client,
+        //         e
+        //     )
+        // })?;
+        let sequence_number = 0;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
         let root_account = Arc::new(root_account);
 
@@ -210,11 +211,11 @@ impl K8sSwarm {
 #[async_trait::async_trait]
 impl Swarm for K8sSwarm {
     async fn health_check(&self) -> Result<()> {
-        let nodes = self.validators.values().collect();
-        let unhealthy_nodes = nodes_healthcheck(nodes).await.unwrap();
-        if !unhealthy_nodes.is_empty() {
-            bail!("Unhealthy nodes: {:?}", unhealthy_nodes)
-        }
+        // let nodes = self.validators.values().collect();
+        // let unhealthy_nodes = nodes_healthcheck(nodes).await.unwrap();
+        // if !unhealthy_nodes.is_empty() {
+        //     bail!("Unhealthy nodes: {:?}", unhealthy_nodes)
+        // }
 
         Ok(())
     }

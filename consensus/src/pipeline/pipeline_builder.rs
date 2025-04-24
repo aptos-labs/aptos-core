@@ -381,7 +381,10 @@ impl PipelineBuilder {
         let _tracker = Tracker::new("prepare", &block);
         // the loop can only be abort by the caller
         let input_txns = loop {
-            match preparer.prepare_block(&block).await {
+            match preparer
+                .prepare_block(&block, async move { None }.shared())
+                .await
+            {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(

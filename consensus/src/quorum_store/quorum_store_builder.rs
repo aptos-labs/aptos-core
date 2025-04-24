@@ -8,7 +8,10 @@ use crate::{
     monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
+    payload_manager::{
+        DirectMempoolPayloadManager, QuorumStoreCommitNotifier, QuorumStorePayloadManager,
+        TPayloadManager,
+    },
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
@@ -40,6 +43,7 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
 use std::{sync::Arc, time::Duration};
+use tokio::time::MissedTickBehavior;
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
@@ -129,7 +133,7 @@ pub struct InnerBuilder {
     network_sender: NetworkSender,
     verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
-    backend: SecureBackend,
+    _backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -205,7 +209,7 @@ impl InnerBuilder {
             network_sender,
             verifier,
             proof_cache,
-            backend,
+            _backend: backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
@@ -274,9 +278,10 @@ impl InnerBuilder {
         aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>,
     ) {
         // TODO: parameter? bring back back-off?
-        let interval = tokio::time::interval(Duration::from_millis(
+        let mut interval = tokio::time::interval(Duration::from_millis(
             self.config.batch_generation_poll_interval_ms as u64,
         ));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         let coordinator_rx = self.coordinator_rx.take().unwrap();
         let quorum_store_coordinator = QuorumStoreCoordinator::new(
@@ -366,6 +371,7 @@ impl InnerBuilder {
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
             self.config.batch_expiry_gap_when_init_usecs,
+            self.config.max_batches_per_pull,
         );
         spawn_named!(
             "proof_manager",
@@ -443,7 +449,7 @@ impl InnerBuilder {
             Arc::from(QuorumStorePayloadManager::new(
                 batch_reader,
                 // TODO: remove after splitting out clean requests
-                self.coordinator_tx.clone(),
+                Box::new(QuorumStoreCommitNotifier::new(self.coordinator_tx.clone())),
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
                 self.verifier.address_to_validator_index().clone(),

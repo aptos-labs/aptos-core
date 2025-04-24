@@ -9,87 +9,56 @@ use crate::{
         types::{BatchRequest, BatchResponse, PersistedValue},
     },
 };
-use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::Rng;
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, time};
 
 struct BatchRequesterState {
-    signers: Vec<PeerId>,
+    signers: Arc<Mutex<BTreeSet<PeerId>>>,
     next_index: usize,
-    ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
     num_retries: usize,
     retry_limit: usize,
 }
 
 impl BatchRequesterState {
-    fn new(
-        signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
-        retry_limit: usize,
-    ) -> Self {
+    fn new(signers: Arc<Mutex<BTreeSet<PeerId>>>, retry_limit: usize) -> Self {
         Self {
             signers,
             next_index: 0,
-            ret_tx,
             num_retries: 0,
             retry_limit,
         }
     }
 
     fn next_request_peers(&mut self, num_peers: usize) -> Option<Vec<PeerId>> {
+        let signers = self.signers.lock();
         if self.num_retries == 0 {
             let mut rng = rand::thread_rng();
             // make sure nodes request from the different set of nodes
-            self.next_index = rng.gen::<usize>() % self.signers.len();
+            self.next_index = rng.gen::<usize>() % signers.len();
             counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
         } else {
             counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
         }
         if self.num_retries < self.retry_limit {
             self.num_retries += 1;
-            let ret = self
-                .signers
+            let ret = signers
                 .iter()
                 .cycle()
                 .skip(self.next_index)
                 .take(num_peers)
                 .cloned()
                 .collect();
-            self.next_index = (self.next_index + num_peers) % self.signers.len();
+            self.next_index = (self.next_index + num_peers) % signers.len();
             Some(ret)
         } else {
             None
-        }
-    }
-
-    fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
-        if let Some(payload) = maybe_payload {
-            trace!(
-                "QS: batch to oneshot, digest {}, tx {:?}",
-                digest,
-                self.ret_tx
-            );
-            if self.ret_tx.send(Ok(payload)).is_err() {
-                debug!(
-                    "Receiver of requested batch not available for digest {}",
-                    digest
-                )
-            };
-        } else if self
-            .ret_tx
-            .send(Err(ExecutorError::CouldNotGetData))
-            .is_err()
-        {
-            debug!(
-                "Receiver of requested batch not available for unavailable digest {}",
-                digest
-            );
         }
     }
 }
@@ -132,12 +101,11 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         &self,
         digest: HashValue,
         expiration: u64,
-        responders: Vec<PeerId>,
-        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+        responders: Arc<Mutex<BTreeSet<PeerId>>>,
         mut subscriber_rx: oneshot::Receiver<PersistedValue>,
-    ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {
+    ) -> ExecutorResult<Vec<SignedTransaction>> {
         let validator_verifier = self.validator_verifier.clone();
-        let mut request_state = BatchRequesterState::new(responders, ret_tx, self.retry_limit);
+        let mut request_state = BatchRequesterState::new(responders, self.retry_limit);
         let network_sender = self.network_sender.clone();
         let request_num_peers = self.request_num_peers;
         let my_peer_id = self.my_peer_id;
@@ -166,11 +134,8 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                         match response {
                             Ok(BatchResponse::Batch(batch)) => {
                                 counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
-                                let digest = *batch.digest();
-                                let batch_info = batch.batch_info().clone();
                                 let payload = batch.into_transactions();
-                                request_state.serve_request(digest, Some(payload.clone()));
-                                return Some((batch_info, payload));
+                                return Ok(payload);
                             }
                             // Short-circuit if the chain has moved beyond expiration
                             Ok(BatchResponse::NotFound(ledger_info)) => {
@@ -181,8 +146,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 {
                                     counters::RECEIVED_BATCH_EXPIRED_COUNT.inc();
                                     debug!("QS: batch request expired, digest:{}", digest);
-                                    request_state.serve_request(digest, None);
-                                    return None;
+                                    return Err(ExecutorError::CouldNotGetData);
                                 }
                             }
                             Err(e) => {
@@ -195,9 +159,8 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                         match result {
                             Ok(persisted_value) => {
                                 counters::RECEIVED_BATCH_FROM_SUBSCRIPTION_COUNT.inc();
-                                let (info, maybe_payload) = persisted_value.unpack();
-                                request_state.serve_request(*info.digest(), maybe_payload);
-                                return None;
+                                let (_, maybe_payload) = persisted_value.unpack();
+                                return Ok(maybe_payload.expect("persisted value must exist"));
                             }
                             Err(err) => {
                                 debug!("channel closed: {}", err);
@@ -208,8 +171,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
             }
             counters::RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT.inc();
             debug!("QS: batch request timed out, digest:{}", digest);
-            request_state.serve_request(digest, None);
-            None
+            Err(ExecutorError::CouldNotGetData)
         })
     }
 }

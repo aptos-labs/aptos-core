@@ -9,6 +9,7 @@ use crate::{
     pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::network_messages::RandGenMessage,
+    raptr_manager::RaptrNetworkMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -81,6 +82,8 @@ pub enum ConsensusMsg {
     /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
     /// on a block.
     OrderVoteMsg(Box<OrderVoteMsg>),
+    RaptrMessage(RaptrNetworkMessage),
+    RaptrDissMessage(RaptrNetworkMessage),
     /// RoundTimeoutMsg is broadcasted by a validator once it decides to timeout the current round.
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
 }
@@ -110,6 +113,8 @@ impl ConsensusMsg {
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
             ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
+            ConsensusMsg::RaptrMessage(_) => "RaikouMessage",
+            ConsensusMsg::RaptrDissMessage(_) => "RaikouDissMessage",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
         }
     }
@@ -129,18 +134,16 @@ pub struct ConsensusNetworkClient<NetworkClient> {
 }
 
 /// Supported protocols in preferred order (from highest priority to lowest).
-pub const RPC: &[ProtocolId] = &[
-    ProtocolId::ConsensusRpcCompressed,
-    ProtocolId::ConsensusRpcBcs,
-    ProtocolId::ConsensusRpcJson,
-];
+pub const RPC: &[ProtocolId] = &[ProtocolId::ConsensusRpcCompressed];
 
 /// Supported protocols in preferred order (from highest priority to lowest).
-pub const DIRECT_SEND: &[ProtocolId] = &[
-    ProtocolId::ConsensusDirectSendCompressed,
-    ProtocolId::ConsensusDirectSendBcs,
-    ProtocolId::ConsensusDirectSendJson,
-];
+pub const DIRECT_SEND: &[ProtocolId] = &[ProtocolId::ConsensusDirectSendCompressed];
+
+/// Supported protocols in preferred order (from highest priority to lowest).
+pub const RPC_NOCOMPRESS: &[ProtocolId] = &[ProtocolId::ConsensusRpcBcs];
+
+/// Supported protocols in preferred order (from highest priority to lowest).
+pub const DIRECT_SEND_NOCOMPRESS: &[ProtocolId] = &[ProtocolId::ConsensusDirectSendBcs];
 
 impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient<NetworkClient> {
     /// Returns a new consensus network client

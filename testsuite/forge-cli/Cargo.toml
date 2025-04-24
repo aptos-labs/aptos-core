@@ -42,3 +42,9 @@ jemallocator = { workspace = true }
 [[bin]]
 name = "forge"
 path = "src/main.rs"
+
+[features]
+sim-types = ["aptos-forge/sim-types","aptos-testcases/sim-types"]
+force-aptos-types = ["aptos-forge/force-aptos-types","aptos-testcases/force-aptos-types"]
+inject-delays = ["aptos-forge/inject-delays"]
+inject-drops = ["aptos-forge/inject-drops"]

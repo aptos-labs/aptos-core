@@ -15,6 +15,7 @@ use anyhow::bail;
 use aptos_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
 use aptos_crypto::{CryptoMaterialError, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult};
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use dashmap::{
@@ -22,11 +23,15 @@ use dashmap::{
     DashMap,
 };
 use fail::fail_point;
+use futures::{future::Shared, FutureExt};
 use once_cell::sync::OnceCell;
 use std::{
+    collections::{hash_map, BTreeSet, HashMap},
+    future::Future,
+    pin::Pin,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc,
     },
     time::Duration,
 };
@@ -136,9 +141,9 @@ impl BatchStore {
         let batch_store = Self {
             epoch: OnceCell::with_value(epoch),
             last_certified_time: AtomicU64::new(last_certified_time),
-            db_cache: DashMap::new(),
-            peer_quota: DashMap::new(),
-            expirations: Mutex::new(TimeExpirations::new()),
+            db_cache: DashMap::with_capacity(50_000),
+            peer_quota: DashMap::with_capacity(50_000),
+            expirations: Mutex::new(TimeExpirations::with_capacity(50_000)),
             db,
             memory_quota,
             db_quota,
@@ -270,12 +275,16 @@ impl BatchStore {
             let cache_entry = self.db_cache.entry(digest);
 
             if let Occupied(entry) = &cache_entry {
-                if entry.get().expiration() >= expiration_time {
-                    debug!(
-                        "QS: already have the digest with higher expiration {}",
-                        digest
-                    );
-                    return Ok(false);
+                match entry.get().expiration().cmp(&expiration_time) {
+                    std::cmp::Ordering::Equal => return Ok(false),
+                    std::cmp::Ordering::Greater => {
+                        debug!(
+                            "QS: already have the digest with higher expiration {}",
+                            digest
+                        );
+                        return Ok(false);
+                    },
+                    std::cmp::Ordering::Less => {},
                 }
             };
             let value_to_be_stored = if self
@@ -309,10 +318,7 @@ impl BatchStore {
         // Add expiration for the inserted entry, no need to be atomic w. insertion.
         #[allow(clippy::unwrap_used)]
         {
-            self.expirations
-                .lock()
-                .unwrap()
-                .add_item(digest, expiration_time);
+            self.expirations.lock().add_item(digest, expiration_time);
         }
         Ok(true)
     }
@@ -346,7 +352,7 @@ impl BatchStore {
         // after the expiration time. This will help remote peers fetch batches that just expired but are within their
         // execution window.
         let expiration_time = certified_time.saturating_sub(self.expiration_buffer_usecs);
-        let expired_digests = self.expirations.lock().unwrap().expire(expiration_time);
+        let expired_digests = self.expirations.lock().expire(expiration_time);
         let mut ret = Vec::new();
         for h in expired_digests {
             let removed_value = match self.db_cache.entry(h) {
@@ -413,9 +419,12 @@ impl BatchStore {
             .fetch_max(certified_time, Ordering::SeqCst);
 
         let expired_keys = self.clear_expired_payload(certified_time);
-        if let Err(e) = self.db.delete_batches(expired_keys) {
-            debug!("Error deleting batches: {:?}", e)
-        }
+        let db = self.db.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(e) = db.delete_batches(expired_keys) {
+                debug!("Error deleting batches: {:?}", e)
+            }
+        });
     }
 
     fn last_certified_time(&self) -> u64 {
@@ -448,6 +457,10 @@ impl BatchStore {
         } else {
             Err(ExecutorError::CouldNotGetData)
         }
+    }
+
+    pub(crate) fn check_batch(&self, digest: &HashValue) -> Option<PeerId> {
+        self.db_cache.get(digest).map(|batch| batch.author)
     }
 
     /// This calls lets the caller subscribe to a batch being added to the batch store.
@@ -495,17 +508,22 @@ pub trait BatchReader: Send + Sync {
 
     fn get_batch(
         &self,
-        digest: HashValue,
-        expiration: u64,
+        batch_info: BatchInfo,
         signers: Vec<PeerId>,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>>;
 
     fn update_certified_timestamp(&self, certified_time: u64);
+}
+
+struct BatchFetchUnit {
+    responders: Arc<Mutex<BTreeSet<PeerId>>>,
+    fut: Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>>,
 }
 
 pub struct BatchReaderImpl<T> {
     batch_store: Arc<BatchStore>,
     batch_requester: Arc<BatchRequester<T>>,
+    inflight_fetch_requests: Arc<DashMap<HashValue, BatchFetchUnit>>,
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
@@ -513,51 +531,80 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
         Self {
             batch_store,
             batch_requester: Arc::new(batch_requester),
+            inflight_fetch_requests: Arc::new(DashMap::with_capacity(5000)),
         }
+    }
+
+    fn get_or_fetch_batch(
+        &self,
+        batch_info: BatchInfo,
+        responders: Vec<PeerId>,
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>> {
+        let mut responders = responders.into_iter().collect();
+
+        self.inflight_fetch_requests
+            .entry(*batch_info.digest())
+            .and_modify(|fetch_unit| {
+                fetch_unit.responders.lock().append(&mut responders);
+            })
+            .or_insert_with(|| {
+                let responders = Arc::new(Mutex::new(responders));
+                let responders_clone = responders.clone();
+
+                let inflight_requests_clone = self.inflight_fetch_requests.clone();
+                let batch_store = self.batch_store.clone();
+                let requester = self.batch_requester.clone();
+
+                let fut = async move {
+                    let batch_digest = *batch_info.digest();
+                    defer!({
+                        inflight_requests_clone.remove(&batch_digest);
+                    });
+                    if let Ok(mut value) = batch_store.get_batch_from_local(&batch_digest) {
+                        Ok(value.take_payload().expect("Must have payload"))
+                    } else {
+                        // Quorum store metrics
+                        counters::MISSED_BATCHES_COUNT.inc();
+                        let subscriber_rx = batch_store.subscribe(batch_digest);
+                        let payload = requester
+                            .request_batch(
+                                batch_digest,
+                                batch_info.expiration(),
+                                responders,
+                                subscriber_rx,
+                            )
+                            .await?;
+                        batch_store
+                            .persist(vec![PersistedValue::new(batch_info, Some(payload.clone()))]);
+                        Ok(payload)
+                    }
+                }
+                .boxed()
+                .shared();
+
+                tokio::spawn(fut.clone());
+
+                BatchFetchUnit {
+                    responders: responders_clone,
+                    fut,
+                }
+            })
+            .fut
+            .clone()
     }
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchReaderImpl<T> {
     fn exists(&self, digest: &HashValue) -> Option<PeerId> {
-        self.batch_store
-            .get_batch_from_local(digest)
-            .map(|v| v.author())
-            .ok()
+        self.batch_store.check_batch(digest)
     }
 
     fn get_batch(
         &self,
-        digest: HashValue,
-        expiration: u64,
-        signers: Vec<PeerId>,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
-        let (tx, rx) = oneshot::channel();
-        let batch_store = self.batch_store.clone();
-        let batch_requester = self.batch_requester.clone();
-        tokio::spawn(async move {
-            if let Ok(mut value) = batch_store.get_batch_from_local(&digest) {
-                if tx
-                    .send(Ok(value.take_payload().expect("Must have payload")))
-                    .is_err()
-                {
-                    debug!(
-                        "Receiver of local batch not available for digest {}",
-                        digest,
-                    )
-                };
-            } else {
-                // Quorum store metrics
-                counters::MISSED_BATCHES_COUNT.inc();
-                let subscriber_rx = batch_store.subscribe(digest);
-                if let Some((batch_info, payload)) = batch_requester
-                    .request_batch(digest, expiration, signers, tx, subscriber_rx)
-                    .await
-                {
-                    batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);
-                }
-            }
-        });
-        rx
+        batch_info: BatchInfo,
+        responders: Vec<PeerId>,
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>> {
+        self.get_or_fetch_batch(batch_info, responders)
     }
 
     fn update_certified_timestamp(&self, certified_time: u64) {

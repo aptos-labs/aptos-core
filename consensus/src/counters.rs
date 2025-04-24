@@ -1072,6 +1072,16 @@ pub static RPC_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters(queued,dequeued,dropped) related to rpc request channel
+pub static RAIKOU_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_raikou_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to rpc request channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
 /// Counters(queued,dequeued,dropped) related to block retrieval per epoch task
 pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -1367,4 +1377,12 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "aptos_optqs_last_consecutive_successes",
         "The number of last consecutive successes capped at window length",
     )
+});
+
+pub static RAIKOU_COMMIT_NOTIFY_TO_MEMPOOL_NOTIFY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "raikou_commit_notify_to_mempool_notify_latency",
+        "Commit to mempool notify latency",
+    )
+    .unwrap()
 });

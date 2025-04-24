@@ -71,6 +71,7 @@ num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 ordered-float = { workspace = true }
+raptr = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 scopeguard = { workspace = true }
@@ -115,6 +116,10 @@ fuzzing = [
     "aptos-safety-rules/testing",
 ]
 failpoints = ["fail/failpoints"]
+sim-types = ["raptr/sim-types"]
+force-aptos-types = ["raptr/force-aptos-types"]
+inject-delays = ["raptr/inject-delays"]
+inject-drops = ["raptr/inject-drops"]
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]

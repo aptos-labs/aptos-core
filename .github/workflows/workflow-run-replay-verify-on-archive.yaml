@@ -55,6 +55,7 @@ jobs:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           EXPORT_GCP_PROJECT_VARIABLES: "false"
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          GCP_AUTH_DURATION: "10800"
 
       # Authenticate to Google Cloud the project is aptos-ci with credentails files generated
       - name: Authenticate to Google Cloud
@@ -100,11 +101,12 @@ jobs:
             CMD="$CMD --end ${{ inputs.END_VERSION }}"  
           fi
 
-           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
-            CMD="$CMD --end ${{ inputs.IMAGE_TAG }}"  
+          if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
+            CMD="$CMD --image_tag ${{ inputs.IMAGE_TAG }}"  
           fi
 
           eval $CMD
+        timeout-minutes: 120 
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
         env:
@@ -112,8 +114,29 @@ jobs:
         if: ${{ always() }}  
         run: |
           cd testsuite/replay-verify
-          poetry run python main.py  --network ${{ inputs.NETWORK }} --cleanup
+          CMD="poetry run python main.py --network ${{ inputs.NETWORK }} --cleanup"  
+          if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
+            CMD="$CMD --image_tag ${{ inputs.IMAGE_TAG }}"  
+          fi
+          eval $CMD
           echo "Cleanup completed"
+      # List all disks in the project that are not in use and finished creating. There is a rare chance that the disk is being created and won't be used in future due to csi retry errors
+      # But this disk will be deleted in the next workflow run since its status is READY then
+      - name: Delete all unsed disks in the project
+        env:
+          GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
+        if: ${{ always() }}
+        run: |
+          
+          DISK_URIS=$(gcloud compute disks list --filter="-users:* AND status=READY" --format "value(uri())")  
+          echo "Disks to be deleted:"  
+          echo "$DISK_URIS"
+            
+          if [ -n "$DISK_URIS" ]; then  
+            gcloud compute disks delete $DISK_URIS
+          else  
+            echo "No unused disks found."  
+          fi  
 
           
           

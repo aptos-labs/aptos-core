@@ -10,7 +10,8 @@ use aptos_consensus_types::{
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_short_hex_str::AsShortHexStr;
-use std::{collections::HashSet, sync::Arc};
+use raptr::raptr::{types::RoundEntryReason, TRaptrFailureTracker};
+use std::{collections::HashSet, ops::Deref, sync::Arc};
 
 pub trait TPastProposalStatusTracker: Send + Sync {
     fn push(&self, status: NewRoundReason);
@@ -33,6 +34,34 @@ pub struct ExponentialWindowFailureTracker {
     past_round_statuses: BoundedVecDeque<NewRoundReason>,
     last_consecutive_success_count: usize,
     ordered_authors: Vec<Author>,
+}
+
+pub struct LockedExponentialWindowFailureTracker(Mutex<ExponentialWindowFailureTracker>);
+
+impl From<Mutex<ExponentialWindowFailureTracker>> for LockedExponentialWindowFailureTracker {
+    fn from(mutex: Mutex<ExponentialWindowFailureTracker>) -> Self {
+        Self(mutex)
+    }
+}
+
+impl Deref for LockedExponentialWindowFailureTracker {
+    type Target = Mutex<ExponentialWindowFailureTracker>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl TRaptrFailureTracker for LockedExponentialWindowFailureTracker {
+    fn push_reason(&self, reason: RoundEntryReason) {
+        let reason = match reason {
+            RoundEntryReason::ThisRoundQC(_) => NewRoundReason::QCReady,
+            RoundEntryReason::FullPrefixQC(_) => NewRoundReason::QCReady,
+            RoundEntryReason::CC(_, _) => NewRoundReason::QCReady,
+            RoundEntryReason::TC(tc, _) => NewRoundReason::Timeout(tc.reason()),
+        };
+        self.0.lock().push(reason)
+    }
 }
 
 impl ExponentialWindowFailureTracker {
@@ -104,17 +133,23 @@ impl TPastProposalStatusTracker for Mutex<ExponentialWindowFailureTracker> {
     }
 }
 
+impl TPastProposalStatusTracker for LockedExponentialWindowFailureTracker {
+    fn push(&self, status: NewRoundReason) {
+        self.lock().push(status)
+    }
+}
+
 pub struct OptQSPullParamsProvider {
     enable_opt_qs: bool,
     minimum_batch_age_usecs: u64,
-    failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
+    failure_tracker: Arc<LockedExponentialWindowFailureTracker>,
 }
 
 impl OptQSPullParamsProvider {
     pub fn new(
         enable_opt_qs: bool,
         minimum_batch_age_usecs: u64,
-        failure_tracker: Arc<Mutex<ExponentialWindowFailureTracker>>,
+        failure_tracker: Arc<LockedExponentialWindowFailureTracker>,
     ) -> Self {
         Self {
             enable_opt_qs,
@@ -139,7 +174,10 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
                 "Skipping OptQS: (last_consecutive_successes) {} < {} (window)",
                 tracker.last_consecutive_success_count, tracker.window
             );
-            return None;
+            return Some(OptQSPayloadPullParams {
+                exclude_authors: HashSet::new(),
+                minimum_batch_age_usecs: self.minimum_batch_age_usecs,
+            });
         }
 
         let exclude_authors = tracker.get_exclude_authors();

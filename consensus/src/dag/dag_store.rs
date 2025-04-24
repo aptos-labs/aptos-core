@@ -526,8 +526,12 @@ impl DagStore {
         self.storage.save_certified_node(&node)?;
 
         debug!("Added node {}", node.id());
-        self.payload_manager
-            .prefetch_payload_data(node.payload(), node.metadata().timestamp());
+        self.payload_manager.prefetch_payload_data(
+            node.payload(),
+            *node.author(),
+            node.metadata().timestamp(),
+            None,
+        );
 
         self.dag.write().add_validated_node(node)
     }

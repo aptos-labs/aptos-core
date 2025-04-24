@@ -24,10 +24,14 @@ pub const POS_EXPIRED_LABEL: &str = "expired";
 pub const POS_DUPLICATE_LABEL: &str = "duplicate";
 
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
-    exponential_buckets(
-        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25,
-    )
-    .unwrap()
+    [
+        exponential_buckets(
+            /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25,
+        )
+        .unwrap(),
+        [30000.0, 35000.0, 40000.0].to_vec(),
+    ]
+    .concat()
 });
 
 static PROOF_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
@@ -154,6 +158,15 @@ pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_batch_per_block",
         "Histogram for the number of batches per (committed) blocks.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_txns_per_block",
+        "Histogram for the number of txns per (committed) blocks.",
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
@@ -382,8 +395,40 @@ static POS_TO_PULL: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+static BATCH_TO_PULL: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_to_pull",
+        "Histogram for how long it took a batch to go from created to pulled into a proposed block",
+        &["bucket"],
+        QUORUM_STORE_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+static BATCH_INSERT_TO_PULL: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_insert_to_pull",
+        "Histogram for how long it took a batch to go from inserted to pulled into a proposed block",
+        &["bucket"],
+        QUORUM_STORE_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 pub fn pos_to_pull(bucket: u64, secs: f64) {
     POS_TO_PULL
+        .with_label_values(&[bucket.to_string().as_str()])
+        .observe(secs)
+}
+
+pub fn batch_to_pull(bucket: u64, secs: f64) {
+    BATCH_TO_PULL
+        .with_label_values(&[bucket.to_string().as_str()])
+        .observe(secs)
+}
+
+pub fn batch_insert_to_pull(bucket: u64, secs: f64) {
+    BATCH_INSERT_TO_PULL
         .with_label_values(&[bucket.to_string().as_str()])
         .observe(secs)
 }
@@ -994,4 +1039,8 @@ pub static PROOF_MANAGER_OUT_OF_ORDER_PROOF_INSERTION: Lazy<IntCounterVec> = Laz
         &["author"]
     )
     .unwrap()
+});
+
+pub static BATCH_PROOF_RATIO: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!("quorum_store_batch_proof_ratio", "QS Batch Proof Ratio").unwrap()
 });

@@ -44,7 +44,7 @@ use move_core_types::{
 };
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
-    Client as ReqwestClient, StatusCode,
+    Client as ReqwestClient, RequestBuilder, StatusCode,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -152,7 +152,7 @@ impl Client {
     }
 
     pub fn build_path(&self, path: &str) -> AptosResult<Url> {
-        Ok(self.base_url.join(&self.version_path_base)?.join(path)?)
+        Ok(self.base_url.join(path)?)
     }
 
     pub fn get_prover_url(&self) -> Url {
@@ -166,6 +166,14 @@ impl Client {
     pub async fn get_aptos_version(&self) -> AptosResult<Response<AptosVersion>> {
         self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
             .await
+    }
+
+    pub fn post(&self, url: Url) -> RequestBuilder {
+        self.inner.post(url)
+    }
+
+    pub fn get_raw(&self, url: Url) -> RequestBuilder {
+        self.inner.get(url)
     }
 
     pub async fn get_block_by_height(

@@ -3,22 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use anyhow::{anyhow, Result};
+use anyhow::{format_err, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    state_store::state_view::db_state_view::DbStateViewAtVersion, DbReader, DbReaderWriter,
+    state_store::state_view::db_state_view::{DbStateView, DbStateViewAtVersion},
+    DbReader,
 };
 use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
-        ConfigurationResource, OnChainConfig, OnChainConfigPayload, OnChainConfigProvider,
+        ConfigStorage, ConfigStorageProvider, ConfigurationResource, OnChainConfig,
+        OnChainConfigPayload, OnChainConfigProvider,
     },
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, TStateView},
     transaction::Version,
 };
+use bytes::Bytes;
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -71,6 +73,70 @@ pub trait EventNotificationSender: Send {
     fn notify_initial_configs(&mut self, version: Version) -> Result<(), Error>;
 }
 
+pub struct DbConfigStorageProvider {
+    db: Arc<dyn DbReader>,
+}
+
+impl DbConfigStorageProvider {
+    pub fn new(db: Arc<dyn DbReader>) -> Self {
+        Self { db }
+    }
+}
+
+impl ConfigStorageProvider for DbConfigStorageProvider {
+    fn get_config_at_version(&self, version: Version) -> Box<dyn ConfigStorage> {
+        let config = self.db.state_view_at_version(Some(version)).unwrap();
+        Box::new(DbConfigStorage { state_view: config })
+    }
+}
+
+pub struct DbConfigStorage {
+    state_view: DbStateView,
+}
+
+impl ConfigStorage for DbConfigStorage {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        let bytes = self
+            .state_view
+            .get_state_value(state_key)
+            .ok()??
+            .bytes()
+            .clone();
+        Some(bytes)
+    }
+}
+
+pub struct InMemConfigStorageProvider {
+    configs: HashMap<StateKey, Vec<u8>>,
+}
+
+impl InMemConfigStorageProvider {
+    pub fn new(configs: HashMap<StateKey, Vec<u8>>) -> Self {
+        Self { configs }
+    }
+}
+
+impl ConfigStorageProvider for InMemConfigStorageProvider {
+    fn get_config_at_version(&self, _version: Version) -> Box<dyn ConfigStorage> {
+        Box::new(InMemConfigStorage {
+            configs: self.configs.clone(),
+        })
+    }
+}
+
+pub struct InMemConfigStorage {
+    configs: HashMap<StateKey, Vec<u8>>,
+}
+
+impl ConfigStorage for InMemConfigStorage {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.configs
+            .get(state_key)
+            .cloned()
+            .map(|bytes| bytes.into())
+    }
+}
+
 /// The subscription service offered by state sync, responsible for notifying
 /// subscribers of on-chain events.
 pub struct EventSubscriptionService {
@@ -83,20 +149,20 @@ pub struct EventSubscriptionService {
     reconfig_subscriptions: HashMap<SubscriptionId, ReconfigSubscription>,
 
     // Database to fetch on-chain configuration data
-    storage: Arc<RwLock<DbReaderWriter>>,
+    config_storage_provider: Arc<dyn ConfigStorageProvider>,
 
     // Internal subscription ID generator
     subscription_id_generator: U64IdGenerator,
 }
 
 impl EventSubscriptionService {
-    pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
+    pub fn new(config_storage: Arc<dyn ConfigStorageProvider>) -> Self {
         Self {
             event_key_subscriptions: HashMap::new(),
             event_v2_tag_subscriptions: HashMap::new(),
             subscription_id_to_event_subscription: HashMap::new(),
             reconfig_subscriptions: HashMap::new(),
-            storage,
+            config_storage_provider: config_storage,
             subscription_id_generator: U64IdGenerator::new(),
         }
     }
@@ -283,27 +349,17 @@ impl EventSubscriptionService {
         &self,
         version: Version,
     ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
-        let db_state_view = &self
-            .storage
-            .read()
-            .reader
-            .state_view_at_version(Some(version))
-            .map_err(|error| {
-                Error::UnexpectedErrorEncountered(format!(
-                    "Failed to create account state view {:?}",
-                    error
-                ))
-            })?;
-        let epoch = ConfigurationResource::fetch_config(&db_state_view)
-            .ok_or_else(|| {
+        let config_storage = self.config_storage_provider.get_config_at_version(version);
+        let resource =
+            ConfigurationResource::fetch_config(config_storage.as_ref()).ok_or_else(|| {
                 Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
-            })?
-            .epoch();
+            })?;
+        let epoch = resource.epoch();
 
         // Return the new on-chain config payload (containing all found configs at this version).
         Ok(OnChainConfigPayload::new(
             epoch,
-            DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version),
+            DbBackedOnChainConfig::new(self.config_storage_provider.clone(), version),
         ))
     }
 }
@@ -385,31 +441,21 @@ impl ReconfigSubscription {
 
 #[derive(Clone)]
 pub struct DbBackedOnChainConfig {
-    pub reader: Arc<dyn DbReader>,
+    pub reader: Arc<dyn ConfigStorageProvider>,
     pub version: Version,
 }
 
 impl DbBackedOnChainConfig {
-    pub fn new(reader: Arc<dyn DbReader>, version: Version) -> Self {
+    pub fn new(reader: Arc<dyn ConfigStorageProvider>, version: Version) -> Self {
         Self { reader, version }
     }
 }
 
 impl OnChainConfigProvider for DbBackedOnChainConfig {
     fn get<T: OnChainConfig>(&self) -> Result<T> {
-        let bytes = self
-            .reader
-            .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
-            .ok_or_else(|| {
-                anyhow!(
-                    "no config {} found in aptos root account state",
-                    T::CONFIG_ID
-                )
-            })?
-            .bytes()
-            .clone();
+        let config_storage = self.reader.get_config_at_version(self.version);
 
-        T::deserialize_into_config(&bytes)
+        T::fetch_config(config_storage.as_ref()).ok_or_else(|| format_err!("unable to read"))
     }
 }
 

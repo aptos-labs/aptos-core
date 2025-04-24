@@ -78,6 +78,11 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+warp = { workspace = true }
+bytes = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+aptos-metrics-core = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
@@ -86,14 +91,32 @@ jemallocator = { workspace = true }
 rstack-self = { workspace = true }
 
 [features]
-assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
+assert-private-keys-not-cloneable = [
+    "aptos-crypto/assert-private-keys-not-cloneable",
+]
 check-vm-features = []
-consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
+consensus-only-perf-test = [
+    "aptos-executor/consensus-only-perf-test",
+    "aptos-mempool/consensus-only-perf-test",
+    "aptos-db/consensus-only-perf-test",
+]
 default = []
-failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
+failpoints = [
+    "fail/failpoints",
+    "aptos-consensus/failpoints",
+    "aptos-executor/failpoints",
+    "aptos-mempool/failpoints",
+    "aptos-api/failpoints",
+    "aptos-config/failpoints",
+]
 indexer = ["aptos-indexer"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
+sim-types = ["aptos-consensus/sim-types"]
+force-aptos-types = ["aptos-consensus/force-aptos-types"]
+inject-delays = ["aptos-consensus/inject-delays"]
+inject-drops = ["aptos-consensus/inject-drops"]
+
 
 [package.metadata.cargo-machete]
 ignored = ["aptos-crypto"]

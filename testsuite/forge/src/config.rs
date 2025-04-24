@@ -157,7 +157,11 @@ impl ForgeConfig {
     /// Builds a function that can be used to override the default helm values for the validator and fullnode.
     /// If a configuration is intended to be set for all nodes, set the value in the default helm values file:
     /// testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml
-    pub fn build_node_helm_config_fn(&self, retain_debug_logs: bool) -> Option<NodeConfigFn> {
+    pub fn build_node_helm_config_fn(
+        &self,
+        retain_debug_logs: bool,
+        env_override: Option<serde_yaml::Value>,
+    ) -> Option<NodeConfigFn> {
         let validator_override_node_config = self
             .validator_override_node_config_fn
             .clone()
@@ -173,8 +177,11 @@ impl ForgeConfig {
 
         // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
+            let env_override_clone = env_override.clone();
             if let Some(override_config) = &validator_override_node_config {
-                helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
+                helm_values["validator"]["config"] = override_config
+                    .get_yaml_with_override(env_override_clone)
+                    .unwrap();
             }
             if let Some(override_config) = &fullnode_override_node_config {
                 helm_values["fullnode"]["config"] = override_config.get_yaml().unwrap();

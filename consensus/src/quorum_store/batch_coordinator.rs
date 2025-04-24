@@ -94,7 +94,10 @@ impl BatchCoordinator {
                     )
                 })
                 .collect();
-            let signed_batch_infos = batch_store.persist(persist_requests);
+            let signed_batch_infos =
+                tokio::task::spawn_blocking(move || batch_store.persist(persist_requests))
+                    .await
+                    .unwrap();
             if !signed_batch_infos.is_empty() {
                 if approx_created_ts_usecs > 0 {
                     observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);

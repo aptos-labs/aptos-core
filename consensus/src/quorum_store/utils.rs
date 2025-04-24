@@ -68,6 +68,12 @@ impl<I: Ord + Hash> TimeExpirations<I> {
         }
     }
 
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Self {
+            expiries: BinaryHeap::with_capacity(capacity),
+        }
+    }
+
     pub(crate) fn add_item(&mut self, item: I, expiry_time: u64) {
         self.expiries.push((Reverse(expiry_time), item));
     }

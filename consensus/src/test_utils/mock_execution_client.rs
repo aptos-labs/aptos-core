@@ -75,8 +75,10 @@ impl MockExecutionClient {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let (mut payload_txns, _max_txns_from_block_to_execute) =
-                self.payload_manager.get_transactions(block.block()).await?;
+            let (mut payload_txns, _max_txns_from_block_to_execute) = self
+                .payload_manager
+                .get_transactions(block.block().block_data())
+                .await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown

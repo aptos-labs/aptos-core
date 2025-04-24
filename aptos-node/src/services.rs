@@ -143,6 +143,8 @@ pub fn start_consensus_runtime(
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
+    qs_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
+    qs2_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
@@ -157,6 +159,10 @@ pub fn start_consensus_runtime(
         node_config,
         consensus_network_interfaces.network_client,
         consensus_network_interfaces.network_service_events,
+        qs_network_interfaces.network_client,
+        qs_network_interfaces.network_service_events,
+        qs2_network_interfaces.network_client,
+        qs2_network_interfaces.network_service_events,
         Arc::new(consensus_notifier),
         consensus_to_mempool_sender,
         db_rw,
@@ -209,13 +215,13 @@ pub fn start_admin_service(node_config: &NodeConfig) -> AdminService {
 /// Spawns a new thread for the node inspection service
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,
-    aptos_data_client: AptosDataClient,
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    // aptos_data_client: AptosDataClient,
+    // peers_and_metadata: Arc<PeersAndMetadata>,
 ) {
     aptos_inspection_service::start_inspection_service(
         node_config.clone(),
-        aptos_data_client,
-        peers_and_metadata,
+        // aptos_data_client,
+        // peers_and_metadata,
     )
 }
 

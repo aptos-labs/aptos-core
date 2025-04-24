@@ -9,6 +9,8 @@ metadata:
     forge-image-tag: {FORGE_IMAGE_TAG}
     forge-test-suite: {FORGE_TEST_SUITE}
     forge-username: {FORGE_USERNAME}
+  annotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
 spec:
   restartPolicy: Never
   serviceAccountName: forge
@@ -24,11 +26,11 @@ spec:
           {FORGE_ARGS}
       resources:
         limits:
-          cpu: 15.5
-          memory: 26Gi
+          cpu:  50
+          memory: 120Gi
         requests:
-          cpu: 15
-          memory: 26Gi
+          cpu: 50
+          memory: 120Gi
       env:
         - name: FORGE_TRIGGERED_BY
           value: {FORGE_TRIGGERED_BY}
@@ -56,6 +58,8 @@ spec:
           value: "1"
         - name: KUBECONFIG
           value: {KUBECONFIG}
+        - name: FORGE_OVERRIDE_CONFIG_MAP
+          value: "{FORGE_OVERRIDE_CONFIG_MAP}"
       # - name: RUST_LOG
       #   value: debug
       volumeMounts:
@@ -81,6 +85,9 @@ spec:
     - effect: NoExecute
       key: aptos.org/nodepool
       value: validators
+    - effect: NoExecute
+      key: AptosNodeOnly
+      value: "false"
   volumes:
     - name: multiregion-kubeconfig
       secret:

@@ -6,8 +6,46 @@ use crate::server::{
     utils,
     utils::{CONTENT_TYPE_JSON, CONTENT_TYPE_TEXT},
 };
+use aptos_config::config::NodeConfig;
 use hyper::{Body, StatusCode};
 use prometheus::TextEncoder;
+
+// The metric key for the consensus execution gauge
+const CONSENSUS_EXECUTION_GAUGE: &str = "aptos_state_sync_consensus_executing_gauge{}";
+
+/// Handles a consensus health check request. This method returns
+/// 200 if the node is currently participating in consensus.
+///
+/// Note: we assume that this endpoint will only be used every few seconds.
+pub async fn handle_consensus_health_check(node_config: &NodeConfig) -> (StatusCode, Body, String) {
+    // Verify the node is a validator. If not, return an error.
+    if !node_config.base.role.is_validator() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Body::from("This node is not a validator!"),
+            CONTENT_TYPE_TEXT.into(),
+        );
+    }
+
+    // Check the value of the consensus execution gauge
+    let metrics = utils::get_all_metrics();
+    if let Some(gauge_value) = metrics.get(CONSENSUS_EXECUTION_GAUGE) {
+        if gauge_value == "1" {
+            return (
+                StatusCode::OK,
+                Body::from("Consensus health check passed!"),
+                CONTENT_TYPE_TEXT.into(),
+            );
+        }
+    }
+
+    // Otherwise, consensus is not executing
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Body::from("Consensus health check failed! Consensus is not executing!"),
+        CONTENT_TYPE_TEXT.into(),
+    )
+}
 
 /// Handles a new forge metrics request
 pub fn handle_forge_metrics() -> (StatusCode, Body, String) {

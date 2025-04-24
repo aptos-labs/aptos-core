@@ -84,7 +84,6 @@ pub struct OrderedBlocks {
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
-
 impl OrderedBlocks {
     pub fn latest_round(&self) -> Round {
         self.ordered_blocks

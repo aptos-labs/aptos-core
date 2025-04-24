@@ -139,10 +139,6 @@ spec:
           value: {{ .Values.genesis.validator.larger_stake_amount | quote }}
         - name: NAMESPACE
           value: {{ .Release.Namespace | quote }}
-        - name: ENABLE_MULTICLUSTER_DOMAIN_SUFFIX
-          value: {{ .Values.genesis.multicluster.enabled | quote }}
-        - name: MULTICLUSTER_DOMAIN_SUFFIXES_STRING
-          value: {{ .Values.genesis.multicluster.domain_suffixes | quote }}
         - name: GENESIS_BLOB_UPLOAD_URL
           value: {{ .Values.genesis.genesis_blob_upload_url | quote }}
         - name: CLUSTER_NAME

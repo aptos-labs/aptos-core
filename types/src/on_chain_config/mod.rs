@@ -7,6 +7,7 @@ use crate::{
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
+    transaction::Version,
 };
 use anyhow::{format_err, Result};
 use bytes::Bytes;
@@ -18,7 +19,12 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt, fmt::Debug, str::FromStr, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+    str::FromStr,
+    sync::Arc,
+};
 
 mod approved_execution_hashes;
 mod aptos_features;
@@ -139,6 +145,10 @@ impl<P: OnChainConfigProvider> OnChainConfigPayload<P> {
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage {
     fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes>;
+}
+
+pub trait ConfigStorageProvider: Send + Sync {
+    fn get_config_at_version(&self, version: Version) -> Box<dyn ConfigStorage>;
 }
 
 /// Trait to be implemented by a Rust struct representation of an on-chain config

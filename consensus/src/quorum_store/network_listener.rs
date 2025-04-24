@@ -6,6 +6,7 @@ use crate::{
     quorum_store::{
         batch_coordinator::BatchCoordinatorCommand, counters,
         proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
+        tracing::observe_batch,
     },
     round_manager::VerifiedEvent,
 };
@@ -13,6 +14,7 @@ use aptos_channels::aptos_channel;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
+use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
@@ -40,6 +42,7 @@ impl NetworkListener {
     pub async fn start(mut self) {
         info!("QS: starting networking");
         let mut next_batch_coordinator_idx = 0;
+        let batch_expiry_gap_when_init_usecs = Duration::from_secs(60).as_micros() as u64;
         while let Some((sender, msg)) = self.network_msg_rx.next().await {
             monitor!("qs_network_listener_main_loop", {
                 match msg {
@@ -84,6 +87,16 @@ impl NetworkListener {
                             self.remote_batch_coordinator_tx.len(),
                             idx
                         );
+                        for batch in &batches {
+                            let approx_created_ts_usecs = batch
+                                .expiration()
+                                .saturating_sub(batch_expiry_gap_when_init_usecs);
+                            observe_batch(
+                                approx_created_ts_usecs,
+                                batch.author(),
+                                "NETWORKRECEIVE",
+                            );
+                        }
                         counters::BATCH_COORDINATOR_NUM_BATCH_REQS
                             .with_label_values(&[&idx.to_string()])
                             .inc();

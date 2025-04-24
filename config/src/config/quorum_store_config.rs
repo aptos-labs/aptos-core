@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
-pub const DEFEAULT_MAX_BATCH_TXNS: usize = 250;
-const DEFAULT_MAX_NUM_BATCHES: usize = 20;
+pub const DEFEAULT_MAX_BATCH_TXNS: usize = 500;
+const DEFAULT_MAX_NUM_BATCHES: usize = 1;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -31,13 +31,13 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, target TPS * commit latency seconds
-            backlog_txn_limit_count: 36_000,
+            backlog_txn_limit_count: 200_000,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 20,
+            backlog_per_validator_batch_limit_count: 300,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_txn_per_s: 160,
+            dynamic_min_txn_per_s: 5000,
             dynamic_max_txn_per_s: 12000,
             // When the QS is no longer backpressured, we increase number of txns to be pulled from mempool
             // by this amount every second until we reach dynamic_max_txn_per_s
@@ -98,24 +98,25 @@ pub struct QuorumStoreConfig {
     pub allow_batches_without_pos_in_proposal: bool,
     pub enable_opt_quorum_store: bool,
     pub opt_qs_minimum_batch_age_usecs: u64,
+    pub max_batches_per_pull: usize,
 }
 
 impl Default for QuorumStoreConfig {
     fn default() -> QuorumStoreConfig {
         QuorumStoreConfig {
-            channel_size: 1000,
+            channel_size: 5000,
             proof_timeout_ms: 10000,
-            batch_generation_poll_interval_ms: 25,
-            batch_generation_min_non_empty_interval_ms: 100,
-            batch_generation_max_interval_ms: 250,
+            batch_generation_poll_interval_ms: 150,
+            batch_generation_min_non_empty_interval_ms: 80,
+            batch_generation_max_interval_ms: 300,
             sender_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
-            sender_max_total_txns: 2000,
+            sender_max_total_txns: 500,
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
             sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
-            receiver_max_batch_txns: 250,
+            receiver_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
             receiver_max_num_batches: 20,
             receiver_max_total_txns: 2000,
@@ -133,11 +134,12 @@ impl Default for QuorumStoreConfig {
             batch_quota: 300_000,
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS batch messages, should be >= 1
-            num_workers_for_remote_batches: 10,
+            num_workers_for_remote_batches: 30,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
-            allow_batches_without_pos_in_proposal: true,
-            enable_opt_quorum_store: false,
-            opt_qs_minimum_batch_age_usecs: Duration::from_millis(20).as_micros() as u64,
+            allow_batches_without_pos_in_proposal: false,
+            enable_opt_quorum_store: true,
+            opt_qs_minimum_batch_age_usecs: Duration::from_millis(30).as_micros() as u64,
+            max_batches_per_pull: 200,
         }
     }
 }

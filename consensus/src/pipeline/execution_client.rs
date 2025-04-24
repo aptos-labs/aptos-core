@@ -30,6 +30,7 @@ use anyhow::{anyhow, Result};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, ConsensusObserverConfig};
+use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
@@ -211,6 +212,8 @@ impl ExecutionProxyClient {
     ) {
         let network_sender = NetworkSender::new(
             self.author,
+            self.network_sender.clone(),
+            self.network_sender.clone(),
             self.network_sender.clone(),
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
@@ -545,10 +548,11 @@ impl TExecutionClient for DummyExecutionClient {
 
     async fn finalize_order(
         &self,
-        _: &[Arc<PipelinedBlock>],
-        _: LedgerInfoWithSignatures,
-        _: StateComputerCommitCallBackType,
+        block: &[Arc<PipelinedBlock>],
+        li: LedgerInfoWithSignatures,
+        cb: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
+        cb(block, li);
         Ok(())
     }
 

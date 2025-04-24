@@ -26,25 +26,6 @@ LARGER_STAKE_AMOUNT=${LARGER_STAKE_AMOUNT:-1}
 RANDOM_SEED=${RANDOM_SEED:-$RANDOM}
 export APTOS_DISABLE_TELEMETRY=true
 
-ENABLE_MULTICLUSTER_DOMAIN_SUFFIX=${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX:-false}
-MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT="forge-multiregion-1,forge-multiregion-2,forge-multiregion-3"
-MULTICLUSTER_DOMAIN_SUFFIXES_STRING=${MULTICLUSTER_DOMAIN_SUFFIXES_STRING:-${MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT}}
-echo $MULTICLUSTER_DOMAIN_SUFFIXES_STRING
-# convert comma separated string to array
-IFS=',' read -r -a MULTICLUSTER_DOMAIN_SUFFIXES <<< "${MULTICLUSTER_DOMAIN_SUFFIXES_STRING}"
-
-if ! [[ $(declare -p MULTICLUSTER_DOMAIN_SUFFIXES) =~ "declare -a" ]]; then
-  echo "MULTICLUSTER_DOMAIN_SUFFIXES must be an array"
-  exit 1
-fi
-
-if [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" == "true" ]]; then
-  if [ -z ${NAMESPACE} ]; then
-    echo "NAMESPACE must be set"
-    exit 1
-  fi
-fi
-
 if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
   echo "ERA (${ERA:-null}) and NUM_VALIDATORS (${NUM_VALIDATORS:-null}) must be set"
   exit 1
@@ -83,20 +64,12 @@ for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
 
   if [[ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]]; then
     fullnode_host="fullnode${i}.${DOMAIN}:6182"
-  elif [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" = "true" ]]; then
-    index=$(($i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
-    cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[${index}]}
-    fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}.${NAMESPACE}.svc.${cluster}:6182"
   else
     fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}:6182"
   fi
 
   if [[ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]]; then
     validator_host="val${i}.${DOMAIN}:6180"
-  elif [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" = "true" ]]; then
-    index=$(($i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
-    cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[${index}]}
-    validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}.${NAMESPACE}.svc.${cluster}:6180"
   else
     validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
   fi

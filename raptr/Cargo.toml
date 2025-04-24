@@ -1,0 +1,57 @@
+[package]
+name = "raptr"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-channels = { workspace = true }
+aptos-consensus-types = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+bitvec = { workspace = true }
+defaultmap = "0.5.0"                                           # Since version 0.6.0, the maps are !Send and !Sync
+futures = { workspace = true }
+futures-channel = { workspace = true }
+itertools = { workspace = true }
+nanovec = "0.2.1"
+rand = { workspace = true, features = ["small_rng", "alloc"] }
+rand_distr = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+aptos-metrics-core = { workspace = true }
+once_cell = { workspace = true }
+aptos-bitvec = { workspace = true }
+aptos-infallible = { workspace = true }
+mini-moka = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "crypto_bench"
+harness = false
+
+[[bench]]
+name = "wendy_bench"
+harness = false
+required-features = ["wendy"]
+
+[features]
+wendy = []
+sim-types = []
+force-aptos-types = []
+inject-delays = []
+inject-drops = []

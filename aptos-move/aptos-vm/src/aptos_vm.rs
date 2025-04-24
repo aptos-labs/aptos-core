@@ -2780,6 +2780,50 @@ pub struct AptosVMBlockExecutor {
     module_cache_manager: AptosModuleCacheManager,
 }
 
+impl AptosVMBlockExecutor {
+    /// Executes transactions with the specified [BlockExecutorConfig] and returns output for each
+    /// one of them.
+    pub fn execute_block_with_config(
+        &self,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        state_view: &(impl StateView + Sync),
+        config: BlockExecutorConfig,
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
+            Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let num_txns = txn_provider.num_txns();
+        info!(
+            log_context,
+            "Executing block, transaction count: {}", num_txns
+        );
+
+        let result = AptosVMBlockExecutorWrapper::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            DefaultTxnProvider<SignatureVerifiedTransaction>,
+        >(
+            txn_provider,
+            state_view,
+            &self.module_cache_manager,
+            config,
+            transaction_slice_metadata,
+            None,
+        );
+        if result.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(num_txns as f64);
+        }
+        result
+    }
+}
+
 impl VMBlockExecutor for AptosVMBlockExecutor {
     fn new() -> Self {
         Self {
@@ -2794,45 +2838,16 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        fail_point!("move_adapter::execute_block", |_| {
-            Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
-        });
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        info!(
-            log_context,
-            "Executing block, transaction count: {}",
-            txn_provider.num_txns()
-        );
-
-        let count = txn_provider.num_txns();
-        let ret = AptosVMBlockExecutorWrapper::execute_block::<
-            _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction>,
-        >(
-            txn_provider,
-            state_view,
-            &self.module_cache_manager,
-            BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: AptosVM::get_concurrency_level(),
-                    allow_fallback: true,
-                    discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
-                    module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
-                },
-                onchain: onchain_config,
+        let config = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level: AptosVM::get_concurrency_level(),
+                allow_fallback: true,
+                discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
-            transaction_slice_metadata,
-            None,
-        );
-        if ret.is_ok() {
-            // Record the histogram count for transactions per block.
-            BLOCK_TRANSACTION_COUNT.observe(count as f64);
-        }
-        ret
+            onchain: onchain_config,
+        };
+        self.execute_block_with_config(txn_provider, state_view, config, transaction_slice_metadata)
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(

@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
-    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
+    payload::{OptQuorumStorePayload, PayloadExecutionLimit, RaptrPayload, SubBlocks},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -17,6 +17,9 @@ use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
+use itertools::Itertools;
+use raptr::raptr::types::N_SUB_BLOCKS;
+use rayon::prelude::IntoParallelRefIterator;
 use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
 
 #[derive(Debug)]
@@ -44,12 +47,14 @@ impl ProofManager {
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
         batch_expiry_gap_when_init_usecs: u64,
+        max_batches_per_pull: usize,
     ) -> Self {
         Self {
             batch_proof_queue: BatchProofQueue::new(
                 my_peer_id,
                 batch_store,
                 batch_expiry_gap_when_init_usecs,
+                max_batches_per_pull,
             ),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
@@ -67,11 +72,11 @@ impl ProofManager {
     }
 
     fn update_remaining_txns_and_proofs(&mut self) {
-        sample!(
-            SampleRate::Duration(Duration::from_millis(200)),
-            (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-                self.batch_proof_queue.remaining_txns_and_proofs();
-        );
+        // sample!(
+        //     SampleRate::Duration(Duration::from_millis(200)),
+        //     (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+        //         self.batch_proof_queue.remaining_txns_and_proofs();
+        // );
     }
 
     pub(crate) fn receive_batches(
@@ -118,12 +123,12 @@ impl ProofManager {
                 request.block_timestamp,
             );
 
-        counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
-            .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
+        // counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
+        //     .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
         counters::PROOF_QUEUE_FULLY_UTILIZED
             .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-        let (opt_batches, opt_batch_txns_size) =
+        let (mut opt_batches, opt_batch_txns_size) =
             // TODO(ibalajiarun): Support unique txn calculation
             if let Some(ref params) = request.maybe_optqs_payload_pull_params {
                 let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
@@ -182,14 +187,33 @@ impl ProofManager {
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
+        let proof_ratio = txns_with_proof_size.count() as f64
+            / (txns_with_proof_size.count() as f64 + opt_batch_txns_size.count() as f64);
+        counters::BATCH_PROOF_RATIO.observe(proof_ratio);
+
         let response = if request.maybe_optqs_payload_pull_params.is_some() {
-            let inline_batches = inline_block.into();
-            Payload::OptQuorumStore(OptQuorumStorePayload::new(
-                inline_batches,
-                opt_batches.into(),
-                proof_block.into(),
-                PayloadExecutionLimit::None,
-            ))
+            let mut sub_blocks = SubBlocks::default();
+
+            fn div_ceil(dividend: usize, divisor: usize) -> usize {
+                if dividend % divisor == 0 {
+                    dividend / divisor
+                } else {
+                    dividend / divisor + 1
+                }
+            }
+
+            let num_chunks = sub_blocks.len();
+            let mut chunks_remaining = num_chunks;
+            while chunks_remaining > 0 {
+                let chunk_size = div_ceil(opt_batches.len(), chunks_remaining);
+                let remaining = opt_batches.split_off(chunk_size);
+                sub_blocks[num_chunks - chunks_remaining] = opt_batches.into();
+                opt_batches = remaining;
+
+                chunks_remaining -= 1;
+            }
+
+            Payload::Raptr(RaptrPayload::new(proof_block.into(), sub_blocks))
         } else if proof_block.is_empty() && inline_block.is_empty() {
             Payload::empty(true, self.allow_batches_without_pos_in_proposal)
         } else {
@@ -270,18 +294,18 @@ impl ProofManager {
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_proofs"]).inc();
-                                self.receive_proofs(proofs.take());
+                                monitor!("proof_manager_handle_receive_proofs", self.receive_proofs(proofs.take()));
                             },
                             ProofManagerCommand::ReceiveBatches(batches) => {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_batches"]).inc();
-                                self.receive_batches(batches);
+                                monitor!("proof_manager_handle_receive_batches", self.receive_batches(batches));
                             }
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::commit_notification"]).inc();
-                                self.handle_commit_notification(
+                                monitor!("proof_manager_handle_commit_notif", self.handle_commit_notification(
                                     block_timestamp,
                                     batches,
-                                );
+                                ));
                             },
                         }
                         let updated_back_pressure = self.qs_back_pressure();

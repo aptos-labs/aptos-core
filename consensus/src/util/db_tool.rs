@@ -133,6 +133,7 @@ pub fn extract_txns_from_block<'a>(
                 );
                 Ok(all_txns)
             },
+            Payload::Raptr(raikou_payload) => todo!(),
         },
         None => Ok(vec![]),
     }

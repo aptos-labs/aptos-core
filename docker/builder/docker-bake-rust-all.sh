@@ -26,6 +26,10 @@ export NORMALIZED_FEATURES_LIST=$(printf "$FEATURES" | sed -e 's/[^a-zA-Z0-9]/_/
 export CUSTOM_IMAGE_TAG_PREFIX=${CUSTOM_IMAGE_TAG_PREFIX:-""}
 export CARGO_TARGET_DIR="target/${FEATURES:-"default"}"
 
+export TARGET_REGISTRY="gcp"
+export GCP_DOCKER_ARTIFACT_REPO="us-docker.pkg.dev/aptos-registry/docker"
+export CI="true"
+
 if [ "$PROFILE" = "release" ]; then
   # Do not prefix image tags if we're building the default profile "release"
   profile_prefix=""

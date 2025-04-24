@@ -22,7 +22,8 @@ pub struct Metadata {
 
 /// at _forge_ compile time, decide what kind of build we will use for `aptos-node`
 pub fn use_release() -> bool {
-    option_env!("LOCAL_SWARM_NODE_RELEASE").is_some()
+    // option_env!("LOCAL_SWARM_NODE_RELEASE").is_some()
+    true
 }
 
 /// at _forge_ compile time, decide to build `aptos-node` only for consensus perf tests
@@ -190,6 +191,19 @@ where
     let mut args = cargo_build_common_args();
     // build the aptos-node package directly to avoid feature unification issues
     args.push("--package=aptos-node");
+
+    // #[cfg(feature = "sim-types")]
+    // args.append(&mut vec!["--features", "sim-types"]);
+
+    // #[cfg(feature = "force-aptos-types")]
+    // args.append(&mut vec!["--features", "force-aptos-types"]);
+    //
+    // #[cfg(feature = "inject-delays")]
+    // args.append(&mut vec!["--features", "inject-delays"]);
+    //
+    // #[cfg(feature = "inject-drops")]
+    // args.append(&mut vec!["--features", "inject-drops"]);
+
     info!("Compiling with cargo args: {:?}", args);
     let output = Command::new("cargo")
         .current_dir(directory)

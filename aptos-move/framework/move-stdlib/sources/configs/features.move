@@ -607,6 +607,14 @@ module std::features {
         is_enabled(COLLECTION_OWNER)
     }
 
+    const NATIVE_MEMORY_OPERATIONS: u64 = 80;
+
+    public fun get_native_memory_operations_feature(): u64 { NATIVE_MEMORY_OPERATIONS }
+
+    public fun is_native_memory_operations_enabled(): bool acquires Features {
+        is_enabled(NATIVE_MEMORY_OPERATIONS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -130,6 +130,35 @@ impl OverrideNodeConfig {
             diff_yaml.unwrap_or(serde_yaml::Value::Mapping(serde_yaml::Mapping::new()))
         })
     }
+
+    fn merge_yaml(a: &mut serde_yaml::Value, b: serde_yaml::Value) {
+        match (a, b) {
+            (serde_yaml::Value::Mapping(a_map), serde_yaml::Value::Mapping(b_map)) => {
+                for (key, b_value) in b_map {
+                    let a_value = a_map.entry(key).or_insert(serde_yaml::Value::Null);
+                    Self::merge_yaml(a_value, b_value);
+                }
+            },
+            (serde_yaml::Value::Sequence(a_seq), serde_yaml::Value::Sequence(b_seq)) => {
+                a_seq.extend(b_seq);
+            },
+            (a, b) => {
+                *a = b;
+            },
+        }
+    }
+
+    pub fn get_yaml_with_override(
+        &self,
+        env_override: Option<serde_yaml::Value>,
+    ) -> anyhow::Result<serde_yaml::Value> {
+        let mut test_yaml = self.get_yaml()?;
+        let Some(env_override_yaml) = env_override else {
+            return Ok(test_yaml);
+        };
+        Self::merge_yaml(&mut test_yaml, env_override_yaml);
+        Ok(test_yaml)
+    }
 }
 
 impl PersistableConfig for OverrideNodeConfig {

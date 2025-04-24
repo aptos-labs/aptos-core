@@ -71,3 +71,7 @@ serde_merge = { workspace = true }
 [features]
 default = []
 testing = ["aptos-global-constants/testing"]
+sim-types = []
+force-aptos-types = []
+inject-delays = []
+inject-drops = []

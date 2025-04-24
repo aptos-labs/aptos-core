@@ -70,14 +70,14 @@ impl Display for BatchId {
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct BatchInfo {
-    author: PeerId,
-    batch_id: BatchId,
-    epoch: u64,
-    expiration: u64,
-    digest: HashValue,
-    num_txns: u64,
-    num_bytes: u64,
-    gas_bucket_start: u64,
+    pub author: PeerId,
+    pub batch_id: BatchId,
+    pub epoch: u64,
+    pub expiration: u64,
+    pub digest: HashValue,
+    pub num_txns: u64,
+    pub num_bytes: u64,
+    pub gas_bucket_start: u64,
 }
 
 impl BatchInfo {

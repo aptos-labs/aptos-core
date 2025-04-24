@@ -5,15 +5,18 @@
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::{
     config::ForgeConfig,
+    create_k8s_client,
     observer::junit::JunitTestObserver,
     result::{TestResult, TestSummary},
-    AdminContext, AdminTest, AptosContext, AptosTest, CoreContext, Factory, NetworkContext,
-    NetworkContextSynchronizer, NetworkTest, ShouldFail, Test, TestReport, Version,
+    AdminContext, AdminTest, AptosContext, AptosTest, CoreContext, Factory, K8sSwarm,
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, ShouldFail, Test, TestReport, Version,
     NAMESPACE_CLEANUP_DURATION_BUFFER_SECS,
 };
 use anyhow::{bail, format_err, Error, Result};
 use aptos_config::config::NodeConfig;
 use clap::{Parser, ValueEnum};
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::Api;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
     io::{self, Write},
@@ -273,23 +276,45 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     .map(|v| v.to_string())
                     .collect::<Vec<_>>()
             );
+            let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
+
+            let override_config =
+                if let Some(config_name) = std::env::var("FORGE_OVERRIDE_CONFIG_MAP").ok() {
+                    let kube_client = runtime.block_on(create_k8s_client())?;
+                    let config_api: Api<ConfigMap> = Api::namespaced(kube_client, "default");
+                    let override_config = runtime.block_on(config_api.get(&config_name))?;
+                    let override_config = override_config
+                        .data
+                        .unwrap()
+                        .get("validator_override")
+                        .unwrap()
+                        .clone();
+
+                    Some(serde_yaml::from_str(&override_config)?)
+                } else {
+                    None
+                };
+
             let initial_version = self.initial_version();
             // The genesis version should always match the initial node version
             let genesis_version = initial_version.clone();
-            let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
-            let mut swarm = runtime.block_on(self.factory.launch_swarm(
-                &mut rng,
-                self.tests.initial_validator_count,
-                self.tests.initial_fullnode_count,
-                &initial_version,
-                &genesis_version,
-                self.tests.genesis_config.as_ref(),
-                self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
-                self.tests.genesis_helm_config_fn.clone(),
-                self.tests.build_node_helm_config_fn(retain_debug_logs),
-                self.tests.existing_db_tag.clone(),
-            ))?;
+            let mut swarm = runtime.block_on(
+                self.factory.launch_swarm(
+                    &mut rng,
+                    self.tests.initial_validator_count,
+                    self.tests.initial_fullnode_count,
+                    &initial_version,
+                    &genesis_version,
+                    self.tests.genesis_config.as_ref(),
+                    self.global_duration
+                        + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                    self.tests.genesis_helm_config_fn.clone(),
+                    self.tests
+                        .build_node_helm_config_fn(retain_debug_logs, override_config),
+                    self.tests.existing_db_tag.clone(),
+                ),
+            )?;
 
             // Run AptosTests
             for test in self.filter_tests(&self.tests.aptos_tests) {

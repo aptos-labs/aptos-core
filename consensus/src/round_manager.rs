@@ -31,6 +31,7 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
     rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
+    raptr_manager::RaptrNetworkMessage,
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
@@ -92,6 +93,8 @@ pub enum UnverifiedEvent {
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
+    RaptrMessage(RaptrNetworkMessage),
+    RaptrDissMessage(RaptrNetworkMessage),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -180,6 +183,8 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
+            UnverifiedEvent::RaptrMessage(m) => VerifiedEvent::RaikouMessage(m),
+            UnverifiedEvent::RaptrDissMessage(m) => VerifiedEvent::RaikouDissMessage(m),
         })
     }
 
@@ -192,6 +197,8 @@ impl UnverifiedEvent {
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
+            UnverifiedEvent::RaptrMessage(r) => r.epoch(),
+            UnverifiedEvent::RaptrDissMessage(r) => r.epoch(),
             UnverifiedEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
         }
     }
@@ -207,6 +214,8 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
+            ConsensusMsg::RaptrMessage(m) => UnverifiedEvent::RaptrMessage(m),
+            ConsensusMsg::RaptrDissMessage(m) => UnverifiedEvent::RaptrDissMessage(m),
             ConsensusMsg::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
@@ -229,6 +238,8 @@ pub enum VerifiedEvent {
     LocalTimeout(Round),
     // Shutdown the NetworkListener
     Shutdown(TokioOneshot::Sender<()>),
+    RaikouMessage(RaptrNetworkMessage),
+    RaikouDissMessage(RaptrNetworkMessage),
 }
 
 #[cfg(test)]

@@ -31,7 +31,7 @@ impl std::fmt::Debug for OptQSPayloadPullParams {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OptQSPayloadPullParams")
             .field("exclude_authors", &self.exclude_authors)
-            .field("minimum_batch_age_useds", &self.minimum_batch_age_usecs)
+            .field("minimum_batch_age_usecs", &self.minimum_batch_age_usecs)
             .finish()
     }
 }

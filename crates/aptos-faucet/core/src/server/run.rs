@@ -388,12 +388,12 @@ mod test {
         types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey},
     };
     use once_cell::sync::OnceCell;
-    use poem::http::header::{AUTHORIZATION, CONTENT_TYPE, REFERER};
     use poem_openapi::types::{ParseFromJSON, ToJSON};
     use rand::{
         rngs::{OsRng, StdRng},
         Rng, SeedableRng,
     };
+    use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, REFERER};
     use std::{collections::HashSet, io::Write, str::FromStr, time::Duration};
     use tokio::task::JoinHandle;
 
@@ -685,7 +685,7 @@ mod test {
             .into_iter()
             .map(|r| r.get_code())
             .collect();
-        assert!(rejection_reason_codes.contains(&RejectionReasonCode::IpUsageLimitExhausted));
+        assert!(rejection_reason_codes.contains(&RejectionReasonCode::UsageLimitExhausted));
 
         Ok(())
     }
@@ -836,7 +836,9 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .view_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
+            .view_apt_account_balance(
+                AccountAddress::from_str(&fund_request.address.unwrap()).unwrap(),
+            )
             .await?;
 
         assert_eq!(response.into_inner(), 10);

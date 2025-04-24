@@ -244,7 +244,12 @@ fn main() -> Result<()> {
         // cmd input for test
         CliCommand::Test(ref test_cmd) => {
             // Identify the test suite to run
-            let mut test_suite = get_test_suite(suite_name, duration, test_cmd)?;
+            let mut test_suite = get_test_suite(
+                suite_name,
+                duration,
+                test_cmd,
+                args.num_validator_fullnodes.unwrap_or(1000),
+            )?;
 
             // Identify the number of validators and fullnodes to run
             // (if overriding what test has specified)
@@ -254,18 +259,18 @@ fn main() -> Result<()> {
                 test_suite = test_suite.with_initial_validator_count(num_validators_non_zero);
 
                 // Verify the number of fullnodes is less than the validators
-                if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
-                    if num_validator_fullnodes > num_validators {
-                        return Err(format_err!(
-                            "Cannot have more fullnodes than validators! Fullnodes: {:?}, validators: {:?}.",
-                            num_validator_fullnodes, num_validators
-                        ));
-                    }
-                }
+                // if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
+                //     if num_validator_fullnodes > num_validators {
+                //         return Err(format_err!(
+                //             "Cannot have more fullnodes than validators! Fullnodes: {:?}, validators: {:?}.",
+                //             num_validator_fullnodes, num_validators
+                //         ));
+                //     }
+                // }
             }
-            if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
-                test_suite = test_suite.with_initial_fullnode_count(num_validator_fullnodes)
-            }
+            // if let Some(num_validator_fullnodes) = args.num_validator_fullnodes {
+            //     test_suite = test_suite.with_initial_fullnode_count(num_validator_fullnodes)
+            // }
 
             // Run the test suite
             match test_cmd {
@@ -495,6 +500,7 @@ fn get_test_suite(
     test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
+    num_fullnodes: usize,
 ) -> Result<ForgeConfig> {
     // These are high level suite aliases that express an intent
     let suite_aliases = hmap! {
@@ -513,9 +519,9 @@ fn get_test_suite(
     // This is done in order of priority
     // A match higher up in the list will take precedence
     let named_test_suites = [
-        boxed!(|| get_land_blocking_test(test_name, duration, test_cmd))
+        boxed!(|| get_land_blocking_test(test_name, duration, test_cmd, num_fullnodes))
             as Box<dyn Fn() -> Option<ForgeConfig>>,
-        boxed!(|| get_multi_region_test(test_name)),
+        boxed!(|| get_multi_region_test(test_name, duration, num_fullnodes)),
         boxed!(|| get_netbench_test(test_name)),
         boxed!(|| get_pfn_test(test_name, duration)),
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),

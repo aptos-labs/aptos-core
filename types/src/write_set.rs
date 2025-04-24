@@ -568,6 +568,10 @@ impl WriteSetMut {
         &mut self.write_set
     }
 
+    pub fn into_inner(self) -> BTreeMap<StateKey, WriteOp> {
+        self.write_set
+    }
+
     pub fn squash(mut self, other: Self) -> Result<Self> {
         use btree_map::Entry::*;
 

@@ -14,7 +14,7 @@ on:
       - ".github/workflows/provision-replay-verify-archive-disks.yaml"
       - ".github/workflows/workflow-run-replay-verify-archive-storage-provision.yaml"
   schedule:
-    - cron: "0 22 * * 1,3,5" # This runs every Mon,Wed,Fri
+    - cron: "0 8 * * 1,3,5" # This runs every Mon,Wed,Fri UTC 08:00
 
 permissions:
   contents: read
@@ -56,8 +56,7 @@ jobs:
   provision-mainnet:
     if: |
       github.event_name == 'schedule' ||
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'testnet' || inputs.NETWORK == 'all')
+      github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'mainnet' || inputs.NETWORK == 'all')
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-archive-storage-provision.yaml
     secrets: inherit

@@ -19,6 +19,7 @@ aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
+bytes = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

@@ -399,7 +399,12 @@ impl BlockStore {
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
             if let Some(payload) = block.payload() {
-                payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
+                payload_manager.prefetch_payload_data(
+                    payload,
+                    block.author().expect("payload block must have author"),
+                    block.timestamp_usecs(),
+                    None,
+                );
             }
         }
 

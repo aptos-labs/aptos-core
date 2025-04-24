@@ -31,7 +31,7 @@ on:
       - ".github/workflows/replay-verify-on-archive.yaml"
       - ".github/workflows/workflow-run-replay-verify-on-archive.yaml"
   schedule:
-    - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
+    - cron: "0 8 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs UTC 08:00
 
 permissions:
   contents: read

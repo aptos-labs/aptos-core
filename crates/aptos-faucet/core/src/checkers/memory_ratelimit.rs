@@ -27,7 +27,7 @@ impl MemoryRatelimitCheckerConfig {
 }
 
 /// Simple in memory storage that rejects if we've ever seen a request from an
-/// IP that has succeeded.
+/// IP that has succeeded. This does not support JWT-based ratelimiting.
 pub struct MemoryRatelimitChecker {
     pub max_requests_per_day: u32,
 
@@ -81,7 +81,7 @@ impl CheckerTrait for MemoryRatelimitChecker {
                     "IP {} has exceeded the daily limit of {} requests",
                     data.source_ip, self.max_requests_per_day
                 ),
-                RejectionReasonCode::IpUsageLimitExhausted,
+                RejectionReasonCode::UsageLimitExhausted,
             )]);
         } else if !dry_run {
             *requests_today += 1;

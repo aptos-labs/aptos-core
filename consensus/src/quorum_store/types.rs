@@ -59,19 +59,19 @@ impl PersistedValue {
     }
 
     pub fn summary(&self) -> Vec<TxnSummaryWithExpiration> {
-        if let Some(payload) = &self.maybe_payload {
-            return payload
-                .iter()
-                .map(|txn| {
-                    TxnSummaryWithExpiration::new(
-                        txn.sender(),
-                        txn.sequence_number(),
-                        txn.expiration_timestamp_secs(),
-                        txn.committed_hash(),
-                    )
-                })
-                .collect();
-        }
+        // if let Some(payload) = &self.maybe_payload {
+        //     return payload
+        //         .iter()
+        //         .map(|txn| {
+        //             TxnSummaryWithExpiration::new(
+        //                 txn.sender(),
+        //                 txn.sequence_number(),
+        //                 txn.expiration_timestamp_secs(),
+        //                 txn.committed_hash(),
+        //             )
+        //         })
+        //         .collect();
+        // }
         vec![]
     }
 

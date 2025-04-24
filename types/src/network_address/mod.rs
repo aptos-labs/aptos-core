@@ -387,6 +387,15 @@ impl NetworkAddress {
         })
     }
 
+    pub fn find_dns_name(&self) -> Option<DnsName> {
+        self.0.iter().find_map(|proto| match proto {
+            Protocol::Dns(addr) => Some(addr.clone()),
+            Protocol::Dns4(addr) => Some(addr.clone()),
+            Protocol::Dns6(addr) => Some(addr.clone()),
+            _ => None,
+        })
+    }
+
     /// Retrieves the port from the network address
     pub fn find_port(&self) -> Option<u16> {
         self.0.iter().find_map(|proto| match proto {

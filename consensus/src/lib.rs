@@ -74,13 +74,14 @@ pub use consensusdb::CONSENSUS_DB_NAME;
 pub use quorum_store::quorum_store_db::QUORUM_STORE_DB_NAME;
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
+mod raptr_manager;
 
-struct IntGaugeGuard {
+pub struct IntGaugeGuard {
     gauge: IntGauge,
 }
 
 impl IntGaugeGuard {
-    fn new(gauge: IntGauge) -> Self {
+    pub fn new(gauge: IntGauge) -> Self {
         gauge.inc();
         Self { gauge }
     }

@@ -279,6 +279,8 @@ class ForgeContext:
     gcp_project: Optional[str] = None
     gcp_zone: Optional[str] = None
 
+    forge_override_config_map: Optional[str] = None
+
     # the default cloud is AWS
     cloud: Cloud = Cloud.AWS
 
@@ -775,9 +777,9 @@ def find_the_killer(
 class LocalForgeRunner(ForgeRunner):
     def run(self, context: ForgeContext) -> ForgeResult:
         # Set rlimit to unlimited for txn emitter locally
-        context.filesystem.rlimit(
-            resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
-        )
+        # context.filesystem.rlimit(
+        #     resource.RLIMIT_NOFILE, resource.RLIM_INFINITY, resource.RLIM_INFINITY
+        # )
 
         with ForgeResult.with_context(context) as forge_result:
             result = context.shell.run(
@@ -875,6 +877,7 @@ class K8sForgeRunner(ForgeRunner):
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
+            FORGE_OVERRIDE_CONFIG_MAP=context.forge_override_config_map,
         )
 
         log.info(f"rendered_forge_test_runner: {rendered}")
@@ -1375,6 +1378,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("FORGE_RETAIN_DEBUG_LOGS", "false")
+@envoption("FORGE_OVERRIDE_CONFIG_MAP")
 @envoption("FORGE_JUNIT_XML_PATH")
 @envoption("FORGE_TEST_SUITE")
 @envoption("IMAGE_TAG")
@@ -1422,6 +1426,7 @@ def test(
     forge_runner_duration_secs: str,
     forge_image_tag: Optional[str],
     forge_retain_debug_logs: str,
+    forge_override_config_map: Optional[str],
     forge_junit_xml_path: Optional[str],
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
@@ -1682,6 +1687,7 @@ def test(
             else None
         ),
         forge_args=forge_args,
+        forge_override_config_map=forge_override_config_map,
     )
     forge_runner_mapping = {
         "local": LocalForgeRunner,

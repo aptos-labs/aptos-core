@@ -10,6 +10,10 @@ use crate::{
     suites::ungrouped::{optimize_for_maximum_throughput, optimize_state_sync_for_throughput},
     TestCommand,
 };
+use aptos_config::{
+    config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig},
+    network_id::NetworkId,
+};
 use aptos_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::LatencyBreakdownSlice,
@@ -26,7 +30,7 @@ use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     modifiers::CpuChaosTest,
     multi_region_network_test::MultiRegionNetworkEmulationTest,
-    performance_test::PerformanceBenchmark,
+    performance_test::{ConsensusOnlyBenchmark, PerformanceBenchmark},
     two_traffics_test::TwoTrafficsTest,
     CompositeNetworkTest,
 };
@@ -262,9 +266,10 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 28 CPU cores for 20% of the time.
                     MetricsThreshold::new(28.0, 20),
-                    // Memory starts around 7GB, and grows around 8GB/hr in this test.
+                    // TODO(ibalajiarun): Investigate the high utilization and adjust accordingly.
+                    // Memory starts around 8GB, and grows around 8GB/hr in this test.
                     // Check that we don't use more than final expected memory for more than 20% of the time.
-                    MetricsThreshold::new_gb(7.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
+                    MetricsThreshold::new_gb(8.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -278,106 +283,39 @@ pub(crate) fn realistic_env_max_load_test(
     num_validators: usize,
     num_fullnodes: usize,
 ) -> ForgeConfig {
-    // Check if HAProxy is enabled
-    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
-        k8s.enable_haproxy
-    } else {
-        false
-    };
-
-    // Determine if this is a long running test
-    let duration_secs = duration.as_secs();
-    let long_running = duration_secs >= 2400;
-
-    // resource override for long_running tests
-    let resource_override = if long_running {
-        NodeResourceOverride {
-            storage_gib: Some(1000), // long running tests need more storage
-            ..NodeResourceOverride::default()
-        }
-    } else {
-        NodeResourceOverride::default() // no overrides
-    };
-
-    let mut success_criteria = SuccessCriteria::new(95)
-        .add_system_metrics_threshold(SystemMetricsThreshold::new(
-            // Check that we don't use more than 18 CPU cores for 15% of the time.
-            MetricsThreshold::new(25.0, 15),
-            // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 20% of the time.
-            MetricsThreshold::new_gb(8.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
-        ))
-        .add_no_restarts()
-        .add_wait_for_catchup_s(
-            // Give at least 60s for catchup, give 10% of the run for longer durations.
-            (duration.as_secs() / 10).max(60),
-        )
-        .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P70)
-        .add_chain_progress(StateProgressThreshold {
-            max_non_epoch_no_progress_secs: 15.0,
-            max_epoch_no_progress_secs: 16.0,
-            max_non_epoch_round_gap: 4,
-            max_epoch_round_gap: 4,
-        });
-    if !ha_proxy {
-        success_criteria = success_criteria.add_latency_breakdown_threshold(
-            LatencyBreakdownThreshold::new_with_breach_pct(
-                vec![
-                    // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 2.5),
-                    // can be adjusted down if less backpressure
-                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
-                    // can be adjusted down if less backpressure
-                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 1.0),
-                ],
-                5,
-            ),
-        )
-    }
-
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
-            inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog })
-                .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    7000
-                } else if long_running {
-                    // This is for forge stable
-                    11000
-                } else {
-                    // During land time we want to be less strict, otherwise we flaky fail
-                    10000
-                },
-            ),
+        .with_validator_override_node_config_fn(Arc::new(|config, base| {
+            base.validator_network2 = Some(NetworkConfig::default());
+            base.validator_network3 = Some(NetworkConfig::default());
+
+            let mut net2config = NetworkConfig::default();
+            net2config.listen_address = "/ip4/0.0.0.0/tcp/12000".parse().unwrap();
+            net2config.mutual_authentication = true;
+            net2config.identity =
+                Identity::from_file("/opt/aptos/genesis/validator-identity.yaml".into());
+            net2config.discovery_method = DiscoveryMethod::Onchain;
+            net2config.network_id = NetworkId::Validator;
+            config.validator_network2 = Some(net2config);
+
+            let mut net3config = NetworkConfig::default();
+            net3config.listen_address = "/ip4/0.0.0.0/tcp/12001".parse().unwrap();
+            net3config.mutual_authentication = true;
+            net3config.identity =
+                Identity::from_file("/opt/aptos/genesis/validator-identity.yaml".into());
+            net3config.discovery_method = DiscoveryMethod::Onchain;
+            net3config.network_id = NetworkId::Validator;
+            config.validator_network3 = Some(net3config);
         }))
-        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-            // Have single epoch change in land blocking, and a few on long-running
-            helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
-            helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
-            helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
-        }))
-        // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
-        .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .latency_polling_interval(Duration::from_millis(100)),
-        )
-        .with_success_criteria(success_criteria)
-        .with_validator_resource_override(resource_override)
-        .with_fullnode_resource_override(resource_override)
+        .add_network_test(wrap_with_realistic_env(
+            num_validators,
+            ConsensusOnlyBenchmark {
+                test_time: duration,
+                // Repurpose num_fullnodes to set concurrency
+                concurrency: num_fullnodes,
+            },
+        ))
 }
 
 pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {

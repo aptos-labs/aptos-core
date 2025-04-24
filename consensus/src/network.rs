@@ -196,6 +196,8 @@ pub trait QuorumStoreSender: Send + Clone {
 pub struct NetworkSender {
     author: Author,
     pub(crate) consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+    pub(crate) qs_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+    pub(crate) qs2_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
@@ -207,12 +209,16 @@ impl NetworkSender {
     pub fn new(
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+        qs_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+        qs2_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         validators: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
             author,
             consensus_network_client,
+            qs_network_client,
+            qs2_network_client,
             self_sender,
             validators,
             time_service: aptos_time_service::TimeService::real(),
@@ -300,12 +306,36 @@ impl NetworkSender {
         }
     }
 
+    pub async fn send_qs_rpc(
+        &self,
+        receiver: Author,
+        msg: ConsensusMsg,
+        timeout_duration: Duration,
+    ) -> anyhow::Result<ConsensusMsg> {
+        fail_point!("consensus::send::any", |_| {
+            Err(anyhow::anyhow!("Injected error in send_rpc"))
+        });
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc();
+        if receiver == self.author() {
+            self.send_rpc_to_self(msg, timeout_duration).await
+        } else {
+            Ok(monitor!(
+                "send_rpc",
+                self.qs_network_client
+                    .send_rpc(receiver, msg, timeout_duration)
+                    .await
+            )?)
+        }
+    }
+
     /// Tries to send the given msg to all the participants.
     ///
     /// The future is fulfilled as soon as the message is put into the mpsc channel to network
     /// internal (to provide back pressure), it does not indicate the message is delivered or sent
     /// out.
-    async fn broadcast(&self, msg: ConsensusMsg) {
+    pub async fn broadcast(&self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
@@ -341,7 +371,7 @@ impl NetworkSender {
     }
 
     /// Tries to send msg to given recipients.
-    async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
+    pub async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::any", |_| ());
         let network_sender = self.consensus_network_client.clone();
         let mut self_sender = self.self_sender.clone();
@@ -357,6 +387,119 @@ impl NetworkSender {
                 .with_label_values(&[msg.name()])
                 .inc();
             if let Err(e) = network_sender.send_to(peer, msg.clone()) {
+                warn!(
+                    remote_peer = peer,
+                    error = ?e, "Failed to send a msg {:?} to peer", msg
+                );
+            }
+        }
+    }
+
+    async fn broadcast_qs(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+        // Directly send the message to ourself without going through network.
+        let self_msg = Event::Message(self.author, msg.clone());
+        let mut self_sender = self.self_sender.clone();
+        if let Err(err) = self_sender.send(self_msg).await {
+            error!("Error broadcasting to self: {:?}", err);
+        }
+
+        self.broadcast_without_self_qs(msg);
+    }
+
+    pub fn broadcast_without_self_qs(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+
+        let self_author = self.author;
+        let mut other_validators: Vec<_> = self
+            .validators
+            .get_ordered_account_addresses_iter()
+            .filter(|author| author != &self_author)
+            .collect();
+        self.sort_peers_by_latency(&mut other_validators);
+
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc_by(other_validators.len() as u64);
+        // Broadcast message over direct-send to all other validators.
+        if let Err(err) = self.qs_network_client.send_to_many(other_validators, msg) {
+            warn!(error = ?err, "Error broadcasting message");
+        }
+    }
+
+    /// Tries to send msg to given recipients.
+    pub async fn send_qs(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
+        fail_point!("consensus::send::any", |_| ());
+        let network_sender = self.qs_network_client.clone();
+        let mut self_sender = self.self_sender.clone();
+        for peer in recipients {
+            if self.author == peer {
+                let self_msg = Event::Message(self.author, msg.clone());
+                if let Err(err) = self_sender.send(self_msg).await {
+                    warn!(error = ?err, "Error delivering a self msg");
+                }
+                continue;
+            }
+            counters::CONSENSUS_SENT_MSGS
+                .with_label_values(&[msg.name()])
+                .inc();
+            if let Err(e) = network_sender.send_to(peer, msg.clone()) {
+                warn!(
+                    remote_peer = peer,
+                    error = ?e, "Failed to send a msg {:?} to peer", msg
+                );
+            }
+        }
+    }
+
+    async fn broadcast_qs2(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+        // Directly send the message to ourself without going through network.
+        let self_msg = Event::Message(self.author, msg.clone());
+        let mut self_sender = self.self_sender.clone();
+        if let Err(err) = self_sender.send(self_msg).await {
+            error!("Error broadcasting to self: {:?}", err);
+        }
+
+        self.broadcast_without_self_qs2(msg);
+    }
+
+    pub fn broadcast_without_self_qs2(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
+
+        let self_author = self.author;
+        let mut other_validators: Vec<_> = self
+            .validators
+            .get_ordered_account_addresses_iter()
+            .filter(|author| author != &self_author)
+            .collect();
+        self.sort_peers_by_latency(&mut other_validators);
+
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc_by(other_validators.len() as u64);
+        // Broadcast message over direct-send to all other validators.
+        if let Err(err) = self.qs2_network_client.send_to_many(other_validators, msg) {
+            warn!(error = ?err, "Error broadcasting message");
+        }
+    }
+
+    /// Tries to send msg to given recipients.
+    pub async fn send_qs2(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
+        fail_point!("consensus::send::any", |_| ());
+        let mut self_sender = self.self_sender.clone();
+        for peer in recipients {
+            if self.author == peer {
+                let self_msg = Event::Message(self.author, msg.clone());
+                if let Err(err) = self_sender.send(self_msg).await {
+                    warn!(error = ?err, "Error delivering a self msg");
+                }
+                continue;
+            }
+            counters::CONSENSUS_SENT_MSGS
+                .with_label_values(&[msg.name()])
+                .inc();
+            if let Err(e) = self.qs2_network_client.send_to(peer, msg.clone()) {
                 warn!(
                     remote_peer = peer,
                     error = ?e, "Failed to send a msg {:?} to peer", msg
@@ -487,7 +630,7 @@ impl QuorumStoreSender for NetworkSender {
     ) -> anyhow::Result<BatchResponse> {
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
-        let response = self.send_rpc(recipient, msg, timeout).await?;
+        let response = self.send_qs_rpc(recipient, msg, timeout).await?;
         match response {
             // TODO: deprecated, remove after another release (likely v1.11)
             ConsensusMsg::BatchResponse(batch) => {
@@ -513,25 +656,25 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send::signed_batch_info", |_| ());
         let msg =
             ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
-        self.send(msg, recipients).await
+        self.send_qs2(msg, recipients).await
     }
 
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
-        self.broadcast(msg).await
+        self.broadcast_qs(msg).await
     }
 
     async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
-        self.broadcast(msg).await
+        self.broadcast_qs2(msg).await
     }
 
     async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
-        self.send(msg, vec![self.author]).await
+        self.send_qs2(msg, vec![self.author]).await
     }
 }
 
@@ -641,6 +784,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<IncomingRpcRequest>),
         (AccountAddress, IncomingRpcRequest),
     >,
+    raikou_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -648,21 +795,27 @@ impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
+        qs_network_service_events: NetworkServiceEvents<ConsensusMsg>,
+        qs2_network_service_events: NetworkServiceEvents<ConsensusMsg>,
         self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
+        raikou_tx: aptos_channel::Sender<
+            (AccountAddress, Discriminant<ConsensusMsg>),
+            (AccountAddress, ConsensusMsg),
+        >,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
             QueueStyle::FIFO,
-            10,
+            100,
             Some(&counters::CONSENSUS_CHANNEL_MSGS),
         );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure
-            50,
+            500,
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
         let (rpc_tx, rpc_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
+            aptos_channel::new(QueueStyle::FIFO, 100, Some(&counters::RPC_CHANNEL_MSGS));
 
         // Verify the network events have been constructed correctly
         let network_and_events = network_service_events.into_network_and_events();
@@ -671,9 +824,25 @@ impl NetworkTask {
         {
             panic!("The network has not been setup correctly for consensus!");
         }
+        let qs_network_and_events = qs_network_service_events.into_network_and_events();
+        if (qs_network_and_events.values().len() != 1
+            || !qs_network_and_events.contains_key(&NetworkId::Validator))
+        {
+            panic!("The network has not been setup correctly for consensus!");
+        }
+        let qs2_network_and_events = qs2_network_service_events.into_network_and_events();
+        if (qs2_network_and_events.values().len() != 1
+            || !qs2_network_and_events.contains_key(&NetworkId::Validator))
+        {
+            panic!("The network has not been setup correctly for consensus!");
+        }
 
         // Collect all the network events into a single stream
-        let network_events: Vec<_> = network_and_events.into_values().collect();
+        let network_events: Vec<_> = network_and_events
+            .into_values()
+            .chain(qs_network_and_events.into_values())
+            .chain(qs2_network_and_events.into_values())
+            .collect();
         let network_events = select_all(network_events).fuse();
         let all_events = Box::new(select(network_events, self_receiver));
 
@@ -682,6 +851,7 @@ impl NetworkTask {
                 consensus_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
+                raikou_tx,
                 all_events,
             },
             NetworkReceivers {
@@ -776,6 +946,10 @@ impl NetworkTask {
                                 );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                        },
+                        raikou_msg @ (ConsensusMsg::RaptrMessage(_)
+                        | ConsensusMsg::RaptrDissMessage(_)) => {
+                            Self::push_msg(peer_id, raikou_msg, &self.raikou_tx);
                         },
                         // TODO: get rid of the rpc dummy value
                         ConsensusMsg::RandGenMessage(req) => {

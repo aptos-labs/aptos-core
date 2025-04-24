@@ -76,6 +76,15 @@ impl TransactionSliceMetadata {
             (Chunk { end, .. }, Chunk { begin, .. }) => begin == end,
         }
     }
+
+    /// Returns the first transaction version for [TransactionSliceMetadata::Chunk], and [None]
+    /// otherwise.
+    pub fn begin_version(&self) -> Option<Version> {
+        if let TransactionSliceMetadata::Chunk { begin, .. } = self {
+            return Some(*begin);
+        }
+        None
+    }
 }
 
 #[cfg(test)]

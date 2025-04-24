@@ -111,6 +111,10 @@ impl<K: Eq + Hash + Clone, M> Sender<K, M> {
         }
         Ok(())
     }
+
+    pub fn receiver_dropped(&self) -> bool {
+        self.shared_state.lock().receiver_dropped
+    }
 }
 
 impl<K: Eq + Hash + Clone, M> Clone for Sender<K, M> {

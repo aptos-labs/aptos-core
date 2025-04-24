@@ -42,6 +42,7 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
+    "aptos-move/replay-benchmark",
     "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
@@ -156,6 +157,7 @@ members = [
     "peer-monitoring-service/server",
     "peer-monitoring-service/types",
     "protos/rust",
+    "raptr",
     "sdk",
     "secure/net",
     "secure/storage",
@@ -419,6 +421,7 @@ aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
+aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
@@ -466,6 +469,7 @@ aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
+raptr = { path = "raptr" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -500,6 +504,7 @@ async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.7.5"
+balter = "0.8.0"
 base64 = "0.13.0"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
@@ -509,7 +514,7 @@ better_any = "0.1.1"
 bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
-bitvec = "1.0.1"
+bitvec = { version = "1.0.1", features = ["serde"] }
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.11"
@@ -593,6 +598,7 @@ fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 file_diff = "1.0.0"
+firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
 firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
@@ -717,6 +723,7 @@ quick-junit = "0.5.0"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
+rand_distr = "0.2.2"
 random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = [
