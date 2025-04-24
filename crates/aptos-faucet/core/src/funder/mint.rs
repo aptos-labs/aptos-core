@@ -225,13 +225,8 @@ impl MintFunder {
         .await?;
 
         if receiver_seq.is_some() && amount == 0 {
-            return Err(AptosTapError::new(
-                format!(
-                    "Account {} already exists and amount asked for is 0",
-                    receiver_address
-                ),
-                AptosTapErrorCode::InvalidRequest,
-            ));
+            // Just act like everything is okay, since the accounts don't necessarily have state
+            return Ok(vec![]);
         }
 
         if check_only {
