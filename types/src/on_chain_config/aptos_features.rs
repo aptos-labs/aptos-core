@@ -135,6 +135,8 @@ pub enum FeatureFlag {
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
     DEFAULT_ACCOUNT_RESOURCE = 91,
+
+    JWK_CONSENSUS_PER_KEY_MODE = 92,
 }
 
 impl FeatureFlag {

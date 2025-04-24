@@ -32,8 +32,12 @@ impl GenesisRuntimeBuilder {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
-        let vm_config =
-            aptos_prod_vm_config(&features, &timed_features, aptos_default_ty_builder());
+        let vm_config = aptos_prod_vm_config(
+            LATEST_GAS_FEATURE_VERSION,
+            &features,
+            &timed_features,
+            aptos_default_ty_builder(),
+        );
 
         // All genesis sessions run with unmetered gas meter, and here we set
         // the gas parameters for natives as zeros (because they do not matter).

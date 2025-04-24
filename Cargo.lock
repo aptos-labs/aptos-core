@@ -2021,6 +2021,7 @@ dependencies = [
  "anyhow",
  "aptos-gas-algebra",
  "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm-types",
  "handlebars",
