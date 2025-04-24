@@ -10,8 +10,7 @@ SIWE.
 <domain> wants you to sign in with your Ethereum account:
 <ethereum_address>
 
-To execute transaction <entry_function_name> on Aptos blockchain
-(<network_name>).
+Please confirm you explicitly initiated this request from <domain>. You are approving to execute transaction <entry_function_name> on Aptos blockchain (<network_name>).
 
 URI: <domain>
 Version: 1
@@ -23,6 +22,11 @@ Issued At: <issued_at>
 3. The abstract signature is a BCS serialized <code><a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_SIWEAbstractSignature">SIWEAbstractSignature</a></code>.
 4. This module has been tested for the following wallets:
 - Metamask
+- Phantom
+- Coinbase
+- OKX
+- Exodus
+- Backpack
 
 
 -  [Enum `SIWEAbstractSignature`](#0x1_ethereum_derivable_account_SIWEAbstractSignature)
@@ -274,7 +278,10 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     message.append(*domain);
     message.append(b" wants you <b>to</b> sign in <b>with</b> your Ethereum <a href="account.md#0x1_account">account</a>:\n");
     message.append(*ethereum_address);
-    message.append(b"\n\nTo execute transaction ");
+    message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
+    message.append(*domain);
+    message.append(b".");
+    message.append(b" You are approving <b>to</b> execute transaction ");
     message.append(*entry_function_name);
     message.append(b" on Aptos blockchain");
     <b>let</b> network_name = network_name();
