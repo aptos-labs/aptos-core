@@ -10,10 +10,12 @@ a 32-bit fractional part.
 -  [Struct `FixedPoint32`](#0x1_fixed_point32_FixedPoint32)
 -  [Constants](#@Constants_0)
 -  [Function `multiply_u64`](#0x1_fixed_point32_multiply_u64)
+-  [Function `add`](#0x1_fixed_point32_add)
 -  [Function `multiply_u64_return_fixpoint32`](#0x1_fixed_point32_multiply_u64_return_fixpoint32)
 -  [Function `divide_u64`](#0x1_fixed_point32_divide_u64)
 -  [Function `create_from_rational`](#0x1_fixed_point32_create_from_rational)
 -  [Function `create_from_raw_value`](#0x1_fixed_point32_create_from_raw_value)
+-  [Function `less`](#0x1_fixed_point32_less)
 -  [Function `get_raw_value`](#0x1_fixed_point32_get_raw_value)
 -  [Function `is_zero`](#0x1_fixed_point32_is_zero)
 -  [Function `min`](#0x1_fixed_point32_min)
@@ -139,6 +141,16 @@ The computed ratio when converting to a <code><a href="fixed_point32.md#0x1_fixe
 
 
 
+<a id="0x1_fixed_point32_ERAW_VALUE_TOO_LARGE"></a>
+
+Intermediate raw value is too large to be held in a <code>u64</code>
+
+
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_ERAW_VALUE_TOO_LARGE">ERAW_VALUE_TOO_LARGE</a>: u64 = 131078;
+</code></pre>
+
+
+
 <a id="0x1_fixed_point32_multiply_u64"></a>
 
 ## Function `multiply_u64`
@@ -168,6 +180,32 @@ overflows.
     // Check whether the value is too large.
     <b>assert</b>!(product &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>);
     (product <b>as</b> u64)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fixed_point32_add"></a>
+
+## Function `add`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_add">add</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, addend: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_add">add</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, addend: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
+    <b>let</b> sum = (val.value <b>as</b> u128) + (addend.value <b>as</b> u128);
+    <b>assert</b>!(sum &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_ERAW_VALUE_TOO_LARGE">ERAW_VALUE_TOO_LARGE</a>);
+    <a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">create_from_raw_value</a>((sum <b>as</b> u64))
 }
 </code></pre>
 
@@ -306,6 +344,30 @@ Create a fixedpoint value from a raw value.
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">create_from_raw_value</a>(value: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
     <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> { value }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fixed_point32_less"></a>
+
+## Function `less`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_less">less</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_less">less</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): bool {
+    num1.value &lt; num2.value
 }
 </code></pre>
 

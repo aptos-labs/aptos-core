@@ -26,7 +26,10 @@ module std::fixed_point32 {
     const EDIVISION_BY_ZERO: u64 = 0x10004;
     /// The computed ratio when converting to a `FixedPoint32` would be unrepresentable
     const ERATIO_OUT_OF_RANGE: u64 = 0x20005;
-
+    /// Intermediate raw value is too large to be held in a `u64`
+    const ERAW_VALUE_TOO_LARGE: u64 = 0x20006;
+    
+    
     /// Multiply a u64 integer by a fixed-point number, truncating any
     /// fractional part of the product. This will abort if the product
     /// overflows.
@@ -54,6 +57,12 @@ module std::fixed_point32 {
     }
     spec fun spec_multiply_u64(val: num, multiplier: FixedPoint32): num {
         (val * multiplier.value) >> 32
+    }
+    
+    public fun add(val: FixedPoint32, addend: FixedPoint32): FixedPoint32 {
+        let sum = (val.value as u128) + (addend.value as u128);
+        assert!(sum <= MAX_U64, ERAW_VALUE_TOO_LARGE);
+        create_from_raw_value((sum as u64))
     }
 
     public fun multiply_u64_return_fixpoint32(val: u64, multiplier: FixedPoint32): FixedPoint32 {
@@ -151,6 +160,9 @@ module std::fixed_point32 {
         ensures result.value == value;
     }
 
+    public fun less(num1: FixedPoint32, num2: FixedPoint32): bool {
+        num1.value < num2.value
+    }
     /// Accessor for the raw u64 value. Other less common operations, such as
     /// adding or subtracting FixedPoint32 values, can be done using the raw
     /// values directly.

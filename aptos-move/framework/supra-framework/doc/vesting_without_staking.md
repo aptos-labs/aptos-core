@@ -3,7 +3,7 @@
 
 # Module `0x1::vesting_without_staking`
 
-
+Copyright (c) Supra -- 2024 - 2025
 Vesting without staking contract
 
 
@@ -18,6 +18,7 @@ Vesting without staking contract
 -  [Struct `TerminateEvent`](#0x1_vesting_without_staking_TerminateEvent)
 -  [Struct `AdminWithdrawEvent`](#0x1_vesting_without_staking_AdminWithdrawEvent)
 -  [Struct `ShareHolderRemovedEvent`](#0x1_vesting_without_staking_ShareHolderRemovedEvent)
+-  [Struct `VestingScheduleUpdated`](#0x1_vesting_without_staking_VestingScheduleUpdated)
 -  [Constants](#@Constants_0)
 -  [Function `vesting_start_secs`](#0x1_vesting_without_staking_vesting_start_secs)
 -  [Function `period_duration_secs`](#0x1_vesting_without_staking_period_duration_secs)
@@ -31,11 +32,14 @@ Vesting without staking contract
 -  [Function `shareholders`](#0x1_vesting_without_staking_shareholders)
 -  [Function `shareholder`](#0x1_vesting_without_staking_shareholder)
 -  [Function `create_vesting_schedule`](#0x1_vesting_without_staking_create_vesting_schedule)
+-  [Function `validate_vesting_contract_parameters`](#0x1_vesting_without_staking_validate_vesting_contract_parameters)
+-  [Function `validate_vesting_schedule`](#0x1_vesting_without_staking_validate_vesting_schedule)
 -  [Function `create_vesting_contract_with_amounts`](#0x1_vesting_without_staking_create_vesting_contract_with_amounts)
 -  [Function `create_vesting_contract`](#0x1_vesting_without_staking_create_vesting_contract)
 -  [Function `vest`](#0x1_vesting_without_staking_vest)
 -  [Function `vest_individual`](#0x1_vesting_without_staking_vest_individual)
 -  [Function `vest_transfer`](#0x1_vesting_without_staking_vest_transfer)
+-  [Function `set_vesting_schedule`](#0x1_vesting_without_staking_set_vesting_schedule)
 -  [Function `remove_shareholder`](#0x1_vesting_without_staking_remove_shareholder)
 -  [Function `terminate_vesting_contract`](#0x1_vesting_without_staking_terminate_vesting_contract)
 -  [Function `admin_withdraw`](#0x1_vesting_without_staking_admin_withdraw)
@@ -591,6 +595,46 @@ Vesting without staking contract
 
 </details>
 
+<a id="0x1_vesting_without_staking_VestingScheduleUpdated"></a>
+
+## Struct `VestingScheduleUpdated`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingScheduleUpdated">VestingScheduleUpdated</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>contract_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_schedule: <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingSchedule">vesting_without_staking::VestingSchedule</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_schedule: <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingSchedule">vesting_without_staking::VestingSchedule</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -612,6 +656,16 @@ Vesting schedule cannot be empty.
 
 
 <pre><code><b>const</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE"></a>
+
+Invalid vesting schedule parameter
+
+
+<pre><code><b>const</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>: u64 = 19;
 </code></pre>
 
 
@@ -941,7 +995,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
     <b>let</b> vesting_record =
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(
             &<b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(vesting_contract_address).shareholders,
-            &shareholder_address
+            &shareholder_address,
         );
     (
         vesting_record.init_amount,
@@ -978,7 +1032,7 @@ Return the remaining grant of shareholder
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_vesting_contract_exists">assert_vesting_contract_exists</a>(vesting_contract_address);
     <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(
         &<b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(vesting_contract_address).shareholders,
-        &shareholder_address
+        &shareholder_address,
     ).left_amount
 }
 </code></pre>
@@ -1012,7 +1066,8 @@ This errors out if the vesting contract with the provided address doesn't exist.
 ): <b>address</b> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_vesting_contract_exists">assert_vesting_contract_exists</a>(vesting_contract_address);
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_beneficiary">get_beneficiary</a>(
-        <b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(vesting_contract_address), shareholder
+        <b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(vesting_contract_address),
+        shareholder,
     )
 }
 </code></pre>
@@ -1076,9 +1131,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vesting_schedule">vesting_schedule</a>(
-    vesting_contract_address: <b>address</b>
-): <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingSchedule">VestingSchedule</a> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vesting_schedule">vesting_schedule</a>(vesting_contract_address: <b>address</b>): <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingSchedule">VestingSchedule</a> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_vesting_contract_exists">assert_vesting_contract_exists</a>(vesting_contract_address);
     <b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(vesting_contract_address).vesting_schedule
 }
@@ -1105,9 +1158,7 @@ Return the list of all shareholders in the vesting contract.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_shareholders">shareholders</a>(
-    vesting_contract_address: <b>address</b>
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_shareholders">shareholders</a>(vesting_contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_active_vesting_contract">assert_active_vesting_contract</a>(vesting_contract_address);
 
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
@@ -1184,22 +1235,20 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_create_vesting_schedule">create_vesting_schedule</a>(
-    schedule: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;FixedPoint32&gt;,
-    start_timestamp_secs: u64,
-    period_duration: u64
+    schedule: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;FixedPoint32&gt;, start_timestamp_secs: u64, period_duration: u64
 ): <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingSchedule">VestingSchedule</a> {
     <b>let</b> schedule_len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&schedule);
     <b>assert</b>!(schedule_len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>));
     // If the first <a href="vesting.md#0x1_vesting">vesting</a> fraction is zero, we can replace it <b>with</b> nonzero by increasing start time
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&schedule, 0)) != 0,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>),
     );
     // last <a href="vesting.md#0x1_vesting">vesting</a> fraction must be non zero <b>to</b> ensure that no amount remains unvested forever.
     <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&schedule, schedule_len - 1))
-            != 0,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&schedule, schedule_len - 1)) !=
+        0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>),
     );
     <b>assert</b>!(
         period_duration != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EZERO_VESTING_SCHEDULE_PERIOD">EZERO_VESTING_SCHEDULE_PERIOD</a>)
@@ -1210,6 +1259,110 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
         period_duration,
         last_vested_period: 0
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vesting_without_staking_validate_vesting_contract_parameters"></a>
+
+## Function `validate_vesting_contract_parameters`
+
+
+
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_contract_parameters">validate_vesting_contract_parameters</a>(shareholders: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, shares: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, vesting_numerators: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, vesting_denominator: u64, period_duration: u64, withdrawal_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_contract_parameters">validate_vesting_contract_parameters</a>(
+    shareholders: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    shares: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    vesting_numerators: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    vesting_denominator: u64,
+    period_duration: u64,
+    withdrawal_address: <b>address</b>
+) {
+    <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_schedule">validate_vesting_schedule</a>(
+        vesting_numerators, vesting_denominator, period_duration
+    );
+
+    <b>assert</b>!(
+        !<a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(withdrawal_address),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>),
+    );
+    assert_account_is_registered_for_supra(withdrawal_address);
+
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders) != 0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>),
+    );
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders) == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shares),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ESHARES_LENGTH_MISMATCH">ESHARES_LENGTH_MISMATCH</a>),
+    );
+
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vesting_without_staking_validate_vesting_schedule"></a>
+
+## Function `validate_vesting_schedule`
+
+
+
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_schedule">validate_vesting_schedule</a>(numerators: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, denominator: u64, period_duration: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_schedule">validate_vesting_schedule</a>(
+    numerators: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, denominator: u64, period_duration: u64
+) {
+    <b>let</b> sum = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_fold">vector::fold</a>(
+        *numerators,
+        0,
+        |acc, numerator| { acc + numerator },
+    );
+    <b>assert</b>!(
+        sum != 0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
+    );
+    <b>assert</b>!(
+        denominator != 0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
+    );
+    <b>assert</b>!(
+        period_duration != 0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EZERO_VESTING_SCHEDULE_PERIOD">EZERO_VESTING_SCHEDULE_PERIOD</a>),
+    );
+    <b>assert</b>!(
+        !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(numerators),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EEMPTY_VESTING_SCHEDULE">EEMPTY_VESTING_SCHEDULE</a>),
+    );
+    <b>assert</b>!(
+        *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(numerators, 0) != 0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
+    );
+    <b>assert</b>!(
+        *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(numerators, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(numerators) - 1) != 0,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
+    );
+
 }
 </code></pre>
 
@@ -1243,20 +1396,15 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
     withdrawal_address: <b>address</b>,
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a> {
-    <b>assert</b>!(
-        !<a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(withdrawal_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>)
-    );
-    assert_account_is_registered_for_supra(withdrawal_address);
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&shareholders) != 0,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>)
-    );
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&shareholders) == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&shares),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ESHARES_LENGTH_MISMATCH">ESHARES_LENGTH_MISMATCH</a>)
-    );
 
+    <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_contract_parameters">validate_vesting_contract_parameters</a>(
+        &shareholders,
+        &shares,
+        &vesting_numerators,
+        vesting_denominator,
+        period_duration,
+        withdrawal_address,
+    );
     // If this is the first time this admin <a href="account.md#0x1_account">account</a> <b>has</b> created a <a href="vesting.md#0x1_vesting">vesting</a> contract, initialize the admin store.
     <b>let</b> admin_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin);
     <b>if</b> (!<b>exists</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a>&gt;(admin_address)) {
@@ -1266,7 +1414,7 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
                 vesting_contracts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;(),
                 nonce: 0,
                 create_events: new_event_handle&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_CreateVestingContractEvent">CreateVestingContractEvent</a>&gt;(admin)
-            }
+            },
         );
     };
 
@@ -1281,7 +1429,7 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
             <b>let</b> <a href="event.md#0x1_event">event</a> =
                 <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, vesting_denominator);
             <a href="event.md#0x1_event">event</a>
-        }
+        },
     );
 
     <b>let</b> vesting_schedule =
@@ -1299,10 +1447,10 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
                     init_amount: amount,
                     left_amount: amount,
                     last_vested_period: vesting_schedule.last_vested_period
-                }
+                },
             );
             grant_amount = grant_amount + amount;
-        }
+        },
     );
     <b>assert</b>!(grant_amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EZERO_GRANT">EZERO_GRANT</a>));
     <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(admin, contract_signer_address, grant_amount);
@@ -1315,7 +1463,7 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
             withdrawal_address,
             grant_amount,
             vesting_contract_address: contract_signer_address
-        }
+        },
     );
 
     <b>move_to</b>(
@@ -1339,7 +1487,7 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
             shareholder_removed_events: new_event_handle&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_ShareHolderRemovedEvent">ShareHolderRemovedEvent</a>&gt;(
                 &contract_signer
             )
-        }
+        },
     );
 }
 </code></pre>
@@ -1373,13 +1521,13 @@ Create a vesting contract with a given configurations.
 ): <b>address</b> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a> {
     <b>assert</b>!(
         !<a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(withdrawal_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>),
     );
     assert_account_is_registered_for_supra(withdrawal_address);
     <b>let</b> shareholders_address = &<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_keys">simple_map::keys</a>(&buy_ins);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders_address) != 0,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>),
     );
 
     <b>let</b> shareholders = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_create">simple_map::create</a>&lt;<b>address</b>, <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">VestingRecord</a>&gt;();
@@ -1398,7 +1546,7 @@ Create a vesting contract with a given configurations.
                 init_amount: init,
                 left_amount: init,
                 last_vested_period: vesting_schedule.last_vested_period
-            }
+            },
         );
         grant_amount = grant_amount + init;
     };
@@ -1413,7 +1561,7 @@ Create a vesting contract with a given configurations.
                 vesting_contracts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;(),
                 nonce: 0,
                 create_events: new_event_handle&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_CreateVestingContractEvent">CreateVestingContractEvent</a>&gt;(admin)
-            }
+            },
         );
     };
 
@@ -1432,7 +1580,7 @@ Create a vesting contract with a given configurations.
             withdrawal_address,
             grant_amount,
             vesting_contract_address: contract_signer_address
-        }
+        },
     );
 
     <b>move_to</b>(
@@ -1456,7 +1604,7 @@ Create a vesting contract with a given configurations.
             shareholder_removed_events: new_event_handle&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_ShareHolderRemovedEvent">ShareHolderRemovedEvent</a>&gt;(
                 &contract_signer
             )
-        }
+        },
     );
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(buy_ins);
@@ -1488,8 +1636,9 @@ Unlock any vested portion of the grant.
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_active_vesting_contract">assert_active_vesting_contract</a>(contract_address);
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     // Short-circuit <b>if</b> <a href="vesting.md#0x1_vesting">vesting</a> hasn't started yet.
-    <b>if</b> (vesting_contract.vesting_schedule.start_timestamp_secs
-        &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) { <b>return</b> };
+    <b>if</b> (vesting_contract.vesting_schedule.start_timestamp_secs &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) {
+        <b>return</b>
+    };
 
     <b>let</b> shareholders = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_keys">simple_map::keys</a>(&vesting_contract.shareholders);
     <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&shareholders) != 0) {
@@ -1531,8 +1680,9 @@ Unlock any vested portion of the grant.
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> beneficiary = <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder_address);
     // Short-circuit <b>if</b> <a href="vesting.md#0x1_vesting">vesting</a> hasn't started yet.
-    <b>if</b> (vesting_contract.vesting_schedule.start_timestamp_secs
-        &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) { <b>return</b> };
+    <b>if</b> (vesting_contract.vesting_schedule.start_timestamp_secs &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) {
+        <b>return</b>
+    };
 
     <b>let</b> vesting_record =
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(
@@ -1546,58 +1696,65 @@ Unlock any vested portion of the grant.
     <b>let</b> last_vested_period = vesting_record.last_vested_period;
     <b>let</b> next_period_to_vest = last_vested_period + 1;
     <b>let</b> last_completed_period =
-        (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() - vesting_schedule.start_timestamp_secs)
-            / vesting_schedule.period_duration;
+        (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() - vesting_schedule.start_timestamp_secs) / vesting_schedule
+            .period_duration;
 
     // Index is 0-based <b>while</b> period is 1-based so we need <b>to</b> subtract 1.
-
-    <b>while</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount != 0 && next_period_to_vest &lt;= <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule)) {
+    <b>let</b> total_vesting_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(0, 1);
+    <b>while</b> (last_completed_period &gt;= next_period_to_vest
+        && vesting_record.left_amount != 0
+        && next_period_to_vest &lt;= <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule)) {
         <b>let</b> schedule_index = next_period_to_vest - 1;
         <b>let</b> vesting_fraction = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, schedule_index);
-        <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record, signer_cap, beneficiary, vesting_fraction);
-        emit_event(&<b>mut</b> vesting_contract.vest_events,
-            <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestEvent">VestEvent</a> {
-                admin: vesting_contract.admin,
-                shareholder_address,
-                vesting_contract_address: contract_address,
-                period_vested: next_period_to_vest
-            }
+        total_vesting_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_add">fixed_point32::add</a>(
+            total_vesting_fraction,
+            vesting_fraction,
         );
         next_period_to_vest = next_period_to_vest + 1;
     };
 
+    <b>let</b> periods_fast_forward = 0;
+
     <b>if</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount != 0) {
         <b>let</b> final_fraction = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1);
-        <b>let</b> final_fraction_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(vesting_record.init_amount, final_fraction);
-        // Determine how many periods is needed based on the left_amount
-        <b>let</b> added_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64_return_fixpoint32">fixed_point32::multiply_u64_return_fixpoint32</a>(last_completed_period - next_period_to_vest + 1, final_fraction);
-        // If the added_fraction is greater than or equal <b>to</b> the left_amount, then we can vest all the left_amount
-        <b>let</b> periods_need =
-            <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(vesting_record.init_amount, added_fraction) &gt;= vesting_record.left_amount){
-            <b>let</b> result =  vesting_record.left_amount / final_fraction_amount;
-                // check <b>if</b> `left_amount` is perfectly divisible by `final_fraction_amount`
-                  <b>if</b> (vesting_record.left_amount == final_fraction_amount*result) {
-                   result
-                } <b>else</b> {
-                   result + 1
-                }
-        } <b>else</b> {
-            last_completed_period - next_period_to_vest + 1
-        };
-
-        <b>let</b> total_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64_return_fixpoint32">fixed_point32::multiply_u64_return_fixpoint32</a>(periods_need, final_fraction);
-        // We don't need <b>to</b> check vesting_record.left_amount &gt; 0 because vest_transfer will handle that.
-        <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record, signer_cap, beneficiary, total_fraction);
-        next_period_to_vest = next_period_to_vest + periods_need;
-        emit_event(&<b>mut</b> vesting_contract.vest_events,
-            <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestEvent">VestEvent</a> {
-                admin: vesting_contract.admin,
-                shareholder_address,
-                vesting_contract_address: contract_address,
-                period_vested: next_period_to_vest,
-            },
+        <b>let</b> final_fraction_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(
+            vesting_record.init_amount, final_fraction
         );
+        // Determine how many periods is needed based on the left_amount
+        periods_fast_forward = last_completed_period - next_period_to_vest + 1;
+        <b>let</b> added_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64_return_fixpoint32">fixed_point32::multiply_u64_return_fixpoint32</a>(
+            periods_fast_forward, final_fraction
+        );
+        // If the added_fraction is greater than or equal <b>to</b> the left_amount, then we can vest all the left_amount
+        total_vesting_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_add">fixed_point32::add</a>(
+            total_vesting_fraction, added_fraction
+        );
+
     };
+    <b>let</b> total_vesting_fraction_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(
+        vesting_record.init_amount,
+        total_vesting_fraction,
+    );
+    // We don't need <b>to</b> check vesting_record.left_amount &gt; 0 because vest_transfer will handle that.
+    <b>let</b> transfer_happened = <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(
+        vesting_record, signer_cap, beneficiary, total_vesting_fraction
+    );
+    //If no amount was transferred DO NOT advance last_vested_period in the <a href="vesting.md#0x1_vesting">vesting</a> record
+    // This check is needed because <b>if</b> the fraction is too low, `vesting_record.init_amount * vesting_fraction`
+    // may be 0. By not advancing, we allow for the possibility for `vesting_fraction` <b>to</b> become large enough
+    // otherwise, even <b>if</b> <a href="vesting.md#0x1_vesting">vesting</a> period passes and shareholder regularly calls `vest_individual`, the shareholder
+    // may never receive <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> amount.
+    <b>if</b> (!transfer_happened) { <b>return</b> };
+    next_period_to_vest = next_period_to_vest + periods_fast_forward;
+    emit_event(
+        &<b>mut</b> vesting_contract.vest_events,
+        <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestEvent">VestEvent</a> {
+            admin: vesting_contract.admin,
+            shareholder_address,
+            vesting_contract_address: contract_address,
+            period_vested: next_period_to_vest - 1
+        },
+    );
 
     //<b>update</b> last_vested_period for the shareholder
     vesting_record.last_vested_period = next_period_to_vest - 1;
@@ -1614,7 +1771,7 @@ Unlock any vested portion of the grant.
 
 
 
-<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record: &<b>mut</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">vesting_without_staking::VestingRecord</a>, signer_cap: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>, beneficiary: <b>address</b>, vesting_fraction: <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>)
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record: &<b>mut</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">vesting_without_staking::VestingRecord</a>, signer_cap: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>, beneficiary: <b>address</b>, vesting_fraction: <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): bool
 </code></pre>
 
 
@@ -1628,20 +1785,97 @@ Unlock any vested portion of the grant.
     signer_cap: &SignerCapability,
     beneficiary: <b>address</b>,
     vesting_fraction: FixedPoint32
-) {
+): bool {
     <b>let</b> vesting_signer = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(signer_cap);
 
     //amount <b>to</b> be transfer is minimum of what is left and <a href="vesting.md#0x1_vesting">vesting</a> fraction due of init_amount
     <b>let</b> amount =
         <b>min</b>(
             vesting_record.left_amount,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(
-                vesting_record.init_amount, vesting_fraction
-            )
+            <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(vesting_record.init_amount, vesting_fraction),
         );
-    //<b>update</b> left_amount for the shareholder
-    vesting_record.left_amount = vesting_record.left_amount - amount;
-    <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(&vesting_signer, beneficiary, amount);
+    <b>let</b> result =
+        <b>if</b> (amount &gt; 0) {
+            //<b>update</b> left_amount for the shareholder
+            vesting_record.left_amount = vesting_record.left_amount - amount;
+            <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(&vesting_signer, beneficiary, amount);
+            <b>true</b>
+        } <b>else</b> { <b>false</b> };
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vesting_without_staking_set_vesting_schedule"></a>
+
+## Function `set_vesting_schedule`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_vesting_schedule">set_vesting_schedule</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, vesting_numerators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, vesting_denominator: u64, period_duration: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_vesting_schedule">set_vesting_schedule</a>(
+    admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    contract_address: <b>address</b>,
+    vesting_numerators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    vesting_denominator: u64,
+    period_duration: u64
+) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
+    <a href="vesting_without_staking.md#0x1_vesting_without_staking_validate_vesting_schedule">validate_vesting_schedule</a>(
+        &vesting_numerators, vesting_denominator, period_duration
+    );
+    <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_vesting_contract_exists">assert_vesting_contract_exists</a>(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
+    <a href="vesting_without_staking.md#0x1_vesting_without_staking_verify_admin">verify_admin</a>(admin, vesting_contract);
+
+    <b>let</b> schedule = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_map_ref">vector::map_ref</a>(
+        &vesting_numerators,
+        |numerator| {
+            <b>let</b> e =
+                <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, vesting_denominator);
+            e
+        },
+    );
+
+    <b>let</b> old_period_duration = vesting_contract.vesting_schedule.period_duration;
+
+    <b>let</b> (keys, values) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_to_vec_pair">simple_map::to_vec_pair</a>(vesting_contract.shareholders);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_zip_mut">vector::zip_mut</a>&lt;<b>address</b>, <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">VestingRecord</a>&gt;(
+        &<b>mut</b> keys,
+        &<b>mut</b> values,
+        |shareholder, srecord| {
+            <b>let</b> msrecord: &<b>mut</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">VestingRecord</a> = srecord;
+            <b>let</b> new_last_vested_period = (
+                msrecord.last_vested_period * old_period_duration
+            ) / period_duration;
+            msrecord.last_vested_period = new_last_vested_period;
+            msrecord.last_vested_period = new_last_vested_period;
+        },
+    );
+    vesting_contract.shareholders = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new_from">simple_map::new_from</a>(keys, values);
+
+    <b>let</b> old_schedule = vesting_contract.vesting_schedule;
+    vesting_contract.vesting_schedule.schedule = schedule;
+    vesting_contract.vesting_schedule.period_duration = period_duration;
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingScheduleUpdated">VestingScheduleUpdated</a> {
+            contract_address,
+            old_schedule: old_schedule,
+            new_schedule: vesting_contract.vesting_schedule
+        },
+    );
+
 }
 </code></pre>
 
@@ -1684,7 +1918,7 @@ Example usage: If admin find shareholder suspicious, admin can remove it.
             admin: vesting_contract.admin,
             vesting_contract_address: contract_address,
             amount: shareholder_amount
-        }
+        },
     );
 
     // remove `shareholder_address`` from `vesting_contract.shareholders`
@@ -1709,7 +1943,7 @@ Example usage: If admin find shareholder suspicious, admin can remove it.
             shareholder: shareholder_address,
             beneficiary,
             amount: shareholders_vesting.left_amount
-        }
+        },
     );
 }
 </code></pre>
@@ -1754,7 +1988,7 @@ Terminate the vesting contract and send all funds back to the withdrawal address
                     &<b>mut</b> vesting_contract.shareholders, shareholder
                 );
             shareholder_amount.left_amount = 0;
-        }
+        },
     );
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_terminate_vesting_contract">set_terminate_vesting_contract</a>(contract_address);
 }
@@ -1787,7 +2021,7 @@ has already been terminated.
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>assert</b>!(
         vesting_contract.state == <a href="vesting_without_staking.md#0x1_vesting_without_staking_VESTING_POOL_TERMINATED">VESTING_POOL_TERMINATED</a>,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_STILL_ACTIVE">EVESTING_CONTRACT_STILL_ACTIVE</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_STILL_ACTIVE">EVESTING_CONTRACT_STILL_ACTIVE</a>),
     );
 
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
@@ -1804,7 +2038,7 @@ has already been terminated.
             admin: vesting_contract.admin,
             vesting_contract_address: contract_address,
             amount: total_balance
-        }
+        },
     );
 }
 </code></pre>
@@ -1853,7 +2087,7 @@ has already been terminated.
             shareholder,
             old_beneficiary,
             new_beneficiary
-        }
+        },
     );
 }
 </code></pre>
@@ -1880,19 +2114,15 @@ account.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_reset_beneficiary">reset_beneficiary</a>(
-    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    contract_address: <b>address</b>,
-    shareholder: <b>address</b>
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, shareholder: <b>address</b>
 ) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a>, <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(
         addr == vesting_contract.admin
-            || addr
-                == <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_role_holder">get_role_holder</a>(
-                    contract_address, utf8(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ROLE_BENEFICIARY_RESETTER">ROLE_BENEFICIARY_RESETTER</a>)
-                ),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EPERMISSION_DENIED">EPERMISSION_DENIED</a>)
+        || addr
+        == <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_role_holder">get_role_holder</a>(contract_address, utf8(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ROLE_BENEFICIARY_RESETTER">ROLE_BENEFICIARY_RESETTER</a>)),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EPERMISSION_DENIED">EPERMISSION_DENIED</a>),
     );
 
     <b>let</b> beneficiaries = &<b>mut</b> vesting_contract.beneficiaries;
@@ -1934,9 +2164,7 @@ account.
         <b>let</b> contract_signer = &<a href="vesting_without_staking.md#0x1_vesting_without_staking_get_vesting_account_signer_internal">get_vesting_account_signer_internal</a>(vesting_contract);
         <b>move_to</b>(
             contract_signer,
-            <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a> {
-                roles: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_create">simple_map::create</a>&lt;String, <b>address</b>&gt;()
-            }
+            <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a> { roles: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_create">simple_map::create</a>&lt;String, <b>address</b>&gt;() },
         )
     };
     <b>let</b> roles =
@@ -1965,15 +2193,13 @@ account.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_beneficiary_resetter">set_beneficiary_resetter</a>(
-    admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    contract_address: <b>address</b>,
-    beneficiary_resetter: <b>address</b>
+    admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>, beneficiary_resetter: <b>address</b>
 ) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a>, <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_set_management_role">set_management_role</a>(
         admin,
         contract_address,
         utf8(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ROLE_BENEFICIARY_RESETTER">ROLE_BENEFICIARY_RESETTER</a>),
-        beneficiary_resetter
+        beneficiary_resetter,
     );
 }
 </code></pre>
@@ -1997,16 +2223,15 @@ account.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_role_holder">get_role_holder</a>(
-    contract_address: <b>address</b>, role: String
-): <b>address</b> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_role_holder">get_role_holder</a>(contract_address: <b>address</b>, role: String): <b>address</b> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_ACCOUNT_HAS_NO_ROLES">EVESTING_ACCOUNT_HAS_NO_ROLES</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_ACCOUNT_HAS_NO_ROLES">EVESTING_ACCOUNT_HAS_NO_ROLES</a>),
     );
     <b>let</b> roles = &<b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address).roles;
     <b>assert</b>!(
-        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(roles, &role), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EROLE_NOT_FOUND">EROLE_NOT_FOUND</a>)
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(roles, &role),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EROLE_NOT_FOUND">EROLE_NOT_FOUND</a>),
     );
     *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(roles, &role)
 }
@@ -2131,7 +2356,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_verify_admin">verify_admin</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vesting_contract: &<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>) {
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) == vesting_contract.admin,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENOT_ADMIN">ENOT_ADMIN</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENOT_ADMIN">ENOT_ADMIN</a>),
     );
 }
 </code></pre>
@@ -2158,7 +2383,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_assert_vesting_contract_exists">assert_vesting_contract_exists</a>(contract_address: <b>address</b>) {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_NOT_FOUND">EVESTING_CONTRACT_NOT_FOUND</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_NOT_FOUND">EVESTING_CONTRACT_NOT_FOUND</a>),
     );
 }
 </code></pre>
@@ -2189,9 +2414,9 @@ This address should be deterministic for the same admin and vesting contract cre
     <b>assert</b>!(
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(
             &<b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address).shareholders,
-            &shareholder_address
+            &shareholder_address,
         ),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ESHAREHOLDER_NOT_EXIST">ESHAREHOLDER_NOT_EXIST</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ESHAREHOLDER_NOT_EXIST">ESHAREHOLDER_NOT_EXIST</a>),
     );
 }
 </code></pre>
@@ -2220,7 +2445,7 @@ This address should be deterministic for the same admin and vesting contract cre
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>assert</b>!(
         vesting_contract.state == <a href="vesting_without_staking.md#0x1_vesting_without_staking_VESTING_POOL_ACTIVE">VESTING_POOL_ACTIVE</a>,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_NOT_ACTIVE">EVESTING_CONTRACT_NOT_ACTIVE</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EVESTING_CONTRACT_NOT_ACTIVE">EVESTING_CONTRACT_NOT_ACTIVE</a>),
     );
 }
 </code></pre>
@@ -2247,9 +2472,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_get_beneficiary">get_beneficiary</a>(contract: &<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>, shareholder: <b>address</b>): <b>address</b> {
     <b>if</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&contract.beneficiaries, &shareholder)) {
         *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&contract.beneficiaries, &shareholder)
-    } <b>else</b> {
-        shareholder
-    }
+    } <b>else</b> { shareholder }
 }
 </code></pre>
 
@@ -2280,7 +2503,7 @@ This address should be deterministic for the same admin and vesting contract cre
         <a href="vesting_without_staking.md#0x1_vesting_without_staking_TerminateEvent">TerminateEvent</a> {
             admin: vesting_contract.admin,
             vesting_contract_address: contract_address
-        }
+        },
     );
 }
 </code></pre>
@@ -2524,7 +2747,7 @@ This address should be deterministic for the same admin and vesting contract cre
 ### Function `vest_transfer`
 
 
-<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record: &<b>mut</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">vesting_without_staking::VestingRecord</a>, signer_cap: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>, beneficiary: <b>address</b>, vesting_fraction: <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>)
+<pre><code><b>fun</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(vesting_record: &<b>mut</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingRecord">vesting_without_staking::VestingRecord</a>, signer_cap: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>, beneficiary: <b>address</b>, vesting_fraction: <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): bool
 </code></pre>
 
 

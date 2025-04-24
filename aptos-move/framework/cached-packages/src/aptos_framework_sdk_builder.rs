@@ -1173,6 +1173,13 @@ pub enum EntryFunctionCall {
         role_holder: AccountAddress,
     },
 
+    VestingWithoutStakingSetVestingSchedule {
+        contract_address: AccountAddress,
+        vesting_numerators: Vec<u64>,
+        vesting_denominator: u64,
+        period_duration: u64,
+    },
+
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
     VestingWithoutStakingTerminateVestingContract {
         contract_address: AccountAddress,
@@ -1981,6 +1988,17 @@ impl EntryFunctionCall {
                 role,
                 role_holder,
             } => vesting_without_staking_set_management_role(contract_address, role, role_holder),
+            VestingWithoutStakingSetVestingSchedule {
+                contract_address,
+                vesting_numerators,
+                vesting_denominator,
+                period_duration,
+            } => vesting_without_staking_set_vesting_schedule(
+                contract_address,
+                vesting_numerators,
+                vesting_denominator,
+                period_duration,
+            ),
             VestingWithoutStakingTerminateVestingContract { contract_address } => {
                 vesting_without_staking_terminate_vesting_contract(contract_address)
             },
@@ -5408,6 +5426,31 @@ pub fn vesting_without_staking_set_management_role(
     ))
 }
 
+pub fn vesting_without_staking_set_vesting_schedule(
+    contract_address: AccountAddress,
+    vesting_numerators: Vec<u64>,
+    vesting_denominator: u64,
+    period_duration: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting_without_staking").to_owned(),
+        ),
+        ident_str!("set_vesting_schedule").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&contract_address).unwrap(),
+            bcs::to_bytes(&vesting_numerators).unwrap(),
+            bcs::to_bytes(&vesting_denominator).unwrap(),
+            bcs::to_bytes(&period_duration).unwrap(),
+        ],
+    ))
+}
+
 /// Terminate the vesting contract and send all funds back to the withdrawal address.
 pub fn vesting_without_staking_terminate_vesting_contract(
     contract_address: AccountAddress,
@@ -7438,6 +7481,21 @@ mod decoder {
         }
     }
 
+    pub fn vesting_without_staking_set_vesting_schedule(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingWithoutStakingSetVestingSchedule {
+                contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                vesting_numerators: bcs::from_bytes(script.args().get(1)?).ok()?,
+                vesting_denominator: bcs::from_bytes(script.args().get(2)?).ok()?,
+                period_duration: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn vesting_without_staking_terminate_vesting_contract(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -8090,6 +8148,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_without_staking_set_management_role".to_string(),
             Box::new(decoder::vesting_without_staking_set_management_role),
+        );
+        map.insert(
+            "vesting_without_staking_set_vesting_schedule".to_string(),
+            Box::new(decoder::vesting_without_staking_set_vesting_schedule),
         );
         map.insert(
             "vesting_without_staking_terminate_vesting_contract".to_string(),
