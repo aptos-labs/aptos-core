@@ -25,10 +25,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     code::ModuleBytesStorage,
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{StructType, Type},
     module_linker_error,
 };
 use std::{

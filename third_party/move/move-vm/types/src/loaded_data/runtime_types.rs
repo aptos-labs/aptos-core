@@ -243,7 +243,7 @@ impl StructType {
         Ok(())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     pub fn for_test() -> StructType {
         Self {
             idx: StructNameIndex::new(0),

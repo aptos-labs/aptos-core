@@ -54,8 +54,8 @@ fn native_to_bytes(
     let arg_type = ty_args.pop().unwrap();
 
     // get type layout
-    let layout = match context.type_to_type_layout(&arg_type) {
-        Ok(layout) => layout,
+    let layout = match context.type_to_type_layout_with_delayed_fields(&arg_type) {
+        Ok(layout) => layout.unpack().0,
         Err(_) => {
             cost += gas_params.failure;
             return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));

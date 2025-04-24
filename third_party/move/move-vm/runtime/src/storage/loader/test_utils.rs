@@ -157,6 +157,10 @@ impl WithRuntimeEnvironment for MockStructDefinitionLoader {
 }
 
 impl StructDefinitionLoader for MockStructDefinitionLoader {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        self.runtime_environment().vm_config().enable_lazy_loading
+    }
+
     fn load_struct_definition(
         &self,
         _gas_meter: &mut impl DependencyGasMeter,

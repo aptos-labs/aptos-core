@@ -33,10 +33,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{StructType, Type},
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};

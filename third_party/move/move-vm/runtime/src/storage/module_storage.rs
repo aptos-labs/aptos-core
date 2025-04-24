@@ -26,10 +26,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -140,9 +137,12 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
 
-    /// Returns a struct type corresponding to the specified name. The module containing the struct
-    /// will be fetched and cached beforehand.
-    fn fetch_struct_ty(
+    /// Returns a struct definition corresponding to the specified name. The module containing the
+    /// struct will be fetched and cached beforehand. Returns an error if the module or struct does
+    /// not exist.
+    ///
+    /// Note: This API is not metered.
+    fn unmetered_get_struct_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -156,19 +156,6 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .map_err(|err| err.to_partial())
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name_ref(*idx)?;
-
-        self.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
-    }
-
     /// Returns a runtime type corresponding to the specified type tag (file format type
     /// representation). If a struct type is constructed, the module containing the struct
     /// definition is fetched and cached.
@@ -180,7 +167,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .vm_config()
             .ty_builder
             .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
+                self.unmetered_get_struct_definition(
                     &st.address,
                     st.module.as_ident_str(),
                     st.name.as_ident_str(),

@@ -55,14 +55,23 @@ fn native_to_bytes(
     let ref_to_val = safely_pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
-    let layout = match context.type_to_type_layout(&arg_type) {
-        Ok(layout) => layout,
-        Err(_) => {
-            context.charge(BCS_TO_BYTES_FAILURE)?;
-            return Err(SafeNativeError::Abort {
-                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-            });
-        },
+    let layout = if context.get_feature_flags().is_lazy_loading_enabled() {
+        // With lazy loading, propagate the error directly. This is because errors here are likely
+        // from metering, so we should not remap them in any way. Note that makes it possible to
+        // fail on constructing a very deep / large layout and not be charged, but this is already
+        // the case for regular execution, so we keep it simple. Also, charging more gas after
+        // out-of-gas failure in layout construction does not make any sense.
+        context.type_to_type_layout_with_delayed_fields(&arg_type)?
+    } else {
+        match context.type_to_type_layout_with_delayed_fields(&arg_type) {
+            Ok(layout) => layout,
+            Err(_) => {
+                context.charge(BCS_TO_BYTES_FAILURE)?;
+                return Err(SafeNativeError::Abort {
+                    abort_code: NFE_BCS_SERIALIZATION_FAILURE,
+                });
+            },
+        }
     };
 
     // TODO(#14175): Reading the reference performs a deep copy, and we can
@@ -73,7 +82,7 @@ fn native_to_bytes(
     let serialized_value = match ValueSerDeContext::new()
         .with_legacy_signer()
         .with_func_args_deserialization(&function_value_extension)
-        .serialize(&val, &layout)?
+        .serialize(&val, &layout.unpack().0)?
     {
         Some(serialized_value) => serialized_value,
         None => {
@@ -135,7 +144,10 @@ fn serialized_size_impl(
     // TODO(#14175): Reading the reference performs a deep copy, and we can
     //               implement it in a more efficient way.
     let value = reference.read_ref()?;
-    let ty_layout = context.type_to_type_layout(ty)?;
+    let ty_layout = context
+        .type_to_type_layout_with_delayed_fields(ty)?
+        .unpack()
+        .0;
 
     let function_value_extension = context.function_value_extension();
     ValueSerDeContext::new()
@@ -155,7 +167,10 @@ fn native_constant_serialized_size(
     context.charge(BCS_CONSTANT_SERIALIZED_SIZE_BASE)?;
 
     let ty = ty_args.pop().unwrap();
-    let ty_layout = context.type_to_type_layout(&ty)?;
+    let ty_layout = context
+        .type_to_type_layout_with_delayed_fields(&ty)?
+        .unpack()
+        .0;
 
     let (visited_count, serialized_size_result) = constant_serialized_size(&ty_layout);
     context
