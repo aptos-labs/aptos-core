@@ -1346,7 +1346,6 @@ module aptos_framework::coin {
         deposit(source_addr, coins_minted);
         maybe_convert_to_fungible_store<FakeMoney>(source_addr);
         assert!(!coin_store_exists<FakeMoney>(source_addr), 0);
-        assert!(coin_store_exists<FakeMoney>(destination_addr), 0);
 
         transfer<FakeMoney>(&source, destination_addr, 50);
         maybe_convert_to_fungible_store<FakeMoney>(destination_addr);
@@ -2039,8 +2038,9 @@ module aptos_framework::coin {
         account::create_account_for_test(account_addr);
         account::create_account_for_test(aaron_addr);
         account::create_account_for_test(bob_addr);
-        let feature = features::get_new_accounts_default_to_fa_apt_store_feature();
-        features::change_feature_flags_for_testing(account, vector[], vector[feature]);
+        let apt_fa_feature = features::get_new_accounts_default_to_fa_apt_store_feature();
+        let fa_feature = features::get_new_accounts_default_to_fa_store_feature();
+        features::change_feature_flags_for_testing(account, vector[], vector[apt_fa_feature, fa_feature]);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
 
         assert!(coin_store_exists<FakeMoney>(account_addr), 0);

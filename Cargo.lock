@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.2.0"
+version = "7.3.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1472,6 +1472,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -1595,6 +1596,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "move-core-types",
  "rand 0.7.3",
 ]
 
@@ -2019,6 +2021,7 @@ dependencies = [
  "anyhow",
  "aptos-gas-algebra",
  "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm-types",
  "handlebars",
@@ -8688,6 +8691,7 @@ dependencies = [
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "arbitrary",
  "base64 0.13.1",
  "bcs 0.1.4",

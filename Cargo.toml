@@ -631,11 +631,6 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemallocator = { version = "0.5.0", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
-jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"

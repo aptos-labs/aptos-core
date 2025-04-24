@@ -16,13 +16,6 @@ use move_vm_types::loaded_data::{
 };
 use std::sync::Arc;
 
-/// Maximal nodes which are allowed when converting to layout. This includes the types of
-/// fields for struct types.
-const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
-
-/// Maximal depth of a value in terms of type depth.
-const VALUE_DEPTH_MAX: u64 = 128;
-
 /// A trait allowing to convert runtime types into other types used throughout the stack.
 #[allow(private_bounds)]
 pub trait LayoutConverter: LayoutConverterBase {
@@ -74,19 +67,19 @@ pub(crate) trait LayoutConverterBase {
     // Layout
 
     fn check_type_layout_bounds(&self, node_count: u64, depth: u64) -> PartialVMResult<()> {
-        if node_count > MAX_TYPE_TO_LAYOUT_NODES {
+        if node_count > self.vm_config().layout_max_size {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
                     "Number of type nodes when constructing type layout exceeded the maximum of {}",
-                    MAX_TYPE_TO_LAYOUT_NODES
+                    self.vm_config().layout_max_size
                 )),
             );
         }
-        if depth > VALUE_DEPTH_MAX {
+        if depth > self.vm_config().layout_max_depth {
             return Err(
                 PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
                     "Depth of a layout exceeded the maximum of {} during construction",
-                    VALUE_DEPTH_MAX
+                    self.vm_config().layout_max_depth
                 )),
             );
         }
@@ -298,22 +291,7 @@ pub(crate) trait LayoutConverterBase {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        if *count > MAX_TYPE_TO_LAYOUT_NODES {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Number of type nodes when constructing type layout exceeded the maximum of {}",
-                    MAX_TYPE_TO_LAYOUT_NODES
-                )),
-            );
-        }
-        if depth > VALUE_DEPTH_MAX {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
-                    "Depth of a layout exceeded the maximum of {} during construction",
-                    VALUE_DEPTH_MAX
-                )),
-            );
-        }
+        self.check_type_layout_bounds(*count, depth)?;
         Ok(match ty {
             Type::Bool => MoveTypeLayout::Bool,
             Type::U8 => MoveTypeLayout::U8,

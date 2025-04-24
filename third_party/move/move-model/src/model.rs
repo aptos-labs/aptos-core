@@ -1696,7 +1696,7 @@ impl GlobalEnv {
             };
 
             // While releasing any mutation, compute the used/called functions if needed.
-            let fun_data = &self.module_data[module_id.0 as usize]
+            let fun_data = &self.module_data[module_id.to_usize()]
                 .function_data
                 .get(&fun_id)
                 .unwrap();

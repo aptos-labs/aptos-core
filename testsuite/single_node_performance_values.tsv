@@ -48,3 +48,8 @@ no_commit_apt-fa-transfer	1	VM	5	0.995	1.007	22715.7
 no_commit_apt-fa-transfer	1	NativeVM	5	0.984	1.008	49048.5
 no_commit_apt-fa-transfer	1	AptosVMSpeculative	5	0.997	1.004	1106.6
 no_commit_apt-fa-transfer	1	NativeSpeculative	5	0.983	1.007	98271.6
+order-book-no-matches	1	VM	1	0.7	1.2	1604.0
+order-book-balanced-matches25-pct	1	VM	1	0.7	1.2	984.0
+order-book-balanced-matches80-pct	1	VM	1	0.7	1.2	482.0
+order-book-balanced-size-skewed80-pct	1	VM	1	0.7	1.2	1008.0
+

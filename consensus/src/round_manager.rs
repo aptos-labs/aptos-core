@@ -904,7 +904,7 @@ impl RoundManager {
                 ensure!(
                     is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                     "unexpected validator txn: {:?}",
-                    vtxn.topic()
+                    vtxn.type_name()
                 );
             }
         }

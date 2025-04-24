@@ -5,11 +5,13 @@ use self::{
     jwk::JWK,
     rsa::{INSECURE_TEST_RSA_JWK, RSA_JWK, SECURE_TEST_RSA_JWK},
 };
+#[cfg(test)]
+use crate::move_any;
 use crate::{
     aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
 };
-use anyhow::{bail, Context};
+use anyhow::{bail, ensure, Context};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
 use move_core_types::{
@@ -32,6 +34,8 @@ pub mod rsa;
 pub mod unsupported;
 
 pub type Issuer = Vec<u8>;
+/// Type for JWK Key ID.
+pub type KID = Vec<u8>;
 
 pub fn secure_test_rsa_jwk() -> RSA_JWK {
     SECURE_TEST_RSA_JWK.clone()
@@ -131,6 +135,20 @@ impl ProviderJWKs {
             jwks: vec![],
         }
     }
+
+    pub fn indexed(&self) -> anyhow::Result<ProviderJWKsIndexed> {
+        let mut jwks = HashMap::new();
+        for jwk_in_move in self.jwks.iter() {
+            let jwk = JWK::try_from(jwk_in_move)
+                .context("ProviderJWKs::indexed failed by JWK conversion")?;
+            jwks.insert(jwk.id(), jwk);
+        }
+        Ok(ProviderJWKsIndexed {
+            issuer: self.issuer.clone(),
+            version: self.version,
+            jwks,
+        })
+    }
 }
 
 impl Debug for ProviderJWKs {
@@ -177,6 +195,25 @@ impl AsMoveValue for ProviderJWKs {
         ]))
     }
 }
+
+/// Similar to `ProviderJWKs` except that the JWKs are indexed by their key ID.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ProviderJWKsIndexed {
+    pub issuer: Issuer,
+    pub version: u64,
+    pub jwks: HashMap<KID, JWK>,
+}
+
+impl ProviderJWKsIndexed {
+    pub fn new(issuer: Issuer) -> Self {
+        Self {
+            issuer,
+            version: 0,
+            jwks: HashMap::default(),
+        }
+    }
+}
+
 /// Move type `0x1::jwks::JWKs` in rust.
 /// See its doc in Move for more details.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -197,6 +234,17 @@ impl AllProvidersJWKs {
             .context("JWK not found for issuer")?;
         let jwk = provider_jwk_set.get_jwk(kid)?;
         Ok(jwk)
+    }
+
+    pub fn indexed(&self) -> anyhow::Result<HashMap<Issuer, ProviderJWKsIndexed>> {
+        let mut ret = HashMap::new();
+        for entry in self.entries.iter() {
+            let entry_indexed = entry
+                .indexed()
+                .context("AllProvidersJWKs::indexed failed at entry indexing")?;
+            ret.insert(entry.issuer.clone(), entry_indexed);
+        }
+        Ok(ret)
     }
 }
 
@@ -266,6 +314,154 @@ impl QuorumCertifiedUpdate {
             multi_sig: AggregateSignature::empty(),
         }
     }
+}
+
+/// To represent a DELETE operation using existing `ProviderJWKs` types,
+/// we put a `RSA_JWK` and set `n` to be this special value.
+pub const DELETE_COMMAND_INDICATOR: &str = "THIS_IS_A_DELETE_COMMAND";
+
+/// Represents a key-level JWK update.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct KeyLevelUpdate {
+    pub issuer: Issuer,
+    pub base_version: u64,
+    pub kid: KID,
+    pub to_upsert: Option<JWK>, // If none, it is a deletion.
+}
+
+impl KeyLevelUpdate {
+    pub fn as_issuer_level_repr(&self) -> anyhow::Result<ProviderJWKs> {
+        let kid_str = String::from_utf8(self.kid.clone())
+            .context("KeyLevelUpdate::as_issuer_level_repr failed on kid")?;
+        let jwk_repr = self.to_upsert.clone().unwrap_or_else(|| {
+            JWK::RSA(RSA_JWK::new_256_aqab(
+                kid_str.as_str(),
+                DELETE_COMMAND_INDICATOR,
+            ))
+        });
+        let version = self
+            .base_version
+            .checked_add(1)
+            .context("KeyLevelUpdate::as_issuer_level_repr failed on version")?;
+        Ok(ProviderJWKs {
+            issuer: self.issuer.clone(),
+            version,
+            jwks: vec![JWKMoveStruct::from(jwk_repr)],
+        })
+    }
+
+    pub fn try_from_issuer_level_repr(repr: &ProviderJWKs) -> anyhow::Result<Self> {
+        ensure!(
+            repr.jwks.len() == 1,
+            "wrapped repr of a key-level update should have exactly 1 jwk"
+        );
+        let jwk =
+            JWK::try_from(&repr.jwks[0]).context("try_from_issuer_level_repr failed on JWK")?;
+        let base_version = repr
+            .version
+            .checked_sub(1)
+            .context("try_from_issuer_level_repr on version")?;
+        Ok(Self {
+            issuer: repr.issuer.clone(),
+            base_version,
+            kid: jwk.id(),
+            to_upsert: match jwk {
+                JWK::RSA(rsa) if rsa.n.as_str() == DELETE_COMMAND_INDICATOR => None,
+                _ => Some(jwk),
+            },
+        })
+    }
+}
+
+#[test]
+fn key_level_upsert_repr_conversions() {
+    let jwk = JWK::RSA(RSA_JWK::new_256_aqab("kid123", "magic n"));
+    let key_level = KeyLevelUpdate {
+        issuer: issuer_from_str("issuer-alice"),
+        base_version: 789,
+        kid: "kid123".as_bytes().to_vec(),
+        to_upsert: Some(jwk.clone()),
+    };
+    let expected_issuer_level = ProviderJWKs {
+        issuer: issuer_from_str("issuer-alice"),
+        version: 790,
+        jwks: vec![JWKMoveStruct::from(jwk)],
+    };
+    let issuer_level = key_level.as_issuer_level_repr().unwrap();
+    assert_eq!(expected_issuer_level, issuer_level);
+    let key_level_another = KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).unwrap();
+    assert_eq!(key_level, key_level_another);
+}
+
+#[test]
+fn key_level_delete_repr_conversions() {
+    let key_level = KeyLevelUpdate {
+        issuer: issuer_from_str("issuer-alice"),
+        base_version: 789,
+        kid: "kid123".as_bytes().to_vec(),
+        to_upsert: None,
+    };
+    let expected_issuer_level = ProviderJWKs {
+        issuer: issuer_from_str("issuer-alice"),
+        version: 790,
+        jwks: vec![JWKMoveStruct::from(JWK::RSA(RSA_JWK::new_256_aqab(
+            "kid123",
+            DELETE_COMMAND_INDICATOR,
+        )))],
+    };
+    let issuer_level = key_level.as_issuer_level_repr().unwrap();
+    assert_eq!(expected_issuer_level, issuer_level);
+    let key_level_another = KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).unwrap();
+    assert_eq!(key_level, key_level_another);
+}
+
+#[test]
+fn repr_conversion_failures() {
+    let key_level = KeyLevelUpdate {
+        issuer: issuer_from_str("issuer-alice"),
+        base_version: u64::MAX,
+        kid: "kid123".as_bytes().to_vec(),
+        to_upsert: None,
+    };
+    assert!(key_level.as_issuer_level_repr().is_err());
+
+    let issuer_level = ProviderJWKs {
+        issuer: issuer_from_str("issuer-alice"),
+        version: 0,
+        jwks: vec![JWKMoveStruct::from(JWK::RSA(RSA_JWK::new_256_aqab(
+            "kid123",
+            DELETE_COMMAND_INDICATOR,
+        )))],
+    };
+    assert!(KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).is_err());
+
+    let issuer_level = ProviderJWKs {
+        issuer: issuer_from_str("issuer-alice"),
+        version: 1,
+        jwks: vec![
+            JWKMoveStruct::from(JWK::RSA(RSA_JWK::new_256_aqab(
+                "kid123",
+                DELETE_COMMAND_INDICATOR,
+            ))),
+            JWKMoveStruct::from(JWK::RSA(RSA_JWK::new_256_aqab(
+                "kid124",
+                DELETE_COMMAND_INDICATOR,
+            ))),
+        ],
+    };
+    assert!(KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).is_err());
+
+    let issuer_level = ProviderJWKs {
+        issuer: issuer_from_str("issuer-alice"),
+        version: 1,
+        jwks: vec![JWKMoveStruct {
+            variant: move_any::Any {
+                type_name: "0x2::unknown_module::UnknownType".to_string(),
+                data: vec![],
+            },
+        }],
+    };
+    assert!(KeyLevelUpdate::try_from_issuer_level_repr(&issuer_level).is_err());
 }
 
 /// Move event type `0x1::jwks::ObservedJWKsUpdated` in rust.

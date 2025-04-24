@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "7.2.0"
+version = "7.3.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -109,7 +109,10 @@ tracing-subscriber = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 
 [features]
 default = []

@@ -4,6 +4,7 @@
 mod dummy_provider;
 mod jwk_consensus_basic;
 mod jwk_consensus_per_issuer;
+mod jwk_consensus_per_key;
 mod jwk_consensus_provider_change_mind;
 
 use crate::smoke_test_environment::SwarmBuilder;

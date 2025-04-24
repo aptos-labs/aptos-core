@@ -788,7 +788,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number,
+                0,
                 txn.timeline_state,
                 false,
                 None,
@@ -801,7 +801,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number,
+                0,
                 txn.timeline_state,
                 false,
                 None,
@@ -820,7 +820,6 @@ fn signed_txn_to_mempool_transaction(txn: SignedTransaction) -> MempoolTransacti
         Duration::from_secs(1),
         1,
         TimelineState::NotReady,
-        0,
         SystemTime::now(),
         false,
         Some(BroadcastPeerPriority::Primary),
