@@ -359,7 +359,7 @@ where
                     },
                 }
             } else {
-                // Failed to get transaction
+                // Failed to get account's onchain sequence number
                 statuses.push((
                     t,
                     (

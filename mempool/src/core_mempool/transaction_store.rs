@@ -245,9 +245,7 @@ impl TransactionStore {
         let account_sequence_number = account_sequence_number.map(|seq_num| {
             max(
                 seq_num,
-                self.get_account_sequence_number(&address)
-                    .copied()
-                    .unwrap_or(0),
+                self.get_account_sequence_number(&address).map_or(0, |v| *v),
             )
         });
 
@@ -476,28 +474,24 @@ impl TransactionStore {
         let tx_replay_protector = txn.get_replay_protector();
         match tx_replay_protector {
             ReplayProtector::SequenceNumber(tx_sequence_number) => {
-                if let Some(account_sequence_number) = account_sequence_number {
-                    if tx_sequence_number == account_sequence_number {
-                        return true;
-                    } else if tx_sequence_number == 0 {
-                        // shouldn't really get here because filtering out old txn sequence numbers happens earlier in workflow
-                        unreachable!("[mempool] already committed txn detected, cannot be checked for readiness upon insertion");
-                    }
+                let account_sequence_number = account_sequence_number.expect("Account sequence number is always provided for transactions with sequence number");
+                if tx_sequence_number == account_sequence_number {
+                    return true;
+                } else if tx_sequence_number == 0 {
+                    // shouldn't really get here because filtering out old txn sequence numbers happens earlier in workflow
+                    unreachable!("[mempool] already committed txn detected, cannot be checked for readiness upon insertion");
+                }
 
-                    // check previous txn in sequence is ready
-                    if let Some(account_txns) = self.transactions.get(&txn.get_sender()) {
-                        let prev_seq_number =
-                            ReplayProtector::SequenceNumber(tx_sequence_number - 1);
-                        if let Some(prev_txn) = account_txns.get(&prev_seq_number) {
-                            if let TimelineState::Ready(_) = prev_txn.timeline_state {
-                                return true;
-                            }
+                // check previous txn in sequence is ready
+                if let Some(account_txns) = self.transactions.get(&txn.get_sender()) {
+                    let prev_seq_number = ReplayProtector::SequenceNumber(tx_sequence_number - 1);
+                    if let Some(prev_txn) = account_txns.get(&prev_seq_number) {
+                        if let TimelineState::Ready(_) = prev_txn.timeline_state {
+                            return true;
                         }
                     }
-                    false
-                } else {
-                    unreachable!("Account sequence number is always provided for transactions with sequence number");
                 }
+                false
             },
             ReplayProtector::Nonce(_) => {
                 // Nonce based transactions are always ready for broadcast

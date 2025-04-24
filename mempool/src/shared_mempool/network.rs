@@ -471,10 +471,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             }
                         })
                         .collect::<Vec<_>>();
-                    info!(
-                        "Rebroadcasting message_id: {:?} to peer {:?}",
-                        message_id, peer
-                    );
                     (message_id.clone(), txns, metric_label)
                 },
                 None => {

@@ -2426,58 +2426,53 @@ impl AptosVM {
             is_approved_gov_script,
             log_context,
         )?;
-
-        match payload {
-            TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {
-                transaction_validation::run_script_prologue(
-                    session,
-                    module_storage,
-                    serialized_signers,
-                    txn_data,
-                    self.features(),
-                    log_context,
-                    traversal_context,
-                    self.is_simulation,
-                )
-            },
-            TransactionPayload::Multisig(multisig_payload) => {
-                // Still run script prologue for multisig transaction to ensure the same tx
-                // validations are still run for this multisig execution tx, which is submitted by
-                // one of the owners.
-                transaction_validation::run_script_prologue(
-                    session,
-                    module_storage,
-                    serialized_signers,
-                    txn_data,
-                    self.features(),
-                    log_context,
-                    traversal_context,
-                    self.is_simulation,
-                )?;
-                // Once "simulation_enhancement" is enabled, the simulation path also validates the
-                // multisig transaction by running the multisig prologue.
-                if !self.is_simulation
-                    || self
-                        .features()
-                        .is_transaction_simulation_enhancement_enabled()
-                {
-                    transaction_validation::run_multisig_prologue(
-                        session,
-                        module_storage,
-                        txn_data,
-                        multisig_payload,
-                        self.features(),
-                        log_context,
-                        traversal_context,
-                    )
-                } else {
-                    Ok(())
-                }
-            },
-
-            // Deprecated.
-            TransactionPayload::ModuleBundle(_) => Err(deprecated_module_bundle!()),
+        if executable.is_empty() && !extra_config.is_multisig() {
+            return Err(VMStatus::error(
+                StatusCode::EMPTY_PAYLOAD_PROVIDED,
+                Some("Empty provided for a non-multisig transaction".to_string()),
+            ));
         }
+
+        if executable.is_script() && extra_config.is_multisig() {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Script payload not yet supported for multisig transactions".to_string()),
+            ));
+        }
+
+        // Runs script prologue for all transaction types including multisig
+        transaction_validation::run_script_prologue(
+            session,
+            module_storage,
+            serialized_signers,
+            txn_data,
+            self.features(),
+            log_context,
+            traversal_context,
+            self.is_simulation,
+        )?;
+
+        if let Some(multisig_address) = extra_config.multisig_address() {
+            // Once "simulation_enhancement" is enabled, the simulation path also validates the
+            // multisig transaction by running the multisig prologue.
+            if !self.is_simulation
+                || self
+                    .features()
+                    .is_transaction_simulation_enhancement_enabled()
+            {
+                transaction_validation::run_multisig_prologue(
+                    session,
+                    module_storage,
+                    txn_data,
+                    executable,
+                    multisig_address,
+                    self.features(),
+                    log_context,
+                    traversal_context,
+                )?
+            }
+        }
+        Ok(())
     }
 
     pub fn should_restart_execution(events: &[(ContractEvent, Option<MoveTypeLayout>)]) -> bool {
