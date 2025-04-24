@@ -7,6 +7,7 @@
 module aptos_framework::jwks {
     use std::bcs;
     use std::error;
+    use std::features;
     use std::option;
     use std::option::Option;
     use std::signer;
@@ -46,6 +47,8 @@ module aptos_framework::jwks {
     const ENATIVE_INCORRECT_VERSION: u64 = 0x0103;
     const ENATIVE_MULTISIG_VERIFICATION_FAILED: u64 = 0x0104;
     const ENATIVE_NOT_ENOUGH_VOTING_POWER: u64 = 0x0105;
+
+    const DELETE_COMMAND_INDICATOR: vector<u8> = b"THIS_IS_A_DELETE_COMMAND";
 
     /// An OIDC provider.
     struct OIDCProvider has copy, drop, store {
@@ -459,10 +462,42 @@ module aptos_framework::jwks {
     public fun upsert_into_observed_jwks(fx: &signer, provider_jwks_vec: vector<ProviderJWKs>) acquires ObservedJWKs, PatchedJWKs, Patches {
         system_addresses::assert_aptos_framework(fx);
         let observed_jwks = borrow_global_mut<ObservedJWKs>(@aptos_framework);
-        vector::for_each(provider_jwks_vec, |obj| {
-            let provider_jwks: ProviderJWKs = obj;
-            upsert_provider_jwks(&mut observed_jwks.jwks, provider_jwks);
-        });
+
+        if (features::is_jwk_consensus_per_key_mode_enabled()) {
+            vector::for_each(provider_jwks_vec, |proposed_provider_jwks|{
+                let maybe_cur_issuer_jwks = remove_issuer(&mut observed_jwks.jwks, proposed_provider_jwks.issuer);
+                let cur_issuer_jwks = if (option::is_some(&maybe_cur_issuer_jwks)) {
+                    option::extract(&mut maybe_cur_issuer_jwks)
+                } else {
+                    ProviderJWKs {
+                        issuer: proposed_provider_jwks.issuer,
+                        version: 0,
+                        jwks: vector[],
+                    }
+                };
+                assert!(cur_issuer_jwks.version + 1 == proposed_provider_jwks.version, error::invalid_argument(EUNEXPECTED_VERSION));
+                vector::for_each(proposed_provider_jwks.jwks, |jwk|{
+                    let variant_type_name = *string::bytes(copyable_any::type_name(&jwk.variant));
+                    let is_delete = if (variant_type_name == b"0x1::jwks::RSA_JWK") {
+                        let rsa_jwk = copyable_any::unpack<RSA_JWK>(jwk.variant);
+                        *string::bytes(&rsa_jwk.n) == DELETE_COMMAND_INDICATOR
+                    } else {
+                        false
+                    };
+                    if (is_delete) {
+                        remove_jwk(&mut cur_issuer_jwks, get_jwk_id(&jwk));
+                    } else {
+                        upsert_jwk(&mut cur_issuer_jwks, jwk);
+                    }
+                });
+                cur_issuer_jwks.version = cur_issuer_jwks.version + 1;
+                upsert_provider_jwks(&mut observed_jwks.jwks, cur_issuer_jwks);
+            });
+        } else {
+            vector::for_each(provider_jwks_vec, |provider_jwks| {
+                upsert_provider_jwks(&mut observed_jwks.jwks, provider_jwks);
+            });
+        };
 
         let epoch = reconfiguration::current_epoch();
         emit(ObservedJWKsUpdated { epoch, jwks: observed_jwks.jwks });
@@ -689,6 +724,7 @@ module aptos_framework::jwks {
     #[test(fx = @aptos_framework)]
     fun test_observed_jwks_operations(fx: &signer) acquires ObservedJWKs, PatchedJWKs, Patches {
         initialize_for_test(fx);
+        features::change_feature_flags_for_testing(fx, vector[], vector[features::get_jwk_consensus_per_key_mode_feature()]);
         let jwk_0 = new_unsupported_jwk(b"key_id_0", b"key_payload_0");
         let jwk_1 = new_unsupported_jwk(b"key_id_1", b"key_payload_1");
         let jwk_2 = new_unsupported_jwk(b"key_id_2", b"key_payload_2");
@@ -730,6 +766,93 @@ module aptos_framework::jwks {
         remove_issuer_from_observed_jwks(fx, b"alice");
         let expected = AllProvidersJWKs { entries: vector[bob_jwks_v1] };
         assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 4);
+    }
+
+    #[test(fx = @aptos_framework)]
+    fun test_observed_jwks_operations_per_key_mode(fx: &signer) acquires ObservedJWKs, PatchedJWKs, Patches {
+        initialize_for_test(fx);
+        features::change_feature_flags_for_testing(fx, vector[features::get_jwk_consensus_per_key_mode_feature()], vector[]);
+
+        let mandatory_jwk= new_rsa_jwk(
+            utf8(b"kid999"),
+            utf8(b"RS256"),
+            utf8(b"AQAB"),
+            utf8(b"999999999"),
+        );
+
+        set_patches(fx, vector[new_patch_upsert_jwk(b"alice", mandatory_jwk)]);
+
+        // Insert a key.
+        let alice_jwk_1 = new_rsa_jwk(
+            utf8(b"kid123"),
+            utf8(b"RS256"),
+            utf8(b"AQAB"),
+            utf8(b"999999999"),
+        );
+        let key_level_update_0 = ProviderJWKs {
+            issuer: b"alice",
+            version: 1,
+            jwks: vector[alice_jwk_1],
+        };
+        upsert_into_observed_jwks(fx, vector[key_level_update_0]);
+        let expected = AllProvidersJWKs {
+            entries: vector[
+                ProviderJWKs {
+                    issuer: b"alice",
+                    version: 1,
+                    jwks: vector[alice_jwk_1, mandatory_jwk],
+                },
+            ]
+        };
+        assert!(expected == borrow_global<PatchedJWKs>(@aptos_framework).jwks, 999);
+
+        // Update a key.
+        let alice_jwk_1b = new_rsa_jwk(
+            utf8(b"kid123"),
+            utf8(b"RS256"),
+            utf8(b"AQAB"),
+            utf8(b"88888888"),
+        );
+        let key_level_update_1 = ProviderJWKs {
+            issuer: b"alice",
+            version: 2,
+            jwks: vector[alice_jwk_1b],
+        };
+        upsert_into_observed_jwks(fx, vector[key_level_update_1]);
+        let expected = AllProvidersJWKs {
+            entries: vector[
+                ProviderJWKs {
+                    issuer: b"alice",
+                    version: 2,
+                    jwks: vector[alice_jwk_1b, mandatory_jwk],
+                },
+            ]
+        };
+        assert!(expected == borrow_global<PatchedJWKs>(@aptos_framework).jwks, 999);
+
+        // Delete a key.
+        let delete_command = new_rsa_jwk(
+            utf8(b"kid123"),
+            utf8(b"RS256"),
+            utf8(b"AQAB"),
+            utf8(DELETE_COMMAND_INDICATOR),
+        );
+        let key_level_update_1 = ProviderJWKs {
+            issuer: b"alice",
+            version: 3,
+            jwks: vector[delete_command],
+        };
+        upsert_into_observed_jwks(fx, vector[key_level_update_1]);
+        let expected = AllProvidersJWKs {
+            entries: vector[
+                ProviderJWKs {
+                    issuer: b"alice",
+                    version: 3,
+                    jwks: vector[mandatory_jwk],
+                },
+            ]
+        };
+        assert!(expected == borrow_global<PatchedJWKs>(@aptos_framework).jwks, 999);
     }
 
     #[test]

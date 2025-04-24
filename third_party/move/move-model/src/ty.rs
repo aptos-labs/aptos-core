@@ -2424,44 +2424,42 @@ impl Substitution {
                     .map_err(TypeUnificationError::lift(order, t1, t2))?,
                 ));
             },
-            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2)) => {
+            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2))
+                // Abilities must be same if NoVariance requested
+                if variance != Variance::NoVariance || abilities1 == abilities2 =>
+            {
                 // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
                 // conversion for arguments. We also have contra-variance of arguments:
                 //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
                 // Intuitively, function f1 can safely _substitute_ function f2 if any argument
                 // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
                 // T2 is also a T1).
-                //
-                // We test for abilities match last, to give more intuitive error messages.
-                return Ok(Type::Fun(
-                    Box::new(
-                        self.unify(context, variance, order.swap(), a1, a2)
-                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?,
-                    ),
-                    Box::new(
-                        self.unify(context, variance, order, r1, r2)
-                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?,
-                    ),
-                    {
-                        // Widening/conversion can remove abilities, not add them.  So check that
-                        // the target has no more abilities than the source.
-                        let (missing_abilities, bad_ty) = match order {
-                            WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
-                            WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
-                            WideningOrder::Join => (AbilitySet::EMPTY, t1),
-                        };
-                        if missing_abilities.is_empty() {
-                            abilities1.intersect(*abilities2)
-                        } else {
-                            return Err(TypeUnificationError::MissingAbilities(
-                                Loc::default(),
-                                bad_ty.clone(),
-                                missing_abilities,
-                                None,
-                            ));
-                        }
-                    },
-                ));
+                let arg_ty = self
+                    .unify(context, variance, order.swap(), a1, a2)
+                    .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                let res_ty = self
+                    .unify(context, variance, order, r1, r2)
+                    .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                let abilities = {
+                    // Widening/conversion can remove abilities, not add them.  So check that
+                    // the target has no more abilities than the source.
+                    let (missing_abilities, bad_ty) = match order {
+                        WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
+                        WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
+                        WideningOrder::Join => (AbilitySet::EMPTY, t1),
+                    };
+                    if missing_abilities.is_empty() {
+                        abilities1.intersect(*abilities2)
+                    } else {
+                        return Err(TypeUnificationError::MissingAbilities(
+                            Loc::default(),
+                            bad_ty.clone(),
+                            missing_abilities,
+                            None,
+                        ));
+                    }
+                };
+                return Ok(Type::Fun(Box::new(arg_ty), Box::new(res_ty), abilities));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
@@ -3385,10 +3383,9 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 if !t.is_unit() {
                     write!(f, "{}", t.display(self.context))?;
                 }
-                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                if !abilities.is_empty() {
                     // Default formatter for Abilities is not compact, manually convert here.
                     let abilities_as_str = abilities
-                        .setminus(AbilitySet::FUNCTIONS)
                         .iter()
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}+{}", l, r))
