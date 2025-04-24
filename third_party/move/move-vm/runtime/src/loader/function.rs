@@ -6,8 +6,8 @@ use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
-    ModuleStorage,
+    storage::ty_layout_converter::LayoutConverter,
+    Loader, ModuleStorage,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -152,13 +152,13 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        module_storage: &impl ModuleStorage,
+        layout_converter: &LayoutConverter<impl Loader>,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
-        let runtime_environment = module_storage.runtime_environment();
+        let runtime_environment = layout_converter.runtime_environment();
         let ty_args = fun
             .ty_args
             .iter()
@@ -177,7 +177,7 @@ impl LazyLoadedFunction {
                 // In case there are delayed fields when constructing captured layouts, we need to
                 // fail early to not allow their capturing altogether.
                 Self::construct_captured_layouts(
-                    module_storage,
+                    layout_converter,
                     gas_meter,
                     traversal_context,
                     &fun,
@@ -205,31 +205,37 @@ impl LazyLoadedFunction {
     /// values are not serializable not "displayable"). For all other failures, an error is
     /// returned.
     pub(crate) fn construct_captured_layouts(
-        module_storage: &impl ModuleStorage,
-        _gas_meter: &mut impl DependencyGasMeter,
-        _traversal_context: &mut TraversalContext,
+        layout_converter: &LayoutConverter<impl Loader>,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
         fun: &LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
-        let ty_converter = StorageLayoutConverter::new(module_storage);
-        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+        let ty_builder = &layout_converter
+            .runtime_environment()
+            .vm_config()
+            .ty_builder;
 
         mask.extract(fun.param_tys(), true)
             .into_iter()
             .map(|ty| {
-                let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
-                    ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
+                let layout = if fun.ty_args.is_empty() {
+                    layout_converter.type_to_type_layout_with_delayed_fields(
+                        gas_meter,
+                        traversal_context,
+                        ty,
+                    )?
                 } else {
                     let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                    ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
+                    layout_converter.type_to_type_layout_with_delayed_fields(
+                        gas_meter,
+                        traversal_context,
+                        &ty,
+                    )?
                 };
 
                 // Do not allow delayed fields to be serialized.
-                if contains_delayed_fields {
-                    return Ok(None);
-                }
-
-                Ok(Some(layout))
+                Ok(layout.into_layout_when_has_no_delayed_fields())
             })
             .collect::<PartialVMResult<Option<Vec<_>>>>()
     }
