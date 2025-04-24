@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{ensure, Context};
 use aptos_crypto::bls12381::Signature;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::RBMessage;
 use aptos_types::{
     account_address::AccountAddress,
-    jwks::{jwk::JWK, Issuer, KeyLevelUpdate, ProviderJWKs, QuorumCertifiedUpdate, KID},
+    jwks::{Issuer, KeyLevelUpdate, ProviderJWKs, QuorumCertifiedUpdate, KID},
 };
 use aptos_validator_transaction_pool::TxnGuard;
 use futures_util::future::AbortHandle;
