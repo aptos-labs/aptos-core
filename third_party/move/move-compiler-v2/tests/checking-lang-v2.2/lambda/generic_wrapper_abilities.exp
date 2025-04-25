@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: captured value is missing abilities `copy`
+   ┌─ tests/checking-lang-v2.2/lambda/generic_wrapper_abilities.move:22:40
+   │
+22 │         let f: Func<S> = |x| { x.merge(s) };
+   │                                        ^
+   │
+   = expected function type: `|S|S with copy` (wrapped type of `Func<S>`)
