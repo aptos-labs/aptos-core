@@ -59,7 +59,7 @@ module aptos_framework::randomness_config {
     public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfig>()) {
-            let new_config = config_buffer::extract<RandomnessConfig>();
+            let new_config = config_buffer::extract_v2<RandomnessConfig>();
             if (exists<RandomnessConfig>(@aptos_framework)) {
                 *borrow_global_mut<RandomnessConfig>(@aptos_framework) = new_config;
             } else {
