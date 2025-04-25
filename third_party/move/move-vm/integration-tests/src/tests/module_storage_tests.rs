@@ -53,7 +53,8 @@ fn add_module_bytes<'a>(
 fn test_module_does_not_exist() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
 
-    let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
+    let result =
+        module_storage.unmetered_check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
     assert!(!assert_ok!(result));
 
     let result = module_storage.unmetered_get_module_size(&AccountAddress::ZERO, ident_str!("a"));
@@ -63,7 +64,8 @@ fn test_module_does_not_exist() {
         module_storage.unmetered_get_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
     assert_none!(assert_ok!(result));
 
-    let result = module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a"));
+    let result =
+        module_storage.unmetered_get_deserialized_module(&AccountAddress::ZERO, ident_str!("a"));
     assert_none!(assert_ok!(result));
 
     let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
@@ -79,7 +81,7 @@ fn test_module_exists() {
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
     assert!(assert_ok!(
-        module_storage.check_module_exists(id.address(), id.name())
+        module_storage.unmetered_check_module_exists(id.address(), id.name())
     ));
     module_storage.assert_cached_state(vec![&id], vec![]);
 }
@@ -104,7 +106,7 @@ fn test_deserialized_caching() {
     assert_eq!(assert_some!(assert_ok!(result)), expected);
     module_storage.assert_cached_state(vec![&a_id], vec![]);
 
-    let result = module_storage.fetch_deserialized_module(c_id.address(), c_id.name());
+    let result = module_storage.unmetered_get_deserialized_module(c_id.address(), c_id.name());
     let expected = make_module("c", vec!["d", "e"], vec![]).0;
     assert_eq!(assert_some!(assert_ok!(result)).as_ref(), &expected);
     module_storage.assert_cached_state(vec![&a_id, &c_id], vec![]);
@@ -159,8 +161,8 @@ fn test_dependency_dag_traversal() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    assert_ok!(module_storage.fetch_deserialized_module(a_id.address(), a_id.name()));
-    assert_ok!(module_storage.fetch_deserialized_module(c_id.address(), c_id.name()));
+    assert_ok!(module_storage.unmetered_get_deserialized_module(a_id.address(), a_id.name()));
+    assert_ok!(module_storage.unmetered_get_deserialized_module(c_id.address(), c_id.name()));
     module_storage.assert_cached_state(vec![&a_id, &c_id], vec![]);
 
     assert_ok!(module_storage.fetch_verified_module(d_id.address(), d_id.name()));

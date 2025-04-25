@@ -179,15 +179,20 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             })
             .collect();
 
-        StagingModuleStorage::create(&sender, &module_storage, module_bundle)
-            .expect("All modules should publish")
-            .release_verified_module_bundle()
-            .into_iter()
-            .for_each(|(module_id, bytes)| {
-                adapter
-                    .storage
-                    .add_module_bytes(module_id.address(), module_id.name(), bytes);
-            });
+        StagingModuleStorage::create(
+            &sender,
+            &module_storage,
+            module_bundle,
+            &NoOpTraversalContext,
+        )
+        .expect("All modules should publish")
+        .release_verified_module_bundle()
+        .into_iter()
+        .for_each(|(module_id, bytes)| {
+            adapter
+                .storage
+                .add_module_bytes(module_id.address(), module_id.name(), bytes);
+        });
 
         let mut addr_to_name_mapping = BTreeMap::new();
         for (name, addr) in move_stdlib_named_addresses() {
@@ -241,6 +246,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             compat,
             &module_storage,
             vec![module_bytes.into()],
+            &NoOpTraversalContext,
         )
         .map_err(|err| {
             anyhow!(
