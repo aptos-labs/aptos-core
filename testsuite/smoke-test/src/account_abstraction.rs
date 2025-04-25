@@ -91,9 +91,10 @@ async fn test_domain_aa() {
             let function_name = "0x1::aptos_account::create_account";
             let digest = format!("0x{}", hex::encode(x));
             let message = format!(
-                "{} wants you to sign in with your Solana account:\n{}\n\nTo execute transaction {} on Aptos blockchain (local).\n\nNonce: {}",
+                "{} wants you to sign in with your Solana account:\n{}\n\nPlease confirm you explicitly initiated this request from {}. You are approving to execute transaction {} on Aptos blockchain (local).\n\nNonce: {}",
                 domain,
                 base58_public_key,
+                domain,
                 function_name,
                 digest
             );

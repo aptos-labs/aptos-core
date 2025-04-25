@@ -100,7 +100,7 @@ impl ExpChecker for NonminimalBool {
             },
             Not => match args[0].as_ref() {
                 ExpValue(_, Bool(b)) => {
-                    Some(format!("The inner expression evaluates to `{}`. Recall that the expression `! {}` is logically equivalent to `{}`. Consider simplifying.", b, b, !b))
+                    Some(format!("This expression evaluates to `{}`. Recall that the expression `!{}` is logically equivalent to `{}`. Consider simplifying.", !b, b, !b))
                 },
                 _ => None,
             },
