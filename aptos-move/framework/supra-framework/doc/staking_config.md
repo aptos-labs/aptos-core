@@ -789,7 +789,7 @@ Can only be called as part of the Supra governance proposal process established 
 ## Function `update_recurring_lockup_duration_secs`
 
 Update the recurring lockup duration.
-Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_recurring_lockup_duration_secs">update_recurring_lockup_duration_secs</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_recurring_lockup_duration_secs: u64)
@@ -825,7 +825,7 @@ Can only be called as part of the Supra governance proposal process established 
 
 DEPRECATING
 Update the rewards rate.
-Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_rewards_rate">update_rewards_rate</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_rewards_rate: u64, new_rewards_rate_denominator: u64)
@@ -960,7 +960,7 @@ Can only be called as part of the Supra governance proposal process established 
 ## Function `update_voting_power_increase_limit`
 
 Update the joining limit %.
-Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_voting_power_increase_limit">update_voting_power_increase_limit</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_voting_power_increase_limit: u64)

@@ -64,7 +64,7 @@ module supra_framework::supra_coin {
         exists<MintCapStore>(signer::address_of(account))
     }
 
-    /// Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
+    /// Only called during genesis to destroy the supra framework account's mint capability once all initial validators
     /// and accounts have been initialized during genesis.
     public(friend) fun destroy_mint_cap(supra_framework: &signer) acquires MintCapStore {
         system_addresses::assert_supra_framework(supra_framework);
@@ -72,7 +72,7 @@ module supra_framework::supra_coin {
         coin::destroy_mint_cap(mint_cap);
     }
 
-    /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
+    /// Can only be called during genesis for tests to grant mint capability to supra framework and core resources
     /// accounts.
     /// Expects account and SUPRA store to be registered before calling.
     public(friend) fun configure_accounts_for_test(

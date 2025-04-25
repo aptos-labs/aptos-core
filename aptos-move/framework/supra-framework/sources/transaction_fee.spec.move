@@ -84,7 +84,7 @@ spec supra_framework::transaction_fee {
         aborts_if !system_addresses::is_supra_framework_address(aptos_addr);
         aborts_if exists<ValidatorFees>(aptos_addr);
 
-        include system_addresses::AbortsIfNotAptosFramework { account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework { account: supra_framework };
         include aggregator_factory::CreateAggregatorInternalAbortsIf;
         aborts_if exists<CollectedFeesPerBlock>(aptos_addr);
 

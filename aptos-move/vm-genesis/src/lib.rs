@@ -34,6 +34,7 @@ use aptos_types::{
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
+        OnChainEvmConfig,
         APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
@@ -156,6 +157,8 @@ pub fn encode_supra_mainnet_genesis_transaction(
     let consensus_config = OnChainConsensusConfig::default_for_genesis();
     let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
+    // Derive the EVM config from the chain ID.
+    let evm_config = OnChainEvmConfig::new_v1(chain_id);
     initialize(
         &mut session,
         chain_id,
@@ -164,6 +167,7 @@ pub fn encode_supra_mainnet_genesis_transaction(
         &execution_config,
         &gas_schedule,
         supra_config_bytes,
+        &evm_config,
     );
     initialize_features(
         &mut session,
@@ -290,7 +294,8 @@ pub fn encode_genesis_change_set_for_testnet(
     supra_config_bytes: Vec<u8>,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
-
+    // Derive the EVM config from the chain ID. 
+    let evm_config = OnChainEvmConfig::new_v1(chain_id);
     // Create a Move VM session so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
@@ -310,6 +315,7 @@ pub fn encode_genesis_change_set_for_testnet(
         execution_config,
         gas_schedule,
         supra_config_bytes,
+        &evm_config,
     );
     initialize_features(
         &mut session,
@@ -485,6 +491,7 @@ fn initialize(
     execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
     supra_config_bytes: Vec<u8>,
+    evm_config: &OnChainEvmConfig,
 ) {
     let gas_schedule_blob =
         bcs::to_bytes(gas_schedule).expect("Failure serializing genesis gas schedule");
@@ -495,6 +502,7 @@ fn initialize(
     let execution_config_bytes =
         bcs::to_bytes(execution_config).expect("Failure serializing genesis consensus config");
 
+    let evm_config_bytes = bcs::to_bytes(evm_config).expect("Failure serializing genesis evm config");
     // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
     // denominator).
     let rewards_rate_denominator = 1_000_000_000;
@@ -528,6 +536,7 @@ fn initialize(
             MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.voting_power_increase_limit),
             MoveValue::U64(genesis_config.genesis_timestamp_in_microseconds),
+            MoveValue::vector_u8(evm_config_bytes),
         ]),
     );
 }

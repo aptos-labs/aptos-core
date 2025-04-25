@@ -4150,7 +4150,7 @@ Can only be updated by <code>@supra_framework</code>.
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> { <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a> { <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">aggregator_factory::CreateAggregatorInternalAbortsIf</a>;
 </code></pre>
 

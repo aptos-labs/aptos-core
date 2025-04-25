@@ -123,7 +123,7 @@ module supra_framework::block {
     }
 
     /// Update the epoch interval.
-    /// Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+    /// Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
     public fun update_epoch_interval_microsecs(
         supra_framework: &signer,
         new_epoch_interval: u64,

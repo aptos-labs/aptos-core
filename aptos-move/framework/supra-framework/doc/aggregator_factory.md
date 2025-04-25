@@ -217,7 +217,7 @@ Returns a new aggregator.
 <td>2</td>
 <td>To create a new aggregator instance, the aggregator factory must already be initialized and exist under the Supra account.</td>
 <td>High</td>
-<td>The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos account.</td>
+<td>The create_aggregator_internal function asserts that AggregatorFactory exists for the Supra account.</td>
 <td>Formally verified via <a href="#high-level-req-2">CreateAggregatorInternalAbortsIf</a>.</td>
 </tr>
 

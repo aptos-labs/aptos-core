@@ -440,7 +440,7 @@ module aptos_std::multi_ed25519 {
             assert!(option::extract(&mut unvalidated_public_key_threshold(&upk)) == threshold, 4);
             assert!(unvalidated_public_key_num_sub_pks(&upk) == group_size, 5);
 
-            let msg1 = b"Hello Aptos!";
+            let msg1 = b"Hello Supra!";
             let sig1 = sign_arbitrary_bytes(&sk, msg1);
             assert!(signature_verify_strict(&sig1, &upk, msg1), 6);
 
@@ -466,7 +466,7 @@ module aptos_std::multi_ed25519 {
         assert!(option::extract(&mut unvalidated_public_key_threshold(&upk)) == 4, 4);
         assert!(unvalidated_public_key_num_sub_pks(&upk) == 5, 5);
 
-        let msg1 = b"Hello Aptos!";
+        let msg1 = b"Hello Supra!";
         let sig1 = sign_arbitrary_bytes(&sk, msg1);
         maul_first_signature(&mut sig1);
         assert!(!signature_verify_strict(&sig1, &upk, msg1), 6);

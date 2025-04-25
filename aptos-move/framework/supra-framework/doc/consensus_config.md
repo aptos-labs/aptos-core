@@ -279,7 +279,7 @@ Only used in reconfigurations to apply the pending <code><a href="consensus_conf
 
 <tr>
 <td>2</td>
-<td>Only aptos framework account is allowed to update the consensus configuration.</td>
+<td>Only supra framework account is allowed to update the consensus configuration.</td>
 <td>Medium</td>
 <td>The consensus_config::set function ensures that the signer is supra_framework.</td>
 <td>Formally verified via <a href="#high-level-req-2">set</a>.</td>

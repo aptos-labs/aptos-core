@@ -580,7 +580,7 @@ spec supra_framework::coin {
     }
 
     spec initialize_aggregatable_coin<CoinType>(supra_framework: &signer): AggregatableCoin<CoinType> {
-        include system_addresses::AbortsIfNotAptosFramework { account: supra_framework };
+        include system_addresses::AbortsIfNotSupraFramework { account: supra_framework };
         include aggregator_factory::CreateAggregatorInternalAbortsIf;
     }
 

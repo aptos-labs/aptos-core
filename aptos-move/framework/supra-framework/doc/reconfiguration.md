@@ -621,10 +621,10 @@ reconfiguration event.
 Make sure the signer address is @supra_framework.
 
 
-<a id="0x1_reconfiguration_AbortsIfNotAptosFramework"></a>
+<a id="0x1_reconfiguration_AbortsIfNotSupraFramework"></a>
 
 
-<pre><code><b>schema</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a> {
+<pre><code><b>schema</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotSupraFramework">AbortsIfNotSupraFramework</a> {
     supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
     <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(addr);
@@ -647,7 +647,7 @@ Already exists in framework account.
 Guid_creation_num should be 2 according to logic.
 
 
-<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotSupraFramework">AbortsIfNotSupraFramework</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
 <b>let</b> <b>post</b> config = <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@supra_framework);
 <b>requires</b> <b>exists</b>&lt;Account&gt;(addr);
@@ -680,7 +680,7 @@ Guid_creation_num should be 2 according to logic.
 
 
 
-<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotSupraFramework">AbortsIfNotSupraFramework</a>;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@supra_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@supra_framework);
 </code></pre>
@@ -699,7 +699,7 @@ Guid_creation_num should be 2 according to logic.
 Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
-<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotSupraFramework">AbortsIfNotSupraFramework</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@supra_framework);
 <b>ensures</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@supra_framework);
 </code></pre>

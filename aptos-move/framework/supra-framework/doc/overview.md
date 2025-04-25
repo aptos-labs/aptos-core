@@ -29,6 +29,7 @@ This is the reference documentation of the Supra framework.
 -  [`0x1::dispatchable_fungible_asset`](dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset)
 -  [`0x1::dkg`](dkg.md#0x1_dkg)
 -  [`0x1::event`](event.md#0x1_event)
+-  [`0x1::evm_config`](evm_config.md#0x1_evm_config)
 -  [`0x1::execution_config`](execution_config.md#0x1_execution_config)
 -  [`0x1::function_info`](function_info.md#0x1_function_info)
 -  [`0x1::fungible_asset`](fungible_asset.md#0x1_fungible_asset)

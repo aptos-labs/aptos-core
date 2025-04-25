@@ -418,7 +418,7 @@ fn bls12381_sample_signature() {
     let sk = keypair.private_key;
     let pk = keypair.public_key;
 
-    let message = b"Hello Aptos!";
+    let message = b"Hello Supra!";
     let signature = sk.sign_arbitrary_message(message);
 
     println!("SK:        {}", hex::encode(sk.to_bytes()));

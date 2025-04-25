@@ -174,7 +174,7 @@ module supra_framework::account {
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
 
     #[test_only]
-    /// Create signer for testing, independently of an Aptos-style `Account`.
+    /// Create signer for testing, independently of an Supra-style `Account`.
     public fun create_signer_for_test(addr: address): signer { create_signer(addr) }
 
     /// Only called during genesis to initialize system resources for this module.

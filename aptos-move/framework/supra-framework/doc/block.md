@@ -487,7 +487,7 @@ Initialize the commit history resource if it's not in genesis.
 ## Function `update_epoch_interval_microsecs`
 
 Update the epoch interval.
-Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_update_epoch_interval_microsecs">update_epoch_interval_microsecs</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_epoch_interval: u64)
@@ -940,7 +940,7 @@ new block event for WriteSetPayload.
 
 <tr>
 <td>1</td>
-<td>During the module's initialization, it guarantees that the BlockResource resource moves under the Aptos framework account with initial values.</td>
+<td>During the module's initialization, it guarantees that the BlockResource resource moves under the Supra framework account with initial values.</td>
 <td>High</td>
 <td>The initialize function is responsible for setting up the initial state of the module, ensuring that the following conditions are met (1) the BlockResource resource is created, indicating its existence within the module's context, and moved under the Supra framework account, (2) the block height is set to zero during initialization, and (3) the epoch interval is greater than zero.</td>
 <td>Formally Verified via <a href="#high-level-req-1">Initialize</a>.</td>

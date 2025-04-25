@@ -455,7 +455,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <td>2</td>
 <td>Only the Supra framework account should be allowed to update the gas schedule resource.</td>
 <td>Critical</td>
-<td>The gas_schedule::set_gas_schedule function calls the assert_supra_framework function to ensure that the signer is the aptos framework account.</td>
+<td>The gas_schedule::set_gas_schedule function calls the assert_supra_framework function to ensure that the signer is the supra framework account.</td>
 <td>Formally verified via <a href="#high-level-req-2">set_gas_schedule</a>.</td>
 </tr>
 
@@ -504,7 +504,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
 // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 // This enforces <a id="high-level-req-3.3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> len(gas_schedule_blob) == 0;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(addr);
@@ -531,7 +531,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 // This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> len(gas_schedule_blob) == 0;
 <b>let</b> new_gas_schedule = <a href="util.md#0x1_util_spec_from_bytes">util::spec_from_bytes</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(gas_schedule_blob);
@@ -555,7 +555,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a> {
     <a href="account.md#0x1_account">account</a>: supra_framework,
     config: gas_schedule_blob
@@ -578,7 +578,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a> {
     <a href="account.md#0x1_account">account</a>: supra_framework,
     config: new_gas_schedule_blob
@@ -623,7 +623,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <pre><code><b>pragma</b> verify_duration_estimate = 600;
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@supra_framework);
 <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(@supra_framework);
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;StorageGasConfig&gt;(@supra_framework);
@@ -633,7 +633,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>&gt;(@supra_framework);
 </code></pre>
 
@@ -650,7 +650,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotSupraFramework">system_addresses::AbortsIfNotSupraFramework</a>{ <a href="account.md#0x1_account">account</a>: supra_framework };
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>&gt;(@supra_framework);
 </code></pre>
 

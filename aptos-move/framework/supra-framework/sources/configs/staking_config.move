@@ -304,7 +304,7 @@ module supra_framework::staking_config {
     }
 
     /// Update the recurring lockup duration.
-    /// Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+    /// Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
     public fun update_recurring_lockup_duration_secs(
         supra_framework: &signer, new_recurring_lockup_duration_secs: u64
     ) acquires StakingConfig {
@@ -320,7 +320,7 @@ module supra_framework::staking_config {
 
     /// DEPRECATING
     /// Update the rewards rate.
-    /// Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+    /// Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
     public fun update_rewards_rate(
         supra_framework: &signer,
         new_rewards_rate: u64,
@@ -395,7 +395,7 @@ module supra_framework::staking_config {
     }
 
     /// Update the joining limit %.
-    /// Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
+    /// Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
     public fun update_voting_power_increase_limit(
         supra_framework: &signer, new_voting_power_increase_limit: u64
     ) acquires StakingConfig {

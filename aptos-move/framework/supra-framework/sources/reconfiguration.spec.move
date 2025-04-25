@@ -53,7 +53,7 @@ spec supra_framework::reconfiguration {
     }
 
     /// Make sure the signer address is @supra_framework.
-    spec schema AbortsIfNotAptosFramework {
+    spec schema AbortsIfNotSupraFramework {
         supra_framework: &signer;
 
         let addr = signer::address_of(supra_framework);
@@ -68,14 +68,14 @@ spec supra_framework::reconfiguration {
         use supra_framework::account::{Account};
         use supra_framework::guid;
 
-        include AbortsIfNotAptosFramework;
+        include AbortsIfNotSupraFramework;
         let addr = signer::address_of(supra_framework);
         let post config = global<Configuration>(@supra_framework);
         requires exists<Account>(addr);
         aborts_if !(global<Account>(addr).guid_creation_num == 2);
         aborts_if exists<Configuration>(@supra_framework);
         // property 1: During the module's initialization, it guarantees that the Configuration resource will move under
-        // the Aptos framework account with initial values.
+        // the Supra framework account with initial values.
         /// [high-level-req-1]
         ensures exists<Configuration>(@supra_framework);
         ensures config.epoch == 0 && config.last_reconfiguration_time == 0;
@@ -96,7 +96,7 @@ spec supra_framework::reconfiguration {
     }
 
     spec disable_reconfiguration(supra_framework: &signer) {
-        include AbortsIfNotAptosFramework;
+        include AbortsIfNotSupraFramework;
         aborts_if exists<DisableReconfiguration>(@supra_framework);
         ensures exists<DisableReconfiguration>(@supra_framework);
     }
@@ -104,7 +104,7 @@ spec supra_framework::reconfiguration {
     /// Make sure the caller is admin and check the resource DisableReconfiguration.
     spec enable_reconfiguration(supra_framework: &signer) {
         use supra_framework::reconfiguration::{DisableReconfiguration};
-        include AbortsIfNotAptosFramework;
+        include AbortsIfNotSupraFramework;
         aborts_if !exists<DisableReconfiguration>(@supra_framework);
         ensures !exists<DisableReconfiguration>(@supra_framework);
     }

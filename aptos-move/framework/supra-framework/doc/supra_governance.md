@@ -9,7 +9,7 @@ current epoch's voting power of the proposer or voter's backing stake pool. In a
 the stake pool's lockup needs to be at least as long as the proposal's duration.
 
 It provides the following flow:
-1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
+1. Proposers can create a proposal by calling SupraGovernance::create_proposal. The proposer's backing stake pool
 needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
 track proposal creation and proposal ids.
 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
@@ -685,7 +685,7 @@ This function is private because it's called directly from the vm.
 ## Function `update_supra_governance_config`
 
 Update the governance configurations. This can only be called as part of resolving a proposal in this same
-AptosGovernance.
+SupraGovernance.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_update_supra_governance_config">update_supra_governance_config</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, voting_duration_secs: u64, min_voting_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)

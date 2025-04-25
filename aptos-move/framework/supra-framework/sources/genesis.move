@@ -14,8 +14,10 @@ module supra_framework::genesis {
     use supra_framework::chain_status;
     use supra_framework::coin;
     use supra_framework::consensus_config;
-    use supra_framework::create_signer::create_signer;
     use supra_framework::execution_config;
+    use supra_framework::supra_config;
+    use supra_framework::evm_config;
+    use supra_framework::create_signer::create_signer;
     use supra_framework::gas_schedule;
     use supra_framework::multisig_account;
     use supra_framework::pbo_delegation_pool;
@@ -27,7 +29,6 @@ module supra_framework::genesis {
     use supra_framework::storage_gas;
     use supra_framework::supra_account;
     use supra_framework::supra_coin::{Self, SupraCoin};
-    use supra_framework::supra_config;
     use supra_framework::supra_governance;
     use supra_framework::timestamp;
     use supra_framework::transaction_fee;
@@ -123,7 +124,7 @@ module supra_framework::genesis {
         unlock_period_duration: u64,
     }
 
-    /// Genesis step 1: Initialize aptos framework account and core modules on chain.
+    /// Genesis step 1: Initialize supra framework account and core modules on chain.
     fun initialize(
         gas_schedule: vector<u8>,
         chain_id: u8,
@@ -140,14 +141,15 @@ module supra_framework::genesis {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
         genesis_timestamp_in_microseconds: u64,
+        evm_config: vector<u8>,
     ) {
-        // Initialize the aptos framework account. This is the account where system resources and modules will be
+        // Initialize the supra framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
         let (supra_framework_account, supra_framework_signer_cap) = account::create_framework_reserved_account(
             @supra_framework
         );
-        // Initialize account configs on aptos framework account.
+        // Initialize account configs on supra framework account.
         account::initialize(&supra_framework_account);
 
         transaction_validation::initialize(
@@ -161,7 +163,7 @@ module supra_framework::genesis {
         // Give the decentralized on-chain governance control over the core framework account.
         supra_governance::store_signer_cap(&supra_framework_account, @supra_framework, supra_framework_signer_cap);
 
-        // put reserved framework reserved accounts under aptos governance
+        // put reserved framework reserved accounts under supra governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         while (!vector::is_empty(&framework_reserved_addresses)) {
             let address = vector::pop_back<address>(&mut framework_reserved_addresses);
@@ -196,6 +198,7 @@ module supra_framework::genesis {
         block::initialize(&supra_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&supra_framework_account);
         timestamp::set_time_has_started(&supra_framework_account, genesis_timestamp_in_microseconds);
+        evm_config::initialize(&supra_framework_account, evm_config);
     }
 
     /// Genesis step 2: Initialize Supra coin.
@@ -597,6 +600,7 @@ module supra_framework::genesis {
         );
     }
 
+
     fun create_vesting_without_staking_pools(
         vesting_pool_map: vector<VestingPoolsMap>
     ) {
@@ -698,6 +702,7 @@ module supra_framework::genesis {
         consensus_config: vector<u8>,
         execution_config: vector<u8>,
         supra_config: vector<u8>,
+        evm_config: vector<u8>,
         epoch_interval_microsecs: u64,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -734,6 +739,8 @@ module supra_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit,
             0,
+            evm_config,
+
         );
         features::change_feature_flags_for_verification(supra_framework, vector[1, 2, 11], vector[]);
         initialize_supra_coin(supra_framework);
@@ -772,6 +779,7 @@ module supra_framework::genesis {
             1,
             30,
             0,
+            x"15",
         )
     }
 

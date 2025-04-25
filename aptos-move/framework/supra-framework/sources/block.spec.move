@@ -2,7 +2,7 @@ spec supra_framework::block {
     /// <high-level-req>
     /// No.: 1
     /// Requirement: During the module's initialization, it guarantees that the BlockResource resource moves under the
-    /// Aptos framework account with initial values.
+    /// Supra framework account with initial values.
     /// Criticality: High
     /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
     /// that the following conditions are met (1) the BlockResource resource is created, indicating its existence within
