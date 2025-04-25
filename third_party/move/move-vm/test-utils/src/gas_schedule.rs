@@ -30,7 +30,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 use once_cell::sync::Lazy;
@@ -198,7 +198,7 @@ impl GasStatus {
 impl DependencyGasMeter for GasStatus {
     fn charge_dependency(
         &mut self,
-        _is_new: bool,
+        _kind: DependencyKind,
         _addr: &AccountAddress,
         _name: &IdentStr,
         _size: NumBytes,

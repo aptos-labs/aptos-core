@@ -33,7 +33,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter},
+    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
     loaded_data::runtime_types::{StructType, Type},
     natives::function::NativeResult,
     resolver::ResourceResolver,
