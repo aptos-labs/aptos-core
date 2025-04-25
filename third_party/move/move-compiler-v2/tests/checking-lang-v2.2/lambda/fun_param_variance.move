@@ -10,3 +10,14 @@ module 0x66::xx {
         apply(func);
     }
 }
+
+module 0x66::yy {
+    fun apply(f: |&mut u64|&u64) {
+        f(&mut 0);
+    }
+
+    fun test() {
+        let func: |&mut u64|&mut u64 = |x| { x };
+        apply(func);
+    }
+}

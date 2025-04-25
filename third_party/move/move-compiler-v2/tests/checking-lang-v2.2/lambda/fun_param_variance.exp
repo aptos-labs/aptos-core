@@ -5,3 +5,9 @@ error: expected function type has argument of type `&u64` but `&mut u64` was pro
    │
 10 │         apply(func);
    │               ^^^^
+
+error: cannot pass `|&mut u64|&mut u64` to a function which expects argument of type `|&mut u64|&u64` (mutability mismatch)
+   ┌─ tests/checking-lang-v2.2/lambda/fun_param_variance.move:21:15
+   │
+21 │         apply(func);
+   │               ^^^^
