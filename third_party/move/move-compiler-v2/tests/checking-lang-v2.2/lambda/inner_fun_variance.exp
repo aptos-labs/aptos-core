@@ -5,3 +5,9 @@ error: cannot pass `&vector<|u64|u64 with drop>` to a function which expects arg
   │
 8 │         zzz(&b);
   │             ^^
+
+error: cannot pass `vector<|&u64| with copy + drop>` to a function which expects argument of type `vector<|&mut u64| with copy + drop>` (mutability mismatch)
+   ┌─ tests/checking-lang-v2.2/lambda/inner_fun_variance.move:22:15
+   │
+22 │         apply(vector[func]);
+   │               ^^^^^^
