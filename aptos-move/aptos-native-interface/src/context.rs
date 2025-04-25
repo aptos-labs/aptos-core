@@ -10,7 +10,7 @@ use aptos_gas_schedule::{
     NativeGasParameters,
 };
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::{PartialVMResult, VMResult};
+use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
     gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
 };
@@ -215,16 +215,37 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
         Ok(())
     }
 
+    /// Loads a function definition corresponding to the given name. The module where the function
+    /// is defined must have been visited and metered (an error is returned otherwise).
     pub fn load_function(
         &mut self,
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.inner.module_storage().fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
+        // INVARIANT:
+        //   There is no need to meter module loading due to function access. This is because this
+        //   function is only called for native dynamic dispatch, which pre-charges gas before the
+        //   dispatch logic:
+        //      1. Native function to load & charge modules is called.
+        //      2. Native is called to dispatch, which calls this function from native context.
+        //   Currently, native implementations in step (2) check if the module loading was metered,
+        //   but we still keep an invariant check here in case there is a mistake and the gas is
+        //   not charged.
+        if self.features.is_lazy_loading_enabled() {
+            self.inner
+                .traversal_context()
+                .check_is_special_or_visited(module_id.address(), module_id.name())
+                .map_err(|err| err.finish(Location::Undefined))?;
+        }
+
+        let (_, function) = self
+            .inner
+            .module_storage()
+            .unmetered_get_function_definition(
+                module_id.address(),
+                module_id.name(),
+                function_name,
+            )?;
         Ok(function)
     }
 }
