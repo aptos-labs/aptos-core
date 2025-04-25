@@ -489,7 +489,6 @@ pub struct UserTransactionRequestInner {
 
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
-
         if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
             if self.expiration_timestamp_secs.0 <= now.as_secs() {
                 bail!(
