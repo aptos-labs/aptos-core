@@ -6,8 +6,7 @@ use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_layout_converter::LayoutConverter,
-    Loader, ModuleStorage,
+    storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -276,10 +275,15 @@ impl LazyLoadedFunction {
 
     /// If the function hasn't been resolved (loaded) yet, loads it. The gas is also charged for
     /// function loading and any other module accesses.
-    pub(crate) fn as_resolved(
+    pub(crate) fn as_resolved<LoaderImpl>(
         &self,
-        module_storage: &impl ModuleStorage,
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
+        loader: &LoaderImpl,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+    ) -> PartialVMResult<Rc<LoadedFunction>>
+    where
+        LoaderImpl: Loader,
+    {
         let mut state = self.state.borrow_mut();
         Ok(match &mut *state {
             LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
@@ -294,11 +298,13 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun = module_storage
-                    .load_function(module_id, fun_id, ty_args)
-                    .map(Rc::new)
-                    .map_err(|err| err.to_partial())?;
-
+                let fun = loader.load_closure(
+                    gas_meter,
+                    traversal_context,
+                    module_id,
+                    fun_id,
+                    ty_args,
+                )?;
                 *state = LazyLoadedFunctionState::Resolved {
                     fun: fun.clone(),
                     ty_args: mem::take(ty_args),

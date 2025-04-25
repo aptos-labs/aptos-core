@@ -44,7 +44,11 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
-    loader::{eager::EagerLoader, lazy::LazyLoader, traits::Loader},
+    loader::{
+        eager::EagerLoader,
+        lazy::LazyLoader,
+        traits::{InstantiatedFunctionLoader, LegacyLoaderConfig, Loader},
+    },
     module_storage::{
         ambassador_impl_ModuleStorage, AsFunctionValueExtension, FunctionValueExtensionAdapter,
         ModuleStorage,
