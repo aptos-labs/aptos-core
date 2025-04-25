@@ -149,7 +149,7 @@ mod test {
     }
 
     impl ModuleStorage for MockModuleStorage {
-        fn check_module_exists(
+        fn unmetered_check_module_exists(
             &self,
             _address: &AccountAddress,
             _module_name: &IdentStr,
@@ -157,7 +157,7 @@ mod test {
             unreachable!("Irrelevant for tests")
         }
 
-        fn fetch_module_bytes(
+        fn unmetered_get_module_bytes(
             &self,
             _address: &AccountAddress,
             _module_name: &IdentStr,
@@ -181,7 +181,7 @@ mod test {
             Ok(Some(vec![]))
         }
 
-        fn fetch_deserialized_module(
+        fn unmetered_get_deserialized_module(
             &self,
             _address: &AccountAddress,
             _module_name: &IdentStr,

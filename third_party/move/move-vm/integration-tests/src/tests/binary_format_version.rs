@@ -13,6 +13,7 @@ use move_vm_runtime::{
     config::VMConfig, AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::NoOpTraversalContext;
 
 fn initialize_storage_with_binary_format_version(binary_format_version: u32) -> InMemoryStorage {
     let vm_config = VMConfig {
@@ -42,14 +43,19 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let storage = initialize_storage_with_binary_format_version(new_version);
         let module_storage = storage.as_unsync_module_storage();
 
-        let new_module_storage =
-            StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
-                .clone()
-                .into()])
-            .expect("New module should be publishable");
-        StagingModuleStorage::create(m.self_addr(), &new_module_storage, vec![b_old
-            .clone()
-            .into()])
+        let new_module_storage = StagingModuleStorage::create(
+            m.self_addr(),
+            &module_storage,
+            vec![b_new.clone().into()],
+            &NoOpTraversalContext,
+        )
+        .expect("New module should be publishable");
+        StagingModuleStorage::create(
+            m.self_addr(),
+            &new_module_storage,
+            vec![b_old.clone().into()],
+            &NoOpTraversalContext,
+        )
         .expect("Old module should be publishable");
     }
 
@@ -58,16 +64,24 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let storage = initialize_storage_with_binary_format_version(old_version);
         let module_storage = storage.as_unsync_module_storage();
 
-        let result_new = StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_new
-            .clone()
-            .into()]);
+        let result_new = StagingModuleStorage::create(
+            m.self_addr(),
+            &module_storage,
+            vec![b_new.clone().into()],
+            &NoOpTraversalContext,
+        );
         if let Err(err) = result_new {
             assert_eq!(err.major_status(), StatusCode::UNKNOWN_VERSION);
         } else {
             panic!("New module should not be publishable")
         }
-        StagingModuleStorage::create(m.self_addr(), &module_storage, vec![b_old.clone().into()])
-            .expect("Old module should be publishable");
+        StagingModuleStorage::create(
+            m.self_addr(),
+            &module_storage,
+            vec![b_old.clone().into()],
+            &NoOpTraversalContext,
+        )
+        .expect("Old module should be publishable");
     }
 }
 
