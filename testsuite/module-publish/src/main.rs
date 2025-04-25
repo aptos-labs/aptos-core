@@ -22,6 +22,10 @@ fn additional_packages() -> Vec<(&'static str, &'static str)> {
     vec![
         ("simple", "src/packages/simple"),
         ("framework_usecases", "src/packages/framework_usecases"),
+        (
+            "experimental_usecases",
+            "src/packages/experimental_usecases",
+        ),
         ("complex", "src/packages/complex"),
         (
             "ambassador_token",
