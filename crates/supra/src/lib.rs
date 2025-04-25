@@ -1,12 +1,30 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
 // Copyright © Entropy Foundation
 
 use anyhow::Result;
-use async_trait::async_trait;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::TransactionPayload;
+use async_trait::async_trait;
+use clap::ValueEnum;
+use std::fmt::{Display, Formatter};
+
+/// RPC api versions maintained by this module.
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Default, ValueEnum)]
+pub enum ApiVersion {
+    V1,
+    V2,
+    #[default]
+    V3,
+}
+
+impl Display for ApiVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApiVersion::V1 => write!(f, "v1"),
+            ApiVersion::V2 => write!(f, "v2"),
+            ApiVersion::V3 => write!(f, "v3"),
+        }
+    }
+}
 
 pub struct ProfileOptions {
     /// Profile to use from the CLI config
@@ -22,7 +40,7 @@ pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to the URL in the `default` profile
-    pub url: Option<reqwest::Url>,
+    pub rpc_url: Option<reqwest::Url>,
 
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
     pub connection_timeout_secs: u64,
@@ -31,6 +49,7 @@ pub struct RestOptions {
     /// as `Authorization: Bearer <key>`. You may also set this with the NODE_API_KEY
     /// environment variable.
     pub node_api_key: Option<String>,
+    pub api_version: ApiVersion,
 }
 
 pub struct GasOptions {
@@ -74,13 +93,11 @@ pub struct SupraCommandArguments {
     pub profile_options: ProfileOptions,
     pub rest_options: RestOptions,
     pub gas_options: GasOptions,
-
 }
 
 /// Trait required by supra cli for its operation.
 #[async_trait]
 pub trait SupraCommand {
-
     /// consume self and returns [SupraCommandArguments]
     async fn supra_command_arguments(self) -> Result<SupraCommandArguments>;
 }

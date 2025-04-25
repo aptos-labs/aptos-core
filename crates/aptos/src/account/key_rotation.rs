@@ -230,7 +230,7 @@ impl CliCommand<RotateSummary> for RotateKey {
             ..self.txn_options.profile_options.profile()?
         };
 
-        if let Some(url) = self.txn_options.rest_options.url {
+        if let Some(url) = self.txn_options.rest_options.rpc_url {
             profile_config.rest_url = Some(url.into());
         }
 

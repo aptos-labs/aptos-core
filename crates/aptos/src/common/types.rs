@@ -69,6 +69,7 @@ use std::{
 };
 use thiserror::Error;
 use aptos_crypto::hash::HashValueParseError;
+use supra_aptos::ApiVersion;
 
 pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
 const US_IN_SECS: u64 = 1_000_000;
@@ -977,7 +978,7 @@ pub struct RestOptions {
     ///
     /// Defaults to the URL in the `default` profile
     #[clap(long)]
-    pub(crate) url: Option<reqwest::Url>,
+    pub(crate) rpc_url: Option<reqwest::Url>,
 
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
     #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS, alias = "connection-timeout-s")]
@@ -988,20 +989,23 @@ pub struct RestOptions {
     /// environment variable.
     #[clap(long, env)]
     pub node_api_key: Option<String>,
+    #[clap(long, default_value_t = ApiVersion::V3)]
+    pub(crate) api_version: ApiVersion,
 }
 
 impl RestOptions {
     pub fn new(url: Option<reqwest::Url>, connection_timeout_secs: Option<u64>) -> Self {
         RestOptions {
-            url,
+            rpc_url: url,
             connection_timeout_secs: connection_timeout_secs.unwrap_or(DEFAULT_EXPIRATION_SECS),
             node_api_key: None,
+            api_version: ApiVersion::default(),
         }
     }
 
     /// Retrieve the URL from the profile or the command line
     pub fn url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
-        if let Some(ref url) = self.url {
+        if let Some(ref url) = self.rpc_url {
             Ok(url.clone())
         } else if let Some(Some(url)) = CliConfig::load_profile(
             profile.profile_name(),

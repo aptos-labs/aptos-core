@@ -14808,6 +14808,7 @@ dependencies = [
  "anyhow",
  "aptos-types",
  "async-trait",
+ "clap 4.4.14",
  "reqwest",
 ]
 

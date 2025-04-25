@@ -1,5 +1,4 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright © Entropy Foundation
 
 use crate::common::types::{GasOptions, ProfileOptions, RestOptions};
 
@@ -12,9 +11,10 @@ impl From<ProfileOptions> for supra_aptos::ProfileOptions {
 impl From<RestOptions> for supra_aptos::RestOptions {
     fn from(value: RestOptions) -> Self {
         Self {
-            url: value.url,
+            rpc_url: value.rpc_url,
             connection_timeout_secs: value.connection_timeout_secs,
             node_api_key: value.node_api_key,
+            api_version: value.api_version,
         }
     }
 }

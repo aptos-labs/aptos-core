@@ -13,4 +13,5 @@ rust-version.workspace = true
 aptos-types = { workspace = true }
 reqwest = { workspace = true }
 anyhow = { workspace = true }
-async-trait= { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
