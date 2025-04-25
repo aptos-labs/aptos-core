@@ -10,7 +10,7 @@ SIWS.
 <domain> wants you to sign in with your Solana account:
 <base58_public_key>
 
-To execute transaction <entry_function_name> on Aptos blockchain (<network_name>).
+Please confirm you explicitly initiated this request from <domain>. You are approving to execute transaction <entry_function_name> on Aptos blockchain (<network_name>).
 
 Nonce: <aptos_txn_digest>
 
@@ -18,6 +18,9 @@ Nonce: <aptos_txn_digest>
 3. The abstract signature is a BCS serialized <code><a href="solana_derivable_account.md#0x1_solana_derivable_account_SIWSAbstractSignature">SIWSAbstractSignature</a></code>.
 4. This module has been tested for the following wallets:
 - Phantom
+- Solflare
+- Backpack
+- OKX
 
 
 -  [Enum `SIWSAbstractSignature`](#0x1_solana_derivable_account_SIWSAbstractSignature)
@@ -307,7 +310,10 @@ Returns a tuple of the signature type and the signature.
     message.append(*domain);
     message.append(b" wants you <b>to</b> sign in <b>with</b> your Solana <a href="account.md#0x1_account">account</a>:\n");
     message.append(*base58_public_key);
-    message.append(b"\n\nTo execute transaction ");
+    message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
+    message.append(*domain);
+    message.append(b".");
+    message.append(b" You are approving <b>to</b> execute transaction ");
     message.append(*entry_function_name);
     message.append(b" on Aptos blockchain");
     <b>let</b> network_name = <a href="solana_derivable_account.md#0x1_solana_derivable_account_network_name">network_name</a>();

@@ -374,6 +374,10 @@ impl Features {
         self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
     pub fn is_native_memory_operations_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
     }
