@@ -29,7 +29,6 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
-    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -343,7 +342,7 @@ impl BlockStore {
         self.execution_client
             .finalize_order(
                 &blocks_to_commit,
-                finality_proof.ledger_info().clone(),
+                finality_proof.clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<PipelinedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
@@ -486,17 +485,21 @@ impl BlockStore {
             let id = pipelined_block.id();
             let round = pipelined_block.round();
             let window_size = self.window_size;
-            let callback = Box::new(move |commit_decision: LedgerInfoWithSignatures| {
-                if let Some(tree) = block_tree.upgrade() {
-                    tree.write().commit_callback(
-                        storage,
-                        id,
-                        round,
-                        WrappedLedgerInfo::new(VoteData::dummy(), commit_decision),
-                        window_size,
-                    );
-                }
-            });
+            let callback = Box::new(
+                move |finality_proof: WrappedLedgerInfo,
+                      commit_decision: LedgerInfoWithSignatures| {
+                    if let Some(tree) = block_tree.upgrade() {
+                        tree.write().commit_callback(
+                            storage,
+                            id,
+                            round,
+                            finality_proof,
+                            commit_decision,
+                            window_size,
+                        );
+                    }
+                },
+            );
             pipeline_builder.build(
                 &pipelined_block,
                 parent_block.pipeline_futs().ok_or_else(|| {
@@ -898,7 +901,8 @@ impl BlockStore {
             self.storage.clone(),
             block_id,
             block_round,
-            commit_proof,
+            commit_proof.clone(),
+            commit_proof.ledger_info().clone(),
             window_size.or(self.window_size),
         )
     }

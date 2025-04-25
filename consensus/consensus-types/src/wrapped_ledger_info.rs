@@ -55,7 +55,9 @@ impl WrappedLedgerInfo {
         let vote_hash = self.vote_data.hash();
         ensure!(
             self.ledger_info().ledger_info().consensus_data_hash() == vote_hash,
-            "WrappedLedgerInfo's vote data hash mismatch LedgerInfo"
+            "WrappedLedgerInfo's vote data hash mismatch LedgerInfo, {} {}",
+            self.ledger_info(),
+            self.vote_data
         );
         Ok(())
     }
