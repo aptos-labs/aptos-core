@@ -37,7 +37,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -54,7 +54,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -62,6 +62,8 @@ jobs:
           path: aptos-cli-*.zip
 
   # Generic linux should be the older version, more likely compatible
+  # This actually builds for non-SIMD processors, and an older GLIBC
+  # TODO: Possibly find a way to support a baseline GLIBC rather than just whatever is on 22.04
   build-linux-binary:
     name: "Build Linux binary"
     runs-on: ubuntu-22.04
@@ -71,7 +73,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "true"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -88,7 +90,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +106,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
+        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -120,7 +122,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}"
+        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
