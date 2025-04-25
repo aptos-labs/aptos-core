@@ -4,10 +4,7 @@
 
 use crate::{
     module_traversal::TraversalContext,
-    storage::{
-        loader::traits::StructDefinitionLoader, module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::LayoutConverter,
-    },
+    storage::{module_storage::FunctionValueExtensionAdapter, ty_layout_converter::LoadedTypeInfo},
     ModuleStorage,
 };
 use bytes::Bytes;
@@ -16,15 +13,15 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    language_storage::{StructTag, TypeTag},
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter, ModuleTraversalContext},
+    gas::ModuleTraversalContext,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
-    value_serde::ValueSerDeContext,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::{BTreeMap, Entry};
@@ -135,49 +132,28 @@ impl TransactionDataCache {
     ///
     /// The caller must ensure that the entry is cached.
     pub(crate) fn load_resource(
-        layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut impl ModuleTraversalContext,
-        module_storage: &dyn ModuleStorage,
+        type_info: LoadedTypeInfo,
+        traversal_context: &impl ModuleTraversalContext,
+        function_value_extension: &dyn FunctionValueExtension,
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
-        ty: &Type,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
-        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
-            TypeTag::Struct(struct_tag) => *struct_tag,
-            _ => {
-                // Since every resource is a struct, the tag must be also a struct tag.
-                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
-            },
-        };
+        let (struct_tag, layout_with_delayed_fields, metadata) = type_info.unpack();
 
-        let layout_with_delayed_fields = layout_converter
-            .type_to_type_layout_with_delayed_field_check(gas_meter, traversal_context, ty)?;
+        // If we need to process delayed fields, we pass type layout to remote storage. Remote
+        // storage, in turn ensures that all delayed field values are pre-processed.
+        let (data, bytes_loaded) = resource_resolver.get_resource_bytes_with_metadata_and_layout(
+            addr,
+            &struct_tag,
+            &metadata,
+            layout_with_delayed_fields.as_layout_expect_delayed_fields(),
+        )?;
 
-        let (data, bytes_loaded) = {
-            let metadata = module_storage
-                .fetch_existing_module_metadata(
-                    &struct_tag.address,
-                    struct_tag.module.as_ident_str(),
-                )
-                .map_err(|err| err.to_partial())?;
-
-            // If we need to process delayed fields, we pass type layout to remote storage. Remote
-            // storage, in turn ensures that all delayed field values are pre-processed.
-            resource_resolver.get_resource_bytes_with_metadata_and_layout(
-                addr,
-                &struct_tag,
-                &metadata,
-                layout_with_delayed_fields.as_layout_expect_delayed_fields(),
-            )?
-        };
-
-        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
         let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
         let value = match data {
             Some(blob) => {
                 let val = ValueSerDeContext::new()
-                    .with_function_value_extension(&function_value_extension, traversal_context)
+                    .with_function_value_extension(function_value_extension, traversal_context)
                     .with_delayed_fields_serde()
                     .deserialize(&blob, &layout)
                     .ok_or_else(|| {

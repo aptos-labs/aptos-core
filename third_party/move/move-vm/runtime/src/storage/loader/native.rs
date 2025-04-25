@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    storage::loader::traits::StructDefinitionLoader, ModuleStorage, RuntimeEnvironment,
-    WithRuntimeEnvironment,
+    storage::loader::traits::{ModuleMetadataLoader, StructDefinitionLoader},
+    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::PartialVMResult;
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::{
     gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
@@ -71,6 +72,24 @@ impl<'a> StructDefinitionLoader for NativeLoader<'a> {
             struct_name.module.name(),
             struct_name.name.as_ident_str(),
         )
+    }
+}
+
+impl<'a> ModuleMetadataLoader for NativeLoader<'a> {
+    fn load_module_metadata(
+        &self,
+        _gas_meter: &mut impl GasMeter,
+        traversal_context: &mut impl ModuleTraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        // If used for lazy loading in native context, ensure module has been charged gas.
+        if self.is_lazy_loading_enabled() {
+            traversal_context.check_is_special_or_visited(module_id.address(), module_id.name())?;
+        }
+
+        self.module_storage
+            .unmetered_get_existing_module_metadata(module_id.address(), module_id.name())
+            .map_err(|err| err.to_partial())
     }
 }
 
@@ -165,12 +184,12 @@ mod test {
             unreachable!("Irrelevant for tests")
         }
 
-        fn fetch_module_metadata(
+        fn unmetered_get_module_metadata(
             &self,
             _address: &AccountAddress,
             _module_name: &IdentStr,
         ) -> VMResult<Option<Vec<Metadata>>> {
-            unreachable!("Irrelevant for tests")
+            Ok(Some(vec![]))
         }
 
         fn fetch_deserialized_module(
@@ -213,12 +232,18 @@ mod test {
         assert!(!loader.is_lazy_loading_enabled());
 
         assert_ok!(loader.load_struct_definition(&mut gas_meter, &mut traversal_context, &idx,));
+        assert_ok!(loader.load_module_metadata(
+            &mut gas_meter,
+            &mut traversal_context,
+            &dummy_struct_module_id()
+        ));
     }
 
     #[test]
     fn test_lazy_loader_checks() {
         let storage = MockModuleStorage::new(true);
         let idx = storage.dummy_struct_idx();
+        let module_id = dummy_struct_module_id();
 
         let mut gas_meter = UnmeteredGasMeter;
         let traversal_storage = TraversalStorage::new();
@@ -229,11 +254,16 @@ mod test {
 
         // Not visited, loader returns an error.
         assert_err!(loader.load_struct_definition(&mut gas_meter, &mut traversal_context, &idx,));
+        assert_err!(loader.load_module_metadata(
+            &mut gas_meter,
+            &mut traversal_context,
+            &module_id
+        ));
 
-        let not_visited =
-            assert_ok!(traversal_context.visit_if_not_special_module_id(&dummy_struct_module_id()));
+        let not_visited = assert_ok!(traversal_context.visit_if_not_special_module_id(&module_id));
         assert!(not_visited);
 
         assert_ok!(loader.load_struct_definition(&mut gas_meter, &mut traversal_context, &idx,));
+        assert_ok!(loader.load_module_metadata(&mut gas_meter, &mut traversal_context, &module_id));
     }
 }
