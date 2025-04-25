@@ -37,10 +37,11 @@ pub struct FmtCommand {
     emit_mode: Option<EmitMode>,
 
     /// Path to the move package (the folder with a Move.toml file) to be formatted.
+    /// If neither a package path nor a file path is provided, the current directory is formatted.
     #[clap(long, value_parser)]
     package_path: Option<PathBuf>,
 
-    /// Path to specific Move source files to format.
+    /// Path to specific Move source files to format. This cannot be called with a package path option.
     #[clap(long, value_parser, num_args = 1..)]
     file_path: Option<Vec<PathBuf>>,
 
@@ -115,10 +116,13 @@ impl FmtCommand {
         let to_cli_error = |e| CliError::IO(exe.display().to_string(), e);
 
         // Get the list of files to format
-        let mut files_to_format = Vec::new();
-
-        // Add individual files if provided
-        if let Some(files) = files_opt {
+        let files_to_format = if let Some(files) = files_opt {
+            // Handle individual files path
+            if package_opt.is_some() {
+                return Err(CliError::UnexpectedError(
+                    "Cannot provide both a package path and individual files to format".to_string(),
+                ));
+            }
             // Verify all files exist
             for file in &files {
                 if !file.exists() {
@@ -140,12 +144,9 @@ impl FmtCommand {
                     )));
                 }
             }
-            files_to_format.extend(files);
-        }
-
-        // Add package files if provided. If no individual files were specified and no package path was provided,
-        // this treats the current directory as the package.
-        if package_opt.is_some() || files_to_format.is_empty() {
+            files
+        } else {
+            // Handle package path
             let package_opt = if let Some(path) = package_opt {
                 fs::canonicalize(path.as_path()).ok()
             } else {
@@ -171,21 +172,20 @@ impl FmtCommand {
                 if examples_path.exists() {
                     path_vec.push(examples_path.clone());
                 }
-                let package_files = find_move_filenames(&path_vec, false)
+                find_move_filenames(&path_vec, false)
                     .map_err(|_| {
                         CliError::UnexpectedError("Failed to find Move files".to_string())
                     })?
                     .into_iter()
                     .map(PathBuf::from)
-                    .collect::<Vec<_>>();
-                files_to_format.extend(package_files);
-            } else if files_to_format.is_empty() {
+                    .collect()
+            } else {
                 return Err(CliError::UnexpectedError(format!(
                     "Unable to find package manifest in {:?} or in its parents",
                     package_path
                 )));
             }
-        }
+        };
 
         if files_to_format.is_empty() {
             return Err(CliError::UnexpectedError("No files to format".to_string()));
