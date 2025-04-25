@@ -68,6 +68,7 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
+    order_vote_enabled: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -194,6 +195,7 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            order_vote_enabled,
         } = self
             .state
             .read()
@@ -218,6 +220,7 @@ impl ExecutionProxy {
             payload_manager,
             self.txn_notifier.clone(),
             self.enable_pre_commit,
+            order_vote_enabled,
         )
     }
 }
@@ -247,6 +250,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            ..
         } = self
             .state
             .read()
@@ -487,6 +491,7 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        order_vote_enabled: bool,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -499,6 +504,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
+            order_vote_enabled,
         });
     }
 
@@ -660,6 +666,7 @@ async fn test_commit_sync_race() {
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
+        false,
         false,
     );
     executor
