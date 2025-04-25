@@ -395,13 +395,13 @@ mod tests {
         assert_eq!(state.module_cache.num_modules(), 0);
 
         assert!(state
-            .fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("d"))
+            .unmetered_get_deserialized_module(&AccountAddress::ZERO, ident_str!("d"))
             .unwrap()
             .is_none());
         assert_eq!(
             &a,
             state
-                .fetch_deserialized_module(a.self_addr(), a.self_name())
+                .unmetered_get_deserialized_module(a.self_addr(), a.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -409,7 +409,7 @@ mod tests {
         assert_eq!(
             &c,
             state
-                .fetch_deserialized_module(c.self_addr(), c.self_name())
+                .unmetered_get_deserialized_module(c.self_addr(), c.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(
             &a_new,
             state
-                .fetch_deserialized_module(a_new.self_addr(), a_new.self_name())
+                .unmetered_get_deserialized_module(a_new.self_addr(), a_new.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(
             &d,
             state
-                .fetch_deserialized_module(d.self_addr(), d.self_name())
+                .unmetered_get_deserialized_module(d.self_addr(), d.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
