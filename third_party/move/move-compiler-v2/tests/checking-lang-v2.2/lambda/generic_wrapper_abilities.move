@@ -1,4 +1,4 @@
-// Fixes ##16158
+// Fixes #16158
 module 0xc0ffee::m {
     struct Func<T>(|T|T) has copy;
 
