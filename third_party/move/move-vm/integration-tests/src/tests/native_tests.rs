@@ -13,7 +13,7 @@ use move_vm_runtime::{
     native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::natives::function::NativeResult;
+use move_vm_types::{gas::AlwaysVisitedModuleTraversalContext, natives::function::NativeResult};
 use std::sync::Arc;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -64,9 +64,13 @@ fn test_failed_native() {
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
 
         let module_storage = storage.as_unsync_code_storage();
-        let new_module_storage =
-            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()])
-                .expect("Module should be publishable");
+        let new_module_storage = StagingModuleStorage::create(
+            &TEST_ADDR,
+            &module_storage,
+            vec![m_blob.clone().into()],
+            &AlwaysVisitedModuleTraversalContext,
+        )
+        .expect("Module should be publishable");
 
         let err = execute_function_for_test(
             &storage,
