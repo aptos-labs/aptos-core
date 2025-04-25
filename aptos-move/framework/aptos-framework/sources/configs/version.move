@@ -67,7 +67,7 @@ module aptos_framework::version {
     public(friend) fun on_new_epoch(framework: &signer) acquires Version {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<Version>()) {
-            let new_value = config_buffer::extract<Version>();
+            let new_value = config_buffer::extract_v2<Version>();
             if (exists<Version>(@aptos_framework)) {
                 *borrow_global_mut<Version>(@aptos_framework) = new_value;
             } else {

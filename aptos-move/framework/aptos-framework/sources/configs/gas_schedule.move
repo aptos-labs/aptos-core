@@ -135,7 +135,7 @@ module aptos_framework::gas_schedule {
     public(friend) fun on_new_epoch(framework: &signer) acquires GasScheduleV2 {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<GasScheduleV2>()) {
-            let new_gas_schedule = config_buffer::extract<GasScheduleV2>();
+            let new_gas_schedule = config_buffer::extract_v2<GasScheduleV2>();
             if (exists<GasScheduleV2>(@aptos_framework)) {
                 *borrow_global_mut<GasScheduleV2>(@aptos_framework) = new_gas_schedule;
             } else {
