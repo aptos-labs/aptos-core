@@ -82,6 +82,17 @@ impl OnChainExecutionConfig {
         }
     }
 
+    pub fn execution_pool_enabled(&self) -> bool {
+        match &self {
+            OnChainExecutionConfig::Missing
+            | OnChainExecutionConfig::V1(_)
+            | OnChainExecutionConfig::V2(_)
+            | OnChainExecutionConfig::V3(_)
+            | OnChainExecutionConfig::V4(_) => false,
+            OnChainExecutionConfig::V5(config) => config.execution_pool_enabled,
+        }
+    }
+
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
@@ -90,6 +101,7 @@ impl OnChainExecutionConfig {
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
+            execution_pool_enabled: false,
         })
     }
 
@@ -165,6 +177,7 @@ pub struct ExecutionConfigV5 {
     pub block_gas_limit_type: BlockGasLimitType,
     pub enable_per_block_gas_limit: bool,
     pub transaction_deduper_type: TransactionDeduperType,
+    pub execution_pool_enabled: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

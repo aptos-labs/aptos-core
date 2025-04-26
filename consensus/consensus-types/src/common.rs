@@ -642,6 +642,38 @@ impl Payload {
         };
         Ok(())
     }
+
+    pub fn get_all_batches(&self) -> Vec<BatchInfo> {
+        let mut batches = vec![];
+        match self {
+            Payload::DirectMempool(_) => {
+                unreachable!("InQuorumStore should be used");
+            },
+            Payload::InQuorumStore(proof_with_status) => {
+                for proof in proof_with_status.proofs.iter() {
+                    batches.push(proof.info().clone());
+                }
+            },
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                for proof in proof_with_status.proof_with_data.proofs.iter() {
+                    batches.push(proof.info().clone());
+                }
+            },
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
+            | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
+                for (batch_info, _) in inline_batches.iter() {
+                    batches.push(batch_info.clone());
+                }
+                for proof in proof_with_data.proofs.iter() {
+                    batches.push(proof.info().clone());
+                }
+            },
+            Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                batches = opt_quorum_store_payload.get_all_batches();
+            },
+        }
+        batches
+    }
 }
 
 impl fmt::Display for Payload {

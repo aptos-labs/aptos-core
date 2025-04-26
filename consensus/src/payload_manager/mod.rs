@@ -5,6 +5,7 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload},
+    pipelined_block::OrderedBlockWindow,
 };
 use aptos_executor_types::*;
 use aptos_types::transaction::SignedTransaction;
@@ -24,7 +25,7 @@ pub use quorum_store_payload_manager::{QuorumStoreCommitNotifier, QuorumStorePay
 pub trait TPayloadManager: Send + Sync {
     /// Notify the payload manager that a block has been committed. This indicates that the
     /// transactions in the block's payload are no longer required for consensus.
-    fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>);
+    fn notify_commit(&self, block: &Block, block_window: Option<&OrderedBlockWindow>);
 
     /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
     /// available when block is executed.

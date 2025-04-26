@@ -12,7 +12,8 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::{
-    block::Block, pipeline_execution_result::PipelineExecutionResult, quorum_cert::QuorumCert,
+    block::Block, pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::OrderedBlockWindow, quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -93,6 +94,7 @@ impl ExecutionPipeline {
     pub async fn queue(
         &self,
         block: Block,
+        block_window: Option<OrderedBlockWindow>,
         metadata: BlockMetadataExt,
         parent_block_id: HashValue,
         block_qc: Option<Arc<QuorumCert>>,
@@ -107,6 +109,7 @@ impl ExecutionPipeline {
         self.prepare_block_tx
             .send(PrepareBlockCommand {
                 block,
+                block_window,
                 metadata,
                 block_executor_onchain_config,
                 parent_block_id,
@@ -138,6 +141,7 @@ impl ExecutionPipeline {
     ) {
         let PrepareBlockCommand {
             block,
+            block_window,
             metadata,
             block_executor_onchain_config,
             parent_block_id,
@@ -152,7 +156,7 @@ impl ExecutionPipeline {
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
         let prepare_block_result = block_preparer
-            .prepare_block(&block, async { block_qc }.shared())
+            .prepare_block(&block, block_window.as_ref(), async { block_qc }.shared())
             .await;
         if let Err(e) = prepare_block_result {
             result_tx
@@ -382,6 +386,7 @@ impl ExecutionPipeline {
 
 struct PrepareBlockCommand {
     block: Block,
+    block_window: Option<OrderedBlockWindow>,
     metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.
