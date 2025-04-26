@@ -1,23 +1,31 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use aptos_experimental_bulk_txn_submit::{
     coordinator::{
         create_sample_addresses, execute_return_worker_funds, execute_submit,
         CreateSampleAddresses, SanitizeAddresses, SubmitArgs,
     },
     workloads::{
-        create_account_addresses_work, CreateAndTransferAptSignedTransactionBuilder,
-        TransferAptSignedTransactionBuilder,
+        create_account_addresses_work, create_job_params_work,
+        CreateAndTransferAptSignedTransactionBuilder, MigrateCoinStoreSignedTransactionBuilder,
+        MigrationJobParams, TransferAptSignedTransactionBuilder,
     },
 };
 use aptos_logger::{Level, Logger};
-use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_sdk::{
+    move_types::{account_address::AccountAddress, language_storage::TypeTag},
+    types::APTOS_COIN_TYPE_STR,
+};
 use aptos_transaction_emitter_lib::Cluster;
 use clap::{Parser, Subcommand};
 use rand::{seq::SliceRandom, thread_rng};
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
+
+lazy_static::lazy_static! {
+    pub static ref APT_COIN_TYPE: TypeTag = TypeTag::from_str(APTOS_COIN_TYPE_STR).unwrap();
+}
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -50,6 +58,8 @@ pub enum WorkTypeSubcommand {
     TransferApt(TransferArg),
     /// Executes aptos_account::transfer with given file providing list of destinations
     CreateAndTransferApt(TransferArg),
+    /// Migrate CoinStore to PrimaryFungibleStore
+    MigrateCoinStore(DestinationsArg),
     /// Returns all leftover funds on the workers to the main source account
     ReturnWorkerFunds,
 }
@@ -116,6 +126,47 @@ async fn create_work_and_execute(args: Submit) -> Result<()> {
                 cluster,
                 coin_source_account,
                 false,
+            )
+            .await
+        },
+        WorkTypeSubcommand::MigrateCoinStore(destinations_arg) => {
+            let work_input =
+                create_job_params_work(&destinations_arg.destinations_file, |words| {
+                    let mut items = words.iter();
+                    let address_string = items
+                        .next()
+                        .ok_or_else(|| anyhow!("no source account provided"))?;
+                    let source_account = AccountAddress::from_str_strict(address_string)
+                        .map_err(|e| anyhow!("failed to parse {}, {:?}", address_string, e))?;
+                    let coin_type = if let Some(coin_type_str) = items.next() {
+                        TypeTag::from_str(coin_type_str.trim_matches('"'))
+                            .map_err(|e| anyhow!("failed to parse {}, {:?}", coin_type_str, e))?
+                    } else {
+                        APT_COIN_TYPE.clone()
+                    };
+                    Ok((source_account, coin_type))
+                })?;
+            let work = work_input.into_iter().fold(
+                Vec::<MigrationJobParams>::new(),
+                |mut acc, (source_account, coin_type)| {
+                    if let Some(last) = acc.last_mut() {
+                        if last.coin_type() == &coin_type && last.source_accounts().len() < 100 { /* cannot migrate more than 400 accounts in a single txn, IO_LIMIT_REACHED otherwise */
+                            last.add_source_account(source_account);
+                            return acc;
+                        }
+                    }
+                    acc.push(MigrationJobParams::new(vec![source_account], coin_type));
+                    acc
+                },
+            );
+
+            execute_submit(
+                work,
+                args.submit_args,
+                MigrateCoinStoreSignedTransactionBuilder,
+                cluster,
+                coin_source_account,
+                true,
             )
             .await
         },

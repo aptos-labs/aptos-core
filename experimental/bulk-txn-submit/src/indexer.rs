@@ -65,7 +65,7 @@ pub(crate) async fn continuously_update_indexer_delay(
                 delay_state.store(delay, std::sync::atomic::Ordering::Relaxed);
             },
             Err(e) => {
-                warn!("fetch_indexer_delay error: {:?}", e);
+                //warn!("fetch_indexer_delay error: {:?}", e);
             },
         }
 
