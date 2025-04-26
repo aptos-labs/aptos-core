@@ -921,7 +921,7 @@ where
                 scheduler,
                 start_shared_counter,
                 shared_counter,
-                incarnation,
+                incarnation + 1,
             );
             match scheduler.as_v2() {
                 None => {
@@ -944,6 +944,11 @@ where
                     )?;
                 },
                 Some(scheduler) => {
+                    counters::SPECULATIVE_ABORT_COUNT.inc();
+
+                    // Any logs from the aborted execution should be cleared and not reported.
+                    clear_speculative_txn_logs(txn_idx as usize);
+
                     scheduler.direct_abort(txn_idx, incarnation, true)?;
                     Self::execute_v2(
                         txn_idx,
@@ -1578,7 +1583,7 @@ where
                 if !custom_validation_pass.is_set() {
                     custom_validation_pass.updated_module_keys.clear();
                     scheduler.unblock_commit_for_idx(from_incl)?;
-                } 
+                }
             }
 
             // TODO: pass worker_id to next_task.
