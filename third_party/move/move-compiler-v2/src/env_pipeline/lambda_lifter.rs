@@ -635,6 +635,16 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             if let RewriteTarget::Temporary(temp) = target {
                 let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
                 return Some(ExpData::Temporary(id, new_temp).into_exp());
+            }
+            None
+        };
+        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
+        let fun_id = FunId::new(fun_name);
+        // Spec rewriter needs to map parameters to temporary indices in the spec
+        let mut spec_replacer = |id: NodeId, target: RewriteTarget| {
+            if let RewriteTarget::Temporary(temp) = target {
+                let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
+                return Some(ExpData::Temporary(id, new_temp).into_exp());
             } else if let RewriteTarget::LocalVar(sym) = target {
                 for (i, par) in params.iter().enumerate() {
                     if sym == par.0 {
@@ -644,12 +654,10 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             }
             None
         };
-        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
-        let fun_id = FunId::new(fun_name);
         let spec = if let Some(spec_exp) = spec_opt {
             if let ExpData::SpecBlock(_, _) = spec_exp.as_ref() {
                 let new_spec_exp =
-                    ExpRewriter::new(env, &mut replacer).rewrite_exp(spec_exp.clone());
+                    ExpRewriter::new(env, &mut spec_replacer).rewrite_exp(spec_exp.clone());
                 if let ExpData::SpecBlock(_, new_spec) = new_spec_exp.as_ref() {
                     Some(new_spec.clone())
                 } else {
