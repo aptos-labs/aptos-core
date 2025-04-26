@@ -120,6 +120,13 @@ This contract is part of the Supra Framework and is designed to manage automated
 <dd>
  Will be the same as main_config.registry_max_gas_cap, unless updated during the epoch.
 </dd>
+<dt>
+<code>registration_enabled: bool</code>
+</dt>
+<dd>
+ Flag indicating whether the task registration is enabled or paused.
+ If paused a new task registration will fail.
+</dd>
 </dl>
 
 
@@ -402,6 +409,12 @@ Epoch state
 </dt>
 <dd>
  Flag indicating whether the task is active, cancelled or pending.
+</dd>
+<dt>
+<code>locked_fee_for_next_epoch: u64</code>
+</dt>
+<dd>
+ Fee locked for the task estimated for the next epoch at the start of the current epoch.
 </dd>
 </dl>
 
@@ -1821,9 +1834,10 @@ Initialization of Automation Registry with configuration parameters is expected 
             congestion_threshold_percentage,
             congestion_base_fee_in_quants_per_sec,
             congestion_exponent,
-            task_capacity
+            task_capacity,
         },
-        next_epoch_registry_max_gas_cap: registry_max_gas_cap
+        next_epoch_registry_max_gas_cap: registry_max_gas_cap,
+        registration_enabled: <b>true</b>,
     });
 
     <b>move_to</b>(supra_framework, <a href="automation_registry.md#0x1_automation_registry_AutomationEpochInfo">AutomationEpochInfo</a> {
@@ -2685,6 +2699,7 @@ Registers a new automation task entry.
         state: <a href="automation_registry.md#0x1_automation_registry_PENDING">PENDING</a>,
         registration_time,
         tx_hash,
+        locked_fee_for_next_epoch: 0
     };
 
     <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_add_value">enumerable_map::add_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index, automation_task_metadata);

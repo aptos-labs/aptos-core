@@ -202,6 +202,8 @@ pub struct AutomationTaskMetaData {
     pub(crate) registration_time: u64,
     /// Flag indicating whether the task is active.
     pub(crate) is_active: bool,
+    /// Fee locked for the task estimated for the next epoch at the start of the current epoch.
+    pub(crate) locked_fee_for_next_epoch: u64,
 }
 
 impl AutomationTaskMetaData {
@@ -219,6 +221,37 @@ impl AutomationTaskMetaData {
         registration_time: u64,
         is_active: bool,
     ) -> Self {
+        Self::new_with_locked_fee(
+            id,
+            owner,
+            payload_tx,
+            expiry_time,
+            tx_hash,
+            max_gas_amount,
+            gas_price_cap,
+            automation_fee_cap_for_epoch,
+            aux_data,
+            registration_time,
+            is_active,
+            0,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_locked_fee(
+        id: u64,
+        owner: AccountAddress,
+        payload_tx: Vec<u8>,
+        expiry_time: u64,
+        tx_hash: Vec<u8>,
+        max_gas_amount: u64,
+        gas_price_cap: u64,
+        automation_fee_cap_for_epoch: u64,
+        aux_data: Vec<Vec<u8>>,
+        registration_time: u64,
+        is_active: bool,
+        locked_fee_for_next_epoch: u64,
+    ) -> Self {
         Self {
             id,
             owner,
@@ -231,6 +264,7 @@ impl AutomationTaskMetaData {
             aux_data,
             registration_time,
             is_active,
+            locked_fee_for_next_epoch,
         }
     }
 
@@ -268,5 +302,9 @@ impl AutomationTaskMetaData {
 
     pub fn id(&self) -> u64 {
         self.id
+    }
+
+    pub fn locked_fee_for_next_epoch(&self) -> u64 {
+        self.locked_fee_for_next_epoch
     }
 }

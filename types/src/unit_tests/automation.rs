@@ -79,6 +79,7 @@ fn automated_txn_builder_from_task_meta() {
         aux_data: vec![],
         registration_time: 1,
         is_active: false,
+        locked_fee_for_next_epoch: 0,
     };
     assert!(AutomatedTransactionBuilder::try_from(task_meta_invalid_payload.clone()).is_err());
 
@@ -149,6 +150,7 @@ fn automated_txn_build() {
         aux_data: vec![],
         registration_time: 1,
         is_active: false,
+        locked_fee_for_next_epoch: 0,
     };
 
     let builder = AutomatedTransactionBuilder::try_from(task_meta.clone()).unwrap();

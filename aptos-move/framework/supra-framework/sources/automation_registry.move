@@ -96,6 +96,9 @@ module supra_framework::automation_registry {
         main_config: AutomationRegistryConfig,
         /// Will be the same as main_config.registry_max_gas_cap, unless updated during the epoch.
         next_epoch_registry_max_gas_cap: u64,
+        /// Flag indicating whether the task registration is enabled or paused.
+        /// If paused a new task registration will fail.
+        registration_enabled: bool,
     }
 
     #[resource_group_member(group = supra_framework::object::ObjectGroup)]
@@ -186,7 +189,9 @@ module supra_framework::automation_registry {
         /// Registration timestamp in seconds
         registration_time: u64,
         /// Flag indicating whether the task is active, cancelled or pending.
-        state: u8
+        state: u8,
+        /// Fee locked for the task estimated for the next epoch at the start of the current epoch.
+        locked_fee_for_next_epoch: u64,
     }
 
     #[event]
@@ -506,9 +511,10 @@ module supra_framework::automation_registry {
                 congestion_threshold_percentage,
                 congestion_base_fee_in_quants_per_sec,
                 congestion_exponent,
-                task_capacity
+                task_capacity,
             },
-            next_epoch_registry_max_gas_cap: registry_max_gas_cap
+            next_epoch_registry_max_gas_cap: registry_max_gas_cap,
+            registration_enabled: true,
         });
 
         move_to(supra_framework, AutomationEpochInfo {
@@ -1051,6 +1057,7 @@ module supra_framework::automation_registry {
             state: PENDING,
             registration_time,
             tx_hash,
+            locked_fee_for_next_epoch: 0
         };
 
         enumerable_map::add_value(&mut automation_registry.tasks, task_index, automation_task_metadata);
