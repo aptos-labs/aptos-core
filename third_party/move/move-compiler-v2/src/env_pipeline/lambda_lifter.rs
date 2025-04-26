@@ -376,6 +376,10 @@ impl<'a> LambdaLifter<'a> {
                                 return None;
                             }
                         }
+                        // We must have curried all arguments to the lambda
+                        if lambda_param_pos < lambda_params.len() {
+                            return None;
+                        }
                         // Create a new node id. We inherit location and type from the lambda,
                         // but instantiation is taken from the call of the curried function.
                         let env = self.fun_env.module_env.env;
