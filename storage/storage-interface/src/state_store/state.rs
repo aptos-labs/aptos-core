@@ -38,7 +38,7 @@ pub struct State {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
     /// The updates made to the state at the current version.
-    ///  N.b. this is not directly iteratable, one needs to make a `StateDelta`
+    ///  N.b. this is not directly iterable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
     shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
