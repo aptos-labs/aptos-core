@@ -1989,7 +1989,8 @@ impl Substitution {
             ty = self.specialize(&ty)
         }
 
-        // Occurs check
+        // Occurs check. Since we specialized the type, we do not need to
+        // check transitively.
         if ty.get_vars().contains(&var) {
             Err(TypeUnificationError::CyclicSubstitution(Type::Var(var), ty))
         } else {
