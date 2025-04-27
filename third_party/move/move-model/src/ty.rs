@@ -384,7 +384,7 @@ impl ConstraintOrigin {
 }
 
 impl Constraint {
-    /// Returns the default type of some constraint. At the end of type unification, variables
+    /// Returns the default type of constraint. At the end of type unification, variables
     /// with constraints that have defaults will be substituted by those defaults.
     pub fn default_type(&self) -> Option<Type> {
         match self {
@@ -405,6 +405,45 @@ impl Constraint {
                     AbilitySet::EMPTY,
                 ))
             },
+            _ => None,
+        }
+    }
+
+    /// Determines the default type for a list of constraints. This finds a constraint
+    /// which can generate a type, and then checks whether it is compatible with any
+    /// other provided constraints.
+    pub fn default_type_for<'a>(constrs: impl Iterator<Item = &'a Constraint>) -> Option<Type> {
+        let mut result = None;
+        let mut abilities = None;
+        for ctr in constrs {
+            if let Some(ty) = ctr.default_type() {
+                result = Some(ty)
+            } else {
+                match ctr {
+                    Constraint::HasAbilities(abs, _) => abilities = Some(*abs),
+                    Constraint::NoTuple | Constraint::NoPhantom | Constraint::NoReference => {
+                        // Skip, is trivially satisfied for a concrete type
+                    },
+                    Constraint::SomeNumber(_)
+                    | Constraint::SomeReference(_)
+                    | Constraint::SomeStruct(_)
+                    | Constraint::SomeReceiverFunction(..)
+                    | Constraint::SomeFunctionValue(..)
+                    | Constraint::WithDefault(_) => {
+                        // Incompatible
+                        return None;
+                    },
+                }
+            }
+        }
+        match (abilities, result) {
+            (Some(abs), Some(Type::Fun(arg, res, _))) => Some(Type::Fun(arg, res, abs)),
+            (Some(abs), Some(Type::Primitive(PrimitiveType::U64)))
+                if !abs.has_ability(Ability::Key) =>
+            {
+                Some(Type::Primitive(PrimitiveType::U64))
+            },
+            (None, result) => result,
             _ => None,
         }
     }
@@ -1233,8 +1272,8 @@ impl Type {
                         // are always fully specialized w.r.t. to the substitution.
                         t.replace(params, subs, use_constr)
                     } else if use_constr {
-                        if let Some(default_ty) = s.constraints.get(i).and_then(|constrs| {
-                            constrs.iter().find_map(|(_, _, c)| c.default_type())
+                        if let Some(default_ty) = s.constraints.get(i).and_then(|ctrs| {
+                            Constraint::default_type_for(ctrs.iter().map(|(_, _, c)| c))
                         }) {
                             default_ty.replace(params, subs, use_constr)
                         } else {
