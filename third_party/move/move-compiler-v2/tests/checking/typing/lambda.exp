@@ -6,13 +6,13 @@ error: `reduce` is a function and not a macro
 34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
    │                                     ^^^^^^
 
-error: function takes arguments of type `&T` but `(&T, u64)` was expected
+error: expected function type has argument of type `(&T, u64)` but `&T` was provided
    ┌─ tests/checking/typing/lambda.move:40:13
    │
 40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: function takes arguments of type `&T` but `u64` was expected
+error: expected function type has argument of type `u64` but `&T` was provided
    ┌─ tests/checking/typing/lambda.move:48:13
    │
 48 │             action(i); // expected to have wrong argument type
