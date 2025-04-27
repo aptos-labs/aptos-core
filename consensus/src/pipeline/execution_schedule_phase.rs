@@ -79,7 +79,6 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             for b in &ordered_blocks {
                 if let Some(tx) = b.pipeline_tx().lock().as_mut() {
                     tx.rand_tx.take().map(|tx| tx.send(b.randomness().cloned()));
-                    tx.order_proof_tx.take().map(|tx| tx.send(()));
                 }
             }
 
