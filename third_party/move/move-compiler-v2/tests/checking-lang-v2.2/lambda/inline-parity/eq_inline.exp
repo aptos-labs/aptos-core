@@ -8,7 +8,7 @@ warning: Unused parameter `f`. Consider removing or prefixing with an underscore
 
 // -- Model dump before bytecode pipeline
 module 0x42::m {
-    private fun foo(f: |&u64| with drop) {
+    private fun foo(f: |&u64| has drop) {
         Tuple()
     }
     private fun g() {
@@ -23,7 +23,7 @@ module 0x42::m {
 
 // -- Sourcified model before bytecode pipeline
 module 0x42::m {
-    fun foo(f: |&u64| with drop) {
+    fun foo(f: |&u64| has drop) {
     }
     fun g() {
         foo(|arg0| __lambda__1__g(arg0));

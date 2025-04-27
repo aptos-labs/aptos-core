@@ -1,6 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
-    private inline fun brk2(f: |()|) {
+    private inline fun brk2(f: ||) {
         (f)();
         Tuple()
     }
@@ -36,7 +36,7 @@ module 0xc0ffee::m {
 
 // -- Sourcified model before bytecode pipeline
 module 0xc0ffee::m {
-    inline fun brk2(f: |()|) {
+    inline fun brk2(f: ||) {
         f();
     }
     inline fun brk3() {
