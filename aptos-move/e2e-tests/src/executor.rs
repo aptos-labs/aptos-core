@@ -75,7 +75,6 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -84,8 +83,9 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_vm_runtime::{
+    dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
+    InstantiatedFunctionLoader, LegacyLoaderConfig,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
@@ -1082,6 +1082,10 @@ impl FakeExecutor {
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
     ) -> Measurement {
+        // First few runs will not be recorded: this ensures modules used for execution are cached.
+        const NUM_WARM_UP_RUNS: u64 = 1;
+        let iterations = iterations + NUM_WARM_UP_RUNS;
+
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
@@ -1093,28 +1097,16 @@ impl FakeExecutor {
         let env = AptosEnvironment::new(&self.state_store);
         let resolver = self.state_store.as_move_resolver();
         let vm = MoveVmExt::new(&env);
-
-        // Create module storage, and ensure the module for the function we want to execute is
-        // cached.
         let module_storage = self.state_store.as_aptos_code_storage(&env);
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
-        // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
         let mut measurements = Vec::new();
+
         while i < iterations {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
-            // load function name into cache to ensure cache is hot
-            let _ = module_storage.load_function(
-                module,
-                &Self::name(function_name),
-                &type_params.clone(),
-            );
-
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
-            let ty = type_params.clone();
             let mut arg = args.clone();
             match &dynamic_args {
                 ExecFuncTimerDynamicArgs::DistinctSigners => {
@@ -1155,28 +1147,58 @@ impl FakeExecutor {
             };
 
             let start = Instant::now();
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
-            let result = match gas_meter_type {
-                GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
-                    module,
-                    &fun_name,
-                    ty,
-                    arg,
-                    regular.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
-                    &module_storage,
-                ),
-                GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
-                    module,
-                    &fun_name,
-                    ty,
-                    arg,
-                    unmetered.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
-                    &module_storage,
-                ),
-            };
+            let result = dispatch_loader!(&module_storage, loader, {
+                let legacy_loader_config = LegacyLoaderConfig::noop();
+                match gas_meter_type {
+                    GasMeterType::RegularGasMeter => {
+                        let gas_meter = regular.as_mut().unwrap();
+                        loader
+                            .load_instantiated_function(
+                                &legacy_loader_config,
+                                gas_meter,
+                                &mut traversal_context,
+                                module,
+                                &Self::name(function_name),
+                                &type_params,
+                            )
+                            .and_then(|function| {
+                                session.execute_loaded_function(
+                                    function,
+                                    arg,
+                                    gas_meter,
+                                    &mut traversal_context,
+                                    &loader,
+                                )
+                            })
+                    },
+                    GasMeterType::UnmeteredGasMeter => {
+                        let gas_meter = unmetered.as_mut().unwrap();
+                        loader
+                            .load_instantiated_function(
+                                &legacy_loader_config,
+                                gas_meter,
+                                &mut traversal_context,
+                                module,
+                                &Self::name(function_name),
+                                &type_params,
+                            )
+                            .and_then(|function| {
+                                session.execute_loaded_function(
+                                    function,
+                                    arg,
+                                    gas_meter,
+                                    &mut traversal_context,
+                                    &loader,
+                                )
+                            })
+                    },
+                }
+            });
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {
@@ -1186,15 +1208,18 @@ impl FakeExecutor {
                     );
                 }
             }
-            measurements.push(Measurement {
-                elapsed,
-                execution_gas: regular
-                    .as_ref()
-                    .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
-                io_gas: regular
-                    .as_ref()
-                    .map_or(0, |gas| gas.algebra().io_gas_used().into()),
-            });
+
+            if i > NUM_WARM_UP_RUNS {
+                measurements.push(Measurement {
+                    elapsed,
+                    execution_gas: regular
+                        .as_ref()
+                        .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
+                    io_gas: regular
+                        .as_ref()
+                        .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+                });
+            }
             i += 1;
         }
 

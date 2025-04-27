@@ -49,18 +49,24 @@ impl<'a> StructDefinitionLoader for NativeLoader<'a> {
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
 
-        if self.is_lazy_loading_enabled() {
+        let module_result = if self.is_lazy_loading_enabled() {
             traversal_context.check_is_special_or_visited(
                 struct_name.module.address(),
                 struct_name.module.name(),
             )?;
-        }
+            self.module_storage
+                .unmetered_get_existing_lazily_verified_module(&struct_name.module)
+        } else {
+            self.module_storage
+                .unmetered_get_existing_eagerly_verified_module(
+                    struct_name.module.address(),
+                    struct_name.module.name(),
+                )
+        };
 
-        self.module_storage.unmetered_get_struct_definition(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
+        module_result
+            .and_then(|module| module.get_struct(&struct_name.name))
+            .map_err(|err| err.to_partial())
     }
 }
 
@@ -87,12 +93,13 @@ mod test {
     use super::*;
     use crate::{
         config::VMConfig,
+        loader::StructDef,
         module_traversal::{TraversalContext, TraversalStorage},
         Module,
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok};
-    use move_binary_format::{errors::VMResult, CompiledModule};
+    use move_binary_format::{errors::VMResult, file_format::empty_module, CompiledModule};
     use move_core_types::{
         account_address::AccountAddress, ident_str, identifier::IdentStr,
         language_storage::ModuleId, metadata::Metadata,
@@ -102,7 +109,7 @@ mod test {
 
     struct MockModuleStorage {
         runtime_environment: RuntimeEnvironment,
-        struct_definition: Arc<StructType>,
+        module: Arc<Module>,
     }
 
     fn dummy_struct_module_id() -> ModuleId {
@@ -131,14 +138,32 @@ mod test {
             let mut struct_definition = StructType::for_test();
             struct_definition.idx = idx;
 
+            // Note: need to patch module name because empty module is created with some dummy id.
+            let mut compiled_module = empty_module();
+            compiled_module.address_identifiers = vec![*dummy_struct_module_id().address()];
+            compiled_module.identifiers = vec![dummy_struct_module_id().name().to_owned()];
+
+            let mut module = assert_ok!(Module::new(
+                runtime_environment.natives(),
+                10,
+                Arc::new(compiled_module),
+                runtime_environment.struct_name_index_map(),
+            ));
+
+            module.struct_map.insert(ident_str!("Bar").to_owned(), 0);
+            module.structs.push(StructDef {
+                field_count: 0,
+                definition_struct_type: Arc::new(struct_definition),
+            });
+
             Self {
                 runtime_environment,
-                struct_definition: Arc::new(struct_definition),
+                module: Arc::new(module),
             }
         }
 
         fn dummy_struct_idx(&self) -> StructNameIndex {
-            self.struct_definition.idx
+            self.module.structs[0].definition_struct_type.idx
         }
     }
 
@@ -189,22 +214,19 @@ mod test {
             unreachable!("Irrelevant for tests")
         }
 
-        fn fetch_verified_module(
+        fn unmetered_get_eagerly_verified_module(
             &self,
             _address: &AccountAddress,
             _module_name: &IdentStr,
         ) -> VMResult<Option<Arc<Module>>> {
-            unreachable!("Irrelevant for tests")
+            Ok(Some(self.module.clone()))
         }
 
-        /// Returns a dummy struct for tests.
-        fn unmetered_get_struct_definition(
+        fn unmetered_get_lazily_verified_module(
             &self,
-            _address: &AccountAddress,
-            _module_name: &IdentStr,
-            _struct_name: &IdentStr,
-        ) -> PartialVMResult<Arc<StructType>> {
-            Ok(self.struct_definition.clone())
+            _module_id: &ModuleId,
+        ) -> VMResult<Option<Arc<Module>>> {
+            Ok(Some(self.module.clone()))
         }
     }
 
