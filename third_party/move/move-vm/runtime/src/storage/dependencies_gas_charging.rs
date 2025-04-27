@@ -1,9 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{module_traversal::TraversalContext, CodeStorage, ModuleStorage};
+use crate::{module_traversal::TraversalContext, ModuleStorage};
 use move_binary_format::{
-    access::{ModuleAccess, ScriptAccess},
+    access::ModuleAccess,
     errors::{Location, VMResult},
 };
 use move_core_types::{
@@ -15,26 +15,6 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::gas::{DependencyGasMeter, DependencyKind};
 use std::collections::BTreeSet;
-
-pub fn check_script_dependencies_and_check_gas(
-    code_storage: &impl CodeStorage,
-    gas_meter: &mut impl DependencyGasMeter,
-    traversal_context: &mut TraversalContext,
-    serialized_script: &[u8],
-) -> VMResult<()> {
-    let compiled_script = code_storage.deserialize_and_cache_script(serialized_script)?;
-    let compiled_script = traversal_context.referenced_scripts.alloc(compiled_script);
-
-    // TODO(Gas): Should we charge dependency gas for the script itself?
-    check_dependencies_and_charge_gas(
-        code_storage,
-        gas_meter,
-        traversal_context,
-        compiled_script.immediate_dependencies_iter(),
-    )?;
-
-    Ok(())
-}
 
 pub fn check_type_tag_dependencies_and_charge_gas(
     module_storage: &impl ModuleStorage,

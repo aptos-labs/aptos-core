@@ -162,7 +162,7 @@ impl RuntimeEnvironment {
 
     /// Creates a verified module by running dependency verification pass for a locally verified
     /// module. The caller must provide verified module dependencies.
-    pub fn build_verified_module(
+    pub(crate) fn build_verified_module_with_linking_checks(
         &self,
         locally_verified_module: LocallyVerifiedModule,
         immediate_dependencies: &[Arc<Module>],
@@ -183,6 +183,21 @@ impl RuntimeEnvironment {
 
         // Note: loader V1 implementation does not set locations for this error.
         result.map_err(|e| e.finish(Location::Undefined))
+    }
+
+    /// Creates a verified module for a locally verified module. Does not perform linking checks
+    /// for module's verified dependencies.
+    pub(crate) fn build_verified_module_skip_linking_checks(
+        &self,
+        locally_verified_module: LocallyVerifiedModule,
+    ) -> VMResult<Module> {
+        Module::new(
+            &self.natives,
+            locally_verified_module.1,
+            locally_verified_module.0,
+            self.struct_name_index_map(),
+        )
+        .map_err(|err| err.finish(Location::Undefined))
     }
 
     /// Deserializes bytes into a compiled module.
