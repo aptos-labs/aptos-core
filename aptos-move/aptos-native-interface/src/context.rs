@@ -231,21 +231,22 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
         //   Currently, native implementations in step (2) check if the module loading was metered,
         //   but we still keep an invariant check here in case there is a mistake and the gas is
         //   not charged.
-        if self.features.is_lazy_loading_enabled() {
+        let module = if self.features.is_lazy_loading_enabled() {
             self.inner
                 .traversal_context()
                 .check_is_special_or_visited(module_id.address(), module_id.name())
                 .map_err(|err| err.finish(Location::Undefined))?;
-        }
-
-        let (_, function) = self
-            .inner
-            .module_storage()
-            .unmetered_get_function_definition(
-                module_id.address(),
-                module_id.name(),
-                function_name,
-            )?;
-        Ok(function)
+            self.inner
+                .module_storage()
+                .unmetered_get_existing_lazily_verified_module(module_id)?
+        } else {
+            self.inner
+                .module_storage()
+                .unmetered_get_existing_eagerly_verified_module(
+                    module_id.address(),
+                    module_id.name(),
+                )?
+        };
+        module.get_function(function_name)
     }
 }

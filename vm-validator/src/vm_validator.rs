@@ -474,7 +474,7 @@ mod tests {
 
         // Get verified module, to load the transitive closure (modules "b" and "c") as well.
         assert!(state
-            .fetch_verified_module(a_new.self_addr(), a_new.self_name())
+            .unmetered_get_eagerly_verified_module(a_new.self_addr(), a_new.self_name())
             .unwrap()
             .is_some());
         assert_eq!(state.module_cache.num_modules(), 4);
