@@ -84,9 +84,12 @@ impl<'r> WriteOpConverter<'r> {
         for (module_id, bytes) in verified_module_bundle {
             let addr = module_id.address();
             let name = module_id.name();
-
-            // If state value metadata exists, this is a modification.
-            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            // MODULE METERING SAFETY:
+            //   We must have already charged for the write of a module when processing module
+            //   bundle. Here, we just do the conversion into a write op - if the state value
+            //   metadata exists, this is a modification.
+            let state_value_metadata =
+                module_storage.unmetered_get_state_value_metadata(addr, name)?;
             let op = if state_value_metadata.is_some() {
                 Op::Modify(bytes)
             } else {

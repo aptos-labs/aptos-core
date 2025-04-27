@@ -289,9 +289,16 @@ fn prefetch_aptos_framework(
 ) -> Result<(), PanicError> {
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
-    // If framework code exists in storage, the transitive closure will be verified and cached.
+    // MODULE METERING SAFETY:
+    //   If framework code exists in storage, the transitive closure will be verified and cached to
+    //   avoid cold starts. From metering perspective, all modules are at special addresses so we
+    //   do not need to meter anything.
+
     let maybe_loaded = code_storage
-        .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+        .unmetered_get_eagerly_verified_module(
+            &AccountAddress::ONE,
+            ident_str!("transaction_validation"),
+        )
         .map_err(|err| {
             // There should be no errors when pre-fetching the framework, if there are, we
             // better return an error here.
