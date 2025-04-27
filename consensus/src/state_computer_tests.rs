@@ -194,6 +194,7 @@ async fn should_see_and_notify_validator_txns() {
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
         false,
+        false,
     );
 
     // Ensure the dummy executor has received the txns.

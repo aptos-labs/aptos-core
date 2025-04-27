@@ -64,12 +64,28 @@ impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+        let block_not_exist = self.ordered_root().round() < li.commit_info().round()
+            && !self.block_exists(li.commit_info().id());
         // TODO move min gap to fallback (30) to config, and if configurable make sure the value is
         // larger than buffer manager MAX_BACKLOG (20)
-        (self.ordered_root().round() < li.commit_info().round()
-            && !self.block_exists(li.commit_info().id()))
-            || self.commit_root().round() + 30.max(2 * self.vote_back_pressure_limit)
-                < li.commit_info().round()
+        let max_commit_gap = 30.max(2 * self.vote_back_pressure_limit);
+        let min_commit_round = li.commit_info().round().saturating_sub(max_commit_gap);
+
+        if let Some(pre_commit_status) = self.pre_commit_status() {
+            let mut status_guard = pre_commit_status.lock();
+            if block_not_exist || status_guard.round() < min_commit_round {
+                // pause the pre_commit so that pre_commit task doesn't over-commit
+                // it can still commit if it receives the LI previously forwarded,
+                // but it won't exceed the LI here
+                // it'll resume after state sync is done
+                status_guard.pause();
+                true
+            } else {
+                false
+            }
+        } else {
+            block_not_exist || self.commit_root().round() < min_commit_round
+        }
     }
 
     /// Checks if quorum certificate can be inserted in block store without RPC
@@ -264,6 +280,12 @@ impl BlockStore {
     ) -> anyhow::Result<()> {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(());
+        }
+
+        if let Some(pre_commit_status) = self.pre_commit_status() {
+            defer! {
+                pre_commit_status.lock().resume();
+            }
         }
 
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(

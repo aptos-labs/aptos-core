@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16195_variant1.move:2:22
+  │
+2 │     struct Func(|(||)|||u64) has copy, drop;
+  │                 -    ^ Expected '|'
+  │                 │
+  │                 To match this '|'
