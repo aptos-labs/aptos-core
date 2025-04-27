@@ -4,30 +4,25 @@
 #![allow(clippy::duplicated_attributes)]
 
 use crate::{
-    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, loader::Function,
-    AsUnsyncModuleStorage, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment,
-    UnsyncModuleStorage, WithRuntimeEnvironment,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
+    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{verification_error, Location, PartialVMError, VMResult},
     CompiledModule, IndexKind,
 };
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::ModuleId,
     metadata::Metadata,
     vm_status::StatusCode,
 };
-use move_vm_types::{
-    code::ModuleBytesStorage,
-    loaded_data::runtime_types::{StructType, Type},
-    module_linker_error, sha3_256,
-};
+use move_vm_types::{code::ModuleBytesStorage, module_linker_error, sha3_256};
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,
@@ -253,15 +248,19 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                     //   Immediate dependency of the module in a bundle must be metered at the
                     //   caller side.
                     let dependency =
-                        staged_module_storage.fetch_existing_verified_module(dep_addr, dep_name)?;
+                        staged_module_storage.unmetered_get_existing_lazily_verified_module(
+                            &ModuleId::new(*dep_addr, dep_name.to_owned()),
+                        )?;
                     verified_dependencies.push(dependency);
                 }
-                staged_runtime_environment
-                    .build_verified_module(locally_verified_code, &verified_dependencies)?;
+                staged_runtime_environment.build_verified_module_with_linking_checks(
+                    locally_verified_code,
+                    &verified_dependencies,
+                )?;
             } else {
                 // Verify the module and its dependencies, and that they do not form a cycle.
                 staged_module_storage
-                    .fetch_verified_module(addr, name)?
+                    .unmetered_get_eagerly_verified_module(addr, name)?
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message(format!(
