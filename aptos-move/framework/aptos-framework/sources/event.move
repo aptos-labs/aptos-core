@@ -91,21 +91,4 @@ module aptos_framework::event {
         use std::vector;
         vector::contains(&emitted_events_by_handle(handle), msg)
     }
-
-    #[test_only]
-    struct TestEvent has drop, store {}
-
-    #[test_only]
-    public fun create_test_event_handle<T: drop + store>(): EventHandle<T> {
-        let dummy_address = @0x1;
-        let dummy_creation_num = 0;
-        let guid = guid::create(dummy_address, &mut dummy_creation_num);
-        new_event_handle<T>(guid)
-    }
-
-    #[test(account = @0x1)]
-    public entry fun test_destroy_event_handle(account: signer) {
-        let handle = create_test_event_handle<TestEvent>();
-        destroy_handle<TestEvent>(handle);
-    }
 }
