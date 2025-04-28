@@ -50,8 +50,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
+        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -905,20 +905,20 @@ impl FakeExecutor {
             &txn,
             &log_context,
             |gas_meter| {
-                let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
-                    // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has been removed")
+                let gas_profiler = match txn.payload().executable_ref() {
+                    Ok(TransactionExecutableRef::Script(_)) => GasProfiler::new_script(gas_meter),
+                    Ok(TransactionExecutableRef::EntryFunction(entry_func))
+                        if !txn.payload().is_multisig() =>
+                    {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
                     },
+                    Ok(_) => unimplemented!("multisig or empty payload not supported yet"),
+                    Err(_) => unimplemented!("payload type is deprecated"),
                 };
                 gas_profiler
             },

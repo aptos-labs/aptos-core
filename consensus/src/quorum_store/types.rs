@@ -65,7 +65,7 @@ impl PersistedValue {
                 .map(|txn| {
                     TxnSummaryWithExpiration::new(
                         txn.sender(),
-                        txn.sequence_number(),
+                        txn.replay_protector(),
                         txn.expiration_timestamp_secs(),
                         txn.committed_hash(),
                     )
@@ -191,6 +191,10 @@ impl Batch {
 
     pub fn into_transactions(self) -> Vec<SignedTransaction> {
         self.payload.into_transactions()
+    }
+
+    pub fn txns(&self) -> &[SignedTransaction] {
+        self.payload.txns()
     }
 
     pub fn batch_info(&self) -> &BatchInfo {
