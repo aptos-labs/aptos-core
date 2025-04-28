@@ -38,8 +38,26 @@ pub trait TStateView {
     /// Gets state storage usage info at epoch ending.
     fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
 
+    /// Returns the version after this view.
+    fn next_version(&self) -> Version {
+        // TODO(HotState):
+        // Hack: This is currently only used by the HotStateOpAccumulator to decide if to refresh
+        //       an already hot item.
+        //       hot state promotions and evictions are not currently serialized, authenticated or
+        //       charged, so it's okay for this to always return 0 if not implemented.
+        0
+    }
+
+    /// Returns the version of the view.
+    ///
+    /// The empty "pre-genesis" state view has version None.
+    fn version(&self) -> Option<Version> {
+        self.next_version().checked_sub(1)
+    }
+
     /// Gets the state slot for a given state key.
     fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        // TODO(HotState):
         // Hack: hot state promotions and evictions are not currently serialized, authenticated or
         //       charged, so it's okay for most type of state views to fake it.
         Ok(StateSlot::from_db_get(
