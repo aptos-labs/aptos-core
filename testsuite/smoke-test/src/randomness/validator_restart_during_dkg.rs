@@ -6,7 +6,7 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::get_on_chain_resource,
 };
-use aptos_forge::{NodeExt, SwarmExt};
+use aptos_forge::{Node, NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
@@ -73,6 +73,7 @@ async fn validator_restart_during_dkg() {
         .enumerate()
         .take(num_validators_to_restart)
     {
+        let _ = node.clear_storage().await;
         while node.health_check().await.is_ok() {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }

@@ -149,6 +149,8 @@ return true.
 -  [Function `is_default_account_resource_enabled`](#0x1_features_is_default_account_resource_enabled)
 -  [Function `get_jwk_consensus_per_key_mode_feature`](#0x1_features_get_jwk_consensus_per_key_mode_feature)
 -  [Function `is_jwk_consensus_per_key_mode_enabled`](#0x1_features_is_jwk_consensus_per_key_mode_enabled)
+-  [Function `get_rand_manager_v2_feature`](#0x1_features_get_rand_manager_v2_feature)
+-  [Function `is_rand_manager_v2_enabled`](#0x1_features_is_rand_manager_v2_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -868,6 +870,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>: u64 = 61;
+</code></pre>
+
+
+
+<a id="0x1_features_RAND_MANAGER_V2"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RAND_MANAGER_V2">RAND_MANAGER_V2</a>: u64 = 93;
 </code></pre>
 
 
@@ -3773,6 +3784,50 @@ Deprecated feature
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_jwk_consensus_per_key_mode_enabled">is_jwk_consensus_per_key_mode_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_JWK_CONSENSUS_PER_KEY_MODE">JWK_CONSENSUS_PER_KEY_MODE</a>)
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_rand_manager_v2_feature"></a>
+
+## Function `get_rand_manager_v2_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_rand_manager_v2_feature">get_rand_manager_v2_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_rand_manager_v2_feature">get_rand_manager_v2_feature</a>(): u64 { <a href="features.md#0x1_features_RAND_MANAGER_V2">RAND_MANAGER_V2</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_rand_manager_v2_enabled"></a>
+
+## Function `is_rand_manager_v2_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_rand_manager_v2_enabled">is_rand_manager_v2_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_rand_manager_v2_enabled">is_rand_manager_v2_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RAND_MANAGER_V2">RAND_MANAGER_V2</a>) }
 </code></pre>
 
 

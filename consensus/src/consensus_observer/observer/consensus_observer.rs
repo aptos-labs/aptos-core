@@ -1134,10 +1134,10 @@ impl ConsensusObserver {
     async fn wait_for_epoch_start(&mut self) {
         // Wait for the active state epoch to update
         let block_payloads = self.block_payload_store.lock().get_block_payloads();
-        let (payload_manager, consensus_config, execution_config, randomness_config) = self
-            .active_observer_state
-            .wait_for_epoch_start(block_payloads)
-            .await;
+        let (payload_manager, features, consensus_config, execution_config, randomness_config) =
+            self.active_observer_state
+                .wait_for_epoch_start(block_payloads)
+                .await;
 
         // Fetch the new epoch state
         let epoch_state = self.get_epoch_state();
@@ -1152,6 +1152,7 @@ impl ConsensusObserver {
             .start_epoch(
                 sk,
                 epoch_state.clone(),
+                &features,
                 dummy_signer.clone(),
                 payload_manager,
                 &consensus_config,

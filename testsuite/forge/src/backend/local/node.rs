@@ -314,6 +314,7 @@ impl Node for LocalNode {
         let secure_storage_path = node_config.get_working_dir().join(SECURE_STORAGE_FILENAME);
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
         let secondary_db_path = node_config.storage.dir().join(SECONDARY_DB_DIR);
+        let rand_db_path = node_config.storage.dir().join("rand_db");
 
         debug!(
             "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}, {:?}) for node {:?}",
@@ -342,6 +343,7 @@ impl Node for LocalNode {
         fs::remove_dir_all(state_sync_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
+        let _ = fs::remove_dir_all(rand_db_path);
 
         // Remove the secondary DB files
         if secondary_db_path.as_path().exists() {
