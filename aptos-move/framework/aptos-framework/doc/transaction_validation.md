@@ -1882,7 +1882,6 @@ Give some constraints that may abort according to the conditions.
     sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     gas_payer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     replay_protector: <a href="transaction_validation.md#0x1_transaction_validation_ReplayProtector">ReplayProtector</a>;
-    txn_sequence_number: u64;
     txn_authentication_key: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
     txn_gas_price: u64;
     txn_max_gas_units: u64;
@@ -1894,32 +1893,6 @@ Give some constraints that may abort according to the conditions.
     <b>aborts_if</b> !(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>);
     <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> gas_payer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(gas_payer);
-    <b>aborts_if</b> (
-        !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
-            || <a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
-            || transaction_sender == gas_payer_addr
-            || txn_sequence_number &gt; 0
-    ) && (
-        !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
-            || !(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(txn_authentication_key) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
-            txn_authentication_key
-        ) == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key)
-            || !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
-            || !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
-    );
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
-        && transaction_sender != gas_payer_addr
-        && txn_sequence_number == 0
-        && !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
-        && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(txn_authentication_key) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
-        txn_authentication_key
-    ) != <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(transaction_sender));
-    <b>aborts_if</b> !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));
-    <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
-    <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
-    <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer_addr);
-    // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-    <b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer_addr).<a href="coin.md#0x1_coin">coin</a>.value &gt;= max_transaction_fee);
 }
 </code></pre>
 
