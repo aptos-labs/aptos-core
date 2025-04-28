@@ -42,5 +42,7 @@ jobs:
           export FEATURES=${FEATURES:-""}
           export CARGO_TARGET_DIR="target/${FEATURES:-default}"
           export GHCR_ORG="movementlabsxyz"
+          export IMAGE_TAG_PREFIX=""
+          export NORMALIZED_GIT_BRANCH_OR_PR=$(echo ${GITHUB_REF#refs/heads/} | sed -e 's/[^a-zA-Z0-9]/-/g')
           
           docker/builder/docker-bake-rust-all.sh 
