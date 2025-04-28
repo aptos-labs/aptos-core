@@ -201,7 +201,7 @@ module aptos_framework::account {
 
         // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
         assert!(
-            new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
+            new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token && new_address != @0xa550c18,
             error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
         );
 
@@ -1572,5 +1572,11 @@ module aptos_framework::account {
 
         let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
         assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 65541, location = Self)]
+    public entry fun test_cannot_create_account_at_core_resources_address() {
+        create_account(@0xa550c18);
     }
 }
