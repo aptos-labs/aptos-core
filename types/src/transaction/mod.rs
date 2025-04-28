@@ -52,6 +52,7 @@ pub mod signature_verified_transaction;
 pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
+pub mod scheduled_txn;
 
 pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::{

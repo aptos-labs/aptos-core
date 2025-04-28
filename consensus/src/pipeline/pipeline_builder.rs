@@ -50,6 +50,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+use crate::scheduled_txns_handler::ScheduledTxnsHandler;
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -536,6 +537,7 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
+        let scheduled_txns = ScheduledTxnsHandler::get_ready_txns(state_view, block.timestamp_usecs());
         let (user_txns, block_gas_limit) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
@@ -893,4 +895,9 @@ impl PipelineBuilder {
         )
         .await;
     }
+}
+
+#[test]
+fn test_pipeline_builder_creation() {
+    // I want to compile the file for now
 }

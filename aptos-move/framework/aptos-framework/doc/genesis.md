@@ -363,10 +363,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="reconfiguration.md#0x1_reconfiguration_initialize">reconfiguration::initialize</a>(&aptos_framework_account);
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
-<<<<<<< HEAD
     <a href="nonce_validation.md#0x1_nonce_validation_initialize">nonce_validation::initialize</a>(&aptos_framework_account);
-=======
->>>>>>> fbdc411893 ([Scheduled Txns] Introduce scheduled txns move module)
     <a href="scheduled_txns.md#0x1_scheduled_txns_initialize">scheduled_txns::initialize</a>(&aptos_framework_account);
 }
 </code></pre>
