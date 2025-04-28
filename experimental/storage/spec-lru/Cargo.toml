@@ -1,0 +1,14 @@
+[package]
+name = "aptos-experimental-spec-lru"
+version = "0.1.0"
+
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aptos-experimental-layered-map = { workspace = true }

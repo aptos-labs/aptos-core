@@ -21,6 +21,7 @@ aptos-metrics-core = { workspace = true }
 bitvec = "1.0.1"
 itertools = { workspace = true }
 once_cell = { workspace = true }
+proptest = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -28,7 +29,6 @@ aptos-schemadb = { workspace = true }
 aptos-temppath = { workspace = true }
 criterion = { workspace = true }
 itertools = { workspace = true }
-proptest = { workspace = true }
 rand = { workspace = true }
 rocksdb = { workspace = true }
 

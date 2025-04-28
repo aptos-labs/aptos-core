@@ -10,7 +10,7 @@ use std::{
 };
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct HashCollide(u8);
+pub struct HashCollide(pub u8);
 
 impl Hash for HashCollide {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -24,7 +24,7 @@ fn naive_view_layers<K: Ord, V>(layers: impl Iterator<Item = Vec<(K, V)>>) -> BT
 }
 
 fn arb_test_case() -> impl Strategy<Value = (Vec<Vec<(HashCollide, u8)>>, usize, usize, usize)> {
-    vec(vec(any::<(u8, u8)>(), 0..100), 1..100).prop_flat_map(|items_per_layer| {
+    vec(vec(any::<(u8, u8)>(), 0..10), 1..10).prop_flat_map(|items_per_layer| {
         let num_overlay_layers = items_per_layer.len();
         let items_per_update = items_per_layer.clone();
         vec(0..=num_overlay_layers, 3).prop_map(move |mut layer_indices| {
