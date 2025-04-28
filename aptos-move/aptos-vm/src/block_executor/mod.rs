@@ -419,7 +419,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
@@ -490,7 +490,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
