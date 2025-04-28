@@ -1,8 +1,7 @@
 #!/usr/bin/env -S node
 
 // This script releases the main aptos docker images to docker hub.
-// It does so by copying the images from aptos GCP artifact registry to docker hub.
-// It also copies the release tags to GCP Artifact Registry and AWS ECR.
+// It does so by copying the images from ghcr.io to docker hub.
 //
 // Usually it's run in CI, but you can also run it locally in emergency situations, assuming you have the right credentials.
 // Before you run this locally, check one more time whether you can trigger a CI build instead which is usually easier and safer.
@@ -14,22 +13,16 @@
 // Prerequisites when running locally:
 // 1. Tools:
 //  - docker
-//  - gcloud
-//  - aws cli
 //  - node (node.js)
 //  - crane - https://github.com/google/go-containerregistry/tree/main/cmd/crane#installation
 //  - pnpm - https://pnpm.io/installation
 // 2. docker login - with authorization to push to the `aptoslabs` org
-// 3. gcloud auth configure-docker us-docker.pkg.dev
-// 4. gcloud auth login --update-adc
-// 5. AWS CLI credentials configured
 //
 // Once you have all prerequisites fulfilled, you can run this script via:
-// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ vars.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
-//
+// GIT_SHA=${{ github.sha }} GHCR_ORG="${{ vars.GHCR_ORG }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
 //
 // You can also run this script locally with the DRY_RUN flag to test it out:
-// IMAGE_TAG_PREFIX=devnet AWS_ACCOUNT_ID=bla GCP_DOCKER_ARTIFACT_REPO=bla GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
+// IMAGE_TAG_PREFIX=devnet GHCR_ORG=aptoslabs GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
 //
 // You can also run unittests by running docker/__tests__/release-images.test.js
 
@@ -108,7 +101,7 @@ const IMAGES_TO_RELEASE = {
 
 
 async function main() {
-  const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
+  const REQUIRED_ARGS = ["GIT_SHA", "GHCR_ORG", "IMAGE_TAG_PREFIX"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS);
@@ -117,17 +110,28 @@ async function main() {
   const crane = await installCrane();
   const craneVersion = await $`${crane} version`;
   console.log(`INFO: crane version: ${craneVersion}`);
-  
-  const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
-  const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
+
+  for (const arg of REQUIRED_ARGS) {
+    const argValue = argv[arg.toLowerCase().replaceAll("_", "-")] ?? process.env[arg];
+    if (!argValue) {
+      console.error(chalk.red(`ERROR: Missing required argument or environment variable: ${arg}`));
+      process.exit(1);
+    }
+    parsedArgs[arg] = argValue;
+  }
+
+  for (const arg of OPTIONAL_ARGS) {
+    const argValue = argv[arg.toLowerCase().replaceAll("_", "-")] ?? process.env[arg];
+    parsedArgs[arg] = argValue;
+  }
+
+  await installCrane();
+
+  const GHCR = `ghcr.io/${parsedArgs.GHCR_ORG}`;
   const DOCKERHUB = "docker.io/aptoslabs";
 
-  const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO, AWS_ECR];
-
-  const ALL_TARGET_REGISTRIES = [
-    ...INTERNAL_TARGET_REGISTRIES,
-    DOCKERHUB,
-  ];
+  const INTERNAL_TARGET_REGISTRIES = [GHCR];
+  const ALL_TARGET_REGISTRIES = [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
 
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
@@ -157,7 +161,7 @@ async function main() {
         const targetRegistries = IMAGE_NAMES_TO_RELEASE_ONLY_INTERNAL.includes(image) ? INTERNAL_TARGET_REGISTRIES : ALL_TARGET_REGISTRIES;
 
         for (const targetRegistry of targetRegistries) {
-          const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
+          const imageSource = `${GHCR}/${image}:${joinTagSegments(
             profilePrefix,
             featureSuffix,
             parsedArgs.GIT_SHA,
