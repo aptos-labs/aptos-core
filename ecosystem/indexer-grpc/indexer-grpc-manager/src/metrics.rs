@@ -16,6 +16,14 @@ pub static FILE_STORE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static FILE_STORE_VERSION_IN_CACHE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_indexer_grpc_v2_file_store_version_in_cache",
+        "File store version in cache."
+    )
+    .unwrap()
+});
+
 pub static FILE_STORE_UPLOADED_BYTES: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_indexer_grpc_v2_file_store_uploaded_bytes",

@@ -24,13 +24,13 @@ error: cannot assign `S` to left-hand side of type `&mut S`
 18 │         s2 = S { f: 0 }
    │         ^^
 
-error: the left-hand side expected `&mut` but `&` was provided
+error: cannot assign `&u64` to left-hand side of type `&mut u64` (mutability mismatch)
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:26:9
    │
 26 │         f = &0;
    │         ^
 
-error: the left-hand side expected `&mut` but `&` was provided
+error: cannot assign `&S` to left-hand side of type `&mut S` (mutability mismatch)
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:27:9
    │
 27 │         s2 = &S { f: 0 }

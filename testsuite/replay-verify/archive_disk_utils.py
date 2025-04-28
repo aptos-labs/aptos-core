@@ -541,7 +541,12 @@ def create_one_pvc_from_snapshot(
 
 
 def create_replay_verify_pvcs_from_snapshot(
-    run_id: str, snapshot_name: str, namespace: str, pvc_num: int, label: str, ttl_secs: int
+    run_id: str,
+    snapshot_name: str,
+    namespace: str,
+    pvc_num: int,
+    label: str,
+    ttl_secs: int,
 ) -> List[str]:
     config.load_kube_config()
     api_instance = client.CustomObjectsApi()

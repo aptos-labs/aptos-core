@@ -3,7 +3,6 @@
 /// represent types and storing values in bcs format.
 module aptos_token_objects::property_map {
     use std::bcs;
-    use std::vector;
     use std::error;
     use std::string::{Self, String};
     use aptos_std::from_bcs;
@@ -87,26 +86,26 @@ module aptos_token_objects::property_map {
         types: vector<String>,
         values: vector<vector<u8>>,
     ): PropertyMap {
-        let length = vector::length(&keys);
+        let length = keys.length();
         assert!(length <= MAX_PROPERTY_MAP_SIZE, error::invalid_argument(ETOO_MANY_PROPERTIES));
-        assert!(length == vector::length(&values), error::invalid_argument(EKEY_VALUE_COUNT_MISMATCH));
-        assert!(length == vector::length(&types), error::invalid_argument(EKEY_TYPE_COUNT_MISMATCH));
+        assert!(length == values.length(), error::invalid_argument(EKEY_VALUE_COUNT_MISMATCH));
+        assert!(length == types.length(), error::invalid_argument(EKEY_TYPE_COUNT_MISMATCH));
 
         let container = simple_map::create<String, PropertyValue>();
-        while (!vector::is_empty(&keys)) {
-            let key = vector::pop_back(&mut keys);
+        while (!keys.is_empty()) {
+            let key = keys.pop_back();
             assert!(
-                string::length(&key) <= MAX_PROPERTY_NAME_LENGTH,
+                key.length() <= MAX_PROPERTY_NAME_LENGTH,
                 error::invalid_argument(EPROPERTY_MAP_KEY_TOO_LONG),
             );
 
-            let value = vector::pop_back(&mut values);
-            let type = vector::pop_back(&mut types);
+            let value = values.pop_back();
+            let type = types.pop_back();
 
             let new_type = to_internal_type(type);
             validate_type(new_type, value);
 
-            simple_map::add(&mut container, key, PropertyValue { value, type: new_type });
+            container.add(key, PropertyValue { value, type: new_type });
         };
 
         PropertyMap { inner: container }
@@ -207,14 +206,14 @@ module aptos_token_objects::property_map {
 
     public fun contains_key<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
         assert_exists(object::object_address(object));
-        let property_map = borrow_global<PropertyMap>(object::object_address(object));
-        simple_map::contains_key(&property_map.inner, key)
+        let property_map = &PropertyMap[object::object_address(object)];
+        property_map.inner.contains_key(key)
     }
 
     public fun length<T: key>(object: &Object<T>): u64 acquires PropertyMap {
         assert_exists(object::object_address(object));
-        let property_map = borrow_global<PropertyMap>(object::object_address(object));
-        simple_map::length(&property_map.inner)
+        let property_map = &PropertyMap[object::object_address(object)];
+        property_map.inner.length()
     }
 
     /// Read the property and get it's external type in it's bcs encoded format
@@ -222,8 +221,8 @@ module aptos_token_objects::property_map {
     /// The preferred method is to use `read_<type>` where the type is already known.
     public fun read<T: key>(object: &Object<T>, key: &String): (String, vector<u8>) acquires PropertyMap {
         assert_exists(object::object_address(object));
-        let property_map = borrow_global<PropertyMap>(object::object_address(object));
-        let property_value = simple_map::borrow(&property_map.inner, key);
+        let property_map = &PropertyMap[object::object_address(object)];
+        let property_value = property_map.inner.borrow(key);
         let new_type = to_external_type(property_value.type);
         (new_type, property_value.value)
     }
@@ -311,8 +310,8 @@ module aptos_token_objects::property_map {
 
     inline fun add_internal(ref: &MutatorRef, key: String, type: u8, value: vector<u8>) acquires PropertyMap {
         assert_exists(ref.self);
-        let property_map = borrow_global_mut<PropertyMap>(ref.self);
-        simple_map::add(&mut property_map.inner, key, PropertyValue { type, value });
+        let property_map = &mut PropertyMap[ref.self];
+        property_map.inner.add(key, PropertyValue { type, value });
     }
 
     /// Updates a property in place already bcs encoded
@@ -330,16 +329,16 @@ module aptos_token_objects::property_map {
 
     inline fun update_internal(ref: &MutatorRef, key: &String, type: u8, value: vector<u8>) acquires PropertyMap {
         assert_exists(ref.self);
-        let property_map = borrow_global_mut<PropertyMap>(ref.self);
-        let old_value = simple_map::borrow_mut(&mut property_map.inner, key);
+        let property_map = &mut PropertyMap[ref.self];
+        let old_value = property_map.inner.borrow_mut(key);
         *old_value = PropertyValue { type, value };
     }
 
     /// Removes a property from the map, ensuring that it does in fact exist
     public fun remove(ref: &MutatorRef, key: &String) acquires PropertyMap {
         assert_exists(ref.self);
-        let property_map = borrow_global_mut<PropertyMap>(ref.self);
-        simple_map::remove(&mut property_map.inner, key);
+        let property_map = &mut PropertyMap[ref.self];
+        property_map.inner.remove(key);
     }
 
     // Tests

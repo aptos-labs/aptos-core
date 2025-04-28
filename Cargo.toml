@@ -22,6 +22,7 @@ members = [
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
+    "aptos-move/aptos-transaction-simulation",
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
@@ -37,7 +38,6 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/framework-experimental",
     "aptos-move/framework/cached-packages",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
@@ -47,7 +47,6 @@ members = [
     "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
-    "aptos-utils",
     "config",
     "config/global-constants",
     "consensus",
@@ -144,6 +143,7 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "experimental/bulk-txn-submit",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "experimental/storage/hexy",
@@ -333,6 +333,7 @@ aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-experimental-hexy = { path = "experimental/storage/hexy" }
+aptos-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
@@ -343,7 +344,6 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
-aptos-framework-experimental = { path = "aptos-move/framework-experimental" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
@@ -455,9 +455,9 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
+aptos-transaction-simulation = { path = "aptos-move/aptos-transaction-simulation" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
-aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
@@ -493,7 +493,10 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "bf4dd89677e6929ef21f898a7a4176514e606ebd" }
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "bfb07a2b6985743fbc275d6fc621a80453f6742d", features = [
+    "postgres_partial",
+] }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
 assert_approx_eq = "1.1.0"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
@@ -560,10 +563,10 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = { version = "2.1", features = ["uuid"] }
+diesel = { version = "2.2.0", features = ["uuid"] }
 # Use the crate version once this feature gets released on crates.io:
 # https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
-diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "e3beac66cd41ab53d78a10328bb72f272103e5d1", features = [
     "async-connection-wrapper",
     "postgres",
     "bb8",
@@ -628,11 +631,6 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemallocator = { version = "0.5.0", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
-jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
@@ -655,7 +653,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
-neptune = { version = "13.0.0", default_features = false }
+neptune = { version = "13.0.0", default-features = false }
 ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -693,7 +691,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "bf4dd89677e6929ef21f898a7a4176514e606ebd", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", rev = "1449895f6e69425e2873b85c14182ac448732109", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -734,7 +732,7 @@ ripemd = "0.1.1"
 rlimit = "0.10.2"
 rocksdb = { version = "0.22.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
-rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
+rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
@@ -759,7 +757,6 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "bf4dd89677e6929ef21f898a7a4176514e606ebd" }
 set_env = "1.3.4"
 shadow-rs = "0.16.2"
 simplelog = "0.9.0"
@@ -813,7 +810,7 @@ uint = "0.9.4"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
-], default_features = false }
+], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"
@@ -866,10 +863,14 @@ move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytec
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
-move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
+    "table-extension",
+] }
 move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
-move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
+    "table-extension",
+] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]

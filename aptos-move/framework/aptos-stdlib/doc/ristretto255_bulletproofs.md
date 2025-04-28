@@ -296,7 +296,7 @@ NOTE: currently, domain separation tags of size larger than 256 bytes are not su
     proof: &<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 {
     <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>));
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&dst) &lt;= 256, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_DST_TOO_LONG">E_DST_TOO_LONG</a>));
+    <b>assert</b>!(dst.length() &lt;= 256, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_DST_TOO_LONG">E_DST_TOO_LONG</a>));
 
     <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)),
@@ -336,7 +336,7 @@ NOTE: currently, domain separation tags of size larger than 256 bytes are not su
     num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 {
     <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_batch_range_proof">verify_batch_range_proof</a>(
-        &std::vector::map_ref(comms, |com| <a href="ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(pedersen::commitment_as_point(com))),
+        &comms.map_ref(|com| <a href="ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(pedersen::commitment_as_point(com))),
         &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">ristretto255::hash_to_point_base</a>(),
         proof,
         num_bits,
@@ -375,9 +375,9 @@ NOTE: currently, domain separation tags of size larger than 256 bytes are not su
     proof: &<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 {
     <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_batch_enabled">features::bulletproofs_batch_enabled</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>));
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&dst) &lt;= 256, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_DST_TOO_LONG">E_DST_TOO_LONG</a>));
+    <b>assert</b>!(dst.length() &lt;= 256, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_DST_TOO_LONG">E_DST_TOO_LONG</a>));
 
-    <b>let</b> comms = std::vector::map_ref(comms, |com| <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)));
+    <b>let</b> comms = comms.map_ref(|com| <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)));
 
     <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_batch_range_proof_internal">verify_batch_range_proof_internal</a>(
         comms,

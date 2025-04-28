@@ -16,4 +16,6 @@ dearbitrary = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-core-types = { workspace = true, features = ["fuzzing"] }
+rayon = { workspace = true }
 sha2 = { workspace = true }
+walkdir = { workspace = true }

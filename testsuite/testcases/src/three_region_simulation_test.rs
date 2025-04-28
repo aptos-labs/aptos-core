@@ -6,9 +6,9 @@ use aptos_forge::{
     GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkContextSynchronizer,
     NetworkTest, SwarmChaos, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
-use aptos_logger::info;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
+use log::info;
 
 /// Represents a test that simulates a network with 3 regions, all in the same cloud.
 pub struct ThreeRegionSameCloudSimulationTest;

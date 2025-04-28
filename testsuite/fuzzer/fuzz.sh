@@ -7,7 +7,8 @@ export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 NIGHTLY_VERSION="nightly-2024-04-06"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
-CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")
+# "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip"
+CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip")
 
 # This save time excluding some features needed only for specific targets
 # Downside: fuzzers which require  specific features need to recompile all dependencies
@@ -66,11 +67,17 @@ function usage() {
             #echo "Usage: $0 block-builder <command> [argumetns]"
             cargo_local run --quiet -- --help
             ;;
+        "block-builder-recursive")
+            echo "Usage: $0 block-builder-recursive <search_directory> <destination_directory>"
+            ;;
         "build")
             echo "Usage: $0 build <fuzz_target|all> [target_dir]"
             ;;
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
+            ;;
+        "clean-coverage")
+            echo "Usage: $0 clean-coverage <fuzz_target>"
             ;;
         "cmin")
             echo "Usage: $0 cmin <fuzz_target> [corpus_dir]"
@@ -78,9 +85,6 @@ function usage() {
         "coverage")
             echo "Usage: $0 coverage <fuzz_target>"
             ;;
-        "clean-coverage")
-            echo "Usage: $0 clean-coverage <fuzz_target>"
-            ;;        
         "debug")
             echo "Usage: $0 debug <fuzz_target> <testcase>"
             ;;
@@ -90,26 +94,35 @@ function usage() {
         "list")
             echo "Usage: $0 list"
             ;;
+        "monitor-coverage")
+            echo "Usage: $0 monitor-coverage <fuzz_target>"
+            ;;
         "run")
             echo "Usage: $0 run <fuzz_target> [testcase]"
             ;;
         "test")
             echo "Usage: $0 test"
             ;;
+        "tmin")
+            echo "Usage: $0 tmin <fuzz_target> <crashing_input>"
+            ;;
         *)
-            echo "Usage: $0 <add|block-builder|build|build-oss-fuzz|coverage|clean-coverage|flamegraph|list|run|debug|test>"
-            echo "    add               adds a new fuzz target"
-            echo "    block-builder     runs rust tool to hel build fuzzers"
-            echo "    build             builds fuzz targets"
-            echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
-            echo "    cmin              minimizes a corpus for a target"
-            echo "    coverage          generates coverage for a fuzz target"
-            echo "    clean-coverage    clean coverage for a fuzz target"
-            echo "    debug             debugs a fuzz target with a testcase"
-            echo "    flamegraph        generates a flamegraph for a fuzz target with a testcase"
-            echo "    list              lists existing fuzz targets"
-            echo "    run               runs a fuzz target"
-            echo "    test              tests all fuzz targets"
+            echo "Usage: $0 <add|block-builder|block-builder-recursive|build|build-oss-fuzz|clean-coverage|cmin|coverage|debug|flamegraph|list|monitor-coverage|run|test|tmin>"
+            echo "    add                   adds a new fuzz target"
+            echo "    block-builder         runs rust tool to help build fuzzers"
+            echo "    block-builder-recursive runs block-builder on all Move.toml files in directory"
+            echo "    build                 builds fuzz targets"
+            echo "    build-oss-fuzz        builds fuzz targets for oss-fuzz"
+            echo "    clean-coverage        clean coverage for a fuzz target"
+            echo "    cmin                  minimizes a corpus for a target"
+            echo "    coverage              generates coverage for a fuzz target"
+            echo "    debug                 debugs a fuzz target with a testcase"
+            echo "    flamegraph           generates a flamegraph for a fuzz target with a testcase"
+            echo "    list                 lists existing fuzz targets"
+            echo "    monitor-coverage     monitors coverage for a fuzz target"
+            echo "    run                  runs a fuzz target"
+            echo "    test                 tests all fuzz targets"
+            echo "    tmin                 minimizes a crashing input for a target"
             ;;
     esac
     exit 1
@@ -121,7 +134,36 @@ function block-builder() {
     fi
     command=$1
     shift
-    cargo_local run --quiet -- $command $@
+    cargo_local run --release --quiet -- $command $@
+    exit 0
+}
+
+function block-builder-recursive() {
+    # Check if both arguments are provided
+    if [ "$#" -ne 2 ]; then
+        usage block-builder-recursive
+        exit 1 # Ensure exit after usage message
+    fi
+    search_directory=$1
+    destination_dir=$2 # Get destination directory from the second argument
+
+    # Ensure the destination directory exists (still good practice)
+    mkdir -p "$destination_dir"
+    if [ $? -ne 0 ]; then
+      error "Failed to create destination directory '$destination_dir'."
+    fi
+
+    # Directly invoke the Rust command for recursive generation.
+    # Pass the search directory as the first argument (base_dir)
+    # and the destination directory as the second argument (destination_path).
+    info "Invoking Rust command for recursive generation: base_dir='$search_directory' destination='$destination_dir'"
+    if ! cargo_local run --release --quiet -- generate_runnable_states_recursive "$search_directory" "$destination_dir"; then
+         error "Rust command 'generate_runnable_states_recursive' failed processing '$search_directory'"
+         # Exit the script if the command fails
+         exit 1
+    fi
+
+    info "Recursive generation command completed."
     exit 0
 }
 
@@ -171,7 +213,7 @@ function build-oss-fuzz() {
     clang --version
 
     # Limit the number of parallel jobs to avoid OOM
-    # export CARGO_BUILD_JOBS = 3
+    export CARGO_BUILD_JOBS=4
 
     # Build the fuzz targets
     # Doing one target at the time should prevent OOM, but use all thread while bulding dependecies
@@ -188,6 +230,10 @@ function build-oss-fuzz() {
     for corpus_zip in "${CORPUS_ZIPS[@]}"; do
         wget --content-disposition -P "$oss_fuzz_out" "$corpus_zip"
     done
+
+    # Hack to reuse the same seed corpus for both fuzz targets
+    cp "$oss_fuzz_out/move_aptosvm_publish_and_run_seed_corpus.zip" "$oss_fuzz_out/move_aptosvm_publish_seed_corpus.zip"
+    cp "$oss_fuzz_out/move_aptosvm_publish_and_run_seed_corpus.zip" "$oss_fuzz_out/move_bytecode_verifier_compiled_modules_seed_corpus.zip"
 }
 
 function cmin() {
@@ -310,7 +356,11 @@ function run() {
     fi
     info "Running $fuzz_target"
     features=$(get_features_for_target $fuzz_target)
-    cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 #-ignore_crashes=1
+    else
+        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
+    fi
 }
 
 function test() {
@@ -354,6 +404,50 @@ function list() {
     cargo fuzz list
 }
 
+# Helper function to get the latest modification time in a directory
+function get_latest_mtime() {
+  local dir=$1
+  # Find all files, get their mtime (Unix timestamp), sort numerically, take the last one (latest)
+  # Handle empty dir case with default 0. Use awk to ensure numeric output.
+  find "$dir" -type f -exec stat -f %m {} \; | sort -n | tail -n 1 | awk '{print $1+0}' || echo 0
+}
+
+function monitor-coverage() {
+    if [ -z "$1" ]; then
+        usage monitor-coverage
+    fi
+    local fuzz_target=$1
+    local corpus_dir="fuzz/corpus/$fuzz_target"
+
+    if [ ! -d "$corpus_dir" ]; then
+        error "Corpus directory $corpus_dir does not exist for target $fuzz_target"
+    fi
+
+    info "Starting coverage monitoring for target '$fuzz_target' on directory '$corpus_dir'..."
+    
+    # Initial coverage run
+    info "Running initial coverage generation..."
+    coverage "$fuzz_target"
+    local last_mtime=$(get_latest_mtime "$corpus_dir")
+    info "Initial coverage done. Last modification time: $last_mtime"
+
+    while true; do
+        local current_mtime=$(get_latest_mtime "$corpus_dir")
+        
+        # Check if current_mtime is greater than last_mtime
+        # Using awk for reliable floating point/integer comparison in bash
+        if awk -v current="$current_mtime" -v last="$last_mtime" 'BEGIN { exit !(current > last) }'; then
+            info "Detected changes in corpus directory (new mtime: $current_mtime > last mtime: $last_mtime). Regenerating coverage..."
+            coverage "$fuzz_target"
+            # Update last_mtime only after successful coverage run
+            last_mtime=$current_mtime
+            info "Coverage updated. New last modification time: $last_mtime"
+        fi
+        
+        sleep 10 # Check every 10 seconds
+    done
+}
+
 function check_cargo_fuzz() {
     if ! command -v cargo-fuzz &> /dev/null; then
         info "cargo-fuzz is not installed. Installing..."
@@ -363,6 +457,21 @@ function check_cargo_fuzz() {
 
 check_cargo_fuzz
 
+# use cargo fuzz tmin to minimize a crashing testcase
+function tmin() {
+    if [ "$#" -ne 2 ]; then
+        usage tmin
+    fi
+    fuzz_target=$1
+    input_case=$2
+    if [ ! -f "$input_case" ]; then
+        error "$input_case does not exist"
+    fi
+    info "Minimizing $input_case for target $fuzz_target"
+    features=$(get_features_for_target $fuzz_target)
+    cargo_fuzz tmin $features --sanitizer address -O $fuzz_target "$input_case"
+}
+
 case "$1" in
   "add")
     shift
@@ -371,6 +480,10 @@ case "$1" in
   "block-builder")
     shift
     block-builder "$@"
+    ;;
+  "block-builder-recursive")
+    shift
+    block-builder-recursive "$@"
     ;;
   "build")
     shift
@@ -411,6 +524,14 @@ case "$1" in
   "test")
     shift
     test
+    ;;
+  "monitor-coverage")
+    shift
+    monitor-coverage "$@"
+    ;;
+  "tmin")
+    shift
+    tmin "$@"
     ;;
   *)
     usage general

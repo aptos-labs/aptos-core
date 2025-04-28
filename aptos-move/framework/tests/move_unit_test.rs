@@ -44,9 +44,8 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
-    )
-    .unwrap();
-    if ok != UnitTestResult::Success {
+    );
+    if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
         panic!("move unit tests failed")
     }
 }
@@ -94,4 +93,9 @@ fn move_token_unit_tests() {
 #[test]
 fn move_token_objects_unit_tests() {
     run_tests_for_pkg("aptos-token-objects");
+}
+
+#[test]
+fn move_experimental_unit_tests() {
+    run_tests_for_pkg("aptos-experimental");
 }

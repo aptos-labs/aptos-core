@@ -9,9 +9,7 @@ use crate::{
     },
     MoveFunction, MoveStructTag, MoveType,
 };
-use aptos_framework::{
-    get_metadata_from_compiled_module, get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
-};
+use aptos_types::vm::module_metadata::prelude::*;
 use aptos_vm::determine_is_view;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -227,7 +225,7 @@ impl Bytecode for CompiledModule {
     }
 
     fn metadata(&self) -> Option<RuntimeModuleMetadataV1> {
-        get_metadata_from_compiled_module(self)
+        get_metadata_from_compiled_code(self)
     }
 
     fn function_is_view(&self, name: &IdentStr) -> bool {
@@ -277,7 +275,7 @@ impl Bytecode for CompiledScript {
     }
 
     fn metadata(&self) -> Option<RuntimeModuleMetadataV1> {
-        get_metadata_from_compiled_script(self)
+        get_metadata_from_compiled_code(self)
     }
 
     fn function_is_view(&self, _name: &IdentStr) -> bool {

@@ -64,6 +64,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
@@ -405,9 +406,8 @@ Only called during genesis to initialize system resources for this module.
 
 <pre><code>inline <b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_allow_missing_txn_authentication_key">allow_missing_txn_authentication_key</a>(transaction_sender: <b>address</b>): bool {
     // aa verifies authentication itself
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>() &&
-    (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_domain_account_abstraction_enabled">features::is_domain_account_abstraction_enabled</a>()
-        || <a href="account_abstraction.md#0x1_account_abstraction_using_dispatchable_authenticator">account_abstraction::using_dispatchable_authenticator</a>(transaction_sender))
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_derivable_account_abstraction_enabled">features::is_derivable_account_abstraction_enabled</a>()
+        || (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>() && <a href="account_abstraction.md#0x1_account_abstraction_using_dispatchable_authenticator">account_abstraction::using_dispatchable_authenticator</a>(transaction_sender))
 }
 </code></pre>
 
@@ -447,8 +447,8 @@ Only called during genesis to initialize system resources for this module.
     );
     <b>assert</b>!(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EBAD_CHAIN_ID">PROLOGUE_EBAD_CHAIN_ID</a>));
 
-    <b>let</b> transaction_sender = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(sender);
-    <b>let</b> gas_payer_address = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(gas_payer);
+    <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
+    <b>let</b> gas_payer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(gas_payer);
 
     <b>if</b> (
         transaction_sender == gas_payer_address
@@ -507,7 +507,7 @@ Only called during genesis to initialize system resources for this module.
                     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>)
                 );
             }
-        }
+        };
     };
 
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
@@ -775,7 +775,7 @@ Only called during genesis to initialize system resources for this module.
         //         ) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(secondary_signer_public_key_hashes[j]) == account_abstraction::native_authenticator(
         //         <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[j])
         //         && secondary_signer_public_key_hashes[j]
-        //             == account::spec_get_authentication_key(secondary_signer_addresses[j])
+        //             == <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[j])
         //             || features::spec_account_abstraction_enabled() && account_abstraction::using_native_authenticator(
         //             secondary_signer_addresses[j]
         //         ) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(
@@ -955,7 +955,7 @@ Called by the Adapter
     txn_max_gas_units: u64,
     gas_units_remaining: u64,
 ) {
-    <b>let</b> addr = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(
         <a href="account.md#0x1_account">account</a>,
         addr,
@@ -994,7 +994,7 @@ Called by the Adapter
     gas_units_remaining: u64,
     is_simulation: bool,
 ) {
-    <b>let</b> addr = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer_extended">epilogue_gas_payer_extended</a>(
         <a href="account.md#0x1_account">account</a>,
         addr,
@@ -1112,7 +1112,7 @@ Called by the Adapter
     };
 
     // Increment sequence number
-    <b>let</b> addr = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
 }
 </code></pre>
@@ -1263,7 +1263,7 @@ If there is no fee_payer, fee_payer = sender
     <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
     <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_simulation_enhancement_enabled">features::transaction_simulation_enhancement_enabled</a>() ||
         !<a href="transaction_validation.md#0x1_transaction_validation_skip_auth_key_check">skip_auth_key_check</a>(is_simulation, &fee_payer_public_key_hash)) {
-        <b>let</b> fee_payer_address = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&fee_payer);
+        <b>let</b> fee_payer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&fee_payer);
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&fee_payer_public_key_hash)) {
             <b>assert</b>!(
                 fee_payer_public_key_hash == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(fee_payer_address)),
@@ -1316,7 +1316,7 @@ If there is no fee_payer, fee_payer = sender
     );
     <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
 
-    <b>let</b> gas_payer_address = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&gas_payer);
+    <b>let</b> gas_payer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&gas_payer);
     // it's important <b>to</b> maintain the <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> <a href="code.md#0x1_code">code</a> consistent <b>with</b> vm
     // <b>to</b> do failed transaction cleanup.
     <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_simulation_enhancement_enabled">features::transaction_simulation_enhancement_enabled</a>() || !<a href="transaction_validation.md#0x1_transaction_validation_skip_gas_payment">skip_gas_payment</a>(
@@ -1355,7 +1355,7 @@ If there is no fee_payer, fee_payer = sender
     };
 
     // Increment sequence number
-    <b>let</b> addr = <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
 }
 </code></pre>
@@ -1518,20 +1518,20 @@ Aborts if TransactionValidation already exists.
     <b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;
     // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
     <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
-        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i]);
+        !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(secondary_signer_addresses[i]);
     <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
         !<a href="transaction_validation.md#0x1_transaction_validation_can_skip">can_skip</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_simulation_enhancement_enabled">features::spec_simulation_enhancement_enabled</a>(), is_simulation, secondary_signer_public_key_hashes[i]) &&
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(secondary_signer_public_key_hashes[i]) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
             secondary_signer_public_key_hashes[i]
         ) !=
-                <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
+                <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[i]);
     <b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
-        <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i]);
+        <a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(secondary_signer_addresses[i]);
     <b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(secondary_signer_public_key_hashes[i]) || <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(
             secondary_signer_public_key_hashes[i]
         ) ==
-            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i])
+            <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[i])
             || <a href="transaction_validation.md#0x1_transaction_validation_can_skip">can_skip</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_simulation_enhancement_enabled">features::spec_simulation_enhancement_enabled</a>(), is_simulation, secondary_signer_public_key_hashes[i]);
 }
 </code></pre>
@@ -1657,8 +1657,8 @@ not equal the number of singers.
     txn_sequence_number,
     txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(txn_sender_public_key),
 };
-<b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(fee_payer_address);
-<b>aborts_if</b> !(fee_payer_public_key_hash == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(fee_payer_address));
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(fee_payer_address);
+<b>aborts_if</b> !(fee_payer_public_key_hash == <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(fee_payer_address));
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_fee_payer_enabled">features::spec_fee_payer_enabled</a>();
 </code></pre>
 

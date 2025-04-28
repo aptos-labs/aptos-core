@@ -64,7 +64,8 @@ pub enum FeatureFlag {
     _DEPRECATED_RECONFIGURE_WITH_DKG = 45,
     KEYLESS_ACCOUNTS = 46,
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
-    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48, // This feature is not used
+    /// This feature was never used.
+    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
@@ -74,7 +75,8 @@ pub enum FeatureFlag {
     MULTISIG_V2_ENHANCEMENT = 55,
     DELEGATION_POOL_ALLOWLISTING = 56,
     MODULE_EVENT_MIGRATION = 57,
-    REJECT_UNSTABLE_BYTECODE = 58,
+    /// Enabled on mainnet, can never be disabled.
+    _REJECT_UNSTABLE_BYTECODE = 58,
     TRANSACTION_CONTEXT_EXTENSION = 59,
     COIN_TO_FUNGIBLE_ASSET_MIGRATION = 60,
     PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
@@ -85,14 +87,18 @@ pub enum FeatureFlag {
     AGGREGATOR_V2_IS_AT_LEAST_API = 66,
     CONCURRENT_FUNGIBLE_BALANCE = 67,
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
-    LIMIT_VM_TYPE_SIZE = 69,
+    /// Enabled on mainnet, cannot be disabled.
+    _LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
-    DISALLOW_USER_NATIVES = 71,
+    /// Enabled on mainnet, cannot be disabled.
+    _DISALLOW_USER_NATIVES = 71,
     ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
-    USE_COMPATIBILITY_CHECKER_V2 = 73,
+    /// Enabled on mainnet, cannot be disabled.
+    _USE_COMPATIBILITY_CHECKER_V2 = 73,
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
-    REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    /// Enabled on mainnet, can never be disabled.
+    _REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
@@ -124,9 +130,13 @@ pub enum FeatureFlag {
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
     BULLETPROOFS_BATCH_NATIVES = 87,
-    DOMAIN_ACCOUNT_ABSTRACTION = 88,
+    DERIVABLE_ACCOUNT_ABSTRACTION = 88,
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
+    NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
+    DEFAULT_ACCOUNT_RESOURCE = 91,
+
+    JWK_CONSENSUS_PER_KEY_MODE = 92,
 }
 
 impl FeatureFlag {
@@ -188,32 +198,38 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
             FeatureFlag::MODULE_EVENT_MIGRATION,
-            FeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::_REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
-            FeatureFlag::LIMIT_VM_TYPE_SIZE,
+            FeatureFlag::_LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
-            FeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::_DISALLOW_USER_NATIVES,
             FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
-            FeatureFlag::USE_COMPATIBILITY_CHECKER_V2,
+            FeatureFlag::_USE_COMPATIBILITY_CHECKER_V2,
             FeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
-            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+            FeatureFlag::_REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::_ENABLE_LOADER_V2,
+            FeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
-            FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION,
+            FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION,
             FeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::ENABLE_FUNCTION_VALUES,
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
+            FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
         ]
     }
 }
@@ -293,8 +309,8 @@ impl Features {
         self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
-    pub fn is_domain_account_abstraction_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::DOMAIN_ACCOUNT_ABSTRACTION)
+    pub fn is_derivable_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {
@@ -368,6 +384,14 @@ impl Features {
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
+    }
+
+    pub fn is_default_account_resource_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
+    }
+
+    pub fn is_new_account_default_to_fa_store(&self) -> bool {
+        self.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

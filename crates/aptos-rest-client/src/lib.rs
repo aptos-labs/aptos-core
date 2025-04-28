@@ -314,7 +314,29 @@ impl Client {
         }
     }
 
-    async fn view_account_balance_bcs_impl(
+    /// Gets the balance of a specific asset type for an account.
+    /// The `asset_type` parameter can be either:
+    /// * A coin type (e.g. "0x1::aptos_coin::AptosCoin")
+    /// * A fungible asset metadata address (e.g. "0xa")
+    /// For more details, see: https://aptos.dev/en/build/apis/fullnode-rest-api-reference#tag/accounts/GET/accounts/{address}/balance/{asset_type}
+    pub async fn get_account_balance(
+        &self,
+        address: AccountAddress,
+        asset_type: &str,
+    ) -> AptosResult<Response<u64>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/balance/{}",
+            address.to_hex(),
+            asset_type
+        ))?;
+        let response = self.inner.get(url).send().await?;
+        self.json(response).await
+    }
+
+    /// Internal implementation for viewing coin balance at a specific version.
+    /// Note: This function should only be used when you need to check coin balance at a specific version.
+    /// This function does not support fungible assets - use `get_account_balance` instead for fungible assets.
+    pub async fn view_account_balance_bcs_impl(
         &self,
         address: AccountAddress,
         coin_type: &str,
@@ -1044,7 +1066,7 @@ impl Client {
         Ok(self.inner.get(url).send().await?)
     }
 
-    pub async fn get_account_transactions(
+    pub async fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start: Option<u64>,

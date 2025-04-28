@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+  ┌─ tests/checking-lang-v2.2/lambda/constraints.move:2:30
+  │
+2 │     struct Func1<phantom T>(|T|T) has copy, drop;
+  │                              ^
+
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+  ┌─ tests/checking-lang-v2.2/lambda/constraints.move:3:30
+  │
+3 │     struct Func2<phantom T>(|&T|&T) has copy, drop;
+  │                              ^^
+
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+  ┌─ tests/checking-lang-v2.2/lambda/constraints.move:4:35
+  │
+4 │     struct Func3<phantom T>(|u64|(T, T)) has copy, drop;
+  │                                   ^
+
+error: tuple type `(u64, u64)` is not allowed as a type argument
+  ┌─ tests/checking-lang-v2.2/lambda/constraints.move:5:24
+  │
+5 │     struct Func4(|u64|((u64, u64), u64)) has copy, drop;
+  │                        ^^^^^^^^^^

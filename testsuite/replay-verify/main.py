@@ -28,7 +28,7 @@ SHARDING_ENABLED = True
 MAX_RETRIES = 5
 RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
-TEARDOWN_DELAY= 30 * 60 # 30 minutes slack to allow for pod setup and teardown
+TEARDOWN_DELAY = 30 * 60  # 30 minutes slack to allow for pod setup and teardown
 
 REPLAY_CONCURRENCY_LEVEL = 1
 
@@ -208,7 +208,9 @@ class WorkerPod:
         pod_manifest["metadata"]["labels"]["run"] = self.label
         pod_manifest["spec"]["containers"][0]["image"] = self.image
         pod_ttl = self.config.timeout_secs + TEARDOWN_DELAY
-        pod_manifest["metadata"]["annotations"]["k8s-ttl-controller.twin.sh/ttl"] = f"{pod_ttl}s"
+        pod_manifest["metadata"]["annotations"][
+            "k8s-ttl-controller.twin.sh/ttl"
+        ] = f"{pod_ttl}s"
         pod_manifest["spec"]["volumes"][0]["persistentVolumeClaim"][
             "claimName"
         ] = self.get_claim_name()

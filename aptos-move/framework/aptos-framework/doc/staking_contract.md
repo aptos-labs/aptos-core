@@ -3456,7 +3456,8 @@ The Account exists under the staker.
 The guid_creation_num of the account resource is up to MAX_U64.
 
 
-<pre><code><b>include</b> <a href="staking_contract.md#0x1_staking_contract_NewStakingContractsHolderAbortsIf">NewStakingContractsHolderAbortsIf</a>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>include</b> <a href="staking_contract.md#0x1_staking_contract_NewStakingContractsHolderAbortsIf">NewStakingContractsHolderAbortsIf</a>;
 </code></pre>
 
 
@@ -3468,10 +3469,6 @@ The guid_creation_num of the account resource is up to MAX_U64.
 <pre><code><b>schema</b> <a href="staking_contract.md#0x1_staking_contract_NewStakingContractsHolderAbortsIf">NewStakingContractsHolderAbortsIf</a> {
     staker: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
-    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 9 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 9 &gt; MAX_U64;
 }
 </code></pre>
 

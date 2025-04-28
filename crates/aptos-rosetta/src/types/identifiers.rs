@@ -119,6 +119,22 @@ impl AccountIdentifier {
         }
     }
 
+    pub fn is_commission(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_commission()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_rewards(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_rewards()
+        } else {
+            false
+        }
+    }
+
     pub fn is_pending_active_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
             inner.is_pending_active_stake()
@@ -223,6 +239,8 @@ const PENDING_ACTIVE_STAKE: &str = "pending_active_stake";
 const ACTIVE_STAKE: &str = "active_stake";
 const PENDING_INACTIVE_STAKE: &str = "pending_inactive_stake";
 const INACTIVE_STAKE: &str = "inactive_stake";
+const COMMISSION: &str = "commission";
+const REWARDS: &str = "rewards";
 const ACCOUNT_SEPARATOR: char = '-';
 
 impl SubAccountIdentifier {
@@ -304,6 +322,20 @@ impl SubAccountIdentifier {
         }
     }
 
+    pub fn new_commission() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: COMMISSION.to_string(),
+            metadata: None,
+        }
+    }
+
+    pub fn new_rewards() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: REWARDS.to_string(),
+            metadata: None,
+        }
+    }
+
     pub fn is_total_stake(&self) -> bool {
         self.address.as_str() == STAKE
     }
@@ -322,6 +354,14 @@ impl SubAccountIdentifier {
 
     pub fn is_inactive_stake(&self) -> bool {
         self.address.as_str() == INACTIVE_STAKE && self.metadata.is_none()
+    }
+
+    pub fn is_commission(&self) -> bool {
+        self.address.as_str() == COMMISSION && self.metadata.is_none()
+    }
+
+    pub fn is_rewards(&self) -> bool {
+        self.address.as_str() == REWARDS && self.metadata.is_none()
     }
 
     pub fn is_delegator_active_stake(&self) -> bool {

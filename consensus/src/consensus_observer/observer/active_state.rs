@@ -16,6 +16,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::wrapped_ledger_info::WrappedLedgerInfo;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
@@ -106,12 +107,12 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
-    ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
+    ) -> Box<dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
 
         // Create the commit callback
-        Box::new(move |ledger_info: LedgerInfoWithSignatures| {
+        Box::new(move |_, ledger_info: LedgerInfoWithSignatures| {
             handle_committed_blocks(
                 pending_ordered_blocks,
                 block_payload_store,
@@ -127,8 +128,15 @@ impl ActiveObserverState {
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
     ) -> StateComputerCommitCallBackType {
-        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
-        Box::new(move |_, ledger_info| callback(ledger_info))
+        let root = self.root.clone();
+        Box::new(move |_, ledger_info| {
+            handle_committed_blocks(
+                pending_ordered_blocks,
+                block_payload_store,
+                root,
+                ledger_info,
+            );
+        })
     }
 
     /// Returns the current epoch state
@@ -310,6 +318,8 @@ fn handle_committed_blocks(
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     ledger_info: LedgerInfoWithSignatures,
 ) {
+    // grab the lock for whole section to avoid inconsistent views
+    let mut root = root.lock();
     // Remove the committed blocks from the payload and pending stores
     block_payload_store.lock().remove_blocks_for_epoch_round(
         ledger_info.commit_info().epoch(),
@@ -320,7 +330,6 @@ fn handle_committed_blocks(
         .remove_blocks_for_commit(&ledger_info);
 
     // Verify the ledger info is for the same epoch
-    let mut root = root.lock();
     if ledger_info.commit_info().epoch() != root.commit_info().epoch() {
         warn!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -352,8 +361,9 @@ fn handle_committed_blocks(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network::observer_message::{
-        BlockPayload, BlockTransactionPayload, OrderedBlock,
+    use crate::consensus_observer::{
+        network::observer_message::{BlockPayload, BlockTransactionPayload, OrderedBlock},
+        observer::execution_pool::ObservedOrderedBlock,
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_consensus_types::{
@@ -575,10 +585,14 @@ mod test {
                 create_ledger_info(epoch, i as aptos_consensus_types::common::Round);
             let ordered_block = OrderedBlock::new(blocks, ordered_proof);
 
+            // Create an observed ordered block
+            let observed_ordered_block =
+                ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
             // Insert the block into the ordered block store
             ordered_block_store
                 .lock()
-                .insert_ordered_block(ordered_block.clone());
+                .insert_ordered_block(observed_ordered_block.clone());
 
             // Add the block to the ordered blocks
             ordered_blocks.push(ordered_block);

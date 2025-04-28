@@ -19,8 +19,8 @@ use std::ops::{Deref, DerefMut};
 /// Major features include incremental gas charging and less ambiguous error handling. For this
 /// reason, native functions should always use [`SafeNativeContext`] instead of [`NativeContext`].
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
-    pub(crate) inner: &'c mut NativeContext<'a, 'b, 'd>,
+pub struct SafeNativeContext<'a, 'b, 'c> {
+    pub(crate) inner: &'c mut NativeContext<'a, 'b>,
 
     pub(crate) timed_features: &'c TimedFeatures,
     pub(crate) features: &'c Features,
@@ -37,21 +37,21 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
-impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
-    type Target = NativeContext<'a, 'b, 'd>;
+impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c> {
+    type Target = NativeContext<'a, 'b>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c, 'd> DerefMut for SafeNativeContext<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'c> DerefMut for SafeNativeContext<'a, 'b, 'c> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**

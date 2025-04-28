@@ -19,6 +19,12 @@ on:
         required: false
         default: true
         description: "Dry run - If checked, the release will not be created"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip checks - If checked, the release will skip version checks"
+
 
 jobs:
   # TODO: Deprecated, please use "Linux" instead as it's more straightforwardly named
@@ -29,9 +35,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -46,9 +52,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -56,6 +62,8 @@ jobs:
           path: aptos-cli-*.zip
 
   # Generic linux should be the older version, more likely compatible
+  # This actually builds for non-SIMD processors, and an older GLIBC
+  # TODO: Possibly find a way to support a baseline GLIBC rather than just whatever is on 22.04
   build-linux-binary:
     name: "Build Linux binary"
     runs-on: ubuntu-22.04
@@ -63,9 +71,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "true"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -80,50 +88,46 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}"
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: cli-builds-linux-arm
           path: aptos-cli-*.zip
 
-  # build-macos-x86_64-binary:
-  #   name: "Build MacOS x86_64 binary"
-  #   runs-on: macos-13
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         ref: ${{ github.event.inputs.source_git_ref_override }}
-  #     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-  #       with:
-  #         macos: true
-  #     - name: Build CLI
-  #       run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
-  #     - name: Upload Binary
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: cli-builds-macos-x86-64
-  #         path: aptos-cli-*.zip
+  build-macos-x86_64-binary:
+    name: "Build MacOS x86_64 binary"
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-macos-x86-64
+          path: aptos-cli-*.zip
 
-  # build-macos-arm-binary:
-  #   name: "Build MacOS ARM binary"
-  #   runs-on: macos-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         ref: ${{ github.event.inputs.source_git_ref_override }}
-  #     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-  #       with:
-  #         macos: true
-  #     - name: Build CLI
-  #       run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}"
-  #     - name: Upload Binary
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: cli-builds-macos-arm
-  #         path: aptos-cli-*.zip
+  build-macos-arm-binary:
+    name: "Build MacOS ARM binary"
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-macos-arm
+          path: aptos-cli-*.zip
 
   build-windows-binary:
     name: "Build Windows binary"
@@ -152,8 +156,8 @@ jobs:
       - build-windows-binary
       - build-linux-binary
       - build-linux-arm-binary
-      #- build-macos-arm-binary
-      #- build-macos-x86_64-binary
+      - build-macos-arm-binary
+      - build-macos-x86_64-binary
     runs-on: ubuntu-latest
     permissions:
       contents: "write"

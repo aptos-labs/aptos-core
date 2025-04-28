@@ -9,18 +9,17 @@ use crate::{
 };
 use move_binary_format::{errors::*, file_format::LocalIndex};
 use move_core_types::{
-    account_address::AccountAddress,
     effects::{ChangeSet, Changes},
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_types::{gas::GasMeter, values::Value};
+use move_vm_types::{gas::GasMeter, resolver::ResourceResolver, values::Value};
 use std::borrow::Borrow;
 
 pub struct Session<'r> {
-    pub(crate) data_cache: TransactionDataCache<'r>,
+    pub(crate) data_cache: TransactionDataCache,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 
@@ -50,6 +49,7 @@ impl<'r> Session<'r> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
+        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<()> {
         if !func.is_entry() {
             let module_id = func
@@ -70,6 +70,7 @@ impl<'r> Session<'r> {
             traversal_context,
             &mut self.native_extensions,
             module_storage,
+            resource_resolver,
         )?;
         Ok(())
     }
@@ -84,6 +85,7 @@ impl<'r> Session<'r> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
+        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         let func = module_storage.load_function(module_id, function_name, &ty_args)?;
         MoveVM::execute_loaded_function(
@@ -94,6 +96,7 @@ impl<'r> Session<'r> {
             traversal_context,
             &mut self.native_extensions,
             module_storage,
+            resource_resolver,
         )
     }
 
@@ -104,6 +107,7 @@ impl<'r> Session<'r> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
+        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function(
             func,
@@ -113,6 +117,7 @@ impl<'r> Session<'r> {
             traversal_context,
             &mut self.native_extensions,
             module_storage,
+            resource_resolver,
         )
     }
 
@@ -140,6 +145,7 @@ impl<'r> Session<'r> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         code_storage: &impl CodeStorage,
+        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<()> {
         let main = code_storage.load_script(script.borrow(), &ty_args)?;
         MoveVM::execute_loaded_function(
@@ -150,12 +156,9 @@ impl<'r> Session<'r> {
             traversal_context,
             &mut self.native_extensions,
             code_storage,
+            resource_resolver,
         )?;
         Ok(())
-    }
-
-    pub fn num_mutated_resources(&self, sender: &AccountAddress) -> u64 {
-        self.data_cache.num_mutated_resources(sender)
     }
 
     /// Finish up the session and produce the side effects.

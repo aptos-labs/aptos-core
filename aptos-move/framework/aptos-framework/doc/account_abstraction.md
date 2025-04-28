@@ -8,22 +8,22 @@
 -  [Struct `UpdateDispatchableAuthenticator`](#0x1_account_abstraction_UpdateDispatchableAuthenticator)
 -  [Struct `RemoveDispatchableAuthenticator`](#0x1_account_abstraction_RemoveDispatchableAuthenticator)
 -  [Enum Resource `DispatchableAuthenticator`](#0x1_account_abstraction_DispatchableAuthenticator)
--  [Enum `DomainRegisterValue`](#0x1_account_abstraction_DomainRegisterValue)
--  [Enum Resource `DomainDispatchableAuthenticator`](#0x1_account_abstraction_DomainDispatchableAuthenticator)
+-  [Enum `DerivableRegisterValue`](#0x1_account_abstraction_DerivableRegisterValue)
+-  [Enum Resource `DerivableDispatchableAuthenticator`](#0x1_account_abstraction_DerivableDispatchableAuthenticator)
 -  [Constants](#@Constants_0)
 -  [Function `using_dispatchable_authenticator`](#0x1_account_abstraction_using_dispatchable_authenticator)
 -  [Function `dispatchable_authenticator`](#0x1_account_abstraction_dispatchable_authenticator)
--  [Function `derive_domain_account_address_view`](#0x1_account_abstraction_derive_domain_account_address_view)
--  [Function `derive_domain_account_address`](#0x1_account_abstraction_derive_domain_account_address)
+-  [Function `derive_account_address_view`](#0x1_account_abstraction_derive_account_address_view)
+-  [Function `derive_account_address`](#0x1_account_abstraction_derive_account_address)
 -  [Function `add_authentication_function`](#0x1_account_abstraction_add_authentication_function)
 -  [Function `remove_authentication_function`](#0x1_account_abstraction_remove_authentication_function)
 -  [Function `remove_authenticator`](#0x1_account_abstraction_remove_authenticator)
--  [Function `register_domain_with_authentication_function`](#0x1_account_abstraction_register_domain_with_authentication_function)
+-  [Function `register_derivable_authentication_function`](#0x1_account_abstraction_register_derivable_authentication_function)
 -  [Function `initialize`](#0x1_account_abstraction_initialize)
 -  [Function `resource_addr`](#0x1_account_abstraction_resource_addr)
 -  [Function `update_dispatchable_authenticator_impl`](#0x1_account_abstraction_update_dispatchable_authenticator_impl)
 -  [Function `dispatchable_authenticator_internal`](#0x1_account_abstraction_dispatchable_authenticator_internal)
--  [Function `dispatchable_domain_authenticator_internal`](#0x1_account_abstraction_dispatchable_domain_authenticator_internal)
+-  [Function `dispatchable_derivable_authenticator_internal`](#0x1_account_abstraction_dispatchable_derivable_authenticator_internal)
 -  [Function `authenticate`](#0x1_account_abstraction_authenticate)
 -  [Function `dispatchable_authenticate`](#0x1_account_abstraction_dispatchable_authenticate)
 -  [Function `add_dispatchable_authentication_function`](#0x1_account_abstraction_add_dispatchable_authentication_function)
@@ -39,6 +39,7 @@
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="function_info.md#0x1_function_info">0x1::function_info</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -164,13 +165,13 @@ enum <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthent
 
 </details>
 
-<a id="0x1_account_abstraction_DomainRegisterValue"></a>
+<a id="0x1_account_abstraction_DerivableRegisterValue"></a>
 
-## Enum `DomainRegisterValue`
+## Enum `DerivableRegisterValue`
 
 
 
-<pre><code>enum <a href="account_abstraction.md#0x1_account_abstraction_DomainRegisterValue">DomainRegisterValue</a> <b>has</b> store
+<pre><code>enum <a href="account_abstraction.md#0x1_account_abstraction_DerivableRegisterValue">DerivableRegisterValue</a> <b>has</b> store
 </code></pre>
 
 
@@ -197,14 +198,14 @@ enum <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthent
 
 </details>
 
-<a id="0x1_account_abstraction_DomainDispatchableAuthenticator"></a>
+<a id="0x1_account_abstraction_DerivableDispatchableAuthenticator"></a>
 
-## Enum Resource `DomainDispatchableAuthenticator`
+## Enum Resource `DerivableDispatchableAuthenticator`
 
-The dispatchable domain-scoped authenticator, that defines how to authenticate
+The dispatchable derivable-scoped authenticator, that defines how to authenticate
 
 
-<pre><code>enum <a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a> <b>has</b> key
+<pre><code>enum <a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a> <b>has</b> key
 </code></pre>
 
 
@@ -223,7 +224,7 @@ The dispatchable domain-scoped authenticator, that defines how to authenticate
 
 <dl>
 <dt>
-<code>auth_functions: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, <a href="account_abstraction.md#0x1_account_abstraction_DomainRegisterValue">account_abstraction::DomainRegisterValue</a>&gt;</code>
+<code>auth_functions: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, <a href="account_abstraction.md#0x1_account_abstraction_DerivableRegisterValue">account_abstraction::DerivableRegisterValue</a>&gt;</code>
 </dt>
 <dd>
 
@@ -260,13 +261,22 @@ The dispatchable domain-scoped authenticator, that defines how to authenticate
 
 
 
-<a id="0x1_account_abstraction_DOMAIN_ABSTRACTION_DERIVED_SCHEME"></a>
+<a id="0x1_account_abstraction_DERIVABLE_ABSTRACTION_DERIVED_SCHEME"></a>
 
-domain_aa_account_address uses this for domain separation within its native implementation
+derivable_aa_account_address uses this for domain separation within its native implementation
 source is defined in Scheme enum in types/src/transaction/authenticator.rs
 
 
-<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_DOMAIN_ABSTRACTION_DERIVED_SCHEME">DOMAIN_ABSTRACTION_DERIVED_SCHEME</a>: u8 = 5;
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_DERIVABLE_ABSTRACTION_DERIVED_SCHEME">DERIVABLE_ABSTRACTION_DERIVED_SCHEME</a>: u8 = 5;
+</code></pre>
+
+
+
+<a id="0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED">EACCOUNT_ABSTRACTION_NOT_ENABLED</a>: u64 = 8;
 </code></pre>
 
 
@@ -289,20 +299,29 @@ source is defined in Scheme enum in types/src/transaction/authenticator.rs
 
 
 
+<a id="0x1_account_abstraction_EDERIVABLE_AA_NOT_INITIALIZED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_AA_NOT_INITIALIZED">EDERIVABLE_AA_NOT_INITIALIZED</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED">EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED</a>: u64 = 9;
+</code></pre>
+
+
+
 <a id="0x1_account_abstraction_EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED"></a>
 
 
 
 <pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED">EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x1_account_abstraction_EDOMAIN_AA_NOT_INITIALIZED"></a>
-
-
-
-<pre><code><b>const</b> <a href="account_abstraction.md#0x1_account_abstraction_EDOMAIN_AA_NOT_INITIALIZED">EDOMAIN_AA_NOT_INITIALIZED</a>: u64 = 6;
 </code></pre>
 
 
@@ -382,16 +401,16 @@ Return the current dispatchable authenticator move function info. <code>None</co
 
 </details>
 
-<a id="0x1_account_abstraction_derive_domain_account_address_view"></a>
+<a id="0x1_account_abstraction_derive_account_address_view"></a>
 
-## Function `derive_domain_account_address_view`
+## Function `derive_account_address_view`
 
-Return the account address corresponding to the given <code>account_identity</code>,
-for the domain account abstraction defined by the given function.
+Return the account address corresponding to the given <code>abstract_public_key</code>,
+for the derivable account abstraction defined by the given function.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_domain_account_address_view">derive_domain_account_address_view</a>(module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, account_identity: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+<b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address_view">derive_account_address_view</a>(module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, abstract_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
 </code></pre>
 
 
@@ -400,15 +419,15 @@ for the domain account abstraction defined by the given function.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_domain_account_address_view">derive_domain_account_address_view</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address_view">derive_account_address_view</a>(
     module_address: <b>address</b>,
     module_name: String,
     function_name: String,
-    account_identity: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+    abstract_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ): <b>address</b> {
-    <a href="account_abstraction.md#0x1_account_abstraction_derive_domain_account_address">derive_domain_account_address</a>(
+    <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address">derive_account_address</a>(
         <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(module_address, module_name, function_name),
-        &account_identity,
+        &abstract_public_key,
     )
 }
 </code></pre>
@@ -417,17 +436,17 @@ for the domain account abstraction defined by the given function.
 
 </details>
 
-<a id="0x1_account_abstraction_derive_domain_account_address"></a>
+<a id="0x1_account_abstraction_derive_account_address"></a>
 
-## Function `derive_domain_account_address`
+## Function `derive_account_address`
 
-Return the account address corresponding to the given <code>account_identity</code>,
-for the domain account abstraction defined by the given function.
+Return the account address corresponding to the given <code>abstract_public_key</code>,
+for the derivable account abstraction defined by the given function.
 TODO: probably worth creating some module with all these derived functions,
 and do computation/caching in rust to avoid recomputation, as we do for objects.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_domain_account_address">derive_domain_account_address</a>(domain_func_info: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, account_identity: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address">derive_account_address</a>(derivable_func_info: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
 </code></pre>
 
 
@@ -436,13 +455,13 @@ and do computation/caching in rust to avoid recomputation, as we do for objects.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_domain_account_address">derive_domain_account_address</a>(domain_func_info: FunctionInfo, account_identity: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address">derive_account_address</a>(derivable_func_info: FunctionInfo, abstract_public_key: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> {
     // using <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">bcs</a> serialized structs here - this allows for no need for separators.
-    // Alternative would've been <b>to</b> create unique <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>, we would need <b>to</b> convert domain_func_info into <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>,
+    // Alternative would've been <b>to</b> create unique <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>, we would need <b>to</b> convert derivable_func_info into <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>,
     // then authentication_key <b>to</b> hex, and then we need separators <b>as</b> well - like ::
-    let bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&domain_func_info);
-    bytes.append(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(account_identity));
-    bytes.push_back(<a href="account_abstraction.md#0x1_account_abstraction_DOMAIN_ABSTRACTION_DERIVED_SCHEME">DOMAIN_ABSTRACTION_DERIVED_SCHEME</a>);
+    let bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&derivable_func_info);
+    bytes.append(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(abstract_public_key));
+    bytes.push_back(<a href="account_abstraction.md#0x1_account_abstraction_DERIVABLE_ABSTRACTION_DERIVED_SCHEME">DERIVABLE_ABSTRACTION_DERIVED_SCHEME</a>);
     <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
 }
 </code></pre>
@@ -474,6 +493,7 @@ Note: it is a private entry function that can only be called directly from trans
     module_name: String,
     function_name: String,
 ) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED">EACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
     <b>assert</b>!(!is_permissioned_signer(<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="account_abstraction.md#0x1_account_abstraction_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <a href="account_abstraction.md#0x1_account_abstraction_update_dispatchable_authenticator_impl">update_dispatchable_authenticator_impl</a>(
         <a href="account.md#0x1_account">account</a>,
@@ -561,22 +581,22 @@ Note: it is a private entry function that can only be called directly from trans
 
 </details>
 
-<a id="0x1_account_abstraction_register_domain_with_authentication_function"></a>
+<a id="0x1_account_abstraction_register_derivable_authentication_function"></a>
 
-## Function `register_domain_with_authentication_function`
+## Function `register_derivable_authentication_function`
 
-Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+Add dispatchable derivable authentication function, that enables account abstraction via this function.
 This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
 dispatchable function needs to verify two things:
-- that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
-- that signing_data.domain_account_identity() is correct identity representing the authenticator
+- that signing_data.derivable_abstract_signature() is a valid signature of signing_data.digest() (just like regular AA)
+- that signing_data.derivable_abstract_public_key() is correct identity representing the authenticator
 (missing this step would allow impersonation)
 
 Note: This is  public entry function, as it requires framework signer, and that can
 only be obtained as a part of the governance script.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_register_domain_with_authentication_function">register_domain_with_authentication_function</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_register_derivable_authentication_function">register_derivable_authentication_function</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -585,17 +605,18 @@ only be obtained as a part of the governance script.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_register_domain_with_authentication_function">register_domain_with_authentication_function</a>(
+<pre><code><b>public</b> entry <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_register_derivable_authentication_function">register_derivable_authentication_function</a>(
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     module_address: <b>address</b>,
     module_name: String,
     function_name: String,
-) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a> {
+) <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_derivable_account_abstraction_enabled">features::is_derivable_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED">EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
-    <a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>[@aptos_framework].auth_functions.add(
+    <a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a>[@aptos_framework].auth_functions.add(
         <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(module_address, module_name, function_name),
-        DomainRegisterValue::Empty,
+        DerivableRegisterValue::Empty,
     );
 }
 </code></pre>
@@ -623,7 +644,7 @@ only be obtained as a part of the governance script.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>move_to</b>(
         aptos_framework,
-        DomainDispatchableAuthenticator::V1 { auth_functions: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(0, 0, <b>false</b>) }
+        DerivableDispatchableAuthenticator::V1 { auth_functions: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(0, 0, <b>false</b>) }
     );
 }
 </code></pre>
@@ -758,13 +779,13 @@ only be obtained as a part of the governance script.
 
 </details>
 
-<a id="0x1_account_abstraction_dispatchable_domain_authenticator_internal"></a>
+<a id="0x1_account_abstraction_dispatchable_derivable_authenticator_internal"></a>
 
-## Function `dispatchable_domain_authenticator_internal`
+## Function `dispatchable_derivable_authenticator_internal`
 
 
 
-<pre><code><b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_domain_authenticator_internal">dispatchable_domain_authenticator_internal</a>(): &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, <a href="account_abstraction.md#0x1_account_abstraction_DomainRegisterValue">account_abstraction::DomainRegisterValue</a>&gt;
+<pre><code><b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_derivable_authenticator_internal">dispatchable_derivable_authenticator_internal</a>(): &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, <a href="account_abstraction.md#0x1_account_abstraction_DerivableRegisterValue">account_abstraction::DerivableRegisterValue</a>&gt;
 </code></pre>
 
 
@@ -773,9 +794,9 @@ only be obtained as a part of the governance script.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_domain_authenticator_internal">dispatchable_domain_authenticator_internal</a>(): &BigOrderedMap&lt;FunctionInfo, <a href="account_abstraction.md#0x1_account_abstraction_DomainRegisterValue">DomainRegisterValue</a>&gt; {
-    <b>assert</b>!(<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDOMAIN_AA_NOT_INITIALIZED">EDOMAIN_AA_NOT_INITIALIZED</a>));
-    &<a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a>[@aptos_framework].auth_functions
+<pre><code>inline <b>fun</b> <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_derivable_authenticator_internal">dispatchable_derivable_authenticator_internal</a>(): &BigOrderedMap&lt;FunctionInfo, <a href="account_abstraction.md#0x1_account_abstraction_DerivableRegisterValue">DerivableRegisterValue</a>&gt; {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_AA_NOT_INITIALIZED">EDERIVABLE_AA_NOT_INITIALIZED</a>));
+    &<a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a>[@aptos_framework].auth_functions
 }
 </code></pre>
 
@@ -802,15 +823,18 @@ only be obtained as a part of the governance script.
     <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     func_info: FunctionInfo,
     signing_data: AbstractionAuthData,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>, <a href="account_abstraction.md#0x1_account_abstraction_DomainDispatchableAuthenticator">DomainDispatchableAuthenticator</a> {
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="account_abstraction.md#0x1_account_abstraction_DispatchableAuthenticator">DispatchableAuthenticator</a>, <a href="account_abstraction.md#0x1_account_abstraction_DerivableDispatchableAuthenticator">DerivableDispatchableAuthenticator</a> {
     <b>let</b> master_signer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
 
-    <b>if</b> (signing_data.is_domain()) {
-        <b>assert</b>!(master_signer_addr == <a href="account_abstraction.md#0x1_account_abstraction_derive_domain_account_address">derive_domain_account_address</a>(func_info, signing_data.domain_account_identity()), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>));
+    <b>if</b> (signing_data.is_derivable()) {
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_derivable_account_abstraction_enabled">features::is_derivable_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED">EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
+        <b>assert</b>!(master_signer_addr == <a href="account_abstraction.md#0x1_account_abstraction_derive_account_address">derive_account_address</a>(func_info, signing_data.derivable_abstract_public_key()), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>));
 
-        <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_domain_authenticator_internal">dispatchable_domain_authenticator_internal</a>();
+        <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_derivable_authenticator_internal">dispatchable_derivable_authenticator_internal</a>();
         <b>assert</b>!(func_infos.contains(&func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     } <b>else</b> {
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EACCOUNT_ABSTRACTION_NOT_ENABLED">EACCOUNT_ABSTRACTION_NOT_ENABLED</a>));
+
         <b>let</b> func_infos = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticator_internal">dispatchable_authenticator_internal</a>(master_signer_addr);
         <b>assert</b>!(func_infos.contains(&func_info), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account_abstraction.md#0x1_account_abstraction_EFUNCTION_INFO_EXISTENCE">EFUNCTION_INFO_EXISTENCE</a>));
     };
@@ -819,7 +843,7 @@ only be obtained as a part of the governance script.
     <b>let</b> returned_signer = <a href="account_abstraction.md#0x1_account_abstraction_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>, signing_data, &func_info);
     // Returned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> MUST represent the same <a href="account.md#0x1_account">account</a> <b>address</b>. Otherwise, it may <b>break</b> the <b>invariant</b> of Aptos blockchain!
     <b>assert</b>!(
-        master_signer_addr == <a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(&returned_signer),
+        master_signer_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&returned_signer),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account_abstraction.md#0x1_account_abstraction_EINCONSISTENT_SIGNER_ADDRESS">EINCONSISTENT_SIGNER_ADDRESS</a>)
     );
     returned_signer

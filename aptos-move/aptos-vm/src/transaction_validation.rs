@@ -4,7 +4,7 @@
 use crate::{
     aptos_vm::SerializedSigners,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::SessionExt,
+    move_vm_ext::{AptosMoveResolver, SessionExt},
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
@@ -92,7 +92,7 @@ impl TransactionValidation {
 }
 
 pub(crate) fn run_script_prologue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
@@ -109,7 +109,9 @@ pub(crate) fn run_script_prologue(
     let chain_id = txn_data.chain_id();
     let mut gas_meter = UnmeteredGasMeter;
     // Use the new prologues that takes signer from both sender and optional gas payer
-    if features.is_account_abstraction_enabled() {
+    if features.is_account_abstraction_enabled()
+        || features.is_derivable_account_abstraction_enabled()
+    {
         let secondary_auth_keys: Vec<MoveValue> = txn_data
             .secondary_authentication_proofs
             .iter()
@@ -345,7 +347,7 @@ pub(crate) fn run_script_prologue(
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
@@ -385,7 +387,7 @@ pub(crate) fn run_multisig_prologue(
 }
 
 fn run_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -398,7 +400,9 @@ fn run_epilogue(
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
 
-    if features.is_account_abstraction_enabled() {
+    if features.is_account_abstraction_enabled()
+        || features.is_derivable_account_abstraction_enabled()
+    {
         let serialize_args = vec![
             serialized_signers.sender(),
             serialized_signers
@@ -521,7 +525,7 @@ fn run_epilogue(
 }
 
 fn emit_fee_statement(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
@@ -541,7 +545,7 @@ fn emit_fee_statement(
 /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -576,7 +580,7 @@ pub(crate) fn run_success_epilogue(
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,

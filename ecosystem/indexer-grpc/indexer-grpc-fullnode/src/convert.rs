@@ -798,11 +798,9 @@ pub fn convert_transaction(
     let txn_data = match &transaction {
         Transaction::UserTransaction(ut) => {
             timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
-            #[allow(deprecated)]
-            let expiration_timestamp_secs = Some(convert_timestamp_secs(std::cmp::min(
+            let expiration_timestamp_secs = Some(convert_timestamp_secs(
                 ut.request.expiration_timestamp_secs.0,
-                chrono::NaiveDateTime::MAX.timestamp() as u64,
-            )));
+            ));
             transaction::transaction::TxnData::User(transaction::UserTransaction {
                 request: Some(transaction::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),

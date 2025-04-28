@@ -14,8 +14,7 @@ use crate::{
     HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
     MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
     SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange,
-    WriteSetPayload,
+    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -36,6 +35,7 @@ use aptos_types::{
         BlockEndInfo, BlockEpiloguePayload, EntryFunction, ExecutionStatus, Multisig,
         RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
     },
+    vm::module_metadata::get_metadata,
     vm_status::AbortLocation,
     write_set::WriteOp,
 };
@@ -98,7 +98,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     pub fn is_resource_group(&self, tag: &StructTag) -> bool {
         if let Ok(Some(module)) = self.inner.view_module(&tag.module_id()) {
-            if let Some(md) = aptos_framework::get_metadata(&module.metadata) {
+            if let Some(md) = get_metadata(&module.metadata) {
                 if let Some(attrs) = md.struct_attributes.get(tag.name.as_ident_str().as_str()) {
                     return attrs
                         .iter()
@@ -279,53 +279,61 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         &self,
         payload: aptos_types::transaction::TransactionPayload,
     ) -> Result<TransactionPayload> {
-        use aptos_types::transaction::TransactionPayload::*;
+        use aptos_types::transaction::{EntryFunction, Script, TransactionPayload::*};
+
+        let try_into_script_payload = |s: Script| -> Result<ScriptPayload> {
+            let (code, ty_args, args) = s.into_inner();
+            let script_args = self.inner.view_script_arguments(&code, &args, &ty_args);
+
+            let json_args = match script_args {
+                Ok(values) => values
+                    .into_iter()
+                    .map(|v| MoveValue::try_from(v)?.json())
+                    .collect::<Result<_>>()?,
+                Err(_e) => convert_txn_args(&args)
+                    .into_iter()
+                    .map(|arg| HexEncodedBytes::from(arg).json())
+                    .collect::<Result<_>>()?,
+            };
+
+            Ok(ScriptPayload {
+                code: MoveScriptBytecode::new(code).try_parse_abi(),
+                type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
+                arguments: json_args,
+            })
+        };
+
+        let try_into_entry_function_payload = |fun: EntryFunction| -> Result<EntryFunctionPayload> {
+            let (module, function, ty_args, args) = fun.into_inner();
+            let func_args = self
+                .inner
+                .view_function_arguments(&module, &function, &ty_args, &args);
+
+            let json_args = match func_args {
+                Ok(values) => values
+                    .into_iter()
+                    .map(|v| MoveValue::try_from(v)?.json())
+                    .collect::<Result<_>>()?,
+                Err(_e) => args
+                    .into_iter()
+                    .map(|arg| HexEncodedBytes::from(arg).json())
+                    .collect::<Result<_>>()?,
+            };
+
+            Ok(EntryFunctionPayload {
+                arguments: json_args,
+                function: EntryFunctionId {
+                    module: module.into(),
+                    name: function.into(),
+                },
+                type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
+            })
+        };
+
         let ret = match payload {
-            Script(s) => {
-                let (code, ty_args, args) = s.into_inner();
-                let script_args = self.inner.view_script_arguments(&code, &args, &ty_args);
-
-                let json_args = match script_args {
-                    Ok(values) => values
-                        .into_iter()
-                        .map(|v| MoveValue::try_from(v)?.json())
-                        .collect::<Result<_>>()?,
-                    Err(_e) => convert_txn_args(&args)
-                        .into_iter()
-                        .map(|arg| HexEncodedBytes::from(arg).json())
-                        .collect::<Result<_>>()?,
-                };
-                TransactionPayload::ScriptPayload(ScriptPayload {
-                    code: MoveScriptBytecode::new(code).try_parse_abi(),
-                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
-                    arguments: json_args,
-                })
-            },
+            Script(s) => TransactionPayload::ScriptPayload(try_into_script_payload(s)?),
             EntryFunction(fun) => {
-                let (module, function, ty_args, args) = fun.into_inner();
-                let func_args = self
-                    .inner
-                    .view_function_arguments(&module, &function, &ty_args, &args);
-
-                let json_args = match func_args {
-                    Ok(values) => values
-                        .into_iter()
-                        .map(|v| MoveValue::try_from(v)?.json())
-                        .collect::<Result<_>>()?,
-                    Err(_e) => args
-                        .into_iter()
-                        .map(|arg| HexEncodedBytes::from(arg).json())
-                        .collect::<Result<_>>()?,
-                };
-
-                TransactionPayload::EntryFunctionPayload(EntryFunctionPayload {
-                    arguments: json_args,
-                    function: EntryFunctionId {
-                        module: module.into(),
-                        name: function.into(),
-                    },
-                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
-                })
+                TransactionPayload::EntryFunctionPayload(try_into_entry_function_payload(fun)?)
             },
             Multisig(multisig) => {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
@@ -333,30 +341,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
                             entry_function,
                         ) => {
-                            let (module, function, ty_args, args) = entry_function.into_inner();
-                            let func_args = self
-                                .inner
-                                .view_function_arguments(&module, &function, &ty_args, &args);
-                            let json_args = match func_args {
-                                Ok(values) => values
-                                    .into_iter()
-                                    .map(|v| MoveValue::try_from(v)?.json())
-                                    .collect::<Result<_>>()?,
-                                Err(_e) => args
-                                    .into_iter()
-                                    .map(|arg| HexEncodedBytes::from(arg).json())
-                                    .collect::<Result<_>>()?,
-                            };
-
+                            let entry_function_payload =
+                                try_into_entry_function_payload(entry_function)?;
                             Some(MultisigTransactionPayload::EntryFunctionPayload(
-                                EntryFunctionPayload {
-                                    arguments: json_args,
-                                    function: EntryFunctionId {
-                                        module: module.into(),
-                                        name: function.into(),
-                                    },
-                                    type_arguments: ty_args.iter().map(|arg| arg.into()).collect(),
-                                },
+                                entry_function_payload,
                             ))
                         },
                     }
@@ -589,22 +577,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         Ok(ret)
     }
 
-    pub fn try_into_signed_transaction(
-        &self,
-        txn: UserTransactionRequest,
-        chain_id: ChainId,
-    ) -> Result<SignedTransaction> {
-        let auth = txn
-            .signature
-            .as_ref()
-            .ok_or_else(|| format_err!("missing signature"))?
-            .try_into();
-        Ok(SignedTransaction::new_signed_transaction(
-            self.try_into_raw_transaction(txn, chain_id)?,
-            auth?,
-        ))
-    }
-
     pub fn try_into_signed_transaction_poem(
         &self,
         submit_transaction_request: SubmitTransactionRequest,
@@ -621,31 +593,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 chain_id,
             )?,
             (&signature).try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
-        ))
-    }
-
-    pub fn try_into_raw_transaction(
-        &self,
-        txn: UserTransactionRequest,
-        chain_id: ChainId,
-    ) -> Result<RawTransaction> {
-        let UserTransactionRequest {
-            sender,
-            sequence_number,
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            payload,
-            signature: _,
-        } = txn;
-        Ok(RawTransaction::new(
-            sender.into(),
-            sequence_number.into(),
-            self.try_into_aptos_core_transaction_payload(payload)?,
-            max_gas_amount.into(),
-            gas_unit_price.into(),
-            expiration_timestamp_secs.into(),
-            chain_id,
         ))
     }
 
@@ -680,8 +627,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     ) -> Result<aptos_types::transaction::TransactionPayload> {
         use aptos_types::transaction::TransactionPayload as Target;
 
-        let ret = match payload {
-            TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
+        let try_into_entry_function =
+            |entry_func_payload: EntryFunctionPayload| -> Result<EntryFunction> {
                 let EntryFunctionPayload {
                     function,
                     type_arguments,
@@ -706,83 +653,62 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
 
-                Target::EntryFunction(EntryFunction::new(
+                Ok(EntryFunction::new(
                     module_id,
-                    function.name.clone().into(),
+                    function.name.into(),
                     type_arguments
                         .iter()
                         .map(|v| v.try_into())
                         .collect::<Result<_>>()?,
                     args,
                 ))
+            };
+
+        let try_into_script_payload = |script: ScriptPayload| -> Result<Script> {
+            let ScriptPayload {
+                code,
+                type_arguments,
+                arguments,
+            } = script;
+
+            let MoveScriptBytecode { bytecode, abi } = code.try_parse_abi();
+            match abi {
+                Some(func) => {
+                    let args = self.try_into_vm_values(&func, arguments.as_slice())?;
+                    Ok(Script::new(
+                        bytecode.into(),
+                        type_arguments
+                            .iter()
+                            .map(|v| v.try_into())
+                            .collect::<Result<_>>()?,
+                        args.into_iter()
+                            .map(|arg| arg.try_into())
+                            .collect::<Result<_>>()?,
+                    ))
+                },
+                None => Err(anyhow::anyhow!("invalid transaction script bytecode")),
+            }
+        };
+        // TODO[Orderless]: After the new TransactionPayload format is fully deployed, output the TransactionPayload in V2 format here.
+        let ret = match payload {
+            TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
+                Target::EntryFunction(try_into_entry_function(entry_func_payload)?)
             },
             TransactionPayload::ScriptPayload(script) => {
-                let ScriptPayload {
-                    code,
-                    type_arguments,
-                    arguments,
-                } = script;
-
-                let MoveScriptBytecode { bytecode, abi } = code.clone().try_parse_abi();
-                match abi {
-                    Some(func) => {
-                        let args = self.try_into_vm_values(&func, arguments.as_slice())?;
-                        Target::Script(Script::new(
-                            bytecode.into(),
-                            type_arguments
-                                .iter()
-                                .map(|v| v.try_into())
-                                .collect::<Result<_>>()?,
-                            args.into_iter()
-                                .map(|arg| arg.try_into())
-                                .collect::<Result<_>>()?,
-                        ))
-                    },
-                    None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
-                }
+                Target::Script(try_into_script_payload(script)?)
             },
+
             TransactionPayload::MultisigPayload(multisig) => {
-                let transaction_payload = if let Some(ref payload) = multisig.transaction_payload {
+                let transaction_payload: Option<
+                    aptos_types::transaction::MultisigTransactionPayload,
+                > = if let Some(payload) = multisig.transaction_payload {
                     match payload {
-                        MultisigTransactionPayload::EntryFunctionPayload(entry_function) => {
-                            let EntryFunctionPayload {
-                                function,
-                                type_arguments,
-                                arguments,
-                            } = entry_function;
-
-                            let module = function.module.clone();
-                            let code = self.inner.view_existing_module(&module.clone().into())?
-                                as Arc<dyn Bytecode>;
-                            let func = code
-                                .find_entry_function(function.name.0.as_ident_str())
-                                .ok_or_else(|| {
-                                    format_err!("could not find entry function by {}", function)
-                                })?;
-                            ensure!(
-                                func.generic_type_params.len() == type_arguments.len(),
-                                "expect {} type arguments for entry function {}, but got {}",
-                                func.generic_type_params.len(),
-                                function,
-                                type_arguments.len()
-                            );
-
-                            let args = self
-                                .try_into_vm_values(&func, arguments)?
-                                .iter()
-                                .map(bcs::to_bytes)
-                                .collect::<Result<_, bcs::Error>>()?;
+                        MultisigTransactionPayload::EntryFunctionPayload(entry_func_payload) => {
+                            let entry_function: EntryFunction =
+                                try_into_entry_function(entry_func_payload)?;
                             Some(
                                 aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
-                                    EntryFunction::new(
-                                        module.into(),
-                                        (&function.name).into(),
-                                        type_arguments
-                                            .iter()
-                                            .map(|v| v.try_into())
-                                            .collect::<Result<_>>()?,
-                                        args,
-                                    ),
+                                    entry_function,
                                 ),
                             )
                         },
@@ -795,7 +721,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     transaction_payload,
                 })
             },
-
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
                 bail!("Module bundle payload has been removed")

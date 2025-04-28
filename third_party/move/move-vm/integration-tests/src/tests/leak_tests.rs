@@ -1,12 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::execute_script_for_test;
+use claims::assert_ok;
 use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 #[ignore] // TODO: figure whether to reactive this test
 #[test]
@@ -43,27 +43,18 @@ fn leak_with_abort() {
         },
         type_parameters: vec![],
         parameters: SignatureIndex(0),
+        access_specifiers: None,
     };
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
-    let storage = InMemoryStorage::new();
 
-    let mut session = MoveVM::new_session(&storage);
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
-    let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage();
-
+    let storage = InMemoryStorage::new();
     for _ in 0..100_000 {
-        let _ = session.load_and_execute_script(
-            script_bytes.as_slice(),
-            vec![],
-            Vec::<Vec<u8>>::new(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-        );
+        let result = execute_script_for_test(&storage, &script_bytes, &[], vec![]);
+        assert_ok!(result);
     }
 
     let mem_stats = memory_stats::memory_stats().unwrap();

@@ -269,7 +269,7 @@ module aptos_framework::keyless_account {
         set_configuration_for_next_epoch(fx, config);
     }
 
-    /// Convenience method to queue up an append to to the set of override `aud`'s. The change will only be effective
+    /// Convenience method to queue up an append to the set of override `aud`'s. The change will only be effective
     /// after reconfiguration. Only callable via governance proposal.
     ///
     /// WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.

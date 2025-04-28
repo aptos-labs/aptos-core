@@ -140,8 +140,8 @@ function check_os {
 	elseif ($osName.Contains("Windows 11")) {
 		$global:os = "Windows 11"
 	}
-	elseif ($osName.Contains("Windows Server 2022")) {
-		$global:os = "Windows Server 2022"
+	elseif ($osName.Contains("Windows Server 20")) {
+		$global:os = "Windows Server 20XX"
 	}
 	else {
 		Write-Host "Unsupported Windows OS detected. Stopping script..."

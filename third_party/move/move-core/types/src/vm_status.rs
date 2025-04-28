@@ -874,13 +874,12 @@ pub enum StatusCode {
     STRUCT_VARIANT_MISMATCH = 4038,
     // An unimplemented functionality in the VM.
     UNIMPLEMENTED_FUNCTIONALITY = 4039,
-    // Calling move_to with a permissioned signer.
-    MOVE_TO_WITH_PERMISSIONED_SIGNER = 4040,
+
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4041,
-    RESERVED_RUNTIME_ERROR_2 = 4042,
-    RESERVED_RUNTIME_ERROR_3 = 4043,
-    RESERVED_RUNTIME_ERROR_4 = 4044,
+    RESERVED_RUNTIME_ERROR_1 = 4040,
+    RESERVED_RUNTIME_ERROR_2 = 4041,
+    RESERVED_RUNTIME_ERROR_3 = 4042,
+    RESERVED_RUNTIME_ERROR_4 = 4043,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

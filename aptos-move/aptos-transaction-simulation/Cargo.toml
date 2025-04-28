@@ -1,0 +1,31 @@
+[package]
+name = "aptos-transaction-simulation"
+description = "Aptos Transaction Simulation"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-keygen = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-genesis = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+proptest = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+aptos-crypto = { workspace = true, features = ["cloneable-private-keys"] }

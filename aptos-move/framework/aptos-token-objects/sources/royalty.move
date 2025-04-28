@@ -66,7 +66,7 @@ module aptos_token_objects::royalty {
         exists<Royalty>(addr)
     }
 
-    public(friend) fun delete(addr: address) acquires Royalty {
+    friend fun delete(addr: address) acquires Royalty {
         assert!(exists<Royalty>(addr), error::not_found(EROYALTY_DOES_NOT_EXIST));
         move_from<Royalty>(addr);
     }
@@ -75,7 +75,7 @@ module aptos_token_objects::royalty {
     public fun get<T: key>(maybe_royalty: Object<T>): Option<Royalty> acquires Royalty {
         let obj_addr = object::object_address(&maybe_royalty);
         if (exists<Royalty>(obj_addr)) {
-            option::some(*borrow_global<Royalty>(obj_addr))
+            option::some(Royalty[obj_addr])
         } else {
             option::none()
         }

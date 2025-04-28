@@ -3,12 +3,26 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [7.3.0]
+
+- Update boogie from 3.2.4 to 3.5.1.
+- Change behavior of `aptos init` to first look and see if the account has an APT balance rather than checking if the account exists
+
+## [7.2.0]
+
+- Add ability to retrieve fungible asset balances
+- Add `aptos key extract-public-key` which generates a public key or a proof of possession for the given key.
+
+## [7.1.0]
+- Add CLI outputs and on-disk storage to be stored in AIP-80 format.  Will allow for legacy formats to be taken in as well
+
+## [7.0.0]
 - Compiler v1 is now deprecated. It is now removed from the Aptos CLI.
 - Added a new option `aptos move compile --fail-on-warning` which fails the compilation if any warnings are found.
 - We now default to running extended checks when compiling test code (this was previously only done with the option `--check-test-code`, but this is no longer available). However, these checks can be now be skipped with `--skip-checks-on-test-code`.
 - Add network to show profiles.
 - The new subcommand `aptos update move-mutation-test` will install/update the external binary `move-mutation-test`, which performs mutation testing on a Move project to find blind spots in Move unit tests.
-
 - Add beta simulate command to simulate any transaction from anyone
 
 ## [6.2.0]

@@ -5,8 +5,9 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, PropertyBag, PropertyValue, QualifiedSymbol,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex, UseDecl, Value,
+        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
+        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
+        UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -18,10 +19,9 @@ use crate::{
     constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
-    model,
     model::{
-        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc, Loc,
-        ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
+        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
         SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
@@ -31,7 +31,10 @@ use crate::{
         CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    ty::{
+        Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, Variance,
+        BOOL_TYPE,
+    },
     well_known, LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -105,8 +108,27 @@ pub enum SpecBlockContext {
     FunctionCodeV2(
         QualifiedSymbol,                                  // function name
         BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables
+        Option<(Pattern, Type)>,                          // for lambda
     ),
     Schema(QualifiedSymbol),
+}
+
+impl SpecBlockContext {
+    pub fn allow_old(&self) -> bool {
+        use SpecBlockContext::*;
+        match self {
+            FunctionCodeV2(_, _, _) => false, // TODO(#16256): add support of old(..) to spec of lambda expression
+            _ => true,
+        }
+    }
+
+    pub fn name(&self) -> Option<&QualifiedSymbol> {
+        use SpecBlockContext::*;
+        match self {
+            Struct(name, ..) | FunctionCodeV2(name, ..) | Schema(name, ..) => Some(name),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for SpecBlockContext {
@@ -777,6 +799,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             callees: Default::default(),
             is_recursive: Default::default(),
             insts_using_generic_type_reflection: Default::default(),
+            spec: RefCell::new(Default::default()),
         };
         self.spec_funs.push(fun_decl);
     }
@@ -1357,6 +1380,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     &field_ty_loc,
                     &ErrorMessageContext::General,
                     &field_ty,
+                    Variance::NoVariance,
                     ctr,
                     Some(ConstraintContext::default().for_field(field_sym)),
                 )
@@ -1768,7 +1792,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 et
             },
-            FunctionCodeV2(name, locals) => {
+            FunctionCodeV2(name, locals, from_lambda) => {
                 let entry = &self
                     .parent
                     .fun_table
@@ -1783,6 +1807,22 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.enter_scope();
                 for (sym, (loc, type_, index)) in locals {
                     et.define_local(loc, *sym, type_.clone(), None, *index)
+                }
+
+                if from_lambda.is_some() && matches!(kind, ConditionKind::Ensures) {
+                    let (_, ty) = from_lambda.clone().unwrap();
+                    et.enter_scope();
+                    if let Type::Tuple(ts) = &ty {
+                        for (i, ty) in ts.iter().enumerate() {
+                            let name: Symbol = et.symbol_pool().make(&format!("result_{}", i + 1));
+                            let oper = Some(Operation::Result(i));
+                            et.define_local(loc, name, ty.clone(), oper, None);
+                        }
+                    } else {
+                        let name = et.symbol_pool().make("result");
+                        let oper = Some(Operation::Result(0));
+                        et.define_local(loc, name, ty.clone(), oper, None);
+                    }
                 }
                 et
             },
@@ -1948,7 +1988,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let entry = self.parent.fun_table.get(name).expect("function defined");
                 cond.kind.allowed_on_fun_decl(entry.visibility)
             },
-            FunctionCodeV2(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCodeV2(.., from_lambda) => {
+                if from_lambda.is_some() {
+                    cond.kind.allowed_on_lambda_spec()
+                } else {
+                    cond.kind.allowed_on_fun_impl()
+                }
+            },
             Schema(_) => true,
         };
         if !ok {
@@ -2006,7 +2052,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 true // continue visit, note all problematic subexprs
             };
             cond.exp.visit_post_order(&mut visitor);
-        } else if let FunctionCodeV2(name, _) = context {
+        } else if !context.allow_old() {
+            let name = context.name().expect("should have name");
             // Restrict accesses to function arguments only for `old(..)` in in-spec block
             let entry = self.parent.fun_table.get(name).expect("function defined");
             let mut visitor = |e: &ExpData| {
@@ -2140,7 +2187,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     SpecBlockContext::Module => ConditionKind::GlobalInvariant(vec![]),
                     SpecBlockContext::Struct(..) => ConditionKind::StructInvariant,
                     SpecBlockContext::Function(..) => ConditionKind::FunctionInvariant,
-                    SpecBlockContext::FunctionCodeV2(..) => ConditionKind::LoopInvariant,
+                    SpecBlockContext::FunctionCodeV2(_, _, Some(..)) => {
+                        ConditionKind::FunctionInvariant
+                    },
+                    SpecBlockContext::FunctionCodeV2(_, _, None) => ConditionKind::LoopInvariant,
                     SpecBlockContext::Schema(..) => {
                         // this is the initial pass that put the condition into the schema context
                         cond.kind.clone()
@@ -2150,8 +2200,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
 
             // Expand invariants on functions in requires/ensures
-            let derived_conds = if matches!(context, SpecBlockContext::Function(..))
-                && matches!(cond.kind, FunctionInvariant)
+            let derived_conds = if matches!(
+                context,
+                SpecBlockContext::Function(..) | SpecBlockContext::FunctionCodeV2(_, _, Some(..))
+            ) && matches!(cond.kind, FunctionInvariant)
             {
                 let mut ensures = cond.clone();
                 ensures.kind = ConditionKind::Ensures;
@@ -2345,7 +2397,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                         StructInvariant
                     },
-                    SpecBlockContext::Function(..) => {
+                    SpecBlockContext::Function(..)
+                    | SpecBlockContext::FunctionCodeV2(_, _, Some(..)) => {
                         if !tys.is_empty() {
                             self.parent.env.error(
                                 &self.parent.to_loc(&kind.loc),
@@ -2354,7 +2407,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                         FunctionInvariant
                     },
-                    SpecBlockContext::FunctionCodeV2(..) => {
+                    SpecBlockContext::FunctionCodeV2(_, _, None) => {
                         if !tys.is_empty() {
                             self.parent.env.error(
                                 &self.parent.to_loc(&kind.loc),

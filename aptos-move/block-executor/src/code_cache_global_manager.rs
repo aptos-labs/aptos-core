@@ -312,7 +312,7 @@ fn prefetch_aptos_framework(
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_language_e2e_tests::executor::FakeExecutor;
+    use aptos_transaction_simulation::InMemoryStateStore;
     use aptos_types::{
         on_chain_config::{FeatureFlag, Features, OnChainConfig},
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
@@ -330,13 +330,12 @@ mod test {
 
     #[test]
     fn test_prefetch_existing_aptos_framework() {
-        let executor = FakeExecutor::from_head_genesis();
-        let state_view = executor.get_state_view();
+        let state_view = InMemoryStateStore::from_head_genesis();
 
-        let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(state_view);
+        let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(&state_view);
         assert_eq!(guard.module_cache().num_modules(), 0);
 
-        let result = prefetch_aptos_framework(state_view, &mut guard);
+        let result = prefetch_aptos_framework(&state_view, &mut guard);
         assert!(result.is_ok());
         assert!(guard.module_cache().num_modules() > 0);
     }

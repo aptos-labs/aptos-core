@@ -102,9 +102,8 @@ module aptos_framework::transaction_validation {
     // TODO: can be removed after features have been rolled out.
     inline fun allow_missing_txn_authentication_key(transaction_sender: address): bool {
         // aa verifies authentication itself
-        features::is_account_abstraction_enabled() &&
-        (features::is_domain_account_abstraction_enabled()
-            || account_abstraction::using_dispatchable_authenticator(transaction_sender))
+        features::is_derivable_account_abstraction_enabled()
+            || (features::is_account_abstraction_enabled() && account_abstraction::using_dispatchable_authenticator(transaction_sender))
     }
 
     fun prologue_common(
@@ -124,8 +123,8 @@ module aptos_framework::transaction_validation {
         );
         assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
 
-        let transaction_sender = permissioned_signer::address_of(sender);
-        let gas_payer_address = permissioned_signer::address_of(gas_payer);
+        let transaction_sender = signer::address_of(sender);
+        let gas_payer_address = signer::address_of(gas_payer);
 
         if (
             transaction_sender == gas_payer_address
@@ -184,7 +183,7 @@ module aptos_framework::transaction_validation {
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     );
                 }
-            }
+            };
         };
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
@@ -481,7 +480,7 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64,
     ) {
-        let addr = permissioned_signer::address_of(&account);
+        let addr = signer::address_of(&account);
         epilogue_gas_payer(
             account,
             addr,
@@ -503,7 +502,7 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         is_simulation: bool,
     ) {
-        let addr = permissioned_signer::address_of(&account);
+        let addr = signer::address_of(&account);
         epilogue_gas_payer_extended(
             account,
             addr,
@@ -584,7 +583,7 @@ module aptos_framework::transaction_validation {
         };
 
         // Increment sequence number
-        let addr = permissioned_signer::address_of(&account);
+        let addr = signer::address_of(&account);
         account::increment_sequence_number(addr);
     }
 
@@ -658,7 +657,7 @@ module aptos_framework::transaction_validation {
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
         if (!features::transaction_simulation_enhancement_enabled() ||
             !skip_auth_key_check(is_simulation, &fee_payer_public_key_hash)) {
-            let fee_payer_address = permissioned_signer::address_of(&fee_payer);
+            let fee_payer_address = signer::address_of(&fee_payer);
             if (option::is_some(&fee_payer_public_key_hash)) {
                 assert!(
                     fee_payer_public_key_hash == option::some(account::get_authentication_key(fee_payer_address)),
@@ -691,7 +690,7 @@ module aptos_framework::transaction_validation {
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
 
-        let gas_payer_address = permissioned_signer::address_of(&gas_payer);
+        let gas_payer_address = signer::address_of(&gas_payer);
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
         if (!features::transaction_simulation_enhancement_enabled() || !skip_gas_payment(
@@ -730,7 +729,7 @@ module aptos_framework::transaction_validation {
         };
 
         // Increment sequence number
-        let addr = permissioned_signer::address_of(&account);
+        let addr = signer::address_of(&account);
         account::increment_sequence_number(addr);
     }
 }
