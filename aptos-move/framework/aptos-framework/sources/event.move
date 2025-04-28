@@ -6,8 +6,6 @@ module aptos_framework::event {
     use std::bcs;
 
     use aptos_framework::guid::GUID;
-    use aptos_framework::system_addresses;
-    use aptos_framework::guid;
 
     friend aptos_framework::account;
     friend aptos_framework::object;
