@@ -194,7 +194,7 @@ impl KeyLevelConsensusManager {
         }
 
         let issuer_level_repr = update
-            .as_issuer_level_repr()
+            .try_as_issuer_level_repr()
             .context("initiate_key_level_consensus failed at repr conversion")?;
         let signature = self
             .consensus_key
@@ -202,7 +202,7 @@ impl KeyLevelConsensusManager {
             .context("crypto material error occurred during signing")?;
 
         let update_translated = update
-            .as_issuer_level_repr()
+            .try_as_issuer_level_repr()
             .context("maybe_start_consensus failed at update translation")?;
         let abort_handle = self
             .update_certifier
@@ -292,7 +292,7 @@ impl KeyLevelConsensusManager {
                                 author: self.my_addr,
                                 observed: my_proposal
                                     .observed
-                                    .as_issuer_level_repr()
+                                    .try_as_issuer_level_repr()
                                     .context("process_peer_request failed with repr conversion")?,
                                 signature: my_proposal.signature.clone(),
                             },
@@ -435,7 +435,7 @@ impl TConsensusManager for KeyLevelConsensusManager {
             if let Err(e) = handle_result {
                 error!(
                     epoch = this.epoch_state.epoch,
-                    "KeyLevelJWKManager error from handling: {}", e
+                    "KeyLevelJWKManager error from handling: {e:#}"
                 );
             }
         }

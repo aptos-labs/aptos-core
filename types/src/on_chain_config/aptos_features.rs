@@ -230,6 +230,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            FeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
         ]
     }
 }
