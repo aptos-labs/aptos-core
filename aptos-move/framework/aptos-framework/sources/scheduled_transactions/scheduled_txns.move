@@ -91,8 +91,10 @@ module aptos_framework::scheduled_txns {
 
     /// First sorted in ascending order of time, then on gas priority, and finally on txn_id
     /// gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
-    /// The goal is to have fixed size key, val entries in BigOrderedMap, hence we use txn_id as a key instead of
-    /// having {time, gas_priority} --> List<txn_id>
+    /// The goal is to have fixed (less variable) size 'key', 'val' entries in BigOrderedMap, hence we use txn_id
+    /// as a key. That is we have "{time, gas_priority, txn_id} -> ScheduledTxn" instead of
+    /// "{time, gas_priority} --> List<(txn_id, ScheduledTxn)>".
+    /// Note: ScheduledTxn is still variable size though due to its closure.
     struct ScheduleMapKey has copy, drop, store {
         time: u64,
         gas_priority: u64,
@@ -108,7 +110,7 @@ module aptos_framework::scheduled_txns {
 
     /// BigOrderedMap has MAX_NODE_BYTES = 409600 (400KB), MAX_DEGREE = 4096, DEFAULT_TARGET_NODE_SIZE = 4096;
     const BIG_ORDRD_MAP_TGT_ND_SZ: u16 = 4096;
-    const SCHEDULE_MAP_KEY_SIZE: u16 = 48;
+    const SCHEDULE_MAP_KEY_SIZE: u16 = TXN_ID_SIZE + 8 + 8; // 32 + 8 + 8 = 48 bytes
 
     /// Signer for the store for gas fee deposits
     struct AuxiliaryData has key {
@@ -174,7 +176,7 @@ module aptos_framework::scheduled_txns {
         let queue = ScheduleQueue {
             schedule_map: big_ordered_map::new_with_config(
                 BIG_ORDRD_MAP_TGT_ND_SZ / SCHEDULE_MAP_KEY_SIZE,
-                (BIG_ORDRD_MAP_TGT_ND_SZ / (TXN_ID_SIZE + AVG_SCHED_TXN_SIZE)),
+                (BIG_ORDRD_MAP_TGT_ND_SZ / (SCHEDULE_MAP_KEY_SIZE + AVG_SCHED_TXN_SIZE)),
                 true
             ),
         };
