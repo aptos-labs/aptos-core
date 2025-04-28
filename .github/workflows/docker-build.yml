@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history
+          ref: ${{ github.ref }}  # Use the full ref to ensure we're on the right branch
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -34,21 +37,10 @@ jobs:
       
       - name: Build and Push Images
         run: |
-          export GIT_SHA=${GITHUB_SHA}
-          export GIT_BRANCH=$(git symbolic-ref --short HEAD || echo "detached")
-          export GIT_TAG=$(git tag -l --contains HEAD || echo "")
-          export BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          export TARGET_CACHE_ID=${GITHUB_REF#refs/heads/}
+          export GHCR_ORG="movementlabsxyz"
           export PROFILE=${PROFILE:-release}
           export FEATURES=${FEATURES:-""}
           export CARGO_TARGET_DIR="target/${FEATURES:-default}"
-          export GHCR_ORG="movementlabsxyz"
-          export IMAGE_TAG_PREFIX=""
-          
-          # Ensure we always have a valid tag by using the git SHA as a fallback
-          if [[ -n "${GITHUB_REF#refs/heads/}" ]]; then
-            export NORMALIZED_GIT_BRANCH_OR_PR=$(echo ${GITHUB_REF#refs/heads/} | sed -e 's/[^a-zA-Z0-9]/-/g')
-          else
-            export NORMALIZED_GIT_BRANCH_OR_PR=${GIT_SHA}
-          fi
           
           docker/builder/docker-bake-rust-all.sh 

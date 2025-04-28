@@ -3,7 +3,7 @@
 # Check https://crazymax.dev/docker-allhands2-buildx-bake and https://docs.docker.com/engine/reference/commandline/buildx_bake/#file-definition for an intro.
 
 variable "CI" {
-  # whether this build runs in aptos-labs' CI environment which makes certain assumptions about certain registries being available to push to cache layers.
+  # whether this build runs in movementlabsxyz' CI environment which makes certain assumptions about certain registries being available to push to cache layers.
   # for local builds we simply default to relying on dockers local caching.
   default = "false"
 }
