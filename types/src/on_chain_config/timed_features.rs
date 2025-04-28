@@ -3,7 +3,7 @@
 
 use crate::chain_id::{ChainId, NamedChain};
 use chrono::{DateTime, TimeZone, Utc};
-use chrono_tz::America::Los_Angeles;
+use chrono_tz::{America::Los_Angeles, Europe::London};
 use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
@@ -20,6 +20,7 @@ pub enum TimedFeatureFlag {
 
     // Fixes the bug of table natives not tracking the memory usage of the global values they create.
     FixMemoryUsageTracking,
+    FixEventTyTagSerialization,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -113,6 +114,20 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (ChargeBytesForPrints, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: Activation time set to 1 hour after the beginning of time
+            //       so we can test the old and new behaviors in tests.
+            (FixEventTyTagSerialization, TESTING) => {
+                Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap()
+            },
+            (FixEventTyTagSerialization, TESTNET) => London
+                .with_ymd_and_hms(2025, 4, 29, 15, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixEventTyTagSerialization, MAINNET) => London
+                .with_ymd_and_hms(2025, 4, 30, 15, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

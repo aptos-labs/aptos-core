@@ -80,14 +80,23 @@ pub fn create_epoch_ending_ledger_info_for_epoch(
 /// Creates a single test event
 pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
     let event_key = event_key.unwrap_or_else(EventKey::random);
-    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+    ContractEvent::new_v1(
+        event_key,
+        0,
+        TypeTag::Bool,
+        bcs::to_bytes(&0).unwrap(),
+        true,
+    )
+    .unwrap()
 }
 
 pub fn create_reconfig_event() -> ContractEvent {
     ContractEvent::new_v2(
         NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
         bcs::to_bytes(&0).unwrap(),
+        true,
     )
+    .unwrap()
 }
 
 /// Creates a test driver configuration for full nodes

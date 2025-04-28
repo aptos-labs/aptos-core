@@ -615,7 +615,9 @@ mod tests {
             0,
             TypeTag::Bool,
             b"some event bytes".to_vec(),
+            true,
         )
+        .unwrap()
     }
 
     fn create_ledger_info() -> LedgerInfoWithSignatures {

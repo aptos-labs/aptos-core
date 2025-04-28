@@ -8,9 +8,9 @@ use aptos_native_interface::{
 };
 #[cfg(feature = "testing")]
 use aptos_types::account_address::AccountAddress;
-use aptos_types::contract_event::ContractEvent;
 #[cfg(feature = "testing")]
 use aptos_types::event::EventKey;
+use aptos_types::{contract_event::ContractEvent, on_chain_config::TimedFeatureFlag};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
@@ -22,6 +22,9 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+
+/// Error code from events.move, returned when event creation fails.
+pub const ECANNOT_CREATE_EVENT: u64 = 1;
 
 /// Cached emitted module events.
 #[derive(Default, Tid)]
@@ -103,11 +106,17 @@ fn native_write_to_event_store(
         SafeNativeError::InvariantViolation(PartialVMError::new(StatusCode::EVENT_KEY_MISMATCH))
     })?;
 
+    let check_event_size =
+        context.timed_feature_enabled(TimedFeatureFlag::FixEventTyTagSerialization);
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    ctx.events.push((
-        ContractEvent::new_v1(key, seq_num, ty_tag, blob),
-        has_aggregator_lifting.then_some(layout),
-    ));
+    let event =
+        ContractEvent::new_v1(key, seq_num, ty_tag, blob, check_event_size).map_err(|_| {
+            SafeNativeError::Abort {
+                abort_code: ECANNOT_CREATE_EVENT,
+            }
+        })?;
+    ctx.events
+        .push((event, has_aggregator_lifting.then_some(layout)));
     Ok(smallvec![])
 }
 
@@ -254,11 +263,17 @@ fn native_write_module_event_to_store(
                     .with_message("Event serialization failure".to_string()),
             )
         })?;
+
+    let check_event_size =
+        context.timed_feature_enabled(TimedFeatureFlag::FixEventTyTagSerialization);
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    ctx.events.push((
-        ContractEvent::new_v2(type_tag, blob),
-        has_identifier_mappings.then_some(layout),
-    ));
+    let event = ContractEvent::new_v2(type_tag, blob, check_event_size).map_err(|_| {
+        SafeNativeError::Abort {
+            abort_code: ECANNOT_CREATE_EVENT,
+        }
+    })?;
+    ctx.events
+        .push((event, has_identifier_mappings.then_some(layout)));
 
     Ok(smallvec![])
 }

@@ -2986,9 +2986,11 @@ mod tests {
             0,
             NEW_EPOCH_EVENT_MOVE_TYPE_TAG.clone(),
             vec![],
-        );
+            true,
+        )
+        .unwrap();
         let new_epoch_event_v2 =
-            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]);
+            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![], true).unwrap();
         assert!(AptosVM::should_restart_execution(&[(
             new_epoch_event,
             None

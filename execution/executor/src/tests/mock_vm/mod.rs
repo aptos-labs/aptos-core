@@ -119,7 +119,9 @@ impl VMBlockExecutor for MockVM {
                     vec![ContractEvent::new_v2(
                         NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
                         bcs::to_bytes(&0).unwrap(),
-                    )],
+                        true,
+                    )
+                    .unwrap()],
                     0,
                     KEEP_STATUS.clone(),
                     TransactionAuxiliaryData::default(),
@@ -337,7 +339,9 @@ fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),
         b"event_data".to_vec(),
-    )]
+        true,
+    )
+    .unwrap()]
 }
 
 pub fn encode_mint_program(amount: u64) -> Script {

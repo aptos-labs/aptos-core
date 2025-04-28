@@ -217,7 +217,8 @@ prop_compose! {
                 seq,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&new_block_event).unwrap(),
-            );
+                true,
+            ).expect("Should always be able to create a new block event");
             seq += 1;
             (version, event)
         }).collect()

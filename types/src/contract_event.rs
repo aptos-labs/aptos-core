@@ -23,7 +23,7 @@ use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{convert::TryFrom, ops::Deref, str::FromStr};
+use std::{convert::TryFrom, ops::Deref};
 
 pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
@@ -70,24 +70,27 @@ impl ContractEvent {
         sequence_number: u64,
         type_tag: TypeTag,
         event_data: Vec<u8>,
-    ) -> Self {
-        ContractEvent::V1(ContractEventV1::new(
+        check_ty_tag_size: bool,
+    ) -> anyhow::Result<Self> {
+        Ok(ContractEvent::V1(ContractEventV1::new(
             key,
             sequence_number,
             type_tag,
             event_data,
-        ))
+            check_ty_tag_size,
+        )?))
     }
 
-    pub fn new_v2(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
-        ContractEvent::V2(ContractEventV2::new(type_tag, event_data))
-    }
-
-    pub fn new_v2_with_type_tag_str(type_tag_str: &str, event_data: Vec<u8>) -> Self {
-        ContractEvent::V2(ContractEventV2::new(
-            TypeTag::from_str(type_tag_str).unwrap(),
+    pub fn new_v2(
+        type_tag: TypeTag,
+        event_data: Vec<u8>,
+        check_ty_tag_size: bool,
+    ) -> anyhow::Result<Self> {
+        Ok(ContractEvent::V2(ContractEventV2::new(
+            type_tag,
             event_data,
-        ))
+            check_ty_tag_size,
+        )?))
     }
 
     pub fn event_key(&self) -> Option<&EventKey> {
@@ -167,6 +170,19 @@ impl ContractEvent {
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
+impl ContractEvent {
+    /// Constructs a V2 event from a type tag string. Only used for tests or benchmarks. Panics if
+    /// type tag cannot be constructed from the string.
+    pub fn new_v2_with_type_tag_str(type_tag_str: &str, event_data: Vec<u8>) -> Self {
+        use std::str::FromStr;
+        ContractEvent::V2(
+            ContractEventV2::new(TypeTag::from_str(type_tag_str).unwrap(), event_data, true)
+                .unwrap(),
+        )
+    }
+}
+
 /// Entry produced via a call to the `emit_event` builtin.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -188,13 +204,17 @@ impl ContractEventV1 {
         sequence_number: u64,
         type_tag: TypeTag,
         event_data: Vec<u8>,
-    ) -> Self {
-        Self {
+        check_ty_tag_size: bool,
+    ) -> anyhow::Result<Self> {
+        if check_ty_tag_size {
+            bcs::serialized_size(&type_tag)?;
+        }
+        Ok(Self {
             key,
             sequence_number,
             type_tag,
             event_data,
-        }
+        })
     }
 
     pub fn key(&self) -> &EventKey {
@@ -214,6 +234,9 @@ impl ContractEventV1 {
     }
 
     pub fn size(&self) -> usize {
+        // TODO:
+        //   It is an invariant that that this should not fail, we should cache size and use it
+        //   here.
         self.key.size() + 8 /* u64 */ + bcs::serialized_size(&self.type_tag).unwrap() + self.event_data.len()
     }
 }
@@ -242,14 +265,24 @@ pub struct ContractEventV2 {
 }
 
 impl ContractEventV2 {
-    pub fn new(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
-        Self {
+    pub fn new(
+        type_tag: TypeTag,
+        event_data: Vec<u8>,
+        check_ty_tag_size: bool,
+    ) -> anyhow::Result<Self> {
+        if check_ty_tag_size {
+            bcs::serialized_size(&type_tag)?;
+        }
+        Ok(Self {
             type_tag,
             event_data,
-        }
+        })
     }
 
     pub fn size(&self) -> usize {
+        // TODO:
+        //   It is an invariant that that this should not fail, we should cache size and use it
+        //   here.
         bcs::serialized_size(&self.type_tag).unwrap() + self.event_data.len()
     }
 
