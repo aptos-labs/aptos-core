@@ -255,8 +255,8 @@ module aptos_framework::account {
             signer_capability_offer,
         } = move_from<Account>(from);
 
-        event::destroy_event_handle(account, coin_register_events);
-        event::destroy_event_handle(account, key_rotation_events);
+        event::destroy_handle<CoinRegisterEvent>(coin_register_events);
+        event::destroy_handle<KeyRotationEvent>(key_rotation_events);
 
         let CapabilityOffer { for: _ } = rotation_capability_offer;
         let CapabilityOffer { for: _ } = signer_capability_offer;

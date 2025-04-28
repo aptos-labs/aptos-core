@@ -40,12 +40,6 @@ module aptos_framework::event {
         guid: GUID,
     }
 
-    public fun destroy_event_handle<T: drop + store>(account: &signer, handle: EventHandle<T>) {
-        system_addresses::assert_aptos_framework(account);
-
-        let EventHandle { counter: _, guid: _ } = handle;
-    }
-
     #[deprecated]
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
     public(friend) fun new_event_handle<T: drop + store>(guid: GUID): EventHandle<T> {
@@ -112,6 +106,6 @@ module aptos_framework::event {
     #[test(account = @0x1)]
     public entry fun test_destroy_event_handle(account: signer) {
         let handle = create_test_event_handle<TestEvent>();
-        destroy_event_handle(&account, handle);
+        destroy_handle<TestEvent>(handle);
     }
 }
