@@ -1,12 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters, types::ReadWriteSummary};
+use crate::{
+    counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
+};
 use aptos_logger::info;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
+    transaction::{
+        block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
+        BlockExecutableTransaction as Transaction,
+    },
 };
 use claims::{assert_le, assert_none};
 use once_cell::sync::Lazy;
@@ -26,6 +31,7 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
     print_conflicts_info: bool,
+    hot_state_op_accumulator: BlockHotStateOpAccumulator<T>,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -46,6 +52,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             start_time: Instant::now(),
             // TODO: have a configuration for it.
             print_conflicts_info: *PRINT_CONFLICTS_INFO,
+            hot_state_op_accumulator: BlockHotStateOpAccumulator::new(),
         }
     }
 
@@ -68,16 +75,16 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             if self.print_conflicts_info {
                 println!("{:?}", txn_read_write_summary);
             }
-            self.txn_read_write_summaries.push(
-                if self
-                    .block_gas_limit_type
-                    .use_granular_resource_group_conflicts()
-                {
-                    txn_read_write_summary
-                } else {
-                    txn_read_write_summary.collapse_resource_group_conflicts()
-                },
-            );
+            let rw_summary = if self
+                .block_gas_limit_type
+                .use_granular_resource_group_conflicts()
+            {
+                txn_read_write_summary
+            } else {
+                txn_read_write_summary.collapse_resource_group_conflicts()
+            };
+            self.hot_state_op_accumulator.add_transaction(&rw_summary);
+            self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
             assert_none!(txn_read_write_summary);
@@ -259,8 +266,8 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
-    pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {
-        BlockEndInfo::V0 {
+    pub(crate) fn get_block_end_info(&self) -> TBlockEndInfoExt<T::Key> {
+        let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
                 .block_gas_limit()
                 .map(|per_block_gas_limit| {
@@ -276,7 +283,10 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 .unwrap_or(false),
             block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
-        }
+        };
+        let keys_to_make_hot = self.hot_state_op_accumulator.get_keys_to_make_hot();
+
+        TBlockEndInfoExt::new(inner, keys_to_make_hot)
     }
 }
 
