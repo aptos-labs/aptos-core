@@ -14,6 +14,17 @@ pub fn create_prebuilt_packages_rs_file(
     packages_to_build: Vec<(&str, &str)>,
     output_file: impl AsRef<Path>,
 ) -> std::result::Result<(), anyhow::Error> {
+    let mut build_options = BuildOptions::move_2();
+    build_options.dev = true;
+    create_prebuilt_packages_rs_file_with_custom_build_options(base_dir, packages_to_build, output_file, build_options)
+}
+
+pub fn create_prebuilt_packages_rs_file_with_custom_build_options(
+    base_dir: impl AsRef<Path>,
+    packages_to_build: Vec<(&str, &str)>,
+    output_file: impl AsRef<Path>,
+    build_options: BuildOptions,
+) -> std::result::Result<(), anyhow::Error> {
     let mut string_buffer = "".to_string();
     //
     // File header
@@ -63,6 +74,7 @@ use std::collections::HashMap;",
             &mut string_buffer,
             base_dir.as_ref().join(additional_package),
             package_name,
+            build_options.clone(),
         ));
     }
 
@@ -99,11 +111,9 @@ impl PreBuiltPackages for PreBuiltPackagesImpl {{
 }
 
 // Write out given package
-fn write_package(file: &mut String, package_path: PathBuf, package_name: &str) -> (String, bool) {
+fn write_package(file: &mut String, package_path: PathBuf, package_name: &str, build_options: BuildOptions) -> (String, bool) {
     println!("Building package {}", package_name);
     // build package
-    let mut build_options = BuildOptions::move_2();
-    build_options.dev = true;
     let package =
         BuiltPackage::build(package_path, build_options).expect("building package must succeed");
     let modules = package.extract_code();
