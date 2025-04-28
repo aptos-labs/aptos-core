@@ -2,6 +2,7 @@
 module aptos_framework::guid {
     friend aptos_framework::account;
     friend aptos_framework::object;
+    friend aptos_framework::event;
 
     /// A globally unique identifier derived from the sender's address and a counter
     struct GUID has drop, store {

@@ -6,6 +6,8 @@ module aptos_framework::event {
     use std::bcs;
 
     use aptos_framework::guid::GUID;
+    use aptos_framework::system_addresses;
+    use aptos_framework::guid;
 
     friend aptos_framework::account;
     friend aptos_framework::object;
@@ -36,6 +38,12 @@ module aptos_framework::event {
         counter: u64,
         /// A globally unique ID for this event stream.
         guid: GUID,
+    }
+
+    public fun destroy_event_handle<T: drop + store>(account: &signer, handle: EventHandle<T>) {
+        system_addresses::assert_aptos_framework(account);
+
+        let EventHandle { counter: _, guid: _ } = handle;
     }
 
     #[deprecated]
@@ -88,5 +96,22 @@ module aptos_framework::event {
     public fun was_event_emitted_by_handle<T: drop + store>(handle: &EventHandle<T>, msg: &T): bool {
         use std::vector;
         vector::contains(&emitted_events_by_handle(handle), msg)
+    }
+
+    #[test_only]
+    struct TestEvent has drop, store {}
+
+    #[test_only]
+    public fun create_test_event_handle<T: drop + store>(): EventHandle<T> {
+        let dummy_address = @0x1;
+        let dummy_creation_num = 0;
+        let guid = guid::create(dummy_address, &mut dummy_creation_num);
+        new_event_handle<T>(guid)
+    }
+
+    #[test(account = @0x1)]
+    public entry fun test_destroy_event_handle(account: signer) {
+        let handle = create_test_event_handle<TestEvent>();
+        destroy_event_handle(&account, handle);
     }
 }

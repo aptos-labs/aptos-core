@@ -240,6 +240,28 @@ module aptos_framework::account {
         new_account
     }
 
+    /// Destroy the Account resource from a given account.
+    /// Used to destroy the core resources account on mainnet.
+    public fun destroy_account_from(account: &signer, from: address) acquires Account {
+        system_addresses::assert_aptos_framework(account);
+
+        let Account {
+            authentication_key: _,
+            sequence_number: _,
+            guid_creation_num: _,
+            coin_register_events,
+            key_rotation_events,
+            rotation_capability_offer,
+            signer_capability_offer,
+        } = move_from<Account>(from);
+
+        event::destroy_event_handle(account, coin_register_events);
+        event::destroy_event_handle(account, key_rotation_events);
+
+        let CapabilityOffer { for: _ } = rotation_capability_offer;
+        let CapabilityOffer { for: _ } = signer_capability_offer;
+    }
+
     #[view]
     public fun exists_at(addr: address): bool {
         exists<Account>(addr)
@@ -951,6 +973,26 @@ module aptos_framework::account {
             account_public_key_bytes,
             recipient_address
         );
+    }
+
+    #[test(aptos_framework = @aptos_framework, from = @0xdead)]
+    public entry fun test_destroy_account_from(
+        aptos_framework: &signer,
+        from: &signer,
+    ) acquires Account {
+        // Ensure the Account resource exists under the from account
+        if (!exists<Account>(signer::address_of(from))) {
+            create_account(signer::address_of(from));
+        };
+
+        // Confirm it now exists
+        assert!(exists<Account>(signer::address_of(from)), 1);
+
+        // Destroy the Account resource
+        destroy_account_from(aptos_framework, signer::address_of(from));
+
+        // Confirm the resource has been removed
+        assert!(!exists<Account>(signer::address_of(from)), 2);
     }
 
     #[test_only]
