@@ -129,8 +129,11 @@ impl IncrementalOutput {
     }
 
     fn into_success_output(mut self, gas: u64) -> Result<TransactionOutput> {
-        self.events
-            .push(FeeStatement::new(gas, gas, 0, 0, 0).create_event_v2());
+        self.events.push(
+            FeeStatement::new(gas, gas, 0, 0, 0)
+                .create_event_v2()
+                .expect("Creating FeeStatement should always succeed"),
+        );
 
         Ok(TransactionOutput::new(
             WriteSetMut::new(self.write_set).freeze()?,
@@ -554,7 +557,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     store: sender_store_address,
                     amount: transfer_amount,
                 }
-                .create_event_v2(),
+                .create_event_v2()
+                .expect("Creating WithdrawFAEvent should always succeed"),
             );
         }
 
@@ -666,7 +670,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     store: recipient_store_address,
                     amount: transfer_amount,
                 }
-                .create_event_v2(),
+                .create_event_v2()
+                .expect("Creating DepositFAEvent should always succeed"),
             )
         }
 
@@ -691,7 +696,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                             account: AccountAddress::ONE,
                             type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()?,
                         }
-                        .create_event_v2(),
+                        .create_event_v2()
+                        .expect("Creating CoinRegister should always succeed"),
                     );
                     (
                         DbAccessUtil::new_apt_coin_store(0, recipient_address),

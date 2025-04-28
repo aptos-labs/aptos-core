@@ -15,5 +15,6 @@ pub trait MoveEventV1Type: MoveStructType + Serialize {
             TypeTag::Struct(Box::new(Self::struct_tag())),
             bcs::to_bytes(self).unwrap(),
         )
+        .unwrap()
     }
 }
