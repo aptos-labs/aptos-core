@@ -17,6 +17,7 @@ mod dependencies;
 mod enum_upgrade;
 mod enum_variant_count;
 mod error_map;
+mod events;
 mod fee_payer;
 mod function_values;
 mod fungible_asset;
