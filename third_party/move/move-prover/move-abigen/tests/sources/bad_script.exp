@@ -1,4 +1,4 @@
-Move prover abigen returns: exiting with checking errors
+Move prover abigen returns: exiting with context checking errors
 error: expected `u64` but found a value of type `bool`
   ┌─ tests/sources/bad_script.move:3:15
   │

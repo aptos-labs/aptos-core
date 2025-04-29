@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun t0() {
         if true {
@@ -13,12 +13,18 @@ module 0x8675309::M {
         }
     }
     private fun t1() {
-        if true {
+        if {
+          let x: bool = true;
+          x
+        } {
           Tuple()
         } else {
           Tuple()
         };
-        if false {
+        if {
+          let x: bool = false;
+          x
+        } {
           Tuple()
         } else {
           Tuple()
@@ -26,14 +32,20 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun t0() {
         if (true) ();
         if (false) ()
     }
     fun t1() {
-        if (true) ();
-        if (false) ()
+        if ({
+            let x = true;
+            x
+        }) ();
+        if ({
+            let x = false;
+            x
+        }) ()
     }
 }

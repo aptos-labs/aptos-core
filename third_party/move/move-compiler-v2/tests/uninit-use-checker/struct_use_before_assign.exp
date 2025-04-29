@@ -48,7 +48,7 @@ warning: Unused local variable `q`. Consider removing or prefixing with an under
 31 │         let q = x;
    │             ^
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun M::main() {
@@ -71,18 +71,20 @@ fun M::main() {
 [variant baseline]
 fun M::main2() {
      var $t0: u64
-     var $t1: 0x876543::M::R
-     var $t2: u64
+     var $t1: u64
+     var $t2: 0x876543::M::R
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-  0: $t2 := 0
-  1: $t1 := pack 0x876543::M::R($t2, $t0)
-  2: ($t3, $t4) := unpack 0x876543::M::R($t1)
-  3: $t5 := infer($t4)
-  4: $t6 := infer($t3)
-  5: return ()
+     var $t7: u64
+  0: $t0 := 0
+  1: $t3 := infer($t0)
+  2: $t2 := pack 0x876543::M::R($t3, $t1)
+  3: ($t4, $t5) := unpack 0x876543::M::R($t2)
+  4: $t6 := infer($t5)
+  5: $t7 := infer($t4)
+  6: return ()
 }
 
 
@@ -172,24 +174,27 @@ fun M::main() {
 [variant baseline]
 fun M::main2() {
      var $t0: u64
-     var $t1: 0x876543::M::R
-     var $t2: u64
+     var $t1: u64
+     var $t2: 0x876543::M::R
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t1, $t3, $t4, $t5, $t6 }
-  0: $t2 := 0
-     # before: { no: $t0, $t1, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t3, $t4, $t5, $t6 }
-  1: $t1 := pack 0x876543::M::R($t2, $t0)
-     # before: { no: $t0, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t5, $t6 }
-  2: ($t3, $t4) := unpack 0x876543::M::R($t1)
-     # before: { no: $t0, $t5, $t6 }, after: { no: $t0, $t6 }
-  3: $t5 := infer($t4)
-     # before: { no: $t0, $t6 }, after: { no: $t0 }
-  4: $t6 := infer($t3)
-     # before: { no: $t0 }, after: { no: $t0 }
-  5: return ()
+     var $t7: u64
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7 }, after: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7 }
+  0: $t0 := 0
+     # before: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7 }, after: { no: $t1, $t2, $t4, $t5, $t6, $t7 }
+  1: $t3 := infer($t0)
+     # before: { no: $t1, $t2, $t4, $t5, $t6, $t7 }, after: { no: $t1, $t4, $t5, $t6, $t7 }
+  2: $t2 := pack 0x876543::M::R($t3, $t1)
+     # before: { no: $t1, $t4, $t5, $t6, $t7 }, after: { no: $t1, $t6, $t7 }
+  3: ($t4, $t5) := unpack 0x876543::M::R($t2)
+     # before: { no: $t1, $t6, $t7 }, after: { no: $t1, $t7 }
+  4: $t6 := infer($t5)
+     # before: { no: $t1, $t7 }, after: { no: $t1 }
+  5: $t7 := infer($t4)
+     # before: { no: $t1 }, after: { no: $t1 }
+  6: return ()
 }
 
 
