@@ -1,0 +1,17 @@
+---
+remote_endpoint: ~
+name: "AIP-63 && AIP-85: New Accounts Default to FA Store"
+proposals:
+  - name: new_account_default_to_fa_store
+    metadata:
+      title: "New Accounts Default to FA Store"
+      description: "This is a preparation stemp for AIP-63 that all new accounts will create FA store instead of coin store"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/13194 and https://github.com/aptos-labs/aptos-core/pull/16216"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-85.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - new_accounts_default_to_fa_apt_store
+            - new_accounts_default_to_fa_store
+          disabled: [ ]
