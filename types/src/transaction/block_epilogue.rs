@@ -1,13 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_key::StateKey;
+use crate::{
+    state_store::{state_key::StateKey, state_slot::StateSlot},
+    transaction::TransactionOutput,
+    write_set::{HotStateOp, WriteSet},
+};
+use anyhow::Result;
 use aptos_crypto::HashValue;
 use derive_more::Deref;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -68,13 +73,12 @@ pub struct TBlockEndInfoExt<Key: Debug> {
     #[deref]
     inner: BlockEndInfo,
     /// TODO(HotState): remove
-    #[allow(dead_code)]
-    /// Changes to the hot state, with regard to keys that are not written to by the user
-    /// transactions.
+    /// Changes to the hot state.
+    /// n.b. only involves keys that are not written to by the user transactions.
     /// TODO(HotState): add evictions
     /// TODO(HotState): once hot state is deterministic across all nodes, add BlockEndInfo::V1 and
     ///                 serialize the promoted and evicted keys in the transaction.
-    keys_to_make_hot: Vec<Key>,
+    slots_to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
@@ -88,18 +92,31 @@ impl<Key: Debug> TBlockEndInfoExt<Key> {
                 block_effective_block_gas_units: 0,
                 block_approx_output_size: 0,
             },
-            keys_to_make_hot: vec![],
+            slots_to_make_hot: BTreeMap::new(),
         }
     }
 
-    pub fn new(inner: BlockEndInfo, keys_to_make_hot: Vec<Key>) -> Self {
+    pub fn new(inner: BlockEndInfo, slots_to_make_hot: BTreeMap<Key, StateSlot>) -> Self {
         Self {
             inner,
-            keys_to_make_hot,
+            slots_to_make_hot,
         }
     }
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
+    }
+}
+
+impl BlockEndInfoExt {
+    pub fn to_transaction_output(&self) -> Result<TransactionOutput> {
+        let write_ops = self
+            .slots_to_make_hot
+            .iter()
+            .map(|(key, slot)| Ok((key.clone(), HotStateOp::make_hot(slot.clone()))))
+            .collect::<Result<_>>()?;
+        Ok(TransactionOutput::new_success_with_write_set(
+            WriteSet::SkipSerde(write_ops),
+        ))
     }
 }
