@@ -1336,10 +1336,8 @@ pub fn test_genesis_module_publishing() {
 #[test]
 pub fn test_mainnet_end_to_end() {
     use aptos_types::{
-        account_address,
-        on_chain_config::ValidatorSet,
-        state_store::state_key::StateKey,
-        write_set::{TransactionWrite, WriteSet},
+        account_address, on_chain_config::ValidatorSet, state_store::state_key::StateKey,
+        write_set::TransactionWrite,
     };
 
     let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
@@ -1540,7 +1538,7 @@ pub fn test_mainnet_end_to_end() {
         panic!("Invalid WriteSetPayload");
     };
 
-    let WriteSet::V0(writeset) = changeset.write_set();
+    let writeset = changeset.write_set().expect_v0();
 
     let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset

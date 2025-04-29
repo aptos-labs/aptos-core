@@ -6,6 +6,7 @@ use crate::{
     transaction::Version,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use derivative::Derivative;
 use StateSlot::*;
 
 /// Represents the content of a state slot, or the lack there of, along with information indicating
@@ -14,12 +15,14 @@ use StateSlot::*;
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Derivative, Eq)]
+#[derivative(PartialEq)]
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
         /// None - unknown, from a DB read
         /// Some - from a WriteOp::Deletion()
+        #[derivative(PartialEq = "ignore")]
         deletion_version: Option<Version>,
         hot_since_version: Version,
     },
@@ -96,6 +99,35 @@ impl StateSlot {
                 }
             },
         } // end match
+    }
+
+    pub fn into_hot(self, version: Version) -> Self {
+        match self {
+            ColdVacant => HotVacant {
+                deletion_version: None,
+                hot_since_version: version,
+            },
+            HotVacant {
+                deletion_version,
+                hot_since_version: _,
+            } => HotVacant {
+                deletion_version,
+                hot_since_version: version,
+            },
+            ColdOccupied {
+                value_version,
+                value,
+            }
+            | HotOccupied {
+                value_version,
+                value,
+                hot_since_version: _,
+            } => HotOccupied {
+                value_version,
+                value,
+                hot_since_version: version,
+            },
+        }
     }
 
     fn should_refresh(
@@ -199,16 +231,20 @@ impl StateSlot {
         }
     }
 
-    pub fn expect_hot_since_version(&self) -> Version {
+    pub fn hot_since_version_opt(&self) -> Option<Version> {
         match self {
-            ColdVacant | ColdOccupied { .. } => unreachable!("expecting hot"),
+            ColdVacant | ColdOccupied { .. } => None,
             HotVacant {
                 hot_since_version, ..
             }
             | HotOccupied {
                 hot_since_version, ..
-            } => *hot_since_version,
+            } => Some(*hot_since_version),
         }
+    }
+
+    pub fn expect_hot_since_version(&self) -> Version {
+        self.hot_since_version_opt().expect("expecting hot")
     }
 
     pub fn expect_value_version(&self) -> Version {

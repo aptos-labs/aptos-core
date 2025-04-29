@@ -16,8 +16,8 @@ pub enum InputOutputKey<K, T> {
 }
 
 pub struct ReadWriteSummary<T: Transaction> {
-    reads: HashSet<InputOutputKey<T::Key, T::Tag>>,
-    writes: HashSet<InputOutputKey<T::Key, T::Tag>>,
+    pub reads: HashSet<InputOutputKey<T::Key, T::Tag>>,
+    pub writes: HashSet<InputOutputKey<T::Key, T::Tag>>,
 }
 
 impl<T: Transaction> ReadWriteSummary<T> {
