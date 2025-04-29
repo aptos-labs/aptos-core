@@ -219,6 +219,7 @@ fn test_db_indexer_data() {
         ident_str!("event"),
         ident_str!("stake"),
         ident_str!("table"),
+        ident_str!("base16"),
         ident_str!("math64"),
         ident_str!("object"),
         ident_str!("option"),
@@ -320,7 +321,9 @@ fn test_db_indexer_data() {
         ident_str!("solana_derivable_account"),
         ident_str!("validator_consensus_info"),
         ident_str!("ristretto255_bulletproofs"),
+        ident_str!("ethereum_derivable_account"),
         ident_str!("dispatchable_fungible_asset"),
+        ident_str!("common_account_abstractions_utils"),
     ]
     .into_iter()
     .map(|module| StateKey::module(&AccountAddress::ONE, module))

@@ -167,20 +167,20 @@
 
 
 
-<a id="0x1_permissioned_delegation_EDELEGATION_EXISTENCE"></a>
-
-
-
-<pre><code><b>const</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_EDELEGATION_EXISTENCE">EDELEGATION_EXISTENCE</a>: u64 = 5;
-</code></pre>
-
-
-
 <a id="0x1_permissioned_delegation_EINVALID_SIGNATURE"></a>
 
 
 
 <pre><code><b>const</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_permissioned_delegation_EDELEGATION_EXISTENCE"></a>
+
+
+
+<pre><code><b>const</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_EDELEGATION_EXISTENCE">EDELEGATION_EXISTENCE</a>: u64 = 5;
 </code></pre>
 
 
