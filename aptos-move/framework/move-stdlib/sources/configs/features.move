@@ -704,7 +704,7 @@ module std::features {
         is_enabled(JWK_CONSENSUS_PER_KEY_MODE)
     }
 
-    const RAND_MANAGER_V2: u64 = 93;
+    const RAND_MANAGER_V2: u64 = 95;
     public fun get_rand_manager_v2_feature(): u64 { RAND_MANAGER_V2 }
     public fun is_rand_manager_v2_enabled(): bool acquires Features { is_enabled(RAND_MANAGER_V2) }
 

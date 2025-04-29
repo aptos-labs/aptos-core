@@ -878,7 +878,7 @@ Lifetime: transient
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_RAND_MANAGER_V2">RAND_MANAGER_V2</a>: u64 = 93;
+<pre><code><b>const</b> <a href="features.md#0x1_features_RAND_MANAGER_V2">RAND_MANAGER_V2</a>: u64 = 95;
 </code></pre>
 
 

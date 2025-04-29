@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::{smoke_test_environment::SwarmBuilder, utils::get_on_chain_resource};
 use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::on_chain_config::{FeatureFlag, Features, OnChainRandomnessConfig};
+use aptos_types::on_chain_config::{
+    ConfigurationResource, FeatureFlag, Features, OnChainRandomnessConfig,
+};
 use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
@@ -31,18 +33,18 @@ async fn rand_manager_v2() {
     let root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
     swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(40))
+        .await
+        .unwrap();
+
+    info!("2-out-of-4-nodes migration in epoch 2 should be fine while v2 is enabled.");
+    migrate_2_nodes(&mut swarm).await;
+    swarm
         .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(40))
         .await
         .unwrap();
 
-    info!("3-out-of-4-nodes migration in epoch 3 should be fine while v2 is enabled.");
-    migrate_3_nodes(&mut swarm).await;
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(40))
-        .await
-        .unwrap();
-
-    info!("Disabling v2 in epoch 4.");
+    info!("Disabling v2 in epoch 3.");
     let script = r#"
 script {
     use aptos_framework::aptos_governance;
@@ -58,22 +60,27 @@ script {
     let txn_summary = cli.run_script(root_idx, script).await.unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
+    let rest_cli = swarm.validators().nth(3).unwrap().rest_client();
+    let epoch_x = get_on_chain_resource::<ConfigurationResource>(&rest_cli)
+        .await
+        .epoch();
     swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(5, Duration::from_secs(40))
+        .wait_for_all_nodes_to_catchup_to_epoch(epoch_x + 1, Duration::from_secs(40))
         .await
         .unwrap();
 
-    info!("3-out-of-4-nodes migration in epoch 5 should break liveness while v2 is disabled. (Epoch 6 will never come.)");
-    migrate_3_nodes(&mut swarm).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    info!("2-out-of-4-nodes migration in epoch {} should break liveness while v2 is disabled. (Epoch {} will never come.)", epoch_x + 1, epoch_x + 2);
+    migrate_2_nodes(&mut swarm).await;
     swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(6, Duration::from_secs(60))
+        .wait_for_all_nodes_to_catchup_to_epoch(epoch_x + 2, Duration::from_secs(60))
         .await
         .err()
         .unwrap();
 }
 
-async fn migrate_3_nodes(swarm: &mut LocalSwarm) {
-    for (node_idx, node) in swarm.validators_mut().enumerate().take(3) {
+async fn migrate_2_nodes(swarm: &mut LocalSwarm) {
+    for (node_idx, node) in swarm.validators_mut().enumerate().take(2) {
         node.stop();
         node.clear_storage().await.unwrap();
         info!("node {} stopped and lost storage", node_idx);
