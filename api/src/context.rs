@@ -36,7 +36,9 @@ use aptos_types::{
     event::EventKey,
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig,
+    },
     state_store::{
         state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
@@ -164,6 +166,13 @@ impl Context {
             .latest_state_checkpoint_view()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn feature_enabled(&self, feature: FeatureFlag) -> Result<bool> {
+        let state_view = self.latest_state_view()?;
+        let features = Features::fetch_config(&state_view)
+            .ok_or_else(|| anyhow::anyhow!("Failed to fetch features from state view"))?;
+        Ok(features.is_enabled(feature))
     }
 
     pub fn state_view<E: StdApiError>(
