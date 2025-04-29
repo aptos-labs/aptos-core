@@ -15,7 +15,7 @@ use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
 use move_package::{
-    compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
+    compilation::{build_plan::BuildPlan, compiled_package::build_and_report_no_exit_v2_driver},
     BuildConfig,
 };
 use move_unit_test::{
@@ -231,7 +231,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
         &build_config.compiler_config,
         vec![],
         |options| {
-            let (files, units, env) = build_and_report_v2_driver(options).unwrap();
+            let (files, units, env) = build_and_report_no_exit_v2_driver(options)?;
             let root_package_in_model = env.symbol_pool().make(root_package.deref());
             let built_test_plan =
                 plan_builder_v2::construct_test_plan(&env, Some(root_package_in_model));

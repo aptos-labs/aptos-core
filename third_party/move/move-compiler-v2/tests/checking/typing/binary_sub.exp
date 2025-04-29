@@ -1,11 +1,11 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0(x: u64,r: R) {
-        0;
-        1;
+        Sub<u64>(0, 0);
+        Sub<u64>(1, 0);
         Sub<u64>(0, 1);
         Sub<u8>(0, 1);
         Sub<u8>(0, 1);
@@ -22,14 +22,14 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     fun t0(x: u64, r: R) {
-        0;
-        1;
+        0 - 0;
+        1 - 0;
         0 - 1;
         0u8 - 1u8;
         0u8 - 1u8;

@@ -1,6 +1,6 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xcafe::m {
-    private fun map(x: u64,f: |u64|u64): u64 {
+    private fun map(x: u64,f: |u64|u64 with drop): u64 {
         (f)(x)
     }
     private fun no_name_clash(x: u64,c: u64): u64 {
@@ -26,9 +26,9 @@ module 0xcafe::m {
     }
 } // end 0xcafe::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xcafe::m {
-    fun map(x: u64, f: |u64|u64): u64 {
+    fun map(x: u64, f: |u64|u64 with drop): u64 {
         f(x)
     }
     fun no_name_clash(x: u64, c: u64): u64 {

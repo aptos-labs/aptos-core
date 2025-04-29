@@ -16,6 +16,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::wrapped_ledger_info::WrappedLedgerInfo;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
@@ -106,12 +107,12 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
-    ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
+    ) -> Box<dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
 
         // Create the commit callback
-        Box::new(move |ledger_info: LedgerInfoWithSignatures| {
+        Box::new(move |_, ledger_info: LedgerInfoWithSignatures| {
             handle_committed_blocks(
                 pending_ordered_blocks,
                 block_payload_store,
@@ -127,8 +128,15 @@ impl ActiveObserverState {
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
     ) -> StateComputerCommitCallBackType {
-        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
-        Box::new(move |_, ledger_info| callback(ledger_info))
+        let root = self.root.clone();
+        Box::new(move |_, ledger_info| {
+            handle_committed_blocks(
+                pending_ordered_blocks,
+                block_payload_store,
+                root,
+                ledger_info,
+            );
+        })
     }
 
     /// Returns the current epoch state

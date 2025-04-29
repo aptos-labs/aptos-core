@@ -1,22 +1,22 @@
 
 Diagnostics:
-error: cannot return a reference derived from value since it is not based on a parameter
+error: cannot return a reference derived from local `x` since it is not based on a parameter
   ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:7:9
   │
 7 │         &x
   │         ^^
   │         │
   │         return attempted here
-  │         value previously borrowed here
+  │         local `x` previously borrowed here
 
-error: cannot return a reference derived from value since it is not based on a parameter
+error: cannot return a reference derived from local `x` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:13:9
    │
 13 │         copy y
    │         ^^^^^^
    │         │
    │         return attempted here
-   │         value previously borrowed here
+   │         local `x` previously borrowed here
 
 error: cannot return a reference derived from field `u` via field `y` via local `s` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:21:9

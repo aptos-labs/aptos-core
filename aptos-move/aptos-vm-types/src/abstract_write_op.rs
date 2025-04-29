@@ -94,19 +94,41 @@ impl AbstractResourceWriteOp {
         &self,
         state_key: &StateKey,
         executor_view: &dyn ExecutorView,
+        fix_prev_materialized_size: bool,
     ) -> PartialVMResult<u64> {
         use AbstractResourceWriteOp::*;
-        match self {
-            Write(_)
-            | WriteWithDelayedFields(WriteWithDelayedFieldsOp { .. })
-            | InPlaceDelayedFieldChange(_)
-            | ResourceGroupInPlaceDelayedFieldChange(_) => Ok(executor_view
-                .get_resource_state_value_size(state_key)?
-                .unwrap_or(0)),
-            WriteResourceGroup(GroupWrite {
-                prev_group_size, ..
-            }) => Ok(*prev_group_size),
-        }
+        let size = if fix_prev_materialized_size {
+            match self {
+                Write(_) | WriteWithDelayedFields(_) => executor_view
+                    .get_resource_state_value_size(state_key)?
+                    .unwrap_or(0),
+                InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {
+                    materialized_size,
+                    ..
+                }) => *materialized_size,
+                ResourceGroupInPlaceDelayedFieldChange(
+                    ResourceGroupInPlaceDelayedFieldChangeOp {
+                        materialized_size, ..
+                    },
+                ) => *materialized_size,
+                WriteResourceGroup(GroupWrite {
+                    prev_group_size, ..
+                }) => *prev_group_size,
+            }
+        } else {
+            match self {
+                Write(_)
+                | WriteWithDelayedFields(WriteWithDelayedFieldsOp { .. })
+                | InPlaceDelayedFieldChange(_)
+                | ResourceGroupInPlaceDelayedFieldChange(_) => executor_view
+                    .get_resource_state_value_size(state_key)?
+                    .unwrap_or(0),
+                WriteResourceGroup(GroupWrite {
+                    prev_group_size, ..
+                }) => *prev_group_size,
+            }
+        };
+        Ok(size)
     }
 
     /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.

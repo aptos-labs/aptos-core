@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: expected `&mut` but `&` was provided
+error: cannot adapt `&u64` to annotated type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:3:37
   │
 3 │         let _: &mut u64 = if (cond) u else u_mut;
   │                                     ^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `&u64` to annotated type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:4:48
   │
 4 │         let _: &mut u64 = if (cond) u_mut else u;
   │                                                ^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `&u64` to annotated type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:5:37
   │
 5 │         let _: &mut u64 = if (cond) u else u;
   │                                     ^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `&u64` to annotated type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:5:44
   │
 5 │         let _: &mut u64 = if (cond) u else u;
@@ -72,31 +72,31 @@ error: cannot adapt `&mut bool` to annotated type `&mut u64`
 20 │         let _: &mut u64 = if (cond) b_mut else u_mut;
    │                                     ^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &u64)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:25:54
    │
 25 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u) else (u_mut, u_mut);
    │                                                      ^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&mut u64, &u64)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:26:54
    │
 26 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u_mut, u) else (u, u_mut);
    │                                                      ^^^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &mut u64)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:26:70
    │
 26 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u_mut, u) else (u, u_mut);
    │                                                                      ^^^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &mut u64)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:27:54
    │
 27 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u_mut) else (u_mut, u);
    │                                                      ^^^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&mut u64, &u64)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:27:70
    │
 27 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u_mut) else (u_mut, u);

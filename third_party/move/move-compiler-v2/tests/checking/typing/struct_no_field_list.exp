@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     struct S {
         dummy_field: bool,
@@ -20,7 +20,7 @@ module 0x42::m {
     }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     struct S has copy, drop {
     }
