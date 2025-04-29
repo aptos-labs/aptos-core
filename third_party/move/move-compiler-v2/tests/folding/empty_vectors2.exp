@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     use std::vector;
     public entry fun init() {
@@ -71,7 +71,7 @@ module 0x42::m {
     }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     public entry fun init() {
         let _x = {
@@ -115,6 +115,79 @@ module 0x42::m {
         };
     }
 }
+
+// -- Model dump before second bytecode pipeline
+module 0x42::m {
+    use std::vector;
+    public entry fun init() {
+        {
+          let _x: vector<u64> = {
+            let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple(Deref(vector::borrow<vector<vector<u8>>>(Borrow(Immutable)([Vector([])]), 0)));
+            {
+              let result: vector<u64> = Vector<u64>();
+              {
+                let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple(v);
+                vector::reverse<vector<u8>>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<vector<u8>>(Borrow(Immutable)(v))) {
+                    {
+                      let e: vector<u8> = vector::pop_back<vector<u8>>(Borrow(Mutable)(v));
+                      {
+                        let (elem: vector<u8>): (vector<u8>) = Tuple(e);
+                        vector::push_back<u64>(Borrow(Mutable)(result), {
+                          let (key: vector<u8>): (vector<u8>) = Tuple(elem);
+                          {
+                            let t: vector<u8> = key;
+                            Add<u64>(vector::length<u8>(Borrow(Immutable)(t)), 2)
+                          }
+                        })
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              result
+            }
+          };
+          {
+            let _y: vector<u64> = {
+              let (v: vector<u64>): (vector<u64>) = Tuple(Deref(vector::borrow<vector<u64>>(Borrow(Immutable)([Vector([])]), 0)));
+              {
+                let result: vector<u64> = Vector<u64>();
+                {
+                  let (v: vector<u64>): (vector<u64>) = Tuple(v);
+                  vector::reverse<u64>(Borrow(Mutable)(v));
+                  loop {
+                    if Not(vector::is_empty<u64>(Borrow(Immutable)(v))) {
+                      {
+                        let e: u64 = vector::pop_back<u64>(Borrow(Mutable)(v));
+                        {
+                          let (elem: u64): (u64) = Tuple(e);
+                          vector::push_back<u64>(Borrow(Mutable)(result), {
+                            let (v: u64): (u64) = Tuple(elem);
+                            Add<u64>(v, 3)
+                          })
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    }
+                  };
+                  Tuple()
+                };
+                result
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::m
 
 
 ============ bytecode verification succeeded ========

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x815::test {
     private fun f1() {
         loop {
@@ -23,7 +23,7 @@ module 0x815::test {
     }
 } // end 0x815::test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x815::test {
     fun f1() {
         'l0: loop {
@@ -36,7 +36,70 @@ module 0x815::test {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun test::f1() {
+     var $t0: bool
+     var $t1: bool
+  0: label L0
+  1: label L2
+  2: label L4
+  3: $t0 := true
+  4: if ($t0) goto 5 else goto 19
+  5: label L6
+  6: label L9
+  7: $t1 := false
+  8: if ($t1) goto 9 else goto 12
+  9: label L11
+ 10: goto 0
+ 11: goto 14
+ 12: label L12
+ 13: goto 23
+ 14: label L13
+ 15: goto 17
+ 16: goto 6
+ 17: label L10
+ 18: goto 21
+ 19: label L7
+ 20: goto 0
+ 21: label L8
+ 22: goto 2
+ 23: label L5
+ 24: goto 1
+ 25: label L3
+ 26: goto 28
+ 27: goto 0
+ 28: label L1
+ 29: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x815::test {
+    private fun f1() {
+        loop {
+          loop {
+            loop {
+              if true {
+                loop {
+                  if false {
+                    continue[3]
+                  } else {
+                    break[1]
+                  };
+                  break
+                }
+              } else {
+                continue[2]
+              }
+            }
+          };
+          break
+        }
+    }
+} // end 0x815::test
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun test::f1() {

@@ -1,4 +1,144 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::foo($t0: &signer, $t1: u64, $t2: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
+     var $t2: &signer
+     var $t3: u64
+     var $t4: &0xc0ffee::m::S
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &0xc0ffee::m::S
+     var $t8: &u64
+  0: $t2 := infer($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := borrow_field<0xc0ffee::m::S>.a($t4)
+  3: $t3 := read_ref($t5)
+  4: $t7 := borrow_local($t1)
+  5: $t8 := borrow_field<0xc0ffee::m::S>.b($t7)
+  6: $t6 := read_ref($t8)
+  7: m::foo($t2, $t3, $t6)
+  8: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: &signer, $t1: u64, $t2: u64) {
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
+     var $t2: &signer
+     var $t3: u64
+     var $t4: &0xc0ffee::m::S
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &0xc0ffee::m::S
+     var $t8: &u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t4 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t4
+     # refs: [$t2 => #2, $t4 => #4]
+     # #2
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `y`] at line 10
+     #
+  2: $t5 := borrow_field<0xc0ffee::m::S>.a($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: [$t2 => #2, $t5 => #5]
+     # #2
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `y`, field `a`] at line 10
+     #
+  3: $t3 := read_ref($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t3
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t7
+     # refs: [$t2 => #2, $t7 => #7]
+     # #2
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `y`] at line 10
+     #
+  5: $t8 := borrow_field<0xc0ffee::m::S>.b($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t8
+     # refs: [$t2 => #2, $t8 => #8]
+     # #2
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `y`, field `b`] at line 10
+     #
+  6: $t6 := read_ref($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t6
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  7: m::foo($t2, $t3, $t6)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  8: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::foo($t0: &signer, $t1: u64, $t2: u64) {

@@ -24,7 +24,7 @@ warning: Unused parameter `y`. Consider removing or prefixing with an underscore
 18 │     public fun test4(y: u64): u64 {
    │                      ^
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test1(): u64 {
@@ -86,6 +86,49 @@ warning: Unused assignment/binding to `x`. Consider removing the assignment/bind
    │
 14 │         let x = y;
    │                 ^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test1(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t1 := 1
+  1: $t2 := 3
+  2: $t0 := infer($t2)
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := infer($t0)
+  1: $t1 := infer($t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test3($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := infer($t0)
+  1: $t1 := 8
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 1
+  1: $t1 := infer($t2)
+  2: return $t1
+}
 
 ============ after DeadStoreElimination: ================
 

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun f<T1,T2,T3>() {
         M::g<T2, T3, T1>()
@@ -11,7 +11,7 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun f<T1, T2, T3>() {
         g<T2,T3,T1>()

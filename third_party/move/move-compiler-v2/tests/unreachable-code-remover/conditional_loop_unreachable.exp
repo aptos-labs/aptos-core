@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::test($t0: bool, $t1: bool) {
@@ -54,6 +54,49 @@ warning: Unused assignment/binding to `i`. Consider removing the assignment/bind
    │
 12 │             i = i + 1;
    │             ^^^^^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test($t0: bool, $t1: bool) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: if ($t0) goto 2 else goto 23
+  2: label L2
+  3: if ($t1) goto 4 else goto 14
+  4: label L5
+  5: label L8
+  6: goto 5
+  7: label L9
+  8: $t2 := 0
+  9: $t4 := infer($t2)
+ 10: $t5 := 1
+ 11: $t3 := +($t4, $t5)
+ 12: $t2 := infer($t3)
+ 13: goto 16
+ 14: label L6
+ 15: goto 27
+ 16: label L7
+ 17: $t6 := 0
+ 18: $t8 := infer($t6)
+ 19: $t9 := 1
+ 20: $t7 := +($t8, $t9)
+ 21: $t6 := infer($t7)
+ 22: goto 25
+ 23: label L3
+ 24: goto 27
+ 25: label L4
+ 26: goto 0
+ 27: label L1
+ 28: return ()
+}
 
 ============ after UnreachableCodeProcessor: ================
 
