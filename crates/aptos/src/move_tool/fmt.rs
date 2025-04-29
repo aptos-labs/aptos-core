@@ -127,31 +127,39 @@ impl FmtCommand {
             for file in &files {
                 if !file.exists() {
                     return Err(CliError::UnexpectedError(format!(
-                        "File does not exist:{:?}",
-                        file
+                        "File does not exist: {}",
+                        file.display()
                     )));
                 }
                 if !file.is_file() {
                     return Err(CliError::UnexpectedError(format!(
-                        "Path is not a file:{:?}",
-                        file
+                        "Path is not a file: {}",
+                        file.display()
                     )));
                 }
                 if file.extension().unwrap() != move_command_line_common::files::MOVE_EXTENSION {
                     return Err(CliError::UnexpectedError(format!(
-                        "File is not a Move file:{:?}",
-                        file
+                        "File is not a Move file: {}",
+                        file.display()
                     )));
                 }
             }
             files
         } else {
             // Handle package path
-            let package_opt = if let Some(path) = package_opt {
-                fs::canonicalize(path.as_path()).ok()
-            } else {
-                None
+            let package_opt = match package_opt {
+                Some(path) => {
+                    let abs = fs::canonicalize(path.as_path()).map_err(|_| {
+                        CliError::UnexpectedError(format!(
+                            "Specified path {} does not exist",
+                            path.display()
+                        ))
+                    })?;
+                    Some(abs)
+                },
+                None => None,
             };
+
             let package_path = dir_default_to_current(package_opt.clone())?;
             let root_res = SourcePackageLayout::try_find_root(&package_path.clone());
             if let Ok(root_package_path) = root_res {
@@ -181,8 +189,8 @@ impl FmtCommand {
                     .collect()
             } else {
                 return Err(CliError::UnexpectedError(format!(
-                    "Unable to find package manifest in {:?} or in its parents",
-                    package_path
+                    "Unable to find package manifest in {} or in its parents",
+                    package_path.display()
                 )));
             }
         };
@@ -203,7 +211,7 @@ impl FmtCommand {
                     String::from_utf8(out.stderr).unwrap_or_default()
                 )));
             } else {
-                eprintln!("Formatting file:{:?}", file);
+                eprintln!("Formatting file: {}", file.display());
                 match String::from_utf8(out.stdout) {
                     Ok(output) => {
                         eprint!("{}", output);
