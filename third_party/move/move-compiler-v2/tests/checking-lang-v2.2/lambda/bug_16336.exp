@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot assign `&mut |()|` to left-hand side of type `&mut |()||()|`
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16336.move:4:10
+  │
+4 │         *(&mut x) = x();
+  │          ^^^^^^^^

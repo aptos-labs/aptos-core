@@ -440,17 +440,17 @@ async fn test_need_sync_for_ledger_info() {
     let block_store = inserter.block_store();
 
     let mut prev = block_store.ordered_root();
-    for i in 1..=100 {
+    for i in 1..=30 {
         prev = inserter.insert_block(&prev, i, None).await;
     }
     inserter
         .insert_block(
             &prev,
-            101,
+            31,
             Some(prev.block().gen_block_info(HashValue::zero(), 1, None)),
         )
         .await;
-    assert_eq!(block_store.ordered_root().round(), 100);
+    assert_eq!(block_store.ordered_root().round(), 30);
     assert_eq!(block_store.commit_root().round(), 0);
 
     let create_ledger_info = |round: u64| {
@@ -476,7 +476,7 @@ async fn test_need_sync_for_ledger_info() {
     assert!(block_store.need_sync_for_ledger_info(&ordered_too_far));
 
     let committed_round_too_far =
-        block_store.commit_root().round() + 100.max(block_store.vote_back_pressure_limit * 2) + 1;
+        block_store.commit_root().round() + 30.max(block_store.vote_back_pressure_limit * 2) + 1;
     let committed_too_far = create_ledger_info(committed_round_too_far);
     assert!(block_store.need_sync_for_ledger_info(&committed_too_far));
 

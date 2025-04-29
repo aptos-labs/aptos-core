@@ -560,6 +560,13 @@ impl ExecutableTransactions {
         }
     }
 
+    pub fn txns(&self) -> Vec<&SignatureVerifiedTransaction> {
+        match self {
+            ExecutableTransactions::Unsharded(txns) => txns.iter().collect(),
+            ExecutableTransactions::Sharded(_partitioned) => unimplemented!(""),
+        }
+    }
+
     pub fn into_txns(self) -> Vec<SignatureVerifiedTransaction> {
         match self {
             ExecutableTransactions::Unsharded(txns) => txns,

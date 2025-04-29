@@ -19,6 +19,7 @@ use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::{Payload, Round},
     pipelined_block::PipelinedBlock,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381::PrivateKey, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -119,7 +120,7 @@ impl TExecutionClient for MockExecutionClient {
     async fn finalize_order(
         &self,
         blocks: &[Arc<PipelinedBlock>],
-        finality_proof: LedgerInfoWithSignatures,
+        finality_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
@@ -146,7 +147,7 @@ impl TExecutionClient for MockExecutionClient {
                     .iter()
                     .map(|b| (**b).clone())
                     .collect::<Vec<PipelinedBlock>>(),
-                ordered_proof: finality_proof,
+                ordered_proof: finality_proof.ledger_info().clone(),
                 callback,
             })
             .await

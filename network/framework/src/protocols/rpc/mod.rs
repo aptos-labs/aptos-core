@@ -704,7 +704,7 @@ impl OutboundRpcs {
         };
 
         if is_canceled {
-            debug!(
+            trace!(
                 NetworkSchema::new(network_context).remote_peer(peer_id),
                 request_id = request_id,
                 "{} Received response for expired request_id {} from {}. Discarding.",

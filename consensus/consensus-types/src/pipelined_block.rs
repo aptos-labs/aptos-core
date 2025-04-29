@@ -10,6 +10,7 @@ use crate::{
     pipeline_execution_result::PipelineExecutionResult,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use anyhow::Error;
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
@@ -109,7 +110,7 @@ pub struct PipelineInputTx {
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
-    pub order_proof_tx: Option<oneshot::Sender<()>>,
+    pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
 }
 
@@ -117,7 +118,7 @@ pub struct PipelineInputRx {
     pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
-    pub order_proof_fut: TaskFuture<()>,
+    pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
 }
 

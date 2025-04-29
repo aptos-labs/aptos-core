@@ -1,0 +1,12 @@
+[package]
+name = "compare"
+version = "1.0.0"
+authors = []
+
+[addresses]
+poc = "0xcaffe"
+
+[dependencies]
+MoveStdlib = { local = "../../../../../../aptos-move/framework/move-stdlib" }
+AptosFramework = { local = "../../../../../../aptos-move/framework/aptos-framework" }
+AptosStdlib = { local = "../../../../../../aptos-move/framework/aptos-stdlib" } 

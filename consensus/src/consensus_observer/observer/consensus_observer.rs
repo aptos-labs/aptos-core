@@ -40,6 +40,8 @@ use aptos_config::{
 use aptos_consensus_types::{
     pipeline,
     pipelined_block::{PipelineFutures, PipelinedBlock},
+    vote_data::VoteData,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
@@ -311,7 +313,7 @@ impl ConsensusObserver {
             .execution_client
             .finalize_order(
                 ordered_block.blocks(),
-                ordered_block.ordered_proof().clone(),
+                WrappedLedgerInfo::new(VoteData::dummy(), ordered_block.ordered_proof().clone()),
                 commit_callback,
             )
             .await

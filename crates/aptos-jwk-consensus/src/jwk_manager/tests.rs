@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jwk_manager::{ConsensusState, JWKManager, PerProviderState, QuorumCertProcessGuard},
+    jwk_manager::{
+        ConsensusState, IssuerLevelConsensusManager, PerProviderState, QuorumCertProcessGuard,
+    },
+    mode::TConsensusMode,
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
     update_certifier::TUpdateCertifier,
@@ -56,7 +59,7 @@ async fn test_jwk_manager_state_transition() {
 
     let update_certifier = DummyUpdateCertifier::default();
     let vtxn_pool = VTxnPoolState::default();
-    let mut jwk_manager = JWKManager::new(
+    let mut jwk_manager = IssuerLevelConsensusManager::new(
         private_keys[0].clone(),
         addrs[0],
         Arc::new(epoch_state),
@@ -472,15 +475,18 @@ impl Default for DummyUpdateCertifier {
     }
 }
 
-impl TUpdateCertifier for DummyUpdateCertifier {
+impl<ConsensusMode: TConsensusMode> TUpdateCertifier<ConsensusMode> for DummyUpdateCertifier {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        _agg_node_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
-    ) -> AbortHandle {
+        _agg_node_tx: aptos_channel::Sender<
+            ConsensusMode::ConsensusSessionKey,
+            QuorumCertifiedUpdate,
+        >,
+    ) -> anyhow::Result<AbortHandle> {
         self.invocations.lock().push((epoch_state, payload));
         let (abort_handle, _) = AbortHandle::new_pair();
-        abort_handle
+        Ok(abort_handle)
     }
 }

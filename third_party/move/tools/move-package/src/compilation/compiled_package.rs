@@ -752,6 +752,8 @@ impl CompiledPackage {
             }
         };
 
+        Self::check_duplicate_script_function_names(&root_compiled_units)?;
+
         let compiled_package = CompiledPackage {
             root_compiled_units,
             deps_compiled_units,
@@ -911,6 +913,41 @@ impl CompiledPackage {
         )?;
 
         Ok(on_disk_package)
+    }
+
+    fn check_duplicate_script_function_names(units: &[CompiledUnitWithSource]) -> Result<()> {
+        let mut seen_names: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut seen_error = false;
+        for unit in units {
+            if let CompiledUnit::Script(named) = &unit.unit {
+                let name = named.name.as_str().to_owned();
+                let script_path = unit.source_path.to_string_lossy().to_string();
+                let entry = seen_names.entry(name).or_default();
+                entry.push(script_path);
+                if entry.len() > 1 {
+                    seen_error = true;
+                }
+            }
+        }
+        if !seen_error {
+            return Ok(());
+        }
+        let mut error_strs = vec![];
+        for (script_name, paths) in seen_names.into_iter() {
+            if paths.len() > 1 {
+                error_strs.push(format!(
+                    "Script function name `{}` duplicated in the following files:\n{}",
+                    script_name,
+                    paths
+                        .iter()
+                        .map(|path| format!("\t`{}`", path))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ));
+            }
+        }
+        error_strs.push("Please rename script functions to remove duplication".to_string());
+        bail!(error_strs.join("\n"));
     }
 
     fn build_abis(

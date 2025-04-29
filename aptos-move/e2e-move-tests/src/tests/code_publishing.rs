@@ -102,7 +102,7 @@ fn code_publishing_upgrade_success_compat() {
 }
 
 #[test]
-fn code_publishing_disallow_native() {
+fn code_publishing_disallow_user_native() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -116,25 +116,14 @@ fn code_publishing_disallow_native() {
 }
 
 #[test]
-fn code_publishing_disallow_native_entry_func() {
+fn code_publishing_disallow_user_native_entry() {
     let mut h = MoveHarness::new();
-    // Disable feature for now to publish the package.
-    h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(h.publish_package_cache_building(
-        &acc,
-        &common::test_dir_path("code_publishing.data/pack_native"),
-    ));
-
-    // Re-enable the flag to test the behavior for this entry native
-    h.enable_features(vec![FeatureFlag::DISALLOW_USER_NATIVES], vec![]);
     assert_vm_status!(
-        h.run_entry_function(
+        h.publish_package_cache_building(
             &acc,
-            str::parse("0xcafe::test::hello").unwrap(),
-            vec![],
-            vec![]
+            &common::test_dir_path("code_publishing.data/pack_native_entry"),
         ),
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
     );
@@ -143,12 +132,26 @@ fn code_publishing_disallow_native_entry_func() {
 #[test]
 fn code_publishing_allow_system_native() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
+    let acc = h.aptos_framework_account();
 
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_native_system"),
     ));
+}
+
+#[test]
+fn code_publishing_disallow_system_native_entry() {
+    let mut h = MoveHarness::new();
+    let acc = h.aptos_framework_account();
+
+    assert_vm_status!(
+        h.publish_package_cache_building(
+            &acc,
+            &common::test_dir_path("code_publishing.data/pack_native_system_entry"),
+        ),
+        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    );
 }
 
 #[test]

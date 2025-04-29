@@ -128,6 +128,18 @@ impl Account {
         }
     }
 
+    pub fn new_from_addr_with_new_keypair_from_seed(
+        addr: AccountAddress,
+        seed: &mut KeyGen,
+    ) -> Self {
+        let (privkey, pubkey) = seed.generate_ed25519_keypair();
+        Self {
+            addr,
+            privkey,
+            pubkey: AccountPublicKey::Ed25519(pubkey),
+        }
+    }
+
     /// Creates a new account with the given keypair.
     ///
     /// Like with [`Account::new`], the account returned by this constructor is a purely logical
@@ -530,7 +542,7 @@ impl AccountData {
     ///
     /// This constructor is non-deterministic and should not be used against golden file.
     pub fn new(balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(Account::new(), balance, sequence_number, false, false)
+        Self::with_account(Account::new(), balance, sequence_number, true, false)
     }
 
     pub fn increment_sequence_number(&mut self) {
@@ -545,7 +557,7 @@ impl AccountData {
             Account::new_from_seed(seed),
             balance,
             sequence_number,
-            false,
+            true,
             false,
         )
     }
@@ -721,19 +733,9 @@ impl AccountData {
         self.sequence_number
     }
 
-    /// Returns the unique key for this sent events stream.
-    pub fn sent_events_key(&self) -> &EventKey {
-        self.coin_store.as_ref().unwrap().withdraw_events.key()
-    }
-
     /// Returns the initial sent events count.
     pub fn sent_events_count(&self) -> u64 {
         self.coin_store.as_ref().unwrap().withdraw_events.count()
-    }
-
-    /// Returns the unique key for this received events stream.
-    pub fn received_events_key(&self) -> &EventKey {
-        self.coin_store.as_ref().unwrap().deposit_events.key()
     }
 
     /// Returns the initial received events count.
@@ -750,25 +752,16 @@ impl AccountData {
         // be generated.
         // XXX should we also test edge cases around large sequence numbers?
         let sequence_strategy = 0u64..(1 << 32);
-        let event_count_strategy = 0u64..(1 << 32);
 
-        (
-            any::<Account>(),
-            balance_strategy,
-            sequence_strategy,
-            event_count_strategy.clone(),
-            event_count_strategy,
+        (any::<Account>(), balance_strategy, sequence_strategy).prop_map(
+            |(account, balance, sequence_number)| {
+                AccountData::with_account_and_fungible_store(
+                    account,
+                    balance,
+                    sequence_number,
+                    false,
+                )
+            },
         )
-            .prop_map(
-                |(account, balance, sequence_number, sent_events_count, received_events_count)| {
-                    AccountData::with_account_and_event_counts(
-                        account,
-                        balance,
-                        sequence_number,
-                        sent_events_count,
-                        received_events_count,
-                    )
-                },
-            )
     }
 }

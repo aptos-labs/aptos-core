@@ -30,7 +30,7 @@ error: cannot assign `&mut u8` to left-hand side of type `&mut u64`
 25 │         *x = 1u8;
    │          ^
 
-error: the left-hand side expected `&mut` but `&` was provided
+error: cannot assign `&S` to left-hand side of type `&mut S` (mutability mismatch)
    ┌─ tests/checking/error_context/assign.move:30:9
    │
 30 │         r = &s2;

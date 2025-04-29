@@ -788,7 +788,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number,
+                0,
                 txn.timeline_state,
                 false,
                 None,
@@ -801,7 +801,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number,
+                0,
                 txn.timeline_state,
                 false,
                 None,
@@ -820,7 +820,6 @@ fn signed_txn_to_mempool_transaction(txn: SignedTransaction) -> MempoolTransacti
         Duration::from_secs(1),
         1,
         TimelineState::NotReady,
-        0,
         SystemTime::now(),
         false,
         Some(BroadcastPeerPriority::Primary),
@@ -1187,6 +1186,19 @@ fn test_sequence_number_behavior_at_capacity() {
     pool.commit_transaction(&TestTransaction::get_address(1), 0);
     add_txn(&mut pool, TestTransaction::new(2, 0, 1)).unwrap();
     pool.commit_transaction(&TestTransaction::get_address(2), 0);
+
+    let batch = pool.get_batch(10, 10240, true, btreemap![]);
+    assert_eq!(batch.len(), 1);
+}
+
+#[test]
+fn test_sequence_number_stale_account_sequence_number() {
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.capacity = 2;
+    let mut pool = CoreMempool::new(&config);
+    pool.commit_transaction(&TestTransaction::get_address(0), 1);
+    // This has a stale account sequence number of 0
+    add_txn(&mut pool, TestTransaction::new(0, 2, 1)).unwrap();
 
     let batch = pool.get_batch(10, 10240, true, btreemap![]);
     assert_eq!(batch.len(), 1);

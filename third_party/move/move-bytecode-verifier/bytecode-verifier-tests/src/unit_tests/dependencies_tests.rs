@@ -248,6 +248,7 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
         }],
         type_parameters: vec![],
         parameters: SignatureIndex(0),
+        access_specifiers: None,
         code: CodeUnit {
             locals: SignatureIndex(0),
             code: vec![call, Bytecode::Ret],

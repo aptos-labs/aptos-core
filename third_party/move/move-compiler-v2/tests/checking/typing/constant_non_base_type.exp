@@ -32,7 +32,7 @@ error: Invalid type for constant
   │     │
   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
-error: expected `&mut` but `&` was provided
+error: expected `&mut u64` but found a value of type `&u64` (mutability mismatch)
   ┌─ tests/checking/typing/constant_non_base_type.move:4:26
   │
 4 │     const C2: &mut u64 = &0;

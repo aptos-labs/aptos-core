@@ -14,7 +14,10 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
-    pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
+    pipeline::{
+        execution_client::TExecutionClient,
+        pipeline_builder::{PipelineBuilder, PreCommitStatus},
+    },
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -26,7 +29,6 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
-    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -92,6 +94,7 @@ pub struct BlockStore {
     window_size: Option<u64>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
+    pre_commit_status: Option<Arc<Mutex<PreCommitStatus>>>,
 }
 
 impl BlockStore {
@@ -226,11 +229,17 @@ impl BlockStore {
             },
         };
 
-        if let Some(pipeline_builder) = &pipeline_builder {
+        let pre_commit_status = if let Some(pipeline_builder) = &pipeline_builder {
             let pipeline_fut =
                 pipeline_builder.build_root(result, root_commit_cert.ledger_info().clone());
             window_root.set_pipeline_futs(pipeline_fut);
-        }
+
+            let status = pipeline_builder.pre_commit_status();
+            status.lock().update_round(root_block_round);
+            Some(status)
+        } else {
+            None
+        };
 
         let tree = BlockTree::new(
             root_block_id,
@@ -261,6 +270,7 @@ impl BlockStore {
             pending_blocks,
             pipeline_builder,
             window_size,
+            pre_commit_status,
         };
 
         for block in blocks {
@@ -332,7 +342,7 @@ impl BlockStore {
         self.execution_client
             .finalize_order(
                 &blocks_to_commit,
-                finality_proof.ledger_info().clone(),
+                finality_proof.clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<PipelinedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
@@ -475,17 +485,21 @@ impl BlockStore {
             let id = pipelined_block.id();
             let round = pipelined_block.round();
             let window_size = self.window_size;
-            let callback = Box::new(move |commit_decision: LedgerInfoWithSignatures| {
-                if let Some(tree) = block_tree.upgrade() {
-                    tree.write().commit_callback(
-                        storage,
-                        id,
-                        round,
-                        WrappedLedgerInfo::new(VoteData::dummy(), commit_decision),
-                        window_size,
-                    );
-                }
-            });
+            let callback = Box::new(
+                move |finality_proof: WrappedLedgerInfo,
+                      commit_decision: LedgerInfoWithSignatures| {
+                    if let Some(tree) = block_tree.upgrade() {
+                        tree.write().commit_callback(
+                            storage,
+                            id,
+                            round,
+                            finality_proof,
+                            commit_decision,
+                            window_size,
+                        );
+                    }
+                },
+            );
             pipeline_builder.build(
                 &pipelined_block,
                 parent_block.pipeline_futs().ok_or_else(|| {
@@ -592,6 +606,10 @@ impl BlockStore {
 
     pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
         self.inner.read().get_block_for_round(round)
+    }
+
+    pub fn pre_commit_status(&self) -> Option<Arc<Mutex<PreCommitStatus>>> {
+        self.pre_commit_status.clone()
     }
 }
 
@@ -883,7 +901,8 @@ impl BlockStore {
             self.storage.clone(),
             block_id,
             block_round,
-            commit_proof,
+            commit_proof.clone(),
+            commit_proof.ledger_info().clone(),
             window_size.or(self.window_size),
         )
     }

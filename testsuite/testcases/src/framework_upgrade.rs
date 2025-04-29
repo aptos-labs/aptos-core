@@ -8,12 +8,12 @@ use aptos_forge::{
     FORGE_KEY_SEED,
 };
 use aptos_keygen::KeyGen;
-use aptos_logger::info;
 use aptos_release_builder::ReleaseConfig;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
+use log::info;
 use std::{ops::DerefMut, path::Path};
 use tokio::{fs, time::Duration};
 

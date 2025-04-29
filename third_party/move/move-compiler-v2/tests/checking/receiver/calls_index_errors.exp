@@ -6,13 +6,13 @@ error: undeclared receiver function `merge_non_receiver` for type `W`
 22 │         S[account].t.w.merge_non_receiver(w)
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&W` to a function which expects argument of type `&mut W` (mutability mismatch)
    ┌─ tests/checking/receiver/calls_index_errors.move:26:9
    │
 26 │         (&S[account].t.w).merge(w)
    │         ^^^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&W` to a function which expects argument of type `&mut W` (mutability mismatch)
    ┌─ tests/checking/receiver/calls_index_errors.move:30:9
    │
 30 │         (&v[0].t.w).merge(w)

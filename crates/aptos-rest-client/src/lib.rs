@@ -1066,7 +1066,7 @@ impl Client {
         Ok(self.inner.get(url).send().await?)
     }
 
-    pub async fn get_account_transactions(
+    pub async fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start: Option<u64>,

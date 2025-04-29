@@ -85,16 +85,14 @@ impl<'r> WriteOpConverter<'r> {
             let addr = module_id.address();
             let name = module_id.name();
 
-            let module_exists = module_storage
-                .check_module_exists(addr, name)
-                .map_err(|e| e.to_partial())?;
-            let op = if module_exists {
+            // If state value metadata exists, this is a modification.
+            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let op = if state_value_metadata.is_some() {
                 Op::Modify(bytes)
             } else {
                 Op::New(bytes)
             };
 
-            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
             let write_op = self.convert(
                 state_value_metadata,
                 op,

@@ -97,34 +97,41 @@ impl<'a> BinaryModuleLoader<'a> {
         let mut module_id = None;
         for handle in module.module_handles() {
             let name = make_module_name(handle.module_id(), env.symbol_pool());
-            if env.find_module(&name).is_none() {
-                if handle.module_id() != module.id() && !with_dep_closure {
-                    env.error(
-                        &module_loc,
-                        &format!(
-                            "while loading binary module `{}`: unresolved dependency to module `{}`",
-                            module_name.display(env),
-                            handle.module_id()
-                        ),
-                    )
-                } else {
-                    let id = ModuleId::new(env.module_data.len());
-                    let mut data = ModuleData::new(name.clone(), id, module_loc.clone());
-                    if name == vector_module_name {
-                        // If this is `0x1::vector`, add well known vector functions.
-                        // Those functions do not appear in the bytecode because they are
-                        // implemented by specific instructions, but they are in the stackless
-                        // bytecode.
-                        add_well_known_vector_funs(env, &mut data);
+            match env.find_module(&name) {
+                None => {
+                    if handle.module_id() != module.id() && !with_dep_closure {
+                        env.error(
+                            &module_loc,
+                            &format!(
+                                "while loading binary module `{}`: unresolved dependency to module `{}`",
+                                module_name.display(env),
+                                handle.module_id()
+                            ),
+                        )
+                    } else {
+                        let id = ModuleId::new(env.module_data.len());
+                        let mut data = ModuleData::new(name.clone(), id, module_loc.clone());
+                        if name == vector_module_name {
+                            // If this is `0x1::vector`, add well known vector functions.
+                            // Those functions do not appear in the bytecode because they are
+                            // implemented by specific instructions, but they are in the stackless
+                            // bytecode.
+                            add_well_known_vector_funs(env, &mut data);
+                        }
+                        // attach source map if this is the loaded module
+                        if handle.module_id() == module.id() {
+                            data.source_map = Some(source_map.clone());
+                            // Remember id of the loaded module
+                            module_id = Some(ModuleId::new(env.module_data.len()))
+                        }
+                        env.module_data.push(data);
                     }
-                    // attach source map if this is the loaded module
+                },
+                Some(module_env) => {
                     if handle.module_id() == module.id() {
-                        data.source_map = Some(source_map.clone());
-                        // Remember id of the loaded module
-                        module_id = Some(ModuleId::new(env.module_data.len()))
+                        module_id = Some(module_env.get_id());
                     }
-                    env.module_data.push(data);
-                }
+                },
             }
         }
         // If the vector module has not been loaded so far, do now, as it can still be

@@ -1,48 +1,48 @@
 
 Diagnostics:
-error: the function takes `&mut` but `&` was provided
+error: expected function type returns value of type `&mut u64` but `&u64` was provided
    ┌─ tests/checking/typing/lambda_typed_widen_result.move:33:38
    │
 33 │         let r = pass_mut_ref(&mut v, |x: &u64| x);
    │                                      ^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type returns value of type `&mut u64` but `&u64` was provided
    ┌─ tests/checking/typing/lambda_typed_widen_result.move:43:38
    │
 43 │         let r = pass_mut_ref(&mut v, |x: &mut u64| (freeze(x)));
    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type returns value of type `&mut u64` but `&u64` was provided
    ┌─ tests/checking/typing/lambda_typed_widen_result.move:55:39
    │
 55 │         let r = pass_mut2_ref(&mut v, |x: &u64| x);
    │                                       ^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type returns value of type `&mut u64` but `&u64` was provided
    ┌─ tests/checking/typing/lambda_typed_widen_result.move:65:39
    │
 65 │         let r = pass_mut2_ref(&mut v, |x: &mut u64| (freeze(x)));
    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type has argument of type `&u64` but `&mut u64` was provided
    ┌─ tests/checking/typing/lambda_typed_widen_result.move:94:39
    │
 94 │         let r = pass_mut4_ref(&mut v, |x: &mut u64| x);
    │                                       ^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type has argument of type `&u64` but `&mut u64` was provided
     ┌─ tests/checking/typing/lambda_typed_widen_result.move:109:39
     │
 109 │         let r = pass_mut4_ref(&mut v, |x: &mut u64| (freeze(x)));
     │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type has argument of type `&u64` but `&mut u64` was provided
     ┌─ tests/checking/typing/lambda_typed_widen_result.move:116:38
     │
 116 │         let r = pass_imm_ref(&mut v, |x: &mut u64| x);
     │                                      ^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type has argument of type `&u64` but `&mut u64` was provided
     ┌─ tests/checking/typing/lambda_typed_widen_result.move:131:38
     │
 131 │         let r = pass_imm_ref(&mut v, |x: &mut u64| (freeze(x)));

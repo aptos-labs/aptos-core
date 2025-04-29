@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `||||..|_ has ..|_||` (consider providing type arguments or annotating the type)
+  ┌─ tests/checking-lang-v2.2/lambda/self_application.move:4:18
+  │
+4 │         let f = |func| func();
+  │                  ^^^^
+
+error: unable to infer instantiation of type `||||..|_ has ..|||` (consider providing type arguments or annotating the type)
+  ┌─ tests/checking-lang-v2.2/lambda/self_application.move:4:17
+  │
+4 │         let f = |func| func();
+  │                 ^^^^^^^^^^^^^

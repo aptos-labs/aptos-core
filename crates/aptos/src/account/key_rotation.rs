@@ -4,8 +4,8 @@
 use crate::common::types::{
     account_address_from_auth_key, account_address_from_public_key, AuthenticationKeyInputOptions,
     CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
-    ExtractPublicKey, HardwareWalletOptions, ParsePrivateKey, ProfileConfig, ProfileOptions,
-    PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
+    ExtractEd25519PublicKey, HardwareWalletOptions, ParseEd25519PrivateKey, ProfileConfig,
+    ProfileOptions, PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -85,7 +85,7 @@ pub(crate) struct NewProfileOptions {
     pub(crate) save_to_profile: Option<String>,
 }
 
-impl ParsePrivateKey for RotateKey {}
+impl ParseEd25519PrivateKey for RotateKey {}
 
 impl RotateKey {
     /// Extract private key from CLI args

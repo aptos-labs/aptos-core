@@ -192,7 +192,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
-        num_leaves_at_beginning + 2  /* 1 token store + 1 token*/ + num_block_resource
+        num_leaves_at_beginning + 3 /* 1 token store + 1 token + 1 account resource */ + num_block_resource
     );
 
     let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
@@ -214,7 +214,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
 
     assert_eq!(
         num_leaves_after_return_nft,
-        num_leaves_at_beginning + 1 + num_block_resource * 2
+        num_leaves_at_beginning + 2 + num_block_resource * 2
     );
 }
 

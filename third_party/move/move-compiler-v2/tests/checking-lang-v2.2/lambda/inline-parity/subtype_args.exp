@@ -1,65 +1,7 @@
-// -- Model dump before bytecode pipeline
-module 0x8675309::M {
-    struct S {
-        dummy_field: bool,
-    }
-    private fun imm<T>(_x: &T) {
-        Tuple()
-    }
-    private fun imm_imm<T>(_x: &T,_y: &T) {
-        Tuple()
-    }
-    private fun imm_mut<T>(_x: &T,_y: &mut T) {
-        Tuple()
-    }
-    private fun mut_imm<T>(_x: &mut T,_y: &T) {
-        Tuple()
-    }
-    private fun t0() {
-        M::imm<u64>(Freeze(false)(Borrow(Mutable)(0)));
-        M::imm<u64>(Borrow(Immutable)(0));
-        M::imm<S>(Freeze(false)(Borrow(Mutable)(pack M::S(false))));
-        M::imm<S>(Borrow(Immutable)(pack M::S(false)));
-        Tuple()
-    }
-    private fun t1() {
-        M::imm_mut<u64>(Freeze(false)(Borrow(Mutable)(0)), Borrow(Mutable)(0));
-        M::mut_imm<u64>(Borrow(Mutable)(0), Freeze(false)(Borrow(Mutable)(0)));
-        M::imm_imm<u64>(Freeze(false)(Borrow(Mutable)(0)), Freeze(false)(Borrow(Mutable)(0)));
-        Tuple()
-    }
-    private fun t2(f: |(&u64, &mut u64)| with copy) {
-        (f)(Borrow(Mutable)(0), Borrow(Mutable)(0));
-        (f)(Borrow(Immutable)(0), Borrow(Mutable)(0));
-        Tuple()
-    }
-} // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
-module 0x8675309::M {
-    struct S has drop {
-    }
-    fun imm<T>(_x: &T) {
-    }
-    fun imm_imm<T>(_x: &T, _y: &T) {
-    }
-    fun imm_mut<T>(_x: &T, _y: &mut T) {
-    }
-    fun mut_imm<T>(_x: &mut T, _y: &T) {
-    }
-    fun t0() {
-        imm<u64>(/*freeze*/&mut 0);
-        imm<u64>(&0);
-        imm<S>(/*freeze*/&mut S{});
-        imm<S>(&S{});
-    }
-    fun t1() {
-        imm_mut<u64>(/*freeze*/&mut 0, &mut 0);
-        mut_imm<u64>(&mut 0, /*freeze*/&mut 0);
-        imm_imm<u64>(/*freeze*/&mut 0, /*freeze*/&mut 0);
-    }
-    fun t2(f: |(&u64, &mut u64)| with copy) {
-        f(&mut 0, &mut 0);
-        f(&0, &mut 0);
-    }
-}
+Diagnostics:
+error: expected function type has argument of type `(&mut u64, &mut integer)` but `(&u64, &mut u64)` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args.move:24:9
+   │
+24 │         f(&mut 0, &mut 0); // need to further investigate this error
+   │         ^^^^^^^^^^^^^^^^^

@@ -652,6 +652,12 @@ impl<'env> Generator<'env> {
             // This here should be well-defined because only structs can be wrappers.
             let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
             let struct_id = wrapper_struct.get_qualified_id();
+            if struct_id.module_id != self.func_env.module_env.get_id() {
+                self.error(
+                    id,
+                    "cannot unpack a wrapper struct and invoke the wrapped function value defined in a different module",
+                )
+            }
             let inst = inst.to_vec();
             self.emit_with(id, |attr| {
                 Bytecode::Call(

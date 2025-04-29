@@ -178,7 +178,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
                 GENESIS_ROUND,
                 genesis_block_id(),
                 output
-                    .expect_ledger_update_output()
+                    .ensure_ledger_update_output()?
                     .transaction_accumulator
                     .root_hash(),
                 genesis_version,

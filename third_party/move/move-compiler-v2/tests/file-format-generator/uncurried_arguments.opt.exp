@@ -1,0 +1,28 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+
+
+take(_x: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+test(s: signer) /* def_idx: 1 */ {
+L1:	f: |signer|
+B0:
+	0: PackClosure#0 __lambda__1__test(signer)
+	1: StLoc[1](f: |signer|)
+	2: MoveLoc[0](s: signer)
+	3: MoveLoc[1](f: |signer|)
+	4: CallClosure(|signer|)
+	5: Ret
+}
+__lambda__1__test(_s: signer) /* def_idx: 2 */ {
+B0:
+	0: LdU64(5)
+	1: Call take(u64)
+	2: Ret
+}
+}
+============ bytecode verification succeeded ========

@@ -90,9 +90,10 @@ fn native_write_to_event_store(
     let (layout, has_aggregator_lifting) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
 
+    let function_value_extension = context.function_value_extension();
     let blob = ValueSerDeContext::new()
         .with_delayed_fields_serde()
-        .with_func_args_deserialization(context.function_value_extension())
+        .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -154,8 +155,9 @@ fn native_emitted_events_by_handle(
         .emitted_v1_events(&key, &ty_tag)
         .into_iter()
         .map(|blob| {
+            let function_value_extension = context.function_value_extension();
             ValueSerDeContext::new()
-                .with_func_args_deserialization(context.function_value_extension())
+                .with_func_args_deserialization(&function_value_extension)
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
                     SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -186,8 +188,9 @@ fn native_emitted_events(
         .emitted_v2_events(&ty_tag)
         .into_iter()
         .map(|blob| {
+            let function_value_extension = context.function_value_extension();
             ValueSerDeContext::new()
-                .with_func_args_deserialization(context.function_value_extension())
+                .with_func_args_deserialization(&function_value_extension)
                 .with_delayed_fields_serde()
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
@@ -244,9 +247,11 @@ fn native_write_module_event_to_store(
     }
     let (layout, has_identifier_mappings) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
+
+    let function_value_extension = context.function_value_extension();
     let blob = ValueSerDeContext::new()
         .with_delayed_fields_serde()
-        .with_func_args_deserialization(context.function_value_extension())
+        .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(

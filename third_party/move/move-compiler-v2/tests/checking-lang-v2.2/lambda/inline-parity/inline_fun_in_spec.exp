@@ -14,7 +14,7 @@ module 0x42::m {
       invariant m::$exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
     }
 
-    private fun exec<T,R>(f: |T|R with copy,x: T): R {
+    private fun exec<T,R>(f: |T|R with copy + drop,x: T): R {
         {
           let r: R = (f)(x);
           spec {
@@ -44,7 +44,7 @@ module 0x42::m {
     private fun __lambda__1__function_code_spec_block(y: num): bool {
         Gt(y, 0)
     }
-    spec fun $exec<T,R>(f: |#0|#1 with copy,x: #0): #1 {
+    spec fun $exec<T,R>(f: |#0|#1 with copy + drop,x: #0): #1 {
         {
           let r: #1 = (f)(x);
           r
@@ -66,7 +66,7 @@ module 0x42::m {
     }
 
     */
-    fun exec<T: copy + drop, R>(f: |T|R with copy, x: T): R {
+    fun exec<T: copy + drop, R>(f: |T|R with copy + drop, x: T): R {
         let r = f(x);
 
         /* spec {

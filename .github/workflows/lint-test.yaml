@@ -185,6 +185,10 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+      # Install Move Prover tools
+      - name: Run dev_setup.sh
+        run: |
+          scripts/dev_setup.sh -b -y
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
         with:

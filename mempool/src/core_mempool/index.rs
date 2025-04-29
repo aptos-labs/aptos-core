@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module provides various indexes used by Mempool.
-use crate::core_mempool::transaction::{MempoolTransaction, SequenceInfo, TimelineState};
+use crate::core_mempool::transaction::{MempoolTransaction, TimelineState};
 use crate::{
     counters,
     logging::{LogEntry, LogSchema},
@@ -62,7 +62,7 @@ impl PriorityIndex {
             expiration_time: txn.expiration_time,
             insertion_time: txn.insertion_info.insertion_time,
             address: txn.get_sender(),
-            sequence_number: txn.sequence_info,
+            sequence_number: txn.get_sequence_number(),
             hash: txn.get_committed_hash(),
         }
     }
@@ -82,7 +82,7 @@ pub struct OrderedQueueKey {
     pub expiration_time: Duration,
     pub insertion_time: SystemTime,
     pub address: AccountAddress,
-    pub sequence_number: SequenceInfo,
+    pub sequence_number: u64,
     pub hash: HashValue,
 }
 
@@ -106,12 +106,7 @@ impl Ord for OrderedQueueKey {
             Ordering::Equal => {},
             ordering => return ordering,
         }
-        match self
-            .sequence_number
-            .transaction_sequence_number
-            .cmp(&other.sequence_number.transaction_sequence_number)
-            .reverse()
-        {
+        match self.sequence_number.cmp(&other.sequence_number).reverse() {
             Ordering::Equal => {},
             ordering => return ordering,
         }
@@ -167,7 +162,7 @@ impl TTLIndex {
         TTLOrderingKey {
             expiration_time: (self.get_expiration_time)(txn),
             address: txn.get_sender(),
-            sequence_number: txn.sequence_info.transaction_sequence_number,
+            sequence_number: txn.get_sequence_number(),
         }
     }
 
@@ -260,11 +255,7 @@ impl TimelineIndex {
     pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
         self.timeline.insert(
             self.timeline_id,
-            (
-                txn.get_sender(),
-                txn.sequence_info.transaction_sequence_number,
-                Instant::now(),
-            ),
+            (txn.get_sender(), txn.get_sequence_number(), Instant::now()),
         );
         txn.timeline_state = TimelineState::Ready(self.timeline_id);
         self.timeline_id += 1;
@@ -530,7 +521,7 @@ impl From<&MempoolTransaction> for TxnPointer {
     fn from(txn: &MempoolTransaction) -> Self {
         Self {
             sender: txn.get_sender(),
-            sequence_number: txn.sequence_info.transaction_sequence_number,
+            sequence_number: txn.get_sequence_number(),
             hash: txn.get_committed_hash(),
         }
     }
@@ -540,7 +531,7 @@ impl From<&OrderedQueueKey> for TxnPointer {
     fn from(key: &OrderedQueueKey) -> Self {
         Self {
             sender: key.address,
-            sequence_number: key.sequence_number.transaction_sequence_number,
+            sequence_number: key.sequence_number,
             hash: key.hash,
         }
     }

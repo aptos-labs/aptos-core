@@ -67,6 +67,7 @@ fn merge_borrow_states_infinite_loop() {
         },
         type_parameters: vec![],
         parameters: SignatureIndex(0),
+        access_specifiers: None,
     };
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");

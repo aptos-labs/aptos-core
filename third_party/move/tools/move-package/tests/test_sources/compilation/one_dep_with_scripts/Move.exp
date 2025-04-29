@@ -1,46 +1,7 @@
-CompiledPackageInfo {
-    package_name: "Root",
-    address_alias_instantiation: {
-        "A": 0000000000000000000000000000000000000000000000000000000000000001,
-    },
-    source_digest: Some(
-        "ELIDED_FOR_TEST",
-    ),
-    build_flags: BuildConfig {
-        dev_mode: true,
-        test_mode: false,
-        override_std: None,
-        generate_docs: false,
-        generate_abis: false,
-        generate_move_model: false,
-        full_model_generation: false,
-        install_dir: Some(
-            "ELIDED_FOR_TEST",
-        ),
-        force_recompilation: false,
-        additional_named_addresses: {},
-        fetch_deps_only: false,
-        skip_fetch_latest_git_deps: false,
-        compiler_config: CompilerConfig {
-            bytecode_version: None,
-            known_attributes: {
-                "bytecode_instruction",
-                "deprecated",
-                "expected_failure",
-                "lint::skip",
-                "module_lock",
-                "native_interface",
-                "persistent",
-                "test",
-                "test_only",
-                "verify_only",
-            },
-            skip_attribute_checks: false,
-            compiler_version: Some(
-                V2_0,
-            ),
-            language_version: None,
-            experiments: [],
-        },
-    },
-}
+Script function name `a_script` duplicated in the following files:
+	`tests/test_sources/compilation/one_dep_with_scripts/sources/a_script.move`
+	`tests/test_sources/compilation/one_dep_with_scripts/sources/a_script.move`
+Script function name `b_script` duplicated in the following files:
+	`tests/test_sources/compilation/one_dep_with_scripts/sources/b_script.move`
+	`tests/test_sources/compilation/one_dep_with_scripts/sources/b_script.move`
+Please rename script functions to remove duplication

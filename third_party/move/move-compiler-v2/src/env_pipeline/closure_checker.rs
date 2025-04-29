@@ -26,10 +26,14 @@ pub fn check_closures(env: &GlobalEnv) {
             if let Some(def) = fun_env.get_def() {
                 def.visit_pre_order(&mut |e| {
                     if let ExpData::Call(id, Operation::Closure(mid, fid, _), args) = e {
-                        let context_ty = env.get_node_type(*id);
+                        let mut context_ty = env.get_node_type(*id);
+                        let mut function_wrapper_ty = None;
+                        if let Some(ty) = context_ty.get_function_wrapper_ty(env) {
+                            function_wrapper_ty = Some(context_ty);
+                            context_ty = ty;
+                        }
                         let required_abilities =
                             env.type_abilities(&context_ty, fun_env.get_type_parameters_ref());
-
                         let fun_env = env.get_function(mid.qualified(*fid));
                         // The function itself has all abilities except `store`, which it only
                         // has if it is public. Notice that since required_abilities is derived
@@ -72,14 +76,25 @@ pub fn check_closures(env: &GlobalEnv) {
 
                         // All captured arguments must (a) have least the required abilities
                         // (b) must not be references
+                        let wrapper_msg = || {
+                            if let Some(ty) = &function_wrapper_ty {
+                                format!(
+                                    " (wrapped type of `{}`)",
+                                    ty.display(&fun_env.get_type_display_ctx())
+                                )
+                            } else {
+                                "".to_owned()
+                            }
+                        };
                         for captured in args {
                             let captured_ty = env.get_node_type(captured.node_id());
                             if captured_ty.is_reference() {
                                 env.error(
                                     &env.get_node_loc(captured.node_id()),
                                     &format!(
-                                        "captured value cannot be a reference, but has type `{}`",
-                                        captured_ty.display(&fun_env.get_type_display_ctx())
+                                        "captured value cannot be a reference, but has type `{}`{}",
+                                        captured_ty.display(&fun_env.get_type_display_ctx()),
+                                        wrapper_msg()
                                     ),
                                 )
                             }
@@ -91,10 +106,11 @@ pub fn check_closures(env: &GlobalEnv) {
                             if !missing.is_empty() {
                                 env.error_with_notes(
                                     &env.get_node_loc(captured.node_id()),
-                                    &format!("captured value is missing abilities `{}`", missing),
+                                    &format!("captured value is missing abilities `{}`", missing,),
                                     vec![format!(
-                                        "expected function type: `{}`",
-                                        context_ty.display(&fun_env.get_type_display_ctx())
+                                        "expected function type: `{}`{}",
+                                        context_ty.display(&fun_env.get_type_display_ctx()),
+                                        wrapper_msg()
                                     )],
                                 )
                             }

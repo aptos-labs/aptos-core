@@ -22,7 +22,6 @@ pub struct MempoolTransaction {
     pub expiration_time: Duration,
     pub ranking_score: u64,
     pub timeline_state: TimelineState,
-    pub sequence_info: SequenceInfo,
     pub insertion_info: InsertionInfo,
     pub was_parked: bool,
     // The priority of this node for the sender of this transaction.
@@ -35,16 +34,11 @@ impl MempoolTransaction {
         expiration_time: Duration,
         ranking_score: u64,
         timeline_state: TimelineState,
-        seqno: u64,
         insertion_time: SystemTime,
         client_submitted: bool,
         priority_of_sender: Option<BroadcastPeerPriority>,
     ) -> Self {
         Self {
-            sequence_info: SequenceInfo {
-                transaction_sequence_number: txn.sequence_number(),
-                account_sequence_number: seqno,
-            },
             txn,
             expiration_time,
             ranking_score,
@@ -57,6 +51,10 @@ impl MempoolTransaction {
 
     pub(crate) fn get_sender(&self) -> AccountAddress {
         self.txn.sender()
+    }
+
+    pub(crate) fn get_sequence_number(&self) -> u64 {
+        self.txn.sequence_number()
     }
 
     pub(crate) fn get_gas_price(&self) -> u64 {
@@ -82,12 +80,6 @@ pub enum TimelineState {
     // Transaction will never be qualified for broadcasting.
     // Currently we don't broadcast transactions originated on other peers.
     NonQualified,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct SequenceInfo {
-    pub transaction_sequence_number: u64,
-    pub account_sequence_number: u64,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -182,7 +174,6 @@ mod test {
             Duration::from_secs(1),
             1,
             TimelineState::NotReady,
-            0,
             SystemTime::now(),
             false,
             Some(BroadcastPeerPriority::Primary),

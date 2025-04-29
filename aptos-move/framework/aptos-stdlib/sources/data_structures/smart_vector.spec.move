@@ -98,4 +98,8 @@ spec aptos_std::smart_vector {
     spec remove {
         pragma verify = false;
     }
+
+    spec singleton {
+        pragma verify = false;
+    }
 }

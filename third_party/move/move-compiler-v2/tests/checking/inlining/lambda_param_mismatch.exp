@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: function returns value of type `u64` but `()` was expected
+error: expected function type returns value of type `()` but `u64` was provided
    ┌─ tests/checking/inlining/lambda_param_mismatch.move:12:33
    │
 12 │           vector::for_each(input, |item| {

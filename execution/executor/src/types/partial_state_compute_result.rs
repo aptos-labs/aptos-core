@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use anyhow::{Context, Result};
 use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     state_compute_result::StateComputeResult, LedgerUpdateOutput,
@@ -57,22 +58,19 @@ impl PartialStateComputeResult {
         self.execution_output.next_epoch_state.is_some()
     }
 
-    pub fn get_state_checkpoint_output(&self) -> Option<&StateCheckpointOutput> {
-        self.state_checkpoint_output.get()
-    }
-
-    pub fn expect_state_checkpoint_output(&self) -> &StateCheckpointOutput {
+    pub fn ensure_state_checkpoint_output(&self) -> Result<&StateCheckpointOutput> {
         self.state_checkpoint_output
             .get()
-            .expect("StateCheckpointOutput not set")
+            .context("StateCheckpointOutput not set.")
     }
 
     pub fn result_state(&self) -> &LedgerState {
         &self.execution_output.result_state
     }
 
-    pub fn expect_result_state_summary(&self) -> &LedgerStateSummary {
-        &self.expect_state_checkpoint_output().state_summary
+    pub fn ensure_result_state_summary(&self) -> Result<&LedgerStateSummary> {
+        self.ensure_state_checkpoint_output()
+            .map(|out| &out.state_summary)
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {
@@ -81,14 +79,10 @@ impl PartialStateComputeResult {
             .expect("StateCheckpointOutput already set");
     }
 
-    pub fn get_ledger_update_output(&self) -> Option<&LedgerUpdateOutput> {
-        self.ledger_update_output.get()
-    }
-
-    pub fn expect_ledger_update_output(&self) -> &LedgerUpdateOutput {
+    pub fn ensure_ledger_update_output(&self) -> Result<&LedgerUpdateOutput> {
         self.ledger_update_output
             .get()
-            .expect("LedgerUpdateOutput not set")
+            .context("LedgerUpdateOutput not set.")
     }
 
     pub fn set_ledger_update_output(&self, ledger_update_output: LedgerUpdateOutput) {
@@ -102,7 +96,9 @@ impl PartialStateComputeResult {
             StateComputeResult::new(
                 self.execution_output.clone(),
                 // ledger_update_output is set in a later stage, so it's safe to `expect` here.
-                self.expect_state_checkpoint_output().clone(),
+                self.ensure_state_checkpoint_output()
+                    .expect("StateCheckpointOutput missing.")
+                    .clone(),
                 ledger_update_output.clone(),
             )
         })

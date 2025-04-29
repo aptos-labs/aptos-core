@@ -36,21 +36,23 @@ pub mod cli;
 
 pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-    run_move_prover_v2(&mut error_writer, options)
+    run_move_prover_v2(&mut error_writer, options, vec![])
 }
 
 pub fn run_move_prover_v2<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
+    experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    let mut env = create_move_prover_v2_model(error_writer, options.clone())?;
+    let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     run_move_prover_with_model_v2(&mut env, error_writer, options, now)
 }
 
 pub fn create_move_prover_v2_model<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
+    experiments: Vec<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let compiler_options = move_compiler_v2::Options {
         dependencies: options.move_deps,
@@ -61,7 +63,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: options.backend.stable_test_output,
-        experiments: vec![],
+        experiments,
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],

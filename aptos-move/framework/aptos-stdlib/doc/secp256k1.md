@@ -101,16 +101,6 @@ The size of a secp256k1-based ECDSA signature, in bytes.
 
 
 
-<a id="0x1_secp256k1_E_BAD_RECOVERY_ID"></a>
-
-Recovery ID needs to be either 0, 1, 2 or 3. If you are recovering from an (r, s, v) Ethereum signature, take its v value and, set the recovery_id as follows: if v == 27, set to 0, if v == 28, set to 1, if v == 37, set to 0, if v == 38, set to 1.
-
-
-<pre><code><b>const</b> <a href="secp256k1.md#0x1_secp256k1_E_BAD_RECOVERY_ID">E_BAD_RECOVERY_ID</a>: u64 = 2;
-</code></pre>
-
-
-
 <a id="0x1_secp256k1_E_DESERIALIZE"></a>
 
 An error occurred while deserializing, for example due to wrong input size.
@@ -127,6 +117,16 @@ The size of a secp256k1-based ECDSA public key, in bytes.
 
 
 <pre><code><b>const</b> <a href="secp256k1.md#0x1_secp256k1_RAW_PUBLIC_KEY_NUM_BYTES">RAW_PUBLIC_KEY_NUM_BYTES</a>: u64 = 64;
+</code></pre>
+
+
+
+<a id="0x1_secp256k1_E_BAD_RECOVERY_ID"></a>
+
+Recovery ID needs to be either 0, 1, 2 or 3. If you are recovering from an (r, s, v) Ethereum signature, take its v value and, set the recovery_id as follows: if v == 27, set to 0, if v == 28, set to 1, if v == 37, set to 0, if v == 38, set to 1.
+
+
+<pre><code><b>const</b> <a href="secp256k1.md#0x1_secp256k1_E_BAD_RECOVERY_ID">E_BAD_RECOVERY_ID</a>: u64 = 2;
 </code></pre>
 
 

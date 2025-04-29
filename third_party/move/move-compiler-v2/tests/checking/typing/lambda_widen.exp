@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: the function takes `&mut` but `&` was provided
+error: expected function type has argument of type `&integer` but `&mut integer` was provided
    ┌─ tests/checking/typing/lambda_widen.move:33:38
    │
 33 │         let r = use_mut2_ref(&mut v, |x| *(freeze(x)));
    │                                      ^^^^^^^^^^^^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: expected function type has argument of type `&integer` but `&mut integer` was provided
    ┌─ tests/checking/typing/lambda_widen.move:43:37
    │
 43 │         let r = use_imm_ref(&mut v, |x| *(freeze(x)));

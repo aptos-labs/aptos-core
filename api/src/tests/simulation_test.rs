@@ -346,7 +346,7 @@ async fn test_bcs_simulate_automated_account_creation() {
         resp[0]["vm_status"]
             .as_str()
             .unwrap()
-            .contains("SENDING_ACCOUNT_DOES_NOT_EXIST"),
+            .contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"),
         "{}",
         pretty(&resp)
     );

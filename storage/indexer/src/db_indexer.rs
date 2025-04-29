@@ -35,7 +35,7 @@ use aptos_types::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
     },
-    transaction::{AccountTransactionsWithProof, Transaction, Version},
+    transaction::{AccountOrderedTransactionsWithProof, Transaction, Version},
     write_set::{TransactionWrite, WriteSet},
 };
 use std::{
@@ -582,14 +582,14 @@ impl DBIndexer {
         }
     }
 
-    pub fn get_account_transactions(
+    pub fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof> {
+    ) -> Result<AccountOrderedTransactionsWithProof> {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
@@ -607,7 +607,7 @@ impl DBIndexer {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+        Ok(AccountOrderedTransactionsWithProof::new(txns_with_proofs))
     }
 
     pub fn get_prefixed_state_value_iterator(

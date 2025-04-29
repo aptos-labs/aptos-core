@@ -286,7 +286,7 @@ module 0x1::MyModule {
 }
 ```
 
-we would get get the following output:
+we would get the following output:
 
 ```
 $ cargo run --bin move-unit-test MyModule.move -g

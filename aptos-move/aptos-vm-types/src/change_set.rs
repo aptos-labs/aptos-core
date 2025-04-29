@@ -850,6 +850,7 @@ pub trait ChangeSetInterface {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
+        fix_prev_materialized_size: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
 }
 
@@ -875,12 +876,17 @@ impl ChangeSetInterface for VMChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         _module_storage: &'a impl AptosModuleStorage,
+        fix_prev_materialized_size: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
+        let resources = self.resource_write_set.iter_mut().map(move |(key, op)| {
             Ok(WriteOpInfo {
                 key,
                 op_size: op.materialized_size(),
-                prev_size: op.prev_materialized_size(key, executor_view)?,
+                prev_size: op.prev_materialized_size(
+                    key,
+                    executor_view,
+                    fix_prev_materialized_size,
+                )?,
                 metadata_mut: op.metadata_mut(),
             })
         });

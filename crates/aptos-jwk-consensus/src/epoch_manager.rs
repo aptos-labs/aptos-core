@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jwk_manager::JWKManager,
+    jwk_manager::IssuerLevelConsensusManager,
+    jwk_manager_per_key::KeyLevelConsensusManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::JWKConsensusNetworkClient,
     types::JWKConsensusMsg,
     update_certifier::UpdateCertifier,
+    TConsensusManager,
 };
 use anyhow::{anyhow, Result};
 use aptos_bounded_executor::BoundedExecutor;
@@ -208,7 +210,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Duration::from_millis(1000),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
-            let update_certifier = UpdateCertifier::new(rb);
             let my_pk = epoch_state
                 .verifier
                 .get_public_key(&self.my_addr)
@@ -216,14 +217,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let my_sk = self.key_storage.consensus_sk_by_pk(my_pk).map_err(|e| {
                 anyhow!("jwk-consensus new epoch handling failed with consensus sk lookup err: {e}")
             })?;
-            let jwk_consensus_manager = JWKManager::new(
-                Arc::new(my_sk),
-                self.my_addr,
-                epoch_state.clone(),
-                Arc::new(update_certifier),
-                self.vtxn_pool.clone(),
-            );
-
             let (jwk_event_tx, jwk_event_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
             self.jwk_updated_event_txs = Some(jwk_event_tx);
             let (jwk_rpc_msg_tx, jwk_rpc_msg_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
@@ -231,7 +224,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (jwk_manager_close_tx, jwk_manager_close_rx) = oneshot::channel();
             self.jwk_rpc_msg_tx = Some(jwk_rpc_msg_tx);
             self.jwk_manager_close_tx = Some(jwk_manager_close_tx);
-
+            let jwk_consensus_manager: Box<dyn TConsensusManager> =
+                if features.is_enabled(FeatureFlag::JWK_CONSENSUS_PER_KEY_MODE) {
+                    Box::new(KeyLevelConsensusManager::new(
+                        Arc::new(my_sk),
+                        self.my_addr,
+                        epoch_state.clone(),
+                        rb,
+                        self.vtxn_pool.clone(),
+                    ))
+                } else {
+                    //TODO: move this into IssuerLevelConsensusManager construction?
+                    let update_certifier = UpdateCertifier::new(rb);
+                    Box::new(IssuerLevelConsensusManager::new(
+                        Arc::new(my_sk),
+                        self.my_addr,
+                        epoch_state.clone(),
+                        Arc::new(update_certifier),
+                        self.vtxn_pool.clone(),
+                    ))
+                };
             tokio::spawn(jwk_consensus_manager.run(
                 oidc_providers,
                 onchain_observed_jwks,

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&u64` to a function which expects argument of type `&mut u64` (mutability mismatch)
    ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args_invalid.move:10:18
    │
 10 │         mut<u64>(&0);
@@ -12,25 +12,25 @@ error: cannot pass `&S` to a function which expects argument of type `&mut u64`
 11 │         mut<u64>(&S{});
    │                  ^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&u64` to a function which expects argument of type `&mut u64` (mutability mismatch)
    ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args_invalid.move:15:26
    │
 15 │         imm_mut<u64>(&0, &0);
    │                          ^^
 
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&u64` to a function which expects argument of type `&mut u64` (mutability mismatch)
    ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args_invalid.move:16:22
    │
 16 │         mut_imm<u64>(&0, &0);
    │                      ^^
 
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&u64` to a function which expects argument of type `&mut u64` (mutability mismatch)
    ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args_invalid.move:17:22
    │
 17 │         mut_mut<u64>(&0, &0);
    │                      ^^
 
-error: expected `&mut` but `&` was provided
+error: expected function type has argument of type `(&u64, &integer)` but `(&mut u64, &u64)` was provided
    ┌─ tests/checking-lang-v2.2/lambda/inline-parity/subtype_args_invalid.move:21:9
    │
 21 │         f(&0, &0); // not okay

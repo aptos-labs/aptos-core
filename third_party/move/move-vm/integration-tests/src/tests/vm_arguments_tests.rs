@@ -61,6 +61,7 @@ fn make_script(parameters: Signature) -> Vec<u8> {
             locals: SignatureIndex(0),
             code: vec![Bytecode::LdU64(0), Bytecode::Abort],
         },
+        access_specifiers: None,
     }
     .serialize(&mut blob)
     .expect("script must serialize");
@@ -123,6 +124,7 @@ fn make_script_with_non_linking_structs(parameters: Signature) -> Vec<u8> {
 
         type_parameters: vec![],
         parameters: parameters_idx,
+        access_specifiers: None,
         code: CodeUnit {
             locals: SignatureIndex(0),
             code: vec![Bytecode::LdU64(0), Bytecode::Abort],

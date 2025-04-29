@@ -16,14 +16,21 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh block-builder <utility> [args]
     ```
+- `block-builder-recursive`: Runs block-builder on all Move.toml files in a directory.
+    ```bash
+    ./fuzz.sh block-builder-recursive <search_directory> <destination_directory>
+    ```
 - `build`: Build specified fuzz targets or all targets.
     ```bash
     ./fuzz.sh build <fuzz_target|all> [target_dir]
     ```
-
 - `build-oss-fuzz`: Build fuzz targets specifically for OSS-Fuzz.
     ```bash
     ./fuzz.sh build-oss-fuzz <target_dir>
+    ```
+- `clean-coverage`: Clean coverage artifacts for a specific target or all targets.
+    ```bash
+    ./fuzz.sh clean-coverage <fuzz_target|all>
     ```
 - `cmin`: Distillate corpora
     ```bash
@@ -34,21 +41,21 @@ The script includes several functions to manage and execute fuzz tests:
     ./fuzz.sh coverage <fuzz_target>
     ```
     > rustup +nightly-2024-04-06 component add llvm-tools-preview
-- `coverage-cleanup`:
-    ```bash
-    ./fuzz.sh clean-coverage <fuzz_target|all>
-    ```
-- `degub`: Run fuzzer with GDB and pass test_case as input
+- `debug`: Run fuzzer with GDB and pass test_case as input
     ```bash
     ./fuzz.sh debug <fuzz_target> <test_case>
     ```
 - `flamegraph`: Generates flamegraph report (might requires addition setups on the os)
-    ```
+    ```bash
     ./fuzz.sh flamegraph <fuzz_target> <test_case>
     ```
 - `list`: List all existing fuzz targets.
     ```bash
     ./fuzz.sh list
+    ```
+- `monitor-coverage`: Monitors coverage for a fuzz target, regenerating when the corpus changes.
+    ```bash
+    ./fuzz.sh monitor-coverage <fuzz_target>
     ```
 - `run`: Run a specific fuzz target, optionally with a testcase.
     ```bash
@@ -57,6 +64,10 @@ The script includes several functions to manage and execute fuzz tests:
 - `test`: Test all fuzz targets with predefined parameters.
     ```bash
     ./fuzz.sh test
+    ```
+- `tmin`: Minimize a crashing input for a target.
+    ```bash
+    ./fuzz.sh tmin <fuzz_target> <crashing_input>
     ```
 
 ## Writing Fuzz Targets
@@ -137,6 +148,20 @@ The first argument is the project, and the second one is the target directory.
 `./fuzz.sh block-builder generate_runnable_state_from_project data/0x1/string/generic fuzz/corpus/move_aptosvm_publish_and_run`
 
 > Verify your testcase runs as expected by appending `DEBUG=1` while calling the fuzzer and using the newly generated test case as the second parameter.
+
+#### Bulk Build
+Use `./fuzz.sh block-builder generate_runnable_states_recursive data/0x1/ fuzz/corpus/move_aptosvm_publish_and_run` to compile all the modules under a specific directory.
+
+#### Steps (internal)
+The following steps apply to wathever seed we might want to make available, remember to add the public link at the begin of `fuzz.sh`.
+1. `gcloud auth login`
+2. `gcloud storage cp gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus.zip`
+3. `unzip move_aptosvm_publish_and_run_seed_corpus.zip -d move_aptosvm_publish_and_run_seed_corpus`
+4. `./fuzz.sh block-builder generate_runnable_states_recursive data/0x1/ move_aptosvm_publish_and_run_seed_corpus`
+5. Normally we would run cmin but we assume that manually created inputs are fine and serve a specific purse.
+6. `zip -r move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus`
+7. `gsutil storage cp move_aptosvm_publish_and_run_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip`
+8. We need to restore ACL (public URL remain the same): `gsutil storage acl ch -u AllUsers:R gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip`
 
 ## Debug Crashes
 Flamegraph and GDB are integrated into fuzz.sh for advanced metrics and debugging. A more rudimentary option is also available: since we have symbolized binaries, we can directly use the stack trace produced by the fuzzer. However, for INVARIANT_VIOLATIONS, the stack trace is incorrect. To obtain the correct stack trace, you can use the following command:

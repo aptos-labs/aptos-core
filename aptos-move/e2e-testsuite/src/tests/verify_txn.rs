@@ -173,7 +173,7 @@ fn verify_reserved_sender() {
     assert_prologue_parity!(
         executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
+        StatusCode::INVALID_AUTH_KEY
     );
 }
 
@@ -272,12 +272,11 @@ fn verify_simple_payment() {
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
+        .sequence_number(0)
         .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
+    assert_prologue_disparity!(
+        executor.validate_transaction(txn.clone()).status() => None,
+        executor.execute_transaction(txn).status() => TransactionStatus::Keep(ExecutionStatus::Success)
     );
 
     // The next couple tests test transaction size, and bounds on gas price and the number of

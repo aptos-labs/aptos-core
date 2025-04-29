@@ -54,9 +54,10 @@ impl ChangeSetInterface for UserSessionChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
+        fix_prev_materialized_size: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.change_set
-            .write_op_info_iter_mut(executor_view, module_storage)
+            .write_op_info_iter_mut(executor_view, module_storage, fix_prev_materialized_size)
             .chain(self.module_write_set.write_op_info_iter_mut(module_storage))
     }
 
@@ -104,9 +105,13 @@ impl ChangeSetInterface for SystemSessionChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
+        fix_prev_materialized_size: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.change_set
-            .write_op_info_iter_mut(executor_view, module_storage)
+        self.change_set.write_op_info_iter_mut(
+            executor_view,
+            module_storage,
+            fix_prev_materialized_size,
+        )
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {

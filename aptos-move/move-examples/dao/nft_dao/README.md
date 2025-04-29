@@ -27,17 +27,17 @@ There are multiple roles:
 
 ### Key Data Structs
 
-`[DAO](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L103)`: this contains all the DAO’s key data fields including DAO resource account signer capability. This data is stored in the DAO resource account.
+`[DAO](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L103)`: this contains all the DAO’s key data fields including DAO resource account signer capability. This data is stored in the DAO resource account.
 
-`[Proposal](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L139)`: this contains the proposal info including the functions and their arguments to be executed.  The state change of proposal is as below:
+`[Proposal](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L139)`: this contains the proposal info including the functions and their arguments to be executed.  The state change of proposal is as below:
 
 ![Screenshot 2023-01-20 at 1.46.33 PM.png](./doc_images/Screenshot_2023-01-20_at_1.46.33_PM.png)
 
-`[Proposals](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L134)`: this contains all the proposals of each DAO. It maps the proposal id to the `Proposal`. This is stored in the DAO resource account
+`[Proposals](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L134)`: this contains all the proposals of each DAO. It maps the proposal id to the `Proposal`. This is stored in the DAO resource account
 
-`[ProposalVotingStatistics](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L158)`: this maps the proposal id to its voting statistics. The voting statistics contain the yes and no counts and the vote of each token_id.
+`[ProposalVotingStatistics](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L158)`: this maps the proposal id to its voting statistics. The voting statistics contain the yes and no counts and the vote of each token_id.
 
-`[GovernanceToken](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L126)`: the NFT collection that forms a DAO.
+`[GovernanceToken](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L126)`: the NFT collection that forms a DAO.
 
 ### An Example E2E Flow
 
@@ -141,9 +141,9 @@ DAO admin can transfer his admin authority through an offer - claim two step pro
 
 ### Some aligned design choices
 
-- Separate the `[ProposalVotingStatistics](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L158)` from `[Proposal](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L139)`,
+- Separate the `[ProposalVotingStatistics](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L158)` from `[Proposal](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L139)`,
     - NFT DAO records which token voted. This can take up a lot of space. We want to keep this data in a separate struct that can be destroyed later after proposal ends
-- [Resolving threshold](https://github.com/areshand/aptos-core-1/blob/98b5372b57c15df6b56d1b1879bebba2a1dc8b7b/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L107) is an absolute number of NFTs
+- [Resolving threshold](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/dao/nft_dao/sources/nft_dao.move#L107) is an absolute number of NFTs
     - This is what we learned from our partners and our own investigation of existing DAOs’ setting
 - Don’t allow the same token being used twice for voting by recording voted token_ids and deduping on token_id
     - This is to allow escrow-less voting and accommodating to existing NFTs since most of them are globally unique

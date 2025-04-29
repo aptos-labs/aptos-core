@@ -14,7 +14,7 @@ error: a reference is expected but `_` was provided
 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
    │                                                                                       ^
 
-error: function takes arguments of type `(u64, u64)` but `(&integer, &mut integer)` was expected
+error: expected function type has argument of type `(&integer, &mut integer)` but `(u64, u64)` was provided
    ┌─ TEMPFILE:24:64
    │
 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)

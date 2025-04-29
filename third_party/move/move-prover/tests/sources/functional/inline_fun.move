@@ -28,7 +28,7 @@ module 0x42::Test {
         v
     }
     spec test_filter {
-        pragma verify = false;
+        pragma verify = true;
         // TODO: turn-on the verification once inlining on spec side is done
     }
 }

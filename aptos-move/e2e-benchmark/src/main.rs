@@ -9,7 +9,7 @@ use aptos_transaction_generator_lib::{
     entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
     publishing::publish_util::{Package, PackageHandler},
 };
-use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType, OrderBookState};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
@@ -335,6 +335,13 @@ fn main() {
             len: 1000,
             repeats: 100,
             map_type: MapType::OrderedMap,
+        }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::OrderBook {
+            state: OrderBookState::new(),
+            overlap_ratio: 0.0, // Since we run a single txn, no matches will happen irrespectively
+            buy_frequency: 0.5,
+            max_sell_size: 1,
+            max_buy_size: 1,
         }),
     ];
 

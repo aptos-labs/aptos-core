@@ -16,10 +16,10 @@ use crate::{
     CreateAccountsArgs,
 };
 use anyhow::{bail, Context, Result};
-use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_generator_lib::{AccountType, TransactionType};
 use aptos_types::{account_address::AccountAddress, keyless::test_utils::get_sample_esk};
+use log::{error, info};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     sync::Arc,

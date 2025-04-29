@@ -1891,9 +1891,7 @@ module aptos_framework::stake {
         should_end_epoch: bool,
     ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         let validator_address = signer::address_of(validator);
-        if (!account::exists_at(signer::address_of(validator))) {
-            account::create_account_for_test(validator_address);
-        };
+        account::create_account_for_test(validator_address);
 
         let pk_bytes = bls12381::public_key_to_bytes(public_key);
         let pop_bytes = bls12381::proof_of_possession_to_bytes(proof_of_possession);

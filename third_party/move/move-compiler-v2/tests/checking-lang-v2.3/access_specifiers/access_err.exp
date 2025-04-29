@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: invalid access specifier
+  ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:6:20
+  │
+6 │     fun f1() reads undef {
+  │                    ^^^^^^
+
+error: undeclared module `undef`
+  ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:9:20
+  │
+9 │     fun f2() reads 0x42::undef::* {
+  │                    ^^^^^^^^^^^^^^^
+
+error: invalid access specifier: a wildcard cannot be followed by a non-wildcard name component
+   ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:12:20
+   │
+12 │     fun f3() reads 0x42::*::S {
+   │                    ^^^^^^^^^^^
+
+error: undeclared `y`
+   ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:18:32
+   │
+18 │     fun f5(x: address) reads *(y) {
+   │                                ^
+
+error: undeclared `y`
+   ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:21:48
+   │
+21 │     fun f6(x: address) reads *(make_up_address(y)) {
+   │                                                ^
+
+error: cannot pass `u64` to a function which expects argument of type `address`
+   ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:24:27
+   │
+24 │     fun f7(x: u64) reads *(make_up_address_wrong(x)) {
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: no function named `undefined` found
+   ┌─ tests/checking-lang-v2.3/access_specifiers/access_err.move:27:27
+   │
+27 │     fun f8(x: u64) reads *(undefined(x)) {
+   │                           ^^^^^^^^^^^^^^

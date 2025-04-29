@@ -363,7 +363,7 @@ fn find_possibly_modified_vars(
                     _ => {},
                 }
             },
-            Lambda(node_id, pat, _, _) => {
+            Lambda(node_id, pat, _, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {

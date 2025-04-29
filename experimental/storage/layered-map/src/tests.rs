@@ -10,7 +10,7 @@ use std::{
 };
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct HashCollide(u8);
+pub struct HashCollide(pub u8);
 
 impl Hash for HashCollide {
     fn hash<H: Hasher>(&self, state: &mut H) {

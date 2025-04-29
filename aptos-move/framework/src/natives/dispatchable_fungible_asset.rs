@@ -25,7 +25,11 @@ pub(crate) fn native_dispatch(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
     // Check if the module is already properly charged in this transaction.
-    let is_err = if context.get_feature_flags().is_account_abstraction_enabled() {
+    let is_err = if context.get_feature_flags().is_account_abstraction_enabled()
+        || context
+            .get_feature_flags()
+            .is_derivable_account_abstraction_enabled()
+    {
         !module_name.address().is_special()
             && !context
                 .traversal_context()

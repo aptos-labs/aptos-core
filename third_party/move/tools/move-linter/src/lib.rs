@@ -3,6 +3,7 @@
 
 mod model_ast_lints;
 mod stackless_bytecode_lints;
+mod utils;
 
 use move_compiler_v2::external_checks::{ExpChecker, ExternalChecks, StacklessBytecodeChecker};
 use std::sync::Arc;

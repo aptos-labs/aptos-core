@@ -1,15 +1,15 @@
 /// Maintains feature flags.
 spec std::features {
     spec Features {
-        pragma bv=b"0";
+        pragma bv = b"0";
     }
 
     spec PendingFeatures {
-        pragma bv=b"0";
+        pragma bv = b"0";
     }
 
     spec set(features: &mut vector<u8>, feature: u64, include: bool) {
-        pragma bv=b"0";
+        pragma bv = b"0";
         aborts_if false;
         ensures feature / 8 < len(features);
         ensures include == spec_contains(features, feature);
@@ -25,7 +25,7 @@ spec std::features {
     }
 
     spec contains(features: &vector<u8>, feature: u64): bool {
-        pragma bv=b"0";
+        pragma bv = b"0";
         aborts_if false;
         ensures result == spec_contains(features, feature);
     }
@@ -40,7 +40,9 @@ spec std::features {
     }
 
     spec fun spec_contains(features: vector<u8>, feature: u64): bool {
-        ((int2bv((((1 as u8) << ((feature % (8 as u64)) as u64)) as u8)) as u8) & features[feature/8] as u8) > (0 as u8)
+        ((int2bv(
+            (((1 as u8) << ((feature % (8 as u64)) as u64)) as u8)
+        ) as u8) & features[feature / 8] as u8) > (0 as u8)
             && (feature / 8) < len(features)
     }
 
@@ -112,6 +114,12 @@ spec std::features {
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_abort_if_multisig_payload_mismatch_enabled();
+    }
+
+    spec is_default_account_resource_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
     }
 
     spec on_new_epoch(framework: &signer) {

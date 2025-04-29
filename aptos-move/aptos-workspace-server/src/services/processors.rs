@@ -7,15 +7,23 @@ use crate::{
     no_panic_println,
 };
 use anyhow::{anyhow, Context, Result};
+use aptos_indexer_processor_sdk::{
+    aptos_indexer_transaction_stream::TransactionStreamConfig,
+    postgres::utils::database::run_pending_migrations, server_framework::RunnableConfig,
+};
 use aptos_localnet::{health_checker::HealthChecker, processors::get_processor_config};
 use diesel::Connection;
 use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPgConnection};
 use futures::{future::try_join_all, stream::FuturesUnordered, StreamExt, TryFutureExt};
 use processor::{
-    gap_detectors::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorName,
-    utils::database::run_pending_migrations, IndexerGrpcProcessorConfig,
+    config::{
+        db_config::{DbConfig, PostgresConfig},
+        indexer_processor_config::IndexerProcessorConfig,
+        processor_config::ProcessorName,
+        processor_mode::{BootStrapConfig, ProcessorMode},
+    },
+    MIGRATIONS,
 };
-use server_framework::RunnableConfig;
 use std::future::Future;
 use tokio::try_join;
 
@@ -31,7 +39,6 @@ const PROCESSOR_NAMES: &[ProcessorName] = {
         ObjectsProcessor,
         StakeProcessor,
         TokenV2Processor,
-        TransactionMetadataProcessor,
         UserTransactionProcessor,
     ]
 };
@@ -58,27 +65,29 @@ fn start_processor(
 
         no_panic_println!("Starting processor {}..", processor_name_);
 
-        let config = IndexerGrpcProcessorConfig {
+        let config = IndexerProcessorConfig {
             processor_config: get_processor_config(&processor_name_)?,
-            postgres_connection_string: get_postgres_connection_string(postgres_port),
-            indexer_grpc_data_service_address: get_data_service_url(indexer_grpc_port),
-
-            auth_token: "notused".to_string(),
-            grpc_http2_config: Default::default(),
-            starting_version: None,
-            ending_version: None,
-            number_concurrent_processing_tasks: None,
-            enable_verbose_logging: None,
-            // The default at the time of writing is 30 but we don't need that
-            // many in a localnet environment.
-            db_pool_size: Some(8),
-            gap_detection_batch_size: 50,
-            pb_channel_txn_chunk_size: 100_000,
-            per_table_chunk_sizes: Default::default(),
-            transaction_filter: Default::default(),
-            grpc_response_item_timeout_in_secs: 10,
-            deprecated_tables: Default::default(),
-            parquet_gap_detection_batch_size: DEFAULT_GAP_DETECTION_BATCH_SIZE,
+            transaction_stream_config: TransactionStreamConfig {
+                indexer_grpc_data_service_address: get_data_service_url(indexer_grpc_port),
+                auth_token: "notused".to_string(),
+                starting_version: Some(0),
+                request_ending_version: None,
+                request_name_header: "notused".to_string(),
+                additional_headers: Default::default(),
+                indexer_grpc_http2_ping_interval_secs: Default::default(),
+                indexer_grpc_http2_ping_timeout_secs: 60,
+                indexer_grpc_reconnection_timeout_secs: 60,
+                indexer_grpc_response_item_timeout_secs: 60,
+                indexer_grpc_reconnection_max_retries: Default::default(),
+                transaction_filter: Default::default(),
+            },
+            db_config: DbConfig::PostgresConfig(PostgresConfig {
+                connection_string: get_postgres_connection_string(postgres_port),
+                db_pool_size: 8,
+            }),
+            processor_mode: ProcessorMode::Default(BootStrapConfig {
+                initial_starting_version: 0,
+            }),
         };
 
         config.run().await
@@ -144,7 +153,7 @@ pub fn start_all_processors(
                 AsyncConnectionWrapper::establish(&connection_string).with_context(|| {
                     format!("Failed to connect to postgres at {}", connection_string)
                 })?;
-            run_pending_migrations(&mut conn);
+            run_pending_migrations(&mut conn, MIGRATIONS);
             anyhow::Ok(())
         })
         .await

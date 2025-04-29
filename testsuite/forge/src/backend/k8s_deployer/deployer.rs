@@ -7,7 +7,6 @@ use super::{
 };
 use crate::{maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result};
 use again::RetryPolicy;
-use aptos_logger::info;
 use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ConfigMap, Namespace, ServiceAccount},
@@ -17,6 +16,7 @@ use kube::{
     api::{ObjectMeta, PostParams},
     ResourceExt,
 };
+use log::info;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 /// The ForgeDeployerManager is responsible for managing the lifecycle of forge deployers, which deploy the

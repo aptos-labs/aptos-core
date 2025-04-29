@@ -14,8 +14,7 @@ mod map;
 mod metrics;
 mod node;
 pub(crate) mod r#ref;
-#[cfg(test)]
-mod tests;
+pub mod tests;
 mod utils;
 
 /// When recursively creating a new `MapLayer` (a crit bit tree overlay), partitioning and passing

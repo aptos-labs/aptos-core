@@ -18,6 +18,7 @@ especially useful for systems requiring cross-chain message interpretation or of
 -  [Struct `BCSStream`](#0x1_bcs_stream_BCSStream)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_bcs_stream_new)
+-  [Function `has_remaining`](#0x1_bcs_stream_has_remaining)
 -  [Function `deserialize_uleb128`](#0x1_bcs_stream_deserialize_uleb128)
 -  [Function `deserialize_bool`](#0x1_bcs_stream_deserialize_bool)
 -  [Function `deserialize_address`](#0x1_bcs_stream_deserialize_address)
@@ -121,6 +122,30 @@ Constructs a new BCSStream instance from the provided byte array.
         data,
         cur: 0,
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_stream_has_remaining"></a>
+
+## Function `has_remaining`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">BCSStream</a>): bool {
+    stream.cur &lt; stream.data.length()
 }
 </code></pre>
 

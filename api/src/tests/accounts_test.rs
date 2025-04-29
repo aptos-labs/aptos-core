@@ -39,7 +39,7 @@ async fn test_get_account_resources_by_address_0x0() {
     let address = "0x0";
 
     let resp = context
-        .expect_status_code(404)
+        .expect_status_code(200)
         .get(&account_resources(address))
         .await;
     context.check_golden_output(resp);
@@ -192,6 +192,32 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_account_auto_creation() {
+    let mut context = new_test_context(current_function_name!());
+    let root_account = context.root_account().await;
+    let account = context.gen_account();
+    let txn1 = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
+        aptos_stdlib::coin_migrate_to_fungible_store(AptosCoinType::type_tag()),
+    ));
+    let txn2 = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
+        aptos_stdlib::aptos_account_fungible_transfer_only(account.address(), 10_000_000_000),
+    ));
+    context
+        .commit_block(&vec![txn1.clone(), txn2.clone()])
+        .await;
+    let txn = account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .payload(aptos_stdlib::aptos_account_fungible_transfer_only(
+                root_account.address(),
+                1,
+            ))
+            .gas_unit_price(1),
+    );
+    context.commit_block(&vec![txn.clone()]).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_balance() {
     let mut context = new_test_context(current_function_name!());
     let root_account = context.root_account().await;
@@ -289,7 +315,7 @@ async fn test_get_core_account_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.expect_status_code(404).get("/accounts/0xf").await;
+    let resp = context.expect_status_code(200).get("/accounts/0xf").await;
     context.check_golden_output(resp);
 }
 

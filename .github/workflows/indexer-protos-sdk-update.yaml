@@ -37,17 +37,27 @@ jobs:
       - name: Generate code
         run: cd protos && ./scripts/build_protos.sh
 
-      - name: Confirm that nothing has changed
-        run: git diff --exit-code
+      - name: Check for proto changes
+        id: check_changes
+        run: |
+          if [[ -n "$(git diff --name-only)" ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Found changes in generated proto code - will trigger SDK update"
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No changes in generated proto code"
+          fi
+
   update-sdk:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    if: | # Only run on each PR once an appropriate event occurs
+    if: | # Only run on each PR once an appropriate event occurs and there are actual changes
       (
         github.event_name == 'push' ||
         contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update')
+      || needs.check-protos.outputs.changes == 'true'
       )
     steps:
       - name: Checkout code

@@ -1,0 +1,18 @@
+processed 1 task
+
+task 0 'publish'. lines 1-104:
+Error: compilation errors:
+ error: too many arguments captured in lambda (can only capture up to a maximum of `64`, but captured `66`)
+   ┌─ TEMPFILE:90:17
+   │  
+90 │           let f = || 0xc0ffee::m::takes_66_args(
+   │ ╭─────────────────^
+91 │ │             a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+92 │ │             a11, a12, a13, a14, a15, a16, a17, a18, a19, a20,
+93 │ │             a21, a22, a23, a24, a25, a26, a27, a28, a29, a30,
+   · │
+97 │ │             a61, a62, a63, a64, a65, a66
+98 │ │         );
+   │ ╰─────────^
+
+
