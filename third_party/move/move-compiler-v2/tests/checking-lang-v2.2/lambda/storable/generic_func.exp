@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::mod2 {
     struct Registry<F> {
         func: F,
@@ -71,7 +71,7 @@ module 0x42::mod3 {
     }
 } // end 0x42::mod3
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::mod2 {
     struct Registry<F: copy + store> has store, key {
         func: F,

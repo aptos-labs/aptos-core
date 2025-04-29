@@ -1,4 +1,4 @@
-Move prover returns: exiting with checking errors
+Move prover returns: exiting with context checking errors
 error: name clash between specification and Move function `double`
   ┌─ tests/sources/functional/duplicate_function_declarations.move:5:9
   │

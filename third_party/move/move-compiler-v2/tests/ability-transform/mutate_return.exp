@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::singleton<#0>($t0: #0): vector<#0> {
@@ -41,6 +41,171 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
      # live vars: $t0
+  0: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::singleton<#0>($t0: #0): vector<#0> {
+     var $t1: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+     # live vars: $t0
+  0: $t2 := vector($t0)
+     # live vars: $t2
+  1: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+  2: m::g<#0>($t3)
+     # live vars: $t2
+  3: $t1 := infer($t2)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+     # live vars: $t0
+  0: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::singleton<#0>($t0: #0): vector<#0> {
+     var $t1: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := vector($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => (mut) #3 via [local `v`] at line 6
+     #
+  2: m::g<#0>($t3)
+     # live vars: $t2
+     # refs: []
+     #
+  3: $t1 := infer($t2)
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::singleton<#0>($t0: #0): vector<#0> {
+     var $t1: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := vector($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => (mut) #3 via [local `v`] at line 6
+     #
+  2: m::g<#0>($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  3: $t1 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: return ()
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::singleton<#0>($t0: #0): vector<#0> {
+     var $t1: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+  0: $t2 := vector($t0)
+  1: $t3 := borrow_local($t2)
+  2: m::g<#0>($t3)
+  3: $t1 := move($t2)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+  0: drop($t0)
+  1: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::singleton<#0>($t0: #0): vector<#0> {
+     var $t1: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+  0: $t2 := vector($t0)
+  1: $t3 := borrow_local($t2)
+  2: m::g<#0>($t3)
+  3: $t1 := infer($t2)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
   0: return ()
 }
 

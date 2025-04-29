@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test1($t0: u64) {
@@ -90,6 +90,91 @@ warning: Unused assignment/binding to `x`. Consider removing the assignment/bind
   │
 3 │         x = x;
   │         ^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+  0: $t0 := infer($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64
+  0: $t0 := infer($t0)
+  1: $t1 := infer($t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test3(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t1 := 0
+  1: $t2 := 1
+  2: label L0
+  3: $t4 := infer($t1)
+  4: $t5 := 42
+  5: $t3 := <($t4, $t5)
+  6: if ($t3) goto 7 else goto 14
+  7: label L2
+  8: $t2 := infer($t2)
+  9: $t7 := infer($t1)
+ 10: $t8 := 1
+ 11: $t6 := +($t7, $t8)
+ 12: $t1 := infer($t6)
+ 13: goto 16
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 2
+ 18: label L1
+ 19: $t0 := infer($t2)
+ 20: return $t0
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t2 := 0
+  1: label L0
+  2: $t4 := infer($t2)
+  3: $t5 := 42
+  4: $t3 := <($t4, $t5)
+  5: if ($t3) goto 6 else goto 13
+  6: label L2
+  7: $t0 := infer($t0)
+  8: $t7 := infer($t2)
+  9: $t8 := 1
+ 10: $t6 := +($t7, $t8)
+ 11: $t2 := infer($t6)
+ 12: goto 15
+ 13: label L3
+ 14: goto 17
+ 15: label L4
+ 16: goto 1
+ 17: label L1
+ 18: $t1 := infer($t0)
+ 19: return $t1
+}
 
 ============ after DeadStoreElimination: ================
 

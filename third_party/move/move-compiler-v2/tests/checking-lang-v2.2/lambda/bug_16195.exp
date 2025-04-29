@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     struct Bug16195 {
         0: |()||()|u64 with copy + drop,
@@ -206,7 +206,7 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     struct Bug16195 has copy, drop {
         0: |()||()|u64 with copy + drop,

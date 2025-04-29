@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test($t0: u64) {
@@ -19,6 +19,20 @@ warning: Unused assignment/binding to `a`. Consider removing the assignment/bind
   │
 6 │         a = c;
   │         ^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t2 := infer($t1)
+  2: $t3 := infer($t2)
+  3: $t1 := infer($t3)
+  4: return ()
+}
 
 ============ after DeadStoreElimination: ================
 
