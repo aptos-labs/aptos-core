@@ -36,6 +36,7 @@ module aptos_std::bcs_stream {
         }
     }
 
+    #[lint::skip(needless_mutable_reference)]
     public fun has_remaining(stream: &mut BCSStream): bool {
         stream.cur < stream.data.length()
     }
