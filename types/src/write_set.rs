@@ -7,6 +7,7 @@
 
 use crate::state_store::{
     state_key::StateKey,
+    state_slot::StateSlot,
     state_value::{PersistedStateValueMetadata, StateValue, StateValueMetadata},
 };
 use anyhow::{bail, ensure, Result};
@@ -410,22 +411,92 @@ impl Debug for WriteOp {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum WriteSet {
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename = "WriteSet")]
+pub enum SerdeWriteSet {
     V0(WriteSetV0),
 }
 
-impl Default for WriteSet {
+impl Default for SerdeWriteSet {
     fn default() -> Self {
         Self::V0(WriteSetV0::default())
     }
 }
 
-impl WriteSet {
-    pub fn into_mut(self) -> WriteSetMut {
+// TODO(HotState): When hot state is deterministic, merge these to the WriteOp
+/// Hot state only write ops, not serialized.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HotStateOp {
+    MakeHot { prev_slot: StateSlot },
+}
+
+impl HotStateOp {
+    pub fn make_hot(prev_slot: StateSlot) -> Self {
+        Self::MakeHot { prev_slot }
+    }
+}
+
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
+pub enum WriteSet {
+    Serde(SerdeWriteSet),
+    SkipSerde(BTreeMap<StateKey, HotStateOp>),
+}
+
+impl Default for WriteSet {
+    fn default() -> Self {
+        Self::Serde(SerdeWriteSet::default())
+    }
+}
+
+impl Serialize for WriteSet {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         match self {
-            Self::V0(write_set) => write_set.0,
+            WriteSet::Serde(ws) => ws.serialize(serializer),
+            WriteSet::SkipSerde(_hot_state_ops) => SerdeWriteSet::default().serialize(serializer),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for WriteSet {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let ws = SerdeWriteSet::deserialize(deserializer)?;
+        Ok(WriteSet::Serde(ws))
+    }
+}
+
+impl WriteSet {
+    pub fn expect_into_v0(self) -> WriteSetV0 {
+        match self {
+            WriteSet::Serde(SerdeWriteSet::V0(ws)) => ws,
+            // TODO(HotState):
+            WriteSet::SkipSerde(_) => panic!("hot state ops touched unexpectedly"),
+        }
+    }
+
+    pub fn expect_v0(&self) -> &WriteSetV0 {
+        match self {
+            WriteSet::Serde(SerdeWriteSet::V0(ws)) => ws,
+            // TODO(HotState):
+            WriteSet::SkipSerde(_) => panic!("hot state ops touched unexpectedly"),
+        }
+    }
+
+    pub fn expect_v0_mut(&mut self) -> &mut WriteSetV0 {
+        match self {
+            WriteSet::Serde(SerdeWriteSet::V0(ws)) => ws,
+            // TODO(HotState):
+            WriteSet::SkipSerde(_) => panic!("hot state ops touched unexpectedly"),
+        }
+    }
+
+    pub fn into_mut(self) -> WriteSetMut {
+        self.expect_into_v0().0
     }
 
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
@@ -460,17 +531,13 @@ impl Deref for WriteSet {
     type Target = WriteSetV0;
 
     fn deref(&self) -> &Self::Target {
-        match self {
-            Self::V0(write_set) => write_set,
-        }
+        self.expect_v0()
     }
 }
 
 impl DerefMut for WriteSet {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        match self {
-            Self::V0(write_set) => write_set,
-        }
+        self.expect_v0_mut()
     }
 }
 
@@ -538,6 +605,14 @@ impl WriteSetMut {
         }
     }
 
+    pub fn try_new(
+        write_ops: impl IntoIterator<Item = Result<(StateKey, WriteOp)>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            write_set: write_ops.into_iter().collect::<Result<_>>()?,
+        })
+    }
+
     pub fn insert(&mut self, item: (StateKey, WriteOp)) {
         self.write_set.insert(item.0, item.1);
     }
@@ -557,7 +632,7 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet::V0(WriteSetV0(self)))
+        Ok(WriteSet::Serde(SerdeWriteSet::V0(WriteSetV0(self))))
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
@@ -607,9 +682,7 @@ impl<'a> IntoIterator for &'a WriteSet {
     type Item = (&'a StateKey, &'a WriteOp);
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            WriteSet::V0(write_set) => write_set.0.write_set.iter(),
-        }
+        self.expect_v0().0.write_set.iter()
     }
 }
 
@@ -618,8 +691,6 @@ impl IntoIterator for WriteSet {
     type Item = (StateKey, WriteOp);
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::V0(write_set) => write_set.0.write_set.into_iter(),
-        }
+        self.expect_into_v0().0.write_set.into_iter()
     }
 }

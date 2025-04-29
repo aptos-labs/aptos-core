@@ -329,7 +329,7 @@ impl Parser {
                     has_reconfig,
                     block_end_info.as_ref(),
                     append_state_checkpoint_to_block,
-                ),
+                )?,
                 has_reconfig,
             )
         };
@@ -456,22 +456,26 @@ impl Parser {
         is_reconfig: bool,
         block_end_info: Option<&BlockEndInfoExt>,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> TransactionsWithOutput {
+    ) -> Result<TransactionsWithOutput> {
         if !is_reconfig {
             // Append the StateCheckpoint transaction to the end
             if let Some(block_id) = append_state_checkpoint_to_block {
-                let state_checkpoint_txn = match block_end_info {
-                    None => Transaction::StateCheckpoint(block_id),
-                    Some(block_end_info) => {
-                        Transaction::block_epilogue(block_id, block_end_info.to_persistent())
-                    },
+                let (state_checkpoint_txn, txn_out) = match block_end_info {
+                    None => (
+                        Transaction::StateCheckpoint(block_id),
+                        TransactionOutput::new_empty_success(),
+                    ),
+                    Some(block_end_info) => (
+                        Transaction::block_epilogue(block_id, block_end_info.to_persistent()),
+                        block_end_info.to_transaction_output()?,
+                    ),
                 };
 
-                to_commit.push(state_checkpoint_txn, TransactionOutput::new_empty_success());
+                to_commit.push(state_checkpoint_txn, txn_out);
             }
         }; // else: not adding block epilogue at epoch ending.
 
-        to_commit
+        Ok(to_commit)
     }
 
     fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
