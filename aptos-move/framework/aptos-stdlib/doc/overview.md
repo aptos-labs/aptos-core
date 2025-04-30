@@ -14,7 +14,6 @@ This is the reference documentation of the Aptos standard library.
 
 -  [`0x1::any`](any.md#0x1_any)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
--  [`0x1::base16`](base16.md#0x1_base16)
 -  [`0x1::bcs_stream`](bcs_stream.md#0x1_bcs_stream)
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
 -  [`0x1::bls12381`](bls12381.md#0x1_bls12381)

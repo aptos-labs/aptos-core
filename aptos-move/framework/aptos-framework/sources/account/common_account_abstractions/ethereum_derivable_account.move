@@ -26,10 +26,10 @@
 module aptos_framework::ethereum_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
+    use aptos_framework::base16::base16_utf8_to_vec_u8;
     use aptos_std::secp256k1;
     use aptos_std::option;
     use aptos_std::aptos_hash;
-    use aptos_std::base16::base16_utf8_to_vec_u8;
     use std::bcs_stream::{Self, deserialize_u8};
     use std::chain_id;
     use std::string_utils;
@@ -49,7 +49,7 @@ module aptos_framework::ethereum_derivable_account {
     const EUNEXPECTED_V: u64 = 5;
 
     enum SIWEAbstractSignature has drop {
-        EIP1193DerivedSignature {
+        MessageV1 {
             issued_at: String,
             signature: vector<u8>,
         },
@@ -79,7 +79,7 @@ module aptos_framework::ethereum_derivable_account {
         if (signature_type == 0x00) {
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::EIP1193DerivedSignature { issued_at: string::utf8(issued_at), signature }
+            SIWEAbstractSignature::MessageV1 { issued_at: string::utf8(issued_at), signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -217,7 +217,7 @@ module aptos_framework::ethereum_derivable_account {
 
     #[test_only]
     fun create_raw_signature(issued_at: String, signature: vector<u8>): vector<u8> {
-        let abstract_signature = SIWEAbstractSignature::EIP1193DerivedSignature { issued_at, signature };
+        let abstract_signature = SIWEAbstractSignature::MessageV1 { issued_at, signature };
         bcs::to_bytes(&abstract_signature)
     }
 
@@ -242,9 +242,9 @@ module aptos_framework::ethereum_derivable_account {
         ];
         let abstract_signature = create_raw_signature(utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
         let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
-        assert!(siwe_abstract_signature is SIWEAbstractSignature::EIP1193DerivedSignature);
+        assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV1);
         match (siwe_abstract_signature) {
-            SIWEAbstractSignature::EIP1193DerivedSignature { signature, issued_at } => {
+            SIWEAbstractSignature::MessageV1 { signature, issued_at } => {
                 assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
                 assert!(signature == signature_bytes);
             },
