@@ -138,6 +138,7 @@ pub enum FeatureFlag {
     JWK_CONSENSUS_PER_KEY_MODE = 92,
     TRANSACTION_PAYLOAD_V2 = 93,
     ORDERLESS_TRANSACTIONS = 94,
+    RAND_MANAGER_V2 = 95,
 }
 
 impl FeatureFlag {
@@ -234,6 +235,7 @@ impl FeatureFlag {
             // TODO[Orderless]: Remove these from deafult features before landing the PR.
             // FeatureFlag::TRANSACTION_PAYLOAD_V2,
             // FeatureFlag::ORDERLESS_TRANSACTIONS,
+            FeatureFlag::RAND_MANAGER_V2,
         ]
     }
 }

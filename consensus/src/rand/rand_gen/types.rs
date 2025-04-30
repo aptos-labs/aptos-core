@@ -4,17 +4,18 @@
 use anyhow::{anyhow, bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, SilentDebug};
 use aptos_dkg::{
     pvss::{Player, WeightedConfig},
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_infallible::RwLock;
 use aptos_logger::debug;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
-        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, WVUF,
+        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, ASK, WVUF,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -60,11 +61,11 @@ impl TShare for Share {
             .address_to_validator_index()
             .get(author)
             .ok_or_else(|| anyhow!("Share::verify failed with unknown author"))?;
-        let maybe_apk = &rand_config.keys.certified_apks[index];
-        if let Some(apk) = maybe_apk.get() {
+        let maybe_apk = rand_config.keys.apk_cloned(index);
+        if let Some(apk) = maybe_apk {
             WVUF::verify_share(
                 &rand_config.vuf_pp,
-                apk,
+                &apk,
                 bcs::to_bytes(&rand_metadata)
                     .map_err(|e| anyhow!("Serialization failed: {}", e))?
                     .as_slice(),
@@ -87,7 +88,7 @@ impl TShare for Share {
     {
         let share = Share {
             share: WVUF::create_share(
-                &rand_config.keys.ask,
+                rand_config.keys.my_ask(),
                 bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
             ),
         };
@@ -116,14 +117,12 @@ impl TShare for Share {
                         share.author
                     )
                 })?;
-            let apk = rand_config
-                .get_certified_apk(share.author())
-                .ok_or_else(|| {
-                    anyhow!(
-                        "Share::aggregate failed with missing apk for share from {}",
-                        share.author
-                    )
-                })?;
+            let apk = rand_config.apk_cloned(share.author()).ok_or_else(|| {
+                anyhow!(
+                    "Share::aggregate failed with missing apk for share from {}",
+                    share.author
+                )
+            })?;
             apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
         }
 
@@ -495,6 +494,10 @@ impl<D: TAugmentedData> AugData<D> {
             .verify(rand_config, fast_rand_config, &self.author)?;
         Ok(())
     }
+
+    pub fn data(&self) -> &D {
+        &self.data
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -577,6 +580,85 @@ impl CertifiedAugDataAck {
     }
 }
 
+/// A Variant of `RandKeys`. Allows `apks` to be overwritten.
+#[derive(Clone, SilentDebug)]
+pub struct RandKeysV2 {
+    pub ask: ASK,
+    pub apk: APK,
+    pub apks: Vec<Arc<RwLock<Option<APK>>>>,
+    pub pk_shares: Vec<PKShare>,
+}
+
+impl RandKeysV2 {
+    pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, num_validators: usize) -> Self {
+        let apks = (0..num_validators)
+            .map(|_| Arc::new(RwLock::new(None)))
+            .collect();
+
+        Self {
+            ask,
+            apk,
+            apks,
+            pk_shares,
+        }
+    }
+
+    pub fn set_apk(&self, index: usize, apk: APK) -> anyhow::Result<()> {
+        assert!(index < self.apks.len());
+        self.apks[index].write().replace(apk);
+        Ok(())
+    }
+}
+
+pub enum RandKeysWrapper {
+    V1(RandKeys),
+    V2(RandKeysV2),
+}
+
+impl RandKeysWrapper {
+    pub fn new(
+        v2: bool,
+        ask: ASK,
+        apk: APK,
+        pk_shares: Vec<PKShare>,
+        num_validators: usize,
+    ) -> Self {
+        if v2 {
+            Self::V2(RandKeysV2::new(ask, apk, pk_shares, num_validators))
+        } else {
+            Self::V1(RandKeys::new(ask, apk, pk_shares, num_validators))
+        }
+    }
+
+    pub fn my_apk(&self) -> &APK {
+        match self {
+            RandKeysWrapper::V1(keys) => &keys.apk,
+            RandKeysWrapper::V2(keys) => &keys.apk,
+        }
+    }
+
+    pub fn my_ask(&self) -> &ASK {
+        match self {
+            RandKeysWrapper::V1(keys) => &keys.ask,
+            RandKeysWrapper::V2(keys) => &keys.ask,
+        }
+    }
+
+    pub fn apk_cloned(&self, idx: usize) -> Option<APK> {
+        match self {
+            RandKeysWrapper::V1(keys) => keys.certified_apks[idx].get().cloned(),
+            RandKeysWrapper::V2(keys) => keys.apks[idx].read().clone(),
+        }
+    }
+
+    pub fn pk_share(&self, idx: usize) -> &PKShare {
+        match self {
+            RandKeysWrapper::V1(keys) => &keys.pk_shares[idx],
+            RandKeysWrapper::V2(keys) => &keys.pk_shares[idx],
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct RandConfig {
     author: Author,
@@ -585,7 +667,7 @@ pub struct RandConfig {
     // public parameters of the weighted VUF
     vuf_pp: WvufPP,
     // key shares for weighted VUF
-    keys: Arc<RandKeys>,
+    keys: Arc<RandKeysWrapper>,
     // weighted config for weighted VUF
     wconfig: WeightedConfig,
 }
@@ -606,7 +688,7 @@ impl RandConfig {
         epoch: u64,
         validator: Arc<ValidatorVerifier>,
         vuf_pp: WvufPP,
-        keys: RandKeys,
+        keys: RandKeysWrapper,
         wconfig: WeightedConfig,
     ) -> Self {
         Self {
@@ -635,22 +717,22 @@ impl RandConfig {
             .expect("Peer should be in the index!")
     }
 
-    pub fn get_certified_apk(&self, peer: &Author) -> Option<&APK> {
+    pub fn apk_cloned(&self, peer: &Author) -> Option<APK> {
         let index = self.get_id(peer);
-        self.keys.certified_apks[index].get()
+        self.keys.apk_cloned(index)
     }
 
     pub fn get_all_certified_apk(&self) -> Vec<Option<APK>> {
-        self.keys
-            .certified_apks
-            .iter()
-            .map(|cell| cell.get().cloned())
-            .collect()
+        let n = self.validator.address_to_validator_index().len();
+        (0..n).map(|idx| self.keys.apk_cloned(idx)).collect()
     }
 
     pub fn add_certified_apk(&self, peer: &Author, apk: APK) -> anyhow::Result<()> {
         let index = self.get_id(peer);
-        self.keys.add_certified_apk(index, apk)
+        match self.keys.as_ref() {
+            RandKeysWrapper::V1(keys) => keys.add_certified_apk(index, apk),
+            RandKeysWrapper::V2(keys) => keys.set_apk(index, apk),
+        }
     }
 
     fn derive_apk(&self, peer: &Author, delta: Delta) -> anyhow::Result<APK> {
@@ -665,12 +747,12 @@ impl RandConfig {
     }
 
     pub fn get_my_delta(&self) -> &Delta {
-        WVUF::get_public_delta(&self.keys.apk)
+        WVUF::get_public_delta(self.keys.my_apk())
     }
 
     pub fn get_pk_share(&self, peer: &Author) -> &PKShare {
         let index = self.get_id(peer);
-        &self.keys.pk_shares[index]
+        self.keys.pk_share(index)
     }
 
     pub fn get_peer_weight(&self, peer: &Author) -> u64 {

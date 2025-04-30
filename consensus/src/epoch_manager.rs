@@ -49,7 +49,7 @@ use crate::{
     },
     rand::rand_gen::{
         storage::interface::RandStorage,
-        types::{AugmentedData, RandConfig},
+        types::{AugmentedData, RandConfig, RandKeysWrapper},
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -81,17 +81,20 @@ use aptos_safety_rules::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
+    dkg::{
+        real_dkg::{maybe_dk_from_bls_sk, DealtPubKeyShares, DealtSecretKeyShares},
+        DKGState, DKGTrait, DefaultDKG,
+    },
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
     on_chain_config::{
-        Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
+        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
         RandomnessConfigSeqNum, ValidatorSet,
     },
-    randomness::{RandKeys, WvufPP, WVUF},
+    randomness::{AugKeyPair, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -782,11 +785,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             });
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_round_manager(
         &mut self,
         consensus_key: Arc<PrivateKey>,
         recovery_data: RecoveryData,
         epoch_state: Arc<EpochState>,
+        features: Features,
         onchain_consensus_config: OnChainConsensusConfig,
         onchain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
@@ -848,6 +853,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .start_epoch(
                 consensus_key.clone(),
                 epoch_state.clone(),
+                &features,
                 safety_rules_container.clone(),
                 payload_manager.clone(),
                 &onchain_consensus_config,
@@ -991,6 +997,28 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
     }
 
+    /// Pulled out from `try_get_rand_config_for_new_epoch` for reuse.
+    fn generate_randomness_augmented_key(
+        vuf_pp: &WvufPP,
+        sk: DealtSecretKeyShares,
+        pk: DealtPubKeyShares,
+        fast_randomness_is_enabled: bool,
+    ) -> Result<(AugKeyPair, Option<AugKeyPair>), NoRandomnessReason> {
+        let mut rng =
+            StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
+        let augmented_key_pair = WVUF::augment_key_pair(vuf_pp, sk.main, pk.main, &mut rng);
+        let fast_augmented_key_pair = if fast_randomness_is_enabled {
+            if let (Some(sk), Some(pk)) = (sk.fast, pk.fast) {
+                Some(WVUF::augment_key_pair(vuf_pp, sk, pk, &mut rng))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        Ok((augmented_key_pair, fast_augmented_key_pair))
+    }
+
     fn try_get_rand_config_for_new_epoch(
         &self,
         consensus_key: Arc<PrivateKey>,
@@ -998,6 +1026,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
+        v2: bool,
     ) -> Result<(RandConfig, Option<RandConfig>), NoRandomnessReason> {
         if !consensus_config.is_vtxn_enabled() {
             return Err(NoRandomnessReason::VTxnDisabled);
@@ -1057,31 +1086,35 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .collect::<Vec<_>>();
 
         // Recover existing augmented key pair or generate a new one
-        let (augmented_key_pair, fast_augmented_key_pair) = if let Some((_, key_pair)) = self
+        let (augmented_key_pair, fast_augmented_key_pair) = if v2 {
+            info!(
+                epoch = new_epoch,
+                "Generating a new augmented key for RandManagerV2"
+            );
+            Self::generate_randomness_augmented_key(&vuf_pp, sk, pk, fast_randomness_is_enabled)?
+        } else if let Some((_, key_pair)) = self
             .rand_storage
             .get_key_pair_bytes()
             .map_err(NoRandomnessReason::RandDbNotAvailable)?
             .filter(|(epoch, _)| *epoch == new_epoch)
         {
-            info!(epoch = new_epoch, "Recovering existing augmented key");
+            info!(
+                epoch = new_epoch,
+                "Recovering existing augmented key for RandManagerV1"
+            );
             bcs::from_bytes(&key_pair).map_err(NoRandomnessReason::KeyPairDeserializationError)?
         } else {
             info!(
-                epoch = new_epoch_state.epoch,
-                "Generating a new augmented key"
+                epoch = new_epoch,
+                "Generating a new augmented key for RandManagerV1"
             );
-            let mut rng =
-                StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
-            let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
-            let fast_augmented_key_pair = if fast_randomness_is_enabled {
-                if let (Some(sk), Some(pk)) = (sk.fast, pk.fast) {
-                    Some(WVUF::augment_key_pair(&vuf_pp, sk, pk, &mut rng))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let (augmented_key_pair, fast_augmented_key_pair) =
+                Self::generate_randomness_augmented_key(
+                    &vuf_pp,
+                    sk,
+                    pk,
+                    fast_randomness_is_enabled,
+                )?;
             self.rand_storage
                 .save_key_pair_bytes(
                     new_epoch,
@@ -1094,7 +1127,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (ask, apk) = augmented_key_pair;
 
-        let keys = RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
+        let keys = RandKeysWrapper::new(v2, ask, apk, pk_shares, new_epoch_state.verifier.len());
 
         let rand_config = RandConfig::new(
             self.author,
@@ -1114,7 +1147,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .map(|id| trx.get_public_key_share(wconfig, &Player { id }))
                 .collect::<Vec<_>>();
 
-            let fast_keys = RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
+            let fast_keys =
+                RandKeysWrapper::new(v2, ask, apk, pk_shares, new_epoch_state.verifier.len());
             let fast_wconfig = wconfig.clone();
 
             Some(RandConfig::new(
@@ -1145,7 +1179,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         });
 
         self.epoch_state = Some(epoch_state.clone());
-
+        let features = payload.get::<Features>().unwrap_or_default();
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
@@ -1209,6 +1243,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &onchain_randomness_config,
             dkg_state,
             &consensus_config,
+            features.is_enabled(FeatureFlag::RAND_MANAGER_V2),
         );
 
         let (rand_config, fast_rand_config) = match rand_configs {
@@ -1255,6 +1290,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
                 epoch_state,
+                features,
                 loaded_consensus_key.clone(),
                 consensus_config,
                 execution_config,
@@ -1272,6 +1308,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.start_new_epoch_with_jolteon(
                 loaded_consensus_key.clone(),
                 epoch_state,
+                features,
                 consensus_config,
                 execution_config,
                 onchain_randomness_config,
@@ -1327,6 +1364,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
+        features: Features,
         consensus_config: OnChainConsensusConfig,
         execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
@@ -1348,6 +1386,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     consensus_key,
                     initial_data,
                     epoch_state,
+                    features,
                     consensus_config,
                     execution_config,
                     onchain_randomness_config,
@@ -1377,6 +1416,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_new_epoch_with_dag(
         &mut self,
         epoch_state: Arc<EpochState>,
+        features: Features,
         loaded_consensus_key: Arc<PrivateKey>,
         onchain_consensus_config: OnChainConsensusConfig,
         on_chain_execution_config: OnChainExecutionConfig,
@@ -1412,6 +1452,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .start_epoch(
                 loaded_consensus_key,
                 epoch_state.clone(),
+                &features,
                 commit_signer,
                 payload_manager.clone(),
                 &onchain_consensus_config,

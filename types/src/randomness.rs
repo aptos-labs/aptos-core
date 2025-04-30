@@ -16,6 +16,7 @@ pub type SKShare = <WVUF as WeightedVUF>::SecretKeyShare;
 pub type PKShare = <WVUF as WeightedVUF>::PubKeyShare;
 pub type ASK = <WVUF as WeightedVUF>::AugmentedSecretKeyShare;
 pub type APK = <WVUF as WeightedVUF>::AugmentedPubKeyShare;
+pub type AugKeyPair = (ASK, APK);
 pub type ProofShare = <WVUF as WeightedVUF>::ProofShare;
 pub type Delta = <WVUF as WeightedVUF>::Delta;
 pub type Evaluation = <WVUF as WeightedVUF>::Evaluation;
@@ -101,6 +102,7 @@ impl OnChainConfig for PerBlockRandomness {
     const TYPE_IDENTIFIER: &'static str = "PerBlockRandomness";
 }
 
+/// TODO: should be an internal type in `aptos-consensus`.
 #[derive(Clone, SilentDebug)]
 pub struct RandKeys {
     // augmented secret / public key share of this validator, obtained from the DKG transcript of last epoch

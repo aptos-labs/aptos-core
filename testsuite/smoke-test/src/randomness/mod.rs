@@ -33,6 +33,8 @@ mod entry_func_attrs;
 mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
 
+mod rand_manager_v2;
+
 #[allow(dead_code)]
 async fn get_current_version(rest_client: &Client) -> u64 {
     rest_client

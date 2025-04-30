@@ -26,7 +26,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+        Features, OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
         RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
@@ -175,12 +175,13 @@ impl ActiveObserverState {
         >,
     ) -> (
         Arc<dyn TPayloadManager>,
+        Features,
         OnChainConsensusConfig,
         OnChainExecutionConfig,
         OnChainRandomnessConfig,
     ) {
         // Extract the epoch state and on-chain configs
-        let (epoch_state, consensus_config, execution_config, randomness_config) =
+        let (epoch_state, features, consensus_config, execution_config, randomness_config) =
             extract_on_chain_configs(&self.node_config, &mut self.reconfig_events).await;
 
         // Update the local epoch state and quorum store config
@@ -207,6 +208,7 @@ impl ActiveObserverState {
         // Return the payload manager and on-chain configs
         (
             payload_manager,
+            features,
             consensus_config,
             execution_config,
             randomness_config,
@@ -225,6 +227,7 @@ async fn extract_on_chain_configs(
     reconfig_events: &mut ReconfigNotificationListener<DbBackedOnChainConfig>,
 ) -> (
     Arc<EpochState>,
+    Features,
     OnChainConsensusConfig,
     OnChainExecutionConfig,
     OnChainRandomnessConfig,
@@ -244,7 +247,7 @@ async fn extract_on_chain_configs(
         on_chain_configs.epoch(),
         (&validator_set).into(),
     ));
-
+    let features = on_chain_configs.get::<Features>().unwrap_or_default();
     // Extract the consensus config (or use the default if it's missing)
     let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = on_chain_configs.get();
     if let Err(error) = &onchain_consensus_config {
@@ -304,6 +307,7 @@ async fn extract_on_chain_configs(
     // Return the extracted epoch state and on-chain configs
     (
         epoch_state,
+        features,
         consensus_config,
         execution_config,
         onchain_randomness_config,

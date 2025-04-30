@@ -336,7 +336,7 @@ mod tests {
         block_queue::QueueItem,
         rand_store::{RandItem, RandStore, ShareAggregator},
         test_utils::{create_ordered_blocks, create_share, create_share_for_round},
-        types::{MockShare, PathType, RandConfig},
+        types::{MockShare, PathType, RandConfig, RandKeysWrapper},
     };
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, HashValue, Uniform};
@@ -433,7 +433,7 @@ mod tests {
 
             let (ask, apk) = WVUF::augment_key_pair(&vuf_pub_params, sk.main, pk.main, &mut rng);
 
-            let rand_keys = RandKeys::new(ask, apk, pk_shares, num_validators);
+            let rand_keys = RandKeysWrapper::V1(RandKeys::new(ask, apk, pk_shares, num_validators));
             let weights: Vec<usize> = weights.into_iter().map(|x| x as usize).collect();
             let half_total_weights = weights.clone().into_iter().sum::<usize>() / 2;
             let weighted_config = WeightedConfig::new(half_total_weights, weights).unwrap();
