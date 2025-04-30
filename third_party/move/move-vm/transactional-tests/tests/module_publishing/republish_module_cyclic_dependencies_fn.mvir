@@ -44,3 +44,5 @@ module 0x42.A {
         return C.foo();
     }
 }
+
+//# run 0x42::A::foo
