@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: constraint `integer` incompatible with `|()|_ has ..`
+error: constraint `integer` incompatible with `||_ has ..`
   ┌─ tests/more-v1/parser/invalid_call_lhs_value2.move:3:9
   │
 3 │         5();

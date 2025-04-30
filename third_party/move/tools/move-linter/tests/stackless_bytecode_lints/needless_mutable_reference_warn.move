@@ -260,3 +260,21 @@ module 0xc0ffee::p {
         let _y = &mut x;
     }
 }
+
+module 0xc0ffee::q {
+    public fun no_warn_01(x: &mut u64): &mut u64 {
+        x
+    }
+
+    struct W {
+        x: u64,
+    }
+
+    public fun no_warn_02(w: &mut W): &mut u64 {
+        &mut w.x
+    }
+
+    public fun warn_01(x: &mut u64): &u64 {
+        x
+    }
+}
