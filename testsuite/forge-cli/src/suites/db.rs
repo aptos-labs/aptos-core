@@ -5,7 +5,7 @@
 use super::ungrouped::PROGRESS_THRESHOLD_20_6;
 use aptos_forge::{
     args::TransactionTypeArg, success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest,
-    ForgeConfig,
+    ForgeConfig, ReplayProtectionType,
 };
 use aptos_testcases::performance_test::PerformanceBenchmark;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
@@ -36,14 +36,20 @@ pub(crate) fn large_db_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionTypeArg::CoinTransfer.materialize_default(), 75),
+                    (
+                        TransactionTypeArg::CoinTransfer.materialize_default(),
+                        ReplayProtectionType::SequenceNumber,
+                        75,
+                    ),
                     (
                         TransactionTypeArg::AccountGeneration.materialize_default(),
+                        ReplayProtectionType::SequenceNumber,
                         20,
                     ),
                     (
                         TransactionTypeArg::TokenV1NFTMintAndTransferSequential
                             .materialize_default(),
+                        ReplayProtectionType::SequenceNumber,
                         5,
                     ),
                 ]),

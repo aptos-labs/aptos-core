@@ -9,7 +9,7 @@ use aptos_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{LatencyBreakdownThreshold, SuccessCriteria},
-    ForgeConfig,
+    ForgeConfig, ReplayProtectionType,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -36,45 +36,96 @@ fn indexer_test() -> ForgeConfig {
     // * The indexer latencies are inter-component within the indexer stack, but not that of the e2e wall-clock time vs the blockchain
     let workloads_and_criteria = vec![
         (
-            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
+            TransactionWorkload::new(
+                TransactionTypeArg::CoinTransfer,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            ),
             (7000, 0.5, 1.0, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
+            TransactionWorkload::new(
+                TransactionTypeArg::CoinTransfer,
+                ReplayProtectionType::Nonce,
+                20000,
+            ),
+            (3500, 0.5, 1.0, 0.1),
+        ),
+        (
+            TransactionWorkload::new(
+                TransactionTypeArg::NoOp,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            )
+            .with_num_modules(100),
             (8500, 0.5, 1.0, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::ModifyGlobalResource,
+                ReplayProtectionType::SequenceNumber,
+                6000,
+            )
+            .with_transactions_per_account(1),
             (2000, 0.5, 0.5, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
-                .with_unique_senders(),
+            TransactionWorkload::new(
+                TransactionTypeArg::TokenV2AmbassadorMint,
+                ReplayProtectionType::SequenceNumber,
+                20000,
+            )
+            .with_unique_senders(),
             (2000, 1.0, 1.0, 0.5),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::TokenV2AmbassadorMint,
+                ReplayProtectionType::Nonce,
+                20000,
+            )
+            .with_unique_senders(),
+            (1000, 1.0, 1.0, 0.5),
+        ),
+        (
+            TransactionWorkload::new(
+                TransactionTypeArg::PublishPackage,
+                ReplayProtectionType::SequenceNumber,
+                200,
+            )
+            .with_transactions_per_account(1),
             (28, 0.5, 1.0, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 100),
+            TransactionWorkload::new(
+                TransactionTypeArg::VectorPicture30k,
+                ReplayProtectionType::SequenceNumber,
+                100,
+            ),
             (100, 0.5, 1.0, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture30KWith200Change, 100),
+            TransactionWorkload::new(
+                TransactionTypeArg::SmartTablePicture30KWith200Change,
+                ReplayProtectionType::SequenceNumber,
+                100,
+            ),
             (100, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(
                 TransactionTypeArg::TokenV1NFTMintAndTransferSequential,
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (500, 0.5, 1.0, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::TokenV1FTMintAndTransfer, 1000),
+            TransactionWorkload::new(
+                TransactionTypeArg::TokenV1FTMintAndTransfer,
+                ReplayProtectionType::SequenceNumber,
+                1000,
+            ),
             (500, 0.5, 0.5, 0.1),
         ),
     ];
@@ -114,10 +165,15 @@ fn indexer_test() -> ForgeConfig {
         })
         .collect::<Vec<_>>();
 
-    realistic_env_sweep_wrap(4, 4, LoadVsPerfBenchmark {
-        test: Box::new(PerformanceBenchmark),
-        workloads,
-        criteria,
-        background_traffic: background_traffic_for_sweep(num_sweep),
-    })
+    realistic_env_sweep_wrap(
+        4,
+        4,
+        LoadVsPerfBenchmark {
+            test: Box::new(PerformanceBenchmark),
+            workloads,
+            criteria,
+            background_traffic: background_traffic_for_sweep(num_sweep),
+        },
+        None,
+    )
 }

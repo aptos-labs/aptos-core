@@ -6,25 +6,66 @@ use super::ungrouped::RELIABLE_PROGRESS_THRESHOLD;
 use aptos_config::config::NodeConfig;
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteria},
-    EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn,
+    EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn, ReplayProtectionType,
+    TransactionType,
 };
 use aptos_testcases::public_fullnode_performance::PFNPerformance;
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 /// Attempts to match the test name to a PFN test
-pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
+pub fn get_pfn_test(
+    test_name: &str,
+    duration: Duration,
+    replay_protection_type: ReplayProtectionType,
+) -> Option<ForgeConfig> {
     let test = match test_name {
-        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
-        "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
-        "pfn_performance_with_network_chaos" => {
-            pfn_performance(duration, false, true, false, 7, 1, false)
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, true, replay_protection_type),
+        "pfn_const_tps_with_network_chaos" => {
+            pfn_const_tps(duration, false, true, false, replay_protection_type)
         },
-        "pfn_performance_with_realistic_env" => {
-            pfn_performance(duration, true, true, false, 7, 1, false)
+        "pfn_const_tps_with_realistic_env" => {
+            pfn_const_tps(duration, true, true, false, replay_protection_type)
         },
-        "pfn_spam_duplicates" => pfn_performance(duration, true, true, true, 7, 7, true),
+        "pfn_performance" => pfn_performance(
+            duration,
+            false,
+            false,
+            true,
+            7,
+            1,
+            false,
+            replay_protection_type,
+        ),
+        "pfn_performance_with_network_chaos" => pfn_performance(
+            duration,
+            false,
+            true,
+            false,
+            7,
+            1,
+            false,
+            replay_protection_type,
+        ),
+        "pfn_performance_with_realistic_env" => pfn_performance(
+            duration,
+            true,
+            true,
+            false,
+            7,
+            1,
+            false,
+            replay_protection_type,
+        ),
+        "pfn_spam_duplicates" => pfn_performance(
+            duration,
+            true,
+            true,
+            true,
+            7,
+            7,
+            true,
+            replay_protection_type,
+        ),
         _ => return None, // The test name does not match a PFN test
     };
     Some(test)
@@ -41,6 +82,7 @@ fn pfn_const_tps(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    replay_protection_type: ReplayProtectionType,
 ) -> ForgeConfig {
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
@@ -51,7 +93,15 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 5000 })
+                .transaction_mix(vec![(
+                    TransactionType::default(),
+                    replay_protection_type,
+                    100,
+                )]),
+        )
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -92,6 +142,7 @@ fn pfn_performance(
     num_validators: usize,
     num_pfns: usize,
     broadcast_to_all_vfns: bool,
+    replay_protection_type: ReplayProtectionType,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
     let min_expected_tps = if broadcast_to_all_vfns { 2500 } else { 4500 };
@@ -123,6 +174,17 @@ fn pfn_performance(
             add_network_emulation,
             config_override_fn,
         ))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 40000,
+                })
+                .transaction_mix(vec![(
+                    TransactionType::default(),
+                    replay_protection_type,
+                    100,
+                )]),
+        )
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))

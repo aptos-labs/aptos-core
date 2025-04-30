@@ -43,10 +43,16 @@ on:
         required: false
         type: string
         description: Number of validator fullnodes to use for the forge test
-      FORGE_RETAIN_DEBUG_LOGS:
+      # TODO: Temporarily commented this as workflow_dispatch allows only upto 10 inputs.
+      # FORGE_RETAIN_DEBUG_LOGS:
+      #   required: false
+      #   type: boolean
+      #   description: Retain debug logs for all nodes
+      FORGE_REPLAY_PROTECTION_TYPE:
         required: false
-        type: boolean
-        description: Retain debug logs for all nodes
+        type: string
+        default: sequence_number
+        description: The type of replay protection to use for the forge test. Either "sequence_number" or "nonce".
 
 permissions:
   contents: read
@@ -68,8 +74,8 @@ jobs:
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
           echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
           echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
-          echo "FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}"
           echo "FORGE_INDEXER_DEPLOYER_PROFILE: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}"
+          echo "FORGE_REPLAY_PROTECTION_TYPE: ${{ inputs.FORGE_REPLAY_PROTECTION_TYPE }}"
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
@@ -79,10 +85,11 @@ jobs:
       forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
       forgeNumValidators: ${{ inputs.FORGE_NUM_VALIDATORS }}
       forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
-      forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
       forgeIndexerDeployerProfile: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}
+      forgeReplayProtectionType: ${{ inputs.FORGE_REPLAY_PROTECTION_TYPE }}
   adhoc-forge-test:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    # TODO: Change this to aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     needs: [determine-forge-run-metadata]
     secrets: inherit
     with:
@@ -94,7 +101,7 @@ jobs:
       FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}
       FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
       FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
-      FORGE_RETAIN_DEBUG_LOGS: ${{ needs.determine-forge-run-metadata.outputs.forgeRetainDebugLogs == 'true' }}
       # Indexer outputs are derived from a single one, to avoid using too many inputs for this workflow_dispatch trigger
       FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile != '' }}
       FORGE_DEPLOYER_PROFILE: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile }}
+      FORGE_REPLAY_PROTECTION_TYPE: ${{ needs.determine-forge-run-metadata.outputs.forgeReplayProtectionType }}

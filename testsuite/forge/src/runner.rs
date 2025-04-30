@@ -201,7 +201,7 @@ impl ForgeRunnerMode {
 
 pub struct Forge<'cfg, F> {
     options: &'cfg Options,
-    tests: ForgeConfig,
+    forge_config: ForgeConfig,
     global_duration: Duration,
     factory: F,
 }
@@ -209,20 +209,20 @@ pub struct Forge<'cfg, F> {
 impl<'cfg, F: Factory> Forge<'cfg, F> {
     pub fn new(
         options: &'cfg Options,
-        tests: ForgeConfig,
+        forge_config: ForgeConfig,
         global_duration: Duration,
         factory: F,
     ) -> Self {
         Self {
             options,
-            tests,
+            forge_config,
             global_duration,
             factory,
         }
     }
 
     pub fn list(&self) -> Result<()> {
-        for test in self.filter_tests(&self.tests.all_tests()) {
+        for test in self.filter_tests(&self.forge_config.all_tests()) {
             println!("{}: test", test.name());
         }
 
@@ -230,7 +230,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             println!();
             println!(
                 "{} tests",
-                self.filter_tests(&self.tests.all_tests()).count()
+                self.filter_tests(&self.forge_config.all_tests()).count()
             );
         }
 
@@ -240,7 +240,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
     /// Get the initial version based on test configuration
     pub fn initial_version(&self) -> Version {
         let versions = self.factory.versions();
-        match self.tests.initial_version {
+        match self.forge_config.initial_version {
             InitialVersion::Oldest => versions.min(),
             InitialVersion::Newest => versions.max(),
         }
@@ -248,9 +248,10 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
     }
 
     pub fn run(&self) -> Result<TestReport> {
-        let test_count = self.filter_tests(&self.tests.all_tests()).count();
-        let filtered_out = test_count.saturating_sub(self.tests.all_tests().len());
-        let retain_debug_logs = self.options.retain_debug_logs || self.tests.retain_debug_logs;
+        let test_count = self.filter_tests(&self.forge_config.all_tests()).count();
+        let filtered_out = test_count.saturating_sub(self.forge_config.all_tests().len());
+        let retain_debug_logs =
+            self.options.retain_debug_logs || self.forge_config.retain_debug_logs;
 
         let mut report = TestReport::new();
         let mut summary = TestSummary::new(test_count, filtered_out);
@@ -258,7 +259,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         // Optionally write junit xml test report for external processing
         if let Some(junit_xml_path) = self.options.junit_xml_path.as_ref() {
             let junit_observer = JunitTestObserver::new(
-                self.tests.get_suite_name().unwrap_or("local".to_string()),
+                self.forge_config
+                    .get_suite_name()
+                    .unwrap_or("local".to_string()),
                 junit_xml_path.to_owned(),
             );
             summary.add_observer(boxed!(junit_observer));
@@ -278,21 +281,25 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let genesis_version = initial_version.clone();
             let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
-            let mut swarm = runtime.block_on(self.factory.launch_swarm(
-                &mut rng,
-                self.tests.initial_validator_count,
-                self.tests.initial_fullnode_count,
-                &initial_version,
-                &genesis_version,
-                self.tests.genesis_config.as_ref(),
-                self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
-                self.tests.genesis_helm_config_fn.clone(),
-                self.tests.build_node_helm_config_fn(retain_debug_logs),
-                self.tests.existing_db_tag.clone(),
-            ))?;
+            let mut swarm = runtime.block_on(
+                self.factory.launch_swarm(
+                    &mut rng,
+                    self.forge_config.initial_validator_count,
+                    self.forge_config.initial_fullnode_count,
+                    &initial_version,
+                    &genesis_version,
+                    self.forge_config.genesis_config.as_ref(),
+                    self.global_duration
+                        + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                    self.forge_config.genesis_helm_config_fn.clone(),
+                    self.forge_config
+                        .build_node_helm_config_fn(retain_debug_logs),
+                    self.forge_config.existing_db_tag.clone(),
+                ),
+            )?;
 
             // Run AptosTests
-            for test in self.filter_tests(&self.tests.aptos_tests) {
+            for test in self.filter_tests(&self.forge_config.aptos_tests) {
                 let mut aptos_ctx = AptosContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info().into_aptos_public_info(),
@@ -304,7 +311,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             }
 
             // Run AdminTests
-            for test in self.filter_tests(&self.tests.admin_tests) {
+            for test in self.filter_tests(&self.forge_config.admin_tests) {
                 let mut admin_ctx = AdminContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info(),
@@ -317,14 +324,14 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             let logs_location = swarm.logs_location();
             let swarm = Arc::new(tokio::sync::RwLock::new(swarm));
-            for test in self.filter_tests(&self.tests.network_tests) {
+            for test in self.filter_tests(&self.forge_config.network_tests) {
                 let network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.clone(),
                     &mut report,
                     self.global_duration,
-                    self.tests.emit_job_request.clone(),
-                    self.tests.success_criteria.clone(),
+                    self.forge_config.emit_job_request.clone(),
+                    self.forge_config.success_criteria.clone(),
                 );
                 let handle = network_ctx.runtime.handle().clone();
                 let _handle_context = handle.enter();
