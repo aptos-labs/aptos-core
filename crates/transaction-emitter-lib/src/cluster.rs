@@ -40,6 +40,8 @@ impl Cluster {
     ) -> Result<Self> {
         let num_peers = peers.len();
 
+        println!("peers: {:?}, coin_source_key: {:?}, coin_source_is_root: {:?}, maybe_chain_id: {:?}, maybe_api_key: {:?}", peers, coin_source_key, coin_source_is_root, maybe_chain_id, maybe_api_key);
+
         let mut instance_states = Vec::new();
         let mut errors = Vec::new();
         let fetch_timestamp = aptos_infallible::duration_since_epoch().as_secs();

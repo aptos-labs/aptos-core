@@ -6,7 +6,7 @@ use super::ungrouped::changing_working_quorum_test_helper;
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, StateSyncConfig};
 use aptos_forge::{
     args::TransactionTypeArg, success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest,
-    ForgeConfig,
+    ForgeConfig, ReplayProtectionType, TransactionType,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -59,6 +59,21 @@ pub fn state_sync_config_fast_sync(state_sync_config: &mut StateSyncConfig) {
 pub fn state_sync_perf_fullnodes_config() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        .with_emit_job(
+            EmitJobRequest::default()
+                // 80% sequence number based txns, 20% nonce based txns
+                .transaction_mix(vec![
+                    (
+                        TransactionType::default(),
+                        ReplayProtectionType::SequenceNumber,
+                        80,
+                    ),
+                    (TransactionType::default(), ReplayProtectionType::Nonce, 20),
+                ])
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 40000,
+                }),
+        )
         .with_initial_fullnode_count(4)
 }
 
@@ -103,7 +118,10 @@ fn state_sync_perf_fullnodes_fast_sync() -> ForgeConfig {
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(TransactionTypeArg::AccountGeneration.materialize_default()), // Create many state values
+                .transaction_type(
+                    TransactionTypeArg::AccountGeneration.materialize_default(),
+                    ReplayProtectionType::SequenceNumber,
+                ), // Create many state values
         )
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             state_sync_config_fast_sync(&mut config.state_sync);

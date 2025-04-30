@@ -17,7 +17,7 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::{AccountType, TransactionType};
+use aptos_transaction_generator_lib::{AccountType, ReplayProtectionType, TransactionType};
 use aptos_types::{account_address::AccountAddress, keyless::test_utils::get_sample_esk};
 use log::{error, info};
 use rand::{rngs::StdRng, SeedableRng};
@@ -29,8 +29,10 @@ use std::{
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
     emit_args: &EmitArgs,
-    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>,
 ) -> Result<TxnStats> {
+    println!("emit_args: {:?}", emit_args);
+    println!("cluster_args: {:?}", cluster_args);
     if emit_args.coordination_delay_between_instances.is_none() {
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
@@ -82,7 +84,7 @@ pub async fn emit_transactions(
 pub async fn emit_transactions_with_cluster(
     cluster: &Cluster,
     args: &EmitArgs,
-    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, ReplayProtectionType, usize)>>,
 ) -> Result<TxnStats> {
     let emitter_mode = EmitJobMode::create(args.mempool_backlog, args.target_tps);
 

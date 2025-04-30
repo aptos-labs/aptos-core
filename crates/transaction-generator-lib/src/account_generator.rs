@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    create_account_transaction, ObjectPool, TransactionGenerator, TransactionGeneratorCreator,
+    create_account_transaction, ObjectPool, ReplayProtectionType, TransactionGenerator,
+    TransactionGeneratorCreator,
 };
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -18,6 +19,7 @@ pub struct AccountGenerator {
     accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
     max_working_set: usize,
     creation_balance: u64,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl AccountGenerator {
@@ -28,6 +30,7 @@ impl AccountGenerator {
         accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         max_working_set: usize,
         creation_balance: u64,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             rng,
@@ -36,6 +39,7 @@ impl AccountGenerator {
             accounts_pool,
             max_working_set,
             creation_balance,
+            replay_protection_type,
         }
     }
 }
@@ -57,6 +61,7 @@ impl TransactionGenerator for AccountGenerator {
                 receiver_address,
                 &self.txn_factory,
                 self.creation_balance,
+                self.replay_protection_type,
             );
             requests.push(request);
             new_accounts.push(receiver);
@@ -84,6 +89,7 @@ pub struct AccountGeneratorCreator {
     accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
     max_working_set: usize,
     creation_balance: u64,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl AccountGeneratorCreator {
@@ -93,6 +99,7 @@ impl AccountGeneratorCreator {
         accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         max_working_set: usize,
         creation_balance: u64,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             txn_factory,
@@ -100,6 +107,7 @@ impl AccountGeneratorCreator {
             accounts_pool,
             max_working_set,
             creation_balance,
+            replay_protection_type,
         }
     }
 }
@@ -113,6 +121,7 @@ impl TransactionGeneratorCreator for AccountGeneratorCreator {
             self.accounts_pool.clone(),
             self.max_working_set,
             self.creation_balance,
+            self.replay_protection_type,
         ))
     }
 }

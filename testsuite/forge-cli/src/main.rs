@@ -50,6 +50,8 @@ struct Args {
     num_validators: Option<usize>,
     #[clap(long)]
     num_validator_fullnodes: Option<usize>,
+    #[clap(long, default_value = "sequence_number")]
+    replay_protection_type: Option<String>,
     #[clap(
         long,
         help = "Specify a test suite to run",
@@ -58,7 +60,6 @@ struct Args {
     suite: String,
     #[clap(long, num_args = 0..)]
     changelog: Option<Vec<String>>,
-
     // subcommand groups
     #[clap(subcommand)]
     cli_cmd: CliCommand,
@@ -242,13 +243,21 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
-
+    let replay_protection_type = match args.replay_protection_type {
+        Some(replay_protection_type) => match replay_protection_type.as_str() {
+            "sequence_number" => ReplayProtectionType::SequenceNumber,
+            "nonce" => ReplayProtectionType::Nonce,
+            _ => return Err(format_err!("Invalid replay protection type: {:?}. Should be either 'sequence_number' or 'nonce'", replay_protection_type)),
+        },
+        None => ReplayProtectionType::SequenceNumber,
+    };
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
         CliCommand::Test(ref test_cmd) => {
             // Identify the test suite to run
-            let mut test_suite = get_test_suite(suite_name, duration, test_cmd)?;
+            let mut test_suite =
+                get_test_suite(suite_name, duration, test_cmd, replay_protection_type)?;
 
             // Identify the number of validators and fullnodes to run
             // (if overriding what test has specified)
@@ -499,6 +508,7 @@ fn get_test_suite(
     test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
+    replay_protection_type: ReplayProtectionType,
 ) -> Result<ForgeConfig> {
     // These are high level suite aliases that express an intent
     let suite_aliases = hmap! {
@@ -521,8 +531,8 @@ fn get_test_suite(
             as Box<dyn Fn() -> Option<ForgeConfig>>,
         boxed!(|| get_multi_region_test(test_name)),
         boxed!(|| get_netbench_test(test_name)),
-        boxed!(|| get_pfn_test(test_name, duration)),
-        boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
+        boxed!(|| get_pfn_test(test_name, duration, replay_protection_type)),
+        boxed!(|| get_realistic_env_test(test_name, duration, test_cmd, replay_protection_type)),
         boxed!(|| get_state_sync_test(test_name)),
         boxed!(|| get_dag_test(test_name, duration, test_cmd)),
         boxed!(|| get_indexer_test(test_name)),

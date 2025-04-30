@@ -8,7 +8,8 @@ use crate::{
 };
 use aptos_consensus::QUORUM_STORE_DB_NAME;
 use aptos_forge::{
-    args::TransactionTypeArg, reconfig, wait_for_all_nodes_to_catchup, NodeExt, Swarm, SwarmExt,
+    args::TransactionTypeArg, reconfig, wait_for_all_nodes_to_catchup, NodeExt,
+    ReplayProtectionType, Swarm, SwarmExt, TransactionType,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client;
@@ -310,9 +311,14 @@ async fn test_swarm_with_bad_non_qs_node() {
             Duration::from_secs(20),
             1,
             vec![vec![
-                (TransactionTypeArg::CoinTransfer.materialize_default(), 70),
+                (
+                    TransactionTypeArg::CoinTransfer.materialize_default(),
+                    ReplayProtectionType::SequenceNumber,
+                    70,
+                ),
                 (
                     TransactionTypeArg::AccountGeneration.materialize_default(),
+                    ReplayProtectionType::SequenceNumber,
                     20,
                 ),
             ]],

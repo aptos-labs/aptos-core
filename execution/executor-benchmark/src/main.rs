@@ -34,7 +34,7 @@ use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadMa
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
-use aptos_transaction_generator_lib::WorkflowProgress;
+use aptos_transaction_generator_lib::{ReplayProtectionType, WorkflowProgress};
 use aptos_transaction_workloads_lib::args::TransactionTypeArg;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
@@ -387,6 +387,9 @@ enum Command {
         )]
         transaction_type: Vec<TransactionTypeArg>,
 
+        #[clap(long, value_enum, default_value = "sequence-number", num_args = 1.., ignore_case = true)]
+        replay_protection_types: Vec<ReplayProtectionType>,
+
         #[clap(long, num_args = 0..)]
         transaction_weights: Vec<usize>,
 
@@ -483,6 +486,7 @@ where
             main_signer_accounts,
             additional_dst_pool_accounts,
             transaction_type,
+            replay_protection_types,
             transaction_weights,
             module_working_set_size,
             use_sender_account_pool,
@@ -505,6 +509,7 @@ where
             } else {
                 let mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
                     &transaction_type,
+                    &replay_protection_types,
                     &transaction_weights,
                     &[],
                     module_working_set_size,
