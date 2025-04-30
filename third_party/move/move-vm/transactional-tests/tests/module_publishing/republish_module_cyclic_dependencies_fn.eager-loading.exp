@@ -1,4 +1,4 @@
-processed 5 tasks
+processed 6 tasks
 
 task 4 'publish'. lines 39-46:
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::A'. Got VMError: {
@@ -8,3 +8,6 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [],
     offsets: [],
 }
+
+task 5 'run'. lines 48-48:
+return values: 5
