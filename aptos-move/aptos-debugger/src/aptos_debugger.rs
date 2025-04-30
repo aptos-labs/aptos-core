@@ -404,7 +404,7 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
                 executable_type
             })
         })
-        // Count number of instances for each (irrsepsecitve of order)
+        // Count number of instances for each (irrepsective of order)
         .sorted()
         .chunk_by(|k| k.clone())
         .into_iter()
