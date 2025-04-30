@@ -1,9 +1,11 @@
-module aptos_std::base16 {
+module aptos_framework::base16 {
 
     use std::vector;
 
+    friend aptos_framework::ethereum_derivable_account;
+
     // Convert a hex character to a u8
-    public fun hex_char_to_u8(c: u8): u8 {
+    public(friend) fun hex_char_to_u8(c: u8): u8 {
         if (c >= 48 && c <= 57) {  // '0' to '9'
             c - 48
         } else if (c >= 65 && c <= 70) { // 'A' to 'F'
@@ -16,7 +18,7 @@ module aptos_std::base16 {
     }
 
     // Convert a base16 encoded string to a vector of u8
-    public fun base16_utf8_to_vec_u8(str: vector<u8>): vector<u8> {
+    public(friend) fun base16_utf8_to_vec_u8(str: vector<u8>): vector<u8> {
         let result = vector::empty<u8>();
         let i = 0;
         while (i < vector::length(&str)) {

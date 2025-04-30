@@ -42,7 +42,7 @@ Issued At: <issued_at>
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
 <b>use</b> <a href="auth_data.md#0x1_auth_data">0x1::auth_data</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/base16.md#0x1_base16">0x1::base16</a>;
+<b>use</b> <a href="base16.md#0x1_base16">0x1::base16</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream">0x1::bcs_stream</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="common_account_abstractions_utils.md#0x1_common_account_abstractions_utils">0x1::common_account_abstractions_utils</a>;
@@ -72,7 +72,7 @@ Issued At: <issued_at>
 
 
 <details>
-<summary>EIP1193DerivedSignature</summary>
+<summary>MessageV1</summary>
 
 
 <details>
@@ -241,7 +241,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     <b>if</b> (signature_type == 0x00) {
         <b>let</b> issued_at = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
-        SIWEAbstractSignature::EIP1193DerivedSignature { issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(issued_at), signature }
+        SIWEAbstractSignature::MessageV1 { issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(issued_at), signature }
     } <b>else</b> {
         <b>abort</b>(<a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
     }
