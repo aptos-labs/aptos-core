@@ -47,7 +47,7 @@ impl Default for VMConfig {
             delayed_field_optimization_enabled: false,
             ty_builder: TypeBuilder::with_limits(128, 20),
             use_call_tree_and_instruction_cache: true,
-            enable_lazy_loading: false,
+            enable_lazy_loading: true,
         }
     }
 }
