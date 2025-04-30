@@ -259,7 +259,7 @@ module aptos_framework::account {
 
     /// Destroy the Account resource from a given account.
     /// Used to destroy the core resources account on mainnet.
-    public fun destroy_account_from(account: &signer, from: address) acquires Account {
+    public entry fun destroy_account_from(account: &signer, from: address) acquires Account {
         system_addresses::assert_aptos_framework(account);
 
         // Assert that the feature flag for decommissioning core resources is enabled
