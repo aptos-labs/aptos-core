@@ -15,6 +15,7 @@ use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
 use std::ops::Deref;
+use crate::state_store::state_value::StateValueOrNone;
 
 pub mod errors;
 pub mod state_key;
@@ -41,14 +42,14 @@ pub trait TStateView {
     }
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>>;
+    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<StateValueOrNone>;
 
     /// Gets state storage usage info at epoch ending.
     fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
 
     /// Checks if a state keyed by the given state key exists.
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
-        self.get_state_value(state_key).map(|opt| opt.is_some())
+        self.get_state_value(state_key).map(StateValueOrNone::is_existing)
     }
 }
 

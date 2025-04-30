@@ -23,6 +23,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use aptos_types::state_store::state_value::StateValueOrNone;
 
 #[derive(Clone, Copy)]
 pub struct FilterCondition {
@@ -147,7 +148,7 @@ impl DebuggerStateView {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<Option<StateValue>> {
+    ) -> Result<StateValueOrNone> {
         let (tx, rx) = std::sync::mpsc::channel();
         let query_handler_locked = self.query_sender.lock().unwrap();
         query_handler_locked
@@ -164,7 +165,7 @@ impl TStateView for DebuggerStateView {
         StateViewId::Replay
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<StateValueOrNone> {
         self.get_state_value_internal(state_key, self.version)
             .map_err(Into::into)
     }

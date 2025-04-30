@@ -7,7 +7,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_view::hot_state_view::HotStateView, versioned_state_value::DbStateUpdate,
+    state::State, state_view::hot_state_view::HotStateView, versioned_state_value::StateUpdate,
 };
 use aptos_types::state_store::{state_key::StateKey, StateViewResult};
 use dashmap::DashMap;
@@ -25,7 +25,7 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 pub struct HotStateBase {
     capacity: usize,
     max_value_bytes: usize,
-    inner: DashMap<StateKey, DbStateUpdate>,
+    inner: DashMap<StateKey, StateUpdate>,
 }
 
 impl HotStateBase {
@@ -37,13 +37,13 @@ impl HotStateBase {
         }
     }
 
-    fn get(&self, key: &StateKey) -> Option<DbStateUpdate> {
+    fn get(&self, key: &StateKey) -> Option<StateUpdate> {
         self.inner.get(key).map(|val| val.clone())
     }
 }
 
 impl HotStateView for HotStateBase {
-    fn get_state_update(&self, state_key: &StateKey) -> StateViewResult<Option<DbStateUpdate>> {
+    fn get_state_update(&self, state_key: &StateKey) -> StateViewResult<Option<StateUpdate>> {
         Ok(self.get(state_key))
     }
 }

@@ -170,11 +170,11 @@ enum PersistedStateValue {
 }
 
 impl PersistedStateValue {
-    fn into_in_mem_form(self) -> StateValue {
+    fn into_in_mem_form(self) -> ExistingStateValue {
         match self {
-            PersistedStateValue::V0(data) => StateValue::new_legacy(data),
+            PersistedStateValue::V0(data) => ExistingStateValue::new_legacy(data),
             PersistedStateValue::WithMetadata { data, metadata } => {
-                StateValue::new_with_metadata(data, metadata.into_in_mem_form())
+                ExistingStateValue::new_with_metadata(data, metadata.into_in_mem_form())
             },
         }
     }
@@ -184,66 +184,52 @@ impl PersistedStateValue {
 pub struct ExistingStateValue {
     data: Bytes,
     metadata: StateValueMetadata,
-    access_time_secs: u32,
 }
 
-/// Shared memory layout between StateValue and DbStateValue. Avoids unnecessary memory movement
-/// when converting between the two.
-#[derive(Clone, Debug)]
-pub enum Store {
-    Existing(ExistingStateValue),
-    /// Non-existent, cached in the hot tier.
-    HotNonExistent {
-        access_time_secs: u32,
-    },
+/// A existing or non-existent state value
+///
+/// value = Some, hot_since_usecs = None  -- cold existing value
+/// value = None, hot_since_usecs = None  -- non-existent and not cached in the hot state
+/// value = Some, hot_since_usecs = Some  -- existing and in the hot state
+/// value = None, hot_since_usecs = Some  -- non-existence cached in the hot state
+pub struct StateValueOrNone {
+    value: Option<ExistingStateValue>,
+    hot_since_usecs: Option<u64>,
 }
 
-impl Store {
-    fn new_existing_without_access_ts(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self::Existing(ExistingStateValue {
-            data,
-            metadata,
-            access_time_secs: 0,
-        })
+
+impl StateValueOrNone {
+    fn new_existing_without_access_ts(_data: Bytes, _metadata: StateValueMetadata) -> Self {
+        todo!()
     }
 
-    fn new_hot_non_existent(access_time_secs: u32) -> Self {
-        Self::HotNonExistent { access_time_secs }
+    fn new_hot_non_existent(_access_time_secs: u32) -> Self {
+        todo!()
     }
 
-    fn set_access_time_secs(&mut self, secs: u32) {
-        match self {
-            Self::HotNonExistent { access_time_secs } => *access_time_secs = secs,
-            Self::Existing(existing) => existing.access_time_secs = secs,
-        }
+    fn set_hot_since_usecs(&mut self, usecs: u64) {
+        self.hot_since_usecs = Some(usecs)
     }
 
     pub fn is_hot_non_existent(&self) -> bool {
-        matches!(self, Self::HotNonExistent { .. })
+        self.hot_since_usecs.is_some() && self.value.is_none()
     }
 
     pub fn size(&self) -> usize {
-        match self {
-            Self::HotNonExistent { .. } => 0,
-            Self::Existing(existing) => existing.data.len(),
-        }
+        self.value.as_ref().map_or(0, |existing| existing.data.len())
+    }
+
+    pub fn is_existing(&self) -> bool {
+        self.value.is_some()
     }
 }
 
-/// StateValue for usage by the VM / `StateView`.
-///
-/// 1. It's guaranteed by constructors that it's not `HotNonExistent`.
-/// 2. Access time is just placeholder, must be set when converting to DbStateValue.
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, RefCast)]
-#[repr(transparent)]
-pub struct StateValue(Store);
 
-impl StateValue {
+impl ExistingStateValue {
     fn to_persistable_form(&self) -> PersistedStateValue {
         let ExistingStateValue {
             data,
             metadata,
-            access_time_secs: _,
         } = self.inner().clone();
         let metadata = metadata.into_persistable();
         match metadata {
@@ -253,15 +239,7 @@ impl StateValue {
     }
 }
 
-impl Deref for StateValue {
-    type Target = ExistingStateValue;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner()
-    }
-}
-
-impl PartialEq for StateValue {
+impl PartialEq for ExistingStateValue {
     fn eq(&self, other: &Self) -> bool {
         // Ignoring access_time_secs for equality check for now.
         // TODO: change after access time is actual part of the metadata.
@@ -269,23 +247,23 @@ impl PartialEq for StateValue {
     }
 }
 
-impl Eq for StateValue {}
+impl Eq for ExistingStateValue {}
 
 pub const ARB_STATE_VALUE_MAX_SIZE: usize = 100;
 
 #[cfg(any(test, feature = "fuzzing"))]
-impl Arbitrary for StateValue {
+impl Arbitrary for ExistingStateValue {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         vec(any::<u8>(), 0..=ARB_STATE_VALUE_MAX_SIZE)
-            .prop_map(|bytes| StateValue::new_legacy(bytes.into()))
+            .prop_map(|bytes| ExistingStateValue::new_legacy(bytes.into()))
             .boxed()
     }
 }
 
-impl<'de> Deserialize<'de> for StateValue {
+impl<'de> Deserialize<'de> for ExistingStateValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -294,7 +272,7 @@ impl<'de> Deserialize<'de> for StateValue {
     }
 }
 
-impl Serialize for StateValue {
+impl Serialize for ExistingStateValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -303,7 +281,7 @@ impl Serialize for StateValue {
     }
 }
 
-impl StateValue {
+impl ExistingStateValue {
     pub fn new_legacy(bytes: Bytes) -> Self {
         Self::new_with_metadata(bytes, StateValueMetadata::none())
     }

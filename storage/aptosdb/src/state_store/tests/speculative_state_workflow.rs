@@ -280,7 +280,7 @@ impl StateByVersion {
             .shards
             .iter()
             .flat_map(|shard| shard.iter())
-            .flat_map(|(k, db_update)| db_update.to_jmt_update_opt(k, last_snapshot.next_version()))
+            .flat_map(|(k, db_update)| db_update.to_cold_state_update_opt(k, last_snapshot.next_version()))
             .collect::<HashMap<_, _>>();
 
         let expected_jmt_updates =

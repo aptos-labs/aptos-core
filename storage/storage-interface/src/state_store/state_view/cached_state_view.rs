@@ -11,7 +11,7 @@ use crate::{
             db_state_view::DbStateView,
             hot_state_view::{EmptyHotState, HotStateView},
         },
-        versioned_state_value::{DbStateUpdate, MemorizedStateRead},
+        versioned_state_value::{StateUpdate, MemorizedStateRead},
         NUM_STATE_SHARDS,
     },
     DbReader,
@@ -39,7 +39,7 @@ use std::{
 };
 
 pub type StateCacheShard = DashMap<StateKey, MemorizedStateRead>;
-pub type HotStateShardRefreshes = DashMap<StateKey, DbStateUpdate>;
+pub type HotStateShardRefreshes = DashMap<StateKey, StateUpdate>;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()

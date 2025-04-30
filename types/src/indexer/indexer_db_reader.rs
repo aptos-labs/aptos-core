@@ -7,12 +7,12 @@ use crate::{
     event::EventKey,
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
-        state_value::StateValue,
         table::{TableHandle, TableInfo},
     },
     transaction::{AccountOrderedTransactionsWithProof, Version},
 };
 use anyhow::Result;
+use crate::state_store::state_value::ExistingStateValue;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Order {
@@ -57,7 +57,7 @@ pub trait IndexerReader: Send + Sync {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, ExistingStateValue)>> + '_>>;
 
     fn get_latest_internal_indexer_ledger_version(&self) -> Result<Option<Version>>;
     fn get_latest_table_info_ledger_version(&self) -> Result<Option<Version>>;

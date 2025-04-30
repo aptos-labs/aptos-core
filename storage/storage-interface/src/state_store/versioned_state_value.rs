@@ -7,20 +7,22 @@ use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
-        state_value::{DbStateValue, StateValue},
+        state_value::{StateValueOrNone},
     },
     transaction::Version,
 };
+use aptos_types::state_store::state_value::{ExistingStateValue, StateValueOrNone};
 
 #[derive(Clone, Debug)]
-pub struct DbStateUpdate {
+pub struct StateUpdate {
     /// The version where the key got updated (incl. deletion).
     pub version: Version,
-    /// `None` indicates deletion.
-    pub value: Option<DbStateValue>,
+    /// TODO(HotState):
+    /// `None` indicates deletion from cold state and/or HotNoneExistent
+    pub value: StateValueOrNone,
 }
 
-impl DbStateUpdate {
+impl StateUpdate {
     pub fn to_jmt_update_opt(
         &self,
         key: StateKey,
@@ -67,8 +69,8 @@ pub struct StateUpdateRef<'kv> {
 }
 
 impl<'kv> StateUpdateRef<'kv> {
-    pub fn to_db_state_update(&self, access_time_secs: u32) -> DbStateUpdate {
-        DbStateUpdate {
+    pub fn to_db_state_update(&self, access_time_secs: u32) -> StateUpdate {
+        StateUpdate {
             version: self.version,
             value: self
                 .value
@@ -87,14 +89,14 @@ pub enum MemorizedStateRead {
     /// Underlying storage doesn't have an entry for this state key.
     NonExistent,
     /// A state update at a known version
-    StateUpdate(DbStateUpdate),
+    StateUpdate(StateUpdate),
 }
 
 impl MemorizedStateRead {
-    pub fn from_db_get(tuple_opt: Option<(Version, StateValue)>) -> Self {
+    pub fn from_db_get(tuple_opt: Option<(Version, ExistingStateValue)>) -> Self {
         match tuple_opt {
             None => Self::NonExistent,
-            Some((version, value)) => Self::StateUpdate(DbStateUpdate {
+            Some((version, value)) => Self::StateUpdate(StateUpdate {
                 version,
                 // N.B. Item will end up in hot state with refreshed access time down the stack.
                 value: Some(value.into_db_state_value(0)),
@@ -102,11 +104,11 @@ impl MemorizedStateRead {
         }
     }
 
-    pub fn from_speculative_state(db_update: DbStateUpdate) -> Self {
+    pub fn from_speculative_state(db_update: StateUpdate) -> Self {
         Self::StateUpdate(db_update)
     }
 
-    pub fn from_hot_state_hit(db_update: DbStateUpdate) -> Self {
+    pub fn from_hot_state_hit(db_update: StateUpdate) -> Self {
         Self::StateUpdate(db_update)
     }
 
@@ -122,7 +124,7 @@ impl MemorizedStateRead {
     pub fn to_state_value_ref_opt(&self) -> Option<&StateValue> {
         match self {
             Self::NonExistent => None,
-            Self::StateUpdate(DbStateUpdate { version: _, value }) => value
+            Self::StateUpdate(StateUpdate { version: _, value }) => value
                 .as_ref()
                 .and_then(|db_val| db_val.to_state_value_opt()),
         }
@@ -131,7 +133,7 @@ impl MemorizedStateRead {
     pub fn into_state_value_opt(self) -> Option<StateValue> {
         match self {
             Self::NonExistent => None,
-            Self::StateUpdate(DbStateUpdate { version: _, value }) => {
+            Self::StateUpdate(StateUpdate { version: _, value }) => {
                 value.and_then(|db_val| db_val.into_state_value_opt())
             },
         }
@@ -141,17 +143,17 @@ impl MemorizedStateRead {
         &self,
         access_time_secs: u32,
         refresh_internal_secs: u32,
-    ) -> Option<DbStateUpdate> {
+    ) -> Option<StateUpdate> {
         match self {
             MemorizedStateRead::NonExistent => {
                 COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
-                Some(DbStateUpdate {
+                Some(StateUpdate {
                     // Dummy creation version
                     version: 0,
                     value: Some(DbStateValue::new_hot_non_existent(access_time_secs)),
                 })
             },
-            MemorizedStateRead::StateUpdate(DbStateUpdate { version, value }) => {
+            MemorizedStateRead::StateUpdate(StateUpdate { version, value }) => {
                 match value {
                     None => {
                         // a deletion from speculative state, no need to refresh
@@ -167,7 +169,7 @@ impl MemorizedStateRead {
                             } else {
                                 COUNTER.inc_with(&["memorized_read_refreshed_hot"]);
                             }
-                            Some(DbStateUpdate {
+                            Some(StateUpdate {
                                 version: *version,
                                 value: Some(
                                     db_value.clone().with_access_time_secs(access_time_secs),

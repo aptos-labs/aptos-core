@@ -57,7 +57,7 @@ use aptos_storage_interface::{
             hot_state_view::HotStateView,
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{DbStateUpdate, MemorizedStateRead, StateUpdateRef},
+        versioned_state_value::{StateUpdate, MemorizedStateRead, StateUpdateRef},
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -881,7 +881,7 @@ impl StateStore {
                         MemorizedStateRead::NonExistent
                     });
 
-                if let MemorizedStateRead::StateUpdate(DbStateUpdate {
+                if let MemorizedStateRead::StateUpdate(StateUpdate {
                     version: old_version,
                     value: old_value_opt,
                 }) = old_entry
