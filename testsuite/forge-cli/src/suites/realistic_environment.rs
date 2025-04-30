@@ -18,6 +18,7 @@ use aptos_forge::{
         SuccessCriteria, SystemMetricsThreshold,
     },
     EmitJobMode, EmitJobRequest, ForgeConfig, NetworkTest, NodeResourceOverride,
+    ReplayProtectionType, TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
@@ -36,15 +37,16 @@ pub(crate) fn get_realistic_env_test(
     test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
+    replay_protection_type: ReplayProtectionType,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
-        "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
-        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
-        "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
-        "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
-        "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
-        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10, replay_protection_type),
+        "realistic_env_load_sweep" => realistic_env_load_sweep_test(replay_protection_type),
+        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(replay_protection_type),
+        "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(replay_protection_type),
+        "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(replay_protection_type),
+        "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration, replay_protection_type),
+        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(replay_protection_type),
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -54,6 +56,7 @@ pub(crate) fn realistic_env_sweep_wrap(
     num_validators: usize,
     num_fullnodes: usize,
     test: LoadVsPerfBenchmark,
+    replay_protection_type: ReplayProtectionType,
 ) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
@@ -78,7 +81,7 @@ pub(crate) fn realistic_env_sweep_wrap(
         )
 }
 
-pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
+pub(crate) fn realistic_env_load_sweep_test(replay_protection_type: ReplayProtectionType) -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
@@ -104,22 +107,43 @@ pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
         )
         .collect(),
         background_traffic: background_traffic_for_sweep(5),
-    })
+    }, replay_protection_type)
 }
 
-pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
+pub(crate) fn realistic_env_workload_sweep_test(replay_protection_type: ReplayProtectionType) -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
-            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
-            TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
-            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
-                .with_transactions_per_account(1),
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
-                .with_unique_senders(),
+            TransactionWorkload::new(
+                TransactionTypeArg::CoinTransfer,
+                replay_protection_type,
+                20000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::NoOp,
+                replay_protection_type,
+                20000,
+            )
+            .with_num_modules(100),
+            TransactionWorkload::new(
+                TransactionTypeArg::ModifyGlobalResource,
+                replay_protection_type,
+                6000,
+            )
+            .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::TokenV2AmbassadorMint,
+                replay_protection_type,
+                20000,
+            )
+            .with_unique_senders(),
             // TODO(ibalajiarun): this is disabled due to Forge Stable failure on PosToProposal latency.
-            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::PublishPackage,
+                replay_protection_type,
+                200,
+            )
+            .with_transactions_per_account(1),
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
@@ -160,21 +184,31 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
         )
         .collect(),
         background_traffic: background_traffic_for_sweep(5),
-    })
+    }, replay_protection_type
+    )
 }
 
-pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
+pub(crate) fn realistic_env_fairness_workload_sweep(replay_protection_type: ReplayProtectionType) -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // Very high gas
             TransactionWorkload::new(
                 TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
+                replay_protection_type,
                 100000,
             ),
-            TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 20000),
-            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 4000)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new(
+                TransactionTypeArg::VectorPicture30k,
+                replay_protection_type,
+                20000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::SmartTablePicture1MWith256Change,
+                replay_protection_type,
+                4000,
+            )
+            .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(
@@ -184,30 +218,49 @@ pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
     })
 }
 
-pub(crate) fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
+pub(crate) fn realistic_env_graceful_workload_sweep(replay_protection_type: ReplayProtectionType) -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // do account generation first, to fill up a storage a bit.
-            TransactionWorkload::new_const_tps(TransactionTypeArg::AccountGeneration, 2 * 7000),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::AccountGeneration,
+                replay_protection_type,
+                2 * 7000,
+            ),
             // Very high gas
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
+                replay_protection_type,
                 3 * 1800,
             ),
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::SmartTablePicture1MWith256Change,
+                replay_protection_type,
                 3 * 14,
             ),
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit,
+                replay_protection_type,
                 3 * 12,
             ),
-            TransactionWorkload::new_const_tps(TransactionTypeArg::VectorPicture30k, 3 * 150),
-            TransactionWorkload::new_const_tps(TransactionTypeArg::ModifyGlobalFlagAggV2, 3 * 3500),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::VectorPicture30k,
+                replay_protection_type,
+                3 * 150,
+            ),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::ModifyGlobalFlagAggV2,
+                replay_protection_type,
+                3 * 3500,
+            ),
             // publishing package - executes sequentially
-            TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
-                .with_transactions_per_account(1),
+            TransactionWorkload::new_const_tps(
+                TransactionTypeArg::PublishPackage,
+                replay_protection_type,
+                3 * 150,
+            )
+            .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(
@@ -234,7 +287,7 @@ pub(crate) fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
     )
 }
 
-pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig {
+pub(crate) fn realistic_env_graceful_overload(duration: Duration, replay_protection_type: ReplayProtectionType) -> ForgeConfig {
     let num_validators = 20;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
@@ -248,6 +301,11 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
+                .transaction_mix(
+                    vec![
+                        (TransactionType::default(), replay_protection_type, 100),
+                    ]
+                )
                 .mode(EmitJobMode::ConstTps { tps: 1000 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
@@ -281,6 +339,7 @@ pub(crate) fn realistic_env_max_load_test(
     test_cmd: &TestCommand,
     num_validators: usize,
     num_fullnodes: usize,
+    replay_protection_type: ReplayProtectionType,
 ) -> ForgeConfig {
     // Check if HAProxy is enabled
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
@@ -347,6 +406,11 @@ pub(crate) fn realistic_env_max_load_test(
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
+                .transaction_mix(
+                    vec![
+                        (TransactionType::default(), replay_protection_type, 100),
+                    ]
+                )
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
@@ -375,6 +439,11 @@ pub(crate) fn realistic_env_max_load_test(
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
+                .transaction_mix(
+                    vec![
+                        (TransactionType::default(), replay_protection_type, 100),
+                    ]
+                )
                 .mode(EmitJobMode::ConstTps { tps: 100 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
@@ -384,7 +453,7 @@ pub(crate) fn realistic_env_max_load_test(
         .with_fullnode_resource_override(resource_override)
 }
 
-pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
+pub(crate) fn realistic_network_tuned_for_throughput_test(replay_protection_type: ReplayProtectionType) -> ForgeConfig {
     // THE MOST COMMONLY USED TUNE-ABLES:
     const USE_CRAZY_MACHINES: bool = false;
     const ENABLE_VFNS: bool = true;
@@ -407,9 +476,16 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     let mut forge_config = ForgeConfig::default()
             .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
             .add_network_test(MultiRegionNetworkEmulationTest::default_for_validator_count(VALIDATOR_COUNT))
-            .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-                mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
-            }))
+            .with_emit_job(EmitJobRequest::default()
+                .transaction_mix(
+                    vec![
+                        (TransactionType::default(), replay_protection_type, 100),
+                    ]
+                )
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
+                })
+            )
             .with_validator_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
                 optimize_state_sync_for_throughput(config, 15_000);

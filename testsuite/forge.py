@@ -1186,6 +1186,7 @@ def create_forge_command(
     cargo_args: Optional[Sequence[str]],
     forge_cli_args: Optional[Sequence[str]],
     test_args: Optional[Sequence[str]],
+    forge_replay_protection_type: Optional[str],
 ) -> List[str]:
     """
     Cargo args get passed before forge directly to cargo (i.e. features)
@@ -1259,6 +1260,9 @@ def create_forge_command(
 
     if test_args:
         forge_args.extend(test_args)
+
+    if forge_replay_protection_type:
+        forge_args.extend(["--replay-protection-type", forge_replay_protection_type])
 
     return forge_args
 
@@ -1387,6 +1391,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("GITHUB_SERVER_URL")
 @envoption("GITHUB_REPOSITORY")
 @envoption("GITHUB_RUN_ID")
+@envoption("FORGE_REPLAY_PROTECTION_TYPE")
 @click.option(
     "--cargo-args",
     multiple=True,
@@ -1438,6 +1443,7 @@ def test(
     forge_cli_args: Optional[List[str]],
     test_args: Optional[List[str]],
     test_suites: Tuple[str],
+    forge_replay_protection_type: Optional[str],
 ) -> None:
     """Run a forge test"""
 
@@ -1649,6 +1655,7 @@ def test(
         cargo_args=cargo_args,
         forge_cli_args=forge_cli_args,
         test_args=test_args,
+        forge_replay_protection_type=forge_replay_protection_type,
     )
 
     log.info("forge_args: %s", forge_args)
@@ -1811,7 +1818,7 @@ def list_jobs(
             fg = "white"
 
         click.secho(
-            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators})",
+            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators}, replay_protection_type: {job.replay_protection_type})",
             fg=fg,
         )
 

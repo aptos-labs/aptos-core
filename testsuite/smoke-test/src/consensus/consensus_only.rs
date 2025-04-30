@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{smoke_test_environment::new_local_swarm_with_aptos, txn_emitter::generate_traffic};
-use aptos_forge::args::TransactionTypeArg;
+use aptos_forge::{args::TransactionTypeArg, ReplayProtectionType};
 use std::time::Duration;
 
 #[ignore]
@@ -19,9 +19,14 @@ async fn test_consensus_only_with_txn_emitter() {
         Duration::from_secs(10),
         1,
         vec![vec![
-            (TransactionTypeArg::CoinTransfer.materialize_default(), 70),
+            (
+                TransactionTypeArg::CoinTransfer.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
+                70,
+            ),
             (
                 TransactionTypeArg::AccountGeneration.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 20,
             ),
         ]],
