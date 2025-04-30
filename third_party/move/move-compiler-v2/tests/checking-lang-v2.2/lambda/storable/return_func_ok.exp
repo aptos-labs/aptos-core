@@ -7,7 +7,7 @@ error: function resulting from lambda lifting is missing the `store` ability
    │             ^^^^^^^^
    │
    = lambda cannot be reduced to partial application of existing function
-   = expected function type: `|u64|u64 with store`
+   = expected function type: `|u64|u64 has store`
 
 error: function resulting from lambda lifting is missing the `store` ability
    ┌─ tests/checking-lang-v2.2/lambda/storable/return_func_ok.move:44:13
@@ -16,7 +16,7 @@ error: function resulting from lambda lifting is missing the `store` ability
    │             ^^^^^^^^
    │
    = lambda cannot be reduced to partial application of existing function
-   = expected function type: `|u64|u64 with store`
+   = expected function type: `|u64|u64 has store`
 
 error: captured value is missing abilities `store`
    ┌─ tests/checking-lang-v2.2/lambda/storable/return_func_ok.move:52:17
@@ -24,7 +24,7 @@ error: captured value is missing abilities `store`
 52 │             |x| f(x)
    │                 ^
    │
-   = expected function type: `|u64|u64 with store`
+   = expected function type: `|u64|u64 has store`
 
 error: function resulting from lambda lifting is missing the `store` ability
    ┌─ tests/checking-lang-v2.2/lambda/storable/return_func_ok.move:52:13
@@ -33,7 +33,7 @@ error: function resulting from lambda lifting is missing the `store` ability
    │             ^^^^^^^^
    │
    = lambda cannot be reduced to partial application of existing function
-   = expected function type: `|u64|u64 with store`
+   = expected function type: `|u64|u64 has store`
 
 error: function resulting from lambda lifting is missing the `store` ability
    ┌─ tests/checking-lang-v2.2/lambda/storable/return_func_ok.move:55:13
@@ -42,4 +42,4 @@ error: function resulting from lambda lifting is missing the `store` ability
    │             ^^^^^^^^
    │
    = lambda cannot be reduced to partial application of existing function
-   = expected function type: `|u64|u64 with store`
+   = expected function type: `|u64|u64 has store`

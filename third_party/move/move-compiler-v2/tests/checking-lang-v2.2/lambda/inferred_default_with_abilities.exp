@@ -12,4 +12,4 @@ error: function resulting from lambda lifting is missing the `store` ability
    │ ╰─────────^
    │
    = lambda cannot be reduced to partial application of existing function
-   = expected function type: `|()|u64 with store`
+   = expected function type: `||u64 has store`

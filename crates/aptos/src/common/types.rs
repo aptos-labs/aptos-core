@@ -65,6 +65,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
+    cmp::max,
     collections::BTreeMap,
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
@@ -1940,8 +1941,10 @@ impl TransactionOptions {
 
             // Take the gas used and use a headroom factor on it
             let gas_used = simulated_txn.info.gas_used.0;
+            // TODO: remove the hardcoded 530 as it's the minumum gas units required for the transaction that will
+            // automatically create an account for stateless account.
             let adjusted_max_gas =
-                adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
+                adjust_gas_headroom(gas_used, max(simulated_txn.request.max_gas_amount.0, 530));
 
             // Ask if you want to accept the estimate amount
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;

@@ -267,7 +267,6 @@ impl Account {
         let state_value_opt = self.get_account_resource()?;
 
         let account_resource = if let Some(state_value) = &state_value_opt {
-            println!("state_value: {:?}", state_value);
             let account_resource: AccountResource = bcs::from_bytes(state_value)
                 .context("Internal error deserializing response from DB")
                 .map_err(|err| {
@@ -292,7 +291,6 @@ impl Account {
                         &self.latest_ledger_info,
                     )
                 })?;
-            println!("stateless_account_enabled: {}", stateless_account_enabled);
             if stateless_account_enabled {
                 AccountResource::new_stateless(*self.address.inner())
             } else {
