@@ -35,13 +35,13 @@ fun m::test($t0: u64, $t1: bool) {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `a` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_a`), or renaming to `_`
    ┌─ tests/variable-coalescing/cant_copy_propagate.move:11:13
    │
 11 │             a = 99;
    │             ^^^^^^
 
-warning: Unused assignment/binding to `c`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_c`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `c` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_c`), or renaming to `_`
    ┌─ tests/variable-coalescing/cant_copy_propagate.move:13:13
    │
 13 │             c = c + 1;

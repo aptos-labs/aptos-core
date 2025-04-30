@@ -1,14 +1,6 @@
 
 Diagnostics:
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-  ┌─ tests/more-v1/parser/address_almost_too_long_decimal_exp.move:4:13
-  │
-4 │         let x = @115792089237316195423570985008687907853269984665640564039457584007913129639935;
-  │             ^
-
-
-Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/more-v1/parser/address_almost_too_long_decimal_exp.move:4:17
   │
 4 │         let x = @115792089237316195423570985008687907853269984665640564039457584007913129639935;

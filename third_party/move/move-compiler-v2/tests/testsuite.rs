@@ -593,7 +593,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "compiler-message-format-json",
             runner: |p| run_test(p, get_config_by_name("compiler-message-format-json")),
             include: vec!["/compiler-message-format-json/"],
-            stop_after: StopAfter::FirstAstPipeline,
+            stop_after: StopAfter::SecondAstPipeline,
             ..config().exp(Experiment::MESSAGE_FORMAT_JSON)
         },
     ];

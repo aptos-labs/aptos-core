@@ -421,6 +421,17 @@ impl<'env> FunctionTarget<'env> {
         result
     }
 
+    /// Get the set of temporaries mentioned in inline spec blocks.
+    pub fn get_temps_used_in_spec_blocks(&self) -> BTreeSet<TempIndex> {
+        let mut result = BTreeSet::new();
+        for bc in self.get_bytecode() {
+            if let Bytecode::SpecBlock(_, spec) = bc {
+                result.append(&mut spec.used_temporaries());
+            }
+        }
+        result
+    }
+
     /// Returns all the mentioned locals (in non-spec-only bytecode instructions).
     pub fn get_mentioned_locals(&self) -> BTreeSet<TempIndex> {
         let mut res = BTreeSet::new();

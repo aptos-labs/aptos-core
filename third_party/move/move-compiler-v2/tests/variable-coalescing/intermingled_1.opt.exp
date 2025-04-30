@@ -22,7 +22,7 @@ fun m::test(): u64 {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `t`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_t`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `t` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_t`), or renaming to `_`
   ┌─ tests/variable-coalescing/intermingled_1.move:5:9
   │
 5 │         t = t + u;
