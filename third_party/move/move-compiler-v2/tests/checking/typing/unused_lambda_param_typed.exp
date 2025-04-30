@@ -6,37 +6,67 @@ warning: Unused anonymous function parameter `x`. Consider removing or prefixing
 7 │         test(0, |x: u64| 1);
   │                  ^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     private inline fun test(p: u64,f: |u64|u64): u64 {
         (f)(p)
     }
     private fun unused_lambda() {
-        1;
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
         Tuple()
     }
     private fun unused_lambda_suppressed1() {
-        1;
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_x: u64): (u64) = Tuple(p);
+            1
+          }
+        };
         Tuple()
     }
     private fun unused_lambda_suppressed2() {
-        1;
+        {
+          let (p: u64): (u64) = Tuple(0);
+          {
+            let (_: u64): (u64) = Tuple(p);
+            1
+          }
+        };
         Tuple()
     }
 } // end 0xc0ffee::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     inline fun test(p: u64, f: |u64|u64): u64 {
         f(p)
     }
     fun unused_lambda() {
-        1;
+        {
+            let (p) = (0);
+            let (x) = (p);
+            1
+        };
     }
     fun unused_lambda_suppressed1() {
-        1;
+        {
+            let (p) = (0);
+            let (_x) = (p);
+            1
+        };
     }
     fun unused_lambda_suppressed2() {
-        1;
+        {
+            let (p) = (0);
+            let (_) = (p);
+            1
+        };
     }
 }

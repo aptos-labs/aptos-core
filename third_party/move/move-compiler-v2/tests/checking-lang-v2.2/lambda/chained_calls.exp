@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x66::test {
     private fun add_some(x: u64): |u64|u64 {
         closure#1test::__lambda__1__add_some(x)
@@ -11,7 +11,7 @@ module 0x66::test {
     }
 } // end 0x66::test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x66::test {
     fun add_some(x: u64): |u64|u64 {
         |arg0| __lambda__1__add_some(x, arg0)

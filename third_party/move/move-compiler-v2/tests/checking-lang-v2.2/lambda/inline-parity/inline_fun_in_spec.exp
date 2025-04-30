@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     spec {
       invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::$exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>({
@@ -55,7 +55,7 @@ module 0x42::m {
     }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     struct S has copy, drop, key {
         f: u64,

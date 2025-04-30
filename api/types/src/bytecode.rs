@@ -103,9 +103,17 @@ pub trait Bytecode {
                 mutable: true,
                 to: Box::new(self.new_move_type(t.borrow())),
             },
-            SignatureToken::Function(..) => {
-                // TODO
-                unimplemented!("signature token function to API MoveType")
+            SignatureToken::Function(args, result, abilities) => {
+                let new_vec = |toks: &[SignatureToken]| {
+                    toks.iter()
+                        .map(|t| self.new_move_type(t))
+                        .collect::<Vec<_>>()
+                };
+                MoveType::Function {
+                    args: new_vec(args),
+                    results: new_vec(result),
+                    abilities: *abilities,
+                }
             },
         }
     }

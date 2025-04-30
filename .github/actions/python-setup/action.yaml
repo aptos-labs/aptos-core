@@ -8,6 +8,10 @@ inputs:
   pyproject_directory:
     description: "Optional path to a poetry project"
     required: false
+  poetry_version:
+    description: "Poetry package manager version"
+    required: false
+    default: 1.2.2
 
 runs:
   using: composite
@@ -18,9 +22,9 @@ runs:
         python-version: 3.10.12
 
     # Install Poetry.
-    - uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d # pin@v1.3.3
+    - uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # pin@v1.4.1
       with:
-        version: 1.2.2
+        version: ${{ inputs.poetry_version }}
 
     - name: Install poetry project
       if: inputs.pyproject_directory != ''
