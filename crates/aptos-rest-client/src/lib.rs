@@ -1957,10 +1957,17 @@ fn parse_state_optional(response: &reqwest::Response) -> Option<State> {
 async fn parse_error(response: reqwest::Response) -> RestError {
     let status_code = response.status();
     let maybe_state = parse_state_optional(&response);
-    match response.json::<AptosError>().await {
-        Ok(error) => (error, maybe_state, status_code).into(),
-        Err(e) => RestError::Http(status_code, e),
-    }
+    response
+        .bytes()
+        .await
+        .map(|bytes| match serde_json::from_slice(&bytes) {
+            Ok(error_json) => (error_json, maybe_state, status_code).into(),
+            Err(json_parse_error) => match std::str::from_utf8(&bytes) {
+                Ok(error_text) => RestError::Unknown(anyhow!(error_text.to_string())),
+                Err(_utf8_error) => RestError::Json(json_parse_error),
+            },
+        })
+        .unwrap_or_else(|reqwest_error| RestError::Http(status_code, reqwest_error))
 }
 
 pub struct GasEstimationParams {
