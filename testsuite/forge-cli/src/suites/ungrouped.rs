@@ -23,7 +23,8 @@ use aptos_forge::{
         SystemMetricsThreshold,
     },
     AdminContext, AdminTest, AptosContext, AptosTest, EmitJobMode, EmitJobRequest, ForgeConfig,
-    NetworkContext, NetworkContextSynchronizer, NetworkTest, Test, WorkflowProgress,
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, ReplayProtectionType, Test,
+    WorkflowProgress,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -191,6 +192,7 @@ fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
     mempool_config.capacity_per_user = 100_000;
+    mempool_config.orderless_txn_capacity_per_user = 100_000;
     mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
     mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
 }
@@ -481,19 +483,27 @@ pub fn mixed_emit_job() -> EmitJobRequest {
             // For other transactions, make more expensive transactions somewhat rarer.
             (
                 TransactionTypeArg::AccountGeneration.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
             (
                 TransactionTypeArg::CoinTransfer.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
-            (TransactionTypeArg::PublishPackage.materialize_default(), 3),
+            (
+                TransactionTypeArg::PublishPackage.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
+                3,
+            ),
             (
                 TransactionTypeArg::Batch100Transfer.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 100,
             ),
             (
                 TransactionTypeArg::VectorPicture30k.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 100,
             ),
             (
@@ -502,42 +512,52 @@ pub fn mixed_emit_job() -> EmitJobRequest {
                     true,
                     WorkflowProgress::when_done_default(),
                 ),
+                ReplayProtectionType::SequenceNumber,
                 100,
             ),
             (
                 TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
             (
                 TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::TokenV1NFTMintAndTransferSequential.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 1000,
             ),
             (
                 TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
         ])
@@ -555,19 +575,27 @@ pub fn mixed_compatible_emit_job() -> EmitJobRequest {
             // For other transactions, make more expensive transactions somewhat rarer.
             (
                 TransactionTypeArg::AccountGeneration.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
             (
                 TransactionTypeArg::CoinTransfer.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
-            (TransactionTypeArg::PublishPackage.materialize_default(), 3),
+            (
+                TransactionTypeArg::PublishPackage.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
+                3,
+            ),
             (
                 TransactionTypeArg::Batch100Transfer.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 100,
             ),
             (
                 TransactionTypeArg::VectorPicture30k.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 100,
             ),
             (
@@ -576,10 +604,12 @@ pub fn mixed_compatible_emit_job() -> EmitJobRequest {
                     true,
                     WorkflowProgress::when_done_default(),
                 ),
+                ReplayProtectionType::SequenceNumber,
                 100,
             ),
             (
                 TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                ReplayProtectionType::SequenceNumber,
                 10000,
             ),
             // (
@@ -833,9 +863,14 @@ pub fn changing_working_quorum_test_helper(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionTypeArg::CoinTransfer.materialize_default(), 80),
+                    (
+                        TransactionTypeArg::CoinTransfer.materialize_default(),
+                        ReplayProtectionType::SequenceNumber,
+                        80,
+                    ),
                     (
                         TransactionTypeArg::AccountGeneration.materialize_default(),
+                        ReplayProtectionType::SequenceNumber,
                         20,
                     ),
                 ]),

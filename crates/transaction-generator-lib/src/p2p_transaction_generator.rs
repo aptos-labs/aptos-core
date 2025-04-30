@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
+use crate::{ObjectPool, ReplayProtectionType, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -150,6 +150,7 @@ pub struct P2PTransactionGenerator {
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
+    replay_protection: ReplayProtectionType,
 }
 
 impl P2PTransactionGenerator {
@@ -161,6 +162,7 @@ impl P2PTransactionGenerator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampler: Box<dyn Sampler<AccountAddress>>,
+        replay_protection: ReplayProtectionType,
     ) -> Self {
         Self {
             rng,
@@ -170,25 +172,43 @@ impl P2PTransactionGenerator {
             sampler,
             invalid_transaction_ratio,
             use_fa_transfer,
+            replay_protection,
         }
     }
 
     fn gen_single_txn(
-        &self,
+        &mut self,
         from: &LocalAccount,
         to: &AccountAddress,
-        num_coins: u64,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        from.sign_with_transaction_builder(
-            if self.use_fa_transfer {
-                txn_factory.payload(aptos_stdlib::aptos_account_fungible_transfer_only(
-                    *to, num_coins,
-                ))
-            } else {
-                txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
-            },
-        )
+        let payload = if self.use_fa_transfer {
+            match self.replay_protection {
+                ReplayProtectionType::SequenceNumber => {
+                    aptos_stdlib::aptos_account_fungible_transfer_only(*to, self.send_amount)
+                },
+                ReplayProtectionType::Nonce => {
+                    aptos_stdlib::aptos_account_fungible_transfer_only_v2(
+                        *to,
+                        self.send_amount,
+                        Some(self.rng.gen()),
+                    )
+                },
+            }
+        } else {
+            match self.replay_protection {
+                ReplayProtectionType::SequenceNumber => {
+                    aptos_stdlib::aptos_coin_transfer(*to, self.send_amount)
+                },
+                ReplayProtectionType::Nonce => aptos_stdlib::aptos_coin_transfer_v2(
+                    *to,
+                    self.send_amount,
+                    Some(self.rng.gen()),
+                ),
+            }
+        };
+
+        from.sign_with_transaction_builder(txn_factory.payload(payload))
     }
 
     fn generate_invalid_transaction(
@@ -203,26 +223,22 @@ impl P2PTransactionGenerator {
         match Standard.sample(rng) {
             InvalidTransactionType::ChainId => {
                 let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                self.gen_single_txn(sender, receiver, self.send_amount, txn_factory)
+                self.gen_single_txn(sender, receiver, txn_factory)
             },
-            InvalidTransactionType::Sender => self.gen_single_txn(
-                &invalid_account,
-                receiver,
-                self.send_amount,
-                &self.txn_factory,
-            ),
-            InvalidTransactionType::Receiver => self.gen_single_txn(
-                sender,
-                &invalid_address,
-                self.send_amount,
-                &self.txn_factory,
-            ),
+            InvalidTransactionType::Sender => {
+                let txn_factory = &self.txn_factory.clone();
+                self.gen_single_txn(&invalid_account, receiver, txn_factory)
+            },
+            InvalidTransactionType::Receiver => {
+                let txn_factory = &self.txn_factory.clone();
+                self.gen_single_txn(sender, &invalid_address, txn_factory)
+            },
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
                 // otherwise, make a duplication of an exist valid tx
                 if reqs.is_empty() {
                     let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                    self.gen_single_txn(sender, receiver, self.send_amount, txn_factory)
+                    self.gen_single_txn(sender, receiver, txn_factory)
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
                     reqs[random_index].clone()
@@ -286,7 +302,8 @@ impl TransactionGenerator for P2PTransactionGenerator {
             let receiver = receivers.get(i).expect("all_addresses can't be empty");
             let request = if num_valid_tx > 0 {
                 num_valid_tx -= 1;
-                self.gen_single_txn(account, receiver, self.send_amount, &self.txn_factory)
+                let txn_factory = &self.txn_factory.clone();
+                self.gen_single_txn(account, receiver, txn_factory)
             } else {
                 self.generate_invalid_transaction(
                     &mut self.rng.clone(),
@@ -308,6 +325,7 @@ pub struct P2PTransactionGeneratorCreator {
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
     sampling_mode: SamplingMode,
+    replay_protection: ReplayProtectionType,
 }
 
 impl P2PTransactionGeneratorCreator {
@@ -318,6 +336,7 @@ impl P2PTransactionGeneratorCreator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampling_mode: SamplingMode,
+        replay_protection: ReplayProtectionType,
     ) -> Self {
         let mut rng = StdRng::from_entropy();
         all_addresses.shuffle(&mut rng);
@@ -329,6 +348,7 @@ impl P2PTransactionGeneratorCreator {
             invalid_transaction_ratio,
             use_fa_transfer,
             sampling_mode,
+            replay_protection,
         }
     }
 }
@@ -350,6 +370,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.invalid_transaction_ratio,
             self.use_fa_transfer,
             sampler,
+            self.replay_protection,
         ))
     }
 }

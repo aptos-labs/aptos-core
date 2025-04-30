@@ -47,6 +47,10 @@ on:
         required: false
         type: boolean
         description: Retain debug logs for all nodes
+      FORGE_REPLAY_PROTECTION_TYPE:
+        required: false
+        type: string
+        description: The type of replay protection to use for the forge test. Either "sequence_number" or "nonce".
 
 permissions:
   contents: read
@@ -70,6 +74,7 @@ jobs:
           echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
           echo "FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}"
           echo "FORGE_INDEXER_DEPLOYER_PROFILE: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}"
+          echo "FORGE_REPLAY_PROTECTION_TYPE: ${{ inputs.FORGE_REPLAY_PROTECTION_TYPE }}"
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
@@ -81,8 +86,9 @@ jobs:
       forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
       forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
       forgeIndexerDeployerProfile: ${{ inputs.FORGE_INDEXER_DEPLOYER_PROFILE }}
+      forgeReplayProtectionType: ${{ inputs.FORGE_REPLAY_PROTECTION_TYPE }}
   adhoc-forge-test:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     needs: [determine-forge-run-metadata]
     secrets: inherit
     with:
@@ -98,3 +104,4 @@ jobs:
       # Indexer outputs are derived from a single one, to avoid using too many inputs for this workflow_dispatch trigger
       FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile != '' }}
       FORGE_DEPLOYER_PROFILE: ${{ needs.determine-forge-run-metadata.outputs.forgeIndexerDeployerProfile }}
+      FORGE_REPLAY_PROTECTION_TYPE: ${{ needs.determine-forge-run-metadata.outputs.forgeReplayProtectionType }}

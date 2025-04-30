@@ -4,7 +4,7 @@
 
 use super::ungrouped::mixed_compatible_emit_job;
 use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
-use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
+use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig, ReplayProtectionType};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
 };
@@ -18,7 +18,7 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            realistic_env_max_load_test(duration, test_cmd, 7, 5, ReplayProtectionType::SequenceNumber)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
