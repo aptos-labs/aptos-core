@@ -137,6 +137,16 @@ impl MoveHarness {
         }
     }
 
+    pub fn new_with_lazy_loading(enable_lazy_loading: bool) -> Self {
+        let mut h = MoveHarness::new();
+        if enable_lazy_loading {
+            h.enable_features(vec![FeatureFlag::ENABLE_LAZY_LOADING], vec![]);
+        } else {
+            h.enable_features(vec![], vec![FeatureFlag::ENABLE_LAZY_LOADING]);
+        }
+        h
+    }
+
     /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
     /// transaction id, with support for a custom API key to access node APIs.
     ///
@@ -883,17 +893,7 @@ impl MoveHarness {
 
     /// Enables features
     pub fn enable_features(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
-        let acc = self.aptos_framework_account();
-        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
-        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
-        self.executor
-            .exec("features", "change_feature_flags_internal", vec![], vec![
-                MoveValue::Signer(*acc.address())
-                    .simple_serialize()
-                    .unwrap(),
-                bcs::to_bytes(&enabled).unwrap(),
-                bcs::to_bytes(&disabled).unwrap(),
-            ]);
+        self.executor.enable_features(enabled, disabled)
     }
 
     fn override_one_gas_param(&mut self, param: &str, param_value: u64) {

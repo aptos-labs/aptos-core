@@ -1,0 +1,10 @@
+processed 6 tasks
+
+task 5 'run'. lines 48-48:
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x44::C,
+    indices: [],
+    offsets: [],
+}
