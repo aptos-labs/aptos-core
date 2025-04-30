@@ -703,8 +703,6 @@ struct InlinedRewriter<'env, 'rewriter> {
     sym_param_map: BTreeMap<Symbol, usize>,
     /// Whether to rewrite invoke for spec
     rewrite_invoke_for_spec: bool,
-    /// Return all lambda parameters that are used as temps
-    lambda_used_as_temp: BTreeSet<Symbol>,
 }
 
 impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
@@ -783,7 +781,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             function_value_spec_map,
             sym_param_map,
             rewrite_invoke_for_spec,
-            lambda_used_as_temp: BTreeSet::new(),
         }
     }
 
@@ -837,7 +834,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
         let (regular_params, regular_actuals): (Vec<(usize, &Parameter)>, Vec<&Exp>) =
             regular_args_matched.into_iter().unzip();
-        let mut regular_params = regular_params
+        let regular_params = regular_params
             .into_iter()
             .map(|(_, para)| para)
             .collect_vec();
@@ -852,7 +849,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .collect();
 
         // While we're looking at the lambdas, check for Return in their bodies.
-        for (_, lambda_body) in lambda_args_matched.iter() {
+        for (_, lambda_body) in lambda_args_matched {
             Self::check_for_return_break_continue_in_lambda(env, lambda_body);
         }
 
@@ -887,26 +884,18 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
         // For now, just copy the actuals.  If FreezeRef is needed, we'll do it in
         // construct_inlined_call_expression.
-        let mut rewritten_actuals: Vec<Exp> = regular_actuals.into_iter().cloned().collect();
+        let rewritten_actuals: Vec<Exp> = regular_actuals.into_iter().cloned().collect();
+
+        // Turn list of parameters into a pattern.  Also rewrite types as needed.
+        // Shadow param vars as if we are in a let.
+        let params_pattern =
+            rewriter.parameter_list_to_pattern(env, func_loc, &call_site_loc, regular_params);
 
         // Enter the scope defined by the params.
         rewriter.shadowing_enter_scope(regular_params_overlapping_free_vars);
 
         // Rewrite body types, shadowed vars, replace invoked lambda params, etc.
         let rewritten_body = rewriter.rewrite_exp(body.clone());
-
-        // For each lambda parameter, if it is also used as a temp in the body of inline function,
-        // add it to the list of regular parameters and actuals.
-        for ((_, param), exp) in lambda_args_matched {
-            if rewriter.lambda_used_as_temp.contains(&param.0) {
-                regular_params.push(param);
-                rewritten_actuals.push(exp.clone());
-            }
-        }
-        // Turn list of parameters into a pattern.  Also rewrite types as needed.
-        // Shadow param vars as if we are in a let.
-        let params_pattern =
-            rewriter.parameter_list_to_pattern(env, func_loc, &call_site_loc, regular_params);
 
         InlinedRewriter::construct_inlined_call_expression(
             env,
@@ -1270,8 +1259,13 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
             if self.lambda_param_map.contains_key(&sym) {
-                // lambda parameter `sym` is used as a tempapart from a call
-                self.lambda_used_as_temp.insert(sym);
+                // lambda parameter `sym` is used as a temp apart from a call
+                // which is currently not supported
+                let msg = format!("parameter `{}` with function type cannot be used as a local variable in an inline function",
+                   sym.display(self.env.symbol_pool()));
+                let call_details = vec![(loc.clone(), "being used here".to_string())];
+                self.env
+                    .diag_with_labels(Severity::Error, &param.2, &msg, call_details);
             }
             let param_type = &param.1;
             let instantiated_param_type = param_type.instantiate(self.type_args);

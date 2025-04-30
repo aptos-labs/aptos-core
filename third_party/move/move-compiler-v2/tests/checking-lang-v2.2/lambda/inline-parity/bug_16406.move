@@ -1,4 +1,3 @@
-//# publish
 module 0xc0ffee::m {
 
     inline fun id(f: ||u64 has copy+drop): ||u64 {
@@ -39,11 +38,3 @@ module 0xc0ffee::m {
         id_4(||1, 2, ||3)()
     }
 }
-
-//# run 0xc0ffee::m::test
-
-//# run 0xc0ffee::m::test_2
-
-//# run 0xc0ffee::m::test_3
-
-//# run 0xc0ffee::m::test_4
