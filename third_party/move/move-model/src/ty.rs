@@ -3511,13 +3511,19 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
-                write!(f, "{}", a.display(self.context))?;
+                if !a.is_unit() {
+                    write!(f, "{}", a.display(self.context))?;
+                }
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))?;
+                    if t.is_function() {
+                        write!(f, "({})", t.display(self.context))?;
+                    } else {
+                        write!(f, "{}", t.display(self.context))?;
+                    }
                 }
                 if !abilities.is_empty() {
-                    write!(f, " with {}", abilities)
+                    write!(f, " has {}", abilities)
                 } else {
                     Ok(())
                 }

@@ -1,31 +1,31 @@
 // -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     struct Bug16195 {
-        0: |()||()|u64 with copy + drop,
+        0: ||(||u64) has copy + drop,
     }
     struct Bug16195_variant1 {
-        0: |()||()|u64 with copy + drop,
+        0: ||(||u64) has copy + drop,
     }
     struct Bug16195_variant2 {
-        0: |()||()||()||()||()|u64 with copy + drop,
+        0: ||(||(||(||(||u64)))) has copy + drop,
     }
     struct Bug16195_variant3 {
-        0: ||()|||()|u64 with copy + drop,
+        0: ||||(||u64) has copy + drop,
     }
     struct Bug16195_variant4 {
-        0: ||()|||()|u64 with copy + drop,
+        0: ||||(||u64) has copy + drop,
     }
     struct Bug16195_variant5 {
-        0: |()||()|bool with copy + drop,
+        0: ||(||bool) has copy + drop,
     }
     struct Bug16195_variant6 {
-        0: |()||()||()||()||()|bool with copy + drop,
+        0: ||(||(||(||(||bool)))) has copy + drop,
     }
     struct Bug16195_variant7 {
-        0: |()||bool|bool with copy + drop,
+        0: ||(|bool|bool) has copy + drop,
     }
     struct Bug16195_variant8 {
-        0: |bool||()|bool with copy + drop,
+        0: |bool|(||bool) has copy + drop,
     }
     public fun test_bug16195(): u64 {
         {
@@ -83,7 +83,7 @@ module 0xc0ffee::m {
     }
     public fun test_bug16195_variant3(): u64 {
         {
-          let _arg: |()| = closure#0m::__lambda__1__test_bug16195_variant3();
+          let _arg: || = closure#0m::__lambda__1__test_bug16195_variant3();
           {
             let f: Bug16195_variant3 = pack m::Bug16195_variant3(closure#0m::__lambda__3__test_bug16195_variant3());
             ((f)(_arg))()
@@ -92,7 +92,7 @@ module 0xc0ffee::m {
     }
     public fun test_bug16195_variant4(): u64 {
         {
-          let _arg: |()| = closure#0m::__lambda__1__test_bug16195_variant4();
+          let _arg: || = closure#0m::__lambda__1__test_bug16195_variant4();
           {
             let f: Bug16195_variant4 = pack m::Bug16195_variant4(closure#0m::__lambda__3__test_bug16195_variant4());
             ((f)(_arg))()
@@ -108,49 +108,49 @@ module 0xc0ffee::m {
     private fun __lambda__1__test_bug16195(): u64 {
         42
     }
-    private fun __lambda__2__test_bug16195(): |()|u64 {
+    private fun __lambda__2__test_bug16195(): ||u64 {
         closure#0m::__lambda__1__test_bug16195()
     }
     private fun __lambda__1__test_bug16195_OR_mix1(): bool {
         true
     }
-    private fun __lambda__2__test_bug16195_OR_mix1(): |()|bool {
+    private fun __lambda__2__test_bug16195_OR_mix1(): ||bool {
         closure#0m::__lambda__1__test_bug16195_OR_mix1()
     }
     private fun __lambda__1__test_bug16195_OR_mix2(): bool {
         true
     }
-    private fun __lambda__2__test_bug16195_OR_mix2(): |()|bool {
+    private fun __lambda__2__test_bug16195_OR_mix2(): ||bool {
         closure#0m::__lambda__1__test_bug16195_OR_mix2()
     }
     private fun __lambda__1__test_bug16195_OR_mix3(): bool {
         true
     }
-    private fun __lambda__2__test_bug16195_OR_mix3(): |()|bool {
+    private fun __lambda__2__test_bug16195_OR_mix3(): ||bool {
         closure#0m::__lambda__1__test_bug16195_OR_mix3()
     }
-    private fun __lambda__3__test_bug16195_OR_mix3(): |()||()|bool {
+    private fun __lambda__3__test_bug16195_OR_mix3(): ||(||bool) {
         closure#0m::__lambda__2__test_bug16195_OR_mix3()
     }
-    private fun __lambda__4__test_bug16195_OR_mix3(): |()||()||()|bool {
+    private fun __lambda__4__test_bug16195_OR_mix3(): ||(||(||bool)) {
         closure#0m::__lambda__3__test_bug16195_OR_mix3()
     }
-    private fun __lambda__5__test_bug16195_OR_mix3(): |()||()||()||()|bool {
+    private fun __lambda__5__test_bug16195_OR_mix3(): ||(||(||(||bool))) {
         closure#0m::__lambda__4__test_bug16195_OR_mix3()
     }
     private fun __lambda__1__test_bug16195_OR_mix4(): bool {
         true
     }
-    private fun __lambda__2__test_bug16195_OR_mix4(): |()|bool {
+    private fun __lambda__2__test_bug16195_OR_mix4(): ||bool {
         closure#0m::__lambda__1__test_bug16195_OR_mix4()
     }
-    private fun __lambda__3__test_bug16195_OR_mix4(): |()||()|bool {
+    private fun __lambda__3__test_bug16195_OR_mix4(): ||(||bool) {
         closure#0m::__lambda__2__test_bug16195_OR_mix4()
     }
-    private fun __lambda__4__test_bug16195_OR_mix4(): |()||()||()|bool {
+    private fun __lambda__4__test_bug16195_OR_mix4(): ||(||(||bool)) {
         closure#0m::__lambda__3__test_bug16195_OR_mix4()
     }
-    private fun __lambda__5__test_bug16195_OR_mix4(): |()||()||()||()|bool {
+    private fun __lambda__5__test_bug16195_OR_mix4(): ||(||(||(||bool))) {
         closure#0m::__lambda__4__test_bug16195_OR_mix4()
     }
     private fun __lambda__1__test_bug16195_OR_mix5(a: bool,x: bool): bool {
@@ -162,28 +162,28 @@ module 0xc0ffee::m {
     private fun __lambda__1__test_bug16195_OR_mix6(x: bool): bool {
         Or(x, true)
     }
-    private fun __lambda__2__test_bug16195_OR_mix6(x: bool): |()|bool {
+    private fun __lambda__2__test_bug16195_OR_mix6(x: bool): ||bool {
         closure#1m::__lambda__1__test_bug16195_OR_mix6(x)
     }
     private fun __lambda__1__test_bug16195_variant1(): u64 {
         42
     }
-    private fun __lambda__2__test_bug16195_variant1(): |()|u64 {
+    private fun __lambda__2__test_bug16195_variant1(): ||u64 {
         closure#0m::__lambda__1__test_bug16195_variant1()
     }
     private fun __lambda__1__test_bug16195_variant2(): u64 {
         42
     }
-    private fun __lambda__2__test_bug16195_variant2(): |()|u64 {
+    private fun __lambda__2__test_bug16195_variant2(): ||u64 {
         closure#0m::__lambda__1__test_bug16195_variant2()
     }
-    private fun __lambda__3__test_bug16195_variant2(): |()||()|u64 {
+    private fun __lambda__3__test_bug16195_variant2(): ||(||u64) {
         closure#0m::__lambda__2__test_bug16195_variant2()
     }
-    private fun __lambda__4__test_bug16195_variant2(): |()||()||()|u64 {
+    private fun __lambda__4__test_bug16195_variant2(): ||(||(||u64)) {
         closure#0m::__lambda__3__test_bug16195_variant2()
     }
-    private fun __lambda__5__test_bug16195_variant2(): |()||()||()||()|u64 {
+    private fun __lambda__5__test_bug16195_variant2(): ||(||(||(||u64))) {
         closure#0m::__lambda__4__test_bug16195_variant2()
     }
     private fun __lambda__1__test_bug16195_variant3() {
@@ -192,7 +192,7 @@ module 0xc0ffee::m {
     private fun __lambda__2__test_bug16195_variant3(): u64 {
         42
     }
-    private fun __lambda__3__test_bug16195_variant3(_arg: |()|): |()|u64 {
+    private fun __lambda__3__test_bug16195_variant3(_arg: ||): ||u64 {
         closure#0m::__lambda__2__test_bug16195_variant3()
     }
     private fun __lambda__1__test_bug16195_variant4() {
@@ -201,7 +201,7 @@ module 0xc0ffee::m {
     private fun __lambda__2__test_bug16195_variant4(): u64 {
         42
     }
-    private fun __lambda__3__test_bug16195_variant4(_arg: |()|): |()|u64 {
+    private fun __lambda__3__test_bug16195_variant4(_arg: ||): ||u64 {
         closure#0m::__lambda__2__test_bug16195_variant4()
     }
 } // end 0xc0ffee::m
@@ -209,31 +209,31 @@ module 0xc0ffee::m {
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     struct Bug16195 has copy, drop {
-        0: |()||()|u64 with copy + drop,
+        0: ||(||u64) has copy + drop,
     }
     struct Bug16195_variant1 has copy, drop {
-        0: |()||()|u64 with copy + drop,
+        0: ||(||u64) has copy + drop,
     }
     struct Bug16195_variant2 has copy, drop {
-        0: |()||()||()||()||()|u64 with copy + drop,
+        0: ||(||(||(||(||u64)))) has copy + drop,
     }
     struct Bug16195_variant3 has copy, drop {
-        0: ||()|||()|u64 with copy + drop,
+        0: ||||(||u64) has copy + drop,
     }
     struct Bug16195_variant4 has copy, drop {
-        0: ||()|||()|u64 with copy + drop,
+        0: ||||(||u64) has copy + drop,
     }
     struct Bug16195_variant5 has copy, drop {
-        0: |()||()|bool with copy + drop,
+        0: ||(||bool) has copy + drop,
     }
     struct Bug16195_variant6 has copy, drop {
-        0: |()||()||()||()||()|bool with copy + drop,
+        0: ||(||(||(||(||bool)))) has copy + drop,
     }
     struct Bug16195_variant7 has copy, drop {
-        0: |()||bool|bool with copy + drop,
+        0: ||(|bool|bool) has copy + drop,
     }
     struct Bug16195_variant8 has copy, drop {
-        0: |bool||()|bool with copy + drop,
+        0: |bool|(||bool) has copy + drop,
     }
     public fun test_bug16195(): u64 {
         let f = Bug16195(|()| __lambda__2__test_bug16195());
@@ -290,49 +290,49 @@ module 0xc0ffee::m {
     fun __lambda__1__test_bug16195(): u64 {
         42
     }
-    fun __lambda__2__test_bug16195(): |()|u64 {
+    fun __lambda__2__test_bug16195(): ||u64 {
         |()| __lambda__1__test_bug16195()
     }
     fun __lambda__1__test_bug16195_OR_mix1(): bool {
         true
     }
-    fun __lambda__2__test_bug16195_OR_mix1(): |()|bool {
+    fun __lambda__2__test_bug16195_OR_mix1(): ||bool {
         |()| __lambda__1__test_bug16195_OR_mix1()
     }
     fun __lambda__1__test_bug16195_OR_mix2(): bool {
         true
     }
-    fun __lambda__2__test_bug16195_OR_mix2(): |()|bool {
+    fun __lambda__2__test_bug16195_OR_mix2(): ||bool {
         |()| __lambda__1__test_bug16195_OR_mix2()
     }
     fun __lambda__1__test_bug16195_OR_mix3(): bool {
         true
     }
-    fun __lambda__2__test_bug16195_OR_mix3(): |()|bool {
+    fun __lambda__2__test_bug16195_OR_mix3(): ||bool {
         |()| __lambda__1__test_bug16195_OR_mix3()
     }
-    fun __lambda__3__test_bug16195_OR_mix3(): |()||()|bool {
+    fun __lambda__3__test_bug16195_OR_mix3(): ||(||bool) {
         |()| __lambda__2__test_bug16195_OR_mix3()
     }
-    fun __lambda__4__test_bug16195_OR_mix3(): |()||()||()|bool {
+    fun __lambda__4__test_bug16195_OR_mix3(): ||(||(||bool)) {
         |()| __lambda__3__test_bug16195_OR_mix3()
     }
-    fun __lambda__5__test_bug16195_OR_mix3(): |()||()||()||()|bool {
+    fun __lambda__5__test_bug16195_OR_mix3(): ||(||(||(||bool))) {
         |()| __lambda__4__test_bug16195_OR_mix3()
     }
     fun __lambda__1__test_bug16195_OR_mix4(): bool {
         true
     }
-    fun __lambda__2__test_bug16195_OR_mix4(): |()|bool {
+    fun __lambda__2__test_bug16195_OR_mix4(): ||bool {
         |()| __lambda__1__test_bug16195_OR_mix4()
     }
-    fun __lambda__3__test_bug16195_OR_mix4(): |()||()|bool {
+    fun __lambda__3__test_bug16195_OR_mix4(): ||(||bool) {
         |()| __lambda__2__test_bug16195_OR_mix4()
     }
-    fun __lambda__4__test_bug16195_OR_mix4(): |()||()||()|bool {
+    fun __lambda__4__test_bug16195_OR_mix4(): ||(||(||bool)) {
         |()| __lambda__3__test_bug16195_OR_mix4()
     }
-    fun __lambda__5__test_bug16195_OR_mix4(): |()||()||()||()|bool {
+    fun __lambda__5__test_bug16195_OR_mix4(): ||(||(||(||bool))) {
         |()| __lambda__4__test_bug16195_OR_mix4()
     }
     fun __lambda__1__test_bug16195_OR_mix5(a: bool, x: bool): bool {
@@ -344,28 +344,28 @@ module 0xc0ffee::m {
     fun __lambda__1__test_bug16195_OR_mix6(x: bool): bool {
         x || true
     }
-    fun __lambda__2__test_bug16195_OR_mix6(x: bool): |()|bool {
+    fun __lambda__2__test_bug16195_OR_mix6(x: bool): ||bool {
         |()| __lambda__1__test_bug16195_OR_mix6(x)
     }
     fun __lambda__1__test_bug16195_variant1(): u64 {
         42
     }
-    fun __lambda__2__test_bug16195_variant1(): |()|u64 {
+    fun __lambda__2__test_bug16195_variant1(): ||u64 {
         |()| __lambda__1__test_bug16195_variant1()
     }
     fun __lambda__1__test_bug16195_variant2(): u64 {
         42
     }
-    fun __lambda__2__test_bug16195_variant2(): |()|u64 {
+    fun __lambda__2__test_bug16195_variant2(): ||u64 {
         |()| __lambda__1__test_bug16195_variant2()
     }
-    fun __lambda__3__test_bug16195_variant2(): |()||()|u64 {
+    fun __lambda__3__test_bug16195_variant2(): ||(||u64) {
         |()| __lambda__2__test_bug16195_variant2()
     }
-    fun __lambda__4__test_bug16195_variant2(): |()||()||()|u64 {
+    fun __lambda__4__test_bug16195_variant2(): ||(||(||u64)) {
         |()| __lambda__3__test_bug16195_variant2()
     }
-    fun __lambda__5__test_bug16195_variant2(): |()||()||()||()|u64 {
+    fun __lambda__5__test_bug16195_variant2(): ||(||(||(||u64))) {
         |()| __lambda__4__test_bug16195_variant2()
     }
     fun __lambda__1__test_bug16195_variant3() {
@@ -373,7 +373,7 @@ module 0xc0ffee::m {
     fun __lambda__2__test_bug16195_variant3(): u64 {
         42
     }
-    fun __lambda__3__test_bug16195_variant3(_arg: |()|): |()|u64 {
+    fun __lambda__3__test_bug16195_variant3(_arg: ||): ||u64 {
         |()| __lambda__2__test_bug16195_variant3()
     }
     fun __lambda__1__test_bug16195_variant4() {
@@ -381,7 +381,7 @@ module 0xc0ffee::m {
     fun __lambda__2__test_bug16195_variant4(): u64 {
         42
     }
-    fun __lambda__3__test_bug16195_variant4(_arg: |()|): |()|u64 {
+    fun __lambda__3__test_bug16195_variant4(_arg: ||): ||u64 {
         |()| __lambda__2__test_bug16195_variant4()
     }
 }

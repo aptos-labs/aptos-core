@@ -25,7 +25,7 @@ module 0xc0ffee::m {
         break;
         Tuple()
     }
-    private fun brk2(f: |()|) {
+    private fun brk2(f: ||) {
         (f)();
         Tuple()
     }
@@ -118,7 +118,7 @@ module 0xc0ffee::m {
     fun brk() {
         break;
     }
-    fun brk2(f: |()|) {
+    fun brk2(f: ||) {
         f();
     }
     fun brk3() {
