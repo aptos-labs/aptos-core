@@ -1,0 +1,25 @@
+//# publish --verbose
+module 0x66::a
+public fun a()
+    ret
+
+
+//# publish --verbose
+module 0x66::b
+public fun b()
+    call 0x66::a::a
+    ret
+
+
+//# publish --verbose
+module 0x66::c
+public fun c()
+    call 0x66::b::b
+    ret
+
+
+//# publish --verbose
+module 0x66::a
+public fun a()
+    call 0x66::c::c
+    ret
