@@ -1,0 +1,10 @@
+processed 5 tasks
+
+task 4 'run'. lines 34-34:
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
