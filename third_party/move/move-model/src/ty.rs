@@ -3208,9 +3208,28 @@ impl TypeUnificationError {
                         main_msg
                     },
                     Constraint::SomeReceiverFunction(name, ..) => {
+                        let name_display =
+                            name.display(display_context.env.symbol_pool()).to_string();
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            let sid = &mid.qualified_inst(*sid, inst.clone());
+                            let (field_decls, _) =
+                                unification_context.get_struct_field_decls(sid, *name);
+                            let field_is_function = !field_decls.is_empty()
+                                && field_decls
+                                    .iter()
+                                    .all(|(_, field_type)| field_type.is_function());
+                            if field_is_function {
+                                let hint = format!(
+                                    "if you intend to call the closure stored in field `{}`, \
+                                    surround the entire field access with parenthesis `()`",
+                                    name_display
+                                );
+                                hints.push(hint);
+                            }
+                        }
                         format!(
                             "undeclared receiver function `{}` for type `{}`",
-                            name.display(display_context.env.symbol_pool()),
+                            name_display,
                             ty.display(display_context)
                         )
                     },
