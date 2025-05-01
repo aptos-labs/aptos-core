@@ -1,6 +1,9 @@
 module aptos_framework::system_addresses {
     use std::error;
     use std::signer;
+    use std::features::get_decommission_core_resources_enabled;
+    #[test_only]
+    use std::features::change_feature_flags_for_testing;
 
     /// The address/account did not correspond to the core resource address
     const ENOT_CORE_RESOURCE_ADDRESS: u64 = 1;
@@ -20,7 +23,12 @@ module aptos_framework::system_addresses {
     }
 
     public fun is_core_resource_address(addr: address): bool {
-        false
+        // Check if the feature flag for decommissioning core resources is enabled.
+        if (get_decommission_core_resources_enabled()) {
+            false
+        } else {
+            addr == @core_resources
+        }
     }
 
     public fun assert_aptos_framework(account: &signer) {
@@ -80,10 +88,21 @@ module aptos_framework::system_addresses {
         is_aptos_framework_address(addr) || is_vm_address(addr)
     }
 
-    #[test(aptos_framework = @aptos_framework, core_resources = @0xA550C18)]
-    #[expected_failure(abort_code = 327681, location = Self)]
-    public entry fun test_core_resource_check_fails(core_resources: signer) {
-        // This should now abort due to is_core_resource_address always returning false
-        assert_core_resource_address(signer::address_of(&core_resources));
+    #[test(aptos_framework = @0x1, core_resources = @0xA550C18)]
+    public entry fun test_core_resource_check_returns_false_with_flag_enabled(aptos_framework: signer, core_resources: address) {
+        // Enable the feature flag for testing
+        std::features::change_feature_flags_for_testing(&aptos_framework, vector[222], vector[]);
+
+        // Assert that is_core_resource_address returns false
+        assert!(!is_core_resource_address(core_resources), 0);
+    }
+
+    #[test(aptos_framework = @0x1, core_resources = @0xA550C18)]
+    public entry fun test_core_resource_check_returns_true_without_flag(aptos_framework: signer, core_resources: address) {
+        // Disable the feature flag for testing
+        std::features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[222]);
+
+        // Assert that is_core_resource_address returns true
+        assert!(is_core_resource_address(core_resources), 0);
     }
 }
