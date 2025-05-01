@@ -916,7 +916,7 @@ module aptos_experimental::market {
         };
     }
 
-    public(package) fun take_ready_time_based_orders<M: store + copy + drop>(
+    public fun take_ready_time_based_orders<M: store + copy + drop>(
         self: &mut Market<M>
     ): vector<Order<M>> {
         self.order_book.take_ready_time_based_orders()
