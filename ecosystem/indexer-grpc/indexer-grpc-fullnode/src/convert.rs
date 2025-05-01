@@ -23,7 +23,7 @@ use aptos_protos::{
                 Jwk as ProtoJwk,
             },
         },
-        Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
+        Ed25519, ExtraConfigV1, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
     },
     util::timestamp,
 };
@@ -175,6 +175,7 @@ pub fn convert_transaction_payload(
                         replay_protection_nonce: nonce,
                     },
                 ),
+
             ),
         },
         TransactionPayload::ScriptPayload(sp) => transaction::TransactionPayload {
