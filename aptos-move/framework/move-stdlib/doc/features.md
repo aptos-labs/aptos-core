@@ -135,6 +135,8 @@ return true.
 -  [Function `abort_native_bridge_enabled`](#0x1_features_abort_native_bridge_enabled)
 -  [Function `get_governed_gas_pool_feature`](#0x1_features_get_governed_gas_pool_feature)
 -  [Function `governed_gas_pool_enabled`](#0x1_features_governed_gas_pool_enabled)
+-  [Function `get_decommission_core_resources_feature`](#0x1_features_get_decommission_core_resources_feature)
+-  [Function `get_decommission_core_resources_enabled`](#0x1_features_get_decommission_core_resources_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -423,6 +425,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
+</code></pre>
+
+
+
+<a id="0x1_features_DECOMMISSION_CORE_RESOURCES"></a>
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a>: u64 = 222;
 </code></pre>
 
 
@@ -3326,6 +3338,52 @@ Whether the Governed Gas Pool is enabled.
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_governed_gas_pool_enabled">governed_gas_pool_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_decommission_core_resources_feature"></a>
+
+## Function `get_decommission_core_resources_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_feature">get_decommission_core_resources_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_feature">get_decommission_core_resources_feature</a>(): u64 { <a href="features.md#0x1_features_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_decommission_core_resources_enabled"></a>
+
+## Function `get_decommission_core_resources_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_enabled">get_decommission_core_resources_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_enabled">get_decommission_core_resources_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a>)
 }
 </code></pre>
 

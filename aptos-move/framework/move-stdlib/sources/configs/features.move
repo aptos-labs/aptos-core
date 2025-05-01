@@ -615,6 +615,15 @@ module std::features {
         is_enabled(GOVERNED_GAS_POOL)
     }
 
+    /// Lifetime: transient
+    const DECOMMISSION_CORE_RESOURCES: u64 = 222;
+
+    public fun get_decommission_core_resources_feature(): u64 { DECOMMISSION_CORE_RESOURCES }
+
+    public fun get_decommission_core_resources_enabled(): bool acquires Features {
+        is_enabled(DECOMMISSION_CORE_RESOURCES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -5,6 +5,9 @@ module aptos_framework::account {
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
+    use std::features::get_decommission_core_resources_enabled;
+    #[test_only]
+    use std::features::change_feature_flags_for_testing;
     use aptos_framework::chain_id;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
@@ -130,6 +133,9 @@ module aptos_framework::account {
     /// whose address matches an existing address of a MultiEd25519 wallet.
     const DERIVE_RESOURCE_ACCOUNT_SCHEME: u8 = 255;
 
+    /// Feature flag for decommissioning core resources.
+    const DECOMMISSION_CORE_RESOURCES: u64 = 222;
+
     /// Account already exists
     const EACCOUNT_ALREADY_EXISTS: u64 = 1;
     /// Account does not exist
@@ -170,6 +176,8 @@ module aptos_framework::account {
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
     // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
     const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
+    // A required feature flag is not enabled.
+    const EFLAG_NOT_ENABLED: u64 = 21;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -199,7 +207,16 @@ module aptos_framework::account {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
 
-        // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
+        // Check if the feature flag for decommissioning core resources is enabled.
+        if (get_decommission_core_resources_enabled()) {
+            // Assert separately for the core resources address if the feature flag is enabled.
+            assert!(
+                new_address != @0xa550c18,
+                error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
+            );
+        };
+
+        // Assert for other reserved addresses.
         assert!(
             new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
             error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
@@ -238,6 +255,34 @@ module aptos_framework::account {
         );
 
         new_account
+    }
+
+    /// Destroy the Account resource from a given account.
+    /// Used to destroy the core resources account on mainnet.
+    public entry fun destroy_account_from(account: &signer, from: address) acquires Account {
+        system_addresses::assert_aptos_framework(account);
+
+        // Assert that the feature flag for decommissioning core resources is enabled
+        assert!(
+            std::features::get_decommission_core_resources_enabled(),
+            EFLAG_NOT_ENABLED
+        );
+
+        let Account {
+            authentication_key: _,
+            sequence_number: _,
+            guid_creation_num: _,
+            coin_register_events,
+            key_rotation_events,
+            rotation_capability_offer,
+            signer_capability_offer,
+        } = move_from<Account>(from);
+
+        event::destroy_handle<CoinRegisterEvent>(coin_register_events);
+        event::destroy_handle<KeyRotationEvent>(key_rotation_events);
+
+        let CapabilityOffer { for: _ } = rotation_capability_offer;
+        let CapabilityOffer { for: _ } = signer_capability_offer;
     }
 
     #[view]
@@ -953,6 +998,50 @@ module aptos_framework::account {
         );
     }
 
+    #[test(aptos_framework = @aptos_framework, from = @0xdead)]
+    public entry fun test_destroy_account_from_with_flag_enabled(
+        aptos_framework: &signer,
+        from: &signer,
+    ) acquires Account {
+        // Enable the feature flag for testing
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[222], vector[]);
+
+        // Ensure the Account resource exists under the from account
+        if (!exists<Account>(signer::address_of(from))) {
+            create_account(signer::address_of(from));
+        };
+
+        // Confirm it now exists
+        assert!(exists<Account>(signer::address_of(from)), 1);
+
+        // Destroy the Account resource
+        destroy_account_from(aptos_framework, signer::address_of(from));
+
+        // Confirm the resource has been removed
+        assert!(!exists<Account>(signer::address_of(from)), 2);
+    }
+
+    #[test(aptos_framework = @aptos_framework, from = @0xdead)]
+    #[expected_failure(abort_code = 21, location = Self)]
+    public entry fun test_destroy_account_from_with_flag_disabled(
+        aptos_framework: &signer,
+        from: &signer,
+    ) acquires Account {
+        // Disable the feature flag for testing
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[222]);
+
+        // Ensure the Account resource exists under the from account
+        if (!exists<Account>(signer::address_of(from))) {
+            create_account(signer::address_of(from));
+        };
+
+        // Confirm it now exists
+        assert!(exists<Account>(signer::address_of(from)), 1);
+
+        // Attempt to destroy the Account resource (should fail)
+        destroy_account_from(aptos_framework, signer::address_of(from));
+    }
+
     #[test_only]
     struct DummyResource has key {}
 
@@ -1530,5 +1619,24 @@ module aptos_framework::account {
 
         let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
         assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+    }
+
+    #[test(framework = @0x1)]
+    #[expected_failure(abort_code = 65541, location = Self)]
+    public entry fun test_cannot_create_account_at_core_resources_address_with_feature_flag(framework: signer) {
+        // Enable the feature flag for testing
+        change_feature_flags_for_testing(&framework, vector[222], vector[]);
+
+        // Attempt to create an account at the core resources address
+        create_account(@0xa550c18);
+    }
+
+    #[test(framework = @0x1)]
+    public entry fun test_can_create_account_at_core_resources_address_without_feature_flag(framework: signer) {
+        // Disable the feature flag for testing
+        change_feature_flags_for_testing(&framework, vector[], vector[222]);
+
+        // Attempt to create an account at the core resources address
+        create_account(@0xa550c18);
     }
 }

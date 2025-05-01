@@ -529,6 +529,7 @@ module aptos_framework::genesis {
         assert!(coin::balance<AptosCoin>(addr0) == 12345, 2);
     }
 
+    /// Expected to fail after post-l1-merge release; it's okay because we will not regenesis.
     #[test(aptos_framework = @0x1, root = @0xabcd)]
     fun test_create_root_account(aptos_framework: &signer) {
         use aptos_framework::aggregator_factory;
