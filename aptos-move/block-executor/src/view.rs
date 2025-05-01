@@ -32,9 +32,9 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    executable::ModulePath,
     state_store::{
         errors::StateViewError,
+        state_key::PathInfo,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -1429,11 +1429,28 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         layout: UnknownOrLayout,
         kind: ReadKind,
     ) -> PartialVMResult<ReadResult> {
-        debug_assert!(
-            !state_key.is_module_path(),
-            "Reading a module {:?} using ResourceView",
-            state_key,
-        );
+        let msg = if state_key.is_module_path() {
+            Some(format!(
+                "Reading a module {:?} using ResourceView",
+                state_key
+            ))
+        } else if state_key.is_resource_group_path() && kind != ReadKind::Metadata {
+            Some(format!(
+                "Reading a group {:?} kind {:?} using ResourceView",
+                state_key, kind,
+            ))
+        } else {
+            None
+        };
+
+        if let Some(msg) = msg {
+            self.mark_incorrect_use();
+            error!("{}", msg);
+            return Err(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                    .with_message(msg),
+            );
+        }
 
         let state = self.latest_view.get_resource_state();
 

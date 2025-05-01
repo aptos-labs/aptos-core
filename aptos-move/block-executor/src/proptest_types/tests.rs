@@ -492,6 +492,7 @@ fn non_empty_group(
     let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
         group_keys: key_universe[(key_universe_len - 3)..key_universe_len]
             .iter()
+            // TODO: FIX these are true. but also not needed.
             .map(|k| KeyType(*k, false))
             .collect(),
     };

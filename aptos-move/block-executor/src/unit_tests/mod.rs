@@ -28,8 +28,10 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ModulePath, state_store::state_value::StateValueMetadata, write_set::WriteOpKind,
+    block_executor::config::BlockExecutorConfig,
+    contract_event::TransactionEvent,
+    state_store::{state_key::PathInfo, state_value::StateValueMetadata},
+    write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
@@ -345,7 +347,7 @@ fn skip_rest_gas_limit() {
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + PathInfo + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     let data_view = DeltaDataView::<K> {

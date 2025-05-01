@@ -13,11 +13,11 @@ use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
     error::PanicError,
-    executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         errors::StateViewError,
+        state_key::PathInfo,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -70,7 +70,7 @@ pub(crate) struct DeltaDataView<K> {
 
 impl<K> TStateView for DeltaDataView<K>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + PathInfo + 'static,
 {
     type Key = K;
 
@@ -96,7 +96,7 @@ pub(crate) struct NonEmptyGroupDataView<K> {
 
 impl<K> TStateView for NonEmptyGroupDataView<K>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + PathInfo + 'static,
 {
     type Key = K;
 
@@ -130,18 +130,23 @@ where
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
-    /// Wrapping the types used for testing to add ModulePath trait implementation (below).
+    /// Wrapping the types used for testing to add PathInfo trait implementation (below).
     pub K,
     /// The bool field determines for testing purposes, whether the key will be interpreted
-    /// as a module access path. In this case, if a module path is both read and written
-    /// during parallel execution, ModulePathReadWrite must be returned and the
-    /// block execution must fall back to the sequential execution.
+    /// as a module access path. Note: no longer use. TODO: revisit with the new tests
+    /// coming w. BlockSTMv2.
     pub bool,
 );
 
-impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
+impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> PathInfo for KeyType<K> {
     fn is_module_path(&self) -> bool {
         self.1
+    }
+
+    // Group path is only used for the defensive mechanism for ResourceView access.
+    // Setting false must work with all tests & we will test the true case separately.
+    fn is_resource_group_path(&self) -> bool {
+        false
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
@@ -441,7 +446,7 @@ impl<K, E> MockTransaction<K, E> {
 }
 
 impl<
-        K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
+        K: Debug + Hash + Ord + Clone + Send + Sync + PathInfo + 'static,
         E: Debug + Clone + Send + Sync + TransactionEvent + 'static,
     > Transaction for MockTransaction<K, E>
 {
@@ -840,7 +845,7 @@ impl<K, E> MockTask<K, E> {
 
 impl<K, E> ExecutorTask for MockTask<K, E>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + PathInfo + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type Error = usize;
@@ -1079,7 +1084,7 @@ pub(crate) struct MockOutput<K, E> {
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + PathInfo + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type Txn = MockTransaction<K, E>;

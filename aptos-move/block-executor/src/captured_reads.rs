@@ -23,8 +23,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
-    executable::ModulePath,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{state_key::PathInfo, state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm_status::StatusCode,
     write_set::TransactionWrite,

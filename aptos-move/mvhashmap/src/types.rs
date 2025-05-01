@@ -185,8 +185,7 @@ pub(crate) mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
-        executable::ModulePath,
-        state_store::state_value::StateValue,
+        state_store::{state_key::PathInfo, state_value::StateValue},
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
@@ -200,8 +199,12 @@ pub(crate) mod test {
         pub K,
     );
 
-    impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
+    impl<K: Hash + Clone + Eq + Debug> PathInfo for KeyType<K> {
         fn is_module_path(&self) -> bool {
+            false
+        }
+
+        fn is_resource_group_path(&self) -> bool {
             false
         }
 

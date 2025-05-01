@@ -299,3 +299,24 @@ impl proptest::arbitrary::Arbitrary for StateKey {
             .boxed()
     }
 }
+pub trait PathInfo {
+    fn is_module_path(&self) -> bool;
+
+    fn is_resource_group_path(&self) -> bool;
+
+    fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self;
+}
+
+impl PathInfo for StateKey {
+    fn is_module_path(&self) -> bool {
+        matches!(self.inner(), StateKeyInner::AccessPath(ap) if ap.is_code())
+    }
+
+    fn is_resource_group_path(&self) -> bool {
+        matches!(self.inner(), StateKeyInner::AccessPath(ap) if ap.is_resource_group())
+    }
+
+    fn from_address_and_module_name(address: &AccountAddress, module_name: &IdentStr) -> Self {
+        Self::module(address, module_name)
+    }
+}

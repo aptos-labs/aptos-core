@@ -9,7 +9,7 @@ use anyhow::anyhow;
 use aptos_aggregator::types::DelayedFieldValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
-    executable::ModulePath,
+    state_store::state_key::PathInfo,
     vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
@@ -33,7 +33,7 @@ use std::{
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
 pub struct UnsyncMap<
-    K: ModulePath,
+    K: PathInfo,
     T: Hash + Clone + Debug + Eq + Serialize,
     V: TransactionWrite,
     I: Copy,
@@ -53,7 +53,7 @@ pub struct UnsyncMap<
 }
 
 impl<
-        K: ModulePath + Hash + Clone + Eq,
+        K: PathInfo + Hash + Clone + Eq,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
         I: Hash + Clone + Copy + Eq,
@@ -73,7 +73,7 @@ impl<
 }
 
 impl<
-        K: ModulePath + Hash + Clone + Eq + Debug,
+        K: PathInfo + Hash + Clone + Eq + Debug,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
         I: Hash + Clone + Copy + Eq,

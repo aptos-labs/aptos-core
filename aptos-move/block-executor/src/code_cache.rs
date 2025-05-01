@@ -9,8 +9,7 @@ use crate::{
 use ambassador::delegate_to_methods;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    executable::ModulePath,
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{state_key::PathInfo, state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
 };

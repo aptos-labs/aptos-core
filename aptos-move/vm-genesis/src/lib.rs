@@ -20,7 +20,6 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
-    executable::ModulePath,
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         patch::{IssuerJWK, PatchJWKMoveStruct, PatchUpsertJWK},
@@ -36,7 +35,7 @@ use aptos_types::{
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
         APTOS_MAX_KNOWN_VERSION,
     },
-    state_store::state_key::StateKey,
+    state_store::state_key::{PathInfo, StateKey},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::{TransactionWrite, WriteOp, WriteSet},
 };
