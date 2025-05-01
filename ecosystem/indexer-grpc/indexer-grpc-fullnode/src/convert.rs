@@ -158,6 +158,7 @@ pub fn convert_entry_function_id(
 
 pub fn convert_transaction_payload(
     payload: &TransactionPayload,
+    nonce: Option<u64>,
 ) -> transaction::TransactionPayload {
     match payload {
         TransactionPayload::EntryFunctionPayload(sfp) => transaction::TransactionPayload {
@@ -168,10 +169,13 @@ pub fn convert_transaction_payload(
                 ),
             ),
             extra_config: Some(
-                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
-                    multisig_address: None,
-                    replay_protection_nonce: None,
-                }),
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                    transaction::ExtraConfigV1 {
+                        multisig_address: None,
+                        replay_protection_nonce: nonce,
+                    },
+                ),
+
             ),
         },
         TransactionPayload::ScriptPayload(sp) => transaction::TransactionPayload {
@@ -180,10 +184,12 @@ pub fn convert_transaction_payload(
                 convert_script_payload(sp),
             )),
             extra_config: Some(
-                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
-                    multisig_address: None,
-                    replay_protection_nonce: None,
-                }),
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                    transaction::ExtraConfigV1 {
+                        multisig_address: None,
+                        replay_protection_nonce: nonce,
+                    },
+                ),
             ),
         },
         TransactionPayload::MultisigPayload(mp) => transaction::TransactionPayload {
@@ -192,10 +198,12 @@ pub fn convert_transaction_payload(
                 convert_multisig_payload(mp),
             )),
             extra_config: Some(
-                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
-                    multisig_address: None,
-                    replay_protection_nonce: None,
-                }),
+                transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                    transaction::ExtraConfigV1 {
+                        multisig_address: Some(mp.multisig_address.to_string()),
+                        replay_protection_nonce: nonce,
+                    },
+                ),
             ),
         },
 
@@ -829,7 +837,10 @@ pub fn convert_transaction(
                     max_gas_amount: ut.request.max_gas_amount.0,
                     gas_unit_price: ut.request.gas_unit_price.0,
                     expiration_timestamp_secs,
-                    payload: Some(convert_transaction_payload(&ut.request.payload)),
+                    payload: Some(convert_transaction_payload(
+                        &ut.request.payload,
+                        ut.request.replay_protection_nonce.map(|n| n.into()),
+                    )),
                     signature: convert_transaction_signature(&ut.request.signature),
                 }),
                 events: convert_events(&ut.events),
