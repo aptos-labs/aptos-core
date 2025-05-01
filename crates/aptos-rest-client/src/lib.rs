@@ -36,7 +36,9 @@ use aptos_types::{
     contract_event::EventWithVersion,
     keyless::{Groth16Proof, Pepper, ZeroKnowledgeSig, ZKP},
     state_store::state_key::StateKey,
-    transaction::{authenticator::EphemeralSignature, SignedTransaction},
+    transaction::{
+        authenticator::EphemeralSignature, IndexedTransactionSummary, SignedTransaction,
+    },
 };
 use move_core_types::{
     ident_str,
@@ -1088,7 +1090,7 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn get_account_transactions_bcs(
+    pub async fn get_account_ordered_transactions_bcs(
         &self,
         address: AccountAddress,
         start: Option<u64>,
@@ -1585,6 +1587,36 @@ impl Client {
     ) -> AptosResult<Response<AccountResource>> {
         let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
         let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: Option<u16>,
+    ) -> AptosResult<Response<Vec<IndexedTransactionSummary>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/transaction_summaries",
+            address.to_hex()
+        ))?;
+
+        let mut request = self.inner.get(url).header(ACCEPT, BCS);
+        if let Some(start_version) = start_version {
+            request = request.query(&[("start_version", start_version)])
+        }
+
+        if let Some(end_version) = end_version {
+            request = request.query(&[("end_version", end_version)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+        let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
