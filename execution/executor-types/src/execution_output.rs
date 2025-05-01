@@ -16,7 +16,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
-        block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
+        block_epilogue::BlockEndInfoExt, ExecutionStatus, Transaction, TransactionStatus, Version,
     },
 };
 use derive_more::Deref;
@@ -38,7 +38,7 @@ impl ExecutionOutput {
         to_retry: TransactionsWithOutput,
         result_state: LedgerState,
         state_reads: ShardedStateCache,
-        block_end_info: Option<BlockEndInfo>,
+        block_end_info: Option<BlockEndInfoExt>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
     ) -> Self {
@@ -160,7 +160,7 @@ pub struct Inner {
     pub state_reads: ShardedStateCache,
 
     /// Optional StateCheckpoint payload
-    pub block_end_info: Option<BlockEndInfo>,
+    pub block_end_info: Option<BlockEndInfoExt>,
     /// Optional EpochState payload.
     /// Only present if the block is the last block of an epoch, and is parsed output of the
     /// state cache.

@@ -42,8 +42,9 @@ use aptos_types::{
         TStateView,
     },
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
-        Transaction, TransactionOutput, TransactionStatus, Version,
+        block_epilogue::BlockEndInfoExt,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
+        TransactionOutput, TransactionStatus, Version,
     },
     write_set::{TransactionWrite, WriteSet},
 };
@@ -228,7 +229,7 @@ impl DoGetExecutionOutput {
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>> {
+    ) -> Result<BlockOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
         Ok(executor.execute_block(
             txn_provider,
@@ -249,7 +250,7 @@ impl DoGetExecutionOutput {
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>> {
+    ) -> Result<BlockOutput> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
             transaction::TransactionAuxiliaryData,
@@ -292,7 +293,7 @@ impl Parser {
         mut transaction_outputs: Vec<TransactionOutput>,
         parent_state: &LedgerState,
         base_state_view: CachedStateView,
-        block_end_info: Option<BlockEndInfo>,
+        block_end_info: Option<BlockEndInfoExt>,
         append_state_checkpoint_to_block: Option<HashValue>,
         prime_state_cache: bool,
     ) -> Result<ExecutionOutput> {
@@ -453,7 +454,7 @@ impl Parser {
     fn maybe_add_block_epilogue(
         mut to_commit: TransactionsWithOutput,
         is_reconfig: bool,
-        block_end_info: Option<&BlockEndInfo>,
+        block_end_info: Option<&BlockEndInfoExt>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> TransactionsWithOutput {
         if !is_reconfig {
@@ -462,7 +463,7 @@ impl Parser {
                 let state_checkpoint_txn = match block_end_info {
                     None => Transaction::StateCheckpoint(block_id),
                     Some(block_end_info) => {
-                        Transaction::block_epilogue(block_id, block_end_info.clone())
+                        Transaction::block_epilogue(block_id, block_end_info.to_persistent())
                     },
                 };
 
