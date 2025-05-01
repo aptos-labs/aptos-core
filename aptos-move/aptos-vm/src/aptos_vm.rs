@@ -1094,7 +1094,6 @@ impl AptosVM {
         };
         let provided_payload = match executable {
             TransactionExecutableRef::EntryFunction(entry_func) => {
-                // TODO[Orderless]: Change this to avoid cloning the entry function.
                 // TODO[Orderless]: For backward compatibility reasons, still using `MultisigTransactionPayload` here.
                 // Find a way to deprecate this.
                 bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
