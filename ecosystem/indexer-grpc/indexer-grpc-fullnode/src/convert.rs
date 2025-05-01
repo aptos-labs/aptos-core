@@ -175,7 +175,6 @@ pub fn convert_transaction_payload(
                         replay_protection_nonce: nonce,
                     },
                 ),
-
             ),
         },
         TransactionPayload::ScriptPayload(sp) => transaction::TransactionPayload {
