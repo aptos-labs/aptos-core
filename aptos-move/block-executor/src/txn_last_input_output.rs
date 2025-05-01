@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::{CapturedReads, DataRead, ReadKind},
     errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
@@ -101,6 +101,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         *self.resource_group_keys_and_tags[txn_idx as usize].acquire() = group_keys_and_tags;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
+    }
+
+    pub fn fetch_exchanged_data(
+        &self,
+        key: &T::Key,
+        txn_idx: TxnIndex,
+    ) -> Result<(Arc<T::Value>, Arc<MoveTypeLayout>), PanicError> {
+        self.inputs[txn_idx as usize].load().as_ref().map_or_else(
+            || {
+                Err(code_invariant_error(
+                    "Read must be recorded before fetching exchanged data".to_string(),
+                ))
+            },
+            |input| {
+                let data_read = input.get_by_kind(key, None, ReadKind::Value);
+                if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
+                    Ok((value, layout))
+                } else {
+                    Err(code_invariant_error(format!(
+                        "Read value needing exchange {:?} not in Exchanged format",
+                        data_read
+                    )))
+                }
+            },
+        )
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {

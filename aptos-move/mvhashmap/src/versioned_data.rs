@@ -277,20 +277,6 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
-    pub fn fetch_exchanged_data(
-        &self,
-        key: &K,
-        txn_idx: TxnIndex,
-    ) -> Option<(Arc<V>, Arc<MoveTypeLayout>)> {
-        if let Ok(MVDataOutput::Versioned(_, ValueWithLayout::Exchanged(value, Some(layout)))) =
-            self.fetch_data(key, txn_idx)
-        {
-            Some((value, layout))
-        } else {
-            None
-        }
-    }
-
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
         let mut v = self.values.entry(key).or_default();
         // For base value, incarnation is irrelevant, and is always set to 0.
