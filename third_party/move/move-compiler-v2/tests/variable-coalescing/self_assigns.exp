@@ -85,7 +85,7 @@ public fun m::test4($t0: u64): u64 {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/variable-coalescing/self_assigns.move:3:9
   │
 3 │         x = x;

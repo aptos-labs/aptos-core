@@ -56,7 +56,7 @@ fun m::g() {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
   ┌─ tests/ability-transform/destroy_after_call.move:8:9
   │
 8 │         r = f(r);

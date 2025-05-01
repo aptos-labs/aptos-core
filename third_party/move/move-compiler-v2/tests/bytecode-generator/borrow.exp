@@ -1,17 +1,3 @@
-
-Diagnostics:
-warning: Unused parameter `param`. Consider removing or prefixing with an underscore: `_param`
-   ┌─ tests/bytecode-generator/borrow.move:12:15
-   │
-12 │     fun local(param: u64): u64 {
-   │               ^^^^^
-
-warning: Unused parameter `param`. Consider removing or prefixing with an underscore: `_param`
-   ┌─ tests/bytecode-generator/borrow.move:29:19
-   │
-29 │     fun mut_local(param: u64): u64 {
-   │                   ^^^^^
-
 // -- Model dump before first bytecode pipeline
 module 0x42::borrow {
     struct S {
@@ -173,6 +159,20 @@ fun borrow::mut_param($t0: u64): u64 {
   3: $t1 := read_ref($t2)
   4: return $t1
 }
+
+
+Diagnostics:
+warning: Unused value of parameter `param`. Consider removing the parameter, or prefixing with an underscore (e.g., `_param`), or binding to `_`
+   ┌─ tests/bytecode-generator/borrow.move:12:15
+   │
+12 │     fun local(param: u64): u64 {
+   │               ^^^^^
+
+warning: Unused value of parameter `param`. Consider removing the parameter, or prefixing with an underscore (e.g., `_param`), or binding to `_`
+   ┌─ tests/bytecode-generator/borrow.move:29:19
+   │
+29 │     fun mut_local(param: u64): u64 {
+   │                   ^^^^^
 
 // -- Model dump before second bytecode pipeline
 module 0x42::borrow {
