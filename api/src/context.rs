@@ -891,9 +891,12 @@ impl Context {
                 address,
                 ledger_info.version(),
                 ledger_info,
-            )?
-            .sequence_number()
-            .saturating_sub(limit as u64)
+            )
+            .map_or(0, |account_resource| {
+                account_resource
+                    .sequence_number()
+                    .saturating_sub(limit as u64)
+            })
         };
 
         let txns_res = if !db_sharding_enabled(&self.node_config) {
