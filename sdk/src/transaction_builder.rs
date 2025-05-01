@@ -76,7 +76,7 @@ impl TransactionBuilder {
     }
 
     pub fn has_nonce(&self) -> bool {
-        self.payload.has_nonce()
+        self.payload.replay_protection_nonce().is_some()
     }
 
     // Primarily used for running the tests with both payload v1 and v2 formats.
