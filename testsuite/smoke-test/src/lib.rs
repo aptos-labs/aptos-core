@@ -4,6 +4,12 @@
 
 extern crate core;
 
+
+pub mod smoke_test_environment;
+
+pub mod utils;
+
+
 #[cfg(test)]
 mod account_abstraction;
 #[cfg(test)]
@@ -60,12 +66,6 @@ mod txn_broadcast;
 mod txn_emitter;
 #[cfg(test)]
 mod upgrade;
-
-#[cfg(test)]
-mod smoke_test_environment;
-
-#[cfg(test)]
-mod utils;
 
 #[cfg(test)]
 mod validator_txns;

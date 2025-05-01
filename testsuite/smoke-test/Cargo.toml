@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
+aptos-infallible = { workspace = true }
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true, features = ["smoke-test"] }
@@ -28,11 +29,13 @@ aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
+aptos-genesis = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-indexer = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keygen = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-release-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
@@ -57,6 +60,8 @@ hex = { workspace = true }
 hyper = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -67,9 +72,6 @@ walkdir = { workspace = true }
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }
 aptos-db-indexer = { workspace = true, features = ["fuzzing"] }
-aptos-genesis = { workspace = true }
-aptos-infallible = { workspace = true }
-aptos-logger = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-vault-client = { workspace = true }
@@ -77,8 +79,6 @@ base64 = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
-once_cell = { workspace = true }
-rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 serde_yaml = { workspace = true }

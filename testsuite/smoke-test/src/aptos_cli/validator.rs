@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    utils::{create_and_fund_account, MAX_CATCH_UP_WAIT_SECS},
+    utils::{create_and_fund_account, generate_blob, MAX_CATCH_UP_WAIT_SECS},
 };
 use aptos::{
     account::create::DEFAULT_FUNDED_COINS,
@@ -525,24 +525,6 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
             _ => {},
         }
     }
-}
-
-pub(crate) fn generate_blob(data: &[u8]) -> String {
-    let mut buf = String::new();
-
-    write!(buf, "vector[").unwrap();
-    for (i, b) in data.iter().enumerate() {
-        if i % 20 == 0 {
-            if i > 0 {
-                writeln!(buf).unwrap();
-            }
-        } else {
-            write!(buf, " ").unwrap();
-        }
-        write!(buf, "{}u8,", b).unwrap();
-    }
-    write!(buf, "]").unwrap();
-    buf
 }
 
 #[tokio::test]

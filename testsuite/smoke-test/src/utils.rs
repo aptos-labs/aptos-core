@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::aptos_cli::validator::generate_blob;
 use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
@@ -22,6 +21,7 @@ use aptos_types::{
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
 use std::{collections::HashSet, net::Ipv4Addr, sync::Arc, time::Duration};
+use std::fmt::Write;
 
 pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
@@ -332,4 +332,22 @@ pub mod swarm_utils {
         let backend = &node_config.consensus.safety_rules.backend;
         f(backend);
     }
+}
+
+pub(crate) fn generate_blob(data: &[u8]) -> String {
+    let mut buf = String::new();
+
+    write!(buf, "vector[").unwrap();
+    for (i, b) in data.iter().enumerate() {
+        if i % 20 == 0 {
+            if i > 0 {
+                writeln!(buf).unwrap();
+            }
+        } else {
+            write!(buf, " ").unwrap();
+        }
+        write!(buf, "{}u8,", b).unwrap();
+    }
+    write!(buf, "]").unwrap();
+    buf
 }
