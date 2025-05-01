@@ -1669,19 +1669,19 @@ mod test {
 
         assert_capture_get!(
             captured_reads,
-            KeyType::<u32>(10, false),
+            KeyType::<u32>::new(10),
             use_tag.then_some(30),
             legacy_reads
         );
         assert_capture_get!(
             captured_reads,
-            KeyType::<u32>(11, false),
+            KeyType::<u32>::new(11),
             use_tag.then_some(30),
             deletion_reads
         );
         assert_capture_get!(
             captured_reads,
-            KeyType::<u32>(15, false),
+            KeyType::<u32>::new(15),
             use_tag.then_some(30),
             with_metadata_reads
         );
@@ -1697,7 +1697,7 @@ mod test {
             MockVerifiedCode,
             MockExtension,
         >::new();
-        captured_reads.get_by_kind(&KeyType::<u32>(21, false), Some(&10), ReadKind::Metadata);
+        captured_reads.get_by_kind(&KeyType::<u32>::new(21), Some(&10), ReadKind::Metadata);
     }
 
     macro_rules! assert_incorrect_use {
@@ -1738,19 +1738,19 @@ mod test {
 
         assert_incorrect_use!(
             captured_reads,
-            KeyType::<u32>(10, false),
+            KeyType::<u32>::new(10),
             use_tag.then_some(30),
             legacy_reads
         );
         assert_incorrect_use!(
             captured_reads,
-            KeyType::<u32>(11, false),
+            KeyType::<u32>::new(11),
             use_tag.then_some(30),
             deletion_reads
         );
         assert_incorrect_use!(
             captured_reads,
-            KeyType::<u32>(15, false),
+            KeyType::<u32>::new(15),
             use_tag.then_some(30),
             with_metadata_reads
         );
@@ -1759,7 +1759,7 @@ mod test {
         assert!(!captured_reads.incorrect_use);
 
         for i in 0..3 {
-            let key = KeyType::<u32>(20 + i, false);
+            let key = KeyType::<u32>::new(20 + i);
             assert_ok!(captured_reads.capture_read(
                 key,
                 use_tag.then_some(30),
@@ -1802,7 +1802,7 @@ mod test {
 
         assert!(!captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
-        let key = KeyType::<u32>(20, false);
+        let key = KeyType::<u32>::new(20);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), exists));
         assert_err!(captured_reads.capture_read(
             key,
@@ -1817,7 +1817,7 @@ mod test {
         captured_reads.incorrect_use = false;
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
-        let key = KeyType::<u32>(21, false);
+        let key = KeyType::<u32>::new(21);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), deletion_metadata));
         assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), resolved));
         assert!(captured_reads.non_delayed_field_speculative_failure);
@@ -1831,7 +1831,7 @@ mod test {
 
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
-        let key = KeyType::<u32>(22, false);
+        let key = KeyType::<u32>::new(22);
         assert_ok!(captured_reads.capture_read(key, use_tag.then_some(30), metadata));
         assert_err!(captured_reads.capture_read(key, use_tag.then_some(30), versioned_legacy));
         assert!(captured_reads.non_delayed_field_speculative_failure);

@@ -197,9 +197,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .collect();
     let txn_provider = DefaultTxnProvider::new(transactions);
 
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
-        phantom: PhantomData,
-    };
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>>::new();
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -244,9 +242,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
     .expect("creating a new value should succeed")
     .current();
 
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
-        phantom: PhantomData,
-    };
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>>::new();
 
     // Do not allow deletes as that would panic in resolver.
     let transactions: Vec<_> = transaction_gen
@@ -352,9 +348,10 @@ fn publishing_fixed_params_with_block_gas_limit(
                 assert!(!behavior.writes.is_empty());
                 let insert_idx = indices[1].index(behavior.writes.len());
                 let val = behavior.writes[0].1.clone();
-                behavior
-                    .writes
-                    .insert(insert_idx, (KeyType(universe[42], true), val));
+                behavior.writes.insert(
+                    insert_idx,
+                    (KeyType::new_maybe_module(universe[42], true), val),
+                );
             });
         },
         _ => {
@@ -362,9 +359,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         },
     };
 
-    let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
-        phantom: PhantomData,
-    };
+    let data_view = DeltaDataView::<KeyType<[u8; 32]>>::new();
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -402,7 +397,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 let insert_idx = indices[3].index(behavior.reads.len());
                 behavior
                     .reads
-                    .insert(insert_idx, KeyType(universe[42], true));
+                    .insert(insert_idx, KeyType::new_maybe_module(universe[42], true));
             });
         },
         _ => {
@@ -490,11 +485,7 @@ fn non_empty_group(
     let txn_provider = DefaultTxnProvider::new(transactions);
 
     let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
-        group_keys: key_universe[(key_universe_len - 3)..key_universe_len]
-            .iter()
-            // TODO: FIX these are true. but also not needed.
-            .map(|k| KeyType(*k, false))
-            .collect(),
+        phantom: PhantomData,
     };
 
     let executor_thread_pool = Arc::new(

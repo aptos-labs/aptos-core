@@ -90,8 +90,16 @@ where
     }
 }
 
+impl<K> DeltaDataView<K> {
+    pub(crate) fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
 pub(crate) struct NonEmptyGroupDataView<K> {
-    pub(crate) group_keys: HashSet<K>,
+    pub(crate) phantom: PhantomData<K>,
 }
 
 impl<K> TStateView for NonEmptyGroupDataView<K>
@@ -102,7 +110,7 @@ where
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
     fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
-        if self.group_keys.contains(key) {
+        if key.is_resource_group_path() {
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
             let bytes = bcs::to_bytes(&group).unwrap();
@@ -124,33 +132,63 @@ where
     }
 }
 
+impl<K> NonEmptyGroupDataView<K> {
+    pub(crate) fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
 ///////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
+pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq> {
     /// Wrapping the types used for testing to add PathInfo trait implementation (below).
-    pub K,
-    /// The bool field determines for testing purposes, whether the key will be interpreted
-    /// as a module access path. Note: no longer use. TODO: revisit with the new tests
-    /// coming w. BlockSTMv2.
-    pub bool,
-);
+    key: K,
+    /// Determines whether the key will be interpreted as a module access path.
+    /// Note: no longer use. TODO: revisit with the new tests coming w. BlockSTMv2.
+    is_module_path: bool,
+    // Determines if the key is a resource group path.
+    is_resource_group_path: bool,
+}
 
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> PathInfo for KeyType<K> {
     fn is_module_path(&self) -> bool {
-        self.1
+        self.is_module_path
     }
 
     // Group path is only used for the defensive mechanism for ResourceView access.
     // Setting false must work with all tests & we will test the true case separately.
     fn is_resource_group_path(&self) -> bool {
-        false
+        self.is_resource_group_path
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
         unimplemented!()
+    }
+}
+
+impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> KeyType<K> {
+    pub(crate) fn new_maybe_resource_group(key: K, is_resource_group_path: bool) -> Self {
+        Self {
+            key,
+            is_module_path: false,
+            is_resource_group_path,
+        }
+    }
+
+    pub(crate) fn new_maybe_module(key: K, is_module_path: bool) -> Self {
+        Self {
+            key,
+            is_module_path,
+            is_resource_group_path: false,
+        }
+    }
+
+    pub(crate) fn new(key: K) -> Self {
+        Self::new_maybe_resource_group(key, false)
     }
 }
 
@@ -507,7 +545,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
                     match delta_fn(i, &value) {
-                        Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
+                        Some(delta) => incarnation_deltas.push((KeyType::new(key), delta)),
                         None => {
                             // One out of 23 writes will be a deletion
                             let val_u128 = ValueType::from_value(value.clone(), true)
@@ -517,7 +555,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                             let is_deletion = allow_deletes && val_u128 % 23 == 0;
                             let mut value = ValueType::from_value(value.clone(), !is_deletion);
                             value.metadata = raw_metadata((val_u128 >> 64) as u64);
-                            incarnation_writes.push((KeyType(key, module_write_fn(i)), value));
+                            incarnation_writes
+                                .push((KeyType::new_maybe_module(key, module_write_fn(i)), value));
                         },
                     }
                 }
@@ -538,7 +577,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             for idx in read_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
-                incarnation_reads.push(KeyType(key, module_read_fn(i)));
+                incarnation_reads.push(KeyType::new_maybe_module(key, module_read_fn(i)));
             }
             ret.push(incarnation_reads);
         }
@@ -688,12 +727,33 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             let mut reads = vec![];
             let mut group_reads = vec![];
             for read_key in behavior.reads.clone() {
-                assert!(read_key != KeyType(universe[universe_len - 1].clone(), false));
-                assert!(read_key != KeyType(universe[universe_len - 2].clone(), false));
-                assert!(read_key != KeyType(universe[universe_len - 3].clone(), false));
+                assert!(
+                    read_key
+                        != KeyType::new_maybe_resource_group(
+                            universe[universe_len - 1].clone(),
+                            true
+                        )
+                );
+                assert!(
+                    read_key
+                        != KeyType::new_maybe_resource_group(
+                            universe[universe_len - 2].clone(),
+                            true
+                        )
+                );
+                assert!(
+                    read_key
+                        != KeyType::new_maybe_resource_group(
+                            universe[universe_len - 3].clone(),
+                            true
+                        )
+                );
                 match key_to_group(&read_key) {
                     Some((idx, tag)) => group_reads.push((
-                        KeyType(universe[universe_len - 1 - idx].clone(), false),
+                        KeyType::new_maybe_resource_group(
+                            universe[universe_len - 1 - idx].clone(),
+                            true,
+                        ),
                         tag,
                     )),
                     None => reads.push(read_key),
@@ -716,7 +776,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             for (idx, inner_ops) in inner_ops.into_iter().enumerate() {
                 if !inner_ops.is_empty() {
                     group_writes.push((
-                        KeyType(universe[universe_len - 1 - idx].clone(), false),
+                        KeyType::new_maybe_resource_group(
+                            universe[universe_len - 1 - idx].clone(),
+                            true,
+                        ),
                         raw_metadata(behavior.metadata_seeds[idx]),
                         inner_ops,
                     ));
@@ -744,7 +807,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                         };
                         (indicator < *size_query_pct).then(|| {
                             (
-                                KeyType(universe[universe_len - 1 - idx].clone(), false),
+                                KeyType::new_maybe_resource_group(
+                                    universe[universe_len - 1 - idx].clone(),
+                                    true,
+                                ),
                                 // TODO: handle metadata queries more uniformly w. size.
                                 indicator % 2 == 0,
                             )
