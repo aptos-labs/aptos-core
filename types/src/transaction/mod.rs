@@ -57,12 +57,14 @@ pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
-    executable::ModulePath,
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     keyless::FederatedKeylessPublicKey,
     proof::accumulator::InMemoryEventAccumulator,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{PathInfo, StateKey},
+        state_value::StateValue,
+    },
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
@@ -2544,7 +2546,7 @@ impl TryFrom<Transaction> for SignedTransaction {
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + PathInfo + Debug;
     /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
     /// specifying a tag, and output requires merging all resources together (Note: this may change
     /// in the future if write-set format changes to be per-resource, could be more performant).

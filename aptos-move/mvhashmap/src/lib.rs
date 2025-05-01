@@ -7,7 +7,8 @@ use crate::{
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    executable::ModulePath, vm::modules::AptosModuleExtension, write_set::TransactionWrite,
+    state_store::state_key::PathInfo, vm::modules::AptosModuleExtension,
+    write_set::TransactionWrite,
 };
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::ModuleId;
@@ -46,7 +47,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
 
 impl<K, T, V, I> MVHashMap<K, T, V, I>
 where
-    K: ModulePath + Hash + Clone + Eq + Debug,
+    K: PathInfo + Hash + Clone + Eq + Debug,
     T: Hash + Clone + Eq + Debug + Serialize,
     V: TransactionWrite,
     I: Copy + Clone + Eq + Hash + Debug,
