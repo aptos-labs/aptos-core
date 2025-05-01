@@ -853,12 +853,13 @@ impl Context {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
         } else {
-            self.expect_resource_poem::<AccountResource, E>(
+            self.get_resource_poem::<AccountResource, E>(
                 address,
                 ledger_info.version(),
                 ledger_info,
             )?
-            .sequence_number()
+            .map(|r| r.sequence_number())
+            .unwrap_or(0)
             .saturating_sub(limit as u64)
         };
 
