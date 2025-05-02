@@ -15,7 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
-aptos-crypto = { workspace = true }
+aptos-crypto = { workspace = true, features = ["cloneable-private-keys"] }
 aptos-global-constants = { workspace = true }
 aptos-ledger = { workspace = true }
 aptos-rest-client = { workspace = true }
