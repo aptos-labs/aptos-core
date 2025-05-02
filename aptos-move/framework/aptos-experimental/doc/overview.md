@@ -24,6 +24,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::ristretto255_twisted_elgamal`](ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal)
 -  [`0x7::sigma_protos`](sigma_protos.md#0x7_sigma_protos)
 -  [`0x7::test_derivable_account_abstraction_ed25519_hex`](test_derivable_account_abstraction_ed25519_hex.md#0x7_test_derivable_account_abstraction_ed25519_hex)
+-  [`0x7::test_function_values`](test_function_values.md#0x7_test_function_values)
 -  [`0x7::veiled_coin`](veiled_coin.md#0x7_veiled_coin)
 
 

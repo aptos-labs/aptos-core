@@ -304,19 +304,51 @@ static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new
         .map(|(string, num_addr)| format!("{}={}", string, num_addr))
         .collect();
 
-    let options = move_compiler_v2::Options {
-        sources: aptos_cached_packages::head_release_bundle()
-            .files()
-            .unwrap(),
+    let is_experimental =
+        |f: &String| f.contains("aptos-move/framework/aptos-experimental/sources");
+
+    // aptos-experimental can be using latest language features, while others cannot.
+    // So we need to compile it twice, once without aptos-experimental, and once with.
+    // (in the second pass, we need to provide both, in case aptos-experimental depends on other modules)
+
+    let all_sources = aptos_cached_packages::head_release_bundle()
+        .files()
+        .unwrap();
+    let prod_sources = all_sources
+        .iter()
+        .filter(|f| !is_experimental(f))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut options = move_compiler_v2::Options {
+        sources: prod_sources,
         dependencies: vec![],
-        named_address_mapping: named_address_mapping_strings,
+        named_address_mapping: named_address_mapping_strings.clone(),
         known_attributes: aptos_framework::extended_checks::get_all_attribute_names().clone(),
         language_version: None,
         ..move_compiler_v2::Options::default()
     };
 
-    let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options)
-        .expect("stdlib compilation succeeds");
+    let (_global_env, mut modules) = move_compiler_v2::run_move_compiler_to_stderr(options.clone())
+        .expect("framework compilation succeeds");
+
+    options.sources = all_sources;
+    options.language_version = Some(LanguageVersion::latest());
+
+    let (experimental_global_env, experimental_modules) =
+        move_compiler_v2::run_move_compiler_to_stderr(options)
+            .expect("aptos-experimental compilation succeeds");
+
+    for cur_module in experimental_modules {
+        let file_name = experimental_global_env.get_file(
+            experimental_global_env
+                .get_file_id(cur_module.loc().file_hash())
+                .unwrap(),
+        );
+        if is_experimental(&file_name.to_str().unwrap().to_string()) {
+            modules.push(cur_module);
+        }
+    }
     PrecompiledFilesModules::new(APTOS_FRAMEWORK_FILES.clone(), modules)
 });
 
