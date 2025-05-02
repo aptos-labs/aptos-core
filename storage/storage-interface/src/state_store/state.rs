@@ -205,7 +205,11 @@ impl State {
                         .value
                         .and_then(|db_val| db_val.into_state_value_opt())
                 })
-                .or_else(|| cache.get(k).map(|entry| entry.value().to_state_value_opt()))
+                .or_else(|| {
+                    cache
+                        .get(*k)
+                        .map(|entry| entry.value().to_state_value_opt())
+                })
                 .expect("Must cache read");
             if let Some(old_v) = old_value {
                 items_delta -= 1;
