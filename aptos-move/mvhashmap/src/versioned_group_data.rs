@@ -17,6 +17,7 @@ use aptos_types::{
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use claims::assert_some;
 use dashmap::DashMap;
+use equivalent::Equivalent;
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{
@@ -60,6 +61,43 @@ pub struct VersionedGroupData<K, T, V> {
     // must correspond to the outputs recorded by the committed transaction incarnations.
     // (and the correctness of the outputs is the responsibility of BlockSTM validation).
     group_tags: DashMap<K, HashSet<T>>,
+}
+
+// This struct allows us to reference a group key and tag without cloning
+#[derive(Clone)]
+struct GroupKeyRef<'a, K, T> {
+    group_key: &'a K,
+    tag: &'a T,
+}
+
+// Implement Equivalent for GroupKeyRef so it can be used to look up (K, T) keys
+impl<'a, K, T> Equivalent<(K, T)> for GroupKeyRef<'a, K, T>
+where
+    K: Eq,
+    T: Eq,
+{
+    fn equivalent(&self, key: &(K, T)) -> bool {
+        self.group_key == &key.0 && self.tag == &key.1
+    }
+}
+
+// Implement Hash for GroupKeyRef to satisfy dashmap's key requirements
+impl<'a, K: Hash, T: Hash> std::hash::Hash for GroupKeyRef<'a, K, T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash the same way as (K, T) would hash
+        self.group_key.hash(state);
+        self.tag.hash(state);
+    }
+}
+
+// Implement Debug for better error messages
+impl<'a, K: Debug, T: Debug> Debug for GroupKeyRef<'a, K, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GroupKeyRef")
+            .field("group_key", &self.group_key)
+            .field("tag", &self.tag)
+            .finish()
+    }
 }
 
 impl<
@@ -223,9 +261,10 @@ impl<
     /// Mark all entry from transaction 'txn_idx' at access path 'key' as an estimated write
     /// (for future incarnation). Will panic if the entry is not in the data-structure.
     pub fn mark_estimate(&self, group_key: &K, txn_idx: TxnIndex, tags: HashSet<T>) {
-        for tag in tags {
-            let key = (group_key.clone(), tag);
-            self.values.mark_estimate(&key, txn_idx);
+        for tag in tags.iter() {
+            // Use GroupKeyRef to avoid cloning the group_key
+            let key_ref = GroupKeyRef { group_key, tag };
+            self.values.mark_estimate(&key_ref, txn_idx);
         }
 
         self.group_sizes
@@ -239,9 +278,9 @@ impl<
 
     /// Remove all entries from transaction 'txn_idx' at access path 'key'.
     pub fn remove(&self, group_key: &K, txn_idx: TxnIndex, tags: HashSet<T>) {
-        for tag in tags {
-            let key = (group_key.clone(), tag);
-            self.values.remove(&key, txn_idx);
+        for tag in tags.iter() {
+            let key_ref = GroupKeyRef { group_key, tag };
+            self.values.remove(&key_ref, txn_idx);
         }
 
         // TODO: consider setting size_has_changed flag if e.g. the size observed
@@ -267,10 +306,10 @@ impl<
         tag: &T,
         txn_idx: TxnIndex,
     ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
-        let key = (group_key.clone(), tag.clone());
+        let key_ref = GroupKeyRef { group_key, tag };
         let initialized = self.group_sizes.contains_key(group_key);
 
-        match self.values.fetch_data(&key, txn_idx) {
+        match self.values.fetch_data(&key_ref, txn_idx) {
             Ok(MVDataOutput::Versioned(version, value)) => Ok((version, value)),
             Err(MVDataError::Uninitialized) => Err(if initialized {
                 MVGroupError::TagNotFound
