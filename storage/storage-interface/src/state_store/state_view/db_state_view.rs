@@ -23,7 +23,7 @@ pub struct DbStateView {
 }
 
 impl DbStateView {
-    fn get(&self, key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get(&self, key: &StateKey) -> StateViewResult<StateValue> {
         if let Some(version) = self.version {
             if let Some(root_hash) = self.maybe_verify_against_state_root_hash {
                 // TODO(aldenhu): sample-verify proof inside DB
@@ -47,7 +47,7 @@ impl DbStateView {
 impl TStateView for DbStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<StateValue> {
         self.get(state_key).map_err(Into::into)
     }
 

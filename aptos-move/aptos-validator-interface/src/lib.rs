@@ -40,7 +40,7 @@ pub trait AptosValidatorInterface: Sync {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<Option<StateValue>>;
+    ) -> Result<StateValue>;
 
     async fn get_committed_transactions(
         &self,
@@ -87,7 +87,7 @@ pub struct DebuggerStateView {
         UnboundedSender<(
             StateKey,
             Version,
-            std::sync::mpsc::Sender<Result<Option<StateValue>>>,
+            std::sync::mpsc::Sender<Result<StateValue>>,
         )>,
     >,
     version: Version,
@@ -98,13 +98,13 @@ async fn handler_thread<'a>(
     mut thread_receiver: UnboundedReceiver<(
         StateKey,
         Version,
-        std::sync::mpsc::Sender<Result<Option<StateValue>>>,
+        std::sync::mpsc::Sender<Result<StateValue>>,
     )>,
 ) {
     const M: usize = 1024 * 1024;
     let cache = Arc::new(Mutex::new(LruCache::<
         (StateKey, Version),
-        Option<StateValue>,
+        StateValue,
     >::new(M)));
     loop {
         let (key, version, sender) =
@@ -147,7 +147,7 @@ impl DebuggerStateView {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<Option<StateValue>> {
+    ) -> Result<StateValue> {
         let (tx, rx) = std::sync::mpsc::channel();
         self.query_sender
             .lock()
@@ -165,7 +165,7 @@ impl TStateView for DebuggerStateView {
         StateViewId::Replay
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<StateValue> {
         self.get_state_value_internal(state_key, self.version)
             .map_err(Into::into)
     }

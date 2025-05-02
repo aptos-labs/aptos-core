@@ -41,7 +41,7 @@ pub trait TStateView {
     }
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>>;
+    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<StateValue>;
 
     /// Gets state storage usage info at epoch ending.
     fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
@@ -86,7 +86,7 @@ where
         self.deref().id()
     }
 
-    fn get_state_value(&self, state_key: &K) -> StateViewResult<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &K) -> StateViewResult<StateValue> {
         self.deref().get_state_value(state_key)
     }
 
@@ -121,8 +121,8 @@ impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
     fn get_state_value(
         &self,
         state_key: &Self::Key,
-    ) -> StateViewResult<Option<StateValue>, StateViewError> {
-        Ok(self.data.get(state_key).cloned())
+    ) -> StateViewResult<StateValue> {
+        Ok(self.data.get(state_key).unwrap_or_else(StateValue::cold_empty))
     }
 
     fn get_usage(&self) -> std::result::Result<StateStorageUsage, StateViewError> {

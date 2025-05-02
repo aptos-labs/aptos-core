@@ -296,7 +296,7 @@ impl TStateView for CachedStateView {
         self.id
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<StateValue> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         COUNTER.inc_with(&["sv_total_get"]);
 
@@ -322,7 +322,7 @@ impl TStateView for CachedStateView {
 
 pub struct CachedDbStateView {
     db_state_view: DbStateView,
-    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
+    state_cache: RwLock<HashMap<StateKey, StateValue>>,
 }
 
 impl From<DbStateView> for CachedDbStateView {
@@ -341,18 +341,18 @@ impl TStateView for CachedDbStateView {
         self.db_state_view.id()
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<StateValue> {
         // First check if the cache has the state value.
         if let Some(val_opt) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(val_opt.clone());
         }
-        let state_value_option = self.db_state_view.get_state_value(state_key)?;
+        let state_value = self.db_state_view.get_state_value(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache
             .entry(state_key.clone())
-            .or_insert_with(|| state_value_option);
+            .or_insert_with(|| state_value );
         Ok(new_value.clone())
     }
 
