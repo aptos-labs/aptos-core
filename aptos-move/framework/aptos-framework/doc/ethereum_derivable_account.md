@@ -12,7 +12,7 @@ SIWE.
 
 Please confirm you explicitly initiated this request from <domain>. You are approving to execute transaction <entry_function_name> on Aptos blockchain (<network_name>).
 
-URI: <domain>
+URI: <scheme>://<domain>
 Version: 1
 Chain ID: <chain_id>
 Nonce: <digest>
@@ -81,16 +81,22 @@ Issued At: <issued_at>
 
 <dl>
 <dt>
+<code>scheme: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The scheme in the URI of the message, e.g. the scheme of the website that requested the signature (http, https, etc.)
+</dd>
+<dt>
 <code>issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
-
+ The date and time when the signature was issued
 </dd>
 <dt>
 <code>signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
-
+ The signature of the message
 </dd>
 </dl>
 
@@ -239,9 +245,10 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstract_signature);
     <b>let</b> signature_type = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_u8">bcs_stream::deserialize_u8</a>(&<b>mut</b> stream);
     <b>if</b> (signature_type == 0x00) {
+        <b>let</b> scheme = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         <b>let</b> issued_at = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
         <b>let</b> signature = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x));
-        SIWEAbstractSignature::MessageV1 { issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(issued_at), signature }
+        SIWEAbstractSignature::MessageV1 { scheme: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(scheme), issued_at: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(issued_at), signature }
     } <b>else</b> {
         <b>abort</b>(<a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>)
     }
@@ -258,7 +265,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 
 
 
-<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(ethereum_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, issued_at: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(ethereum_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, domain: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, issued_at: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scheme: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -273,6 +280,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     entry_function_name: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     digest_utf8: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     issued_at: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    scheme: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> message = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     message.append(*domain);
@@ -290,6 +298,8 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     message.append(b")");
     message.append(b".");
     message.append(b"\n\nURI: ");
+    message.append(*scheme);
+    message.append(b"://");
     message.append(*domain);
     message.append(b"\nVersion: 1");
     message.append(b"\nChain ID: ");
@@ -388,7 +398,8 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     <b>let</b> digest_utf8 = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(aa_auth_data.digest()).bytes();
     <b>let</b> abstract_signature = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_deserialize_abstract_signature">deserialize_abstract_signature</a>(aa_auth_data.derivable_abstract_signature());
     <b>let</b> issued_at = abstract_signature.issued_at.bytes();
-    <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at);
+    <b>let</b> scheme = abstract_signature.scheme.bytes();
+    <b>let</b> message = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_construct_message">construct_message</a>(&abstract_public_key.ethereum_address, &abstract_public_key.domain, entry_function_name, digest_utf8, issued_at, scheme);
     <b>let</b> hashed_message = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(message);
     <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(&abstract_signature.signature, &hashed_message);
 
