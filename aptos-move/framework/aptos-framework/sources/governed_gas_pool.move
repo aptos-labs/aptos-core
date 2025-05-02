@@ -146,7 +146,7 @@ module aptos_framework::governed_gas_pool {
     /// Deposits gas fees into the governed gas pool.
     /// @param gas_payer The address of the account that paid the gas fees.
     /// @param gas_fee The amount of gas fees to be deposited.
-    public fun deposit_gas_fee(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
+    public fun deposit_gas_fee(_gas_payer: address, _gas_fee: u64) acquires GovernedGasPool {
         // get the sender to preserve the signature but do nothing
         governed_gas_pool_address();
     }

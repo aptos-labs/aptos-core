@@ -69,7 +69,7 @@ spec aptos_framework::governed_gas_pool {
         */
     }
 
-    spec deposit_gas_fee(gas_payer: address, gas_fee: u64) {
+    spec deposit_gas_fee(_gas_payer: address, _gas_fee: u64) {
         /*
         /// [high-level-req-5]
         //   ensures governed_gas_pool_balance<AptosCoin> == old(governed_gas_pool_balance<AptosCoin>) + gas_fee;
