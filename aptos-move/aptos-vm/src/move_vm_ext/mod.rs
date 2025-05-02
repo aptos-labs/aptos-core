@@ -9,7 +9,7 @@ mod vm;
 pub(crate) mod write_op_converter;
 
 pub use crate::move_vm_ext::{
-    resolver::{AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver},
+    resolver::{AptosMoveResolver, AsExecutorView, ResourceGroupResolver},
     session::{convert_modules_into_write_ops, SessionExt},
     vm::{GenesisMoveVm, GenesisRuntimeBuilder, MoveVmExt},
 };

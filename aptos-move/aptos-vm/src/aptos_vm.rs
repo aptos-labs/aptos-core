@@ -98,8 +98,8 @@ use aptos_vm_types::{
     module_write_set::ModuleWriteSet,
     output::VMOutput,
     resolver::{
-        BlockSynchronizationKillSwitch, ExecutorView, NoopBlockSynchronizationKillSwitch,
-        ResourceGroupView,
+        BlockSynchronizationKillSwitch, ExecutorView, ExecutorViewWithoutGroupView,
+        NoopBlockSynchronizationKillSwitch, ResourceGroupView,
     },
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
@@ -423,7 +423,7 @@ impl AptosVM {
         self.gas_params(&log_context)
     }
 
-    pub fn as_move_resolver<'r, R: ExecutorView>(
+    pub fn as_move_resolver<'r, R: ExecutorViewWithoutGroupView>(
         &self,
         executor_view: &'r R,
     ) -> StorageAdapter<'r, R> {
@@ -2069,7 +2069,6 @@ impl AptosVM {
     fn read_change_set(
         &self,
         executor_view: &dyn ExecutorView,
-        resource_group_view: &dyn ResourceGroupView,
         module_storage: &impl AptosModuleStorage,
         change_set: &VMChangeSet,
         module_write_set: &ModuleWriteSet,
@@ -2091,7 +2090,7 @@ impl AptosVM {
             executor_view.get_resource_state_value(state_key, None)?;
             if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
                 for (tag, (_, maybe_layout)) in group_write.inner_ops() {
-                    resource_group_view.get_resource_from_group(
+                    executor_view.get_resource_from_group(
                         state_key,
                         tag,
                         maybe_layout.as_deref(),
@@ -2142,7 +2141,6 @@ impl AptosVM {
         Self::validate_waypoint_change_set(change_set.events(), log_context)?;
         self.read_change_set(
             resolver.as_executor_view(),
-            resolver.as_resource_group_view(),
             code_storage,
             &change_set,
             &module_write_set,
