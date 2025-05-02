@@ -23,8 +23,7 @@ use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
-        TResourceView,
+        ExecutorView, ResourceGroupSize, StateStorageView, TResourceGroupView, TResourceView,
     },
 };
 use bytes::Bytes;
@@ -39,19 +38,13 @@ use std::{
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
 pub struct ExecutorViewWithChangeSet<'r> {
     base_executor_view: &'r dyn ExecutorView,
-    base_resource_group_view: &'r dyn ResourceGroupView,
     pub(crate) change_set: VMChangeSet,
 }
 
 impl<'r> ExecutorViewWithChangeSet<'r> {
-    pub(crate) fn new(
-        base_executor_view: &'r dyn ExecutorView,
-        base_resource_group_view: &'r dyn ResourceGroupView,
-        change_set: VMChangeSet,
-    ) -> Self {
+    pub(crate) fn new(base_executor_view: &'r dyn ExecutorView, change_set: VMChangeSet) -> Self {
         Self {
             base_executor_view,
-            base_resource_group_view,
             change_set,
         }
     }
@@ -295,22 +288,23 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         use AbstractResourceWriteOp::*;
 
         if let Some(size) = self
-        .change_set
-        .resource_write_set()
-        .get(group_key)
-        .and_then(|write| match write {
-            WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
-            ResourceGroupInPlaceDelayedFieldChange(_) => None,
-            Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+            .change_set
+            .resource_write_set()
+            .get(group_key)
+            .and_then(|write| match write {
+                WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
                 // There should be no collisions, we cannot have group key refer to a resource.
                 Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
             },
         })
-        .transpose()? {
+        .transpose()? 
+        {
             return Ok(size);
         }
 
-        self.base_resource_group_view.resource_group_size(group_key)
+        self.base_executor_view.resource_group_size(group_key)
     }
 
     fn get_resource_from_group(
@@ -339,7 +333,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             randomly_check_layout_matches(maybe_layout, layout.as_deref())?;
             Ok(write_op.extract_raw_bytes())
         } else {
-            self.base_resource_group_view.get_resource_from_group(
+            self.base_executor_view.get_resource_from_group(
                 group_key,
                 resource_tag,
                 maybe_layout,
@@ -371,7 +365,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         {
             Ok(write_op.bytes_size())
         } else {
-            self.base_resource_group_view.resource_size_in_group(
+            self.base_executor_view.resource_size_in_group(
                 group_key,
                 resource_tag,
             )
@@ -402,7 +396,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         {
             Ok(write_op.bytes().is_some())
         } else {
-            self.base_resource_group_view.resource_exists_in_group(
+            self.base_executor_view.resource_exists_in_group(
                 group_key,
                 resource_tag,
             )
@@ -416,7 +410,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        self.base_resource_group_view
+        self.base_executor_view
             .is_resource_groups_split_in_change_set_capable()
     }
 }
@@ -444,7 +438,7 @@ mod test {
     use super::*;
     use crate::{
         data_cache::AsMoveResolver,
-        move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
+        move_vm_ext::resolver::AsExecutorView,
     };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
@@ -627,7 +621,6 @@ mod test {
         let resolver = state_view.as_move_resolver();
         let view = ExecutorViewWithChangeSet::new(
             resolver.as_executor_view(),
-            resolver.as_resource_group_view(),
             change_set,
         );
 

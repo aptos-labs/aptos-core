@@ -44,7 +44,6 @@ impl<'r> RespawnedSession<'r> {
     ) -> RespawnedSession<'r> {
         let executor_view = ExecutorViewWithChangeSet::new(
             base.as_executor_view(),
-            base.as_resource_group_view(),
             previous_session_change_set,
         );
 
