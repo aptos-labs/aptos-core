@@ -91,7 +91,7 @@ module aptos_framework::system_addresses {
     #[test(aptos_framework = @0x1, core_resources = @0xA550C18)]
     public entry fun test_core_resource_check_returns_false_with_flag_enabled(aptos_framework: signer, core_resources: address) {
         // Enable the feature flag for testing
-        std::features::change_feature_flags_for_testing(&aptos_framework, vector[222], vector[]);
+        change_feature_flags_for_testing(&aptos_framework, vector[222], vector[]);
 
         // Assert that is_core_resource_address returns false
         assert!(!is_core_resource_address(core_resources), 0);
@@ -100,7 +100,7 @@ module aptos_framework::system_addresses {
     #[test(aptos_framework = @0x1, core_resources = @0xA550C18)]
     public entry fun test_core_resource_check_returns_true_without_flag(aptos_framework: signer, core_resources: address) {
         // Disable the feature flag for testing
-        std::features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[222]);
+        change_feature_flags_for_testing(&aptos_framework, vector[], vector[222]);
 
         // Assert that is_core_resource_address returns true
         assert!(is_core_resource_address(core_resources), 0);
