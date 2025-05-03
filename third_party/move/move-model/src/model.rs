@@ -4518,7 +4518,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.loc.id_loc.clone()
     }
 
-    /// Returns the location of the function identifier.
+    /// Returns the location of the function's return type.
     pub fn get_result_type_loc(&self) -> Loc {
         self.data.loc.result_type_loc.clone()
     }
