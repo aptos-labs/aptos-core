@@ -466,7 +466,9 @@ mod tests {
                 StateKey::raw(b"key-6"),
                 WriteOp::creation(
                     vec![0, 1, 2].into(),
-                    StateValueMetadata::new(1, 2, &CurrentTimeMicroseconds { microseconds: 100 }),
+                    StateValueMetadata::new_cold(1, 2, &CurrentTimeMicroseconds {
+                        microseconds: 100,
+                    }),
                 ),
             ),
         ])
@@ -497,7 +499,9 @@ mod tests {
                 StateKey::raw(b"key-6"),
                 WriteOp::creation(
                     vec![0, 1, 2].into(),
-                    StateValueMetadata::new(1, 2, &CurrentTimeMicroseconds { microseconds: 200 }),
+                    StateValueMetadata::new_cold(1, 2, &CurrentTimeMicroseconds {
+                        microseconds: 200,
+                    }),
                 ),
             ),
         ])
@@ -529,11 +533,15 @@ mod tests {
                 state_key: StateKey::raw(b"key-6"),
                 left: Some(WriteOp::creation(
                     vec![0, 1, 2].into(),
-                    StateValueMetadata::new(1, 2, &CurrentTimeMicroseconds { microseconds: 100 }),
+                    StateValueMetadata::new_cold(1, 2, &CurrentTimeMicroseconds {
+                        microseconds: 100,
+                    }),
                 )),
                 right: Some(WriteOp::creation(
                     vec![0, 1, 2].into(),
-                    StateValueMetadata::new(1, 2, &CurrentTimeMicroseconds { microseconds: 200 }),
+                    StateValueMetadata::new_cold(1, 2, &CurrentTimeMicroseconds {
+                        microseconds: 200,
+                    }),
                 )),
             },
         ];

@@ -22,6 +22,7 @@ pub enum SessionId {
     BlockMeta {
         // block id
         id: HashValue,
+        #[serde(skip)]
         timestamp_usecs: u64,
     },
     Genesis {
@@ -48,6 +49,7 @@ pub enum SessionId {
     BlockMetaExt {
         // block id
         id: HashValue,
+        #[serde(skip)]
         timestamp_usecs: u64,
     },
     ValidatorTxn {

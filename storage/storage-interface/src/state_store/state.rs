@@ -12,7 +12,7 @@ use crate::{
             },
             hot_state_view::HotStateView,
         },
-        versioned_state_value::{DbStateUpdate, StateUpdateRef},
+        versioned_state_value::{DbStateUpdate},
         NUM_STATE_SHARDS,
     },
     DbReader,
@@ -29,7 +29,8 @@ use arr_macro::arr;
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
-use std::{collections::HashMap, sync::Arc};
+use std::{sync::Arc};
+use crate::state_store::versioned_state_value::ColdStateUpdateRef;
 
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
@@ -156,7 +157,13 @@ impl State {
                 (
                     // TODO(aldenhu): change interface to take iter of ref
                     overlay.new_layer(&new_items),
-                    Self::usage_delta_for_shard(cache, overlay, updates),
+                    Self::usage_delta_for_shard(
+                        cache,
+                        overlay,
+                        updates.iter().filter_map(|(k, u)| {
+                            u.maybe_to_cold_state_update(self.next_version()).map(|cold_upd| (*k, cold_upd))
+                        })
+                    ),
                 )
             })
             .unzip();
@@ -184,15 +191,15 @@ impl State {
     fn usage_delta_for_shard<'kv>(
         cache: &StateCacheShard,
         overlay: &LayeredMap<StateKey, DbStateUpdate>,
-        updates: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
+        updates: impl Iterator<Item=(&'kv StateKey, ColdStateUpdateRef<'kv>)>,
     ) -> (i64, i64) {
         let mut items_delta: i64 = 0;
         let mut bytes_delta: i64 = 0;
-        for (k, v) in updates {
+        for (k, upd) in updates {
             let key_size = k.size();
-            if let Some(value) = v.value {
+            if !upd.is_delete() {
                 items_delta += 1;
-                bytes_delta += (key_size + value.size()) as i64;
+                bytes_delta += (key_size + upd.value_size()) as i64;
             }
 
             // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
@@ -202,8 +209,8 @@ impl State {
                 .get(k)
                 .map(|update| {
                     update
-                        .value
-                        .and_then(|db_val| db_val.into_state_value_opt())
+                        .to_state_value_opt()
+                        .cloned()
                 })
                 .or_else(|| cache.get(k).map(|entry| entry.value().to_state_value_opt()))
                 .expect("Must cache read");

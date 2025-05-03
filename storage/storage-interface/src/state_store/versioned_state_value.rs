@@ -7,78 +7,116 @@ use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
-        state_value::{DbStateValue, StateValue},
+        state_value::{StateSlot, StateValue},
     },
     transaction::Version,
 };
 
+// FIXME(aldenhu): rename to StateUpdate
+/// State slot content with the version for the last change to it.
+///
+/// | slot.occupied() | version | meaning                                        |
+/// | --------------- | ------- | ---------------------------------------------- |
+/// | true            | Some    | existing and last change version known         |
+/// | true            | None    | invalid -- occupied slot version must be known |
+/// | false           | Some    | Deletion at known version                      |
+/// | false           | None    | Non-existent, unclear if ever existed          |
 #[derive(Clone, Debug)]
 pub struct DbStateUpdate {
-    /// The version where the key got updated (incl. deletion).
-    pub version: Version,
-    /// `None` indicates deletion.
-    pub value: Option<DbStateValue>,
+    /// TODO(HotState): Revisit: a mere move between the hot and cold state tiers doesn't change
+    ///                 the version.
+    pub version: Option<Version>,
+    pub slot: StateSlot,
 }
 
 impl DbStateUpdate {
-    pub fn to_jmt_update_opt(
-        &self,
-        key: StateKey,
-        min_version: Version,
-    ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
-        // Items from < min_version are cached old items.
-        if self.version < min_version {
-            return None;
-        }
-
-        match &self.value {
-            None => {
-                // HotNonExistent is not explicitly evicted for now, so this must be a real delete
-                // on the jmt
-                Some((CryptoHash::hash(&key), None))
-            },
-            Some(db_val) => {
-                if db_val.is_hot_non_existent() {
-                    // not persisting HotNoneExistent for now
-                    None
-                } else {
-                    Some((
-                        CryptoHash::hash(&key),
-                        Some((CryptoHash::hash(db_val.expect_state_value()), key)),
-                    ))
-                }
-            },
+    pub fn get_ref(&self) -> StateUpdateRef {
+        StateUpdateRef {
+            version: self.version,
+            slot: &self.slot,
         }
     }
 
-    pub fn expect_non_delete(&self) -> &DbStateValue {
-        self.value.as_ref().expect("Unexpected deletion.")
+    pub fn to_state_value_opt(&self) -> Option<&StateValue> {
+        self.slot.to_state_value_opt()
+    }
+
+    pub fn maybe_to_cold_state_update(&self, chunk_first_version: Version) -> Option<ColdStateUpdateRef> {
+        ColdStateUpdateRef::maybe_new_from_state_update(self.version, chunk_first_version, &self.slot)
     }
 }
 
+/// Borrowed version of StateUpdate.
 #[derive(Clone, Debug)]
 pub struct StateUpdateRef<'kv> {
-    /// The version where the key got updated (incl. deletion).
-    pub version: Version,
-    /// `None` indicates deletion.
-    /// TODO(aldenhu): Maybe upgrade to make DbStateValue here already,  but for now this is raw
-    ///                VM output that doesn't involve hot state manipulation.
-    pub value: Option<&'kv StateValue>,
+    pub version: Option<Version>,
+    pub slot: &'kv StateSlot,
 }
 
 impl<'kv> StateUpdateRef<'kv> {
+    // FIXME(aldenhu): rename to to_owned or to_state_update
     pub fn to_db_state_update(&self, access_time_secs: u32) -> DbStateUpdate {
         DbStateUpdate {
             version: self.version,
-            value: self
-                .value
-                .cloned()
-                .map(|val| val.into_db_state_value(access_time_secs)),
+            slot: self.slot.clone(),
         }
     }
 
     pub fn value_hash_opt(&self) -> Option<HashValue> {
-        self.value.as_ref().map(|val| val.hash())
+        self.slot.to_state_value_opt().map(CryptoHash::hash)
+    }
+
+    pub fn maybe_to_cold_state_update(&self, chunk_first_version: Version) -> Option<ColdStateUpdateRef<'kv>> {
+        ColdStateUpdateRef::maybe_new_from_state_update(self.version, chunk_first_version, self.slot)
+    }
+}
+
+pub struct ColdStateUpdateRef<'kv> {
+    value: Option<&'kv StateValue>,
+}
+
+impl<'kv> ColdStateUpdateRef<'kv> {
+    pub fn maybe_new_from_state_update(
+        version: Option<Version>,
+        chunk_first_version: Version,
+        slot: &StateSlot,
+    ) -> Option<Self> {
+        if version.is_none() {
+            // Cached empty slot
+            return None
+        }
+        let version = version.unwrap();
+
+        if version < chunk_first_version {
+            // Cached old slot that's not updated in the chunk being executed or applied.
+            return None;
+        }
+
+        // TODO(HotState): Revisit when the hot state is exclusive to the cold state.
+        // Content changed in the chunk, should be updated in the cold state
+        Some(Self {
+            value: slot.to_state_value_opt()
+        })
+    }
+
+    pub fn to_jmt_update(
+        &self,
+        key: &StateKey,
+    ) -> (HashValue, Option<(HashValue, StateKey)>) {
+        let key_hash = CryptoHash::hash(key);
+        let value_hash_and_key = self.value.map(|value| {
+            (CryptoHash::hash(value), key.clone())
+        });
+
+        (key_hash, value_hash_and_key)
+    }
+
+    pub fn is_delete(&self) -> bool {
+        self.value.is_none()
+    }
+
+    pub fn value_size(&self) -> usize {
+        self.value.map_or(0, StateValue::size)
     }
 }
 
@@ -148,7 +186,7 @@ impl MemorizedStateRead {
                 Some(DbStateUpdate {
                     // Dummy creation version
                     version: 0,
-                    value: Some(DbStateValue::new_hot_non_existent(access_time_secs)),
+                    value: Some(StateSlot::new_hot_non_existent(access_time_secs)),
                 })
             },
             MemorizedStateRead::StateUpdate(DbStateUpdate { version, value }) => {

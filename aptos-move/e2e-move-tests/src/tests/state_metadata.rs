@@ -88,6 +88,6 @@ fn test_metadata_tracking() {
         harness
             .read_resource_metadata(&address2, coin_store.clone())
             .unwrap(),
-        StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 })
+        StateValueMetadata::new_cold(0, 0, &CurrentTimeMicroseconds { microseconds: 0 })
     );
 }

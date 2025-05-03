@@ -370,7 +370,7 @@ mod tests {
         let (c_state_key, c_bytes, c) = module("c");
         let c_state_value = StateValue::new_with_metadata(
             c_bytes.clone(),
-            StateValueMetadata::new(20, 30, &CurrentTimeMicroseconds { microseconds: 200 }),
+            StateValueMetadata::new_cold(20, 30, &CurrentTimeMicroseconds { microseconds: 200 }),
         );
 
         // Module that does not yet exist.
