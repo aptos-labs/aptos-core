@@ -9,17 +9,23 @@ use aptos_types::{
     transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
 };
 use claims::{assert_le, assert_none};
-use std::time::Instant;
+use once_cell::sync::Lazy;
+use std::{env, time::Instant};
+
+pub static PRINT_CONFLICTS_INFO: Lazy<bool> =
+    Lazy::new(|| env::var("PRINT_CONFLICTS_INFO").is_ok());
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
     block_gas_limit_override: Option<u64>,
+    accumulated_raw_block_gas: u64,
     accumulated_effective_block_gas: u64,
     accumulated_approx_output_size: u64,
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
+    print_conflicts_info: bool,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -31,12 +37,15 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
+            accumulated_raw_block_gas: 0,
             accumulated_effective_block_gas: 0,
             accumulated_approx_output_size: 0,
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
             start_time: Instant::now(),
+            // TODO: have a configuration for it.
+            print_conflicts_info: *PRINT_CONFLICTS_INFO,
         }
     }
 
@@ -56,6 +65,9 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             let txn_read_write_summary = txn_read_write_summary.expect(
                 "txn_read_write_summary needs to be computed if conflict_penalty_window is set",
             );
+            if self.print_conflicts_info {
+                println!("{:?}", txn_read_write_summary);
+            }
             self.txn_read_write_summaries.push(
                 if self
                     .block_gas_limit_type
@@ -75,13 +87,13 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         // When the accumulated execution and io gas of the committed txns exceeds
         // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
         // the per block gas limit, as we measure execution related cost here.
-        self.accumulated_effective_block_gas += conflict_multiplier
-            * (fee_statement.execution_gas_used()
-                * self
-                    .block_gas_limit_type
-                    .execution_gas_effective_multiplier()
-                + fee_statement.io_gas_used()
-                    * self.block_gas_limit_type.io_gas_effective_multiplier());
+        let raw_gas_used = fee_statement.execution_gas_used()
+            * self
+                .block_gas_limit_type
+                .execution_gas_effective_multiplier()
+            + fee_statement.io_gas_used() * self.block_gas_limit_type.io_gas_effective_multiplier();
+        self.accumulated_raw_block_gas += raw_gas_used;
+        self.accumulated_effective_block_gas += conflict_multiplier * raw_gas_used;
 
         if self.block_gas_limit_type.block_output_limit().is_some() {
             self.accumulated_approx_output_size += approx_output_size
@@ -162,8 +174,20 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         let current = &self.txn_read_write_summaries[end];
         for prev in &self.txn_read_write_summaries[start..end] {
             if current.conflicts_with_previous(prev) {
+                if self.print_conflicts_info {
+                    println!(
+                        "Conflicts with previous: {:?}",
+                        current.find_conflicts(prev)
+                    );
+                }
                 conflict_count += 1;
             }
+        }
+        if self.print_conflicts_info {
+            println!(
+                "Number of conflicts: {} out of {}",
+                conflict_count, conflict_overlap_length
+            );
         }
         assert_le!(conflict_count + 1, conflict_overlap_length);
         (conflict_count + 1) as u64
@@ -178,6 +202,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     ) {
         let accumulated_effective_block_gas = self.get_effective_accumulated_block_gas();
         let accumulated_approx_output_size = self.get_accumulated_approx_output_size();
+        let accumulated_raw_block_gas = self.accumulated_raw_block_gas;
 
         counters::update_block_gas_counters(
             &self.accumulated_fee_statement,
@@ -190,6 +215,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
 
         info!(
             effective_block_gas = accumulated_effective_block_gas,
+            raw_block_gas = accumulated_raw_block_gas,
             block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
             block_gas_limit_override = self.block_gas_limit_override.unwrap_or(0),
             block_gas_limit_exceeded = self

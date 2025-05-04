@@ -1,14 +1,6 @@
-
-Diagnostics:
-warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
-  ┌─ tests/checking-lang-v2.2/lambda/inline-parity/eq_inline.move:3:13
-  │
-3 │     fun foo(f: |&u64| has drop) {
-  │             ^
-
 // -- Model dump before first bytecode pipeline
 module 0x42::m {
-    private fun foo(f: |&u64| with drop) {
+    private fun foo(f: |&u64| has drop) {
         Tuple()
     }
     private fun g() {
@@ -23,7 +15,7 @@ module 0x42::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::m {
-    fun foo(f: |&u64| with drop) {
+    fun foo(f: |&u64| has drop) {
     }
     fun g() {
         foo(|arg0| __lambda__1__g(arg0));

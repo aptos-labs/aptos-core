@@ -25,13 +25,13 @@ fun m::test() {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/variable-coalescing/non_overlapping_vars1.move:4:9
   │
 4 │         x = x + 1;
   │         ^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
   ┌─ tests/variable-coalescing/non_overlapping_vars1.move:6:9
   │
 6 │         y = y + 1;

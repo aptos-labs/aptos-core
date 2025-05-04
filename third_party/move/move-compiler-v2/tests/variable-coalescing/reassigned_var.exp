@@ -18,7 +18,7 @@ fun m::test(): u64 {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `a` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_a`), or renaming to `_`
   ┌─ tests/variable-coalescing/reassigned_var.move:3:17
   │
 3 │         let a = 1;

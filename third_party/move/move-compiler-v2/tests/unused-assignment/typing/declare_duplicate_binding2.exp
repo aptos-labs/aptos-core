@@ -1,18 +1,18 @@
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/unused-assignment/typing/declare_duplicate_binding2.move:7:9
   │
 7 │         x = 0;
   │         ^^^^^
 
-warning: Unused assignment/binding to `f`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_f`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `f` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_f`), or renaming to `_`
   ┌─ tests/unused-assignment/typing/declare_duplicate_binding2.move:8:9
   │
 8 │         f = 0;
   │         ^^^^^
 
-warning: Unused assignment/binding to `g`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_g`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `g` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_g`), or renaming to `_`
   ┌─ tests/unused-assignment/typing/declare_duplicate_binding2.move:9:9
   │
 9 │         g = 0;

@@ -1,18 +1,24 @@
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+  ┌─ tests/unused-assignment/unused_assign_to_param.move:2:13
+  │
+2 │     fun foo(x: u8) {
+  │             ^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/unused-assignment/unused_assign_to_param.move:3:9
   │
 3 │         x = 42;
   │         ^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/unused-assignment/unused_assign_to_param.move:8:13
   │
 8 │             x = 42;
   │             ^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_assign_to_param.move:10:9
    │
 10 │         x = 42;

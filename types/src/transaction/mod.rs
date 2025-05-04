@@ -1231,6 +1231,46 @@ impl SignedTransaction {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IndexedTransactionSummary {
+    V1 {
+        sender: AccountAddress,
+        version: Version,
+        transaction_hash: HashValue,
+        replay_protector: ReplayProtector,
+    },
+}
+
+impl IndexedTransactionSummary {
+    pub fn version(&self) -> Version {
+        match self {
+            IndexedTransactionSummary::V1 { version, .. } => *version,
+        }
+    }
+
+    pub fn transaction_hash(&self) -> HashValue {
+        match self {
+            IndexedTransactionSummary::V1 {
+                transaction_hash, ..
+            } => *transaction_hash,
+        }
+    }
+
+    pub fn replay_protector(&self) -> ReplayProtector {
+        match self {
+            IndexedTransactionSummary::V1 {
+                replay_protector, ..
+            } => *replay_protector,
+        }
+    }
+
+    pub fn sender(&self) -> AccountAddress {
+        match self {
+            IndexedTransactionSummary::V1 { sender, .. } => *sender,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {

@@ -1,9 +1,9 @@
 // -- Model dump before first bytecode pipeline
 module 0xdecafbad::m {
-    private fun bar(f: |()|u64): u64 {
+    private fun bar(f: ||u64): u64 {
         (f)()
     }
-    private fun foo(f: |()|) {
+    private fun foo(f: ||) {
         (f)();
         Tuple()
     }
@@ -24,10 +24,10 @@ module 0xdecafbad::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xdecafbad::m {
-    fun bar(f: |()|u64): u64 {
+    fun bar(f: ||u64): u64 {
         f()
     }
-    fun foo(f: |()|) {
+    fun foo(f: ||) {
         f();
     }
     public fun one() {

@@ -3,8 +3,8 @@ module 0x66::test {
     private fun add_some(x: u64): |u64|u64 {
         closure#1test::__lambda__1__add_some(x)
     }
-    private fun chain(v: vector<|u64||u64|u64>): u64 {
-        Add<u64>(((Deref(vector::borrow<|u64||u64|u64>(Borrow(Immutable)(v), 0)))(1))(2), (test::add_some(1))(2))
+    private fun chain(v: vector<|u64|(|u64|u64)>): u64 {
+        Add<u64>(((Deref(vector::borrow<|u64|(|u64|u64)>(Borrow(Immutable)(v), 0)))(1))(2), (test::add_some(1))(2))
     }
     private fun __lambda__1__add_some(x: u64,y: u64): u64 {
         Add<u64>(x, y)
@@ -16,8 +16,8 @@ module 0x66::test {
     fun add_some(x: u64): |u64|u64 {
         |arg0| __lambda__1__add_some(x, arg0)
     }
-    fun chain(v: vector<|u64||u64|u64>): u64 {
-        (*0x1::vector::borrow<|u64||u64|u64>(&v, 0))(1)(2) + add_some(1)(2)
+    fun chain(v: vector<|u64|(|u64|u64)>): u64 {
+        (*0x1::vector::borrow<|u64|(|u64|u64)>(&v, 0))(1)(2) + add_some(1)(2)
     }
     fun __lambda__1__add_some(x: u64, y: u64): u64 {
         x + y
