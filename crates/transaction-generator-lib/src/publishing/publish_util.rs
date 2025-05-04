@@ -18,7 +18,9 @@ use aptos_sdk::{
 };
 use move_binary_format::{
     access::ModuleAccess,
+    deserializer::DeserializerConfig,
     file_format::{CompiledScript, FunctionHandleIndex, IdentifierIndex, SignatureToken},
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT, VERSION_MAX},
     CompiledModule,
 };
 use rand::{rngs::StdRng, Rng};
@@ -115,11 +117,12 @@ impl PackageHandler {
 // Enum to define all packages known to the publisher code.
 #[derive(Clone, Debug)]
 pub enum Package {
-    Simple(
-        Vec<(String, CompiledModule)>,
-        PackageMetadata,
-        Option<CompiledScript>,
-    ),
+    Simple {
+        /// (module_name, compiled_module, binary_format_version)
+        modules: Vec<(String, CompiledModule, u32)>,
+        metadata: PackageMetadata,
+        script: Option<CompiledScript>,
+    },
 }
 
 impl Package {
@@ -131,12 +134,18 @@ impl Package {
         let script = pre_built
             .package_script(name)
             .map(|code| CompiledScript::deserialize(code).expect("Script must deserialize"));
-        Self::Simple(modules, metadata, script)
+        Self::Simple {
+            modules,
+            metadata,
+            script,
+        }
     }
 
     pub fn script(&self, publisher: AccountAddress) -> TransactionPayload {
         match self {
-            Self::Simple(_, _, script_opt) => {
+            Self::Simple {
+                script: script_opt, ..
+            } => {
                 let mut script = script_opt
                     .clone()
                     .expect("Script not defined for wanted package");
@@ -161,14 +170,29 @@ impl Package {
     fn load_package(
         package_bytes: &[u8],
         modules_bytes: &[Vec<u8>],
-    ) -> (Vec<(String, CompiledModule)>, PackageMetadata) {
+    ) -> (Vec<(String, CompiledModule, u32)>, PackageMetadata) {
         let metadata = bcs::from_bytes::<PackageMetadata>(package_bytes)
             .expect("PackageMetadata for GenericModule must deserialize");
         let mut modules = Vec::new();
+
+        let default_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+
         for module_content in modules_bytes {
-            let module =
-                CompiledModule::deserialize(module_content).expect("Simple.move must deserialize");
-            modules.push((module.self_id().name().to_string(), module));
+            let (module, binary_format_version) = if let Ok(module) =
+                CompiledModule::deserialize_with_config(module_content, &default_config)
+            {
+                (module, VERSION_DEFAULT)
+            } else {
+                let module = CompiledModule::deserialize(module_content)
+                    .expect("Simple.move must deserialize");
+                (module, VERSION_MAX)
+            };
+
+            modules.push((
+                module.self_id().name().to_string(),
+                module,
+                binary_format_version,
+            ));
         }
         (modules, metadata)
     }
@@ -176,23 +200,33 @@ impl Package {
     // Given an "original" package, updates all modules with the given publisher.
     pub fn update(&self, publisher: AccountAddress, suffix: u64) -> Self {
         match self {
-            Self::Simple(modules, metadata, script) => {
+            Self::Simple {
+                modules,
+                metadata,
+                script,
+            } => {
                 let (new_modules, metadata) = update(modules, metadata, publisher, suffix);
-                Self::Simple(new_modules, metadata, script.clone())
+                Self::Simple {
+                    modules: new_modules,
+                    metadata,
+                    script: script.clone(),
+                }
             },
         }
     }
 
     pub fn get_publish_args(&self) -> (Vec<u8>, Vec<Vec<u8>>) {
         match self {
-            Self::Simple(modules, metadata, _) => {
+            Self::Simple {
+                modules, metadata, ..
+            } => {
                 let metadata_serialized =
                     bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
                 let mut code: Vec<Vec<u8>> = vec![];
-                for (_, module) in modules {
+                for (_, module, binary_format_version) in modules {
                     let mut module_code: Vec<u8> = vec![];
                     module
-                        .serialize(&mut module_code)
+                        .serialize_for_version(Some(*binary_format_version), &mut module_code)
                         .expect("Module must serialize");
                     code.push(module_code);
                 }
@@ -209,8 +243,8 @@ impl Package {
 
     pub fn get_module_id(&self, module_name: &str) -> ModuleId {
         match self {
-            Self::Simple(modules, _, _) => {
-                for (name, module) in modules {
+            Self::Simple { modules, .. } => {
+                for (name, module, _) in modules {
                     if name == module_name {
                         return module.self_id();
                     }
@@ -222,8 +256,8 @@ impl Package {
 
     pub fn get_mut_module(&mut self, module_name: &str) -> &mut CompiledModule {
         match self {
-            Self::Simple(modules, _, _) => {
-                for (name, module) in modules {
+            Self::Simple { modules, .. } => {
+                for (name, module, _) in modules {
                     if name == module_name {
                         return module;
                     }
@@ -235,13 +269,13 @@ impl Package {
 }
 
 fn update(
-    modules: &[(String, CompiledModule)],
+    modules: &[(String, CompiledModule, u32)],
     metadata: &PackageMetadata,
     publisher: AccountAddress,
     suffix: u64,
-) -> (Vec<(String, CompiledModule)>, PackageMetadata) {
+) -> (Vec<(String, CompiledModule, u32)>, PackageMetadata) {
     let mut new_modules = Vec::new();
-    for (original_name, module) in modules {
+    for (original_name, module, binary_format_version) in modules {
         let mut new_module = module.clone();
         let module_handle = new_module
             .module_handles
@@ -311,7 +345,7 @@ fn update(
             assert!(count == 1, "{:?}", new_module.metadata);
         }
 
-        new_modules.push((original_name.clone(), new_module));
+        new_modules.push((original_name.clone(), new_module, *binary_format_version));
     }
     let mut metadata = metadata.clone();
     if suffix > 0 {

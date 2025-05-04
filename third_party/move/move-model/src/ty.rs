@@ -108,7 +108,7 @@ pub enum PrimitiveType {
 }
 
 /// A type substitution.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct Substitution {
     /// Assignment of types to variables.
     subs: BTreeMap<u32, Type>,
@@ -384,7 +384,7 @@ impl ConstraintOrigin {
 }
 
 impl Constraint {
-    /// Returns the default type of some constraint. At the end of type unification, variables
+    /// Returns the default type of constraint. At the end of type unification, variables
     /// with constraints that have defaults will be substituted by those defaults.
     pub fn default_type(&self) -> Option<Type> {
         match self {
@@ -405,6 +405,45 @@ impl Constraint {
                     AbilitySet::EMPTY,
                 ))
             },
+            _ => None,
+        }
+    }
+
+    /// Determines the default type for a list of constraints. This finds a constraint
+    /// which can generate a type, and then checks whether it is compatible with any
+    /// other provided constraints.
+    pub fn default_type_for<'a>(constrs: impl Iterator<Item = &'a Constraint>) -> Option<Type> {
+        let mut result = None;
+        let mut abilities = None;
+        for ctr in constrs {
+            if let Some(ty) = ctr.default_type() {
+                result = Some(ty)
+            } else {
+                match ctr {
+                    Constraint::HasAbilities(abs, _) => abilities = Some(*abs),
+                    Constraint::NoTuple | Constraint::NoPhantom | Constraint::NoReference => {
+                        // Skip, is trivially satisfied for a concrete type
+                    },
+                    Constraint::SomeNumber(_)
+                    | Constraint::SomeReference(_)
+                    | Constraint::SomeStruct(_)
+                    | Constraint::SomeReceiverFunction(..)
+                    | Constraint::SomeFunctionValue(..)
+                    | Constraint::WithDefault(_) => {
+                        // Incompatible
+                        return None;
+                    },
+                }
+            }
+        }
+        match (abilities, result) {
+            (Some(abs), Some(Type::Fun(arg, res, _))) => Some(Type::Fun(arg, res, abs)),
+            (Some(abs), Some(Type::Primitive(PrimitiveType::U64)))
+                if !abs.has_ability(Ability::Key) =>
+            {
+                Some(Type::Primitive(PrimitiveType::U64))
+            },
+            (None, result) => result,
             _ => None,
         }
     }
@@ -1172,7 +1211,7 @@ impl Type {
         if params.is_empty() {
             self.clone()
         } else {
-            self.replace(Some(params), None, false)
+            self.replace(Some(params), None, false, &mut BTreeSet::new())
         }
     }
 
@@ -1209,11 +1248,12 @@ impl Type {
         params: Option<&[Type]>,
         subs: Option<&Substitution>,
         use_constr: bool,
+        visiting: &mut BTreeSet<u32>,
     ) -> Type {
-        let replace_vec = |types: &[Type]| -> Vec<Type> {
+        let replace_vec = |types: &[Type], visited: &mut BTreeSet<u32>| -> Vec<Type> {
             types
                 .iter()
-                .map(|t| t.replace(params, subs, use_constr))
+                .map(move |t| t.replace(params, subs, use_constr, visited))
                 .collect()
         };
         match self {
@@ -1229,14 +1269,34 @@ impl Type {
                     if let Some(t) = s.subs.get(i) {
                         // Recursively call replacement again here, in case the substitution s
                         // refers to type variables.
-                        // TODO: a more efficient approach is to maintain that type assignments
-                        // are always fully specialized w.r.t. to the substitution.
-                        t.replace(params, subs, use_constr)
+                        //
+                        // We need to check for cycles here because a type created by
+                        // `Constraint::default_type_for` below can introduce a cyclic
+                        // replacement. As an example, consider:
+                        //
+                        //   v1 -> v5
+                        //   v5 where SomeFunctionValue(v1, t)
+                        //
+                        // In this case, we abandon replacement which leads to free type variables
+                        // and produces an inference error.
+                        if visiting.insert(*i) {
+                            let result = t.replace(params, subs, use_constr, visiting);
+                            visiting.remove(i);
+                            result
+                        } else {
+                            t.clone()
+                        }
                     } else if use_constr {
-                        if let Some(default_ty) = s.constraints.get(i).and_then(|constrs| {
-                            constrs.iter().find_map(|(_, _, c)| c.default_type())
+                        if let Some(default_ty) = s.constraints.get(i).and_then(|ctrs| {
+                            Constraint::default_type_for(ctrs.iter().map(|(_, _, c)| c))
                         }) {
-                            default_ty.replace(params, subs, use_constr)
+                            if visiting.insert(*i) {
+                                let result = default_ty.replace(params, subs, use_constr, visiting);
+                                visiting.remove(i);
+                                result
+                            } else {
+                                default_ty
+                            }
                         } else {
                             self.clone()
                         }
@@ -1247,23 +1307,28 @@ impl Type {
                     self.clone()
                 }
             },
-            Type::Reference(kind, bt) => {
-                Type::Reference(*kind, Box::new(bt.replace(params, subs, use_constr)))
-            },
-            Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args)),
+            Type::Reference(kind, bt) => Type::Reference(
+                *kind,
+                Box::new(bt.replace(params, subs, use_constr, visiting)),
+            ),
+            Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args, visiting)),
             Type::Fun(arg, result, abilities) => Type::Fun(
-                Box::new(arg.replace(params, subs, use_constr)),
-                Box::new(result.replace(params, subs, use_constr)),
+                Box::new(arg.replace(params, subs, use_constr, visiting)),
+                Box::new(result.replace(params, subs, use_constr, visiting)),
                 *abilities,
             ),
-            Type::Tuple(args) => Type::Tuple(replace_vec(args)),
-            Type::Vector(et) => Type::Vector(Box::new(et.replace(params, subs, use_constr))),
+            Type::Tuple(args) => Type::Tuple(replace_vec(args, visiting)),
+            Type::Vector(et) => {
+                Type::Vector(Box::new(et.replace(params, subs, use_constr, visiting)))
+            },
             Type::TypeDomain(et) => {
-                Type::TypeDomain(Box::new(et.replace(params, subs, use_constr)))
+                Type::TypeDomain(Box::new(et.replace(params, subs, use_constr, visiting)))
             },
-            Type::ResourceDomain(mid, sid, args_opt) => {
-                Type::ResourceDomain(*mid, *sid, args_opt.as_ref().map(|args| replace_vec(args)))
-            },
+            Type::ResourceDomain(mid, sid, args_opt) => Type::ResourceDomain(
+                *mid,
+                *sid,
+                args_opt.as_ref().map(|args| replace_vec(args, visiting)),
+            ),
             Type::Primitive(..) | Type::Error => self.clone(),
         }
     }
@@ -1788,6 +1853,23 @@ impl AbilityContext for NoUnificationContext {
     }
 }
 
+impl Debug for Substitution {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for (i, ty) in &self.subs {
+            writeln!(f, "Var({}) => {:?}", i, ty)?
+        }
+        for (i, ctrs) in &self.constraints {
+            writeln!(
+                f,
+                "Var({}) where {:?}",
+                i,
+                ctrs.iter().map(|(_, _, c)| c).collect_vec()
+            )?
+        }
+        Ok(())
+    }
+}
+
 impl Substitution {
     /// Creates a new substitution.
     pub fn new() -> Self {
@@ -1907,7 +1989,8 @@ impl Substitution {
             ty = self.specialize(&ty)
         }
 
-        // Occurs check
+        // Occurs check. Since we specialized the type, we do not need to
+        // check transitively.
         if ty.get_vars().contains(&var) {
             Err(TypeUnificationError::CyclicSubstitution(Type::Var(var), ty))
         } else {
@@ -2312,14 +2395,14 @@ impl Substitution {
 
     /// Specializes the type, substituting all variables bound in this substitution.
     pub fn specialize(&self, t: &Type) -> Type {
-        t.replace(None, Some(self), false)
+        t.replace(None, Some(self), false, &mut BTreeSet::new())
     }
 
     /// Similar like `specialize`, but if a variable is not resolvable but has constraints,
     /// attempts to derive a default from the constraints. For instance, a `SomeNumber(..u64..)`
     /// constraint can default to `u64`.
     pub fn specialize_with_defaults(&self, t: &Type) -> Type {
-        t.replace(None, Some(self), true)
+        t.replace(None, Some(self), true, &mut BTreeSet::new())
     }
 
     /// Checks whether the type is a number, considering constraints.
@@ -3125,9 +3208,28 @@ impl TypeUnificationError {
                         main_msg
                     },
                     Constraint::SomeReceiverFunction(name, ..) => {
+                        let name_display =
+                            name.display(display_context.env.symbol_pool()).to_string();
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            let sid = &mid.qualified_inst(*sid, inst.clone());
+                            let (field_decls, _) =
+                                unification_context.get_struct_field_decls(sid, *name);
+                            let field_is_function = !field_decls.is_empty()
+                                && field_decls
+                                    .iter()
+                                    .all(|(_, field_type)| field_type.is_function());
+                            if field_is_function {
+                                let hint = format!(
+                                    "if you intend to call the closure stored in field `{}`, \
+                                    surround the entire field access with parenthesis `()`",
+                                    name_display
+                                );
+                                hints.push(hint);
+                            }
+                        }
                         format!(
                             "undeclared receiver function `{}` for type `{}`",
-                            name.display(display_context.env.symbol_pool()),
+                            name_display,
                             ty.display(display_context)
                         )
                     },
@@ -3428,13 +3530,19 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
-                write!(f, "{}", a.display(self.context))?;
+                if !a.is_unit() {
+                    write!(f, "{}", a.display(self.context))?;
+                }
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))?;
+                    if t.is_function() {
+                        write!(f, "({})", t.display(self.context))?;
+                    } else {
+                        write!(f, "{}", t.display(self.context))?;
+                    }
                 }
                 if !abilities.is_empty() {
-                    write!(f, " with {}", abilities)
+                    write!(f, " has {}", abilities)
                 } else {
                     Ok(())
                 }

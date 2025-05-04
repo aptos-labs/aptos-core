@@ -1,7 +1,7 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x66::test {
     struct Work {
-        0: |u64|u64 with drop,
+        0: |u64|u64 has drop,
     }
     private fun t1(): bool {
         {
@@ -26,10 +26,10 @@ module 0x66::test {
     }
 } // end 0x66::test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x66::test {
     struct Work has drop {
-        0: |u64|u64 with drop,
+        0: |u64|u64 has drop,
     }
     fun t1(): bool {
         let work = Work(|arg0| __lambda__1__t1(arg0));

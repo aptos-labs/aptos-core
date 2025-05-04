@@ -50,7 +50,7 @@ note: unused schema M::SchemaExp
 73 │ │     }
    │ ╰─────^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::M {
     struct S<X> {
         x: X,
@@ -76,7 +76,7 @@ module 0x42::M {
 
 } // end 0x42::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::M {
     struct S<X> {
         x: X,

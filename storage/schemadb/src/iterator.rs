@@ -7,6 +7,7 @@ use crate::{
 };
 use std::marker::PhantomData;
 
+#[derive(PartialEq)]
 pub enum ScanDirection {
     Forward,
     Backward,

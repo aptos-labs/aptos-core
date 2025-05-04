@@ -1,12 +1,4 @@
-
-Diagnostics:
-warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
-  ┌─ tests/checking-lang-v2.2/lambda/inline-parity/unused_lambda_param.move:7:18
-  │
-7 │         test(0, |x| 1);
-  │                  ^
-
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     private fun test(p: u64,f: |u64|u64): u64 {
         (f)(p)
@@ -37,7 +29,7 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     fun test(p: u64, f: |u64|u64): u64 {
         f(p)

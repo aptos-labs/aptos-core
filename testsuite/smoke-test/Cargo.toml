@@ -52,6 +52,7 @@ diesel = { workspace = true, features = [
     "serde_json",
 ] }
 digest = { workspace = true }
+ethers = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-binary-format = { workspace = true }

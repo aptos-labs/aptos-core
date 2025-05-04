@@ -149,8 +149,9 @@ impl DebuggerStateView {
         version: Version,
     ) -> Result<Option<StateValue>> {
         let (tx, rx) = std::sync::mpsc::channel();
-        let query_handler_locked = self.query_sender.lock().unwrap();
-        query_handler_locked
+        self.query_sender
+            .lock()
+            .unwrap()
             .send((state_key.clone(), version, tx))
             .unwrap();
         rx.recv()?

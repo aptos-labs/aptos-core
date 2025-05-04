@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::foo($t0: u64, $t1: u64): u64 {
@@ -55,6 +55,31 @@ fun m::foo($t0: u64, $t1: u64): u64 {
      # before: { no: $t2 }, after: all initialized
   8: $t2 := infer($t8)
      # before: all initialized, after: all initialized
+  9: return $t2
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::foo($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t4 := infer($t0)
+  1: $t3 := +($t4, $t1)
+  2: $t6 := infer($t3)
+  3: $t7 := 1
+  4: $t5 := +($t6, $t7)
+  5: $t9 := infer($t5)
+  6: $t10 := 1
+  7: $t8 := +($t9, $t10)
+  8: $t2 := infer($t8)
   9: return $t2
 }
 
