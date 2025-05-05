@@ -17,6 +17,7 @@ use crate::{
         },
         observer::{
             active_state::ActiveObserverState,
+            execution_pool::ObservedOrderedBlock,
             fallback_manager::ObserverFallbackManager,
             ordered_blocks::OrderedBlockStore,
             payload_store::BlockPayloadStore,
@@ -39,6 +40,8 @@ use aptos_config::{
 use aptos_consensus_types::{
     pipeline,
     pipelined_block::{PipelineFutures, PipelinedBlock},
+    vote_data::VoteData,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
@@ -310,7 +313,7 @@ impl ConsensusObserver {
             .execution_client
             .finalize_order(
                 ordered_block.blocks(),
-                ordered_block.ordered_proof().clone(),
+                WrappedLedgerInfo::new(VoteData::dummy(), ordered_block.ordered_proof().clone()),
                 commit_callback,
             )
             .await
@@ -760,8 +763,12 @@ impl ConsensusObserver {
         update_metrics_for_ordered_block_message(peer_network_id, &ordered_block);
 
         // Create a new pending block with metadata
-        let pending_block_with_metadata =
-            PendingBlockWithMetadata::new(peer_network_id, message_received_time, ordered_block);
+        let observed_ordered_block = ObservedOrderedBlock::new(ordered_block);
+        let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
+            peer_network_id,
+            message_received_time,
+            observed_ordered_block,
+        );
 
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
@@ -779,11 +786,12 @@ impl ConsensusObserver {
     /// has been sanity checked and that all payloads exist.
     async fn process_ordered_block(
         &mut self,
-        pending_block_with_metadata: PendingBlockWithMetadata,
+        pending_block_with_metadata: Arc<PendingBlockWithMetadata>,
     ) {
         // Unpack the pending block
-        let (peer_network_id, message_received_time, ordered_block) =
-            pending_block_with_metadata.into_parts();
+        let (peer_network_id, message_received_time, observed_ordered_block) =
+            pending_block_with_metadata.unpack();
+        let ordered_block = observed_ordered_block.ordered_block().clone();
 
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
@@ -844,7 +852,7 @@ impl ConsensusObserver {
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
-                .insert_ordered_block(ordered_block.clone());
+                .insert_ordered_block(observed_ordered_block.clone());
 
             // If state sync is not syncing to a commit, finalize the ordered blocks
             if !self.state_sync_manager.is_syncing_to_commit() {
@@ -1092,8 +1100,9 @@ impl ConsensusObserver {
 
         // Process all the newly ordered blocks
         let all_ordered_blocks = self.ordered_block_store.lock().get_all_ordered_blocks();
-        for (_, (ordered_block, commit_decision)) in all_ordered_blocks {
+        for (_, (observed_ordered_block, commit_decision)) in all_ordered_blocks {
             // Finalize the ordered block
+            let ordered_block = observed_ordered_block.consume_ordered_block();
             self.finalize_ordered_block(ordered_block).await;
 
             // If a commit decision is available, forward it to the execution pipeline

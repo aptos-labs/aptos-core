@@ -21,8 +21,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl, SpecVarDecl,
-        TempIndex, Value,
+        Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind,
+        SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -255,6 +255,98 @@ impl<'env> SpecTranslator<'env> {
         }
     }
 
+    /// Generates axioms for uninterpreted spec function.
+    fn generate_spec_function_axioms(
+        &self,
+        fun: &SpecFunDecl,
+        module_env: &ModuleEnv,
+        boogie_name: String,
+        param_list: String,
+    ) {
+        let collect_conditions = |kind: ConditionKind| {
+            fun.spec
+                .borrow()
+                .conditions
+                .clone()
+                .into_iter()
+                .filter(|cond| cond.kind == kind)
+                .collect_vec()
+        };
+        let emit_condition = |conditions: &[Condition], negate: bool| {
+            for (i, cond) in conditions.iter().enumerate() {
+                if i > 0 {
+                    emitln!(self.writer, " && ");
+                }
+                for (j, exp) in cond.all_exps().enumerate() {
+                    emit!(self.writer, "{}(", if negate { "!" } else { "" });
+                    self.translate_exp(exp);
+                    emit!(self.writer, ")");
+                    if j > 0 {
+                        emitln!(self.writer, " && ");
+                    }
+                }
+            }
+        };
+        let aborts_if = collect_conditions(ConditionKind::AbortsIf);
+        let requires = collect_conditions(ConditionKind::Requires);
+        let ensures = collect_conditions(ConditionKind::Ensures);
+        let emit_requires = || {
+            if !requires.is_empty() {
+                emit!(self.writer, "(");
+                emit_condition(&requires, false);
+                emit!(self.writer, ") ");
+            }
+            if !aborts_if.is_empty() {
+                if !requires.is_empty() {
+                    emitln!(self.writer, " && ");
+                }
+                emit!(self.writer, "(");
+                emit_condition(&aborts_if, true);
+                emit!(self.writer, ")");
+            }
+        };
+        let emit_predicate = |exp| {
+            if !requires.is_empty() || !aborts_if.is_empty() {
+                emit!(self.writer, "(");
+                emit_requires();
+                emit!(self.writer, "==> ");
+            }
+            emit!(self.writer, "(");
+            self.translate_exp(exp);
+            emit!(self.writer, ")");
+            if !requires.is_empty() || !aborts_if.is_empty() {
+                emit!(self.writer, ")");
+            }
+        };
+        for cond in ensures.iter() {
+            let call = format!(
+                "{}({})",
+                boogie_name,
+                fun.params
+                    .iter()
+                    .map(|Parameter(n, ..)| { format!("{}", n.display(module_env.symbol_pool())) })
+                    .join(", ")
+            );
+            //TODO(#16256): currently spec function does not support tuple as return type
+            for exp in cond.all_exps() {
+                if !param_list.is_empty() {
+                    emitln!(
+                        self.writer,
+                        "axiom (forall {} ::\n(var $ret0 := {};",
+                        param_list,
+                        call,
+                    );
+                    emit_predicate(exp);
+                    emitln!(self.writer, "\n));");
+                } else {
+                    emitln!(self.writer, "axiom (var $ret0 := {};", call,);
+                    emit_predicate(exp);
+                    emitln!(self.writer, "\n);");
+                }
+            }
+        }
+    }
+
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
             // This function is native and expected to be found in the prelude.
@@ -436,6 +528,9 @@ impl<'env> SpecTranslator<'env> {
                     );
                 }
             }
+            // Generate axioms from the spec block attached to the spec function
+            // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
+            self.generate_spec_function_axioms(fun, module_env, boogie_name, param_list);
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();

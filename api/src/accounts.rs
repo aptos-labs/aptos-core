@@ -264,28 +264,53 @@ impl Account {
     /// * BCS: Return a BCS encoded version of [`AccountData`]
     pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
         // Retrieve the Account resource and convert it accordingly
-        let state_value = self.get_account_resource()?;
+        let state_value_opt = self.get_account_resource()?;
+
+        let account_resource = if let Some(state_value) = &state_value_opt {
+            let account_resource: AccountResource = bcs::from_bytes(state_value)
+                .context("Internal error deserializing response from DB")
+                .map_err(|err| {
+                    BasicErrorWith404::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                })?;
+            account_resource
+        } else {
+            let stateless_account_enabled = self
+                .context
+                .feature_enabled(
+                    aptos_types::on_chain_config::FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+                )
+                .context("Failed to check if stateless account is enabled")
+                .map_err(|_| {
+                    BasicErrorWith404::internal_with_code(
+                        "Failed to check if stateless account is enabled",
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                })?;
+            if stateless_account_enabled {
+                AccountResource::new_stateless(*self.address.inner())
+            } else {
+                Err(account_not_found(
+                    self.address,
+                    self.ledger_version,
+                    &self.latest_ledger_info,
+                ))?
+            }
+        };
 
         // Convert the AccountResource into the summary object AccountData
-        let account_resource: AccountResource = bcs::from_bytes(&state_value)
-            .context("Internal error deserializing response from DB")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
-                )
-            })?;
-        let account_data: AccountData = account_resource.into();
-
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
-                account_data,
+                account_resource.into(),
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
             AcceptType::Bcs => BasicResponse::try_from_encoded((
-                state_value,
+                state_value_opt.unwrap_or_else(|| bcs::to_bytes(&account_resource).unwrap()),
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
@@ -399,7 +424,8 @@ impl Account {
         }
     }
 
-    pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
+    /// Retrieves the account resource for the associated account
+    fn get_account_resource(&self) -> Result<Option<Vec<u8>>, BasicErrorWith404> {
         let state_key =
             StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
                 BasicErrorWith404::internal_with_code(
@@ -409,42 +435,8 @@ impl Account {
                 )
             })?;
 
-        let state_value = self.context.get_state_value_poem(
-            &state_key,
-            self.ledger_version,
-            &self.latest_ledger_info,
-        )?;
-
-        state_value.ok_or_else(|| {
-            account_not_found(self.address, self.ledger_version, &self.latest_ledger_info)
-        })
-    }
-
-    /// Returns an error if an object or account resource does not exist at the address specified
-    /// within the context provided.
-    pub(crate) fn verify_account_or_object_resource(&self) -> Result<(), BasicErrorWith404> {
-        if self.get_account_resource().is_ok() {
-            return Ok(());
-        }
-
-        let state_key =
-            StateKey::resource_group(&self.address.into(), &ObjectGroupResource::struct_tag());
-
-        let state_value = self.context.get_state_value_poem(
-            &state_key,
-            self.ledger_version,
-            &self.latest_ledger_info,
-        )?;
-
-        if state_value.is_some() {
-            Ok(())
-        } else {
-            Err(account_not_found(
-                self.address,
-                self.ledger_version,
-                &self.latest_ledger_info,
-            ))
-        }
+        self.context
+            .get_state_value_poem(&state_key, self.ledger_version, &self.latest_ledger_info)
     }
 
     /// Retrieves the move resources associated with the account
@@ -455,8 +447,6 @@ impl Account {
     /// Note: For the BCS response, if results are being returned in pages, i.e. with the
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
     pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
-        // check account exists
-        self.verify_account_or_object_resource()?;
         let max_account_resources_page_size = self.context.max_account_resources_page_size();
         let (resources, next_state_key) = self
             .context
@@ -527,8 +517,6 @@ impl Account {
     /// Note: For the BCS response, if results are being returned in pages, i.e. with the
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
     pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
-        // check account exists
-        self.verify_account_or_object_resource()?;
         let max_account_modules_page_size = self.context.max_account_modules_page_size();
         let (modules, next_state_key) = self
             .context

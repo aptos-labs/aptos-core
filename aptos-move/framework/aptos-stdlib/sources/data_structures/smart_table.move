@@ -75,7 +75,7 @@ module aptos_std::smart_table {
     ): SmartTable<K, V> {
         assert!(split_load_threshold <= 100, error::invalid_argument(EINVALID_LOAD_THRESHOLD_PERCENT));
         let buckets = table_with_length::new();
-        table_with_length::add(&mut buckets, 0, vector::empty());
+        buckets.add(0, vector::empty());
         let table = SmartTable {
             buckets,
             num_buckets: 1,
@@ -90,8 +90,8 @@ module aptos_std::smart_table {
             num_initial_buckets = 2;
         };
         while (num_initial_buckets > 1) {
-            num_initial_buckets = num_initial_buckets - 1;
-            split_one_bucket(&mut table);
+            num_initial_buckets -= 1;
+            table.split_one_bucket();
         };
         table
     }
@@ -100,28 +100,24 @@ module aptos_std::smart_table {
     /// Aborts if it's not empty.
     public fun destroy_empty<K, V>(self: SmartTable<K, V>) {
         assert!(self.size == 0, error::invalid_argument(ENOT_EMPTY));
-        let i = 0;
-        while (i < self.num_buckets) {
-            vector::destroy_empty(table_with_length::remove(&mut self.buckets, i));
-            i = i + 1;
+        for (i in 0..self.num_buckets) {
+            self.buckets.remove(i).destroy_empty();
         };
         let SmartTable { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = self;
-        table_with_length::destroy_empty(buckets);
+        buckets.destroy_empty();
     }
 
     /// Destroy a table completely when V has `drop`.
     public fun destroy<K: drop, V: drop>(self: SmartTable<K, V>) {
-        clear(&mut self);
-        destroy_empty(self);
+        self.clear();
+        self.destroy_empty();
     }
 
     /// Clear a table completely when T has `drop`.
     public fun clear<K: drop, V: drop>(self: &mut SmartTable<K, V>) {
-        *table_with_length::borrow_mut(&mut self.buckets, 0) = vector::empty();
-        let i = 1;
-        while (i < self.num_buckets) {
-            table_with_length::remove(&mut self.buckets, i);
-            i = i + 1;
+        *self.buckets.borrow_mut(0) = vector::empty();
+        for (i in 1..self.num_buckets) {
+            self.buckets.remove(i);
         };
         self.num_buckets = 1;
         self.level = 0;
@@ -136,10 +132,10 @@ module aptos_std::smart_table {
     public fun add<K, V>(self: &mut SmartTable<K, V>, key: K, value: V) {
         let hash = sip_hash_from_value(&key);
         let index = bucket_index(self.level, self.num_buckets, hash);
-        let bucket = table_with_length::borrow_mut(&mut self.buckets, index);
+        let bucket = self.buckets.borrow_mut(index);
         // We set a per-bucket limit here with a upper bound (10000) that nobody should normally reach.
-        assert!(vector::length(bucket) <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
-        assert!(vector::all(bucket, | entry | {
+        assert!(bucket.length() <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
+        assert!(bucket.all(| entry | {
             let e: &Entry<K, V> = entry;
             &e.key != &key
         }), error::invalid_argument(EALREADY_EXIST));
@@ -148,26 +144,26 @@ module aptos_std::smart_table {
             let estimated_entry_size = max(size_of_val(&e), 1);
             self.target_bucket_size = max(1024 /* free_write_quota */ / estimated_entry_size, 1);
         };
-        vector::push_back(bucket, e);
-        self.size = self.size + 1;
+        bucket.push_back(e);
+        self.size += 1;
 
-        if (load_factor(self) >= (self.split_load_threshold as u64)) {
-            split_one_bucket(self);
+        if (self.load_factor() >= (self.split_load_threshold as u64)) {
+            self.split_one_bucket();
         }
     }
 
     /// Add multiple key/value pairs to the smart table. The keys must not already exist.
     public fun add_all<K, V>(self: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
-        vector::zip(keys, values, |key, value| { add(self, key, value); });
+        keys.zip(values, |key, value| { self.add(key, value); });
     }
 
     inline fun unzip_entries<K: copy, V: copy>(entries: &vector<Entry<K, V>>): (vector<K>, vector<V>) {
         let keys = vector[];
         let values = vector[];
-        vector::for_each_ref(entries, |e|{
+        entries.for_each_ref(|e|{
             let entry: &Entry<K, V> = e;
-            vector::push_back(&mut keys, entry.key);
-            vector::push_back(&mut values, entry.value);
+            keys.push_back(entry.key);
+            values.push_back(entry.value);
         });
         (keys, values)
     }
@@ -178,12 +174,10 @@ module aptos_std::smart_table {
     public fun to_simple_map<K: store + copy + drop, V: store + copy>(
         self: &SmartTable<K, V>,
     ): SimpleMap<K, V> {
-        let i = 0;
         let res = simple_map::new<K, V>();
-        while (i < self.num_buckets) {
-            let (keys, values) = unzip_entries(table_with_length::borrow(&self.buckets, i));
-            simple_map::add_all(&mut res, keys, values);
-            i = i + 1;
+        for (i in 0..self.num_buckets) {
+            let (keys, values) = unzip_entries(self.buckets.borrow(i));
+            res.add_all(keys, values);
         };
         res
     }
@@ -195,7 +189,7 @@ module aptos_std::smart_table {
     public fun keys<K: store + copy + drop, V: store + copy>(
         self: &SmartTable<K, V>
     ): vector<K> {
-        let (keys, _, _) = keys_paginated(self, 0, 0, length(self));
+        let (keys, _, _) = self.keys_paginated(0, 0, self.length());
         keys
     }
 
@@ -225,8 +219,8 @@ module aptos_std::smart_table {
         let num_buckets = self.num_buckets;
         let buckets_ref = &self.buckets;
         assert!(starting_bucket_index < num_buckets, EINVALID_BUCKET_INDEX);
-        let bucket_ref = table_with_length::borrow(buckets_ref, starting_bucket_index);
-        let bucket_length = vector::length(bucket_ref);
+        let bucket_ref = buckets_ref.borrow(starting_bucket_index);
+        let bucket_length = bucket_ref.length();
         assert!(
             // In the general case, starting vector index should never be equal to bucket length
             // because then iteration will attempt to borrow a vector element that is out of bounds.
@@ -240,15 +234,15 @@ module aptos_std::smart_table {
         if (num_keys_to_get == 0) return
             (keys, option::some(starting_bucket_index), option::some(starting_vector_index));
         for (bucket_index in starting_bucket_index..num_buckets) {
-            bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
-            bucket_length = vector::length(bucket_ref);
+            bucket_ref = buckets_ref.borrow(bucket_index);
+            bucket_length = bucket_ref.length();
             for (vector_index in starting_vector_index..bucket_length) {
-                vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
-                num_keys_to_get = num_keys_to_get - 1;
+                keys.push_back(bucket_ref.borrow(vector_index).key);
+                num_keys_to_get -= 1;
                 if (num_keys_to_get == 0) {
-                    vector_index = vector_index + 1;
+                    vector_index += 1;
                     return if (vector_index == bucket_length) {
-                        bucket_index = bucket_index + 1;
+                        bucket_index += 1;
                         if (bucket_index < num_buckets) {
                             (keys, option::some(bucket_index), option::some(0))
                         } else {
@@ -272,16 +266,16 @@ module aptos_std::smart_table {
         self.num_buckets = new_bucket_index + 1;
         // if the whole level is splitted once, bump the level.
         if (to_split + 1 == 1 << self.level) {
-            self.level = self.level + 1;
+            self.level += 1;
         };
-        let old_bucket = table_with_length::borrow_mut(&mut self.buckets, to_split);
+        let old_bucket = self.buckets.borrow_mut(to_split);
         // partition the bucket, [0..p) stays in old bucket, [p..len) goes to new bucket
-        let p = vector::partition(old_bucket, |e| {
+        let p = old_bucket.partition(|e| {
             let entry: &Entry<K, V> = e; // Explicit type to satisfy compiler
             bucket_index(self.level, self.num_buckets, entry.hash) != new_bucket_index
         });
-        let new_bucket = vector::trim_reverse(old_bucket, p);
-        table_with_length::add(&mut self.buckets, new_bucket_index, new_bucket);
+        let new_bucket = old_bucket.trim_reverse(p);
+        self.buckets.add(new_bucket_index, new_bucket);
     }
 
     /// Return the expected bucket index to find the hash.
@@ -302,15 +296,13 @@ module aptos_std::smart_table {
     /// Aborts if there is no entry for `key`.
     public fun borrow<K: drop, V>(self: &SmartTable<K, V>, key: K): &V {
         let index = bucket_index(self.level, self.num_buckets, sip_hash_from_value(&key));
-        let bucket = table_with_length::borrow(&self.buckets, index);
-        let i = 0;
-        let len = vector::length(bucket);
-        while (i < len) {
-            let entry = vector::borrow(bucket, i);
+        let bucket = self.buckets.borrow(index);
+        let len = bucket.length();
+        for (i in 0..len) {
+            let entry = bucket.borrow(i);
             if (&entry.key == &key) {
                 return &entry.value
             };
-            i = i + 1;
         };
         abort error::invalid_argument(ENOT_FOUND)
     }
@@ -318,10 +310,10 @@ module aptos_std::smart_table {
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
     public fun borrow_with_default<K: copy + drop, V>(self: &SmartTable<K, V>, key: K, default: &V): &V {
-        if (!contains(self, copy key)) {
+        if (!self.contains(copy key)) {
             default
         } else {
-            borrow(self, copy key)
+            self.borrow(copy key)
         }
     }
 
@@ -329,15 +321,13 @@ module aptos_std::smart_table {
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: drop, V>(self: &mut SmartTable<K, V>, key: K): &mut V {
         let index = bucket_index(self.level, self.num_buckets, sip_hash_from_value(&key));
-        let bucket = table_with_length::borrow_mut(&mut self.buckets, index);
-        let i = 0;
-        let len = vector::length(bucket);
-        while (i < len) {
-            let entry = vector::borrow_mut(bucket, i);
+        let bucket = self.buckets.borrow_mut(index);
+        let len = bucket.length();
+        for (i in 0..len) {
+            let entry = bucket.borrow_mut(i);
             if (&entry.key == &key) {
                 return &mut entry.value
             };
-            i = i + 1;
         };
         abort error::invalid_argument(ENOT_FOUND)
     }
@@ -349,19 +339,18 @@ module aptos_std::smart_table {
         key: K,
         default: V
     ): &mut V {
-        if (!contains(self, copy key)) {
-            add(self, copy key, default)
+        if (!self.contains(copy key)) {
+            self.add(copy key, default)
         };
-        borrow_mut(self, key)
+        self.borrow_mut(key)
     }
 
     /// Returns true iff `table` contains an entry for `key`.
     public fun contains<K: drop, V>(self: &SmartTable<K, V>, key: K): bool {
         let hash = sip_hash_from_value(&key);
         let index = bucket_index(self.level, self.num_buckets, hash);
-        let bucket = table_with_length::borrow(&self.buckets, index);
-        vector::any(bucket, | entry | {
-            let e: &Entry<K, V> = entry;
+        let bucket = self.buckets.borrow(index);
+        bucket.any(| e | {
             e.hash == hash && &e.key == &key
         })
     }
@@ -370,17 +359,15 @@ module aptos_std::smart_table {
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(self: &mut SmartTable<K, V>, key: K): V {
         let index = bucket_index(self.level, self.num_buckets, sip_hash_from_value(&key));
-        let bucket = table_with_length::borrow_mut(&mut self.buckets, index);
-        let i = 0;
-        let len = vector::length(bucket);
-        while (i < len) {
-            let entry = vector::borrow(bucket, i);
+        let bucket = self.buckets.borrow_mut(index);
+        let len = bucket.length();
+        for (i in 0..len) {
+            let entry = bucket.borrow(i);
             if (&entry.key == &key) {
-                let Entry { hash: _, key: _, value } = vector::swap_remove(bucket, i);
-                self.size = self.size - 1;
+                let Entry { hash: _, key: _, value } = bucket.swap_remove(i);
+                self.size -= 1;
                 return value
             };
-            i = i + 1;
         };
         abort error::invalid_argument(ENOT_FOUND)
     }
@@ -388,10 +375,10 @@ module aptos_std::smart_table {
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
     public fun upsert<K: copy + drop, V: drop>(self: &mut SmartTable<K, V>, key: K, value: V) {
-        if (!contains(self, copy key)) {
-            add(self, copy key, value)
+        if (!self.contains(copy key)) {
+            self.add(copy key, value)
         } else {
-            let ref = borrow_mut(self, key);
+            let ref = self.borrow_mut(key);
             *ref = value;
         };
     }
@@ -423,31 +410,21 @@ module aptos_std::smart_table {
 
     /// Apply the function to a reference of each key-value pair in the table.
     public inline fun for_each_ref<K, V>(self: &SmartTable<K, V>, f: |&K, &V|) {
-        let i = 0;
-        while (i < aptos_std::smart_table::num_buckets(self)) {
-            vector::for_each_ref(
-                aptos_std::table_with_length::borrow(aptos_std::smart_table::borrow_buckets(self), i),
-                |elem| {
-                    let (key, value) = aptos_std::smart_table::borrow_kv(elem);
-                    f(key, value)
-                }
-            );
-            i = i + 1;
+        for (i in 0..self.num_buckets()) {
+            self.borrow_buckets().borrow(i).for_each_ref(|elem| {
+                let (key, value) = elem.borrow_kv();
+                f(key, value)
+            });
         }
     }
 
     /// Apply the function to a mutable reference of each key-value pair in the table.
     public inline fun for_each_mut<K, V>(self: &mut SmartTable<K, V>, f: |&K, &mut V|) {
-        let i = 0;
-        while (i < aptos_std::smart_table::num_buckets(self)) {
-            vector::for_each_mut(
-                table_with_length::borrow_mut(aptos_std::smart_table::borrow_buckets_mut(self), i),
-                |elem| {
-                    let (key, value) = aptos_std::smart_table::borrow_kv_mut(elem);
-                    f(key, value)
-                }
-            );
-            i = i + 1;
+        for (i in 0..self.num_buckets()) {
+            self.borrow_buckets_mut().borrow_mut(i).for_each_mut(|elem| {
+                let (key, value) = elem.borrow_kv_mut();
+                f(key, value)
+            });
         };
     }
 
@@ -457,7 +434,7 @@ module aptos_std::smart_table {
         f: |&V1|V2
     ): SmartTable<K, V2> {
         let new_table = new<K, V2>();
-        for_each_ref(self, |key, value| add(&mut new_table, *key, f(value)));
+        self.for_each_ref(|key, value| new_table.add(*key, f(value)));
         new_table
     }
 
@@ -467,14 +444,12 @@ module aptos_std::smart_table {
         p: |&K, &V|bool
     ): bool {
         let found = false;
-        let i = 0;
-        while (i < aptos_std::smart_table::num_buckets(self)) {
-            found = vector::any(table_with_length::borrow(aptos_std::smart_table::borrow_buckets(self), i), |elem| {
-                let (key, value) = aptos_std::smart_table::borrow_kv(elem);
+        for (i in 0..self.num_buckets()) {
+            found = self.borrow_buckets().borrow(i).any(|elem| {
+                let (key, value) = elem.borrow_kv();
                 p(key, value)
             });
             if (found) break;
-            i = i + 1;
         };
         found
     }
@@ -506,24 +481,24 @@ module aptos_std::smart_table {
         let table = new();
         let i = 0;
         while (i < 200) {
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
         };
-        assert!(length(&table) == 200, 0);
+        assert!(table.length() == 200, 0);
         i = 0;
         while (i < 200) {
-            *borrow_mut(&mut table, i) = i * 2;
-            assert!(*borrow(&table, i) == i * 2, 0);
-            i = i + 1;
+            *table.borrow_mut(i) = i * 2;
+            assert!(*table.borrow(i) == i * 2, 0);
+            i += 1;
         };
         i = 0;
         assert!(table.num_buckets > 5, table.num_buckets);
         while (i < 200) {
-            assert!(contains(&table, i), 0);
-            assert!(remove(&mut table, i) == i * 2, 0);
-            i = i + 1;
+            assert!(table.contains(i), 0);
+            assert!(table.remove(i) == i * 2, 0);
+            i += 1;
         };
-        destroy_empty(table);
+        table.destroy_empty();
     }
 
     #[test]
@@ -534,21 +509,21 @@ module aptos_std::smart_table {
         while (i <= 256) {
             assert!(table.num_buckets == i, 0);
             assert!(table.level == level, i);
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
             if (i == 1 << (level + 1)) {
-                level = level + 1;
+                level += 1;
             };
         };
         let i = 1;
         while (i <= 256) {
-            assert!(*borrow(&table, i) == i, 0);
-            i = i + 1;
+            assert!(*table.borrow(i) == i, 0);
+            i += 1;
         };
         assert!(table.num_buckets == 257, table.num_buckets);
-        assert!(load_factor(&table) == 99, 0);
-        assert!(length(&table) == 256, 0);
-        destroy(table);
+        assert!(table.load_factor() == 99, 0);
+        assert!(table.length() == 256, 0);
+        table.destroy();
     }
 
     #[test]
@@ -556,43 +531,43 @@ module aptos_std::smart_table {
         let table = new();
         let i = 0;
         while (i < 200) {
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
         };
-        assert!(length(&table) == 200, 0);
-        update_target_bucket_size(&mut table, 10);
-        update_split_load_threshold(&mut table, 50);
+        assert!(table.length() == 200, 0);
+        table.update_target_bucket_size(10);
+        table.update_split_load_threshold(50);
         while (i < 400) {
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
         };
-        assert!(length(&table) == 400, 0);
+        assert!(table.length() == 400, 0);
         i = 0;
         while (i < 400) {
-            assert!(contains(&table, i), 0);
-            assert!(remove(&mut table, i) == i, 0);
-            i = i + 1;
+            assert!(table.contains(i), 0);
+            assert!(table.remove(i) == i, 0);
+            i += 1;
         };
-        destroy_empty(table);
+        table.destroy_empty();
     }
 
     #[test]
     public fun smart_table_add_all_test() {
         let table: SmartTable<u64, u64> = new_with_config(1, 100, 2);
-        assert!(length(&table) == 0, 0);
-        add_all(&mut table, vector[1, 2, 3, 4, 5, 6, 7], vector[1, 2, 3, 4, 5, 6, 7]);
-        assert!(length(&table) == 7, 1);
+        assert!(table.length() == 0, 0);
+        table.add_all(vector[1, 2, 3, 4, 5, 6, 7], vector[1, 2, 3, 4, 5, 6, 7]);
+        assert!(table.length() == 7, 1);
         let i = 1;
         while (i < 8) {
-            assert!(*borrow(&table, i) == i, 0);
-            i = i + 1;
+            assert!(*table.borrow(i) == i, 0);
+            i += 1;
         };
-        i = i - 1;
+        i -= 1;
         while (i > 0) {
-            remove(&mut table, i);
-            i = i - 1;
+            table.remove(i);
+            i -= 1;
         };
-        destroy_empty(table);
+        table.destroy_empty();
     }
 
     #[test]
@@ -600,12 +575,12 @@ module aptos_std::smart_table {
         let table = new();
         let i = 0;
         while (i < 200) {
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
         };
-        let map = to_simple_map(&table);
-        assert!(simple_map::length(&map) == 200, 0);
-        destroy(table);
+        let map = table.to_simple_map();
+        assert!(map.length() == 200, 0);
+        table.destroy();
     }
 
     #[test]
@@ -613,17 +588,17 @@ module aptos_std::smart_table {
         let table = new();
         let i = 0u64;
         while (i < 200) {
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
         };
-        clear(&mut table);
+        table.clear();
         let i = 0;
         while (i < 200) {
-            add(&mut table, i, i);
-            i = i + 1;
+            table.add(i, i);
+            i += 1;
         };
         assert!(table.size == 200, 0);
-        destroy(table);
+        table.destroy();
     }
 
     #[test]
@@ -631,73 +606,70 @@ module aptos_std::smart_table {
         let i = 0;
         let table = new();
         let expected_keys = vector[];
-        let keys = keys(&table);
-        assert!(vector::is_empty(&keys), 0);
+        let keys = table.keys();
+        assert!(keys.is_empty(), 0);
         let starting_bucket_index = 0;
         let starting_vector_index = 0;
-        let (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
-            &table,
+        let (keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(
             starting_bucket_index,
             starting_vector_index,
             0
         );
         assert!(starting_bucket_index_r == option::some(starting_bucket_index), 0);
         assert!(starting_vector_index_r == option::some(starting_vector_index), 0);
-        assert!(vector::is_empty(&keys), 0);
+        assert!(keys.is_empty(), 0);
         while (i < 100) {
-            add(&mut table, i, 0);
-            vector::push_back(&mut expected_keys, i);
-            i = i + 1;
+            table.add(i, 0);
+            expected_keys.push_back(i);
+            i += 1;
         };
-        let keys = keys(&table);
-        assert!(vector::length(&keys) == vector::length(&expected_keys), 0);
-        vector::for_each_ref(&keys, |e_ref| {
-            assert!(vector::contains(&expected_keys, e_ref), 0);
+        let keys = table.keys();
+        assert!(keys.length() == expected_keys.length(), 0);
+        keys.for_each_ref(|e_ref| {
+            assert!(expected_keys.contains(e_ref), 0);
         });
         let keys = vector[];
         let starting_bucket_index = 0;
         let starting_vector_index = 0;
         let returned_keys = vector[];
-        vector::length(&returned_keys); // To eliminate erroneous compiler "unused" warning
+        returned_keys.length(); // To eliminate erroneous compiler "unused" warning
         loop {
-            (returned_keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
-                &table,
+            (returned_keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(
                 starting_bucket_index,
                 starting_vector_index,
                 15
             );
-            vector::append(&mut keys, returned_keys);
+            keys.append(returned_keys);
             if (
                 starting_bucket_index_r == option::none() ||
                 starting_vector_index_r == option::none()
             ) break;
-            starting_bucket_index = option::destroy_some(starting_bucket_index_r);
-            starting_vector_index = option::destroy_some(starting_vector_index_r);
+            starting_bucket_index = starting_bucket_index_r.destroy_some();
+            starting_vector_index = starting_vector_index_r.destroy_some();
         };
-        assert!(vector::length(&keys) == vector::length(&expected_keys), 0);
-        vector::for_each_ref(&keys, |e_ref| {
-            assert!(vector::contains(&expected_keys, e_ref), 0);
+        assert!(keys.length() == expected_keys.length(), 0);
+        keys.for_each_ref(|e_ref| {
+            assert!(expected_keys.contains(e_ref), 0);
         });
-        destroy(table);
+        table.destroy();
         table = new();
-        add(&mut table, 1, 0);
-        add(&mut table, 2, 0);
-        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(&table, 0, 0, 1);
-        (returned_keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
-            &table,
-            option::destroy_some(starting_bucket_index_r),
-            option::destroy_some(starting_vector_index_r),
-            1,
+        table.add(1, 0);
+        table.add(2, 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(0, 0, 1);
+        (returned_keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(
+            starting_bucket_index_r.destroy_some(),
+            starting_vector_index_r.destroy_some(),
+            1
         );
-        vector::append(&mut keys, returned_keys);
+        keys.append(returned_keys);
         assert!(keys == vector[1, 2] || keys == vector[2, 1], 0);
         assert!(starting_bucket_index_r == option::none(), 0);
         assert!(starting_vector_index_r == option::none(), 0);
-        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(&table, 0, 0, 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(0, 0, 0);
         assert!(keys == vector[], 0);
         assert!(starting_bucket_index_r == option::some(0), 0);
         assert!(starting_vector_index_r == option::some(0), 0);
-        destroy(table);
+        table.destroy();
     }
 
     #[test]
@@ -705,68 +677,57 @@ module aptos_std::smart_table {
         let table = new();
         let expected_keys = vector[];
         for (i in 0..100) {
-            add(&mut table, i, 0);
-            vector::push_back(&mut expected_keys, i);
+            table.add(i, 0);
+            expected_keys.push_back(i);
         };
         let (keys, starting_bucket_index_r, starting_vector_index_r) =
-            keys_paginated(&table, 0, 0, 5); // Both indices 0.
-        assert!(vector::length(&keys) == 5, 0);
-        vector::for_each_ref(&keys, |e_ref| {
-            assert!(vector::contains(&expected_keys, e_ref), 0);
+            table.keys_paginated(0, 0, 5); // Both indices 0.
+        assert!(keys.length() == 5, 0);
+        keys.for_each_ref(|e_ref| {
+            assert!(expected_keys.contains(e_ref), 0);
         });
-        let starting_bucket_index = option::destroy_some(starting_bucket_index_r);
-        let starting_vector_index = option::destroy_some(starting_vector_index_r);
-        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
-            &table,
+        let starting_bucket_index = starting_bucket_index_r.destroy_some();
+        let starting_vector_index = starting_vector_index_r.destroy_some();
+        (keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(
             starting_bucket_index,
             starting_vector_index,
-            0, // Number of keys 0.
+            0
         );
         assert!(keys == vector[], 0);
         assert!(starting_bucket_index_r == option::some(starting_bucket_index), 0);
         assert!(starting_vector_index_r == option::some(starting_vector_index), 0);
-        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
-            &table,
-            starting_bucket_index,
-            0, // Vector index 0.
-            50,
-        );
-        assert!(vector::length(&keys) == 50, 0);
-        vector::for_each_ref(&keys, |e_ref| {
-            assert!(vector::contains(&expected_keys, e_ref), 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(starting_bucket_index, 0, 50);
+        assert!(keys.length() == 50, 0);
+        keys.for_each_ref(|e_ref| {
+            assert!(expected_keys.contains(e_ref), 0);
         });
-        let starting_bucket_index = option::destroy_some(starting_bucket_index_r);
+        let starting_bucket_index = starting_bucket_index_r.destroy_some();
         assert!(starting_bucket_index > 0, 0);
-        assert!(option::is_some(&starting_vector_index_r), 0);
-        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
-            &table,
-            0, // Bucket index 0.
-            1,
-            50,
-        );
-        assert!(vector::length(&keys) == 50, 0);
-        vector::for_each_ref(&keys, |e_ref| {
-            assert!(vector::contains(&expected_keys, e_ref), 0);
+        assert!(starting_vector_index_r.is_some(), 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = table.keys_paginated(0, 1, 50);
+        assert!(keys.length() == 50, 0);
+        keys.for_each_ref(|e_ref| {
+            assert!(expected_keys.contains(e_ref), 0);
         });
-        assert!(option::is_some(&starting_bucket_index_r), 0);
-        assert!(option::is_some(&starting_vector_index_r), 0);
-        destroy(table);
+        assert!(starting_bucket_index_r.is_some(), 0);
+        assert!(starting_vector_index_r.is_some(), 0);
+        table.destroy();
     }
 
     #[test, expected_failure(abort_code = EINVALID_BUCKET_INDEX)]
     fun test_keys_invalid_bucket_index() {
-        let table = new();
-        add(&mut table, 1, 0);
+        let table = new<u64, u64>();
+        table.add(1, 0);
         let num_buckets = table.num_buckets;
-        keys_paginated(&table, num_buckets + 1, 0, 1);
-        destroy(table);
+        table.keys_paginated(num_buckets + 1, 0, 1);
+        table.destroy();
     }
 
     #[test, expected_failure(abort_code = EINVALID_VECTOR_INDEX)]
     fun test_keys_invalid_vector_index() {
         let table = new();
-        add(&mut table, 1, 0);
-        keys_paginated(&table, 0, 1, 1);
-        destroy(table);
+        table.add(1, 0);
+        table.keys_paginated(0, 1, 1);
+        table.destroy();
     }
 }

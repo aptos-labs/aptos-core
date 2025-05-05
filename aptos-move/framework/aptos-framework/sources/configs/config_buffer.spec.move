@@ -22,7 +22,7 @@ spec aptos_framework::config_buffer {
         aborts_if !exists<PendingConfigs>(@aptos_framework);
     }
 
-    spec extract<T: store>(): T {
+    spec extract_v2<T: store>(): T {
         aborts_if !exists<PendingConfigs>(@aptos_framework);
         include ExtractAbortsIf<T>;
     }

@@ -292,9 +292,7 @@ impl Default for LedgerPrunerConfig {
     fn default() -> Self {
         LedgerPrunerConfig {
             enable: true,
-            // This assumes we have 1T disk, minus the space needed by state merkle db and the
-            // overhead in storage.
-            prune_window: 150_000_000,
+            prune_window: 90_000_000,
             batch_size: 5_000,
             user_pruning_window_offset: 200_000,
         }

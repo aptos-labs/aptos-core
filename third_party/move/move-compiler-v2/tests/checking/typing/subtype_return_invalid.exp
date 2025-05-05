@@ -1,30 +1,30 @@
 
 Diagnostics:
-error: the function returns `&mut` but `&` was provided
+error: cannot return `&u64` from a function with result type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/subtype_return_invalid.move:5:9
   │
 5 │         u
   │         ^
 
-error: the function returns `&mut` but `&` was provided
+error: cannot return `&S` from a function with result type `&mut S` (mutability mismatch)
   ┌─ tests/checking/typing/subtype_return_invalid.move:9:9
   │
 9 │         s
   │         ^
 
-error: the function returns `&mut` but `&` was provided
+error: cannot return `(&u64, &u64)` from a function with result type `(&u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_return_invalid.move:13:9
    │
 13 │         (u1, u2)
    │         ^^^^^^^^
 
-error: the function returns `&mut` but `&` was provided
+error: cannot return `(&u64, &u64)` from a function with result type `(&mut u64, &u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_return_invalid.move:17:9
    │
 17 │         (u1, u2)
    │         ^^^^^^^^
 
-error: the function returns `&mut` but `&` was provided
+error: cannot return `(&u64, &u64)` from a function with result type `(&mut u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_return_invalid.move:21:9
    │
 21 │         (u1, u2)

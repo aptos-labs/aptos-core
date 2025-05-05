@@ -7,12 +7,12 @@ use crate::{
     publishing::{entry_point_trait::PreBuiltPackages, publish_util::PackageHandler},
     RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator,
 };
-use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
+use log::{error, info};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::{borrow::Borrow, sync::Arc};
 
@@ -37,7 +37,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
     fn initialize_package(
         &mut self,
         _package: &Package,
-        _publisher: &mut LocalAccount,
+        _publisher: &LocalAccount,
         _txn_factory: &TransactionFactory,
         _rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
@@ -57,6 +57,29 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
         txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker>;
+}
+
+pub struct PlainUserModuleTransactionGenerator {
+    generator_worker: Arc<TransactionGeneratorWorker>,
+}
+
+impl PlainUserModuleTransactionGenerator {
+    pub fn new(generator_worker: Arc<TransactionGeneratorWorker>) -> Self {
+        Self { generator_worker }
+    }
+}
+
+#[async_trait]
+impl UserModuleTransactionGenerator for PlainUserModuleTransactionGenerator {
+    async fn create_generator_fn(
+        &self,
+        _root_account: &dyn RootAccountHandle,
+        _txn_factory: &TransactionFactory,
+        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _rng: &mut StdRng,
+    ) -> Arc<TransactionGeneratorWorker> {
+        self.generator_worker.clone()
+    }
 }
 
 pub struct CustomModulesDelegationGenerator {
@@ -137,7 +160,7 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Self {
-        let mut packages = Self::publish_package(
+        let packages = Self::publish_package(
             init_txn_factory.clone(),
             root_account,
             txn_executor,
@@ -151,7 +174,7 @@ impl CustomModulesDelegationGeneratorCreator {
             init_txn_factory,
             root_account,
             txn_executor,
-            &mut packages,
+            &packages,
             workload,
         )
         .await;
@@ -166,13 +189,13 @@ impl CustomModulesDelegationGeneratorCreator {
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        packages: &mut [(Package, LocalAccount)],
+        packages: &[(Package, LocalAccount)],
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Arc<TransactionGeneratorWorker> {
         let mut rng = StdRng::from_entropy();
         let mut requests_initialize = Vec::with_capacity(packages.len());
 
-        for (package, publisher) in packages.iter_mut() {
+        for (package, publisher) in packages.iter() {
             requests_initialize.append(&mut workload.initialize_package(
                 package,
                 publisher,
@@ -215,7 +238,7 @@ impl CustomModulesDelegationGeneratorCreator {
         let mut packages = Vec::new();
 
         let publisher_balance = publisher_balance.unwrap_or(
-            2 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
+            4 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
         );
         let total_funds = (num_modules as u64) * publisher_balance;
         root_account

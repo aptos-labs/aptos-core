@@ -194,7 +194,7 @@ module aptos_std::bls12381 {
 
     /// Deserializes an aggregate-or-multi-signature from 96 bytes.
     public fun aggr_or_multi_signature_from_bytes(bytes: vector<u8>): AggrOrMultiSignature {
-        assert!(std::vector::length(&bytes) == SIGNATURE_SIZE, std::error::invalid_argument(EWRONG_SIZE));
+        assert!(bytes.length() == SIGNATURE_SIZE, std::error::invalid_argument(EWRONG_SIZE));
 
         AggrOrMultiSignature {
             bytes
@@ -267,41 +267,37 @@ module aptos_std::bls12381 {
     #[test_only]
     /// Generates a multi-signature for a message with multiple signing keys.
     public fun multi_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, message: vector<u8>): AggrOrMultiSignature {
-        let n = std::vector::length(signing_keys);
+        let n = signing_keys.length();
         let sigs = vector[];
-        let i: u64 = 0;
-        while (i < n) {
-            let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), message);
-            std::vector::push_back(&mut sigs, sig);
-            i = i + 1;
+        for (i in 0..n) {
+            let sig = sign_arbitrary_bytes(&signing_keys[i], message);
+            sigs.push_back(sig);
         };
         let multisig = aggregate_signatures(sigs);
-        option::extract(&mut multisig)
+        multisig.extract()
     }
 
     #[test_only]
     /// Generates an aggregated signature over all messages in messages, where signing_keys[i] signs messages[i].
     public fun aggr_sign_arbitrary_bytes(signing_keys: &vector<SecretKey>, messages: &vector<vector<u8>>): AggrOrMultiSignature {
-        let signing_key_count = std::vector::length(signing_keys);
-        let message_count = std::vector::length(messages);
+        let signing_key_count = signing_keys.length();
+        let message_count = messages.length();
         assert!(signing_key_count == message_count, invalid_argument(E_NUM_SIGNERS_MUST_EQ_NUM_MESSAGES));
         let sigs = vector[];
-        let i: u64 = 0;
-        while (i < signing_key_count) {
-            let sig = sign_arbitrary_bytes(std::vector::borrow(signing_keys, i), *std::vector::borrow(messages, i));
-            std::vector::push_back(&mut sigs, sig);
-            i = i + 1;
+        for (i in 0..signing_key_count) {
+            let sig = sign_arbitrary_bytes(&signing_keys[i], messages[i]);
+            sigs.push_back(sig);
         };
         let aggr_sig = aggregate_signatures(sigs);
-        option::extract(&mut aggr_sig)
+        aggr_sig.extract()
     }
 
     #[test_only]
     /// Returns a mauled copy of a byte array.
     public fun maul_bytes(bytes: &vector<u8>): vector<u8> {
         let new_bytes = *bytes;
-        let first_byte = std::vector::borrow_mut(&mut new_bytes, 0);
-        *first_byte = *first_byte ^ 0xff;
+        let first_byte = &mut new_bytes[0];
+        *first_byte ^= 0xff;
         new_bytes
     }
 
@@ -510,9 +506,15 @@ module aptos_std::bls12381 {
     #[test]
     fun test_pubkey_validation() {
         // test low order points (in group for PK)
-        assert!(option::is_none(&public_key_from_bytes(x"ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0")), 1);
-        assert!(option::is_none(&public_key_from_bytes(x"928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68")), 1);
-        assert!(option::is_some(&public_key_from_bytes(x"b3e4921277221e01ed71284be5e3045292b26c7f465a6fcdba53ee47edd39ec5160da3b229a73c75671024dcb36de091")), 1);
+        assert!(
+            public_key_from_bytes(x"ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0").is_none(
+            ), 1);
+        assert!(
+            public_key_from_bytes(x"928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68").is_none(
+            ), 1);
+        assert!(
+            public_key_from_bytes(x"b3e4921277221e01ed71284be5e3045292b26c7f465a6fcdba53ee47edd39ec5160da3b229a73c75671024dcb36de091").is_some(
+            ), 1);
     }
 
     #[test]
@@ -544,18 +546,15 @@ module aptos_std::bls12381 {
             AggrPublicKeysWithPoP { bytes: x"b53df1cfee2168f59e5792e710bf22928dc0553e6531dae5c7656c0a66fc12cb82fbb04863938c953dc901a5a79cc0f3" },
         ];
 
-        let i = 0;
         let accum_pk = std::vector::empty<PublicKeyWithPoP>();
-        while (i < std::vector::length(&pks)) {
-            std::vector::push_back(&mut accum_pk, *std::vector::borrow(&pks, i));
+        for (i in 0..pks.length()) {
+            accum_pk.push_back(pks[i]);
 
             let apk = aggregate_pubkeys(accum_pk);
 
             // Make sure PKs were aggregated correctly
-            assert!(apk == *std::vector::borrow(&agg_pks, i), 1);
+            assert!(apk == agg_pks[i], 1);
             assert!(validate_pubkey_internal(apk.bytes), 1);
-
-            i = i + 1;
         };
     }
 
@@ -563,14 +562,14 @@ module aptos_std::bls12381 {
     fun test_pubkey_validation_against_invalid_keys() {
         let (_sk, pk) = generate_keys();
         let pk_bytes = public_key_with_pop_to_bytes(&pk);
-        assert!(option::is_some(&public_key_from_bytes(pk_bytes)), 1);
-        assert!(option::is_none(&public_key_from_bytes(maul_bytes(&pk_bytes))), 1);
+        assert!(public_key_from_bytes(pk_bytes).is_some(), 1);
+        assert!(public_key_from_bytes(maul_bytes(&pk_bytes)).is_none(), 1);
     }
 
     #[test]
     fun test_signature_aggregation() {
         // First, test empty aggregation
-        assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
+        assert!(aggregate_signatures(vector[]).is_none(), 1);
 
         // Second, try some test-cases generated by running the following command in `crates/aptos-crypto`:
         //  $ cargo test -- sample_aggregate_sigs --nocapture --include-ignored
@@ -593,24 +592,21 @@ module aptos_std::bls12381 {
             AggrOrMultiSignature { bytes: x"8284e4e3983f29cb45020c3e2d89066df2eae533a01cb6ca2c4d466b5e02dd22467f59640aa120db2b9cc49e931415c3097e3d54ff977fd9067b5bc6cfa1c885d9d8821aef20c028999a1d97e783ae049d8fa3d0bbac36ce4ca8e10e551d3461" },
         ];
 
-        let i = 0;
         let accum_sigs = std::vector::empty<Signature>();
-        while (i < std::vector::length(&sigs)) {
-            std::vector::push_back(&mut accum_sigs, *std::vector::borrow(&sigs, i));
+        for (i in 0..sigs.length()) {
+            accum_sigs.push_back(sigs[i]);
 
-            let multisig = option::extract(&mut aggregate_signatures(accum_sigs));
+            let multisig = aggregate_signatures(accum_sigs).extract();
 
             // Make sure sigs were aggregated correctly
-            assert!(multisig == *std::vector::borrow(&multisigs, i), 1);
+            assert!(multisig == multisigs[i], 1);
             assert!(signature_subgroup_check_internal(multisig.bytes), 1);
-
-            i = i + 1;
         };
     }
 
     #[test]
     fun test_empty_signature_aggregation() {
-        assert!(option::is_none(&mut aggregate_signatures(vector[])), 1);
+        assert!(aggregate_signatures(vector[]).is_none(), 1);
     }
 
     #[test]
@@ -643,18 +639,15 @@ module aptos_std::bls12381 {
             AggrOrMultiSignature { bytes: x"b627b2cfd8ae59dcf5e58cc6c230ae369985fd096e1bc3be38da5deafcbed7d939f07cccc75383539940c56c6b6453db193f563f5b6e4fe54915afd9e1baea40a297fa7eda74abbdcd4cc5c667d6db3b9bd265782f7693798894400f2beb4637" },
         ];
 
-        let i = 0;
         let accum_pk = std::vector::empty<PublicKeyWithPoP>();
-        while (i < std::vector::length(&pks)) {
-            std::vector::push_back(&mut accum_pk, *std::vector::borrow(&pks, i));
+        for (i in 0..pks.length()) {
+            accum_pk.push_back(pks[i]);
 
             let apk = aggregate_pubkeys(accum_pk);
 
-            assert!(apk == *std::vector::borrow(&agg_pks, i), 1);
+            assert!(apk == agg_pks[i], 1);
 
-            assert!(verify_multisignature(std::vector::borrow(&multisigs, i), &apk, b"Hello, Aptoverse!"), 1);
-
-            i = i + 1;
+            assert!(verify_multisignature(&multisigs[i], &apk, b"Hello, Aptoverse!"), 1);
         };
     }
 
@@ -667,12 +660,10 @@ module aptos_std::bls12381 {
             // Generate key pairs.
             let signing_keys = vector[];
             let public_keys = vector[];
-            let i = 0;
-            while (i < signer_count) {
+            for (i in 0..signer_count) {
                 let (sk, pk) = generate_keys();
-                std::vector::push_back(&mut signing_keys, sk);
-                std::vector::push_back(&mut public_keys, pk);
-                i = i + 1;
+                signing_keys.push_back(sk);
+                public_keys.push_back(pk);
             };
 
             // Generate multi-signature.
@@ -687,18 +678,16 @@ module aptos_std::bls12381 {
 
             // Also test signature aggregation.
             let signatures = vector[];
-            let i = 0;
-            while (i < signer_count) {
-                let sk = std::vector::borrow(&signing_keys, i);
+            for (i in 0..signer_count) {
+                let sk = signing_keys.borrow(i);
                 let sig = sign_arbitrary_bytes(sk, msg);
-                std::vector::push_back(&mut signatures, sig);
-                i = i + 1;
+                signatures.push_back(sig);
             };
-            let aggregated_signature = option::extract(&mut aggregate_signatures(signatures));
+            let aggregated_signature = aggregate_signatures(signatures).extract();
             assert!(aggr_or_multi_signature_subgroup_check(&aggregated_signature), 1);
             assert!(aggr_or_multi_signature_to_bytes(&aggregated_signature) == aggr_or_multi_signature_to_bytes(&multisig), 1);
 
-            signer_count = signer_count + 1;
+            signer_count += 1;
         }
     }
 
@@ -770,15 +759,15 @@ module aptos_std::bls12381 {
         let i = 0;
         let msg_subset = std::vector::empty<vector<u8>>();
         let pk_subset = std::vector::empty<PublicKeyWithPoP>();
-        while (i < std::vector::length(&pks)) {
-            let aggsig = *std::vector::borrow(&aggsigs, i);
+        while (i < pks.length()) {
+            let aggsig = aggsigs[i];
 
-            std::vector::push_back(&mut pk_subset, *std::vector::borrow(&pks, i));
-            std::vector::push_back(&mut msg_subset, *std::vector::borrow(&msgs, i));
+            pk_subset.push_back(pks[i]);
+            msg_subset.push_back(msgs[i]);
 
             assert!(verify_aggregate_signature(&aggsig, pk_subset, msg_subset), 1);
 
-            i = i + 1;
+            i += 1;
         };
     }
 
@@ -794,23 +783,23 @@ module aptos_std::bls12381 {
             let i = 0;
             while (i < signer_count) {
                 let (sk, pk) = generate_keys();
-                std::vector::push_back(&mut signing_keys, sk);
-                std::vector::push_back(&mut public_keys, pk);
+                signing_keys.push_back(sk);
+                public_keys.push_back(pk);
                 let msg: vector<u8> = vector[104, 101, 108, 108, 111, 32, 97, 112, 116, 111, 115, 32, 117, 115, 101, 114, 32, 48+(i as u8)]; //"hello aptos user {i}"
-                std::vector::push_back(&mut messages, msg);
-                i = i + 1;
+                messages.push_back(msg);
+                i += 1;
             };
 
             // Maul messages and public keys.
-            let mauled_public_keys = vector[maul_public_key_with_pop(std::vector::borrow(&public_keys, 0))];
-            let mauled_messages = vector[maul_bytes(std::vector::borrow(&messages, 0))];
+            let mauled_public_keys = vector[maul_public_key_with_pop(public_keys.borrow(0))];
+            let mauled_messages = vector[maul_bytes(messages.borrow(0))];
             let i = 1;
             while (i < signer_count) {
-                let pk = std::vector::borrow(&public_keys, i);
-                let msg = std::vector::borrow(&messages, i);
-                std::vector::push_back(&mut mauled_public_keys, *pk);
-                std::vector::push_back(&mut mauled_messages, *msg);
-                i = i + 1;
+                let pk = public_keys.borrow(i);
+                let msg = messages.borrow(i);
+                mauled_public_keys.push_back(*pk);
+                mauled_messages.push_back(*msg);
+                i += 1;
             };
 
             // Generate aggregated signature.
@@ -826,16 +815,16 @@ module aptos_std::bls12381 {
             let signatures = vector[];
             let i = 0;
             while (i < signer_count) {
-                let sk = std::vector::borrow(&signing_keys, i);
-                let msg = std::vector::borrow(&messages, i);
+                let sk = signing_keys.borrow(i);
+                let msg = messages.borrow(i);
                 let sig = sign_arbitrary_bytes(sk, *msg);
-                std::vector::push_back(&mut signatures, sig);
-                i = i + 1;
+                signatures.push_back(sig);
+                i += 1;
             };
-            let aggrsig_another = option::extract(&mut aggregate_signatures(signatures));
+            let aggrsig_another = aggregate_signatures(signatures).extract();
             assert!(aggr_or_multi_signature_to_bytes(&aggrsig_another) == aggr_or_multi_signature_to_bytes(&aggrsig), 1);
 
-            signer_count = signer_count + 1;
+            signer_count += 1;
         }
     }
 
@@ -852,12 +841,14 @@ module aptos_std::bls12381 {
         // First, test signatures that verify
         let ok = verify_normal_signature(
             &signature_from_bytes(x"b01ce4632e94d8c611736e96aa2ad8e0528a02f927a81a92db8047b002a8c71dc2d6bfb94729d0973790c10b6ece446817e4b7543afd7ca9a17c75de301ae835d66231c26a003f11ae26802b98d90869a9e73788c38739f7ac9d52659e1f7cf7"),
-            &option::extract(&mut public_key_from_bytes(x"94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858")),
+            &public_key_from_bytes(x"94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858").extract(
+            ),
             message,
         );
         assert!(ok == true, 1);
 
-        let pk = option::extract(&mut public_key_from_bytes(x"94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858"));
+        let pk = public_key_from_bytes(x"94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858").extract(
+        );
         let pk_with_pop = PublicKeyWithPoP { bytes: pk.bytes };
 
         let ok = verify_signature_share(
@@ -885,12 +876,12 @@ module aptos_std::bls12381 {
         ];
 
         let i = 0;
-        while (i < std::vector::length(&pks)) {
-            let sig = std::vector::borrow(&sigs, i);
-            let pk = *std::vector::borrow(&pks, i);
-            let msg = *std::vector::borrow(&messages, i);
+        while (i < pks.length()) {
+            let sig = sigs.borrow(i);
+            let pk = pks[i];
+            let msg = messages[i];
 
-            let pk = option::extract(&mut public_key_from_bytes(pk));
+            let pk = public_key_from_bytes(pk).extract();
 
             let notok = verify_normal_signature(
                 sig,
@@ -906,7 +897,7 @@ module aptos_std::bls12381 {
             );
             assert!(notok == false, 1);
 
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -950,27 +941,27 @@ module aptos_std::bls12381 {
             proof_of_possession_from_bytes(x"8899b294f3c066e6dfb59bc0843265a1ccd6afc8f0f38a074d45ded8799c39d25ee0376cd6d6153b0d4d2ff8655e578b140254f1287b9e9df4e2aecc5b049d8556a4ab07f574df68e46348fd78e5298b7913377cf5bb3cf4796bfc755902bfdd"),
         ];
 
-        assert!(std::vector::length(&pks) == std::vector::length(&pops), 1);
+        assert!(pks.length() == pops.length(), 1);
 
         let i = 0;
-        while (i < std::vector::length(&pks)) {
-            let opt_pk = public_key_from_bytes_with_pop(*std::vector::borrow(&pks, i), std::vector::borrow(&pops, i));
-            assert!(option::is_some(&opt_pk), 1);
+        while (i < pks.length()) {
+            let opt_pk = public_key_from_bytes_with_pop(pks[i], pops.borrow(i));
+            assert!(opt_pk.is_some(), 1);
 
-            i = i + 1;
+            i += 1;
         };
 
         // assert first PK's PoP does not verify against modifed PK' = 0xa0 | PK[1:]
         let opt_pk = public_key_from_bytes_with_pop(
             x"a08864c91ae7a9998b3f5ee71f447840864e56d79838e4785ff5126c51480198df3d972e1e0348c6da80d396983e42d7",
             &proof_of_possession_from_bytes(x"ab42afff92510034bf1232a37a0d31bc8abfc17e7ead9170d2d100f6cf6c75ccdcfedbd31699a112b4464a06fd636f3f190595863677d660b4c5d922268ace421f9e86e3a054946ee34ce29e1f88c1a10f27587cf5ec528d65ba7c0dc4863364"));
-        assert!(option::is_none(&opt_pk), 1);
+        assert!(opt_pk.is_none(), 1);
 
         // assert first PK's PoP does not verify if modifed as pop' = 0xb0 | pop[1:]
         let opt_pk = public_key_from_bytes_with_pop(
             x"808864c91ae7a9998b3f5ee71f447840864e56d79838e4785ff5126c51480198df3d972e1e0348c6da80d396983e42d7",
             &proof_of_possession_from_bytes(x"bb42afff92510034bf1232a37a0d31bc8abfc17e7ead9170d2d100f6cf6c75ccdcfedbd31699a112b4464a06fd636f3f190595863677d660b4c5d922268ace421f9e86e3a054946ee34ce29e1f88c1a10f27587cf5ec528d65ba7c0dc4863364"));
-        assert!(option::is_none(&opt_pk), 1);
+        assert!(opt_pk.is_none(), 1);
     }
 
     #[test]
@@ -978,8 +969,8 @@ module aptos_std::bls12381 {
         let (sk, pk) = generate_keys();
         let pk_bytes = public_key_with_pop_to_bytes(&pk);
         let pop = generate_proof_of_possession(&sk);
-        assert!(option::is_some(&public_key_from_bytes_with_pop(pk_bytes, &pop)), 1);
-        assert!(option::is_none(&public_key_from_bytes_with_pop(pk_bytes, &maul_proof_of_possession(&pop))), 1);
-        assert!(option::is_none(&public_key_from_bytes_with_pop(maul_bytes(&pk_bytes), &pop)), 1);
+        assert!(public_key_from_bytes_with_pop(pk_bytes, &pop).is_some(), 1);
+        assert!(public_key_from_bytes_with_pop(pk_bytes, &maul_proof_of_possession(&pop)).is_none(), 1);
+        assert!(public_key_from_bytes_with_pop(maul_bytes(&pk_bytes), &pop).is_none(), 1);
     }
 }

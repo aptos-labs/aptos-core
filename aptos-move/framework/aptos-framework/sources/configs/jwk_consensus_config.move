@@ -68,7 +68,7 @@ module aptos_framework::jwk_consensus_config {
     public(friend) fun on_new_epoch(framework: &signer) acquires JWKConsensusConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<JWKConsensusConfig>()) {
-            let new_config = config_buffer::extract<JWKConsensusConfig>();
+            let new_config = config_buffer::extract_v2<JWKConsensusConfig>();
             if (exists<JWKConsensusConfig>(@aptos_framework)) {
                 *borrow_global_mut<JWKConsensusConfig>(@aptos_framework) = new_config;
             } else {

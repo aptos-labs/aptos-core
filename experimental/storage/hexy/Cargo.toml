@@ -24,9 +24,14 @@ once_cell = { workspace = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 criterion = { workspace = true }
-jemallocator = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 
 [[bench]]
 name = "sort_dedup"

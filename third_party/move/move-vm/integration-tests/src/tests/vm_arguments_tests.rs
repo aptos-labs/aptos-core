@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::{execute_function_with_single_storage_for_test, execute_script_for_test};
 use move_binary_format::{
     errors::VMResult,
     file_format::{
@@ -22,11 +23,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
-};
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -64,6 +61,7 @@ fn make_script(parameters: Signature) -> Vec<u8> {
             locals: SignatureIndex(0),
             code: vec![Bytecode::LdU64(0), Bytecode::Abort],
         },
+        access_specifiers: None,
     }
     .serialize(&mut blob)
     .expect("script must serialize");
@@ -126,6 +124,7 @@ fn make_script_with_non_linking_structs(parameters: Signature) -> Vec<u8> {
 
         type_parameters: vec![],
         parameters: parameters_idx,
+        access_specifiers: None,
         code: CodeUnit {
             locals: SignatureIndex(0),
             code: vec![Bytecode::LdU64(0), Bytecode::Abort],
@@ -257,21 +256,8 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let storage = InMemoryStorage::new();
-    let code_storage = storage.as_unsync_code_storage();
-    let mut session = MoveVM::new_session(&storage);
-
-    let traversal_storage = TraversalStorage::new();
-
-    session
-        .load_and_execute_script(
-            script,
-            ty_args,
-            combine_signers_and_args(signers, non_signer_args),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &code_storage,
-        )
-        .map(|_| ())
+    let args = combine_signers_and_args(signers, non_signer_args);
+    execute_script_for_test(&storage, &script, &ty_args, args)
 }
 
 fn call_script(script: Vec<u8>, args: Vec<Vec<u8>>) -> VMResult<()> {
@@ -292,18 +278,13 @@ fn call_function_with_args_ty_args_signers(
     module.serialize(&mut module_blob).unwrap();
 
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
-    let module_storage = storage.as_unsync_module_storage();
-    let mut session = MoveVM::new_session(&storage);
 
-    let traversal_storage = TraversalStorage::new();
-    session.execute_function_bypass_visibility(
+    execute_function_with_single_storage_for_test(
+        &storage,
         &module_id,
         function_name.as_ident_str(),
-        ty_args,
+        &ty_args,
         combine_signers_and_args(signers, non_signer_args),
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
-        &module_storage,
     )?;
     Ok(())
 }
@@ -776,56 +757,28 @@ fn call_missing_item() {
     module.serialize(&mut module_blob).unwrap();
 
     // missing module
-    let function_name = ident_str!("foo");
-
     let mut storage = InMemoryStorage::new();
-    let module_storage = storage.as_unsync_module_storage();
-    let mut session = MoveVM::new_session(&storage);
-
-    let traversal_storage = TraversalStorage::new();
-    let error = session
-        .execute_function_bypass_visibility(
-            &module_id,
-            function_name,
-            vec![],
-            Vec::<Vec<u8>>::new(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-        )
-        .err()
-        .unwrap();
-    assert_eq!(
-        error.major_status(),
-        StatusCode::LINKER_ERROR,
-        "Linker Error: Call to item at a non-existent external module {:?}",
-        module
-    );
-    assert_eq!(error.status_type(), StatusType::Verification);
-    drop(session);
+    let err = execute_function_with_single_storage_for_test(
+        &storage,
+        &module_id,
+        ident_str!("foo"),
+        &[],
+        vec![],
+    )
+    .unwrap_err();
+    assert_eq!(err.major_status(), StatusCode::LINKER_ERROR);
+    assert_eq!(err.status_type(), StatusType::Verification);
 
     // missing function
-
     storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
-    let module_storage = storage.as_unsync_module_storage();
-    let mut session = MoveVM::new_session(&storage);
-
-    let traversal_storage = TraversalStorage::new();
-    let error = session
-        .execute_function_bypass_visibility(
-            &module_id,
-            function_name,
-            vec![],
-            Vec::<Vec<u8>>::new(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-        )
-        .err()
-        .unwrap();
-    assert_eq!(
-        error.major_status(),
-        StatusCode::FUNCTION_RESOLUTION_FAILURE
-    );
-    assert_eq!(error.status_type(), StatusType::Verification);
+    let err = execute_function_with_single_storage_for_test(
+        &storage,
+        &module_id,
+        ident_str!("foo"),
+        &[],
+        vec![],
+    )
+    .unwrap_err();
+    assert_eq!(err.major_status(), StatusCode::FUNCTION_RESOLUTION_FAILURE);
+    assert_eq!(err.status_type(), StatusType::Verification);
 }

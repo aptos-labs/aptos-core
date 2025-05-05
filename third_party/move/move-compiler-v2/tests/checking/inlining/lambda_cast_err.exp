@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: function takes arguments of type `(u64, integer)` but `(u64, vector<u8>)` was expected
+error: expected function type has argument of type `(u64, vector<u8>)` but `(u64, integer)` was provided
   ┌─ tests/checking/inlining/lambda_cast_err.move:7:53
   │
 7 │         vector::fold(gas_schedule_blob, (0 as u64), |sum, addend| sum + (addend as u64))

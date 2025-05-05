@@ -1,4 +1,87 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::mathtest {
+    public inline fun fun1(a: u64,b: u64,c: u64): u64 {
+        Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(2, Cast<u128>(a)), Mul<u128>(3, Cast<u128>(b))), Mul<u128>(5, Cast<u128>(c))))
+    }
+} // end 0x42::mathtest
+module 0x42::mathtest2 {
+    public inline fun fun2(a: u64,b: u64,c: u64): u64 {
+        Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(7, Cast<u128>(a)), Mul<u128>(11, Cast<u128>(b))), Mul<u128>(13, Cast<u128>(c))))
+    }
+} // end 0x42::mathtest2
+module 0x42::test {
+    use 0x42::mathtest; // resolved as: 0x42::mathtest
+    use 0x42::mathtest2; // resolved as: 0x42::mathtest2
+    private fun test_nested_fun1() {
+        {
+          let a: u64 = {
+            let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(2, {
+              let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(3, {
+                let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(4, 5, 6);
+                Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(7, Cast<u128>(a)), Mul<u128>(11, Cast<u128>(b))), Mul<u128>(13, Cast<u128>(c))))
+              }, 7);
+              Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(2, Cast<u128>(a)), Mul<u128>(3, Cast<u128>(b))), Mul<u128>(5, Cast<u128>(c))))
+            }, {
+              let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(8, 9, {
+                let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(10, {
+                  let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(11, 12, 13);
+                  Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(7, Cast<u128>(a)), Mul<u128>(11, Cast<u128>(b))), Mul<u128>(13, Cast<u128>(c))))
+                }, 14);
+                Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(2, Cast<u128>(a)), Mul<u128>(3, Cast<u128>(b))), Mul<u128>(5, Cast<u128>(c))))
+              });
+              Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(7, Cast<u128>(a)), Mul<u128>(11, Cast<u128>(b))), Mul<u128>(13, Cast<u128>(c))))
+            });
+            Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(2, Cast<u128>(a)), Mul<u128>(3, Cast<u128>(b))), Mul<u128>(5, Cast<u128>(c))))
+          };
+          if Eq<u64>(a, 81911) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::mathtest {
+    public inline fun fun1(a: u64, b: u64, c: u64): u64 {
+        2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+    }
+}
+module 0x42::mathtest2 {
+    public inline fun fun2(a: u64, b: u64, c: u64): u64 {
+        7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+    }
+}
+module 0x42::test {
+    use 0x42::mathtest;
+    use 0x42::mathtest2;
+    fun test_nested_fun1() {
+        let a = {
+            let (a,b,c) = (2, {
+                let (a,b,c) = (3, {
+                    let (a,b,c) = (4, 5, 6);
+                    7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+                }, 7);
+                2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+            }, {
+                let (a,b,c) = (8, 9, {
+                    let (a,b,c) = (10, {
+                        let (a,b,c) = (11, 12, 13);
+                        7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+                    }, 14);
+                    2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+                });
+                7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+            });
+            2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+        };
+        if (a == 81911) () else abort 0;
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::mathtest {
     public inline fun fun1(a: u64,b: u64,c: u64): u64 {
         Cast<u64>(Add<u128>(Add<u128>(Mul<u128>(2, Cast<u128>(a)), Mul<u128>(3, Cast<u128>(b))), Mul<u128>(5, Cast<u128>(c))))
@@ -21,25 +104,6 @@ module 0x42::test {
         Tuple()
     }
 } // end 0x42::test
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::mathtest {
-    public inline fun fun1(a: u64, b: u64, c: u64): u64 {
-        2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
-    }
-}
-module 0x42::mathtest2 {
-    public inline fun fun2(a: u64, b: u64, c: u64): u64 {
-        7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
-    }
-}
-module 0x42::test {
-    use 0x42::mathtest;
-    use 0x42::mathtest2;
-    fun test_nested_fun1() {
-        if (true) () else abort 0;
-    }
-}
 
 
 ============ bytecode verification succeeded ========

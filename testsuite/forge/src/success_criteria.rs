@@ -10,8 +10,9 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
-use aptos_logger::info;
+use aptos_logger::info as aptos_logger_info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
+use log::info;
 use prometheus_http_query::response::Sample;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -409,7 +410,7 @@ impl SuccessCriteriaChecker {
             chain_progress_threshold.max_epoch_no_progress_secs,
         );
 
-        info!(
+        aptos_logger_info!(
             max_non_epoch_round_gap = gap_info.non_epoch_round_gap.max_gap,
             max_epoch_round_gap = gap_info.epoch_round_gap.max_gap,
             max_non_epoch_time_gap = gap_info.non_epoch_time_gap.max_gap,

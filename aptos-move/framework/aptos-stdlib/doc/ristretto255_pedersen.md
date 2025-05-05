@@ -99,9 +99,9 @@ Creates a new public key from a serialized Ristretto255 point.
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_new_commitment_from_bytes">new_commitment_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a>&gt; {
     <b>let</b> point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes);
-    <b>if</b> (std::option::is_some(&<b>mut</b> point)) {
+    <b>if</b> (point.is_some()) {
         <b>let</b> comm = <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a> {
-            point: std::option::extract(&<b>mut</b> point)
+            point: point.extract()
         };
         std::option::some(comm)
     } <b>else</b> {
@@ -266,7 +266,7 @@ base used in the Bulletproofs library (i.e., <code><a href="ristretto255_pederse
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_new_commitment_for_bulletproof">new_commitment_for_bulletproof</a>(v: &Scalar, r: &Scalar): <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a> {
     <b>let</b> rand_base = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE">BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</a>);
-    <b>let</b> rand_base = std::option::extract(&<b>mut</b> rand_base);
+    <b>let</b> rand_base = rand_base.extract();
 
     <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a> {
         point: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">ristretto255::basepoint_double_mul</a>(r, &rand_base, v)
@@ -561,7 +561,7 @@ Bulletproofs Move module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_randomness_base_for_bulletproof">randomness_base_for_bulletproof</a>(): RistrettoPoint {
-    std::option::extract(&<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE">BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</a>))
+    <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE">BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</a>).extract()
 }
 </code></pre>
 

@@ -224,7 +224,7 @@ module aptos_framework::keyless_account {
         };
 
         let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
+            config_buffer::extract_v2<Configuration>()
         } else {
             *borrow_global<Configuration>(signer::address_of(fx))
         };
@@ -240,7 +240,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
 
         let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
+            config_buffer::extract_v2<Configuration>()
         } else {
             *borrow_global<Configuration>(signer::address_of(fx))
         };
@@ -259,7 +259,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
 
         let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
+            config_buffer::extract_v2<Configuration>()
         } else {
             *borrow_global<Configuration>(signer::address_of(fx))
         };
@@ -269,7 +269,7 @@ module aptos_framework::keyless_account {
         set_configuration_for_next_epoch(fx, config);
     }
 
-    /// Convenience method to queue up an append to to the set of override `aud`'s. The change will only be effective
+    /// Convenience method to queue up an append to the set of override `aud`'s. The change will only be effective
     /// after reconfiguration. Only callable via governance proposal.
     ///
     /// WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.
@@ -277,7 +277,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
 
         let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
+            config_buffer::extract_v2<Configuration>()
         } else {
             *borrow_global<Configuration>(signer::address_of(fx))
         };
@@ -292,7 +292,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
 
         if (config_buffer::does_exist<Groth16VerificationKey>()) {
-            let vk = config_buffer::extract();
+            let vk = config_buffer::extract_v2();
             if (exists<Groth16VerificationKey>(@aptos_framework)) {
                 *borrow_global_mut<Groth16VerificationKey>(@aptos_framework) = vk;
             } else {
@@ -301,7 +301,7 @@ module aptos_framework::keyless_account {
         };
 
         if (config_buffer::does_exist<Configuration>()) {
-            let config = config_buffer::extract();
+            let config = config_buffer::extract_v2();
             if (exists<Configuration>(@aptos_framework)) {
                 *borrow_global_mut<Configuration>(@aptos_framework) = config;
             } else {

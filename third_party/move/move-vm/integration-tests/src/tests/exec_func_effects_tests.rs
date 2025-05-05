@@ -2,22 +2,21 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::compiler::{as_module, compile_units};
+use crate::{
+    compiler::{as_module, compile_units},
+    tests::execute_function_with_single_storage_for_test,
+};
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::ChangeSet,
     identifier::Identifier,
     language_storage::ModuleId,
     u256::U256,
     value::{serialize_values, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
-};
+use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_test_utils::InMemoryStorage;
-use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 const TEST_MODULE_ID: &str = "M";
@@ -41,23 +40,19 @@ fn fail_arg_deserialize() {
     ];
     for value in values {
         for name in FUN_NAMES {
-            let err = run(&mod_code, name, value.clone())
-                .map(|_| ())
-                .expect_err("Should have failed to deserialize non-u64 type to u64");
-            assert_eq!(
-                err.major_status(),
-                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
-            );
+            let status = run(&mod_code, name, value.clone())
+                .expect_err("Should have failed to deserialize non-u64 type to u64")
+                .major_status();
+            assert_eq!(status, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
         }
     }
 }
 
-// check happy path for writing to mut ref args - may be unecessary / covered by other tests
+// check happy path for writing to mut ref args - may be unnecessary / covered by other tests
 #[test]
 fn mutref_output_success() {
     let mod_code = setup_module();
-    let result = run(&mod_code, USE_MUTREF_LABEL, MoveValue::U64(1));
-    let (_, ret_values) = result.unwrap();
+    let ret_values = run(&mod_code, USE_MUTREF_LABEL, MoveValue::U64(1)).unwrap();
     assert_eq!(1, ret_values.mutable_reference_outputs.len());
     let parsed = parse_u64_arg(&ret_values.mutable_reference_outputs.first().unwrap().1);
     assert_eq!(EXPECT_MUTREF_OUT_VALUE, parsed);
@@ -86,36 +81,21 @@ fn setup_module() -> ModuleCode {
     (module_id, code)
 }
 
-fn run(
-    module: &ModuleCode,
-    fun_name: &str,
-    arg_val0: MoveValue,
-) -> VMResult<(ChangeSet, SerializedReturnValues)> {
+fn run(module: &ModuleCode, fun_name: &str, arg: MoveValue) -> VMResult<SerializedReturnValues> {
     let module_id = &module.0;
+    let function_name = Identifier::new(fun_name).unwrap();
+
     let modules = vec![module.clone()];
     let mut storage = InMemoryStorage::new();
     compile_modules(&mut storage, &modules);
 
-    let mut session = MoveVM::new_session(&storage);
-
-    let fun_name = Identifier::new(fun_name).unwrap();
-    let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage();
-
-    session
-        .execute_function_bypass_visibility(
-            module_id,
-            &fun_name,
-            vec![],
-            serialize_values(&vec![arg_val0]),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-        )
-        .and_then(|ret_values| {
-            let change_set = session.finish(&module_storage)?;
-            Ok((change_set, ret_values))
-        })
+    execute_function_with_single_storage_for_test(
+        &storage,
+        module_id,
+        &function_name,
+        &[],
+        serialize_values(&vec![arg]),
+    )
 }
 
 type ModuleCode = (ModuleId, String);

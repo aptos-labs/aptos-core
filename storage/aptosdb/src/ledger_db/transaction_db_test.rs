@@ -122,7 +122,7 @@ proptest! {
             prop_assert!(transaction_db.get_transaction(1).is_ok());
             prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), Some(1));
             let mut batch = SchemaBatch::new();
-            transaction_db.prune_transaction_by_hash_indices(&[txns[1].clone()], &mut batch).unwrap();
+            transaction_db.prune_transaction_by_hash_indices(std::iter::once(txns[1].hash()), &mut batch).unwrap();
             transaction_db.write_schemas(batch).unwrap();
             prop_assert!(transaction_db.get_transaction(1).is_ok());
             prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), None);

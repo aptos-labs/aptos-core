@@ -14,8 +14,6 @@ module aptos_framework::permissioned_signer_tests {
         addr: address
     }
 
-    struct Foo has key {}
-
     #[test(creator = @0xcafe)]
     fun test_permission_e2e(creator: &signer) {
         let aptos_framework = create_signer_for_test(@0x1);
@@ -26,7 +24,7 @@ module aptos_framework::permissioned_signer_tests {
 
         assert!(permissioned_signer::is_permissioned_signer(&perm_signer), 1);
         assert!(!permissioned_signer::is_permissioned_signer(creator), 1);
-        assert!(permissioned_signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
 
         permissioned_signer::authorize_increase(creator, &perm_signer, 100, OnePermission {});
         assert!(
@@ -110,7 +108,7 @@ module aptos_framework::permissioned_signer_tests {
 
         assert!(permissioned_signer::is_permissioned_signer(&perm_signer), 1);
         assert!(!permissioned_signer::is_permissioned_signer(creator), 1);
-        assert!(permissioned_signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
 
         permissioned_signer::authorize_increase(creator, &perm_signer, 100, OnePermission {});
         assert!(
@@ -377,38 +375,6 @@ module aptos_framework::permissioned_signer_tests {
             permissioned_signer::signer_from_storable_permissioned_handle(&perm_handle);
 
         bcs::to_bytes(&perm_signer);
-
-        permissioned_signer::destroy_storable_permissioned_handle(perm_handle);
-    }
-
-    #[test(creator = @0xcafe)]
-    #[expected_failure(major_status = 4040, location = Self)]
-    fun test_move_to_with_permissioned_signer(creator: &signer) {
-        let aptos_framework = create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let perm_handle =
-            permissioned_signer::create_storable_permissioned_handle(creator, 60);
-        let perm_signer =
-            permissioned_signer::signer_from_storable_permissioned_handle(&perm_handle);
-
-        move_to(&perm_signer, Foo {});
-
-        permissioned_signer::destroy_storable_permissioned_handle(perm_handle);
-    }
-
-    #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0, location = std::signer)]
-    fun test_address_of_with_permissioned_signer(creator: &signer) {
-        let aptos_framework = create_signer_for_test(@0x1);
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
-
-        let perm_handle =
-            permissioned_signer::create_storable_permissioned_handle(creator, 60);
-        let perm_signer =
-            permissioned_signer::signer_from_storable_permissioned_handle(&perm_handle);
-
-        signer::address_of(&perm_signer);
 
         permissioned_signer::destroy_storable_permissioned_handle(perm_handle);
     }

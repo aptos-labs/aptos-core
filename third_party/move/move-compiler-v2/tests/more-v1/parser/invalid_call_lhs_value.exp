@@ -1,13 +1,13 @@
 
 Diagnostics:
-error: constraint `|()|_ has ..` incompatible with `integer`
+error: constraint `integer` incompatible with `||_ has ..`
   ┌─ tests/more-v1/parser/invalid_call_lhs_value.move:3:9
   │
 3 │         5();
-  │         ^
+  │         ^^^
 
-error: constraint `|(integer, integer)|_ has ..` incompatible with `integer`
+error: constraint `integer` incompatible with `|(integer, integer)|_ has ..`
   ┌─ tests/more-v1/parser/invalid_call_lhs_value.move:4:9
   │
 4 │         5(0, 1);
-  │         ^
+  │         ^^^^^^^

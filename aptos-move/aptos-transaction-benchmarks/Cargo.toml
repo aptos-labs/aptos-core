@@ -22,6 +22,7 @@ aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-node-resource-metrics = { workspace = true }
 aptos-push-metrics =  { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-logging = { workspace = true }

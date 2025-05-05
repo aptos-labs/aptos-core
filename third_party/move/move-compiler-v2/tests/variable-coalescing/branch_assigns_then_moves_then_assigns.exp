@@ -1,4 +1,48 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 11
+  2: label L0
+  3: $t3 := 1
+  4: $t0 := infer($t3)
+  5: $t4 := move($t0)
+  6: $t1 := infer($t4)
+  7: $t5 := 5
+  8: $t0 := infer($t5)
+  9: $t6 := infer($t1)
+ 10: goto 14
+ 11: label L1
+ 12: $t7 := 0
+ 13: $t0 := infer($t7)
+ 14: label L2
+ 15: $t9 := copy($t0)
+ 16: $t10 := 5
+ 17: $t8 := ==($t9, $t10)
+ 18: if ($t8) goto 19 else goto 21
+ 19: label L3
+ 20: goto 24
+ 21: label L4
+ 22: $t11 := 42
+ 23: abort($t11)
+ 24: label L5
+ 25: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun <SELF>_0::main() {

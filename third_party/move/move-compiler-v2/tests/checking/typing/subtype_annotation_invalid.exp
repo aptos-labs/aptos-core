@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: expected `&mut` but `&` was provided
+error: cannot adapt `&u64` to annotated type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/subtype_annotation_invalid.move:5:10
   │
 5 │         (&0: &mut u64);
   │          ^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &integer)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
   ┌─ tests/checking/typing/subtype_annotation_invalid.move:9:10
   │
 9 │         ((&0, &0): (&mut u64, &mut u64));
   │          ^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &integer)` to annotated type `(&mut u64, &u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_annotation_invalid.move:10:10
    │
 10 │         ((&0, &0): (&mut u64, &u64));
    │          ^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &u64)` to annotated type `(&u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_annotation_invalid.move:11:10
    │
 11 │         ((&0, &0): (&u64, &mut u64));

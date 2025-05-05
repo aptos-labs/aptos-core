@@ -44,6 +44,7 @@ mainnet:
     550582915: 550582915_multiple_transfer_event
     2308282694: 2308282694_asset_type_v1_null
     2308283617: 2308283617_asset_type_v1_null_2
+    2662373625: 2662373625_fa_secondary_store_burnt_with_deletion_event
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
@@ -113,6 +114,7 @@ mainnet:
 
     # events processor
     554229017: 554229017_events_with_no_event_size_info
+    2448304257: 2448304257_coinstore_deletion_event
 
     # Fungible asset migration
     1680592683: 1680592683_fa_migration_coin_info

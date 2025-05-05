@@ -595,10 +595,18 @@ pub enum StatusCode {
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
     ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED = 41,
+    NONCE_ALREADY_USED = 42,
+    EMPTY_PAYLOAD_PROVIDED = 43,
+
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_7 = 42,
-    RESERVED_VALIDATION_ERROR_8 = 43,
     RESERVED_VALIDATION_ERROR_9 = 44,
+    RESERVED_VALIDATION_ERROR_10 = 45,
+    RESERVED_VALIDATION_ERROR_11 = 46,
+    RESERVED_VALIDATION_ERROR_12 = 47,
+    RESERVED_VALIDATION_ERROR_13 = 48,
+    RESERVED_VALIDATION_ERROR_14 = 49,
+    RESERVED_VALIDATION_ERROR_15 = 50,
+
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
@@ -874,13 +882,12 @@ pub enum StatusCode {
     STRUCT_VARIANT_MISMATCH = 4038,
     // An unimplemented functionality in the VM.
     UNIMPLEMENTED_FUNCTIONALITY = 4039,
-    // Calling move_to with a permissioned signer.
-    MOVE_TO_WITH_PERMISSIONED_SIGNER = 4040,
+
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4041,
-    RESERVED_RUNTIME_ERROR_2 = 4042,
-    RESERVED_RUNTIME_ERROR_3 = 4043,
-    RESERVED_RUNTIME_ERROR_4 = 4044,
+    RESERVED_RUNTIME_ERROR_1 = 4040,
+    RESERVED_RUNTIME_ERROR_2 = 4041,
+    RESERVED_RUNTIME_ERROR_3 = 4042,
+    RESERVED_RUNTIME_ERROR_4 = 4043,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

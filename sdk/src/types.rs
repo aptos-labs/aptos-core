@@ -63,7 +63,7 @@ enum LocalAccountAuthenticator {
     Keyless(KeylessAccount),
     FederatedKeyless(FederatedKeylessAccount),
     Abstraction(AbstractedAccount), // TODO: Add support for keyless authentication
-    DomainAbstraction(DomainAbstractedAccount), // TODO: Add support for keyless authentication
+    DerivableAbstraction(DomainAbstractedAccount), // TODO: Add support for keyless authentication
 }
 
 impl LocalAccountAuthenticator {
@@ -86,7 +86,7 @@ impl LocalAccountAuthenticator {
                 )
             },
             LocalAccountAuthenticator::Abstraction(..) => unreachable!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => unreachable!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => unreachable!(),
         }
     }
 
@@ -134,10 +134,7 @@ pub struct LocalAccount {
 }
 
 pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress {
-    let mut bytes = address.to_vec();
-    bytes.append(&mut AccountAddress::ONE.to_vec());
-    bytes.push(0xFC);
-    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+    get_paired_fa_primary_store_address(address, *APT_METADATA_ADDRESS)
 }
 
 pub fn get_paired_fa_primary_store_address(
@@ -210,7 +207,7 @@ impl LocalAccount {
                 &account_identity,
             )
             .account_address(),
-            auth: LocalAccountAuthenticator::DomainAbstraction(DomainAbstractedAccount {
+            auth: LocalAccountAuthenticator::DerivableAbstraction(DomainAbstractedAccount {
                 function_info,
                 account_identity,
                 sign_func,
@@ -356,10 +353,18 @@ impl LocalAccount {
     }
 
     pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+        let raw_txn = if builder.has_nonce() {
+            // Do not increment sequence number for orderless transactions.
+            builder
+                .sender(self.address())
+                .sequence_number(u64::MAX)
+                .build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         self.sign_transaction(raw_txn)
     }
 
@@ -376,10 +381,19 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+
+        let raw_txn = if builder.has_nonce() {
+            // Do not increment sequence number for orderless transactions.
+            builder
+                .sender(self.address())
+                .sequence_number(u64::MAX)
+                .build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         raw_txn
             .sign_multi_agent(
                 self.private_key(),
@@ -404,10 +418,18 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+        let raw_txn = if builder.has_nonce() {
+            // Do not increment sequence number for orderless transactions.
+            builder
+                .sender(self.address())
+                .sequence_number(u64::MAX)
+                .build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         raw_txn
             .sign_fee_payer(
                 self.private_key(),
@@ -431,10 +453,17 @@ impl LocalAccount {
             .map(|signer| signer.address())
             .collect();
         let secondary_signer_auths = secondary_signers.iter().map(|a| a.auth()).collect();
-        let raw_txn = builder
-            .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
-            .build();
+        let raw_txn = if builder.has_nonce() {
+            builder
+                .sender(self.address())
+                .sequence_number(u64::MAX)
+                .build()
+        } else {
+            builder
+                .sender(self.address())
+                .sequence_number(self.increment_sequence_number())
+                .build()
+        };
         raw_txn
             .sign_aa_transaction(
                 self.auth(),
@@ -456,7 +485,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -466,7 +495,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -480,7 +509,7 @@ impl LocalAccount {
                 federated_keyless_account.authentication_key()
             },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -492,7 +521,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Abstraction(aa) => {
                 Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone())
             },
-            LocalAccountAuthenticator::DomainAbstraction(aa) => Auth::DomainAbstraction {
+            LocalAccountAuthenticator::DerivableAbstraction(aa) => Auth::DerivableAbstraction {
                 function_info: aa.function_info.clone(),
                 account_identity: aa.account_identity.clone(),
                 sign_function: aa.sign_func.clone(),
@@ -534,7 +563,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
-            LocalAccountAuthenticator::DomainAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
         }
     }
 
@@ -596,13 +625,21 @@ impl TransactionSigner for HardwareWalletAccount {
         let two_minutes = Duration::from_secs(2 * 60);
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH)? + two_minutes;
         let seconds = current_time.as_secs();
-
+        let orderless = builder.has_nonce();
+        let sequence_number = if orderless {
+            u64::MAX
+        } else {
+            self.sequence_number()
+        };
         let raw_txn = builder
             .sender(self.address())
-            .sequence_number(self.sequence_number())
+            .sequence_number(sequence_number)
             .expiration_timestamp_secs(seconds)
             .build();
-        *self.sequence_number_mut() += 1;
+
+        if !orderless {
+            *self.sequence_number_mut() += 1;
+        }
         self.sign_transaction(raw_txn)
     }
 }

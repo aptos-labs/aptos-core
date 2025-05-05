@@ -1,0 +1,165 @@
+# Continuously run land blocking forge tests against the latest main branch.
+# This is meant to be a health check for Forge, to ensure it is working as expected.
+name: Continuous Forge Tests - Land Blocking
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
+
+on:
+  # Allow triggering manually
+  workflow_dispatch:
+  push:
+    branches:
+      # Use this branch for canary
+      - 04-01-_gha_forge_clbt_fix
+
+env:
+  AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: us-west-2
+  # In case of pull_request events by default github actions merges main into the PR branch and then runs the tests etc
+  # on the prospective merge result instead of only on the tip of the PR.
+  # For more info also see https://github.com/actions/checkout#checkout-pull-request-head-commit-instead-of-merge-commit
+  GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  permission-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
+  # Because the docker build happens in a reusable workflow, have a separate job that collects the right metadata
+  # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
+  determine-docker-build-metadata:
+    needs: [permission-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      # NOTE: Because these tests are run in quick succession there's a change that jobs may overlap and preempt each other if they have the same namespace.
+      #       To avoid this, we derive a unique suffix from the trigger event name and timestamp.
+      - name: Normalize and Derive Forge Namespace Suffix
+        id: normalize
+        run: |
+          GHA_TRIGGER_EVENT_NAME=${{ github.event_name == 'workflow_dispatch' && 'w-d' || github.event_name }}
+          TIMESTAMP=$(date +%s)
+          FORGE_NAMESPACE_SUFFIX="clbt-${GHA_TRIGGER_EVENT_NAME}-${TIMESTAMP}-${GIT_SHA}"
+          FORGE_NAMESPACE_SUFFIX=${FORGE_NAMESPACE_SUFFIX:0:30}
+          echo "FORGE_NAMESPACE_SUFFIX=${FORGE_NAMESPACE_SUFFIX}" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/wait-images-ci
+        with:
+          GIT_SHA: ${{ env.GIT_SHA }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+          WAIT_FOR_IMAGE_SECONDS: 1800
+
+    outputs:
+      gitSha: ${{ env.GIT_SHA }}
+      FORGE_NAMESPACE_SUFFIX: ${{ steps.normalize.outputs.FORGE_NAMESPACE_SUFFIX }}
+
+  forge-e2e-test:
+    needs:
+      - permission-check
+      - determine-docker-build-metadata
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success'
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_TEST_SUITE: realistic_env_max_load
+      IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_RUNNER_DURATION_SECS: 480
+      FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
+      SEND_RESULTS_TO_TRUNK: true
+
+  # This job determines the last released docker image tag, which is used by forge compat test.
+  fetch-last-released-docker-image-tag:
+    needs:
+      - permission-check
+    #  runs only when need to run forge-compat-test or forge-framework-upgrade-test
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref }}
+
+      # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Get Docker Image Tag
+        uses: ./.github/actions/determine-or-use-target-branch-and-get-last-released-image
+        id: get-docker-image-tag
+        with:
+          base-branch: ${{ github.base_ref }}
+          variants: "failpoints performance"
+
+      - name: Add Image Tag to Step Summary
+        run: |
+          echo "## Image Tag for compat tests" >> $GITHUB_STEP_SUMMARY
+          echo "IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}" >> $GITHUB_STEP_SUMMARY
+    outputs:
+      IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
+
+  forge-compat-test:
+    needs:
+      - permission-check
+      - fetch-last-released-docker-image-tag
+      - determine-docker-build-metadata
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success'
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_TEST_SUITE: compat
+      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
+      SEND_RESULTS_TO_TRUNK: true
+
+  forge-framework-upgrade-test:
+    needs:
+      - permission-check
+      - fetch-last-released-docker-image-tag
+      - determine-docker-build-metadata
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success'
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_TEST_SUITE: framework_upgrade
+      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
+      SEND_RESULTS_TO_TRUNK: true

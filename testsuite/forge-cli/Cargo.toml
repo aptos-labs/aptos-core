@@ -25,6 +25,7 @@ aptos-testcases = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+env_logger = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
@@ -37,7 +38,10 @@ tokio = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 
 [[bin]]
 name = "forge"

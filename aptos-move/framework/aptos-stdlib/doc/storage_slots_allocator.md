@@ -747,7 +747,7 @@ Remove storage slot, but reserve it for later.
     <b>if</b> (slot_index != <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>) {
         <b>let</b> Link::Vacant { next } = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_link">remove_link</a>(slot_index);
         self.reuse_head_index = next;
-        self.reuse_spare_count = self.reuse_spare_count - 1;
+        self.reuse_spare_count -= 1;
     };
     slot_index
 }
@@ -777,7 +777,7 @@ Remove storage slot, but reserve it for later.
         <b>let</b> link = Link::Vacant { next: self.reuse_head_index };
         self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_add_link">add_link</a>(slot_index, link);
         self.reuse_head_index = slot_index;
-        self.reuse_spare_count = self.reuse_spare_count + 1;
+        self.reuse_spare_count += 1;
     };
 }
 </code></pre>
@@ -803,7 +803,7 @@ Remove storage slot, but reserve it for later.
 
 <pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_next_slot_index">next_slot_index</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;): u64 {
     <b>let</b> slot_index = self.new_slot_index;
-    self.new_slot_index = self.new_slot_index + 1;
+    self.new_slot_index += 1;
     <b>if</b> (self.slots.is_none()) {
         self.slots.fill(<a href="table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>&lt;u64, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_Link">Link</a>&lt;T&gt;&gt;());
     };

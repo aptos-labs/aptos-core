@@ -60,8 +60,8 @@ spec aptos_std::pool_u64 {
         let new_shares = spec_amount_to_shares_with_total_coins(self, coins_amount, self.total_coins);
         aborts_if self.total_coins + coins_amount > MAX_U64;
         aborts_if self.total_shares + new_shares > MAX_U64;
-        include coins_amount > 0 ==> AddSharesAbortsIf { new_shares: new_shares };
-        include coins_amount > 0 ==> AddSharesEnsures { new_shares: new_shares };
+        include coins_amount > 0 ==> AddSharesAbortsIf { new_shares };
+        include coins_amount > 0 ==> AddSharesEnsures { new_shares };
         ensures self.total_coins == old(self.total_coins) + coins_amount;
         ensures self.total_shares == old(self.total_shares) + new_shares;
         ensures result == new_shares;

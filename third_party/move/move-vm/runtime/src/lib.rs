@@ -14,7 +14,6 @@ pub mod logging;
 pub mod move_vm;
 pub mod native_extensions;
 pub mod native_functions;
-pub mod session;
 #[macro_use]
 pub mod tracing;
 pub mod config;
@@ -25,6 +24,7 @@ pub mod module_traversal;
 mod debug;
 
 mod access_control;
+mod frame;
 mod frame_type_cache;
 mod reentrancy_checker;
 mod runtime_type_checks;

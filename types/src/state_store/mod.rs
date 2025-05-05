@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use bytes::Bytes;
-use move_core_types::move_resource::MoveResource;
+use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
 use std::ops::Deref;
@@ -43,8 +43,13 @@ pub trait TStateView {
     /// Gets the state value for a given state key.
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>>;
 
-    /// Get state storage usage info at epoch ending.
+    /// Gets state storage usage info at epoch ending.
     fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
+
+    /// Checks if a state keyed by the given state key exists.
+    fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
+        self.get_state_value(state_key).map(|opt| opt.is_some())
+    }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
@@ -135,6 +140,23 @@ pub trait MoveResourceExt: MoveResource {
             .get_state_value_bytes(&state_key)?
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()?)
+    }
+
+    fn fetch_move_resource_from_group(
+        state_view: &dyn StateView,
+        address: &AccountAddress,
+        group: &StructTag,
+    ) -> StateViewResult<Option<Self>> {
+        let rg = state_view
+            .get_state_value_bytes(&StateKey::resource_group(address, group))?
+            .map(|data| bcs::from_bytes::<std::collections::BTreeMap<StructTag, Vec<u8>>>(&data))
+            .transpose()?;
+        if let Some(group) = rg {
+            if let Some(data) = group.get(&Self::struct_tag()) {
+                return Ok(Some(bcs::from_bytes::<Self>(data)?));
+            }
+        }
+        Ok(None)
     }
 }
 

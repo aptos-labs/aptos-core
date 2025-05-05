@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun t0(cond: bool) {
         loop {
@@ -24,8 +24,11 @@ module 0x8675309::M {
         };
         loop {
           if cond {
-            0;
-            Tuple()
+            {
+              let x: u64 = 0;
+              x;
+              Tuple()
+            }
           } else {
             break
           }
@@ -92,14 +95,15 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun t0(cond: bool) {
         while (cond) ();
         while (cond) ();
         while (cond) ();
         while (cond) {
-            0;
+            let x = 0;
+            x;
         };
         while (cond) if (cond) ();
         while (cond) break;

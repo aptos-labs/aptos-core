@@ -296,6 +296,7 @@ impl NativeVMExecutorTask {
                         recipient,
                         fail_on_account_existing,
                         fail_on_account_missing,
+                        !fa_migration_complete,
                         view,
                         &mut resource_write_set,
                     )?;
@@ -344,6 +345,7 @@ impl NativeVMExecutorTask {
                             recipient_address,
                             fail_on_recipient_account_existing,
                             fail_on_recipient_account_missing,
+                            !fa_migration_complete,
                             view,
                             &mut resource_write_set,
                         )?;
@@ -432,8 +434,23 @@ impl NativeVMExecutorTask {
                 }
             },
             None => {
-                error!("Account doesn't exist");
-                Err(())
+                let mut account = DbAccessUtil::new_account_resource(sender_address);
+                if sequence_number == 0 {
+                    account.sequence_number = 1;
+                    resource_write_set.insert(
+                        sender_account_key,
+                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
+                            bcs::to_bytes(&account).map_err(hide_error)?,
+                        ))),
+                    );
+                    Ok(())
+                } else {
+                    error!(
+                        "Invalid sequence number: txn: {} vs account: {}",
+                        sequence_number, account.sequence_number
+                    );
+                    Err(())
+                }
             },
         }
     }
@@ -443,6 +460,7 @@ impl NativeVMExecutorTask {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        create_account_resource: bool,
         view: &(impl ExecutorView + ResourceGroupView),
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
     ) -> Result<(), ()> {
@@ -458,7 +476,7 @@ impl NativeVMExecutorTask {
             None => {
                 if fail_on_account_missing {
                     return Err(());
-                } else {
+                } else if create_account_resource {
                     let account = DbAccessUtil::new_account_resource(address);
 
                     resource_write_set.insert(

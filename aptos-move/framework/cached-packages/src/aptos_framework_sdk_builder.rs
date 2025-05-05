@@ -143,6 +143,15 @@ pub enum EntryFunctionCall {
         new_auth_key: Vec<u8>,
     },
 
+    /// Private entry function for key rotation that allows the signer to update their authentication key from a given public key.
+    /// This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
+    ///
+    /// Note: This function does not update the `OriginatingAddress` table.
+    AccountRotateAuthenticationKeyFromPublicKey {
+        scheme: u8,
+        new_public_key_bytes: Vec<u8>,
+    },
+
     AccountRotateAuthenticationKeyWithRotationCapability {
         rotation_cap_offerer_address: AccountAddress,
         new_scheme: u8,
@@ -165,6 +174,34 @@ pub enum EntryFunctionCall {
     /// authority of the new authentication key.
     AccountSetOriginatingAddress {},
 
+    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+    ///
+    /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
+    /// is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
+    ///
+    /// # Arguments
+    /// * `account` - The signer representing the keyless account
+    /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
+    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_key_proof` - A signature from the backup key proving ownership
+    ///
+    /// # Aborts
+    /// * If the any of inputs deserialize incorrectly
+    /// * If the provided public key is not a keyless public key
+    /// * If the keyless public key is not the original public key of the account
+    /// * If the backup key proof signature is invalid
+    ///
+    /// # Events
+    /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+    AccountUpsertEd25519BackupKeyOnKeylessAccount {
+        keyless_public_key: Vec<u8>,
+        backup_public_key: Vec<u8>,
+        backup_key_proof: Vec<u8>,
+    },
+
     /// Add dispatchable authentication function that enables account abstraction via this function.
     /// Note: it is a private entry function that can only be called directly from transaction.
     AccountAbstractionAddAuthenticationFunction {
@@ -181,16 +218,16 @@ pub enum EntryFunctionCall {
 
     AccountAbstractionInitialize {},
 
-    /// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+    /// Add dispatchable derivable authentication function, that enables account abstraction via this function.
     /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
     /// dispatchable function needs to verify two things:
-    /// - that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
-    /// - that signing_data.domain_account_identity() is correct identity representing the authenticator
+    /// - that signing_data.derivable_abstract_signature() is a valid signature of signing_data.digest() (just like regular AA)
+    /// - that signing_data.derivable_abstract_public_key() is correct identity representing the authenticator
     ///   (missing this step would allow impersonation)
     ///
     /// Note: This is  public entry function, as it requires framework signer, and that can
     /// only be obtained as a part of the governance script.
-    AccountAbstractionRegisterDomainWithAuthenticationFunction {
+    AccountAbstractionRegisterDerivableAuthenticationFunction {
         module_address: AccountAddress,
         module_name: Vec<u8>,
         function_name: Vec<u8>,
@@ -474,9 +511,9 @@ pub enum EntryFunctionCall {
         new_beneficiary: AccountAddress,
     },
 
-    /// Allows an owner to change the delegated voter of the underlying stake pool.
+    /// Deprecated. Use the partial governance voting flow instead.
     DelegationPoolSetDelegatedVoter {
-        new_voter: AccountAddress,
+        _new_voter: AccountAddress,
     },
 
     /// Allows an owner to change the operator of the underlying stake pool.
@@ -552,7 +589,7 @@ pub enum EntryFunctionCall {
     /// ```
     ///
     /// We can call update_federated_jwk_set for Google's `iss` - "https://accounts.google.com" and for each vector
-    /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+    /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1
     /// the corresponding attribute in the second JWK as shown below.
     ///
     /// ```move
@@ -847,6 +884,12 @@ pub enum EntryFunctionCall {
         sequence_number: u64,
         approved: bool,
     },
+
+    NonceValidationAddNonceBuckets {
+        count: u64,
+    },
+
+    NonceValidationInitializeNonceTable {},
 
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     ObjectTransferCall {
@@ -1266,6 +1309,10 @@ impl EntryFunctionCall {
             AccountRotateAuthenticationKeyCall { new_auth_key } => {
                 account_rotate_authentication_key_call(new_auth_key)
             },
+            AccountRotateAuthenticationKeyFromPublicKey {
+                scheme,
+                new_public_key_bytes,
+            } => account_rotate_authentication_key_from_public_key(scheme, new_public_key_bytes),
             AccountRotateAuthenticationKeyWithRotationCapability {
                 rotation_cap_offerer_address,
                 new_scheme,
@@ -1278,6 +1325,15 @@ impl EntryFunctionCall {
                 cap_update_table,
             ),
             AccountSetOriginatingAddress {} => account_set_originating_address(),
+            AccountUpsertEd25519BackupKeyOnKeylessAccount {
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+            } => account_upsert_ed25519_backup_key_on_keyless_account(
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+            ),
             AccountAbstractionAddAuthenticationFunction {
                 module_address,
                 module_name,
@@ -1297,11 +1353,11 @@ impl EntryFunctionCall {
                 _function_name,
             ),
             AccountAbstractionInitialize {} => account_abstraction_initialize(),
-            AccountAbstractionRegisterDomainWithAuthenticationFunction {
+            AccountAbstractionRegisterDerivableAuthenticationFunction {
                 module_address,
                 module_name,
                 function_name,
-            } => account_abstraction_register_domain_with_authentication_function(
+            } => account_abstraction_register_derivable_authentication_function(
                 module_address,
                 module_name,
                 function_name,
@@ -1480,8 +1536,8 @@ impl EntryFunctionCall {
             DelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
                 delegation_pool_set_beneficiary_for_operator(new_beneficiary)
             },
-            DelegationPoolSetDelegatedVoter { new_voter } => {
-                delegation_pool_set_delegated_voter(new_voter)
+            DelegationPoolSetDelegatedVoter { _new_voter } => {
+                delegation_pool_set_delegated_voter(_new_voter)
             },
             DelegationPoolSetOperator { new_operator } => {
                 delegation_pool_set_operator(new_operator)
@@ -1700,6 +1756,8 @@ impl EntryFunctionCall {
                 sequence_number,
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
+            NonceValidationAddNonceBuckets { count } => nonce_validation_add_nonce_buckets(count),
+            NonceValidationInitializeNonceTable {} => nonce_validation_initialize_nonce_table(),
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ObjectCodeDeploymentPublish {
                 metadata_serialized,
@@ -2156,6 +2214,31 @@ pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> Transact
     ))
 }
 
+/// Private entry function for key rotation that allows the signer to update their authentication key from a given public key.
+/// This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
+///
+/// Note: This function does not update the `OriginatingAddress` table.
+pub fn account_rotate_authentication_key_from_public_key(
+    scheme: u8,
+    new_public_key_bytes: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key_from_public_key").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&scheme).unwrap(),
+            bcs::to_bytes(&new_public_key_bytes).unwrap(),
+        ],
+    ))
+}
+
 pub fn account_rotate_authentication_key_with_rotation_capability(
     rotation_cap_offerer_address: AccountAddress,
     new_scheme: u8,
@@ -2206,6 +2289,51 @@ pub fn account_set_originating_address() -> TransactionPayload {
         ident_str!("set_originating_address").to_owned(),
         vec![],
         vec![],
+    ))
+}
+
+/// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+/// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+/// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+/// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+///
+/// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
+/// is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
+///
+/// # Arguments
+/// * `account` - The signer representing the keyless account
+/// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
+/// * `backup_public_key` - The ED25519 public key to add as a backup
+/// * `backup_key_proof` - A signature from the backup key proving ownership
+///
+/// # Aborts
+/// * If the any of inputs deserialize incorrectly
+/// * If the provided public key is not a keyless public key
+/// * If the keyless public key is not the original public key of the account
+/// * If the backup key proof signature is invalid
+///
+/// # Events
+/// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
+pub fn account_upsert_ed25519_backup_key_on_keyless_account(
+    keyless_public_key: Vec<u8>,
+    backup_public_key: Vec<u8>,
+    backup_key_proof: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("upsert_ed25519_backup_key_on_keyless_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keyless_public_key).unwrap(),
+            bcs::to_bytes(&backup_public_key).unwrap(),
+            bcs::to_bytes(&backup_key_proof).unwrap(),
+        ],
     ))
 }
 
@@ -2272,16 +2400,16 @@ pub fn account_abstraction_initialize() -> TransactionPayload {
     ))
 }
 
-/// Add dispatchable domain-scoped authentication function, that enables account abstraction via this function.
+/// Add dispatchable derivable authentication function, that enables account abstraction via this function.
 /// This means all accounts within the domain can use it to authenticate, without needing an initialization (unlike non-domain AA).
 /// dispatchable function needs to verify two things:
-/// - that signing_data.domain_authenticator() is a valid signature of signing_data.digest() (just like regular AA)
-/// - that signing_data.domain_account_identity() is correct identity representing the authenticator
+/// - that signing_data.derivable_abstract_signature() is a valid signature of signing_data.digest() (just like regular AA)
+/// - that signing_data.derivable_abstract_public_key() is correct identity representing the authenticator
 ///   (missing this step would allow impersonation)
 ///
 /// Note: This is  public entry function, as it requires framework signer, and that can
 /// only be obtained as a part of the governance script.
-pub fn account_abstraction_register_domain_with_authentication_function(
+pub fn account_abstraction_register_derivable_authentication_function(
     module_address: AccountAddress,
     module_name: Vec<u8>,
     function_name: Vec<u8>,
@@ -2294,7 +2422,7 @@ pub fn account_abstraction_register_domain_with_authentication_function(
             ]),
             ident_str!("account_abstraction").to_owned(),
         ),
-        ident_str!("register_domain_with_authentication_function").to_owned(),
+        ident_str!("register_derivable_authentication_function").to_owned(),
         vec![],
         vec![
             bcs::to_bytes(&module_address).unwrap(),
@@ -3176,8 +3304,8 @@ pub fn delegation_pool_set_beneficiary_for_operator(
     ))
 }
 
-/// Allows an owner to change the delegated voter of the underlying stake pool.
-pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
+/// Deprecated. Use the partial governance voting flow instead.
+pub fn delegation_pool_set_delegated_voter(_new_voter: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -3188,7 +3316,7 @@ pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> Transac
         ),
         ident_str!("set_delegated_voter").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&new_voter).unwrap()],
+        vec![bcs::to_bytes(&_new_voter).unwrap()],
     ))
 }
 
@@ -3346,7 +3474,7 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
 /// ```
 ///
 /// We can call update_federated_jwk_set for Google's `iss` - "https://accounts.google.com" and for each vector
-/// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+/// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1
 /// the corresponding attribute in the second JWK as shown below.
 ///
 /// ```move
@@ -4140,6 +4268,36 @@ pub fn multisig_account_vote_transanction(
             bcs::to_bytes(&sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
         ],
+    ))
+}
+
+pub fn nonce_validation_add_nonce_buckets(count: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation").to_owned(),
+        ),
+        ident_str!("add_nonce_buckets").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&count).unwrap()],
+    ))
+}
+
+pub fn nonce_validation_initialize_nonce_table() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("nonce_validation").to_owned(),
+        ),
+        ident_str!("initialize_nonce_table").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -5454,6 +5612,21 @@ mod decoder {
         }
     }
 
+    pub fn account_rotate_authentication_key_from_public_key(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountRotateAuthenticationKeyFromPublicKey {
+                    scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key_with_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5476,6 +5649,22 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AccountSetOriginatingAddress {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_upsert_ed25519_backup_key_on_keyless_account(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountUpsertEd25519BackupKeyOnKeylessAccount {
+                    keyless_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    backup_public_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    backup_key_proof: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -5523,12 +5712,12 @@ mod decoder {
         }
     }
 
-    pub fn account_abstraction_register_domain_with_authentication_function(
+    pub fn account_abstraction_register_derivable_authentication_function(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
-                EntryFunctionCall::AccountAbstractionRegisterDomainWithAuthenticationFunction {
+                EntryFunctionCall::AccountAbstractionRegisterDerivableAuthenticationFunction {
                     module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                     module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
                     function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -6067,7 +6256,7 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSetDelegatedVoter {
-                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+                _new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -6583,6 +6772,28 @@ mod decoder {
                 sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
                 approved: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_add_nonce_buckets(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::NonceValidationAddNonceBuckets {
+                count: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn nonce_validation_initialize_nonce_table(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::NonceValidationInitializeNonceTable {})
         } else {
             None
         }
@@ -7352,12 +7563,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key_call),
         );
         map.insert(
+            "account_rotate_authentication_key_from_public_key".to_string(),
+            Box::new(decoder::account_rotate_authentication_key_from_public_key),
+        );
+        map.insert(
             "account_rotate_authentication_key_with_rotation_capability".to_string(),
             Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
             "account_set_originating_address".to_string(),
             Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
+            "account_upsert_ed25519_backup_key_on_keyless_account".to_string(),
+            Box::new(decoder::account_upsert_ed25519_backup_key_on_keyless_account),
         );
         map.insert(
             "account_abstraction_add_authentication_function".to_string(),
@@ -7372,8 +7591,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_abstraction_initialize),
         );
         map.insert(
-            "account_abstraction_register_domain_with_authentication_function".to_string(),
-            Box::new(decoder::account_abstraction_register_domain_with_authentication_function),
+            "account_abstraction_register_derivable_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_register_derivable_authentication_function),
         );
         map.insert(
             "account_abstraction_remove_authentication_function".to_string(),
@@ -7704,6 +7923,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
+        );
+        map.insert(
+            "nonce_validation_add_nonce_buckets".to_string(),
+            Box::new(decoder::nonce_validation_add_nonce_buckets),
+        );
+        map.insert(
+            "nonce_validation_initialize_nonce_table".to_string(),
+            Box::new(decoder::nonce_validation_initialize_nonce_table),
         );
         map.insert(
             "object_transfer_call".to_string(),

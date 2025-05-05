@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::test() {
@@ -25,17 +25,42 @@ fun m::test() {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/variable-coalescing/non_overlapping_vars_diff_type.move:4:9
   │
 4 │         x = x + 1;
   │         ^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
   ┌─ tests/variable-coalescing/non_overlapping_vars_diff_type.move:6:9
   │
 6 │         y = y + 1;
   │         ^^^^^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u32
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t0 := 1
+  1: $t2 := infer($t0)
+  2: $t3 := 1
+  3: $t1 := +($t2, $t3)
+  4: $t0 := infer($t1)
+  5: $t4 := 2
+  6: $t6 := infer($t4)
+  7: $t7 := 1
+  8: $t5 := +($t6, $t7)
+  9: $t4 := infer($t5)
+ 10: return ()
+}
 
 ============ after DeadStoreElimination: ================
 

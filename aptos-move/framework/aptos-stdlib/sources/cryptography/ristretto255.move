@@ -41,9 +41,6 @@ module aptos_std::ristretto255 {
     use std::features;
     use std::option::Option;
 
-    #[test_only]
-    use std::option;
-
     //
     // Constants
     //
@@ -203,7 +200,7 @@ module aptos_std::ristretto255 {
     /// Samples a uniformly-at-random RistrettoPoint given a sequence of 64 uniformly-at-random bytes. This function
     /// can be used to build a collision-resistant hash function that maps 64-byte messages to RistrettoPoint's.
     public fun new_point_from_64_uniform_bytes(bytes: vector<u8>): Option<RistrettoPoint> {
-        if (std::vector::length(&bytes) == 64) {
+        if (bytes.length() == 64) {
             std::option::some(RistrettoPoint {
                 handle: new_point_from_64_uniform_bytes_internal(bytes)
             })
@@ -322,9 +319,10 @@ module aptos_std::ristretto255 {
     /// Computes a multi-scalar multiplication, returning a_1 p_1 + a_2 p_2 + ... + a_n p_n.
     /// This function is much faster than computing each a_i p_i using `point_mul` and adding up the results using `point_add`.
     public fun multi_scalar_mul(points: &vector<RistrettoPoint>, scalars: &vector<Scalar>): RistrettoPoint {
-        assert!(!std::vector::is_empty(points), std::error::invalid_argument(E_ZERO_POINTS));
-        assert!(!std::vector::is_empty(scalars), std::error::invalid_argument(E_ZERO_SCALARS));
-        assert!(std::vector::length(points) == std::vector::length(scalars), std::error::invalid_argument(E_DIFFERENT_NUM_POINTS_AND_SCALARS));
+        assert!(!points.is_empty(), std::error::invalid_argument(E_ZERO_POINTS));
+        assert!(!scalars.is_empty(), std::error::invalid_argument(E_ZERO_SCALARS));
+        assert!(
+            points.length() == scalars.length(), std::error::invalid_argument(E_DIFFERENT_NUM_POINTS_AND_SCALARS));
 
         RistrettoPoint {
             handle: multi_scalar_mul_internal<RistrettoPoint, Scalar>(points, scalars)
@@ -364,9 +362,7 @@ module aptos_std::ristretto255 {
     /// Creates a Scalar from an u8.
     public fun new_scalar_from_u8(byte: u8): Scalar {
         let s = scalar_zero();
-        let byte_zero = std::vector::borrow_mut(&mut s.data, 0);
-        *byte_zero = byte;
-
+        s.data[0] = byte;
         s
     }
 
@@ -393,7 +389,7 @@ module aptos_std::ristretto255 {
 
     /// Creates a Scalar from 32 bytes by reducing the little-endian-encoded number in those bytes modulo $\ell$.
     public fun new_scalar_reduced_from_32_bytes(bytes: vector<u8>): Option<Scalar> {
-        if (std::vector::length(&bytes) == 32) {
+        if (bytes.length() == 32) {
             std::option::some(Scalar {
                 data: scalar_reduced_from_32_bytes_internal(bytes)
             })
@@ -405,7 +401,7 @@ module aptos_std::ristretto255 {
     /// Samples a scalar uniformly-at-random given 64 uniform-at-random bytes as input by reducing the little-endian-encoded number
     /// in those bytes modulo $\ell$.
     public fun new_scalar_uniform_from_64_bytes(bytes: vector<u8>): Option<Scalar> {
-        if (std::vector::length(&bytes) == 64) {
+        if (bytes.length() == 64) {
             std::option::some(Scalar {
                 data: scalar_uniform_from_64_bytes_internal(bytes)
             })
@@ -693,13 +689,13 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_point_decompression() {
         let compressed = new_compressed_point_from_bytes(A_POINT);
-        assert!(std::option::is_some(&compressed), 1);
+        assert!(compressed.is_some(), 1);
 
         let point = new_point_from_bytes(A_POINT);
-        assert!(std::option::is_some(&point), 1);
+        assert!(point.is_some(), 1);
 
-        let point = std::option::extract(&mut point);
-        let compressed = std::option::extract(&mut compressed);
+        let point = point.extract();
+        let compressed = compressed.extract();
         let same_point = point_decompress(&compressed);
 
         assert!(point_equals(&point, &same_point), 1);
@@ -708,8 +704,8 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_point_equals() {
         let g = basepoint();
-        let same_g = std::option::extract(&mut new_point_from_bytes(BASE_POINT));
-        let ag = std::option::extract(&mut new_point_from_bytes(A_TIMES_BASE_POINT));
+        let same_g = new_point_from_bytes(BASE_POINT).extract();
+        let ag = new_point_from_bytes(A_TIMES_BASE_POINT).extract();
 
         assert!(point_equals(&g, &same_g), 1);
         assert!(!point_equals(&g, &ag), 1);
@@ -720,9 +716,9 @@ module aptos_std::ristretto255 {
         // fetch g
         let g = basepoint();
         // fetch a
-        let a = std::option::extract(&mut new_scalar_from_bytes(A_SCALAR));
+        let a = new_scalar_from_bytes(A_SCALAR).extract();
         // fetch expected a*g
-        let ag = std::option::extract(&mut new_point_from_bytes(A_TIMES_BASE_POINT));
+        let ag = new_point_from_bytes(A_TIMES_BASE_POINT).extract();
 
         // compute a*g
         let p = point_mul(&g, &a);
@@ -741,9 +737,9 @@ module aptos_std::ristretto255 {
         let g = basepoint();
         assert!(g.handle == 0, 1);
 
-        let a = std::option::extract(&mut new_scalar_from_bytes(A_SCALAR));
+        let a = new_scalar_from_bytes(A_SCALAR).extract();
 
-        let ag = std::option::extract(&mut new_point_from_bytes(A_TIMES_BASE_POINT));
+        let ag = new_point_from_bytes(A_TIMES_BASE_POINT).extract();
         assert!(ag.handle == 1, 1);
         assert!(!point_equals(&g, &ag), 1);
 
@@ -763,13 +759,13 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_point_add() {
         // fetch a
-        let a = std::option::extract(&mut new_point_from_bytes(A_POINT));
+        let a = new_point_from_bytes(A_POINT).extract();
 
         // fetch b
-        let b = std::option::extract(&mut new_point_from_bytes(B_POINT));
+        let b = new_point_from_bytes(B_POINT).extract();
 
         // fetch expected a + b
-        let a_plus_b = std::option::extract(&mut new_point_from_bytes(A_PLUS_B_POINT));
+        let a_plus_b = new_point_from_bytes(A_PLUS_B_POINT).extract();
 
         // compute a*g
         let result = point_add(&a, &b);
@@ -812,25 +808,25 @@ module aptos_std::ristretto255 {
         // create extra RistrettoPoints here, so as to generate different PointStore layouts inside the native Rust implementation
         let c = before_a_gap;
         while (c > 0) {
-            let _ignore = std::option::extract(&mut new_point_from_bytes(BASE_POINT));
+            let _ignore = new_point_from_bytes(BASE_POINT).extract();
 
-            c = c - 1;
+            c -= 1;
         };
 
         // fetch a
-        let a = std::option::extract(&mut new_point_from_bytes(A_POINT));
+        let a = new_point_from_bytes(A_POINT).extract();
 
         // create extra RistrettoPoints here, so as to generate different PointStore layouts inside the native Rust implementation
         let c = before_b_gap;
         while (c > 0) {
-            let _ignore = std::option::extract(&mut new_point_from_bytes(BASE_POINT));
+            let _ignore = new_point_from_bytes(BASE_POINT).extract();
 
-            c = c - 1;
+            c -= 1;
         };
         // fetch b
-        let b = std::option::extract(&mut new_point_from_bytes(B_POINT));
+        let b = new_point_from_bytes(B_POINT).extract();
 
-        let a_plus_b = std::option::extract(&mut new_point_from_bytes(A_PLUS_B_POINT));
+        let a_plus_b = new_point_from_bytes(A_PLUS_B_POINT).extract();
 
         // sanity-check the handles
         assert!(a.handle == before_a_gap, 1);
@@ -856,13 +852,13 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_point_sub() {
         // fetch a
-        let a = std::option::extract(&mut new_point_from_bytes(A_POINT));
+        let a = new_point_from_bytes(A_POINT).extract();
 
         // fetch b
-        let b = std::option::extract(&mut new_point_from_bytes(B_POINT));
+        let b = new_point_from_bytes(B_POINT).extract();
 
         // fetch expected a + b
-        let a_plus_b = std::option::extract(&mut new_point_from_bytes(A_PLUS_B_POINT));
+        let a_plus_b = new_point_from_bytes(A_PLUS_B_POINT).extract();
 
         // compute a*g
         let result = point_sub(&a_plus_b, &b);
@@ -882,7 +878,7 @@ module aptos_std::ristretto255 {
 
     #[test]
     fun test_point_neg() {
-        let a = std::option::extract(&mut new_point_from_bytes(A_POINT));
+        let a = new_point_from_bytes(A_POINT).extract();
 
         let neg_a = point_neg(&a);
 
@@ -909,10 +905,11 @@ module aptos_std::ristretto255 {
     fun test_basepoint_double_mul(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
-        let expected = option::extract(&mut new_point_from_bytes(x"be5d615d8b8f996723cdc6e1895b8b6d312cc75d1ffb0259873b99396a38c05a"));
+        let expected = new_point_from_bytes(x"be5d615d8b8f996723cdc6e1895b8b6d312cc75d1ffb0259873b99396a38c05a").extract(
+        );
 
         let a = Scalar { data: A_SCALAR };
-        let a_point = option::extract(&mut new_point_from_bytes(A_POINT));
+        let a_point = new_point_from_bytes(A_POINT).extract();
         let b = Scalar { data: B_SCALAR };
         let actual = basepoint_double_mul(&a, &a_point, &b);
 
@@ -958,7 +955,7 @@ module aptos_std::ristretto255 {
         ];
 
         let result = multi_scalar_mul(&points, &scalars);
-        let expected = std::option::extract(&mut new_point_from_bytes(A_TIMES_BASE_POINT));
+        let expected = new_point_from_bytes(A_TIMES_BASE_POINT).extract();
 
         assert!(point_equals(&result, &expected), 1);
     }
@@ -978,9 +975,9 @@ module aptos_std::ristretto255 {
 
         let result = multi_scalar_mul(&points, &scalars);
         let expected = basepoint_double_mul(
-            std::vector::borrow(&scalars, 0),
+            scalars.borrow(0),
             &basepoint(),
-            std::vector::borrow(&scalars, 1));
+            scalars.borrow(1));
 
         assert!(point_equals(&result, &expected), 1);
     }
@@ -1003,7 +1000,8 @@ module aptos_std::ristretto255 {
             new_point_from_sha2_512(b"5"),
         ];
 
-        let expected = std::option::extract(&mut new_point_from_bytes(x"c4a98fbe6bd0f315a0c150858aec8508be397443093e955ef982e299c1318928"));
+        let expected = new_point_from_bytes(x"c4a98fbe6bd0f315a0c150858aec8508be397443093e955ef982e299c1318928").extract(
+        );
         let result = multi_scalar_mul(&points, &scalars);
 
         assert!(point_equals(&expected, &result), 1);
@@ -1012,7 +1010,8 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_new_point_from_sha2_512() {
         let msg = b"To really appreciate architecture, you may even need to commit a murder";
-        let expected = option::extract(&mut new_point_from_bytes(x"baaa91eb43e5e2f12ffc96347e14bc458fdb1772b2232b08977ee61ea9f84e31"));
+        let expected = new_point_from_bytes(x"baaa91eb43e5e2f12ffc96347e14bc458fdb1772b2232b08977ee61ea9f84e31").extract(
+        );
 
         assert!(point_equals(&expected, &new_point_from_sha2_512(msg)), 1);
     }
@@ -1020,9 +1019,10 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_new_point_from_64_uniform_bytes() {
         let bytes_64 = x"baaa91eb43e5e2f12ffc96347e14bc458fdb1772b2232b08977ee61ea9f84e31e87feda199d72b83de4f5b2d45d34805c57019c6c59c42cb70ee3d19aa996f75";
-        let expected = option::extract(&mut new_point_from_bytes(x"4a8e429f906478654232d7ae180ad60854754944ac67f38e20d8fa79e4b7d71e"));
+        let expected = new_point_from_bytes(x"4a8e429f906478654232d7ae180ad60854754944ac67f38e20d8fa79e4b7d71e").extract(
+        );
 
-        let point = option::extract(&mut new_point_from_64_uniform_bytes(bytes_64));
+        let point = new_point_from_64_uniform_bytes(bytes_64).extract();
         assert!(point_equals(&expected, &point), 1);
     }
 
@@ -1046,31 +1046,31 @@ module aptos_std::ristretto255 {
     /// Tests deserializing a Scalar from a sequence of canonical bytes
     fun test_scalar_from_canonical_bytes() {
         // Too few bytes
-        assert!(std::option::is_none(&new_scalar_from_bytes(x"00")), 1);
+        assert!(new_scalar_from_bytes(x"00").is_none(), 1);
 
         // 32 zero bytes are canonical
-        assert!(std::option::is_some(&new_scalar_from_bytes(x"0000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(new_scalar_from_bytes(x"0000000000000000000000000000000000000000000000000000000000000000").is_some(), 1);
 
         // Non-canonical because unreduced
-        assert!(std::option::is_none(&new_scalar_from_bytes(x"1010101010101010101010101010101010101010101010101010101010101010")), 1);
+        assert!(new_scalar_from_bytes(x"1010101010101010101010101010101010101010101010101010101010101010").is_none(), 1);
 
         // Canonical because \ell - 1
-        assert!(std::option::is_some(&new_scalar_from_bytes(L_MINUS_ONE)), 1);
+        assert!(new_scalar_from_bytes(L_MINUS_ONE).is_some(), 1);
 
         // Non-canonical because \ell
-        assert!(std::option::is_none(&new_scalar_from_bytes(ORDER_ELL)), 1);
+        assert!(new_scalar_from_bytes(ORDER_ELL).is_none(), 1);
 
         // Non-canonical because \ell+1
-        assert!(std::option::is_none(&new_scalar_from_bytes(L_PLUS_ONE)), 1);
+        assert!(new_scalar_from_bytes(L_PLUS_ONE).is_none(), 1);
 
         // Non-canonical because \ell+2
-        assert!(std::option::is_none(&new_scalar_from_bytes(L_PLUS_TWO)), 1);
+        assert!(new_scalar_from_bytes(L_PLUS_TWO).is_none(), 1);
 
         // Non-canonical because high bit is set
         let non_canonical_highbit = vector[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];
         let non_canonical_highbit_hex = x"0000000000000000000000000000000000000000000000000000000000000080";
         assert!(non_canonical_highbit == non_canonical_highbit_hex, 1);
-        assert!(std::option::is_none(&new_scalar_from_bytes(non_canonical_highbit)), 1);
+        assert!(new_scalar_from_bytes(non_canonical_highbit).is_none(), 1);
     }
 
     #[test]
@@ -1108,9 +1108,9 @@ module aptos_std::ristretto255 {
         let inv = scalar_invert(&s);
 
         // Technically, there is a negligible probability (i.e., 1/2^\ell) that s was zero and the call above returned None
-        assert!(std::option::is_some(&inv), 1);
+        assert!(inv.is_some(), 1);
 
-        let inv = std::option::extract(&mut inv);
+        let inv = inv.extract();
 
         // Multiply s with s^{-1} and make sure you get one
         assert!(scalar_is_one(&scalar_mul(&s, &inv)), 1);
@@ -1121,12 +1121,12 @@ module aptos_std::ristretto255 {
     fun test_scalar_from_sha2_512() {
         // Test a specific message hashes correctly to the field
         let str: vector<u8> = vector[];
-        std::vector::append(&mut str, b"To really appreciate architecture, you may even need to commit a murder.");
-        std::vector::append(&mut str, b"While the programs used for The Manhattan Transcripts are of the most extreme");
-        std::vector::append(&mut str, b"nature, they also parallel the most common formula plot: the archetype of");
-        std::vector::append(&mut str, b"murder. Other phantasms were occasionally used to underline the fact that");
-        std::vector::append(&mut str, b"perhaps all architecture, rather than being about functional standards, is");
-        std::vector::append(&mut str, b"about love and death.");
+        str.append(b"To really appreciate architecture, you may even need to commit a murder.");
+        str.append(b"While the programs used for The Manhattan Transcripts are of the most extreme");
+        str.append(b"nature, they also parallel the most common formula plot: the archetype of");
+        str.append(b"murder. Other phantasms were occasionally used to underline the fact that");
+        str.append(b"perhaps all architecture, rather than being about functional standards, is");
+        str.append(b"about love and death.");
 
         let s = new_scalar_from_sha2_512(str);
 
@@ -1143,21 +1143,21 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_scalar_invert() {
         // Cannot invert zero
-        assert!(std::option::is_none(&scalar_invert(&scalar_zero())), 1);
+        assert!(scalar_invert(&scalar_zero()).is_none(), 1);
 
         // One's inverse is one
         let one = scalar_invert(&scalar_one());
-        assert!(std::option::is_some(&one), 1);
+        assert!(one.is_some(), 1);
 
-        let one = std::option::extract(&mut one);
+        let one = one.extract();
         assert!(scalar_is_one(&one), 1);
 
         // Test a random point X's inverse is correct
         let x = Scalar { data: X_SCALAR };
         let xinv = scalar_invert(&x);
-        assert!(std::option::is_some(&xinv), 1);
+        assert!(xinv.is_some(), 1);
 
-        let xinv = std::option::extract(&mut xinv);
+        let xinv = xinv.extract();
         let xinv_expected = Scalar { data: X_INV_SCALAR };
 
         assert!(scalar_equals(&xinv, &xinv_expected), 1)
@@ -1245,12 +1245,12 @@ module aptos_std::ristretto255 {
     #[test]
     fun test_scalar_reduced_from_32_bytes() {
         // \ell + 2 = 0 + 2 = 2 (modulo \ell)
-        let s = std::option::extract(&mut new_scalar_reduced_from_32_bytes(L_PLUS_TWO));
+        let s = new_scalar_reduced_from_32_bytes(L_PLUS_TWO).extract();
         let two = Scalar { data: TWO_SCALAR };
         assert!(scalar_equals(&s, &two), 1);
 
         // Reducing the all 1's bit vector yields $(2^256 - 1) \mod \ell$
-        let biggest = std::option::extract(&mut new_scalar_reduced_from_32_bytes(NON_CANONICAL_ALL_ONES));
+        let biggest = new_scalar_reduced_from_32_bytes(NON_CANONICAL_ALL_ONES).extract();
         assert!(scalar_equals(&biggest, &Scalar { data: REDUCED_2_256_MINUS_1_SCALAR }), 1);
     }
 
@@ -1259,10 +1259,10 @@ module aptos_std::ristretto255 {
         // Test X + 2^256 * X reduces correctly
         let x_plus_2_to_256_times_x: vector<u8> = vector[];
 
-        std::vector::append(&mut x_plus_2_to_256_times_x, X_SCALAR);
-        std::vector::append(&mut x_plus_2_to_256_times_x, X_SCALAR);
+        x_plus_2_to_256_times_x.append(X_SCALAR);
+        x_plus_2_to_256_times_x.append(X_SCALAR);
 
-        let reduced = std::option::extract(&mut new_scalar_uniform_from_64_bytes(x_plus_2_to_256_times_x));
+        let reduced = new_scalar_uniform_from_64_bytes(x_plus_2_to_256_times_x).extract();
         let expected = Scalar { data: REDUCED_X_PLUS_2_TO_256_TIMES_X_SCALAR };
         assert!(scalar_equals(&reduced, &expected), 1)
     }
@@ -1274,14 +1274,14 @@ module aptos_std::ristretto255 {
 
         // ...but if we maul it and set the high bit to 1, it is non-canonical
         let non_can = scalar_zero();
-        let last_byte = std::vector::borrow_mut(&mut non_can.data, 31);
+        let last_byte = non_can.data.borrow_mut(31);
         *last_byte = 128;
         assert!(!scalar_is_canonical_internal(non_can.data), 1);
 
         // This test makes sure scalar_to_bytes does not return a mutable reference to a scalar's bits
         let non_can = scalar_zero();
         let bytes = scalar_to_bytes(&scalar_zero());
-        let last_byte = std::vector::borrow_mut(&mut bytes, 31);
+        let last_byte = bytes.borrow_mut(31);
         *last_byte = 128;
         assert!(scalar_is_canonical_internal(non_can.data), 1);
         assert!(scalar_equals(&non_can, &scalar_zero()), 1);
@@ -1293,7 +1293,7 @@ module aptos_std::ristretto255 {
         let i = 0;
         while (i < limit) {
             point_identity();
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -1304,7 +1304,7 @@ module aptos_std::ristretto255 {
         let i = 0;
         while (i < limit) {
             point_identity();
-            i = i + 1;
+            i += 1;
         }
     }
 }

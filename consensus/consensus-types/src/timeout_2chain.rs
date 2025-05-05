@@ -197,7 +197,7 @@ impl TwoChainTimeoutCertificate {
     }
 }
 
-/// Contains two chain timout with partial signatures from the validators. This is only used during
+/// Contains two chain timeout with partial signatures from the validators. This is only used during
 /// signature aggregation and does not go through the wire.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TwoChainTimeoutWithPartialSignatures {

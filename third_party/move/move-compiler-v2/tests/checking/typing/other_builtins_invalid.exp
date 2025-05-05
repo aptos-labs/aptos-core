@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: the operator takes `&mut` but `&` was provided
+error: cannot use `&u64` with an operator which expects a value of type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/other_builtins_invalid.move:4:22
   │
 4 │         (freeze<u64>(x): &mut u64);
   │                      ^
 
-error: the operator takes `&mut` but `&` was provided
+error: cannot use `&vector<bool>` with an operator which expects a value of type `&mut vector<bool>` (mutability mismatch)
   ┌─ tests/checking/typing/other_builtins_invalid.move:5:31
   │
 5 │         (freeze<vector<bool>>(&any()): &mut vector<bool>);
