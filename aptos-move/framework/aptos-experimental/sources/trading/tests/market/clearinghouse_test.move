@@ -21,8 +21,13 @@ module aptos_experimental::clearinghouse_test {
         TestOrderMetadata {}
     }
 
+    struct Position has store, drop {
+        size: u64,
+        is_long: bool
+    }
+
     struct GlobalState has key {
-        user_positions: Table<address, u64>
+        user_positions: Table<address, Position>
     }
 
     public(package) fun initialize(admin: &signer) {
@@ -48,27 +53,49 @@ module aptos_experimental::clearinghouse_test {
         if (!user_positions.contains(user)) {
             return 0;
         };
-        *user_positions.borrow(user)
+        user_positions.borrow(user).size
+    }
+
+    fun update_position(
+        position: &mut Position, size: u64, is_long: bool
+    ) {
+        if (position.is_long != is_long) {
+            if (size > position.size) {
+                position.size = size - position.size;
+                position.is_long = is_long;
+            } else {
+                position.size -= size;
+            }
+        } else {
+            position.size += size;
+        }
     }
 
     public(package) fun settle_trade(
-        taker: address, maker: address, size: u64
+        taker: address,
+        maker: address,
+        size: u64,
+        is_taker_long: bool
     ): SettleTradeResult acquires GlobalState {
-        let user_positions =
-            &mut borrow_global_mut<GlobalState>(@0x1).user_positions;
-        let taker_position = user_positions.borrow_mut_with_default(taker, 0);
-        *taker_position += size;
-        let maker_position = user_positions.borrow_mut_with_default(maker, 0);
-        // TODO(skedia): Track the position direction and reduce the size if applicable.
-        *maker_position += size;
+        let user_positions = &mut borrow_global_mut<GlobalState>(@0x1).user_positions;
+        let taker_position =
+            user_positions.borrow_mut_with_default(
+                taker, Position { size: 0, is_long: true }
+            );
+        update_position(taker_position, size, is_taker_long);
+        let maker_position =
+            user_positions.borrow_mut_with_default(
+                maker, Position { size: 0, is_long: true }
+            );
+        update_position(maker_position, size, !is_taker_long);
         new_settle_trade_result(size, option::none(), option::none())
     }
 
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, _is_taker_long, _price, size| {
-                settle_trade(taker, maker, size)
+            |taker, maker, is_taker_long, _price, size| {
+                settle_trade(taker, maker, size, is_taker_long)
             },
             |_account, _is_taker, _is_long, _price, _size| { validate_settlement_update() },
             |_user_addr, _is_buy, orig_size, _metadata| {

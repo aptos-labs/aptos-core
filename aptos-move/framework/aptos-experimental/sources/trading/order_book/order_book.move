@@ -1,4 +1,15 @@
-/// (work in progress)
+/// This module provides a core order book functionality for a trading system. On a high level, it has three major
+/// components
+/// 1. ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
+/// book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
+/// The orders are matched based on time-price priority.
+/// 2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
+/// types of pending orders are supported.
+///  - Price move up - Trigggered when the price moves above a certain price level
+/// - Price move down - Triggered when the price moves below a certain price level
+/// - Time based - Triggered when a certain time has passed
+/// 3. Orders: This is a BigOrderMap of order id to order details.
+///
 module aptos_experimental::order_book {
     use std::vector;
     use std::error;
@@ -94,6 +105,9 @@ module aptos_experimental::order_book {
         }
     }
 
+    /// Cancels an order from the order book. If the order is active, it is removed from the active order book else
+    /// it is removed from the pending order book. The API doesn't abort if the order is not found in the order book -
+    /// this is a TODO for now.
     public fun cancel_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, account: address, account_order_id: u64
     ): Option<Order<M>> {
@@ -126,6 +140,7 @@ module aptos_experimental::order_book {
         return option::some(order)
     }
 
+    /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
     public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
         price: u64,
@@ -138,6 +153,8 @@ module aptos_experimental::order_book {
         return self.active_orders.is_taker_order(price, is_buy)
     }
 
+    /// Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
+    /// else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
     public fun place_maker_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ) {
@@ -211,6 +228,8 @@ module aptos_experimental::order_book {
         );
     }
 
+    /// Returns a single match for a taker order. It is responsibility of the caller to first call the `is_taker_order`
+    /// API to ensure that the order is a taker order before calling this API, otherwise it will abort.
     public fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut OrderBook<M>,
         price: u64,
@@ -228,14 +247,6 @@ module aptos_experimental::order_book {
         let (order, is_active) = order_with_state.destroy_order_from_state();
         assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
         new_single_order_match(order, matched_size)
-    }
-
-    #[test_only]
-    public fun destroy_order_book<M: store + copy + drop>(self: OrderBook<M>) {
-        let OrderBook::V1 { orders, active_orders, pending_orders } = self;
-        orders.destroy(|_v| {});
-        active_orders.destroy_active_order_book();
-        pending_orders.destroy_pending_order_book_index();
     }
 
     public fun is_active_order<M: store + copy + drop>(
@@ -256,16 +267,6 @@ module aptos_experimental::order_book {
             return option::none();
         };
         option::some(*self.orders.borrow(&order_id))
-    }
-
-    public fun get_unique_priority_idx<M: store + copy + drop>(
-        self: &OrderBook<M>, account: address, account_order_id: u64
-    ): Option<UniqueIdxType> {
-        let order_id = new_order_id_type(account, account_order_id);
-        if (!self.orders.contains(&order_id)) {
-            return option::none();
-        };
-        option::some(self.orders.borrow(&order_id).get_unique_priority_idx_from_state())
     }
 
     public fun get_remaining_size<M: store + copy + drop>(
@@ -322,7 +323,28 @@ module aptos_experimental::order_book {
         orders
     }
 
-    // #[test_only]
+    // ============================= test_only APIs ====================================
+
+    #[test_only]
+    public fun destroy_order_book<M: store + copy + drop>(self: OrderBook<M>) {
+        let OrderBook::V1 { orders, active_orders, pending_orders } = self;
+        orders.destroy(|_v| {});
+        active_orders.destroy_active_order_book();
+        pending_orders.destroy_pending_order_book_index();
+    }
+
+    #[test_only]
+    public fun get_unique_priority_idx<M: store + copy + drop>(
+        self: &OrderBook<M>, account: address, account_order_id: u64
+    ): Option<UniqueIdxType> {
+        let order_id = new_order_id_type(account, account_order_id);
+        if (!self.orders.contains(&order_id)) {
+            return option::none();
+        };
+        option::some(self.orders.borrow(&order_id).get_unique_priority_idx_from_state())
+    }
+
+    #[test_only]
     public fun place_order_and_get_matches<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ): vector<SingleOrderMatch<M>> {
@@ -432,6 +454,8 @@ module aptos_experimental::order_book {
     }
 
     struct TestMetadata has store, copy, drop {}
+
+    // ============================= Tests ====================================
 
     #[test]
     fun test_good_til_cancelled_order() {

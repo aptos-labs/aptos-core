@@ -1,3 +1,33 @@
+/// This module provides a generic trading engine implementation for a market. On a high level, its a data structure,
+/// that stores an order book and provides APIs to place orders, cancel orders, and match orders. The market also acts
+/// as a wrapper around the order book and pluggable clearinghouse implementation.
+/// A clearing house implementation is expected to implement the following APIs
+///  - settle_trade(taker, maker, is_taker_long, price, size): SettleTradeResult -> Called by the market when there
+/// is an match between taker and maker. The clearinghouse is expected to settle the trade and return the result. Please
+/// note that the clearing house settlment size might not be the same as the order match size and the settlement might
+/// also fail.
+///  - validate_settlement_update(account, is_taker, is_long, price, size): bool -> Called by the market to validate
+///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
+///  - max_settlement_size(account, is_long, orig_size): Option<u64> -> Called by the market to validate the size
+///  of the order when its placed. The clearinghouse is expected to validate the order and return the maximum settlement size
+///  of the order. Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
+///  the position size of the user and does not do any validation.
+///
+/// Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
+/// is a unique id for the order that can be used to later get the status of the order or cancel the order.
+///
+/// Market also supports various conditions for order matching like Good Till Cancelled (GTC), Post Only, Immediate or Cancel (IOC).
+/// GTC orders are orders that are valid until they are cancelled or filled. Post Only orders are orders that are valid only if they are not
+/// taker orders. IOC orders are orders that are valid only if they are taker orders.
+///
+/// In addition, the market also supports trigger conditions for orders. An order with trigger condition is not put
+/// on the order book until its trigger conditions are met. Following trigger conditions are supported:
+/// TakeProfit(price): If its a buy order its triggered when the market price is greater than or equal to the price. If
+/// its a sell order its triggered when the market price is less than or equal to the price.
+/// StopLoss(price): If its a buy order its triggered when the market price is less than or equal to the price. If its
+/// a sell order its triggered when the market price is greater than or equal to the price.
+/// TimeBased(time): The order is triggered when the current time is greater than or equal to the time.
+///
 module aptos_experimental::market {
 
     use std::option;
@@ -22,8 +52,12 @@ module aptos_experimental::market {
     const EINVALID_LIQUIDATION: u64 = 11;
 
     // Order time in force
+    /// Good till cancelled order type
     const TIME_IN_FORCE_GTC: u8 = 0;
+    /// Post Only order type - ensures that the order is not a taker order
     const TIME_IN_FORCE_POST_ONLY: u8 = 1;
+    /// Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
+    /// order as possible as taker order and cancel the rest.
     const TIME_IN_FORCE_IOC: u8 = 2;
 
     public fun good_till_cancelled(): u8 {
@@ -47,7 +81,6 @@ module aptos_experimental::market {
         parent: address,
         /// Address of the market object of this market.
         market: address,
-
         // TODO: remove sequential order id generation
         last_order_id: u64,
         order_book: OrderBook<M>
@@ -87,7 +120,9 @@ module aptos_experimental::market {
         market: address,
         order_id: u64,
         user: address,
+        /// Original size of the order
         orig_size: u64,
+        /// Remaining size of the order in the order book
         remaining_size: u64,
         // TODO(bl): Brian and Sean will revisit to see if we should have split
         // into multiple events for OrderEvent
@@ -98,7 +133,7 @@ module aptos_experimental::market {
         size_delta: u64,
         price: u64,
         is_buy: bool,
-        // Whether the order crosses the orderbook.
+        /// Whether the order crosses the orderbook.
         is_taker: bool,
         status: u8,
         details: std::string::String
@@ -154,48 +189,6 @@ module aptos_experimental::market {
         self.order_id
     }
 
-    #[test_only]
-    public fun get_order_id_from_event(self: OrderEvent): u64 {
-        self.order_id
-    }
-
-    #[test_only]
-    public fun verify_order_event(
-        self: OrderEvent,
-        order_id: u64,
-        market: address,
-        user: address,
-        orig_size: u64,
-        remaining_size: u64,
-        size_delta: u64,
-        price: u64,
-        is_buy: bool,
-        is_taker: bool,
-        status: u8
-    ) {
-        assert!(self.order_id == order_id);
-        assert!(self.market == market);
-        assert!(self.user == user);
-        assert!(self.orig_size == orig_size);
-        assert!(self.remaining_size == remaining_size);
-        assert!(self.size_delta == size_delta);
-        assert!(self.price == price);
-        assert!(self.is_buy == is_buy);
-        assert!(self.is_taker == is_taker);
-        assert!(self.status == status);
-    }
-
-    #[test_only]
-    public fun is_clearinghouse_settle_violation(
-        cancellation_reason: OrderCancellationReason
-    ): bool {
-        if (cancellation_reason
-            == OrderCancellationReason::ClearinghouseSettleViolation) {
-            return true;
-        };
-        false
-    }
-
     public fun new_market<M: store + copy + drop>(
         parent: &signer, market: &signer
     ): Market<M> {
@@ -207,17 +200,6 @@ module aptos_experimental::market {
             last_order_id: 0,
             order_book: new_order_book()
         }
-    }
-
-    #[test_only]
-    public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
-        let Market {
-            parent: _parent,
-            market: _market,
-            last_order_id: _last_order_id,
-            order_book
-        } = self;
-        order_book.destroy_order_book()
     }
 
     public fun get_market<M: store + copy + drop>(self: &Market<M>): address {
@@ -248,6 +230,30 @@ module aptos_experimental::market {
         self.order_book.is_taker_order(price, is_buy, option::none())
     }
 
+    /// Places an order - If its a taker order, it will be matched immediately and if its a maker order, it will simply
+    /// be placed in the order book. An order id is generated when the order is placed and this id can be used to
+    /// uniquely identify the order for this market and can also be used to get the status of the order or cancel the order.
+    /// The order is placed with the following parameters:
+    /// - user: The user who is placing the order
+    /// - price: The price at which the order is placed
+    /// - orig_size: The original size of the order
+    /// - is_buy: Whether the order is a buy order or a sell order
+    /// - time_in_force: The time in force for the order. This can be one of the following:
+    ///  - TIME_IN_FORCE_GTC: Good till cancelled order type
+    /// - TIME_IN_FORCE_POST_ONLY: Post Only order type - ensures that the order is not a taker order
+    /// - TIME_IN_FORCE_IOC: Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
+    /// order as possible as taker order and cancel the rest.
+    /// - trigger_condition: The trigger condition
+    /// - metadata: The metadata for the order. This can be any type that the clearing house implementation supports.
+    /// - max_fill_limit: The maximum fill limit for the order. This is the maximum number of fills to trigger for this order.
+    /// This knob is present to configure maximum amount of gas any order placement transaction might consume and avoid
+    /// hitting the maximum has limit of the blockchain.
+    /// - emit_cancel_on_fill_limit: bool,: Whether to emit an order cancellation event when the fill limit is reached.
+    /// This is used ful as the caller might not want to cancel the order when the limit is reached and can continue
+    /// that order in a separate transaction.
+    /// - callbacks: The callbacks for the market clearinghouse. This is a struct that implements the MarketClearinghouseCallbacks
+    /// interface. This is used to validate the order and settle the trade.
+    /// Returns the order id, remaining size, cancel reason and number of fills for the order.
     public fun place_order<M: store + copy + drop>(
         self: &mut Market<M>,
         user: &signer,
@@ -258,7 +264,7 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         max_fill_limit: u64,
-        cancel_on_fill_limit: bool,
+        emit_cancel_on_fill_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         let order_id = self.next_order_id();
@@ -274,7 +280,7 @@ module aptos_experimental::market {
             order_id,
             option::none(),
             max_fill_limit,
-            cancel_on_fill_limit,
+            emit_cancel_on_fill_limit,
             true,
             callbacks
         )
@@ -285,6 +291,9 @@ module aptos_experimental::market {
         self.last_order_id
     }
 
+    /// Similar to `place_order` API but instead of a signer, it takes a user address - can be used in case trading
+    /// functionality is delegated to a different address. Please note that it is the responsibility of the caller
+    /// to verify that the transaction signer is authorized to place orders on behalf of the user.
     public fun place_order_with_user_addr<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
@@ -295,7 +304,7 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         max_fill_limit: u64,
-        cancel_on_fill_limit: bool,
+        emit_cancel_on_fill_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         let order_id = self.next_order_id();
@@ -311,7 +320,7 @@ module aptos_experimental::market {
             order_id,
             option::none(),
             max_fill_limit,
-            cancel_on_fill_limit,
+            emit_cancel_on_fill_limit,
             true,
             callbacks
         )
@@ -441,6 +450,12 @@ module aptos_experimental::market {
         }
     }
 
+    /// Similar to `place_order` API but allows few extra parameters as follows
+    /// - order_id: The order id for the order - this is needed because for orders with trigger conditions, the order
+    /// id is generated when the order is placed and when they are triggered, the same order id is used to match the order.
+    /// - emit_taker_order_open: bool: Whether to emit an order open event for the taker order - this is used when
+    /// the caller do not wants to emit an open order event for a taker in case the taker order was intterrupted because
+    /// of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
     public fun place_order_with_order_id<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
@@ -834,6 +849,7 @@ module aptos_experimental::market {
         }
     }
 
+    /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
     public fun cancel_order<M: store + copy + drop>(
         self: &mut Market<M>, user: &signer, order_id: u64
     ) {
@@ -871,18 +887,22 @@ module aptos_experimental::market {
         }
     }
 
+    /// Remaining size of the order in the order book.
     public fun get_remaining_size<M: store + copy + drop>(
         self: &Market<M>, user: address, order_id: u64
     ): u64 {
         self.order_book.get_remaining_size(user, order_id)
     }
 
+    /// Returns all the pending order ready to be executed based on the oracle price. The caller is responsible to
+    /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
         self: &mut Market<M>, oracle_price: u64
     ): vector<Order<M>> {
         self.order_book.take_ready_price_based_orders(oracle_price)
     }
 
+    /// Triggers all the orders that are ready to be executed based on the oracle price.
     public fun trigger_price_based_orders<M: store + copy + drop>(
         self: &mut Market<M>,
         oracle_price: u64,
@@ -902,7 +922,7 @@ module aptos_experimental::market {
                 orig_size,
                 orig_size,
                 is_buy,
-                TIME_IN_FORCE_GTC, // TODO(skedia): Add time in force to the Order metadata and retrieve it here
+                TIME_IN_FORCE_GTC,
                 option::none(),
                 metadata,
                 order_id,
@@ -916,9 +936,66 @@ module aptos_experimental::market {
         };
     }
 
+    /// Returns all the pending order that are ready to be executed based on current time stamp. The caller is responsible to
+    /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
         self: &mut Market<M>
     ): vector<Order<M>> {
         self.order_book.take_ready_time_based_orders()
+    }
+
+    // ============================= test_only APIs ====================================
+
+    #[test_only]
+    public fun is_clearinghouse_settle_violation(
+        cancellation_reason: OrderCancellationReason
+    ): bool {
+        if (cancellation_reason
+            == OrderCancellationReason::ClearinghouseSettleViolation) {
+            return true;
+        };
+        false
+    }
+
+    #[test_only]
+    public fun get_order_id_from_event(self: OrderEvent): u64 {
+        self.order_id
+    }
+
+    #[test_only]
+    public fun verify_order_event(
+        self: OrderEvent,
+        order_id: u64,
+        market: address,
+        user: address,
+        orig_size: u64,
+        remaining_size: u64,
+        size_delta: u64,
+        price: u64,
+        is_buy: bool,
+        is_taker: bool,
+        status: u8
+    ) {
+        assert!(self.order_id == order_id);
+        assert!(self.market == market);
+        assert!(self.user == user);
+        assert!(self.orig_size == orig_size);
+        assert!(self.remaining_size == remaining_size);
+        assert!(self.size_delta == size_delta);
+        assert!(self.price == price);
+        assert!(self.is_buy == is_buy);
+        assert!(self.is_taker == is_taker);
+        assert!(self.status == status);
+    }
+
+    #[test_only]
+    public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
+        let Market {
+            parent: _parent,
+            market: _market,
+            last_order_id: _last_order_id,
+            order_book
+        } = self;
+        order_book.destroy_order_book()
     }
 }
