@@ -19,9 +19,12 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
+    chain_id::ChainId,
+    contract_event::ContractEvent,
+    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
+    transaction::user_transaction_context::UserTransactionContext,
+    write_set::WriteOp,
 };
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
@@ -66,6 +69,7 @@ pub struct SessionExt<'r, R> {
     data_cache: TransactionDataCache,
     extensions: NativeContextExtensions<'r>,
     pub(crate) resolver: &'r R,
+    current_time: Option<CurrentTimeMicroseconds>,
     is_storage_slot_metadata_enabled: bool,
 }
 
@@ -87,6 +91,9 @@ where
             .to_vec()
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
+        let current_time = session_id
+            .current_timestamp_override()
+            .or_else(|| CurrentTimeMicroseconds::fetch_config(resolver));
 
         extensions.add(NativeTableContext::new(txn_hash, resolver));
         extensions.add(NativeRistrettoPointContext::new());
@@ -114,6 +121,7 @@ where
             data_cache: TransactionDataCache::empty(),
             extensions,
             resolver,
+            current_time,
             is_storage_slot_metadata_enabled,
         }
     }
@@ -236,6 +244,7 @@ where
             data_cache,
             mut extensions,
             resolver,
+            current_time,
             is_storage_slot_metadata_enabled,
         } = self;
 
@@ -260,7 +269,11 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
 
-        let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
+        let woc = WriteOpConverter::new(
+            resolver,
+            current_time.as_ref(),
+            is_storage_slot_metadata_enabled,
+        );
 
         let change_set = Self::convert_change_set(
             &woc,
@@ -550,16 +563,25 @@ where
 
         Ok(change_set)
     }
+
+    pub(crate) fn current_time(&self) -> Option<&CurrentTimeMicroseconds> {
+        self.current_time.as_ref()
+    }
 }
 
 /// Converts module bytes and their compiled representation extracted from publish request into
 /// write ops. Only used by V2 loader implementation.
 pub fn convert_modules_into_write_ops(
     resolver: &impl AptosMoveResolver,
+    current_time: Option<&CurrentTimeMicroseconds>,
     features: &Features,
     module_storage: &impl AptosModuleStorage,
     verified_module_bundle: VerifiedModuleBundle<ModuleId, Bytes>,
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-    let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
+    let woc = WriteOpConverter::new(
+        resolver,
+        current_time,
+        features.is_storage_slot_metadata_enabled(),
+    );
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
 }

@@ -9,7 +9,10 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_types::transaction::user_transaction_context::UserTransactionContext;
+use aptos_types::{
+    on_chain_config::CurrentTimeMicroseconds,
+    transaction::user_transaction_context::UserTransactionContext,
+};
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 use move_vm_runtime::ModuleStorage;
@@ -65,7 +68,7 @@ impl<'r> RespawnedSession<'r> {
         self.with_session_mut(|session| {
             fun(session
                 .as_mut()
-                .expect("session is set on construction and live until destruction."))
+                .expect("session is set on construction and lives until destruction."))
         })
     }
 
@@ -106,5 +109,13 @@ impl<'r> RespawnedSession<'r> {
                 )
             })?;
         Ok(change_set)
+    }
+
+    pub fn current_time(&self) -> Option<&CurrentTimeMicroseconds> {
+        self.with_session(|s| {
+            s.as_ref()
+                .expect("session is set on construction and lives until destruction.")
+                .current_time()
+        })
     }
 }

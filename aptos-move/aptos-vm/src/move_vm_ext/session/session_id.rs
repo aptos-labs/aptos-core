@@ -6,7 +6,8 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
-    transaction::ReplayProtector, validator_txn::ValidatorTransaction,
+    on_chain_config::CurrentTimeMicroseconds, transaction::ReplayProtector,
+    validator_txn::ValidatorTransaction,
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,7 @@ pub enum SessionId {
     BlockMeta {
         // block id
         id: HashValue,
+        timestamp_usecs: u64,
     },
     Genesis {
         // id to identify this specific genesis build
@@ -46,6 +48,7 @@ pub enum SessionId {
     BlockMetaExt {
         // block id
         id: HashValue,
+        timestamp_usecs: u64,
     },
     ValidatorTxn {
         script_hash: Vec<u8>,
@@ -100,12 +103,14 @@ impl SessionId {
     pub fn block_meta(block_meta: &BlockMetadata) -> Self {
         Self::BlockMeta {
             id: block_meta.id(),
+            timestamp_usecs: block_meta.timestamp_usecs(),
         }
     }
 
     pub fn block_meta_ext(block_meta_ext: &BlockMetadataExt) -> Self {
         Self::BlockMetaExt {
             id: block_meta_ext.id(),
+            timestamp_usecs: block_meta_ext.timestamp_usecs(),
         }
     }
 
@@ -182,10 +187,42 @@ impl SessionId {
             | Self::OrderlessTxnProlouge { script_hash, .. }
             | Self::OrderlessTxnEpilogue { script_hash, .. }
             | Self::OrderlessRunOnAbort { script_hash, .. } => script_hash,
-            Self::BlockMeta { id: _ }
+            Self::BlockMeta {
+                id: _,
+                timestamp_usecs: _,
+            }
             | Self::Genesis { id: _ }
             | Self::Void
-            | Self::BlockMetaExt { id: _ } => vec![],
+            | Self::BlockMetaExt {
+                id: _,
+                timestamp_usecs: _,
+            } => vec![],
+        }
+    }
+
+    pub(crate) fn current_timestamp_override(&self) -> Option<CurrentTimeMicroseconds> {
+        match self {
+            SessionId::BlockMeta {
+                id: _,
+                timestamp_usecs,
+            }
+            | SessionId::BlockMetaExt {
+                id: _,
+                timestamp_usecs,
+            } => Some(CurrentTimeMicroseconds {
+                microseconds: *timestamp_usecs,
+            }),
+            SessionId::Txn { .. }
+            | SessionId::Genesis { .. }
+            | SessionId::Prologue { .. }
+            | SessionId::Epilogue { .. }
+            | SessionId::Void
+            | SessionId::RunOnAbort { .. }
+            | SessionId::ValidatorTxn { .. }
+            | SessionId::OrderlessTxn { .. }
+            | SessionId::OrderlessTxnProlouge { .. }
+            | SessionId::OrderlessTxnEpilogue { .. }
+            | SessionId::OrderlessRunOnAbort { .. } => None,
         }
     }
 }

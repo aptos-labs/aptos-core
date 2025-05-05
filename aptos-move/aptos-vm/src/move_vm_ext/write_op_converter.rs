@@ -4,7 +4,7 @@
 use crate::move_vm_ext::{session::BytesWithResourceLayout, AptosMoveResolver};
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
-    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
+    on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     write_set::WriteOp,
 };
@@ -58,14 +58,15 @@ impl<'r> WriteOpConverter<'r> {
 
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,
+        current_time: Option<&CurrentTimeMicroseconds>,
         is_storage_slot_metadata_enabled: bool,
     ) -> Self {
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
-            if let Some(current_time) = CurrentTimeMicroseconds::fetch_config(remote) {
+            if let Some(current_time) = current_time {
                 // The deposit on the metadata is a placeholder (0), it will be updated later when
                 // storage fee is charged.
-                new_slot_metadata = Some(StateValueMetadata::placeholder(&current_time));
+                new_slot_metadata = Some(StateValueMetadata::placeholder(current_time));
             }
         }
 
@@ -375,18 +376,8 @@ mod tests {
         // Module that does not yet exist.
         let (d_state_key, d_bytes, d) = module("d");
 
-        // Create the configuration time resource in the state as well;
-        let current_time = CurrentTimeMicroseconds { microseconds: 300 };
-        let state_key = assert_ok!(StateKey::resource(
-            CurrentTimeMicroseconds::address(),
-            &CurrentTimeMicroseconds::struct_tag()
-        ));
-        let bytes = assert_ok!(bcs::to_bytes(&current_time));
-        let state_value = StateValue::new_legacy(bytes.into());
-
         // Setting up the state.
         let state_view = MockStateView::new(HashMap::from([
-            (state_key, state_value),
             (a_state_key.clone(), a_state_value.clone()),
             (b_state_key.clone(), b_state_value.clone()),
             (c_state_key.clone(), c_state_value.clone()),
@@ -395,7 +386,8 @@ mod tests {
         let env = AptosEnvironment::new(&state_view);
         let code_storage = state_view.as_aptos_code_storage(&env);
         // Storage slot metadata is enabled on the mainnet.
-        let woc = WriteOpConverter::new(&resolver, true);
+        let current_time = CurrentTimeMicroseconds { microseconds: 300 };
+        let woc = WriteOpConverter::new(&resolver, Some(&current_time), true);
 
         let modules = vec![
             (a.self_id(), a_bytes.clone()),
@@ -479,7 +471,7 @@ mod tests {
                 MoveStorageOp::Modify((vec![5, 5, 5, 5, 5].into(), None)),
             ),
         ]);
-        let converter = WriteOpConverter::new(&resolver, false);
+        let converter = WriteOpConverter::new(&resolver, None, false);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
@@ -525,7 +517,7 @@ mod tests {
             mock_tag_2(),
             MoveStorageOp::New((vec![3, 3, 3].into(), None)),
         )]);
-        let converter = WriteOpConverter::new(&resolver, true);
+        let converter = WriteOpConverter::new(&resolver, None, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
@@ -554,7 +546,7 @@ mod tests {
         let group_changes =
             BTreeMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
         let key = StateKey::raw(&[0]);
-        let converter = WriteOpConverter::new(&resolver, true);
+        let converter = WriteOpConverter::new(&resolver, None, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
@@ -591,7 +583,7 @@ mod tests {
             (mock_tag_0(), MoveStorageOp::Delete),
             (mock_tag_1(), MoveStorageOp::Delete),
         ]);
-        let converter = WriteOpConverter::new(&resolver, true);
+        let converter = WriteOpConverter::new(&resolver, None, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
             .unwrap();
