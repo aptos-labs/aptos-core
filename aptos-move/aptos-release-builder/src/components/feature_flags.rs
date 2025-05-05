@@ -122,6 +122,7 @@ pub enum FeatureFlag {
     LimitVMTypeSize,
     AbortIfMultisigPayloadMismatch,
     GovernedGasPool,
+    DecommissionCoreResources,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -332,6 +333,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
             FeatureFlag::GovernedGasPool => AptosFeatureFlag::GOVERNED_GAS_POOL,
+            FeatureFlag::DecommissionCoreResources => AptosFeatureFlag::DECOMMISSION_CORE_RESOURCES,
         }
     }
 }
@@ -457,6 +459,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
             AptosFeatureFlag::GOVERNED_GAS_POOL => FeatureFlag::GovernedGasPool,
+            AptosFeatureFlag::DECOMMISSION_CORE_RESOURCES => FeatureFlag::DecommissionCoreResources,
         }
     }
 }
