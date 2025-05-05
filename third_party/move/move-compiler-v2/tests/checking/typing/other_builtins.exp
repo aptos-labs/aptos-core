@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun any<T>(): T {
         Abort(0)
@@ -6,21 +6,21 @@ module 0x8675309::M {
     private fun foo(x: &mut u64) {
         Freeze(true)<u64>(x);
         Freeze(true)<vector<bool>>(Borrow(Mutable)(M::any<vector<bool>>()));
-        if false {
+        if And(true, false) {
           Tuple()
         } else {
           Abort(Deref(x))
         };
-        if true {
+        if Or(true, false) {
           Tuple()
         } else {
-          Abort(0)
+          Abort(Cast<u64>(0))
         };
         Tuple()
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun any<T>(): T {
         abort 0
@@ -28,7 +28,7 @@ module 0x8675309::M {
     fun foo(x: &mut u64) {
         /*freeze*/x;
         /*freeze*/&mut any<vector<bool>>();
-        if (false) () else abort *x;
-        if (true) () else abort 0;
+        if (true && false) () else abort *x;
+        if (true || false) () else abort 0u8 as u64;
     }
 }

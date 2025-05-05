@@ -318,7 +318,7 @@ module aptos_framework::jwks {
         system_addresses::assert_aptos_framework(fx);
 
         let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            config_buffer::extract<SupportedOIDCProviders>()
+            config_buffer::extract_v2<SupportedOIDCProviders>()
         } else {
             *borrow_global<SupportedOIDCProviders>(@aptos_framework)
         };
@@ -353,7 +353,7 @@ module aptos_framework::jwks {
         system_addresses::assert_aptos_framework(fx);
 
         let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            config_buffer::extract<SupportedOIDCProviders>()
+            config_buffer::extract_v2<SupportedOIDCProviders>()
         } else {
             *borrow_global<SupportedOIDCProviders>(@aptos_framework)
         };
@@ -366,7 +366,7 @@ module aptos_framework::jwks {
     public(friend) fun on_new_epoch(framework: &signer) acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            let new_config = config_buffer::extract<SupportedOIDCProviders>();
+            let new_config = config_buffer::extract_v2<SupportedOIDCProviders>();
             if (exists<SupportedOIDCProviders>(@aptos_framework)) {
                 *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = new_config;
             } else {

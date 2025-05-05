@@ -507,7 +507,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             std::cmp::Ordering::Greater
                         }
                     });
-
                     let max_txns = self.mempool_config.shared_mempool_batch_size;
                     let mut output_txns = vec![];
                     let mut output_updates = vec![];
@@ -541,7 +540,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                                 .push((sender_bucket, (old_timeline_id.clone(), new_timeline_id)));
                         }
                     }
-
                     (
                         MempoolMessageId::from_timeline_ids(output_updates),
                         output_txns,

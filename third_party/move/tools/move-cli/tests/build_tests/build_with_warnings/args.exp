@@ -1,6 +1,6 @@
 Command `build`:
 BUILDING Test
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ ./sources/m.move:2:16
   │
 2 │ public fun foo(x: u64): u64 {
@@ -17,7 +17,7 @@ B0:
 	1: Ret
 }
 }
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ ./sources/m.move:2:16
   │
 2 │ public fun foo(x: u64): u64 {

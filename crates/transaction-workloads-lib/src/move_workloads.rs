@@ -319,8 +319,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::CoinInitAndMint
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
-            | EntryPoints::APTTransferWithMasterSigner
-            | EntryPoints::OrderBook { .. } => "framework_usecases",
+            | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
+            EntryPoints::OrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },

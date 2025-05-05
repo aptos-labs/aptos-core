@@ -1,4 +1,353 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::call_other($t0: &signer, $t1: address, $t2: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
+     var $t3: u64
+     var $t4: &vector<address>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: &address
+     var $t9: &vector<address>
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: &signer
+     var $t13: address
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t4 := borrow_local($t1)
+  1: $t3 := vector::length<address>($t4)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 21
+  7: label L2
+  8: $t9 := borrow_local($t1)
+  9: $t8 := vector::borrow<address>($t9, $t5)
+ 10: $t11 := borrow_local($t2)
+ 11: $t10 := vector::borrow<u64>($t11, $t5)
+ 12: $t12 := infer($t0)
+ 13: $t13 := read_ref($t8)
+ 14: $t14 := read_ref($t10)
+ 15: m::call_other($t12, $t13, $t14)
+ 16: $t16 := infer($t5)
+ 17: $t17 := 1
+ 18: $t15 := +($t16, $t17)
+ 19: $t5 := infer($t15)
+ 20: goto 23
+ 21: label L3
+ 22: goto 25
+ 23: label L4
+ 24: goto 3
+ 25: label L1
+ 26: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::call_other($t0: &signer, $t1: address, $t2: u64) {
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
+     var $t3: u64
+     var $t4: &vector<address>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: &address
+     var $t9: &vector<address>
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: &signer
+     var $t13: address
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t4 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t4
+     # refs: [$t0 => #0, $t4 => #4]
+     # #0
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `to_vec`] at line 5
+     #
+  1: $t3 := vector::length<address>($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t5 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := infer($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t7
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := <($t7, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: if ($t6) goto 7 else goto 21
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  7: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  8: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t9
+     # refs: [$t0 => #0, $t9 => #9]
+     # #0
+     #   <no edges>
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `to_vec`] at line 8
+     #
+  9: $t8 := vector::borrow<address>($t9, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8
+     # refs: [$t0 => #0, $t8 => #8]
+     # #0
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `to_vec`] at line 8
+     #
+ 10: $t11 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t11
+     # refs: [$t0 => #0, $t8 => #8, $t11 => #11]
+     # #0
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #11
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `to_vec`] at line 8
+     #   => #11 via [local `amount_vec`] at line 9
+     #
+ 11: $t10 := vector::borrow<u64>($t11, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t10
+     # refs: [$t0 => #0, $t8 => #8, $t10 => #10]
+     # #0
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `to_vec`] at line 8
+     #   -> #10 via [local `amount_vec`] at line 9
+     #
+ 12: $t12 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t10, $t12
+     # refs: [$t0 => #0, $t8 => #8, $t10 => #10, $t12 => #12]
+     # #0
+     #   => #12 via [] at line 10
+     # #8
+     #   <no edges>
+     # #10
+     #   <no edges>
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `to_vec`] at line 8
+     #   -> #10 via [local `amount_vec`] at line 9
+     #
+ 13: $t13 := read_ref($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t10, $t12, $t13
+     # refs: [$t0 => #0, $t10 => #10, $t12 => #12]
+     # #0
+     #   => #12 via [] at line 10
+     # #10
+     #   <no edges>
+     # #12
+     #   <no edges>
+     # #root
+     #   -> #10 via [local `amount_vec`] at line 9
+     #
+ 14: $t14 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t12, $t13, $t14
+     # refs: [$t0 => #0, $t12 => #12]
+     # #0
+     #   => #12 via [] at line 10
+     # #12
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 15: m::call_other($t12, $t13, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 16: $t16 := infer($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t16
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 17: $t17 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t16, $t17
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 18: $t15 := +($t16, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t15
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 19: $t5 := infer($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 20: goto 23
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 21: label L3
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 22: goto 25
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 23: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t5
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 24: goto 3
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 25: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 26: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::call_other($t0: &signer, $t1: address, $t2: u64) {

@@ -1,4 +1,18 @@
 
+Diagnostics:
+warning: Unused value of parameter `f`. Consider removing the parameter, or prefixing with an underscore (e.g., `_f`), or binding to `_`
+   ┌─ tests/file-format-generator/assign.move:20:30
+   │
+20 │     fun assign_pattern(s: S, f: u64, h: u64): u64 {
+   │                              ^
+
+warning: Unused value of parameter `h`. Consider removing the parameter, or prefixing with an underscore (e.g., `_h`), or binding to `_`
+   ┌─ tests/file-format-generator/assign.move:20:38
+   │
+20 │     fun assign_pattern(s: S, f: u64, h: u64): u64 {
+   │                                      ^
+
+
 ============ disassembled file-format ==================
 // Move bytecode v8
 module 42.assign {
