@@ -149,6 +149,9 @@ pub fn create_consensus_observer_and_publisher(
     consensus_observer_reconfig_subscription: Option<
         ReconfigNotificationListener<DbBackedOnChainConfig>,
     >,
+    consensus_publisher_reconfig_subscription: Option<
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+    >,
 ) -> (
     Option<Runtime>,
     Option<Runtime>,
@@ -182,6 +185,7 @@ pub fn create_consensus_observer_and_publisher(
         node_config,
         consensus_observer_client.clone(),
         consensus_publisher_message_receiver,
+        consensus_publisher_reconfig_subscription,
     );
 
     // Create the consensus observer (if enabled)
@@ -244,6 +248,7 @@ fn create_consensus_publisher(
         ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
     >,
     publisher_message_receiver: Receiver<(), ConsensusPublisherNetworkMessage>,
+    publisher_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) -> (Option<Runtime>, Option<Arc<ConsensusPublisher>>) {
     // If the publisher is not enabled, return early
     if !node_config.consensus_observer.publisher_enabled {
@@ -258,11 +263,13 @@ fn create_consensus_publisher(
         ConsensusPublisher::new(node_config.consensus_observer, consensus_observer_client);
 
     // Start the consensus publisher
-    runtime.spawn(
-        consensus_publisher
-            .clone()
-            .start(outbound_message_receiver, publisher_message_receiver),
-    );
+    let publisher_reconfig_subscription = publisher_reconfig_subscription
+        .expect("The reconfig subscription should exist for the consensus publisher!");
+    runtime.spawn(consensus_publisher.clone().start(
+        outbound_message_receiver,
+        publisher_message_receiver,
+        publisher_reconfig_subscription,
+    ));
 
     // Return the runtime and publisher
     (Some(runtime), Some(Arc::new(consensus_publisher)))

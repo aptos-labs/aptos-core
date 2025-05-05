@@ -47,6 +47,7 @@ pub fn create_event_subscription_service(
     ReconfigNotificationListener<DbBackedOnChainConfig>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+    Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
@@ -72,6 +73,18 @@ pub fn create_event_subscription_service(
                 event_subscription_service
                     .subscribe_to_reconfigurations()
                     .expect("Consensus observer must subscribe to reconfigurations"),
+            )
+        } else {
+            None
+        };
+
+    // Create a reconfiguration subscription for consensus publisher (if enabled)
+    let consensus_publisher_reconfig_subscription =
+        if node_config.consensus_observer.publisher_enabled {
+            Some(
+                event_subscription_service
+                    .subscribe_to_reconfigurations()
+                    .expect("Consensus publisher must subscribe to reconfigurations"),
             )
         } else {
             None
@@ -118,6 +131,7 @@ pub fn create_event_subscription_service(
         event_subscription_service,
         mempool_reconfig_subscription,
         consensus_observer_reconfig_subscription,
+        consensus_publisher_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
         jwk_consensus_subscriptions,

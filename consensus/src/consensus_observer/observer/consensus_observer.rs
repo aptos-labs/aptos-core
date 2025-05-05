@@ -988,7 +988,7 @@ impl ConsensusObserver {
         ordered_block_with_window: OrderedBlockWithWindow,
     ) {
         // If execution pool is disabled, ignore the message
-        let execution_pool_window_size = match self.get_execution_pool_window_size() {
+        let _execution_pool_window_size = match self.get_execution_pool_window_size() {
             Some(window_size) => window_size,
             None => {
                 // Log the failure and update the invalid message counter
@@ -1046,26 +1046,6 @@ impl ConsensusObserver {
             );
             return;
         }
-
-        // Verify the execution pool window contents
-        let execution_pool_window = ordered_block_with_window.execution_pool_window();
-        if let Err(error) = execution_pool_window.verify_window_contents(execution_pool_window_size)
-        {
-            // Log the error and update the invalid message counter
-            error!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify execution pool window contents! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
-                    ordered_block.proof_block_info(),
-                    peer_network_id,
-                    error
-                ))
-            );
-            increment_invalid_message_counter(
-                &peer_network_id,
-                metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
-            );
-            return;
-        };
 
         // Get the epoch and round of the first block
         let first_block = ordered_block.first_block();
