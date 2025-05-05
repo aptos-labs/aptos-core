@@ -31,6 +31,7 @@ use std::{
         Arc,
     },
 };
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 
 mod error;
 pub mod execution_output;
@@ -170,6 +171,7 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView>;
 }
 
 #[derive(Clone)]

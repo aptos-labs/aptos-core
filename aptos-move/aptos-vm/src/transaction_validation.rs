@@ -36,6 +36,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
+use aptos_types::transaction::scheduled_txn::ScheduledTransactionWithKey;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -62,6 +63,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         unified_prologue_fee_payer_v2_name: Identifier::new("unified_prologue_fee_payer_v2")
             .unwrap(),
         unified_epilogue_v2_name: Identifier::new("unified_epilogue_v2").unwrap(),
+        scheduled_txn_epilogue_name: Identifier::new("scheduled_txn_epilogue").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -87,6 +89,7 @@ pub struct TransactionValidation {
     pub unified_prologue_v2_name: Identifier,
     pub unified_prologue_fee_payer_v2_name: Identifier,
     pub unified_epilogue_v2_name: Identifier,
+    pub scheduled_txn_epilogue_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -683,3 +686,32 @@ pub(crate) fn run_failure_epilogue(
         )
     })
 }
+
+/*pub(crate) fn run_scheduled_txn_epilogue(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    txn: &ScheduledTransactionWithKey,
+    gas_remaining: Gas,
+    fee_statement: FeeStatement,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<()> {
+    let args = vec![
+        MoveValue::Address(txn.txn.sender_handle),
+        MoveValue::U64(fee_statement.storage_fee_refund()),
+        MoveValue::U64(100),
+        MoveValue::U64(txn.max_gas_unit),
+        MoveValue::U64(gas_remaining.into()),
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.scheduled_txn_epilogue_name,
+            vec![],
+            serialize_values(&args),
+            &mut UnmeteredGasMeter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)?;
+    emit_fee_statement(session, fee_statement, traversal_context)?;
+    Ok(())
+}*/

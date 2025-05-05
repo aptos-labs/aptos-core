@@ -26,6 +26,7 @@
 -  [Function `get_ready_transactions`](#0x1_scheduled_txns_get_ready_transactions)
 -  [Function `finish_execution`](#0x1_scheduled_txns_finish_execution)
 -  [Function `remove_txns`](#0x1_scheduled_txns_remove_txns)
+-  [Function `execute_user_function_wrapper`](#0x1_scheduled_txns_execute_user_function_wrapper)
 -  [Function `step`](#0x1_scheduled_txns_step)
 
 
@@ -1143,6 +1144,38 @@ Remove the txns that are run
             };
         };
         tbl_idx = tbl_idx + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_execute_user_function_wrapper"></a>
+
+## Function `execute_user_function_wrapper`
+
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper">execute_user_function_wrapper</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pass_signer: bool, f: |<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>&gt;| <b>has</b> <b>copy</b> + drop + store)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper">execute_user_function_wrapper</a>(
+    <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pass_signer: bool,
+    f: |Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>&gt;| <b>has</b> <b>copy</b> + store + drop
+) {
+    <b>if</b> (pass_signer) {
+        f(some(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>));
+    } <b>else</b> {
+        f(std::option::none());
     };
 }
 </code></pre>

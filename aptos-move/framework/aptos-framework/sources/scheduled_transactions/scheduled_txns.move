@@ -2,7 +2,7 @@ module aptos_framework::scheduled_txns {
     use std::bcs;
     use std::error;
     use std::hash::sha3_256;
-    use std::option::Option;
+    use std::option::{Option, some};
     use std::signer;
     use std::vector;
     use aptos_std::from_bcs;
@@ -489,6 +489,19 @@ module aptos_framework::scheduled_txns {
                 };
             };
             tbl_idx = tbl_idx + 1;
+        };
+    }
+
+    // Wrapper to call the user function when the txn is scheduled
+    fun execute_user_function_wrapper(
+        signer: signer,
+        pass_signer: bool,
+        f: |Option<signer>| has copy + store + drop
+    ) {
+        if (pass_signer) {
+            f(some(signer));
+        } else {
+            f(std::option::none());
         };
     }
 

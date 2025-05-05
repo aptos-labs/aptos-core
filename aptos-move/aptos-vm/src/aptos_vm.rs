@@ -144,6 +144,8 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
+use aptos_crypto::hash::CryptoHash;
+use aptos_types::transaction::scheduled_txn::{SCHEDULED_TRANSACTIONS_MODULE_INFO, ScheduledTransactionWithKey};
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -2299,7 +2301,7 @@ impl AptosVM {
         get_metadata(&metadata)
     }
 
-    pub fn execute_function<R: AptosMoveResolver>(
+    pub fn execute_function(
         state_view: &impl StateView,
         module_id: &ModuleId,
         function_name: &Identifier,
@@ -2663,7 +2665,85 @@ impl AptosVM {
                 )?;
                 (vm_status, output)
             },
+            Transaction::ScheduledTransaction(txn) => {
+                let storage = TraversalStorage::new();
+                let mut context = TraversalContext::new(&storage);
+                match self.process_scheduled_transaction(
+                    resolver,
+                    txn.clone(),
+                    &mut context,
+                    code_storage,
+                    log_context,
+                ) {
+                    Ok((vm_status, output)) => (vm_status, output),
+                    Err(e) => {
+                        /*let storage_gas =
+                            get_or_vm_startup_failure(&self.storage_gas_params, log_context)?;
+                        let mut session =
+                            self.new_session(resolver, SessionId::scheduled_txn(txn.hash()), None);
+                        run_scheduled_txn_cleanup(&mut session, &mut context);
+                        let output =
+                            get_system_transaction_output(session, &storage_gas.change_set_configs)
+                                .unwrap();
+                        println!("scheduled transaction {:?} failed: {:?}", txn, e);
+                        (VMStatus::Executed, output)*/
+                        unimplemented!()
+                    },
+                }
+            },
         })
+    }
+
+    pub(crate) fn process_scheduled_transaction(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        txn: ScheduledTransactionWithKey,
+        traversal_context: &mut TraversalContext,
+        code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let balance = txn.txn.max_gas_amount;
+        let storage_gas = self.storage_gas_params(log_context)?;
+        let mut gas_meter = make_prod_gas_meter(
+            self.gas_feature_version(),
+            self.gas_params(log_context)?.vm.clone(),
+            storage_gas.clone(),
+            false,
+            balance.into(),
+            &NoopBlockSynchronizationKillSwitch {},
+        );
+
+        // no need of scheduled txn prologue for now.
+
+        let args = vec![
+            MoveValue::Signer(txn.txn.sender_handle),
+            MoveValue::Bool(txn.txn.pass_signer),
+            MoveValue::vector_u8(txn.txn.f),
+        ];
+        let mut session = self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
+        let result = session.execute_function_bypass_visibility(
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
+            vec![],
+            serialize_values(&args),
+            &mut gas_meter,
+            traversal_context,
+            code_storage,
+        )?;
+        /*run_scheduled_txn_epilogue(
+            &mut session,
+            &txn,
+            gas_meter.balance(),
+            Self::fee_statement_from_gas_meter(txn.max_gas_unit.into(), &gas_meter, 0),
+            context,
+        )?;*/
+        let output = get_system_transaction_output(
+            session,
+            code_storage,
+            &self.storage_gas_params(log_context)?.change_set_configs,
+        )?;
+        // println!("scheduled transaction output: {:?}", output);
+        Ok((VMStatus::Executed, output))
     }
 }
 
