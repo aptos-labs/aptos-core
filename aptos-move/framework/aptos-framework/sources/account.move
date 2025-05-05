@@ -260,7 +260,7 @@ module aptos_framework::account {
     /// Destroy the Account resource from a given account.
     /// Used to destroy the core resources account on mainnet.
     public entry fun destroy_account_from(account: &signer, from: address) acquires Account {
-        system_addresses::assert_aptos_framework(account);
+        system_addresses::assert_core_resource(account);
 
         // Assert that the feature flag for decommissioning core resources is enabled
         assert!(
@@ -998,9 +998,10 @@ module aptos_framework::account {
         );
     }
 
-    #[test(aptos_framework = @aptos_framework, from = @0xdead)]
+    #[test(aptos_framework = @aptos_framework, core_resources = @0xa550c18, from = @0xdead)]
     public entry fun test_destroy_account_from_with_flag_enabled(
         aptos_framework: &signer,
+        core_resources: &signer,
         from: &signer,
     ) acquires Account {
         // Enable the feature flag for testing
@@ -1015,16 +1016,17 @@ module aptos_framework::account {
         assert!(exists<Account>(signer::address_of(from)), 1);
 
         // Destroy the Account resource
-        destroy_account_from(aptos_framework, signer::address_of(from));
+        destroy_account_from(core_resources, signer::address_of(from));
 
         // Confirm the resource has been removed
         assert!(!exists<Account>(signer::address_of(from)), 2);
     }
 
-    #[test(aptos_framework = @aptos_framework, from = @0xdead)]
+    #[test(aptos_framework = @aptos_framework, core_resources = @0xa550c18, from = @0xdead)]
     #[expected_failure(abort_code = 21, location = Self)]
     public entry fun test_destroy_account_from_with_flag_disabled(
         aptos_framework: &signer,
+        core_resources: &signer,
         from: &signer,
     ) acquires Account {
         // Disable the feature flag for testing
@@ -1039,7 +1041,7 @@ module aptos_framework::account {
         assert!(exists<Account>(signer::address_of(from)), 1);
 
         // Attempt to destroy the Account resource (should fail)
-        destroy_account_from(aptos_framework, signer::address_of(from));
+        destroy_account_from(core_resources, signer::address_of(from));
     }
 
     #[test_only]

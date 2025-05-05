@@ -700,6 +700,15 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 
 
+<a id="0x1_account_EFLAG_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EFLAG_NOT_ENABLED">EFLAG_NOT_ENABLED</a>: u64 = 21;
+</code></pre>
+
+
+
 <a id="0x1_account_EINVALID_ACCEPT_ROTATION_CAPABILITY"></a>
 
 The caller does not have a valid rotation capability offer from the other account
@@ -1037,7 +1046,7 @@ Destroy the Account resource from a given account.
 Used to destroy the core resources account on mainnet.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_destroy_account_from">destroy_account_from</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_destroy_account_from">destroy_account_from</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>)
 </code></pre>
 
 
@@ -1046,8 +1055,14 @@ Used to destroy the core resources account on mainnet.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_destroy_account_from">destroy_account_from</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_destroy_account_from">destroy_account_from</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
+
+    // Assert that the feature flag for decommissioning core resources is enabled
+    <b>assert</b>!(
+        std::features::get_decommission_core_resources_enabled(),
+        <a href="account.md#0x1_account_EFLAG_NOT_ENABLED">EFLAG_NOT_ENABLED</a>
+    );
 
     <b>let</b> <a href="account.md#0x1_account_Account">Account</a> {
         authentication_key: _,
