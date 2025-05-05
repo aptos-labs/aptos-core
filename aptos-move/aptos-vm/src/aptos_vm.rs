@@ -64,8 +64,8 @@ use aptos_types::{
     function_info::FunctionInfo,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features, OnChainConfig,
-        TimedFeatureFlag, TimedFeatures,
+        ApprovedExecutionHashes, ConfigStorage, CurrentTimeMicroseconds, FeatureFlag, Features,
+        OnChainConfig, TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -286,7 +286,22 @@ impl AptosVM {
         user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, R> {
         self.move_vm
-            .new_session(resolver, session_id, user_transaction_context_opt)
+            .new_session(None, resolver, session_id, user_transaction_context_opt)
+    }
+
+    pub fn new_block_prologue_session<'r, R: AptosMoveResolver>(
+        &self,
+        current_time: CurrentTimeMicroseconds,
+        resolver: &'r R,
+        session_id: SessionId,
+        user_transaction_context_opt: Option<UserTransactionContext>,
+    ) -> SessionExt<'r, R> {
+        self.move_vm.new_session(
+            Some(current_time),
+            resolver,
+            session_id,
+            user_transaction_context_opt,
+        )
     }
 
     #[inline(always)]
@@ -2175,7 +2190,14 @@ impl AptosVM {
         });
 
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata), None);
+        let mut session = self.new_block_prologue_session(
+            CurrentTimeMicroseconds {
+                microseconds: block_metadata.timestamp_usecs(),
+            },
+            resolver,
+            SessionId::block_meta(&block_metadata),
+            None,
+        );
 
         let args = serialize_values(
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
@@ -2221,7 +2243,10 @@ impl AptosVM {
         });
 
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(
+        let mut session = self.new_block_prologue_session(
+            CurrentTimeMicroseconds {
+                microseconds: block_metadata_ext.timestamp_usecs(),
+            },
             resolver,
             SessionId::block_meta_ext(&block_metadata_ext),
             None,

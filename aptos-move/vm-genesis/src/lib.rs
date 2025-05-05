@@ -948,6 +948,7 @@ fn code_to_writes_for_publishing(
 
     convert_modules_into_write_ops(
         &resolver,
+        None,
         genesis_features,
         &module_storage,
         verified_module_bundle,
