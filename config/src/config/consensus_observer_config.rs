@@ -49,6 +49,8 @@ pub struct ConsensusObserverConfig {
     /// Interval (in milliseconds) to refresh the subscription
     pub subscription_refresh_interval_ms: u64,
 
+    /// The multiplier for the block window (used to calculate the block buffer size)
+    pub observer_block_window_buffer_multiplier: u64,
     /// Duration (in milliseconds) to require state sync to synchronize when in fallback mode
     pub observer_fallback_duration_ms: u64,
     /// Duration (in milliseconds) we'll wait on startup before considering fallback mode
@@ -69,13 +71,14 @@ impl Default for ConsensusObserverConfig {
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
-            max_num_pending_blocks: 100,                       // 100 blocks
+            max_num_pending_blocks: 200,                       // 200 blocks
             progress_check_interval_ms: 5_000,                 // 5 seconds
             max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
             max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
             max_subscription_timeout_ms: 15_000,               // 15 seconds
             subscription_peer_change_interval_ms: 180_000,     // 3 minutes
             subscription_refresh_interval_ms: 600_000,         // 10 minutes
+            observer_block_window_buffer_multiplier: 2,        // Double the block window
             observer_fallback_duration_ms: 600_000,            // 10 minutes
             observer_fallback_startup_period_ms: 60_000,       // 60 seconds
             observer_fallback_progress_threshold_ms: 10_000,   // 10 seconds
