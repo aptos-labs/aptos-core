@@ -37,6 +37,7 @@ crossbeam = { workspace = true }
 derivative = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }
+itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }

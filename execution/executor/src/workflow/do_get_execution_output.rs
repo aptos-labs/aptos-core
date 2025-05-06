@@ -113,10 +113,10 @@ impl DoGetExecutionOutput {
             executor,
             &txn_provider,
             &state_view,
-            onchain_config,
+            onchain_config.clone(),
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
         let mut transactions: Vec<_> = txn_provider
             .txns
             .into_iter()
@@ -124,7 +124,6 @@ impl DoGetExecutionOutput {
             .collect();
         if let Some(block_epilogue_txn) = block_epilogue_txn {
             transactions.push(block_epilogue_txn);
-            transaction_outputs.push(TransactionOutput::new_empty_success());
         }
 
         Parser::parse(
@@ -151,8 +150,10 @@ impl DoGetExecutionOutput {
         let transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
             state_view_arc.clone(),
-            onchain_config,
+            onchain_config.clone(),
         )?;
+
+        // TODO(Manu): Handle state checkpoint here.
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
@@ -319,13 +320,17 @@ impl Parser {
         // Isolate discards.
         let to_discard = Self::extract_discards(&mut transactions, &mut transaction_outputs);
 
-        let mut block_end_info = None;
-        if is_block && !has_reconfig {
-            if let Some(Transaction::BlockEpilogue(payload)) = transactions.last() {
-                block_end_info = payload.try_as_block_end_info().cloned();
-                ensure!(statuses_for_input_txns.pop().is_some());
+        let block_end_info = if is_block && !has_reconfig {
+            match transactions.last() {
+                Some(Transaction::BlockEpilogue(payload)) => {
+                    payload.try_as_block_end_info().map(|info| info.clone())
+                },
+                _ => None,
             }
-        }
+        } else {
+            None
+        };
+
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);

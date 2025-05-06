@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    account_address::AccountAddress,
     state_store::{state_key::StateKey, state_slot::StateSlot},
     transaction::TransactionOutput,
     write_set::{HotStateOp, WriteSet},
