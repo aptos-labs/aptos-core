@@ -5,7 +5,6 @@ module aptos_framework::account {
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
-    use std::features::get_decommission_core_resources_enabled;
     use aptos_framework::chain_id;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
@@ -130,10 +129,6 @@ module aptos_framework::account {
     /// authentication keys. Without such separation, an adversary could create (and get a signer for) a resource account
     /// whose address matches an existing address of a MultiEd25519 wallet.
     const DERIVE_RESOURCE_ACCOUNT_SCHEME: u8 = 255;
-
-    /// Feature flag for decommissioning core resources.
-    const DECOMMISSION_CORE_RESOURCES: u64 = 222;
-
     /// Account already exists
     const EACCOUNT_ALREADY_EXISTS: u64 = 1;
     /// Account does not exist
@@ -205,16 +200,7 @@ module aptos_framework::account {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
 
-        // Check if the feature flag for decommissioning core resources is enabled.
-        if (get_decommission_core_resources_enabled()) {
-            // Assert separately for the core resources address if the feature flag is enabled.
-            assert!(
-                new_address != @0xa550c18,
-                error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
-            );
-        };
-
-        // Assert for other reserved addresses.
+        // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
         assert!(
             new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
             error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
