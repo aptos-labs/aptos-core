@@ -156,15 +156,37 @@ impl ClosureMask {
         i
     }
 
-    pub fn merge_placeholder_strings(
-        &self,
-        arity: usize,
-        captured: Vec<String>,
-    ) -> Option<Vec<String>> {
-        let provided = (0..arity - captured.len())
-            .map(|_| "_".to_string())
-            .collect::<Vec<_>>();
-        self.compose(captured, provided)
+    pub fn merge_placeholder_strings(&self, captured: Vec<String>) -> Vec<String> {
+        // If the function returns None, this means not all arguments were captured. Should not
+        // happen. Do not return an error because this is used to implement `Display`, which can
+        // make `format!` panic.
+        self.merge_placeholder_strings_impl(captured)
+            .unwrap_or_else(|| vec!["*invalid*".to_string()])
+    }
+
+    fn merge_placeholder_strings_impl(&self, captured: Vec<String>) -> Option<Vec<String>> {
+        let mut mask = self.0;
+        let mut captured = captured.into_iter();
+
+        let mut result = vec![];
+        while mask != 0 {
+            if mask & 0x1 != 0 {
+                result.push(captured.next()?)
+            } else {
+                result.push("_".to_string())
+            }
+            mask >>= 1;
+        }
+
+        // We do not now arity information of the function, so the simplest option is to indicate
+        // that there can be more arguments in the end.
+        result.push("..".to_string());
+
+        if captured.next().is_some() {
+            return None;
+        }
+
+        Some(result)
     }
 }
 
@@ -407,11 +429,7 @@ impl fmt::Display for MoveClosure {
             captured,
         } = self;
         let captured_str = mask
-            .merge_placeholder_strings(
-                mask.captured_count() as usize,
-                captured.iter().map(|v| v.1.to_string()).collect(),
-            )
-            .unwrap_or_else(|| vec!["*invalid*".to_string()])
+            .merge_placeholder_strings(captured.iter().map(|v| v.1.to_string()).collect())
             .join(",");
         let inst_str = if ty_args.is_empty() {
             "".to_string()
