@@ -284,7 +284,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.78.0"
+rust-version = "1.80.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.

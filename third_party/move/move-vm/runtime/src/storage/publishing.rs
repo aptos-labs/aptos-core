@@ -1,6 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::duplicated_attributes)]
+
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, loader::Function,
     AsUnsyncModuleStorage, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment,
