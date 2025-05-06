@@ -26,12 +26,12 @@ through a well-defined lifecycle:
    - When the scheduler selects a transaction, it transitions the status to `Executing` via
      the `try_start_executing` method.
 
-2. Abortion Process:
+2. Abort Process:
    - A transaction incarnation may be aborted if it reads data that is later modified in a way
      that would cause the transaction to read different values if it executed again. This
      signals the need for re-execution with an incremented incarnation number.
    - In BlockSTMv2, a transaction can be aborted while executing or after execution finishes.
-   - The abortion happens in two distinct phases:
+   - Abort happens in two distinct phases:
 
    a) Try Abort Phase:
       - `try_abort` is called with an incarnation number and succeeds if the incarnation has
@@ -71,8 +71,8 @@ Executing(i) ------------------------------> Executed(i)
 Aborted(i) ------------------------------> PendingScheduling(i+1)
 
 Note: `try_abort` doesn't change the status directly but marks the transaction for
-abortion. The actual status change occurs during `finish_abort`. Both steps are
-required for the complete abortion process.
+abort. The actual status change occurs during `finish_abort`. Both steps are
+required to complete the abort process.
 
 ============================== Transaction Stall Mechanism ==============================
 
@@ -175,40 +175,36 @@ impl InnerStatus {
 /// The flags are updated while holding the status lock but provide a fast way to evaluate
 /// a predicate associated with the status that enables the scheduler to make decisions about
 /// stall propagation, transaction scheduling, and dependency resolution.
-mod dependency_flags {
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq)]
+enum DependencyFlag {
     /// The transaction has successfully executed and is not stalled.
     /// Reading values written by this dependency is safe.
-    pub(crate) const SAFE: u8 = 0;
-
+    Safe = 0,
     /// The transaction is currently executing.
     ///
     /// In this case, it may be beneficial to wait for the execution to finish
     /// to obtain up-to-date values rather than proceeding with potentially
     /// stale data. This is especially relevant for pipelining high-priority
     /// transaction execution to avoid aborts from reading outdated values.
-    pub(crate) const EXECUTING: u8 = 1;
-
+    Executing = 1,
     /// This occurs when:
     /// 1. The transaction is in Aborted or PendingScheduling state (not yet re-scheduled)
     /// 2. The transaction is Executed but stalled (has an active dependency chain
     ///    that previously triggered an abort and may do so again)
-    pub(crate) const DEFER: u8 = 2;
+    Defer = 2,
+}
 
-    /// The highest valid flag value.
-    /// Values above this are considered invalid.
-    pub(crate) const MAX_VALID: u8 = DEFER;
-
-    pub(crate) fn is_valid(flag: u8) -> bool {
-        flag <= MAX_VALID
-    }
-
-    /// Returns a human-readable description of the flag.
-    pub(crate) fn describe(flag: u8) -> &'static str {
+impl DependencyFlag {
+    fn from_u8(flag: u8) -> Result<Self, PanicError> {
         match flag {
-            SAFE => "SAFE",
-            EXECUTING => "EXECUTING",
-            DEFER => "DEFER",
-            _ => "INVALID",
+            0 => Ok(Self::Safe),
+            1 => Ok(Self::Executing),
+            2 => Ok(Self::Defer),
+            _ => Err(code_invariant_error(format!(
+                "Invalid dependency flag: {}",
+                flag
+            ))),
         }
     }
 }
@@ -268,7 +264,7 @@ impl<'a> ExecutionStatus<'a> {
         Self {
             inner_status: CachePadded::new(Mutex::new(InnerStatus::new())),
             next_incarnation_to_abort: CachePadded::new(AtomicU32::new(0)),
-            dependency_shortcut: CachePadded::new(AtomicU8::new(dependency_flags::DEFER)),
+            dependency_shortcut: CachePadded::new(AtomicU8::new(DependencyFlag::Defer as u8)),
             num_stalls: CachePadded::new(AtomicU32::new(0)),
             execution_queue_manager,
             txn_idx,
@@ -292,8 +288,8 @@ impl<'a> ExecutionStatus<'a> {
             // When status is PendingScheduling the dependency shortcut flag should be
             // DEFER (default or set by abort under the inner status lock).
             self.swap_dependency_flag_any(
-                &[dependency_flags::DEFER],
-                dependency_flags::EXECUTING,
+                &[DependencyFlag::Defer],
+                DependencyFlag::Executing,
                 "try_start_executing",
             )?;
         }
@@ -339,12 +335,12 @@ impl<'a> ExecutionStatus<'a> {
                 inner_status.status = StatusEnum::Executed;
 
                 let new_flag = if self.num_stalls.load(Ordering::Relaxed) == 0 {
-                    dependency_flags::SAFE
+                    DependencyFlag::Safe
                 } else {
-                    dependency_flags::DEFER
+                    DependencyFlag::Defer
                 };
                 self.swap_dependency_flag_any(
-                    &[dependency_flags::EXECUTING],
+                    &[DependencyFlag::Executing],
                     new_flag,
                     "finish_execution",
                 )?;
@@ -364,7 +360,7 @@ impl<'a> ExecutionStatus<'a> {
         }
     }
 
-    /// Attempts to mark a transaction incarnation for abortion.
+    /// Attempts to mark a transaction incarnation for abort.
     ///
     /// This is the first step of the two-step abort process. It serves as an efficient
     /// test-and-set filter for abort attempts, ensuring only one worker successfully
@@ -374,8 +370,8 @@ impl<'a> ExecutionStatus<'a> {
     /// - `incarnation`: The incarnation number to abort
     ///
     /// # Returns
-    /// - `Ok(true)` if this call successfully marked the incarnation for abortion
-    /// - `Ok(false)` if the incarnation was already marked for abortion
+    /// - `Ok(true)` if this call successfully marked the incarnation for abort
+    /// - `Ok(false)` if the incarnation was already marked for abort
     /// - `Err` if the provided incarnation is invalid (greater than the current value)
     pub(crate) fn start_abort(&self, incarnation: Incarnation) -> Result<bool, PanicError> {
         let prev_value = self
@@ -391,7 +387,7 @@ impl<'a> ExecutionStatus<'a> {
         }
     }
 
-    /// Completes the abortion of a transaction incarnation. It is the second step of
+    /// Completes the abort of a transaction incarnation. It is the second step of
     /// the two-step abort process. It must be called after a successful try_abort and
     /// updates the transaction's status (o.w. it is a PanicError):
     /// - If Executing → Aborted
@@ -402,7 +398,7 @@ impl<'a> ExecutionStatus<'a> {
     /// - `caller_reexecuting`: Whether the calling worker will handle re-execution
     ///
     /// # Returns
-    /// - `Ok(())` if abortion was completed successfully
+    /// - `Ok(())` if abort was completed successfully
     /// - `Err` if the abort can't be completed (e.g., wrong incarnation or status)
     pub(crate) fn finish_abort(
         &self,
@@ -435,8 +431,8 @@ impl<'a> ExecutionStatus<'a> {
                 StatusEnum::Executing => {
                     inner_status.status = StatusEnum::Aborted;
                     self.swap_dependency_flag_any(
-                        &[dependency_flags::EXECUTING],
-                        dependency_flags::DEFER,
+                        &[DependencyFlag::Executing],
+                        DependencyFlag::Defer,
                         "finish_abort",
                     )?;
                 },
@@ -473,42 +469,35 @@ impl<'a> ExecutionStatus<'a> {
             // Acquire write lock for (non-monitor) shortcut modifications.
             let inner_status = self.inner_status.lock();
 
-            let dependency_flag = self.dependency_shortcut.load(Ordering::Relaxed);
-            if !dependency_flags::is_valid(dependency_flag) {
-                return Err(code_invariant_error(format!(
-                    "Invalid dependency flag {dependency_flag} in add_stall",
-                )));
-            }
+            let dependency_flag =
+                DependencyFlag::from_u8(self.dependency_shortcut.load(Ordering::Relaxed))?;
 
             match (inner_status.pending_scheduling(), dependency_flag) {
-                (Some(0), dependency_flags::DEFER) => {
+                (Some(0), DependencyFlag::Defer) => {
                     // Adding a stall requires being recorded in aborted depedencies in scheduler_v2,
                     // which in turn only happens in the scheduler after a successful abort (that must
                     // increment the incarnation of the status).
                     return Err(code_invariant_error("0-th incarnation in add_stall"));
                 },
-                (Some(_), dependency_flags::DEFER) => {
+                (Some(_), DependencyFlag::Defer) => {
                     self.execution_queue_manager
                         .remove_from_schedule(self.txn_idx);
                     // Shortcut not affected.
                 },
-                (Some(_), dependency_flags::SAFE | dependency_flags::EXECUTING) => {
+                (Some(_), DependencyFlag::Safe | DependencyFlag::Executing) => {
                     return Err(code_invariant_error(
                         "Inconsistent status and dependency shortcut in add_stall",
                     ));
                 },
-                (None, dependency_flags::SAFE) => {
+                (None, DependencyFlag::Safe) => {
                     // May not update SAFE flag at a future incorrect time (i.e. ABA), as observing
                     // num_stalls = 0 under status is required to set SAFE flag, but impossible
                     // until the corresponding remove_stall (that starts only after add_stall finishes).
                     self.dependency_shortcut
-                        .store(dependency_flags::DEFER, Ordering::Relaxed);
+                        .store(DependencyFlag::Defer as u8, Ordering::Relaxed);
                 },
-                (None, dependency_flags::EXECUTING | dependency_flags::DEFER) => {
+                (None, DependencyFlag::Executing | DependencyFlag::Defer) => {
                     // Executing or aborted: shortcut not affected.
-                },
-                (_, unsupported_flag_value) => {
-                    unreachable!("Unsupported flag value {unsupported_flag_value} in add_stall");
                 },
             }
 
@@ -561,8 +550,8 @@ impl<'a> ExecutionStatus<'a> {
                 // Status is Executed so the dependency shortcut flag may not be
                 // EXECUTING (finish_execution sets Executed status and DEFER or SAFE flag).
                 self.swap_dependency_flag_any(
-                    &[dependency_flags::DEFER, dependency_flags::SAFE],
-                    dependency_flags::SAFE,
+                    &[DependencyFlag::Defer, DependencyFlag::Safe],
+                    DependencyFlag::Safe,
                     "remove_stall",
                 )?;
             }
@@ -572,7 +561,7 @@ impl<'a> ExecutionStatus<'a> {
         Ok(false)
     }
 
-    /// Checks if an incarnation has already been marked for abortion.
+    /// Checks if an incarnation has already been marked for abort.
     ///
     /// This can be called during an ongoing execution to determine if the
     /// execution has been concurrently aborted. This allows the executor
@@ -585,10 +574,7 @@ impl<'a> ExecutionStatus<'a> {
     /// when removing a previously propagated stall signal, and it is safe to
     /// use the shortcutbecause of the best-effort nature of the stall mechanism.
     pub(crate) fn shortcut_executed_and_not_stalled(&self) -> bool {
-        matches!(
-            self.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::SAFE
-        )
+        self.dependency_shortcut.load(Ordering::Relaxed) == DependencyFlag::Safe as u8
     }
 
     /// Checks if the transaction is ready for scheduling and not stalled.
@@ -634,20 +620,18 @@ impl ExecutionStatus<'_> {
     /// - `Err(PanicError)` if the previous value didn't match any expected value
     fn swap_dependency_flag_any(
         &self,
-        expected_values: &[u8],
-        new_value: u8,
+        expected_values: &[DependencyFlag],
+        new_value: DependencyFlag,
         context: &str,
-    ) -> Result<u8, PanicError> {
-        let prev = self.dependency_shortcut.swap(new_value, Ordering::Relaxed);
+    ) -> Result<DependencyFlag, PanicError> {
+        let prev = DependencyFlag::from_u8(
+            self.dependency_shortcut
+                .swap(new_value as u8, Ordering::Relaxed),
+        )?;
         if !expected_values.contains(&prev) {
             return Err(code_invariant_error(format!(
-                "Incorrect dependency shortcut flag in {}: expected one of {:?}, found {}",
-                context,
-                expected_values
-                    .iter()
-                    .map(|v| dependency_flags::describe(*v))
-                    .collect::<Vec<_>>(),
-                dependency_flags::describe(prev),
+                "Incorrect dependency shortcut flag in {}: expected one of {:?}, found {:?}",
+                context, expected_values, prev,
             )));
         }
         Ok(prev)
@@ -666,7 +650,7 @@ impl ExecutionStatus<'_> {
 
         // Under the lock, update the shortcuts.
         self.dependency_shortcut
-            .store(dependency_flags::DEFER, Ordering::Relaxed);
+            .store(DependencyFlag::Defer as u8, Ordering::Relaxed);
 
         if !caller_reexecuting && self.num_stalls.load(Ordering::Relaxed) == 0 {
             // Need to schedule the transaction for re-execution. If num_stalls > 0, then
@@ -688,13 +672,13 @@ impl<'a> ExecutionStatus<'a> {
     ) -> Self {
         let incarnation = inner_status.incarnation();
         let shortcut = match inner_status.status {
-            StatusEnum::PendingScheduling | StatusEnum::Aborted => dependency_flags::DEFER,
-            StatusEnum::Executing => dependency_flags::EXECUTING,
+            StatusEnum::PendingScheduling | StatusEnum::Aborted => DependencyFlag::Defer as u8,
+            StatusEnum::Executing => DependencyFlag::Executing as u8,
             StatusEnum::Executed => {
                 if num_stalls == 0 {
-                    dependency_flags::SAFE
+                    DependencyFlag::Safe as u8
                 } else {
-                    dependency_flags::DEFER
+                    DependencyFlag::Defer as u8
                 }
             },
         };
@@ -753,7 +737,7 @@ mod tests {
             status,
             if stall_before_finish { 1 } else { 0 },
             expected_incarnation,
-            dependency_flags::DEFER,
+            DependencyFlag::Defer as u8,
         );
 
         if stall_before_finish {
@@ -773,7 +757,7 @@ mod tests {
             status.inner_status.lock().status,
             StatusEnum::PendingScheduling
         );
-        assert_simple_status_state(&status, 0, 0, dependency_flags::DEFER);
+        assert_simple_status_state(&status, 0, 0, DependencyFlag::Defer as u8);
 
         // Compatible with start (incompatible with abort and finish).
         for i in [0, 2] {
@@ -783,7 +767,7 @@ mod tests {
         assert_some_eq!(status.try_start_executing().unwrap(), 0);
 
         assert_eq!(status.inner_status.lock().status, StatusEnum::Executing);
-        assert_simple_status_state(&status, 0, 0, dependency_flags::EXECUTING);
+        assert_simple_status_state(&status, 0, 0, DependencyFlag::Executing as u8);
 
         // Compatible with finish(0) & finish_abort(0) only. Here, we test finish.
         assert_none!(status.try_start_executing().unwrap());
@@ -800,9 +784,9 @@ mod tests {
             if stall_before_finish { 1 } else { 0 },
             0,
             if stall_before_finish {
-                dependency_flags::DEFER
+                DependencyFlag::Defer as u8
             } else {
-                dependency_flags::SAFE
+                DependencyFlag::Safe as u8
             },
         );
 
@@ -832,7 +816,7 @@ mod tests {
         let status = ExecutionStatus::new(&manager, txn_idx);
         *status.inner_status.lock() = InnerStatus::new_for_test(StatusEnum::PendingScheduling, 5);
         status.next_incarnation_to_abort.store(5, Ordering::Relaxed);
-        assert_simple_status_state(&status, 0, 5, dependency_flags::DEFER);
+        assert_simple_status_state(&status, 0, 5, DependencyFlag::Defer as u8);
 
         // Compatible with start (incompatible with abort and finish).
         for i in 0..5 {
@@ -851,7 +835,7 @@ mod tests {
             *status.inner_status.lock(),
             InnerStatus::new_for_test(StatusEnum::Executing, 5)
         );
-        assert_simple_status_state(&status, 0, 5, dependency_flags::EXECUTING);
+        assert_simple_status_state(&status, 0, 5, DependencyFlag::Executing as u8);
 
         // Compatible with finish(5) & finish_abort(5) only. Here, we test abort.
         assert_none!(status.try_start_executing().unwrap());
@@ -955,13 +939,13 @@ mod tests {
         // Assert correct starting state - provided by new_for_test.
         executed_status
             .dependency_shortcut
-            .store(dependency_flags::SAFE, Ordering::Relaxed);
+            .store(DependencyFlag::Safe as u8, Ordering::Relaxed);
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 0);
 
         assert_ok_eq!(executed_status.add_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 1);
 
@@ -976,32 +960,32 @@ mod tests {
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 2);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         assert_ok_eq!(executed_status.remove_stall(), false);
         assert_ok_eq!(executed_status.remove_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::SAFE
+            DependencyFlag::Safe as u8
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 0);
 
         assert_ok_eq!(executed_status.add_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 1);
         assert_ok_eq!(executed_status.remove_stall(), true);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::SAFE
+            DependencyFlag::Safe as u8
         );
         assert_ok_eq!(executed_status.add_stall(), true);
         assert_ok_eq!(executed_status.add_stall(), false);
         assert_eq!(
             executed_status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         assert_eq!(executed_status.num_stalls.load(Ordering::Relaxed), 2);
         assert_ok_eq!(executed_status.remove_stall(), false);
@@ -1021,7 +1005,7 @@ mod tests {
                     &manager,
                     10,
                 ),
-                dependency_flags::EXECUTING,
+                DependencyFlag::Executing as u8,
             )
         } else {
             (
@@ -1031,7 +1015,7 @@ mod tests {
                     &manager,
                     10,
                 ),
-                dependency_flags::DEFER,
+                DependencyFlag::Defer as u8,
             )
         };
 
@@ -1115,7 +1099,7 @@ mod tests {
 
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
         assert_ok_eq!(status.add_stall(), false);
@@ -1123,7 +1107,7 @@ mod tests {
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 3);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
 
         // remove_stalls work normally, but w.o. changing the dependency shortcut flag.
@@ -1132,7 +1116,7 @@ mod tests {
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 1);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         manager.assert_execution_queue(&vec![]);
 
@@ -1141,7 +1125,7 @@ mod tests {
         assert_eq!(status.num_stalls.load(Ordering::Relaxed), 0);
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
         manager.assert_execution_queue(&vec![txn_idx]);
         assert_err!(status.remove_stall());
@@ -1154,7 +1138,7 @@ mod tests {
     ) {
         status.dependency_shortcut.store(
             if case {
-                dependency_flags::SAFE
+                DependencyFlag::Safe as u8
             } else {
                 provided_shortcut
             },
@@ -1169,7 +1153,7 @@ mod tests {
         let status = ExecutionStatus::new(&manager, 10);
         // Breaking the invariant, not changing status from PendingScheduling
         // but updating dependency shortcut flag.
-        set_shortcut_to_safe_or_provided(&status, case, dependency_flags::EXECUTING);
+        set_shortcut_to_safe_or_provided(&status, case, DependencyFlag::Executing as u8);
 
         // Should now panic.
         assert_err!(status.try_start_executing());
@@ -1205,7 +1189,7 @@ mod tests {
             assert_eq!(status.inner_status.lock().incarnation(), 1);
             assert_eq!(
                 status.dependency_shortcut.load(Ordering::Relaxed),
-                dependency_flags::DEFER
+                DependencyFlag::Defer as u8
             );
             assert_eq!(
                 status.pending_scheduling_and_not_stalled(),
@@ -1244,7 +1228,7 @@ mod tests {
             assert!(status.is_executed());
             assert_eq!(
                 status.dependency_shortcut.load(Ordering::Relaxed),
-                dependency_flags::SAFE
+                DependencyFlag::Safe as u8
             );
             assert!(!status.pending_scheduling_and_not_stalled());
 
@@ -1254,7 +1238,7 @@ mod tests {
             assert_eq!(status.inner_status.lock().incarnation(), new_incarnation);
             assert_eq!(
                 status.dependency_shortcut.load(Ordering::Relaxed),
-                dependency_flags::DEFER
+                DependencyFlag::Defer as u8
             );
             assert_eq!(
                 status.pending_scheduling_and_not_stalled(),
@@ -1276,9 +1260,9 @@ mod tests {
         // Break the invariant: reset only the dependency shortcut flag.
         status.dependency_shortcut.store(
             if case {
-                dependency_flags::SAFE
+                DependencyFlag::Safe as u8
             } else {
-                dependency_flags::DEFER
+                DependencyFlag::Defer as u8
             },
             Ordering::Relaxed,
         );
@@ -1290,7 +1274,7 @@ mod tests {
     fn remove_stall_err_senarios() {
         let manager = ExecutionQueueManager::new_for_test(10);
 
-        for wrong_shortcut in [dependency_flags::EXECUTING, 100] {
+        for wrong_shortcut in [DependencyFlag::Executing as u8, 100] {
             let status = ExecutionStatus::new_for_test(
                 InnerStatus::new_for_test(StatusEnum::Executed, 0),
                 2,
@@ -1354,7 +1338,7 @@ mod tests {
 
         assert_eq!(
             status.dependency_shortcut.load(Ordering::Relaxed),
-            dependency_flags::DEFER
+            DependencyFlag::Defer as u8
         );
     }
 }
