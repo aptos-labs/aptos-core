@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::duplicated_attributes)]
+
 use crate::{
     module_and_script_storage::module_storage::AptosModuleStorage,
     resolver::BlockSynchronizationKillSwitch,

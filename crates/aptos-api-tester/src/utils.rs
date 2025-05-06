@@ -21,6 +21,7 @@ use std::{env, fmt::Display, num::ParseIntError, str::FromStr};
 // Test failure
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum TestFailure {
     // Variant for failed checks, e.g. wrong balance
     Fail(&'static str),

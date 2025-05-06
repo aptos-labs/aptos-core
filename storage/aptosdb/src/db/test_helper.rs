@@ -460,7 +460,7 @@ fn get_events_by_event_key(
         first_seq_num
     } else if is_latest {
         // Test the ability to get the latest.
-        u64::max_value()
+        u64::MAX
     } else {
         last_seq_num
     };
@@ -471,7 +471,7 @@ fn get_events_by_event_key(
             db.get_events_by_event_key(event_key, cursor, order, LIMIT, ledger_info.version())?;
 
         let num_events = events.len() as u64;
-        if cursor == u64::max_value() {
+        if cursor == u64::MAX {
             cursor = last_seq_num;
         }
         let expected_seq_nums: Vec<_> = if order == Order::Ascending {

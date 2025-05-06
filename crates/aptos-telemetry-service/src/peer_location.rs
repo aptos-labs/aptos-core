@@ -13,6 +13,7 @@ use std::{collections::HashMap, env, str::FromStr, sync::Arc, time::Duration};
 const ANALYTICS_PROJECT_ID: &str = "analytics-test-345723";
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct PeerLocation {
     pub peer_id: PeerId,
     pub country: Option<String>,

@@ -62,6 +62,7 @@ use tokio_stream::StreamExt;
 ///
 /// TODO: Add ability to mock StateSync updates to remove transactions
 /// TODO: Add ability to reject transactions via Consensus
+#[allow(dead_code)]
 pub struct MempoolNode {
     /// The [`CoreMempool`] storage of the node
     pub mempool: Arc<Mutex<CoreMempool>>,
