@@ -23,7 +23,6 @@
 -  [Function `create_account_if_does_not_exist`](#0x1_account_create_account_if_does_not_exist)
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
--  [Function `destroy_account_from`](#0x1_account_destroy_account_from)
 -  [Function `exists_at`](#0x1_account_exists_at)
 -  [Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
 -  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
@@ -617,16 +616,6 @@ This V2 struct adds the <code><a href="chain_id.md#0x1_chain_id">chain_id</a></c
 
 
 
-<a id="0x1_account_DECOMMISSION_CORE_RESOURCES"></a>
-
-Feature flag for decommissioning core resources.
-
-
-<pre><code><b>const</b> <a href="account.md#0x1_account_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a>: u64 = 222;
-</code></pre>
-
-
-
 <a id="0x1_account_DERIVE_RESOURCE_ACCOUNT_SCHEME"></a>
 
 Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
@@ -963,16 +952,7 @@ is returned. This way, the caller of this function can publish additional resour
     // there cannot be an <a href="account.md#0x1_account_Account">Account</a> resource under new_addr already.
     <b>assert</b>!(!<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account.md#0x1_account_EACCOUNT_ALREADY_EXISTS">EACCOUNT_ALREADY_EXISTS</a>));
 
-    // Check <b>if</b> the feature flag for decommissioning core resources is enabled.
-    <b>if</b> (get_decommission_core_resources_enabled()) {
-        // Assert separately for the core resources <b>address</b> <b>if</b> the feature flag is enabled.
-        <b>assert</b>!(
-            new_address != @0xa550c18,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ECANNOT_RESERVED_ADDRESS">ECANNOT_RESERVED_ADDRESS</a>)
-        );
-    };
-
-    // Assert for other reserved addresses.
+    // NOTE: @core_resources gets created via a `create_account` call, so we do not <b>include</b> it below.
     <b>assert</b>!(
         new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ECANNOT_RESERVED_ADDRESS">ECANNOT_RESERVED_ADDRESS</a>)
@@ -1031,54 +1011,6 @@ is returned. This way, the caller of this function can publish additional resour
     );
 
     new_account
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_account_destroy_account_from"></a>
-
-## Function `destroy_account_from`
-
-Destroy the Account resource from a given account.
-Used to destroy the core resources account on mainnet.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_destroy_account_from">destroy_account_from</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_destroy_account_from">destroy_account_from</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(<a href="account.md#0x1_account">account</a>);
-
-    // Assert that the feature flag for decommissioning core resources is enabled
-    <b>assert</b>!(
-        std::features::get_decommission_core_resources_enabled(),
-        <a href="account.md#0x1_account_EFLAG_NOT_ENABLED">EFLAG_NOT_ENABLED</a>
-    );
-
-    <b>let</b> <a href="account.md#0x1_account_Account">Account</a> {
-        authentication_key: _,
-        sequence_number: _,
-        guid_creation_num: _,
-        coin_register_events,
-        key_rotation_events,
-        rotation_capability_offer,
-        signer_capability_offer,
-    } = <b>move_from</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(from);
-
-    <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>&lt;<a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a>&gt;(coin_register_events);
-    <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>&lt;<a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a>&gt;(key_rotation_events);
-
-    <b>let</b> <a href="account.md#0x1_account_CapabilityOffer">CapabilityOffer</a> { for: _ } = rotation_capability_offer;
-    <b>let</b> <a href="account.md#0x1_account_CapabilityOffer">CapabilityOffer</a> { for: _ } = signer_capability_offer;
 }
 </code></pre>
 
