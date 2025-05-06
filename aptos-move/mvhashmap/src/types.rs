@@ -177,6 +177,7 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
 #[derive(Clone, Debug)]
 pub enum UnknownOrLayout<'a> {
     Unknown,
+    // TODO: Make this Arc<MoveTypeLayout> to avoid deep cloning.
     Known(Option<&'a MoveTypeLayout>),
 }
 
