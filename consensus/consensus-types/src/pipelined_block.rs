@@ -321,6 +321,10 @@ impl PipelinedBlock {
         }
     }
 
+    pub fn set_block_window(&mut self, block_window: OrderedBlockWindow) {
+        self.block_window = block_window;
+    }
+
     pub fn set_execution_result(
         mut self,
         pipeline_execution_result: PipelineExecutionResult,

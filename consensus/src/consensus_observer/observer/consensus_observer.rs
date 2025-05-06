@@ -4,6 +4,7 @@
 use crate::{
     consensus_observer::{
         common::{
+            error::Error,
             logging::{LogEntry, LogSchema},
             metrics,
         },
@@ -40,7 +41,7 @@ use aptos_config::{
 };
 use aptos_consensus_types::{
     pipeline,
-    pipelined_block::{PipelineFutures, PipelinedBlock},
+    pipelined_block::{OrderedBlockWindow, PipelineFutures, PipelinedBlock},
     vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
@@ -905,43 +906,12 @@ impl ConsensusObserver {
             pending_block_with_metadata.unpack();
         let ordered_block = observed_ordered_block.ordered_block().clone();
 
-        // Verify the ordered block proof
-        let epoch_state = self.get_epoch_state();
-        if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
-            if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
-                // Log the error and update the invalid message counter
-                error!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify ordered proof! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
-                        ordered_block.proof_block_info(),
-                        peer_network_id,
-                        error
-                    ))
-                );
-                increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
-                return;
-            }
-        } else {
-            // Drop the block and log an error (the block should always be for the current epoch)
+        // Verify the ordered block proof and payloads
+        if let Err(error) = self.verify_ordered_block_proof_and_payloads(&ordered_block) {
+            // Log the error, update the invalid message counter and return early
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Received ordered block for a different epoch! Ignoring: {:?}",
-                    ordered_block.proof_block_info()
-                ))
-            );
-            return;
-        };
-
-        // Verify the block payloads against the ordered block
-        if let Err(error) = self
-            .block_payload_store
-            .lock()
-            .verify_payloads_against_ordered_block(&ordered_block)
-        {
-            // Log the error and update the invalid message counter
-            error!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
+                    "Failed to verify ordered block proof and payloads! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                     ordered_block.proof_block_info(),
                     peer_network_id,
                     error
@@ -988,24 +958,21 @@ impl ConsensusObserver {
         ordered_block_with_window: OrderedBlockWithWindow,
     ) {
         // If execution pool is disabled, ignore the message
-        let _execution_pool_window_size = match self.get_execution_pool_window_size() {
-            Some(window_size) => window_size,
-            None => {
-                // Log the failure and update the invalid message counter
-                warn!(
+        if self.get_execution_pool_window_size().is_none() {
+            // Log the failure and update the invalid message counter
+            warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Received ordered block with window message from peer: {:?}, but execution pool is disabled! Ignoring: {:?}",
                         peer_network_id,
                         ordered_block_with_window.ordered_block().proof_block_info()
                     ))
                 );
-                increment_invalid_message_counter(
-                    &peer_network_id,
-                    metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
-                );
-                return;
-            },
-        };
+            increment_invalid_message_counter(
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+            );
+            return;
+        }
 
         // Verify the ordered blocks before processing
         let ordered_block = ordered_block_with_window.ordered_block();
@@ -1096,11 +1063,76 @@ impl ConsensusObserver {
     /// has been sanity checked and that all blocks and payloads exist.
     async fn process_ordered_block_with_window(
         &mut self,
-        _pending_block_with_metadata: Arc<PendingBlockWithMetadata>,
+        pending_block_with_metadata: Arc<PendingBlockWithMetadata>,
     ) {
-        // TODO: implement me!
-        // This requires populating the pending block with the appropriate
-        // pipelined blocks before pushing it into the execution pipeline.
+        // Unpack the pending block
+        let (peer_network_id, message_received_time, observed_ordered_block) =
+            pending_block_with_metadata.unpack();
+        let ordered_block = observed_ordered_block.ordered_block();
+
+        // Verify the ordered block proof and payloads
+        if let Err(error) = self.verify_ordered_block_proof_and_payloads(ordered_block) {
+            // Log the error, update the invalid message counter and return early
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify ordered block with window proof and payloads! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
+                    ordered_block.proof_block_info(),
+                    peer_network_id,
+                    error
+                ))
+            );
+            increment_invalid_message_counter(
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+            );
+            return;
+        }
+
+        // The block was verified correctly. If the block is a child of our
+        // last block, we can insert it into the ordered block store.
+        if self.get_last_ordered_block().id() == ordered_block.first_block().parent_id() {
+            // Update the latency metrics for ordered block processing
+            update_message_processing_latency_metrics(
+                message_received_time,
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+            );
+
+            // Populate the block window for the ordered pipelined block
+            let populated_ordered_block = match self.populate_pipelined_block_window(ordered_block)
+            {
+                Ok(populated_ordered_block) => populated_ordered_block,
+                Err(error) => {
+                    // Log the error and return (something has gone wrong)
+                    error!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Failed to populate ordered block window! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
+                            ordered_block.proof_block_info(),
+                            peer_network_id,
+                            error
+                        ))
+                    );
+                    return;
+                },
+            };
+
+            // Insert the ordered block into the pending blocks
+            self.ordered_block_store
+                .lock()
+                .insert_ordered_block(observed_ordered_block.clone());
+
+            // If state sync is not syncing to a commit, finalize the ordered blocks
+            if !self.state_sync_manager.is_syncing_to_commit() {
+                self.finalize_ordered_block(populated_ordered_block).await;
+            }
+        } else {
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Parent block for ordered block with window is missing! Ignoring: {:?}",
+                    ordered_block.proof_block_info()
+                ))
+            );
+        }
     }
 
     /// Processes the given state sync notification
@@ -1278,6 +1310,68 @@ impl ConsensusObserver {
             .remove_blocks_for_commit(commit_proof);
     }
 
+    /// Returns a copy of the given ordered block, but with the pipelined
+    /// block window correctly populated.
+    /// Note: this function assumes that the ordered block only has a single
+    /// pipelined block (as multiple pipelined blocks are not supported yet).
+    fn populate_pipelined_block_window(
+        &mut self,
+        ordered_block: &OrderedBlock,
+    ) -> Result<OrderedBlock, Error> {
+        // Get the execution pool window size
+        let execution_pool_window_size = match self.get_execution_pool_window_size() {
+            Some(window_size) => window_size,
+            None => {
+                return Err(Error::UnexpectedError(
+                    "Execution pool is disabled! Cannot populate pipelined block window.".into(),
+                ))
+            },
+        };
+
+        // Get all the pipelined blocks for the window
+        let ordered_block_window = match execution_pool::get_all_pipelined_blocks_for_window(
+            self.pending_block_store.clone(),
+            ordered_block,
+            execution_pool_window_size,
+        ) {
+            Ok(pipelined_blocks) => pipelined_blocks,
+            Err(error) => {
+                return Err(Error::UnexpectedError(format!(
+                    "Failed to get all pipelined blocks for the execution window! Error: {:?}",
+                    error
+                )));
+            },
+        };
+
+        // Extract the ordered pipelined block
+        let mut ordered_pipelined_block = match ordered_block.blocks().first() {
+            Some(pipelined_block) => (**pipelined_block).clone(),
+            None => {
+                return Err(Error::UnexpectedError(
+                    "No pipelined blocks were found in the ordered block!".into(),
+                ))
+            },
+        };
+
+        // Remove the ordered pipelined block from the ordered block window.
+        // This is required because the window should not contain the block itself.
+        let filtered_block_window = ordered_block_window
+            .into_iter()
+            .filter(|block| block.id() != ordered_pipelined_block.id())
+            .collect::<Vec<_>>();
+
+        // Populate the block window for the pipelined block
+        let ordered_block_window = OrderedBlockWindow::new(filtered_block_window);
+        ordered_pipelined_block.set_block_window(ordered_block_window);
+
+        // Create and return an ordered block with the populated block window
+        let populated_ordered_block = OrderedBlock::new(
+            vec![Arc::new(ordered_pipelined_block)],
+            ordered_block.ordered_proof().clone(),
+        );
+        Ok(populated_ordered_block)
+    }
+
     /// Updates the metrics for the processed blocks
     fn update_processed_blocks_metrics(&self) {
         // Update the payload store metrics
@@ -1294,6 +1388,46 @@ impl ConsensusObserver {
         self.ordered_block_store
             .lock()
             .update_ordered_blocks_metrics();
+    }
+
+    /// Verifies the ordered block proof and payloads (for the given block)
+    fn verify_ordered_block_proof_and_payloads(
+        &mut self,
+        ordered_block: &OrderedBlock,
+    ) -> Result<(), Error> {
+        // Verify the ordered block proof
+        let epoch_state = self.get_epoch_state();
+        if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
+            if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
+                // Proof verification failed
+                return Err(Error::InvalidMessageError(format!(
+                    "Failed to verify ordered block proof! Error: {:?}!",
+                    error,
+                )));
+            }
+        } else {
+            // The ordered block is for a different epoch
+            return Err(Error::InvalidMessageError(format!(
+                "Ordered block epoch mismatch! Expected epoch: {}. Received epoch: {}!",
+                epoch_state.epoch,
+                ordered_block.proof_block_info().epoch(),
+            )));
+        };
+
+        // Verify the block payloads
+        if let Err(error) = self
+            .block_payload_store
+            .lock()
+            .verify_payloads_against_ordered_block(ordered_block)
+        {
+            // Payload verification failed
+            return Err(Error::InvalidMessageError(format!(
+                "Failed to verify block payloads against ordered block! Error: {:?}!",
+                error,
+            )));
+        }
+
+        Ok(())
     }
 
     /// Waits for a new epoch to start
