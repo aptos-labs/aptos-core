@@ -225,9 +225,9 @@ module aptos_experimental::market {
     }
 
     public fun is_taker_order<M: store + copy + drop>(
-        self: &Market<M>, price: u64, is_buy: bool
+        self: &Market<M>, price: u64, is_buy: bool, trigger_condition: Option<TriggerCondition>
     ): bool {
-        self.order_book.is_taker_order(price, is_buy, option::none())
+        self.order_book.is_taker_order(price, is_buy, trigger_condition)
     }
 
     /// Places an order - If its a taker order, it will be matched immediately and if its a maker order, it will simply
@@ -540,7 +540,7 @@ module aptos_experimental::market {
             };
         };
 
-        let is_taker_order = self.order_book.is_taker_order(price, is_buy, option::none());
+        let is_taker_order = self.order_book.is_taker_order(price, is_buy, trigger_condition);
         if (!is_taker_order) {
             return self.place_maker_order(
                 user_addr,

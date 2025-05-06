@@ -3,7 +3,17 @@
 
 # Module `0x7::order_book`
 
-(work in progress)
+This module provides a core order book functionality for a trading system. On a high level, it has three major
+components
+1. ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
+book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
+The orders are matched based on time-price priority.
+2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
+types of pending orders are supported.
+- Price move up - Trigggered when the price moves above a certain price level
+- Price move down - Triggered when the price moves below a certain price level
+- Time based - Triggered when a certain time has passed
+3. Orders: This is a BigOrderMap of order id to order details.
 
 
 -  [Struct `OrderRequest`](#0x7_order_book_OrderRequest)
@@ -20,14 +30,12 @@
 -  [Function `get_single_match_for_taker`](#0x7_order_book_get_single_match_for_taker)
 -  [Function `is_active_order`](#0x7_order_book_is_active_order)
 -  [Function `get_order`](#0x7_order_book_get_order)
--  [Function `get_unique_priority_idx`](#0x7_order_book_get_unique_priority_idx)
 -  [Function `get_remaining_size`](#0x7_order_book_get_remaining_size)
 -  [Function `take_ready_price_based_orders`](#0x7_order_book_take_ready_price_based_orders)
 -  [Function `best_bid_price`](#0x7_order_book_best_bid_price)
 -  [Function `best_ask_price`](#0x7_order_book_best_ask_price)
 -  [Function `get_slippage_price`](#0x7_order_book_get_slippage_price)
 -  [Function `take_ready_time_based_orders`](#0x7_order_book_take_ready_time_based_orders)
--  [Function `place_order_and_get_matches`](#0x7_order_book_place_order_and_get_matches)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -394,6 +402,9 @@
 
 ## Function `cancel_order`
 
+Cancels an order from the order book. If the order is active, it is removed from the active order book else
+it is removed from the pending order book. The API doesn't abort if the order is not found in the order book -
+this is a TODO for now.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, account_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;&gt;
@@ -446,6 +457,7 @@
 
 ## Function `is_taker_order`
 
+Checks if the order is a taker order i.e., matched immediatedly with the active order book.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: u64, is_buy: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
@@ -478,6 +490,8 @@
 
 ## Function `place_maker_order`
 
+Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
+else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;)
@@ -591,6 +605,8 @@
 
 ## Function `get_single_match_for_taker`
 
+Returns a single match for a taker order. It is responsibility of the caller to first call the <code>is_taker_order</code>
+API to ensure that the order is a taker order before calling this API, otherwise it will abort.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: u64, size: u64, is_buy: bool): <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;
@@ -679,36 +695,6 @@
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*self.orders.borrow(&order_id))
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_get_unique_priority_idx"></a>
-
-## Function `get_unique_priority_idx`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, account_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_unique_priority_idx">get_unique_priority_idx</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, account_order_id: u64
-): Option&lt;UniqueIdxType&gt; {
-    <b>let</b> order_id = new_order_id_type(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, account_order_id);
-    <b>if</b> (!self.orders.contains(&order_id)) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-    };
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.orders.borrow(&order_id).get_unique_priority_idx_from_state())
 }
 </code></pre>
 
@@ -883,59 +869,6 @@
         orders.push_back(order);
     });
     orders
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_place_order_and_get_matches"></a>
-
-## Function `place_order_and_get_matches`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_order_and_get_matches">place_order_and_get_matches</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_order_and_get_matches">place_order_and_get_matches</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;
-): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrderMatch&lt;M&gt;&gt; {
-    <b>let</b> match_results = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>let</b> remainig_size = order_req.remaining_size;
-    <b>while</b> (remainig_size &gt; 0) {
-        <b>if</b> (!self.<a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>(order_req.price, order_req.is_buy, order_req.trigger_condition)) {
-            self.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(
-                <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a> {
-                    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-                    account_order_id: order_req.account_order_id,
-                    unique_priority_idx: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-                    price: order_req.price,
-                    orig_size: order_req.orig_size,
-                    remaining_size: remainig_size,
-                    is_buy: order_req.is_buy,
-                    trigger_condition: order_req.trigger_condition,
-                    metadata: order_req.metadata
-                }
-            );
-            <b>return</b> match_results;
-        };
-        <b>let</b> match_result =
-            self.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(
-                order_req.price, remainig_size, order_req.is_buy
-            );
-        <b>let</b> matched_size = match_result.get_matched_size();
-        match_results.push_back(match_result);
-        remainig_size -= matched_size;
-    };
-    <b>return</b> match_results
 }
 </code></pre>
 
