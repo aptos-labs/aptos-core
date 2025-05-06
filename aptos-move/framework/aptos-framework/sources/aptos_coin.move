@@ -214,8 +214,8 @@ module aptos_framework::aptos_coin {
         (burn_cap, mint_cap)
     }
 
-    /// Initializes the Delegations resource under `@aptos_framework`.
     #[test_only]
+    /// Initializes the Delegations resource under `@aptos_framework`.
     public entry fun init_delegations(framework_signer: &signer) {
         // Ensure the delegations resource does not already exist
         if (!exists<Delegations>(@aptos_framework)) {

@@ -407,7 +407,7 @@ Deposits gas fees into the governed gas pool.
 @param gas_fee The amount of gas fees to be deposited.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(gas_payer: <b>address</b>, gas_fee: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(_gas_payer: <b>address</b>, _gas_fee: u64)
 </code></pre>
 
 
@@ -416,7 +416,7 @@ Deposits gas fees into the governed gas pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(gas_payer: <b>address</b>, gas_fee: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(_gas_payer: <b>address</b>, _gas_fee: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
     // get the sender <b>to</b> preserve the signature but do nothing
     <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_pool_address">governed_gas_pool_address</a>();
 }
@@ -561,7 +561,7 @@ Abort if the governed gas pool has insufficient funds
 ### Function `deposit_gas_fee`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(gas_payer: <b>address</b>, gas_fee: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(_gas_payer: <b>address</b>, _gas_fee: u64)
 </code></pre>
 
 

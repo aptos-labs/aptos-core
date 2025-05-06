@@ -87,6 +87,7 @@ pub enum FeatureFlag {
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
     GOVERNED_GAS_POOL = 73,
+    DECOMMISSION_CORE_RESOURCES = 222,
 }
 
 impl FeatureFlag {

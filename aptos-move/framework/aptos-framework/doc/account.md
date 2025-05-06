@@ -689,6 +689,15 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 
 
+<a id="0x1_account_EFLAG_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EFLAG_NOT_ENABLED">EFLAG_NOT_ENABLED</a>: u64 = 21;
+</code></pre>
+
+
+
 <a id="0x1_account_EINVALID_ACCEPT_ROTATION_CAPABILITY"></a>
 
 The caller does not have a valid rotation capability offer from the other account

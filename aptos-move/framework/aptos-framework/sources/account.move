@@ -129,7 +129,6 @@ module aptos_framework::account {
     /// authentication keys. Without such separation, an adversary could create (and get a signer for) a resource account
     /// whose address matches an existing address of a MultiEd25519 wallet.
     const DERIVE_RESOURCE_ACCOUNT_SCHEME: u8 = 255;
-
     /// Account already exists
     const EACCOUNT_ALREADY_EXISTS: u64 = 1;
     /// Account does not exist
@@ -170,6 +169,8 @@ module aptos_framework::account {
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
     // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
     const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
+    // A required feature flag is not enabled.
+    const EFLAG_NOT_ENABLED: u64 = 21;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
