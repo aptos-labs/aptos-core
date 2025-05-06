@@ -330,7 +330,7 @@ impl AbstractFunction for LazyLoadedFunction {
                         .join(",")
                 )
             };
-            format!("{}::{}:{}", prefix, fun_id, ty_args_str)
+            format!("{}::{}{}", prefix, fun_id, ty_args_str)
         })
     }
 }
