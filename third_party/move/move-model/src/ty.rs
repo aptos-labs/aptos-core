@@ -1631,6 +1631,15 @@ impl Type {
     pub fn is_tuple(&self) -> bool {
         matches!(self, Type::Tuple(_))
     }
+
+    /// Returns true if this type is a reference to a reference.
+    pub fn is_reference_to_a_reference(&self) -> bool {
+        if let Type::Reference(_, bt) = self {
+            bt.is_reference()
+        } else {
+            false
+        }
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
