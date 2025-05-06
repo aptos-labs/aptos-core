@@ -3,8 +3,8 @@
 
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
-    signature_verified_transaction::{into_signature_verified_block, SignatureVerifiedTransaction},
-    Transaction,
+    signature_verified_transaction::SignatureVerifiedTransaction,
+    ExtraInfo, Transaction,
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
@@ -433,28 +433,41 @@ impl<T: Clone> TransactionWithDependencies<T> {
 pub struct ExecutableBlock {
     pub block_id: HashValue,
     pub transactions: ExecutableTransactions,
+    pub unpersisted_info: Vec<Option<ExtraInfo>>,
 }
 
 impl ExecutableBlock {
-    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
+    pub fn new(
+        block_id: HashValue,
+        transactions: ExecutableTransactions,
+        unpersisted_info: Vec<Option<ExtraInfo>>,
+    ) -> Self {
         Self {
             block_id,
             transactions,
+            unpersisted_info,
         }
     }
 }
 
-impl From<(HashValue, Vec<SignatureVerifiedTransaction>)> for ExecutableBlock {
-    fn from((block_id, transactions): (HashValue, Vec<SignatureVerifiedTransaction>)) -> Self {
-        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
-    }
-}
-
-impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
-    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
+impl
+    From<(
+        HashValue,
+        Vec<SignatureVerifiedTransaction>,
+        Vec<Option<ExtraInfo>>,
+    )> for ExecutableBlock
+{
+    fn from(
+        (block_id, transactions, unpersisted_info): (
+            HashValue,
+            Vec<SignatureVerifiedTransaction>,
+            Vec<Option<ExtraInfo>>,
+        ),
+    ) -> Self {
         Self::new(
             block_id,
-            ExecutableTransactions::Unsharded(into_signature_verified_block(transactions)),
+            ExecutableTransactions::Unsharded(transactions),
+            unpersisted_info,
         )
     }
 }

@@ -24,7 +24,7 @@ use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, ExtraInfo, SignedTransaction,
     },
 };
 use fail::fail_point;
@@ -178,12 +178,26 @@ impl ExecutionPipeline {
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
+            let unpersisted_info = sig_verified_txns
+                .iter()
+                .map(|txn| {
+                    if txn.borrow_into_inner().try_as_signed_user_txn().is_some() {
+                        if let Some(proposer) = block.author() {
+                            Some(ExtraInfo { proposer })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
                 .observe_duration(sig_verification_start.elapsed());
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
-                    block: (block.id(), sig_verified_txns).into(),
+                    block: (block.id(), sig_verified_txns, unpersisted_info).into(),
                     parent_block_id,
                     block_executor_onchain_config,
                     pre_commit_hook,

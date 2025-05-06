@@ -90,9 +90,12 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
+        let mut unpersisted_info = Vec::new();
+        unpersisted_info.resize(sig_verified_txns.len(), None);
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
+            unpersisted_info,
             parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

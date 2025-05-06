@@ -334,15 +334,36 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         );
     }
 
-    /// Return the fee statement of the transaction.
-    /// Should never be called after vm_output is consumed.
+    /// Returns the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement {
+        if let Some(committed_output) = self.committed_output.get() {
+            if let Ok(Some(fee_statement)) = committed_output.try_extract_fee_statement() {
+                return fee_statement;
+            }
+            return FeeStatement::zero();
+        }
         *self
             .vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get fee statement")
             .fee_statement()
+    }
+
+    /// Returns the committed TransactionsStatus.
+    fn committed_status(&self) -> &TransactionStatus {
+        self.committed_output
+            .get()
+            .expect("Must call after commit.")
+            .status()
+    }
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool {
+        self.committed_output
+            .get()
+            .expect("Must call after commit.")
+            .has_new_epoch_event()
     }
 
     fn output_approx_size(&self) -> u64 {
@@ -419,14 +440,14 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
-            init_speculative_logs(num_txns);
+            init_speculative_logs(num_txns + 1);
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
@@ -446,11 +467,12 @@ impl<
         let ret = executor.execute_block(
             signature_verified_block,
             state_view,
+            transaction_slice_metadata,
             &mut module_cache_manager_guard,
         );
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_end_info) = block_output.into_inner();
+                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
                 let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
@@ -465,7 +487,7 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec, block_end_info))
+                Ok(BlockOutput::new(output_vec, block_epilogue_txn))
             },
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,
@@ -490,7 +512,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,

@@ -595,10 +595,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
+        let mut unpersisted_info = Vec::new();
+        unpersisted_info.resize(txns.len(), None);
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),
+            unpersisted_info,
             &parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

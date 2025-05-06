@@ -11,7 +11,7 @@ use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{BlockExecutableTransaction as Transaction, TransactionStatus},
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -193,6 +193,16 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
+
+    /// Returns the committed TransactionsStatus.
+    fn committed_status(&self) -> &TransactionStatus {
+        unimplemented!()
+    }
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool {
+        unimplemented!()
+    }
 
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.

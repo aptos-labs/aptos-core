@@ -25,7 +25,9 @@ module aptos_framework::stake {
     use std::vector;
     use aptos_std::bls12381;
     use aptos_std::math64::min;
+    use aptos_std::ordered_map::{Self, OrderedMap};
     use aptos_std::table::Table;
+    use aptos_framework::aggregator_v2::{Self, Aggregator};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
@@ -84,6 +86,8 @@ module aptos_framework::stake {
     const ERECONFIGURATION_IN_PROGRESS: u64 = 20;
     /// Signer does not have permission to perform stake logic.
     const ENO_STAKE_PERMISSION: u64 = 28;
+    /// Transaction fee is not fully distributed at epoch ending.
+    const ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED: u64 = 28;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -186,6 +190,10 @@ module aptos_framework::stake {
         total_voting_power: u128,
         // Total voting power waiting to join in the next epoch.
         total_joining_power: u128,
+    }
+
+    struct PendingTransactionFee has key, store {
+        pending_fee_by_validator: OrderedMap<address, Aggregator<u64>>,
     }
 
     /// AptosCoin capabilities, set during genesis and stored in @CoreResource account.
@@ -542,6 +550,38 @@ module aptos_framework::stake {
             };
             i = i + 1;
         };
+    }
+
+    public fun initialize_pending_validator_fee(framework: &signer) {
+        system_addresses::assert_aptos_framework(framework);
+
+        if (!exists<PendingTransactionFee>(@aptos_framework)) {
+            move_to(framework, PendingTransactionFee {
+                pending_fee_by_validator: ordered_map::new(),
+            });
+        }
+    }
+
+    public(friend) fun record_fee(
+        vm: &signer,
+        fee_distribution_addresses: vector<address>,
+        fee_amounts_octa: vector<u64>,
+    ) acquires PendingTransactionFee {
+        // Operational constraint: can only be invoked by the VM.
+        system_addresses::assert_vm(vm);
+
+        assert!(fee_distribution_addresses.length() == fee_amounts_octa.length());
+
+        let num_address = fee_distribution_addresses.length();
+        let pending_fee = borrow_global_mut<PendingTransactionFee>(@aptos_framework);
+        let i = 0;
+        while (i < num_address) {
+            let address = fee_distribution_addresses[i];
+            let fee_octa = fee_amounts_octa[i];
+            // address must exist
+            pending_fee.pending_fee_by_validator.borrow_mut(&address).add(fee_octa);
+            i = i + 1;
+        }
     }
 
     /// Initialize the validator account and give ownership to the signing account
@@ -1252,7 +1292,7 @@ module aptos_framework::stake {
     /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
     public(friend) fun on_new_epoch(
-    ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+    ) acquires AptosCoinCapabilities, PendingTransactionFee, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let config = staking_config::get();
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
@@ -1311,6 +1351,12 @@ module aptos_framework::stake {
         validator_set.active_validators = next_epoch_validators;
         validator_set.total_voting_power = total_voting_power;
         validator_set.total_joining_power = 0;
+
+        if (exists<PendingTransactionFee>(@aptos_framework)) {
+            let pending_fee_by_validator = &mut borrow_global_mut<PendingTransactionFee>(@aptos_framework).pending_fee_by_validator;
+            assert!(pending_fee_by_validator.is_empty(), error::internal(ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED));
+            validator_set.active_validators.for_each_ref(|v| pending_fee_by_validator.add(v.addr, aggregator_v2::create_unbounded_aggregator<u64>()));
+        };
 
         // Update validator indices, reset performance scores, and renew lockups.
         validator_perf.validators = vector::empty();
@@ -1557,11 +1603,31 @@ module aptos_framework::stake {
         validator_perf: &ValidatorPerformance,
         pool_address: address,
         staking_config: &StakingConfig,
-    ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig {
+    ) acquires AptosCoinCapabilities, PendingTransactionFee, StakePool, ValidatorConfig {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         let cur_validator_perf = vector::borrow(&validator_perf.validators, validator_config.validator_index);
         let num_successful_proposals = cur_validator_perf.successful_proposals;
+
+        let fee_pending_inactive = 0;
+        let fee_active = 0;
+
+        if (exists<PendingTransactionFee>(@aptos_framework)) {
+            let pending_fee_by_validator = &mut borrow_global_mut<PendingTransactionFee>(@aptos_framework).pending_fee_by_validator;
+            if (pending_fee_by_validator.contains(&pool_address)) {
+                let fee_octa = pending_fee_by_validator.remove(&pool_address).read();
+                // TODO(grao): Feature flag.
+                let mint_transaction_fee = true;
+                if (mint_transaction_fee) {
+                    let stake_active = (coin::value(&stake_pool.active) as u128);
+                    let stake_pending_inactive = (coin::value(&stake_pool.pending_inactive) as u128);
+
+                    fee_pending_inactive = (((fee_octa as u128) * stake_pending_inactive / (stake_active + stake_pending_inactive)) as u64);
+                    fee_active = fee_octa - fee_pending_inactive;
+                }
+            }
+        };
+
         spec {
             // The following addition should not overflow because `num_total_proposals` cannot be larger than 86400,
             // the maximum number of proposals in a day (1 proposal per second).
@@ -1586,6 +1652,15 @@ module aptos_framework::stake {
         spec {
             assume rewards_active + rewards_pending_inactive <= MAX_U64;
         };
+
+        let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
+        if (fee_active > 0) {
+            coin::merge(&mut stake_pool.active, coin::mint(fee_active, mint_cap));
+        };
+        if (fee_pending_inactive > 0) {
+            coin::merge(&mut stake_pool.pending_inactive, coin::mint(fee_pending_inactive, mint_cap));
+        };
+
         let rewards_amount = rewards_active + rewards_pending_inactive;
         // Pending active stake can now be active.
         coin::merge(&mut stake_pool.active, coin::extract_all(&mut stake_pool.pending_active));
