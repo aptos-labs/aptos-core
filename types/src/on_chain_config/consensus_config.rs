@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 /// Default Window Size for Execution Pool.
 /// This describes the number of blocks in the Execution Pool Window
-pub const DEFAULT_WINDOW_SIZE: Option<u64> = None;
+pub const DEFAULT_WINDOW_SIZE: Option<u64> = Some(3);
 pub const DEFAULT_ENABLED_WINDOW_SIZE: Option<u64> = Some(1);
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
