@@ -272,11 +272,18 @@ impl<
         self.resource_map.borrow().get(key).cloned()
     }
 
-    pub fn fetch_exchanged_data(&self, key: &K) -> Option<(Arc<V>, Arc<MoveTypeLayout>)> {
-        if let Some(ValueWithLayout::Exchanged(value, Some(layout))) = self.fetch_data(key) {
-            Some((value, layout))
+    pub fn fetch_exchanged_data(
+        &self,
+        key: &K,
+    ) -> Result<(Arc<V>, Arc<MoveTypeLayout>), PanicError> {
+        let data = self.fetch_data(key);
+        if let Some(ValueWithLayout::Exchanged(value, Some(layout))) = data {
+            Ok((value, layout))
         } else {
-            None
+            Err(code_invariant_error(format!(
+                "Read value needing exchange {:?} not in Exchanged format",
+                data
+            )))
         }
     }
 

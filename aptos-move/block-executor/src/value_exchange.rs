@@ -14,7 +14,11 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
+#[cfg(test)]
+use fail::fail_point;
 use move_binary_format::errors::PartialVMResult;
+#[cfg(test)]
+use move_core_types::value::MoveStructLayout;
 use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
 use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
@@ -110,6 +114,19 @@ where
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<HashSet<DelayedFieldID>> {
+        #[cfg(test)]
+        fail_point!("delayed_field_test", |_| {
+            assert_eq!(
+                *layout,
+                MoveTypeLayout::Struct(MoveStructLayout::new(vec![])),
+                "Layout does not match expected mock layout"
+            );
+
+            let (id, _) = crate::proptest_types::types::deserialize_to_delayed_field_id(&bytes)
+                .expect("Mock deserialization failed in delayed field test.");
+            Ok(HashSet::from([id]))
+        });
+
         // TODO[agg_v2](optimize): this performs 2 traversals of a value:
         //   1) deserialize,
         //   2) find identifiers to populate the set.

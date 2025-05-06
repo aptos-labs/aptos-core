@@ -275,7 +275,7 @@ impl WriteOpSize {
     }
 }
 
-pub trait TransactionWrite: Debug {
+pub trait TransactionWrite: Debug + Eq {
     fn bytes(&self) -> Option<&Bytes>;
 
     // Returns state value that would be observed by a read following the 'self' write.

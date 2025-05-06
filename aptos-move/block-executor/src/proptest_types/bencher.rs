@@ -7,8 +7,9 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
+        mock_executor::{MockOutput, MockTask},
         types::{
-            KeyType, MockOutput, MockTask, MockTransaction, TransactionGen, TransactionGenParams,
+            KeyType, MockTransaction, TransactionGen, TransactionGenParams,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -106,7 +107,7 @@ where
 
         let transactions: Vec<_> = transaction_gens
             .into_iter()
-            .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
+            .map(|txn_gen| txn_gen.materialize(&key_universe))
             .collect();
         let txns_provider = DefaultTxnProvider::new(transactions.clone());
 

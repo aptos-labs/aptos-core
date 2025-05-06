@@ -46,13 +46,13 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
-#[derive(Debug, Clone)]
-struct Value<V> {
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct Value<V: Eq + PartialEq> {
     maybe_value: Option<V>,
     maybe_bytes: Option<Bytes>,
 }
 
-impl<V: Into<Vec<u8>> + Clone> Value<V> {
+impl<V: Into<Vec<u8>> + Clone + Eq + PartialEq> Value<V> {
     fn new(maybe_value: Option<V>) -> Self {
         let maybe_bytes = maybe_value.clone().map(|v| {
             let mut bytes = v.into();
@@ -66,7 +66,7 @@ impl<V: Into<Vec<u8>> + Clone> Value<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
+impl<V: Into<Vec<u8>> + Clone + Debug + Eq + PartialEq> TransactionWrite for Value<V> {
     fn bytes(&self) -> Option<&Bytes> {
         self.maybe_bytes.as_ref()
     }
@@ -88,16 +88,16 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     }
 }
 
-enum Data<V> {
+enum Data<V: Eq + PartialEq> {
     Write(Value<V>),
     Delta(DeltaOp),
 }
-struct Baseline<K, V>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
+struct Baseline<K, V: PartialEq + Eq>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
     K: Hash + Eq + Clone + Debug,
-    V: Clone + Into<Vec<u8>> + Debug + PartialEq,
+    V: Clone + Into<Vec<u8>> + Debug + PartialEq + Eq,
 {
     pub fn new(txns: &[(K, Operator<V>)], ignore_updates: bool) -> Self {
         let mut baseline: HashMap<K, BTreeMap<TxnIndex, Data<V>>> = HashMap::new();
@@ -213,7 +213,7 @@ fn run_and_assert<K, V>(
 ) -> Result<(), TestCaseError>
 where
     K: PartialOrd + Send + Clone + Hash + Eq + Sync + Debug,
-    V: Send + Into<Vec<u8>> + Debug + Clone + PartialEq + Sync,
+    V: Send + Into<Vec<u8>> + Debug + Clone + PartialEq + Eq + Sync,
 {
     let transactions: Vec<(K, Operator<V>)> = transaction_gens
         .into_iter()
