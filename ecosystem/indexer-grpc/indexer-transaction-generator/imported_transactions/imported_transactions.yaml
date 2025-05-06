@@ -44,6 +44,7 @@ mainnet:
     550582915: 550582915_multiple_transfer_event
     2308282694: 2308282694_asset_type_v1_null
     2308283617: 2308283617_asset_type_v1_null_2
+    2662373625: 2662373625_fa_secondary_store_burnt_with_deletion_event
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events

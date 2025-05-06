@@ -18,7 +18,7 @@ error: phantom type `T` can only be used as an argument for another phantom type
 4 │     struct Func3<phantom T>(|u64|(T, T)) has copy, drop;
   │                                   ^
 
-error: tuple type `(u64, u64)` is not allowed as a type argument
+error: tuple type `(u64, u64)` is not allowed
   ┌─ tests/checking-lang-v2.2/lambda/constraints.move:5:24
   │
 5 │     struct Func4(|u64|((u64, u64), u64)) has copy, drop;

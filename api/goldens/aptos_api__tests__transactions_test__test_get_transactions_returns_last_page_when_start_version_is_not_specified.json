@@ -264,6 +264,7 @@
       "signature": "0xb30ffdbedfdee10b517ea68e45f0b1818bee51711e67be37f781873e42880e7676f340dc5f4efb3251a04b4579223102781f62613f6195b912ff0e86ee4fae04",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -549,6 +550,7 @@
       "signature": "0x8586d3ba1d54c630418b039a45414e672f5c24345d902ecce6972e461c4f668018916956d25214202958cf708152d35319522396626d2badecc22a7613861b0c",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -834,6 +836,7 @@
       "signature": "0xf50c815eeb949b00002a33446a1b7247967a3957f928555b4cfae68022e5a1c76b0f7be98458300c98b5268d1df86e5b80d49ab7cbdb1207617427f580d1f405",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -1119,6 +1122,7 @@
       "signature": "0xbb3b9d47694bcd53e6ede0450d9f601703cd4a1a5fc6481f93ed866e398d895f97903d0f61a9c84d20e7f3d0ea84d2974694f3441f936474014bc050dbc69506",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -1404,6 +1408,7 @@
       "signature": "0xe68c4ac0f33d1fb117a69706fb8c50a5422e83b5b1807431f0b8773f4c3fe9c33182f8cdc8baca1a11a64eafd40bbcaa42ee49c7043cb3d8860bdb3338ee790a",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -1689,6 +1694,7 @@
       "signature": "0x008d33c2cb967f335b0487d09ed2fee498e87b106072027cd01233e8a35a9c74dbe27251e244b64904a6e2f00b9deefb9dcc0dd890313c834f2a6437baf49a03",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -1974,6 +1980,7 @@
       "signature": "0xcfd0d47f1932e231f48ef37538494b0360bee0c3ada183b1bc6f3e1e88c5d20ddb9c569a62a857efde687d908e32490f652676e1e3c87e035378bbb5ffe34e09",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {
@@ -2259,6 +2266,7 @@
       "signature": "0xc531868a2a5691f5abe36a969e7657581fee8c99688627fffe26093aea423801c8a72178c47bc9f6ab2b7bd49a5fccbcb3c8d058d59bcf315b4197b5a52d3306",
       "type": "ed25519_signature"
     },
+    "replay_protection_nonce": null,
     "events": [
       {
         "guid": {

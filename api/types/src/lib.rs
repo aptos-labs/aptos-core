@@ -53,9 +53,10 @@ pub use transaction::{
     PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet, Signature, SingleKeySignature,
     SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
     TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
-    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
-    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
-    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
+    TransactionSummary, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
 };
 pub use view::{ViewFunction, ViewRequest};
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};

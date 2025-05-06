@@ -22,7 +22,7 @@ public fun m::test($t0: bool): u32 {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/variable-coalescing/dead_assignment_3.move:10:13
    │
 10 │             y = y;

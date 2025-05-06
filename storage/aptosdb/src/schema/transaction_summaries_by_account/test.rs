@@ -10,11 +10,11 @@ proptest! {
     #[test]
     fn test_encode_decode(
         address in any::<AccountAddress>(),
-        seq_num in any::<u64>(),
         version in any::<Version>(),
+        summary in any::<IndexedTransactionSummary>(),
     ) {
-        assert_encode_decode::<TransactionByAccountSchema>(&(address, seq_num), &version);
+        assert_encode_decode::<TransactionSummariesByAccountSchema>(&(address, version), &summary);
     }
 }
 
-test_no_panic_decoding!(TransactionByAccountSchema);
+test_no_panic_decoding!(TransactionSummariesByAccountSchema);

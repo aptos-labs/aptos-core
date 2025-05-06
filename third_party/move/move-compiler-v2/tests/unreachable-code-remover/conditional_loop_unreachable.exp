@@ -43,13 +43,13 @@ fun m::test($t0: bool, $t1: bool) {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `i`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_i`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `i` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_i`), or renaming to `_`
   ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:7:17
   │
 7 │                 i = i + 1;
   │                 ^^^^^^^^^
 
-warning: Unused assignment/binding to `i`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_i`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `i` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_i`), or renaming to `_`
    ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:12:13
    │
 12 │             i = i + 1;

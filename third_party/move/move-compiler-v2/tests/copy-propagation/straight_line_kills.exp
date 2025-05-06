@@ -22,7 +22,7 @@ fun m::copy_kill($t0: u64): u64 {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `p`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_p`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `p` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_p`), or renaming to `_`
   ┌─ tests/copy-propagation/straight_line_kills.move:5:9
   │
 5 │         p = p + 1;

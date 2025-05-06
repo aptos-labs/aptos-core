@@ -1,41 +1,5 @@
 
 Diagnostics:
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:58:21
-   │
-58 │                 let x = 3;
-   │                     ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:80:47
-   │
-80 │     public fun return_function_base(key: u64, x: u64): |u64|u64 {
-   │                                               ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:87:21
-   │
-87 │                 let x = 3;
-   │                     ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:118:21
-    │
-118 │                 let x = 3;
-    │                     ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:140:47
-    │
-140 │     public fun return_function_copy(key: u64, x: u64): |u64|u64 has copy {
-    │                                               ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:147:21
-    │
-147 │                 let x = 3;
-    │                     ^
-
 error: captured value is missing abilities `copy`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:148:30
     │
@@ -67,24 +31,6 @@ error: captured value is missing abilities `copy`
     │                                   ^^^^^^^
     │
     = expected function type: `|u64|u64 has copy`
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:177:21
-    │
-177 │                 let x = 3;
-    │                     ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:199:48
-    │
-199 │     public fun return_function_store(key: u64, x: u64): |u64|u64 has store {
-    │                                                ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:206:21
-    │
-206 │                 let x = 3;
-    │                     ^
 
 error: captured value is missing abilities `store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:207:30
@@ -126,24 +72,6 @@ error: function resulting from lambda lifting is missing the `store` ability
     │
     = lambda cannot be reduced to partial application of existing function
     = expected function type: `|u64|u64 has store`
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:237:21
-    │
-237 │                 let x = 3;
-    │                     ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:259:47
-    │
-259 │     public fun return_function_both(key: u64, x: u64): |u64|u64 has store+copy {
-    │                                               ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-    ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:266:21
-    │
-266 │                 let x = 3;
-    │                     ^
 
 error: captured value is missing abilities `copy + store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:267:30

@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/bytecode-generator/globals.move:18:27
-   │
-18 │     fun write(a: address, x: u64): u64 acquires R {
-   │                           ^
-
 // -- Model dump before first bytecode pipeline
 module 0x42::globals {
     struct R {
@@ -111,6 +103,14 @@ fun globals::write($t0: address, $t1: u64): u64 {
   4: $t2 := 9
   5: return $t2
 }
+
+
+Diagnostics:
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/bytecode-generator/globals.move:18:27
+   │
+18 │     fun write(a: address, x: u64): u64 acquires R {
+   │                           ^
 
 // -- Model dump before second bytecode pipeline
 module 0x42::globals {

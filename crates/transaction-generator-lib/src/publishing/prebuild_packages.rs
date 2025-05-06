@@ -4,16 +4,31 @@
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_sdk::bcs;
 use move_binary_format::CompiledModule;
+use move_package::source_package::std_lib::StdVersion;
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
 };
 
+/// Get the local framework path based on this source file's location.
+/// Note: If this source file is moved to a different location, this function
+/// may need to be updated.
+fn get_local_framework_path() -> String {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("aptos-move").join("framework"))
+        .expect("framework path")
+        .to_string_lossy()
+        .to_string()
+}
+
 pub fn create_prebuilt_packages_rs_file(
     base_dir: impl AsRef<Path>,
-    packages_to_build: Vec<(&str, &str)>,
+    packages_to_build: Vec<(&str, &str, bool)>,
     output_file: impl AsRef<Path>,
-) -> std::result::Result<(), anyhow::Error> {
+    in_aptos_core: bool,
+) -> anyhow::Result<()> {
     let mut string_buffer = "".to_string();
     //
     // File header
@@ -58,11 +73,22 @@ use std::collections::HashMap;",
     writeln!(string_buffer).expect("Empty line failed");
 
     let mut packages = Vec::new();
-    for (package_name, additional_package) in packages_to_build {
+    for (package_name, additional_package, use_latest_language) in packages_to_build {
+        let mut build_options = if use_latest_language {
+            BuildOptions::move_2().set_latest_language()
+        } else {
+            BuildOptions::move_2()
+        };
+        build_options.dev = true;
+        if in_aptos_core {
+            build_options.override_std = Some(StdVersion::Local(get_local_framework_path()));
+        }
+
         packages.push(write_package(
             &mut string_buffer,
             base_dir.as_ref().join(additional_package),
             package_name,
+            build_options,
         ));
     }
 
@@ -99,11 +125,14 @@ impl PreBuiltPackages for PreBuiltPackagesImpl {{
 }
 
 // Write out given package
-fn write_package(file: &mut String, package_path: PathBuf, package_name: &str) -> (String, bool) {
+fn write_package(
+    file: &mut String,
+    package_path: PathBuf,
+    package_name: &str,
+    build_options: BuildOptions,
+) -> (String, bool) {
     println!("Building package {}", package_name);
     // build package
-    let mut build_options = BuildOptions::move_2();
-    build_options.dev = true;
     let package =
         BuiltPackage::build(package_path, build_options).expect("building package must succeed");
     let modules = package.extract_code();
