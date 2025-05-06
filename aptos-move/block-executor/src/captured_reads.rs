@@ -152,7 +152,7 @@ impl<V: TransactionWrite> DataRead<V> {
         } else {
             match self.convert_to(&other_kind) {
                 Some(value) => {
-                    if value == *other {
+                    if &value == other {
                         DataReadComparison::Contains
                     } else {
                         DataReadComparison::Inconsistent
@@ -163,7 +163,7 @@ impl<V: TransactionWrite> DataRead<V> {
         }
     }
 
-    fn v_size(v: &Arc<V>) -> Option<u64> {
+    fn value_size(v: &Arc<V>) -> Option<u64> {
         v.bytes().map(|bytes| bytes.len() as u64)
     }
 
@@ -203,10 +203,10 @@ impl<V: TransactionWrite> DataRead<V> {
             )),
             ReadKind::MetadataAndResourceSize => Some(DataRead::MetadataAndResourceSize(
                 v.as_state_value_metadata(),
-                Self::v_size(v),
+                Self::value_size(v),
             )),
             ReadKind::Metadata => Some(DataRead::Metadata(v.as_state_value_metadata())),
-            ReadKind::ResourceSize => Some(DataRead::ResourceSize(Self::v_size(v))),
+            ReadKind::ResourceSize => Some(DataRead::ResourceSize(Self::value_size(v))),
             ReadKind::Exists => Some(DataRead::Exists(!v.is_deletion())),
         }
     }
@@ -248,19 +248,15 @@ impl<V: TransactionWrite> DataRead<V> {
         kind: &ReadKind,
     ) -> Option<DataRead<V>> {
         match kind {
-            ReadKind::Value => None,
-            ReadKind::MetadataAndResourceSize => None,
+            ReadKind::Value | ReadKind::MetadataAndResourceSize | ReadKind::ResourceSize => None,
             ReadKind::Metadata => Some(DataRead::Metadata(maybe_metadata.clone())),
-            ReadKind::ResourceSize => None,
             ReadKind::Exists => Some(DataRead::Exists(maybe_metadata.is_some())),
         }
     }
 
     fn resource_size_convert_to(maybe_size: Option<u64>, kind: &ReadKind) -> Option<DataRead<V>> {
         match kind {
-            ReadKind::Value => None,
-            ReadKind::MetadataAndResourceSize => None,
-            ReadKind::Metadata => None,
+            ReadKind::Value | ReadKind::MetadataAndResourceSize | ReadKind::Metadata => None,
             ReadKind::ResourceSize => Some(DataRead::ResourceSize(maybe_size)),
             ReadKind::Exists => Some(DataRead::Exists(maybe_size.is_some())),
         }
@@ -268,10 +264,10 @@ impl<V: TransactionWrite> DataRead<V> {
 
     fn exists_convert_to(exists: bool, kind: &ReadKind) -> Option<DataRead<V>> {
         match kind {
-            ReadKind::Value => None,
-            ReadKind::MetadataAndResourceSize => None,
-            ReadKind::Metadata => None,
-            ReadKind::ResourceSize => None,
+            ReadKind::Value
+            | ReadKind::MetadataAndResourceSize
+            | ReadKind::Metadata
+            | ReadKind::ResourceSize => None,
             ReadKind::Exists => Some(DataRead::Exists(exists)),
         }
     }
@@ -282,7 +278,7 @@ impl<V: TransactionWrite> DataRead<V> {
             // a MetadataAndResourceSize variant that implies everything non-value. This also
             // ensures that RawFromStorage can't be consistent with any other value read.
             ValueWithLayout::RawFromStorage(v) => {
-                DataRead::MetadataAndResourceSize(v.as_state_value_metadata(), Self::v_size(&v))
+                DataRead::MetadataAndResourceSize(v.as_state_value_metadata(), Self::value_size(&v))
             },
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)
@@ -602,10 +598,11 @@ where
         data_read: DataRead<T::Value>,
         target_kind: &ReadKind,
     ) -> PartialVMResult<GroupReadResult> {
-        // Unpatched RawFromStorage should not be used for values, and should fail below:
-        // from_value_with_layout will return MetadataAndResourceSize (because value is
-        // unsafe) and then the downcast to the Value kind will return None.
         let data_read = data_read.convert_to(target_kind).ok_or_else(|| {
+            // The read could not be converted to target kind. This should not happen due
+            // to concurrency, so we return PanicError which internally logs an error and
+            // set the incorrect_use flag.
+            self.incorrect_use = true;
             code_invariant_error("Couldn't convert a value from versioned group map")
         })?;
 
@@ -626,25 +623,18 @@ where
         group_key: T::Key,
         data_read: DataRead<T::Value>,
         target_kind: &ReadKind,
-    ) -> Result<ReadResult, PanicError> {
-        // Unpatched RawFromStorage should not be used for values, and should fail below:
-        // from_value_with_layout will return MetadataAndResourceSize (because value is
-        // unsafe) and then the downcast to the Value kind will return None.
-        let data_read = match data_read.convert_to(target_kind) {
-            Some(data_read) => data_read,
-            None => {
-                self.incorrect_use = true;
-                // This may not happen due to concurrency, so we return PanicError
-                // which internally logs an error.
-                return Err(code_invariant_error(
-                    "Couldn't downcast a value from versioned data map",
-                ));
-            },
-        };
+    ) -> PartialVMResult<ReadResult> {
+        let data_read = data_read.convert_to(target_kind).ok_or_else(|| {
+            // The read could not be converted to target kind. This should not happen due
+            // to concurrency, so we return PanicError which internally logs an error and
+            // set the incorrect_use flag.
+            self.incorrect_use = true;
+            code_invariant_error("Couldn't convert a value from versioned data map")
+        })?;
 
         match self.capture_read(group_key, None, data_read.clone()) {
             Ok(_) => Ok(ReadResult::from_data_read(data_read)),
-            Err(PanicOr::CodeInvariantError(e)) => Err(code_invariant_error(e)),
+            Err(PanicOr::CodeInvariantError(e)) => Err(code_invariant_error(e).into()),
             Err(PanicOr::Or(())) => Ok(ReadResult::HaltSpeculativeExecution(
                 "Inconsistency in data reads (must be due to speculation)".to_string(),
             )),
@@ -1074,6 +1064,28 @@ mod test {
     };
     use test_case::test_case;
 
+    // Macro to reduce code duplication for CapturedReads type parameters
+    macro_rules! test_captured_reads {
+        (update_entry, $entry:expr, $read:expr) => {
+            CapturedReads::<
+                TestTransactionType,
+                u32,
+                MockDeserializedCode,
+                MockVerifiedCode,
+                MockExtension,
+            >::update_entry($entry, $read)
+        };
+        (new) => {
+            CapturedReads::<
+                TestTransactionType,
+                u32,
+                MockDeserializedCode,
+                MockVerifiedCode,
+                MockExtension,
+            >::new()
+        };
+    }
+
     #[test_case(false)]
     #[test_case(true)]
     fn test_metadata_size_merge_success(direction: bool) {
@@ -1340,14 +1352,7 @@ mod test {
     macro_rules! assert_update_incorrect {
         ($m:expr, $x:expr, $y:expr) => {{
             let original = $m.get(&$x).cloned().unwrap();
-            match CapturedReads::<
-                TestTransactionType,
-                u32,
-                MockDeserializedCode,
-                MockVerifiedCode,
-                MockExtension,
-            >::update_entry($m.entry($x), $y.clone())
-            {
+            match test_captured_reads!(update_entry, $m.entry($x), $y.clone()) {
                 UpdateResult::IncorrectUse(m) => {
                     assert!(m.contains("of same kind"));
                 },
@@ -1360,14 +1365,7 @@ mod test {
     macro_rules! assert_update_insufficient {
         ($m:expr, $x:expr, $y:expr) => {{
             let original = $m.get(&$x).cloned().unwrap();
-            match CapturedReads::<
-                TestTransactionType,
-                u32,
-                MockDeserializedCode,
-                MockVerifiedCode,
-                MockExtension,
-            >::update_entry($m.entry($x), $y.clone())
-            {
+            match test_captured_reads!(update_entry, $m.entry($x), $y.clone()) {
                 UpdateResult::IncorrectUse(m) => {
                     assert!(m.contains("of higher kind"));
                 },
@@ -1382,13 +1380,7 @@ mod test {
             let original = $m.get(&$x).cloned().unwrap();
 
             assert_matches!(
-                CapturedReads::<
-                    TestTransactionType,
-                    u32,
-                    MockDeserializedCode,
-                    MockVerifiedCode,
-                    MockExtension,
-                >::update_entry($m.entry($x), $y.clone()),
+                test_captured_reads!(update_entry, $m.entry($x), $y.clone()),
                 UpdateResult::Inconsistency
             );
             assert_some_eq!($m.get(&$x), &original);
@@ -1398,13 +1390,7 @@ mod test {
     macro_rules! assert_insert {
         ($m:expr, $x:expr, $y:expr) => {{
             assert_matches!(
-                CapturedReads::<
-                    TestTransactionType,
-                    u32,
-                    MockDeserializedCode,
-                    MockVerifiedCode,
-                    MockExtension,
-                >::update_entry($m.entry($x), $y.clone()),
+                test_captured_reads!(update_entry, $m.entry($x), $y.clone()),
                 UpdateResult::Inserted
             );
             assert_some_eq!($m.get(&$x), &$y);
@@ -1414,13 +1400,7 @@ mod test {
     macro_rules! assert_update {
         ($m:expr, $x:expr, $y:expr) => {{
             assert_matches!(
-                CapturedReads::<
-                    TestTransactionType,
-                    u32,
-                    MockDeserializedCode,
-                    MockVerifiedCode,
-                    MockExtension,
-                >::update_entry($m.entry($x), $y.clone()),
+                test_captured_reads!(update_entry, $m.entry($x), $y.clone()),
                 UpdateResult::Updated
             );
             assert_some_eq!($m.get(&$x), &$y);
@@ -1441,13 +1421,7 @@ mod test {
 
         assert_insert!(map, 0, metadata);
         assert_matches!(
-            CapturedReads::<
-                TestTransactionType,
-                u32,
-                MockDeserializedCode,
-                MockVerifiedCode,
-                MockExtension,
-            >::update_entry(map.entry(0), size.clone()),
+            test_captured_reads!(update_entry, map.entry(0), size.clone()),
             UpdateResult::Updated
         );
         assert_some_eq!(map.get(&0), &metadata_and_size);
@@ -1465,13 +1439,7 @@ mod test {
 
         assert_insert!(map, 1, size);
         assert_matches!(
-            CapturedReads::<
-                TestTransactionType,
-                u32,
-                MockDeserializedCode,
-                MockVerifiedCode,
-                MockExtension,
-            >::update_entry(map.entry(1), metadata.clone()),
+            test_captured_reads!(update_entry, map.entry(1), metadata.clone()),
             UpdateResult::Updated
         );
         assert_some_eq!(map.get(&1), &metadata_and_size);
@@ -1657,13 +1625,7 @@ mod test {
     #[test_case(false)]
     #[test_case(true)]
     fn capture_and_get_by_kind(use_tag: bool) {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let legacy_reads = legacy_reads_by_kind();
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
@@ -1691,13 +1653,7 @@ mod test {
     #[should_panic]
     #[test]
     fn metadata_for_group_member() {
-        let captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let captured_reads = test_captured_reads!(new);
         captured_reads.get_by_kind(&KeyType::<u32>(21, false), Some(&10), ReadKind::Metadata);
     }
 
@@ -1719,13 +1675,7 @@ mod test {
     #[test_case(false)]
     #[test_case(true)]
     fn incorrect_use_flag(use_tag: bool) {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let legacy_reads = legacy_reads_by_kind();
         let deletion_reads = deletion_reads_by_kind();
         let with_metadata_reads = with_metadata_reads_by_kind();
@@ -1781,13 +1731,7 @@ mod test {
     #[test_case(false)]
     #[test_case(true)]
     fn speculative_failure_flag(use_tag: bool) {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(
@@ -1838,13 +1782,7 @@ mod test {
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
 
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
         captured_reads.mark_failure(true);
@@ -1872,13 +1810,7 @@ mod test {
 
     #[test]
     fn test_speculative_failure_for_module_reads() {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
@@ -1893,13 +1825,7 @@ mod test {
 
     #[test]
     fn test_global_cache_module_reads() {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
@@ -1933,13 +1859,7 @@ mod test {
 
     #[test]
     fn test_block_cache_module_reads_are_recorded() {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let per_block_module_cache: SyncModuleCache<u32, _, MockVerifiedCode, _, _> =
             SyncModuleCache::empty();
 
@@ -1972,13 +1892,7 @@ mod test {
 
     #[test]
     fn test_block_cache_module_reads() {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
@@ -2032,13 +1946,7 @@ mod test {
 
     #[test]
     fn test_global_and_block_cache_module_reads() {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
+        let mut captured_reads = test_captured_reads!(new);
         let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 

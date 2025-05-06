@@ -251,9 +251,11 @@ impl TResourceView for ExecutorViewWithChangeSet<'_> {
                 // this should never be called.
                 // Call to metadata should go through get_resource_state_value_metadata(), and
                 // calls to individual tagged resources should go through their trait.
-                unreachable!(
-                    "get_resource_state_value_size should never be called for resource group"
-                );
+                Err(code_invariant_error(format!(
+                    "get_resource_state_value_size called for resource group with key {:?}",
+                    state_key
+                ))
+                .into())
             },
         }
     }
@@ -277,7 +279,11 @@ impl TResourceView for ExecutorViewWithChangeSet<'_> {
                 // this should never be called.
                 // Call to metadata should go through get_resource_state_value_metadata(), and
                 // calls to individual tagged resources should go through their trait.
-                unreachable!("resource_exists should never be called for resource group");
+                Err(code_invariant_error(format!(
+                    "resource_exists called for resource group with key {:?}",
+                    state_key
+                ))
+                .into())
             },
         }
     }
@@ -295,20 +301,20 @@ impl TResourceGroupView for ExecutorViewWithChangeSet<'_> {
         use AbstractResourceWriteOp::*;
 
         if let Some(size) = self
-        .change_set
-        .resource_write_set()
-        .get(group_key)
-        .and_then(|write| match write {
-            WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
-            ResourceGroupInPlaceDelayedFieldChange(_) => None,
-            Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                // There should be no collisions, we cannot have group key refer to a resource.
-                Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
-            },
-        })
-        .transpose()? {
-            return Ok(size);
-        }
+            .change_set
+            .resource_write_set()
+            .get(group_key)
+            .and_then(|write| match write {
+                WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    // There should be no collisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
+                },
+            })
+            .transpose()? {
+                return Ok(size);
+            }
 
         self.base_resource_group_view.resource_group_size(group_key)
     }

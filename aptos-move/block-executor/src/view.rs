@@ -70,11 +70,10 @@ use std::{
     },
 };
 
-/// ReadResult wraps the result of MVHashMap's data map, while GroupReadResult
-/// is for the groups' MVHHashMap. TODO: Needs re-organization and clean-up.
+/// [ReadResult] wraps the result of MVHashMap's data map, while [GroupReadResult]
+/// is for the groups' MVHHashMap. The client can interpret these types to
+/// further resolve the reads. TODO: Needs re-organization and clean-up.
 
-/// A struct which describes the result of the read from the proxy. The client
-/// can interpret these types to further resolve the reads.
 #[derive(Debug)]
 pub(crate) enum ReadResult {
     Value(Option<StateValue>, Option<Arc<MoveTypeLayout>>),
@@ -87,6 +86,14 @@ pub(crate) enum ReadResult {
     // waiting indicated that the parallel execution had been halted. The String
     // parameter provides more context (error description / message).
     HaltSpeculativeExecution(String),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum GroupReadResult {
+    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
+    ResourceSize(Option<u64>),
+    Exists(bool),
+    Uninitialized,
 }
 
 impl ReadResult {
@@ -124,22 +131,13 @@ impl ReadResult {
         }
     }
 
-    pub fn into_value(self) -> Option<StateValue> {
+    fn expect_value(self) -> Option<StateValue> {
         if let ReadResult::Value(v, _layout) = self {
             v
         } else {
             unreachable!("Read result must be Value kind")
         }
     }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum GroupReadResult {
-    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
-    GroupSize(ResourceGroupSize),
-    ResourceSize(Option<u64>),
-    Exists(bool),
-    Uninitialized,
 }
 
 impl GroupReadResult {
@@ -176,12 +174,9 @@ impl GroupReadResult {
         }
     }
 
-    pub fn into_value(self) -> Option<Bytes> {
+    fn expect_value(self) -> Option<Bytes> {
         match self {
             GroupReadResult::Value(maybe_bytes, _) => maybe_bytes,
-            GroupReadResult::GroupSize(_) => {
-                unreachable!("Expected group value, found size")
-            },
             GroupReadResult::Uninitialized => {
                 unreachable!("Expected group value, found uninitialized")
             },
@@ -190,25 +185,6 @@ impl GroupReadResult {
             },
             GroupReadResult::Exists(_) => {
                 unreachable!("Expected group value, found exists")
-            },
-        }
-    }
-
-    pub fn into_group_size(self) -> ResourceGroupSize {
-        match self {
-            GroupReadResult::GroupSize(size) => size,
-            GroupReadResult::Value(maybe_bytes, maybe_layout) => unreachable!(
-                "Expected group size, found value bytes = {:?}, layout = {:?}",
-                maybe_bytes, maybe_layout
-            ),
-            GroupReadResult::Uninitialized => {
-                unreachable!("Expected group size, found uninitialized")
-            },
-            GroupReadResult::ResourceSize(_) => {
-                unreachable!("Expected group size, found resource size")
-            },
-            GroupReadResult::Exists(_) => {
-                unreachable!("Expected group size, found exists")
             },
         }
     }
@@ -562,11 +538,11 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         &self,
         group_key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> PartialVMResult<GroupReadResult> {
+    ) -> PartialVMResult<Option<ResourceGroupSize>> {
         use MVGroupError::*;
 
         if let Some(group_size) = self.captured_reads.borrow().group_size(group_key) {
-            return Ok(GroupReadResult::GroupSize(group_size));
+            return Ok(Some(group_size));
         }
 
         loop {
@@ -583,10 +559,10 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
                         "Group size may not be inconsistent: must be recorded once"
                     );
 
-                    return Ok(GroupReadResult::GroupSize(group_size));
+                    return Ok(Some(group_size));
                 },
                 Err(Uninitialized) => {
-                    return Ok(GroupReadResult::Uninitialized);
+                    return Ok(None);
                 },
                 Err(TagNotFound) => {
                     unreachable!("Reading group size does not require a specific tag look-up");
@@ -660,18 +636,18 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                         }
                     }
 
-                    return Ok(self.captured_reads.borrow_mut().capture_data_read(
+                    return self.captured_reads.borrow_mut().capture_data_read(
                         key.clone(),
                         DataRead::from_value_with_layout(version, value),
                         &target_kind,
-                    )?);
+                    );
                 },
                 Ok(Resolved(value)) => {
-                    return Ok(self.captured_reads.borrow_mut().capture_data_read(
+                    return self.captured_reads.borrow_mut().capture_data_read(
                         key.clone(),
                         DataRead::Resolved(value),
                         &target_kind,
-                    )?);
+                    );
                 },
                 Err(Uninitialized) | Err(Unresolved(_)) => {
                     // The underlying assumption here for not recording anything about the read is
@@ -761,18 +737,25 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                             assert_eq!(version, Err(StorageVersion),
                             "Fetched resource has unknown layout but the version is not Err(StorageVersion)"
                             );
-                            let patched_value = patch_base_value(v.as_ref(), layout)?;
-
-                            self.versioned_map
-                                .group_data()
-                                .update_tagged_base_value_with_layout(
-                                    group_key.clone(),
-                                    resource_tag.clone(),
-                                    patched_value,
-                                    layout.cloned().map(Arc::new),
-                                );
-                            // Re-fetch in case a concurrent change went through.
-                            continue;
+                            match patch_base_value(v.as_ref(), layout) {
+                                Ok(patched_value) => {
+                                    self.versioned_map
+                                        .group_data()
+                                        .update_tagged_base_value_with_layout(
+                                            group_key.clone(),
+                                            resource_tag.clone(),
+                                            patched_value,
+                                            layout.cloned().map(Arc::new),
+                                        );
+                                    // Re-fetch in case a concurrent change went through.
+                                    continue;
+                                },
+                                Err(e) => {
+                                    error!("Couldn't patch value from versioned group map: {}", e);
+                                    self.captured_reads.borrow_mut().mark_incorrect_use();
+                                    return Err(e);
+                                },
+                            }
                         }
                     }
 
@@ -867,21 +850,31 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
         layout: UnknownOrLayout,
         patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> PartialVMResult<ReadResult> {
-        match self.unsync_map.fetch_data(key) {
+        Ok(match self.unsync_map.fetch_data(key) {
             Some(mut value) => {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let UnknownOrLayout::Known(layout) = layout {
                     if let ValueWithLayout::RawFromStorage(v) = value {
-                        let patched_value = patch_base_value(v.as_ref(), layout)?;
-                        let exchanged_value = ValueWithLayout::Exchanged(
-                            Arc::new(patched_value.clone()),
-                            layout.cloned().map(Arc::new),
-                        );
-                        self.unsync_map
-                            .set_base_value(key.clone(), exchanged_value.clone());
+                        match patch_base_value(v.as_ref(), layout) {
+                            Ok(patched_value) => {
+                                let exchanged_value = ValueWithLayout::Exchanged(
+                                    Arc::new(patched_value.clone()),
+                                    layout.cloned().map(Arc::new),
+                                );
+                                self.unsync_map
+                                    .set_base_value(key.clone(), exchanged_value.clone());
 
-                        // sequential execution doesn't need to worry about concurrent change going through.
-                        value = exchanged_value;
+                                // sequential execution doesn't need to worry about concurrent change going through.
+                                value = exchanged_value;
+                            },
+                            Err(e) => {
+                                error!("Couldn't patch value from unsync map: {}", e);
+                                self.read_set.borrow_mut().incorrect_use = true;
+                                return Ok(ReadResult::HaltSpeculativeExecution(
+                                    "Couldn't patch value from unsync map".to_string(),
+                                ));
+                            },
+                        }
                     }
                 }
 
@@ -895,22 +888,22 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
                                 .resource_reads
                                 .insert(key.clone());
                         }
-                        Ok(read_result)
+                        read_result
                     },
                     Err(_) => {
                         self.read_set.borrow_mut().incorrect_use = true;
                         error!(
                             "Unsync map has RawFromStorage value type, while we are requesting value"
                         );
-                        Ok(ReadResult::HaltSpeculativeExecution(
+                        ReadResult::HaltSpeculativeExecution(
                             "Unsync map has RawFromStorage value type, while we are requesting value"
                                 .to_string(),
-                        ))
+                        )
                     },
                 }
             },
-            None => Ok(ReadResult::Uninitialized),
-        }
+            None => ReadResult::Uninitialized,
+        })
     }
 }
 
@@ -946,16 +939,27 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let UnknownOrLayout::Known(layout) = layout {
                     if let ValueWithLayout::RawFromStorage(v) = value {
-                        let patched_value = patch_base_value(v.as_ref(), layout)?;
-                        let arced_layout = layout.cloned().map(Arc::new);
-                        self.unsync_map.update_tagged_base_value_with_layout(
-                            group_key.clone(),
-                            resource_tag.clone(),
-                            patched_value.clone(),
-                            arced_layout.clone(),
-                        );
+                        match patch_base_value(v.as_ref(), layout) {
+                            Ok(patched_value) => {
+                                let arced_layout = layout.cloned().map(Arc::new);
+                                self.unsync_map.update_tagged_base_value_with_layout(
+                                    group_key.clone(),
+                                    resource_tag.clone(),
+                                    patched_value.clone(),
+                                    arced_layout.clone(),
+                                );
 
-                        value = ValueWithLayout::Exchanged(Arc::new(patched_value), arced_layout);
+                                value = ValueWithLayout::Exchanged(
+                                    Arc::new(patched_value),
+                                    arced_layout,
+                                );
+                            },
+                            Err(e) => {
+                                error!("Couldn't patch a group value from unsync map: {}", e);
+                                self.read_set.borrow_mut().incorrect_use = true;
+                                return Err(e);
+                            },
+                        }
                     }
                 }
 
@@ -1092,17 +1096,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.borrow_mut().mark_incorrect_use(),
             ViewState::Unsync(state) => state.read_set.borrow_mut().incorrect_use = true,
-        }
-    }
-
-    pub fn is_incorrect_use(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => {
-                // Parallel executor accesses captured reads directly and does not use this API.
-                true
-            },
-            // TODO: store incorrect use in UnsyncMap and eliminate this API.
-            ViewState::Unsync(state) => state.read_set.borrow().incorrect_use,
         }
     }
 
@@ -1303,13 +1296,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
                 match self.get_resource_state_value_metadata(&key)? {
                     Some(metadata) => match parallel_state.read_group_size(&key, self.txn_idx)? {
-                        GroupReadResult::GroupSize(group_size) => {
-                            Ok(Some((key, (metadata, group_size.get()))))
-                        },
-                        GroupReadResult::Value(_, _)
-                        | GroupReadResult::Exists(_)
-                        | GroupReadResult::ResourceSize(_)
-                        | GroupReadResult::Uninitialized => Err(code_invariant_error(format!(
+                        Some(group_size) => Ok(Some((key, (metadata, group_size.get())))),
+                        None => Err(code_invariant_error(format!(
                             "Cannot compute metadata op size for the group read {:?}",
                             key
                         ))
@@ -1546,7 +1534,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'
             UnknownOrLayout::Known(maybe_layout),
             ReadKind::Value,
         )
-        .map(|res| res.into_value())
+        .map(|res| res.expect_value())
     }
 
     fn get_resource_state_value_metadata(
@@ -1601,25 +1589,26 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestV
     ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-            ViewState::Unsync(state) => match state.unsync_map.get_group_size(group_key) {
-                Some(group_size) => GroupReadResult::GroupSize(group_size),
-                None => GroupReadResult::Uninitialized,
-            },
+            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
         };
 
-        if matches!(group_read, GroupReadResult::Uninitialized) {
+        if group_read.is_none() {
             self.initialize_mvhashmap_base_group_contents(group_key)?;
 
             group_read = match &self.latest_view {
                 ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-                ViewState::Unsync(state) => match state.unsync_map.get_group_size(group_key) {
-                    Some(group_size) => GroupReadResult::GroupSize(group_size),
-                    None => GroupReadResult::Uninitialized,
-                },
+                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
             }
         };
 
-        Ok(group_read.into_group_size())
+        let group_size = group_read.ok_or_else(|| {
+            code_invariant_error(format!(
+                "Group size not found for the group read {:?}",
+                group_key
+            ))
+        })?;
+
+        Ok(group_size)
     }
 
     fn get_resource_from_group(
@@ -1634,7 +1623,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestV
             UnknownOrLayout::Known(maybe_layout),
             ReadKind::Value,
         )
-        .map(|group_read| group_read.into_value())
+        .map(|group_read| group_read.expect_value())
     }
 
     fn resource_size_in_group(
