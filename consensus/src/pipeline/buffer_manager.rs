@@ -4,10 +4,7 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    consensus_observer::{
-        network::observer_message::ConsensusObserverMessage,
-        publisher::consensus_publisher::ConsensusPublisher,
-    },
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     counters::{self, log_executor_error_occurred},
     monitor,
     network::{IncomingCommitRequest, NetworkSender},
@@ -410,11 +407,10 @@ impl BufferManager {
             lifetime_guard: self.create_new_request(()),
         });
         if let Some(consensus_publisher) = &self.consensus_publisher {
-            let message = ConsensusObserverMessage::new_ordered_block_message(
+            consensus_publisher.publish_ordered_block(
                 ordered_blocks.clone().into_iter().map(Arc::new).collect(),
                 ordered_proof.clone(),
             );
-            consensus_publisher.publish_message(message);
         }
         self.execution_schedule_phase_tx
             .send(request)
@@ -529,9 +525,7 @@ impl BufferManager {
                     self.reset().await;
                 }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
-                    let message =
-                        ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
-                    consensus_publisher.publish_message(message);
+                    consensus_publisher.publish_commit_decision(commit_proof.clone());
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {

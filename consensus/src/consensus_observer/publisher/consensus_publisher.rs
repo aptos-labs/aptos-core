@@ -10,16 +10,24 @@ use crate::consensus_observer::{
         network_handler::ConsensusPublisherNetworkMessage,
         observer_client::ConsensusObserverClient,
         observer_message::{
-            ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
-            ConsensusObserverResponse,
+            BlockTransactionPayload, ConsensusObserverDirectSend, ConsensusObserverMessage,
+            ConsensusObserverRequest, ConsensusObserverResponse,
         },
     },
 };
 use aptos_channels::aptos_channel::Receiver;
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_event_notifications::{
+    DbBackedOnChainConfig, ReconfigNotification, ReconfigNotificationListener,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info, warn};
 use aptos_network::application::interface::NetworkClient;
+use aptos_types::{
+    block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainConsensusConfig,
+};
 use futures::StreamExt;
 use futures_channel::mpsc;
 use std::{collections::HashSet, sync::Arc, time::Duration};
@@ -41,6 +49,9 @@ pub struct ConsensusPublisher {
 
     // The sender for outbound network messages
     outbound_message_sender: mpsc::Sender<(PeerNetworkId, ConsensusObserverDirectSend)>,
+
+    // If execution pool is enabled (updated by the on-chain configs)
+    execution_pool_enabled: Arc<RwLock<bool>>,
 }
 
 impl ConsensusPublisher {
@@ -64,6 +75,7 @@ impl ConsensusPublisher {
             consensus_observer_config,
             active_subscribers: Arc::new(RwLock::new(HashSet::new())),
             outbound_message_sender,
+            execution_pool_enabled: Arc::new(RwLock::new(false)), // This is updated via on-chain reconfigs
         };
 
         // Return the publisher and the outbound message receiver
@@ -154,6 +166,30 @@ impl ConsensusPublisher {
         }
     }
 
+    /// Handles a reconfiguration notification and processes the most recent on-chain configs
+    fn handle_reconfig_notification(
+        &mut self,
+        reconfig_notification: ReconfigNotification<DbBackedOnChainConfig>,
+    ) {
+        // Extract the consensus config (or use the default if it's missing)
+        let on_chain_configs = reconfig_notification.on_chain_configs;
+        let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> =
+            on_chain_configs.get();
+        if let Err(error) = &onchain_consensus_config {
+            error!(
+                LogSchema::new(LogEntry::ConsensusPublisher).message(&format!(
+                    "Failed to read on-chain consensus config! Error: {:?}",
+                    error
+                ))
+            );
+        }
+        let consensus_config = onchain_consensus_config.unwrap_or_default();
+
+        // Update the execution pool flag
+        let execution_pool_enabled = consensus_config.window_size().is_some();
+        *self.execution_pool_enabled.write() = execution_pool_enabled;
+    }
+
     /// Returns a clone of the currently active subscribers
     pub fn get_active_subscribers(&self) -> HashSet<PeerNetworkId> {
         self.active_subscribers.read().clone()
@@ -207,9 +243,51 @@ impl ConsensusPublisher {
         }
     }
 
+    /// Publishes a block payload message to all active subscribers
+    pub fn publish_block_payload(
+        &self,
+        block: BlockInfo,
+        transaction_payload: BlockTransactionPayload,
+    ) {
+        // Create the block payload message
+        let block_payload_message =
+            ConsensusObserverMessage::new_block_payload_message(block, transaction_payload);
+
+        // Publish the message
+        self.publish_message(block_payload_message);
+    }
+
+    /// Publishes a commit decision message to all active subscribers
+    pub fn publish_commit_decision(&self, commit_decision: LedgerInfoWithSignatures) {
+        // Create the commit decision message
+        let commit_decision_message =
+            ConsensusObserverMessage::new_commit_decision_message(commit_decision);
+
+        // Publish the message
+        self.publish_message(commit_decision_message);
+    }
+
+    /// Publishes an ordered block message to all active subscribers. The
+    /// message type is determined by whether execution pool is enabled.
+    pub fn publish_ordered_block(
+        &self,
+        blocks: Vec<Arc<PipelinedBlock>>,
+        ordered_proof: LedgerInfoWithSignatures,
+    ) {
+        // Determine the message type
+        let ordered_block_message = if *self.execution_pool_enabled.read() {
+            ConsensusObserverMessage::new_ordered_block_with_window_message(blocks, ordered_proof)
+        } else {
+            ConsensusObserverMessage::new_ordered_block_message(blocks, ordered_proof)
+        };
+
+        // Publish the message
+        self.publish_message(ordered_block_message);
+    }
+
     /// Publishes a direct send message to all active subscribers. Note: this method
     /// is non-blocking (to avoid blocking callers during publishing, e.g., consensus).
-    pub fn publish_message(&self, message: ConsensusObserverDirectSend) {
+    fn publish_message(&self, message: ConsensusObserverDirectSend) {
         // Get the active subscribers
         let active_subscribers = self.get_active_subscribers();
 
@@ -233,9 +311,10 @@ impl ConsensusPublisher {
 
     /// Starts the consensus publisher
     pub async fn start(
-        self,
+        mut self,
         outbound_message_receiver: mpsc::Receiver<(PeerNetworkId, ConsensusObserverDirectSend)>,
         mut publisher_message_receiver: Receiver<(), ConsensusPublisherNetworkMessage>,
+        mut reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     ) {
         // Spawn the message serializer and sender
         spawn_message_serializer_and_sender(
@@ -251,6 +330,13 @@ impl ConsensusPublisher {
         )))
         .fuse();
 
+        // Handle the first reconfig notification (this is the initial state)
+        let reconfig_notification = reconfig_events
+            .next()
+            .await
+            .expect("Failed to get first reconfig notification!");
+        self.handle_reconfig_notification(reconfig_notification);
+
         // Start the publisher garbage collection loop
         info!(LogSchema::new(LogEntry::ConsensusPublisher)
             .message("Starting the consensus publisher garbage collection loop!"));
@@ -259,6 +345,9 @@ impl ConsensusPublisher {
                 Some(network_message) = publisher_message_receiver.next() => {
                     self.process_network_message(network_message);
                 },
+                Some(reconfig_notification) = reconfig_events.next() => {
+                    self.handle_reconfig_notification(reconfig_notification);
+                }
                 _ = garbage_collection_interval.select_next_some() => {
                     self.garbage_collect_subscriptions();
                 },
@@ -367,6 +456,7 @@ mod test {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         PeerId,
     };
+    use claims::assert_matches;
     use futures::FutureExt;
     use maplit::hashmap;
     use tokio_stream::StreamExt;
@@ -518,10 +608,7 @@ mod test {
         // Publish a message to the active subscribers
         let ordered_block_message = ConsensusObserverMessage::new_ordered_block_message(
             vec![],
-            LedgerInfoWithSignatures::new(
-                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-                AggregateSignature::empty(),
-            ),
+            create_ledger_info_with_signatures(),
         );
         consensus_publisher.publish_message(ordered_block_message.clone());
 
@@ -539,17 +626,9 @@ mod test {
         }
 
         // Publish a message to the active subscribers
-        let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
-            vec![],
-            vec![],
-            Some(10),
-            Some(10_000),
-            vec![],
-            true,
-        );
         let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
             BlockInfo::empty(),
-            transaction_payload,
+            BlockTransactionPayload::empty(),
         );
         consensus_publisher.publish_message(block_payload_message.clone());
 
@@ -568,11 +647,9 @@ mod test {
         process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_1);
 
         // Publish another message to the active subscribers
-        let commit_decision_message =
-            ConsensusObserverMessage::new_commit_decision_message(LedgerInfoWithSignatures::new(
-                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-                AggregateSignature::empty(),
-            ));
+        let commit_decision_message = ConsensusObserverMessage::new_commit_decision_message(
+            create_ledger_info_with_signatures(),
+        );
         consensus_publisher.publish_message(commit_decision_message.clone());
 
         // Verify that the message was sent to all active subscribers except the first peer
@@ -596,6 +673,80 @@ mod test {
 
         // Verify that no messages were sent to the outbound message receiver
         assert!(outbound_message_receiver.next().now_or_never().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_publish_message_type() {
+        // Create a network client
+        let network_id = NetworkId::Public;
+        let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
+        let network_client =
+            NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+        let consensus_observer_client = Arc::new(ConsensusObserverClient::new(network_client));
+
+        // Create a consensus publisher
+        let (consensus_publisher, mut outbound_message_receiver) = ConsensusPublisher::new(
+            ConsensusObserverConfig::default(),
+            consensus_observer_client,
+        );
+
+        // Subscribe a new peer to consensus updates
+        let subscribed_peer_network_id = PeerNetworkId::new(network_id, PeerId::random());
+        process_subscription_for_peer(&consensus_publisher, &subscribed_peer_network_id);
+
+        // Publish a block payload message to the active subscriber
+        consensus_publisher
+            .publish_block_payload(BlockInfo::empty(), BlockTransactionPayload::empty());
+
+        // Verify that the message was sent to the outbound message receiver
+        let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+        assert_eq!(peer_network_id, subscribed_peer_network_id);
+        assert_matches!(message, ConsensusObserverDirectSend::BlockPayload(_));
+
+        // Publish a commit decision message to the active subscriber
+        consensus_publisher.publish_commit_decision(create_ledger_info_with_signatures());
+
+        // Verify that the message was sent to the outbound message receiver
+        let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+        assert_eq!(peer_network_id, subscribed_peer_network_id);
+        assert_matches!(message, ConsensusObserverDirectSend::CommitDecision(_));
+
+        // Publish an ordered block message to the active subscriber (with execution pool disabled)
+        *consensus_publisher.execution_pool_enabled.write() = false;
+        let ordered_block_message = ConsensusObserverMessage::new_ordered_block_message(
+            vec![],
+            create_ledger_info_with_signatures(),
+        );
+        consensus_publisher.publish_message(ordered_block_message.clone());
+
+        // Verify that the message was sent to the outbound message receiver
+        let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+        assert_eq!(peer_network_id, subscribed_peer_network_id);
+        assert_matches!(message, ConsensusObserverDirectSend::OrderedBlock(_));
+
+        // Publish an ordered block message to the active subscriber (with execution pool enabled)
+        *consensus_publisher.execution_pool_enabled.write() = true;
+        let ordered_block_message = ConsensusObserverMessage::new_ordered_block_with_window_message(
+            vec![],
+            create_ledger_info_with_signatures(),
+        );
+        consensus_publisher.publish_message(ordered_block_message.clone());
+
+        // Verify that the message was sent to the outbound message receiver
+        let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+        assert_eq!(peer_network_id, subscribed_peer_network_id);
+        assert_matches!(
+            message,
+            ConsensusObserverDirectSend::OrderedBlockWithWindow(_)
+        );
+    }
+
+    /// Creates and returns a new ledger info with signatures
+    fn create_ledger_info_with_signatures() -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+            AggregateSignature::empty(),
+        )
     }
 
     /// Processes a subscription request for the given peer

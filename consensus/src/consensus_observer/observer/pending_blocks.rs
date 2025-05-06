@@ -257,11 +257,19 @@ impl PendingBlockStore {
 
     /// Updates the metrics for the pending blocks
     pub fn update_pending_blocks_metrics(&self) {
+        // Determine the metric labels to use (depending on the pending block types)
+        let (
+            pending_block_entries_label,
+            pending_block_entries_by_hash_label,
+            pending_blocks_label,
+            pending_blocks_by_hash_label,
+        ) = self.determine_pending_block_metric_labels();
+
         // Update the number of pending block entries
         let num_entries = self.pending_blocks.len() as u64;
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::PENDING_BLOCK_ENTRIES_LABEL,
+            pending_block_entries_label,
             num_entries,
         );
 
@@ -269,7 +277,7 @@ impl PendingBlockStore {
         let num_entries_by_hash = self.pending_blocks_by_hash.len() as u64;
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::PENDING_BLOCK_ENTRIES_BY_HASH_LABEL,
+            pending_block_entries_by_hash_label,
             num_entries_by_hash,
         );
 
@@ -281,7 +289,7 @@ impl PendingBlockStore {
             .sum();
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::PENDING_BLOCKS_LABEL,
+            pending_blocks_label,
             num_pending_blocks,
         );
 
@@ -293,7 +301,7 @@ impl PendingBlockStore {
             .sum();
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::PENDING_BLOCKS_BY_HASH_LABEL,
+            pending_blocks_by_hash_label,
             num_pending_blocks_by_hash,
         );
 
@@ -305,9 +313,35 @@ impl PendingBlockStore {
             .unwrap_or(0);
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
-            metrics::PENDING_BLOCKS_LABEL,
+            pending_blocks_label,
             highest_pending_round,
         );
+    }
+
+    /// Determines the metric labels to use for the pending blocks (based on the block types)
+    fn determine_pending_block_metric_labels(&self) -> (&str, &str, &str, &str) {
+        // If the pending blocks contain execution windows, use the corresponding labels
+        if let Some((_, pending_block_with_metadata)) = self.pending_blocks.first_key_value() {
+            if matches!(
+                pending_block_with_metadata.observed_ordered_block(),
+                ObservedOrderedBlock::OrderedWithWindow(_)
+            ) {
+                return (
+                    metrics::PENDING_BLOCK_ENTRIES_WITH_WINDOW_LABEL,
+                    metrics::PENDING_BLOCK_ENTRIES_BY_HASH_WITH_WINDOW_LABEL,
+                    metrics::PENDING_BLOCKS_WITH_WINDOW_LABEL,
+                    metrics::PENDING_BLOCKS_BY_HASH_WITH_WINDOW_LABEL,
+                );
+            }
+        }
+
+        // Otherwise, default to blocks without execution windows
+        (
+            metrics::PENDING_BLOCK_ENTRIES_LABEL,
+            metrics::PENDING_BLOCK_ENTRIES_BY_HASH_LABEL,
+            metrics::PENDING_BLOCKS_LABEL,
+            metrics::PENDING_BLOCKS_BY_HASH_LABEL,
+        )
     }
 }
 

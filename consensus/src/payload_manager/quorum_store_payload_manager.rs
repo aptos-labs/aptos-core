@@ -3,7 +3,7 @@
 
 use crate::{
     consensus_observer::{
-        network::observer_message::{BlockTransactionPayload, ConsensusObserverMessage},
+        network::observer_message::BlockTransactionPayload,
         publisher::consensus_publisher::ConsensusPublisher,
     },
     counters,
@@ -474,11 +474,10 @@ impl TPayloadManager for QuorumStorePayloadManager {
         };
 
         if let Some(consensus_publisher) = &self.maybe_consensus_publisher {
-            let message = ConsensusObserverMessage::new_block_payload_message(
+            consensus_publisher.publish_block_payload(
                 block.gen_block_info(HashValue::zero(), 0, None),
                 transaction_payload.clone(),
             );
-            consensus_publisher.publish_message(message);
         }
 
         Ok((

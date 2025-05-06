@@ -8,7 +8,7 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::hash::CryptoHash;
 use aptos_types::{
     block_info::{BlockInfo, Round},
     epoch_change::Verifier,
@@ -43,6 +43,16 @@ impl ConsensusObserverMessage {
     ) -> ConsensusObserverDirectSend {
         let ordered_block = OrderedBlock::new(blocks, ordered_proof);
         ConsensusObserverDirectSend::OrderedBlock(ordered_block)
+    }
+
+    /// Creates and returns a new ordered block with window message using the given blocks and proof
+    pub fn new_ordered_block_with_window_message(
+        blocks: Vec<Arc<PipelinedBlock>>,
+        ordered_proof: LedgerInfoWithSignatures,
+    ) -> ConsensusObserverDirectSend {
+        let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+        let ordered_block_with_window = OrderedBlockWithWindow::new(ordered_block);
+        ConsensusObserverDirectSend::OrderedBlockWithWindow(ordered_block_with_window)
     }
 
     /// Creates and returns a new commit decision message using the given commit decision
@@ -282,53 +292,21 @@ impl OrderedBlock {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OrderedBlockWithWindow {
     ordered_block: OrderedBlock,
-    execution_pool_window: ExecutionPoolWindow,
 }
 
 impl OrderedBlockWithWindow {
-    pub fn new(ordered_block: OrderedBlock, execution_pool_window: ExecutionPoolWindow) -> Self {
-        Self {
-            ordered_block,
-            execution_pool_window,
-        }
+    pub fn new(ordered_block: OrderedBlock) -> Self {
+        Self { ordered_block }
     }
 
-    /// Returns a reference to the execution pool window
-    pub fn execution_pool_window(&self) -> &ExecutionPoolWindow {
-        &self.execution_pool_window
-    }
-
-    /// Consumes the ordered block with window and returns the inner parts
-    pub fn into_parts(self) -> (OrderedBlock, ExecutionPoolWindow) {
-        (self.ordered_block, self.execution_pool_window)
+    /// Consumes the ordered block with window
+    pub fn consume_ordered_block(self) -> OrderedBlock {
+        self.ordered_block
     }
 
     /// Returns a reference to the ordered block
     pub fn ordered_block(&self) -> &OrderedBlock {
         &self.ordered_block
-    }
-}
-
-/// The execution pool window information for an ordered block
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct ExecutionPoolWindow {
-    // TODO: identify exactly what information is required here
-    block_ids: Vec<HashValue>, // The list of parent block hashes in chronological order
-}
-
-impl ExecutionPoolWindow {
-    pub fn new(block_ids: Vec<HashValue>) -> Self {
-        Self { block_ids }
-    }
-
-    /// Returns a reference to the block IDs in the execution pool window
-    pub fn block_ids(&self) -> &Vec<HashValue> {
-        &self.block_ids
-    }
-
-    /// Verifies the execution pool window contents and returns an error if the data is invalid
-    pub fn verify_window_contents(&self, _expected_window_size: u64) -> Result<(), Error> {
-        Ok(()) // TODO: Implement this method!
     }
 }
 

@@ -170,11 +170,15 @@ impl OrderedBlockStore {
 
     /// Updates the metrics for the ordered blocks
     pub fn update_ordered_blocks_metrics(&self) {
+        // Determine the metric labels to use (depending on the ordered block types)
+        let (ordered_block_entries_label, ordered_block_label) =
+            self.determine_ordered_block_metric_labels();
+
         // Update the number of ordered block entries
         let num_entries = self.ordered_blocks.len() as u64;
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::ORDERED_BLOCK_ENTRIES_LABEL,
+            ordered_block_entries_label,
             num_entries,
         );
 
@@ -188,7 +192,7 @@ impl OrderedBlockStore {
             .sum();
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::ORDERED_BLOCK_LABEL,
+            ordered_block_label,
             num_ordered_blocks,
         );
 
@@ -202,7 +206,7 @@ impl OrderedBlockStore {
             .unwrap_or(0);
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
-            metrics::ORDERED_BLOCK_LABEL,
+            ordered_block_label,
             highest_ordered_round,
         );
 
@@ -216,6 +220,28 @@ impl OrderedBlockStore {
             metrics::COMMITTED_BLOCKS_LABEL,
             highest_committed_round,
         );
+    }
+
+    /// Determines the metric labels to use for the ordered blocks (based on the block types)
+    fn determine_ordered_block_metric_labels(&self) -> (&str, &str) {
+        // If the ordered blocks contain execution windows, use the corresponding labels
+        if let Some((_, (observed_ordered_block, _))) = self.ordered_blocks.first_key_value() {
+            if matches!(
+                observed_ordered_block,
+                ObservedOrderedBlock::OrderedWithWindow(_)
+            ) {
+                return (
+                    metrics::ORDERED_BLOCK_ENTRIES_WITH_WINDOW_LABEL,
+                    metrics::ORDERED_BLOCK_WITH_WINDOW_LABEL,
+                );
+            }
+        }
+
+        // Otherwise, default to blocks without execution windows
+        (
+            metrics::ORDERED_BLOCK_ENTRIES_LABEL,
+            metrics::ORDERED_BLOCK_LABEL,
+        )
     }
 }
 

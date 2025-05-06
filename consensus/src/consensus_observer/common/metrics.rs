@@ -10,21 +10,32 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
-// Useful observer metric labels
+// Generic observer metric labels
 pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
 pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
-pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
-pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
-pub const ORDERED_BLOCK_WITH_WINDOW_LABEL: &str = "ordered_block_with_window";
-pub const PENDING_BLOCK_ENTRIES_BY_HASH_LABEL: &str = "pending_block_by_hash_entries";
-pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
-pub const PENDING_BLOCKS_BY_HASH_LABEL: &str = "pending_blocks_by_hash";
-pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 
-// Useful state sync metric labels
+// Ordered block metric labels
+pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
+pub const ORDERED_BLOCK_ENTRIES_WITH_WINDOW_LABEL: &str = "ordered_block_entries_with_window";
+pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
+pub const ORDERED_BLOCK_WITH_WINDOW_LABEL: &str = "ordered_block_with_window";
+
+// Pending block metric labels
+pub const PENDING_BLOCK_ENTRIES_BY_HASH_LABEL: &str = "pending_block_by_hash_entries";
+pub const PENDING_BLOCK_ENTRIES_BY_HASH_WITH_WINDOW_LABEL: &str =
+    "pending_block_by_hash_entries_with_window";
+pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
+pub const PENDING_BLOCK_ENTRIES_WITH_WINDOW_LABEL: &str = "pending_block_entries_with_window";
+
+pub const PENDING_BLOCKS_BY_HASH_LABEL: &str = "pending_blocks_by_hash";
+pub const PENDING_BLOCKS_BY_HASH_WITH_WINDOW_LABEL: &str = "pending_blocks_by_hash_with_window";
+pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
+pub const PENDING_BLOCKS_WITH_WINDOW_LABEL: &str = "pending_blocks_with_window";
+
+// State sync metric labels
 pub const STATE_SYNCING_FOR_FALLBACK: &str = "sync_for_fallback";
 pub const STATE_SYNCING_TO_COMMIT: &str = "sync_to_commit";
 
