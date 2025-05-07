@@ -1048,23 +1048,26 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     rty
                 }
             },
-            Ref(is_mut, ty) => Type::Reference(
-                ReferenceKind::from_is_mut(*is_mut),
-                Box::new(self.translate_type(ty)),
-            ),
+            Ref(is_mut, ty) => {
+                let inner = self.translate_type(ty);
+                if inner.is_reference() {
+                    self.error(loc, "reference to a reference is not allowed");
+                }
+                Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(inner))
+            },
             Fun(args, result, abilities) => {
                 let arg_tys = args
                     .iter()
-                    .map(|ty| self.translate_function_param_type(ty))
+                    .map(|ty| self.translate_function_param_or_return_type(ty))
                     .collect_vec();
                 let result_tys = match &result.value {
                     Multiple(tys) => tys
                         .iter()
-                        .map(|ty| self.translate_function_param_type(ty))
+                        .map(|ty| self.translate_function_param_or_return_type(ty))
                         .collect_vec(),
                     Unit => vec![],
                     _ => {
-                        vec![self.translate_function_param_type(result)]
+                        vec![self.translate_function_param_or_return_type(result)]
                     },
                 };
                 Type::function(
@@ -1074,13 +1077,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 )
             },
             Unit => Type::Tuple(vec![]),
-            Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
+            Multiple(vst) => {
+                let (inner_locs, inner_types) = self.translate_types_with_loc(vst.as_ref());
+                for (inner_ty, inner_loc) in inner_types.iter().zip(inner_locs.iter()) {
+                    if inner_ty.is_tuple() {
+                        self.error(inner_loc, "tuples cannot be nested");
+                    }
+                }
+                Type::Tuple(inner_types)
+            },
             UnresolvedError => Type::Error,
         }
     }
 
-    /// Translates a type and impose constraints for function parameters.
-    fn translate_function_param_type(&mut self, ty: &EA::Type) -> Type {
+    /// Translates a type and impose constraints for function parameters or return.
+    fn translate_function_param_or_return_type(&mut self, ty: &EA::Type) -> Type {
         let loc = self.to_loc(&ty.loc);
         let ty = self.translate_type(ty);
         for ctr in Constraint::for_fun_parameter() {
@@ -1090,7 +1101,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ty.skip_reference(),
                 Variance::NoVariance,
                 ctr,
-                None,
+                Some(ConstraintContext::default()),
             )
         }
         ty
@@ -2308,6 +2319,40 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             "cannot mutably borrow from an immutable ref",
                         );
                         return false;
+                    }
+                }
+            }
+            true
+        });
+    }
+
+    /// Check whether types of lambda expressions are valid.
+    pub fn check_lambda_types(&self, exp: &ExpData) {
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Lambda(id, ..) = e {
+                let lambda_type = self.env().get_node_type(*id);
+                if let Type::Fun(args, result, _) = lambda_type.clone() {
+                    let mut has_error = false;
+                    for arg_type in args.flatten() {
+                        if arg_type.is_reference_to_a_reference() {
+                            has_error = true;
+                            break;
+                        }
+                    }
+                    for result_type in result.flatten() {
+                        if result_type.is_reference_to_a_reference() {
+                            has_error = true;
+                            break;
+                        }
+                    }
+                    if has_error {
+                        self.error(
+                            &self.get_node_loc(*id),
+                            &format!(
+                                "lambda expression has invalid type `{}` (reference to a reference is disallowed)",
+                                lambda_type.display(&self.env().get_type_display_ctx())
+                            ),
+                        );
                     }
                 }
             }

@@ -68,7 +68,7 @@ async fn test_permissioned_delegation() {
     }}
     "#,
         hex::encode(account2_public_key.to_bytes()),
-        u64::max_value(),
+        u64::MAX,
     );
     assert_eq!(
         Some(true),

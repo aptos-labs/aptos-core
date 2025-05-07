@@ -1,5 +1,17 @@
 
 Diagnostics:
+error: tuples cannot be nested
+  ┌─ tests/checking/typing/nested_tuple_err.move:2:25
+  │
+2 │     public fun test(): ((u64, u64), (u64, u64)) {
+  │                         ^^^^^^^^^^
+
+error: tuples cannot be nested
+  ┌─ tests/checking/typing/nested_tuple_err.move:2:37
+  │
+2 │     public fun test(): ((u64, u64), (u64, u64)) {
+  │                                     ^^^^^^^^^^
+
 error: Expected a single type, but found a tuple type
   ┌─ tests/checking/typing/nested_tuple_err.move:3:10
   │
