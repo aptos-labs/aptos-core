@@ -5,12 +5,40 @@
 
 
 
+-  [Struct `Funcs`](#0x7_test_function_values_Funcs)
 -  [Function `transfer_and_create_account`](#0x7_test_function_values_transfer_and_create_account)
 
 
 <pre><code></code></pre>
 
 
+
+<a id="0x7_test_function_values_Funcs"></a>
+
+## Struct `Funcs`
+
+
+
+<pre><code><b>struct</b> <a href="test_function_values.md#0x7_test_function_values_Funcs">Funcs</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>f: |u64|u64 <b>has</b> <b>copy</b> + drop</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="0x7_test_function_values_transfer_and_create_account"></a>
 
