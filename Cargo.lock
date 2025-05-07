@@ -12554,15 +12554,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-vm-paranoid-tests"
-version = "0.1.0"
-dependencies = [
- "datatest-stable",
- "fail",
- "move-transactional-test-runner",
-]
-
-[[package]]
 name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
@@ -12614,7 +12605,14 @@ name = "move-vm-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "fail",
+ "libtest-mimic",
+ "move-bytecode-verifier",
+ "move-model",
  "move-transactional-test-runner",
+ "move-vm-runtime",
+ "once_cell",
+ "walkdir",
 ]
 
 [[package]]
