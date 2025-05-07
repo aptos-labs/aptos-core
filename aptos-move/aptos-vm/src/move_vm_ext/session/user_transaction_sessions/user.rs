@@ -123,7 +123,9 @@ impl<'r> UserSession<'r> {
                             &module_id,
                             init_func_name,
                             vec![],
-                            vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
+                            vec![MoveValue::Signer(destination)
+                                .simple_serialize()
+                                .expect("Signer is always serializable")],
                             gas_meter,
                             traversal_context,
                             &staging_module_storage,
@@ -142,7 +144,9 @@ impl<'r> UserSession<'r> {
                         };
                         session.execute_loaded_function(
                             loaded_function,
-                            vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
+                            vec![MoveValue::Signer(destination)
+                                .simple_serialize()
+                                .expect("Signer is always serializable")],
                             gas_meter,
                             traversal_context,
                             &staging_module_storage,

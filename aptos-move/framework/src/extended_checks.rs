@@ -155,15 +155,16 @@ impl ExtendedChecker<'_> {
                 )
             }
 
+            let record_param_mismatch_error = || {
+                let msg = format!(
+                    "`{}` function can only take a single parameter of type `signer` or `&signer`",
+                    INIT_MODULE_FUN
+                );
+                self.env.error(&fun.get_id_loc(), &msg);
+            };
+
             if fun.get_parameter_count() != 1 {
-                self.env.error(
-                    &fun.get_id_loc(),
-                    &format!(
-                        "`{}` function can only take a single value of type `signer` \
-                         or `&signer` as parameter",
-                        INIT_MODULE_FUN
-                    ),
-                )
+                record_param_mismatch_error();
             } else {
                 let Parameter(_, ty, _) = &fun.get_parameters()[0];
                 let ok = match ty {
@@ -174,14 +175,7 @@ impl ExtendedChecker<'_> {
                     _ => false,
                 };
                 if !ok {
-                    self.env.error(
-                        &fun.get_id_loc(),
-                        &format!(
-                            "`{}` function can only take an argument of type `signer` \
-                             or `&signer` as a single parameter",
-                            INIT_MODULE_FUN
-                        ),
-                    );
+                    record_param_mismatch_error();
                 }
             }
 

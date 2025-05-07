@@ -3,7 +3,7 @@ processed 2 tasks
 task 1 'publish'. lines 4-10:
 Error: extended checks failed:
 
-error: `init_module` function can only take values of type `signer` or `&signer` as parameters
+error: `init_module` function can only take a single parameter of type `signer` or `&signer`
   ┌─ TEMPFILE:6:16
   │
 6 │     public fun init_module(value: u64): u64 { value }

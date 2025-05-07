@@ -237,45 +237,7 @@ impl BuiltPackage {
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
         let build_config = Self::create_build_config(&options)?;
         let resolved_graph = Self::prepare_resolution_graph(package_path, build_config.clone())?;
-        BuiltPackage::build_with_external_checks_impl(
-            resolved_graph,
-            options,
-            build_config,
-            false,
-            vec![],
-        )
-    }
-
-    /// Same as `build` but allows to provide external checks to be made on Move code.
-    /// The `external_checks` are only run when compiler v2 is used.
-    pub fn build_with_external_checks(
-        resolved_graph: ResolvedGraph,
-        options: BuildOptions,
-        build_config: BuildConfig,
-        external_checks: Vec<Arc<dyn ExternalChecks>>,
-    ) -> anyhow::Result<Self> {
-        Self::build_with_external_checks_impl(
-            resolved_graph,
-            options,
-            build_config,
-            false,
-            external_checks,
-        )
-    }
-
-    /// Used only for testing to skip errors (e.g., when running extended checks) when compiling
-    /// and building a package.
-    #[cfg(any(test, feature = "testing"))]
-    pub fn build_skip_errors(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
-        let build_config = Self::create_build_config(&options)?;
-        let resolved_graph = Self::prepare_resolution_graph(package_path, build_config.clone())?;
-        BuiltPackage::build_with_external_checks_impl(
-            resolved_graph,
-            options,
-            build_config,
-            true,
-            vec![],
-        )
+        BuiltPackage::build_with_external_checks(resolved_graph, options, build_config, vec![])
     }
 
     pub fn create_build_config(options: &BuildOptions) -> anyhow::Result<BuildConfig> {
@@ -316,11 +278,12 @@ impl BuiltPackage {
         build_config.resolution_graph_for_package(&package_path, &mut stderr())
     }
 
-    fn build_with_external_checks_impl(
+    /// Same as `build` but allows to provide external checks to be made on Move code.
+    /// The `external_checks` are only run when compiler v2 is used.
+    pub fn build_with_external_checks(
         resolved_graph: ResolvedGraph,
         options: BuildOptions,
         build_config: BuildConfig,
-        skip_errors: bool,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
     ) -> anyhow::Result<Self> {
         {
@@ -343,7 +306,13 @@ impl BuiltPackage {
             }
 
             let runtime_metadata = extended_checks::run_extended_checks(model);
-            if model.diag_count(Severity::Warning) > 0 && !skip_errors {
+            if model.diag_count(Severity::Warning) > 0
+                && !model
+                    .get_extension::<Options>()
+                    .is_some_and(|model_options| {
+                        model_options.experiment_on(Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS)
+                    })
+            {
                 let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
                 model.report_diag(&mut error_writer, Severity::Warning);
                 if model.has_errors() {

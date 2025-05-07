@@ -509,6 +509,11 @@ impl Function {
         &self.ty_param_abilities
     }
 
+    /// Returns the number of type parameters this function has.
+    pub fn ty_params_count(&self) -> usize {
+        self.ty_param_abilities.len()
+    }
+
     pub(crate) fn local_tys(&self) -> &[Type] {
         &self.local_tys
     }
@@ -540,11 +545,11 @@ impl Function {
     }
 
     /// Returns the abilities associated with this function, without consideration of any captured
-    /// closure arguments. By default, this is copy and drop, and if the function is
-    /// immutable (public), also store.
+    /// closure arguments. By default, this is copy and drop, and if the function signature cannot
+    /// be changed (i.e., the function has `#[persistent]` attribute or is public), also store.
     pub fn abilities(&self) -> AbilitySet {
         let result = AbilitySet::singleton(Ability::Copy).add(Ability::Drop);
-        if self.is_public() {
+        if self.is_persistent() {
             result.add(Ability::Store)
         } else {
             result
