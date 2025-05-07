@@ -409,6 +409,30 @@ impl Type {
         Ok(())
     }
 
+    /// Returns true if the type is a signer or an immutable signer reference type. Returns false
+    /// otherwise.
+    pub fn is_signer_or_signer_ref_ty(&self) -> bool {
+        use Type::*;
+        match self {
+            Signer => true,
+            Reference(inner_ty) => matches!(inner_ty.as_ref(), Signer),
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Vector(_)
+            | Struct { .. }
+            | StructInstantiation { .. }
+            | Function { .. }
+            | MutableReference(_)
+            | TyParam(_) => false,
+        }
+    }
+
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::Bool) {
             let msg = format!("Expected boolean type, got {}", self);

@@ -45,7 +45,7 @@ pub struct Function {
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) is_native: bool,
-    pub(crate) is_friend_or_private: bool,
+    pub(crate) visibility: Visibility,
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
     pub(crate) return_tys: Vec<Type>,
@@ -343,13 +343,12 @@ impl LoadedFunction {
 
     /// Returns true if the loaded function has friend or private visibility.
     pub fn is_friend_or_private(&self) -> bool {
-        self.function.is_friend_or_private()
+        self.function.is_friend() || self.function.is_private()
     }
 
-    /// Returns true if the loaded function has public visibility. This is the
-    /// opposite of the above (for better readability).
+    /// Returns true if the loaded function has public visibility.
     pub fn is_public(&self) -> bool {
-        !self.function.is_friend_or_private()
+        self.function.is_public()
     }
 
     /// Returns true if the loaded function is an entry function.
@@ -437,12 +436,6 @@ impl Function {
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();
 
-        let is_friend_or_private = match def.visibility {
-            Visibility::Friend | Visibility::Private => true,
-            Visibility::Public => false,
-        };
-        let is_entry = def.is_entry;
-
         let (native, is_native) = if def.is_native() {
             let native = natives.resolve(
                 module_id.address(),
@@ -483,8 +476,8 @@ impl Function {
             ty_param_abilities,
             native,
             is_native,
-            is_friend_or_private,
-            is_entry,
+            visibility: def.visibility,
+            is_entry: def.is_entry,
             name,
             local_tys,
             return_tys,
@@ -529,7 +522,7 @@ impl Function {
     }
 
     pub fn is_persistent(&self) -> bool {
-        self.is_persistent || !self.is_friend_or_private()
+        self.is_persistent || self.is_public()
     }
 
     pub fn has_module_lock(&self) -> bool {
@@ -551,7 +544,7 @@ impl Function {
     /// immutable (public), also store.
     pub fn abilities(&self) -> AbilitySet {
         let result = AbilitySet::singleton(Ability::Copy).add(Ability::Drop);
-        if !self.is_friend_or_private {
+        if self.is_public() {
             result.add(Ability::Store)
         } else {
             result
@@ -562,8 +555,16 @@ impl Function {
         self.is_native
     }
 
-    pub fn is_friend_or_private(&self) -> bool {
-        self.is_friend_or_private
+    pub fn is_public(&self) -> bool {
+        matches!(self.visibility, Visibility::Public)
+    }
+
+    pub fn is_friend(&self) -> bool {
+        matches!(self.visibility, Visibility::Friend)
+    }
+
+    pub fn is_private(&self) -> bool {
+        matches!(self.visibility, Visibility::Private)
     }
 
     pub(crate) fn is_entry(&self) -> bool {

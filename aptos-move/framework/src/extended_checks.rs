@@ -154,24 +154,48 @@ impl ExtendedChecker<'_> {
                     &format!("`{}` function must be private", INIT_MODULE_FUN),
                 )
             }
-            for Parameter(_, ty, _) in fun.get_parameters() {
+
+            if fun.get_parameter_count() != 1 {
+                self.env.error(
+                    &fun.get_id_loc(),
+                    &format!(
+                        "`{}` function can only take a single value of type `signer` \
+                         or `&signer` as parameter",
+                        INIT_MODULE_FUN
+                    ),
+                )
+            } else {
+                let Parameter(_, ty, _) = &fun.get_parameters()[0];
                 let ok = match ty {
                     Type::Primitive(PrimitiveType::Signer) => true,
-                    Type::Reference(_, ty) => matches!(*ty, Type::Primitive(PrimitiveType::Signer)),
+                    Type::Reference(_, ty) => {
+                        matches!(ty.as_ref(), Type::Primitive(PrimitiveType::Signer))
+                    },
                     _ => false,
                 };
                 if !ok {
                     self.env.error(
                         &fun.get_id_loc(),
-                        &format!("`{}` function can only take values of type `signer` or `&signer` as parameters",
-                                 INIT_MODULE_FUN),
+                        &format!(
+                            "`{}` function can only take an argument of type `signer` \
+                             or `&signer` as a single parameter",
+                            INIT_MODULE_FUN
+                        ),
                     );
                 }
             }
+
             if fun.get_return_count() > 0 {
                 self.env.error(
                     &fun.get_id_loc(),
                     &format!("`{}` function cannot return values", INIT_MODULE_FUN),
+                )
+            }
+
+            if fun.get_type_parameter_count() > 0 {
+                self.env.error(
+                    &fun.get_id_loc(),
+                    &format!("`{}` function cannot have type parameters", INIT_MODULE_FUN),
                 )
             }
         }
