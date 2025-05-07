@@ -11,7 +11,7 @@ use crate::{
             create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest,
             ResetSignal, Sender,
         },
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        decoupled_execution_utils,
         execution_schedule_phase::ExecutionSchedulePhase,
         execution_wait_phase::ExecutionWaitPhase,
         persisting_phase::PersistingPhase,
@@ -141,8 +141,8 @@ pub fn prepare_buffer_manager(
         execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
-        buffer_manager,
-    ) = prepare_phases_and_buffer_manager(
+        (buffer_manager, _),
+    ) = decoupled_execution_utils::prepare_phases_and_buffer_manager(
         author,
         mocked_execution_proxy,
         Arc::new(Mutex::new(safety_rules)),
