@@ -376,7 +376,7 @@ module aptos_std::ristretto255_bulletproofs {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x030004, location = Self)]
+    #[expected_failure(abort_code = 0x030007, location = Self)]
     fun test_bulletproof_feature_disabled(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ ], vector[ features::get_bulletproofs_feature()]);
 
@@ -392,7 +392,7 @@ module aptos_std::ristretto255_bulletproofs {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x030004, location = Self)]
+    #[expected_failure(abort_code = 0x030007, location = Self)]
     fun test_bulletproof_batch_feature_disabled(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ ], vector[ features::get_bulletproofs_batch_feature() ]);
 
