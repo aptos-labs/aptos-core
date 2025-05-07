@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: enable_bulletproofs_batch
+proposals:
+  - name: enable_bulletproofs_batch
+    metadata:
+      title: "Enable Bulletproofs Batch"
+      description: "Enable Bulletproofs Batch"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bulletproofs_batch
