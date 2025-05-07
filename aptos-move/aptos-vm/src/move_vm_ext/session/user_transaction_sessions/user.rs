@@ -14,7 +14,6 @@ use crate::{
     verifier, AptosVM,
 };
 use aptos_gas_meter::AptosGasMeter;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
 use aptos_types::{on_chain_config::Features, transaction::ModuleBundle};
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
@@ -108,7 +107,9 @@ impl<'r> UserSession<'r> {
             }
 
             self.session.execute(|session| {
-                if gas_feature_version <= RELEASE_V1_30 {
+                #[allow(unused_comparisons)]
+                #[allow(clippy::absurd_extreme_comparisons)]
+                if gas_feature_version < 0 {
                     let module_id = module.self_id();
                     let init_function_exists = staging_module_storage
                         .load_function(&module_id, init_func_name, &[])
