@@ -123,9 +123,12 @@ fn invalid_init_module(allow_extended_checks_to_fail: bool) {
     ];
     for package_path in package_paths {
         let path = common::test_dir_path(package_path).to_owned();
-        let options = BuildOptions::default();
+        let mut options = BuildOptions::default();
         let package = if allow_extended_checks_to_fail {
-            assert_ok!(BuiltPackage::build_skip_errors(path, options))
+            options
+                .experiments
+                .push("skip-bailout-on-extended-checks".to_string());
+            assert_ok!(BuiltPackage::build(path, options))
         } else {
             assert!(BuiltPackage::build(path, options).is_err());
             continue;

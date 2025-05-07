@@ -126,7 +126,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
     for ty in func.param_tys() {
-        if ty.is_signer_or_signer_ref_ty() {
+        if ty.is_signer_or_signer_ref() {
             signer_param_cnt += 1;
         }
     }

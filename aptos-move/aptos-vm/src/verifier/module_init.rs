@@ -76,27 +76,28 @@ pub(crate) fn verify_init_module_function(function: &Function) -> Result<(), VMS
         ));
     }
 
-    if function.param_tys().len() != 1 {
+    let param_tys = function.param_tys();
+    if param_tys.len() != 1 {
         return err(format!(
-            "init_module function expects a single signer or &signer argument, \
-             but has {} arguments",
-            function.param_tys().len()
+            "init_module function should have a single signer or &signer parameter, \
+             but has {} parameters",
+            param_tys.len()
         ));
     }
 
-    let arg_ty = &function.param_tys()[0];
-    if !arg_ty.is_signer_or_signer_ref_ty() {
+    let arg_ty = &param_tys[0];
+    if !arg_ty.is_signer_or_signer_ref() {
         return err(
-            "init_module function expects a single signer or &signer argument, \
-             but its argument type is different"
+            "init_module function expects a single signer or &signer parameter, \
+             but its parameter type is different"
                 .to_string(),
         );
     }
 
-    if !function.ty_param_abilities().is_empty() {
+    if function.ty_params_count() != 0 {
         return err(format!(
-            "init_module function expects 0 type parameters, but has {} type arguments",
-            function.ty_param_abilities().len()
+            "init_module function expects 0 type parameters, but has {} type parameters",
+            function.ty_params_count()
         ));
     }
 

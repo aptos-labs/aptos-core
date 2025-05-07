@@ -411,7 +411,7 @@ impl Type {
 
     /// Returns true if the type is a signer or an immutable signer reference type. Returns false
     /// otherwise.
-    pub fn is_signer_or_signer_ref_ty(&self) -> bool {
+    pub fn is_signer_or_signer_ref(&self) -> bool {
         use Type::*;
         match self {
             Signer => true,
