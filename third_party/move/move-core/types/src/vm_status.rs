@@ -756,12 +756,14 @@ pub enum StatusCode {
     INVALID_CLOSURE_MASK = 1132,
     // Closure eval type is not a function
     CLOSURE_CALL_REQUIRES_FUNCTION = 1133,
+    // Returned if init_module function is not valid during code publishing.
+    INVALID_INIT_MODULE = 1134,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1134,
-    RESERVED_VERIFICATION_ERROR_3 = 1135,
-    RESERVED_VERIFICATION_ERROR_4 = 1136,
-    RESERVED_VERIFICATION_ERROR_5 = 1137,
+    RESERVED_VERIFICATION_ERROR_1 = 1135,
+    RESERVED_VERIFICATION_ERROR_2 = 1136,
+    RESERVED_VERIFICATION_ERROR_3 = 1137,
+    RESERVED_VERIFICATION_ERROR_4 = 1138,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
