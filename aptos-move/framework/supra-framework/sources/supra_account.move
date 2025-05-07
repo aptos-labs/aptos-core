@@ -135,6 +135,10 @@ module supra_framework::supra_account {
         assert!(account::exists_at(addr), error::not_found(EACCOUNT_NOT_FOUND));
     }
 
+    public fun assert_account_is_registered_for_apt(addr: address) {
+        assert_account_is_registered_for_supra(addr)
+    }
+
     public fun assert_account_is_registered_for_supra(addr: address) {
         assert_account_exists(addr);
         assert!(coin::is_account_registered<SupraCoin>(addr), error::not_found(EACCOUNT_NOT_REGISTERED_FOR_SUPRA));

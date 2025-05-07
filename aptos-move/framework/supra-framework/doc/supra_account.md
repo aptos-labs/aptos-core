@@ -16,6 +16,7 @@
 -  [Function `transfer_coins`](#0x1_supra_account_transfer_coins)
 -  [Function `deposit_coins`](#0x1_supra_account_deposit_coins)
 -  [Function `assert_account_exists`](#0x1_supra_account_assert_account_exists)
+-  [Function `assert_account_is_registered_for_apt`](#0x1_supra_account_assert_account_is_registered_for_apt)
 -  [Function `assert_account_is_registered_for_supra`](#0x1_supra_account_assert_account_is_registered_for_supra)
 -  [Function `set_allow_direct_coin_transfers`](#0x1_supra_account_set_allow_direct_coin_transfers)
 -  [Function `can_receive_direct_coin_transfers`](#0x1_supra_account_can_receive_direct_coin_transfers)
@@ -430,6 +431,30 @@ This would create the recipient account first and register it to receive the Coi
 
 <pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>) {
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_FOUND">EACCOUNT_NOT_FOUND</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_supra_account_assert_account_is_registered_for_apt"></a>
+
+## Function `assert_account_is_registered_for_apt`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>) {
+    <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_supra">assert_account_is_registered_for_supra</a>(addr)
 }
 </code></pre>
 
