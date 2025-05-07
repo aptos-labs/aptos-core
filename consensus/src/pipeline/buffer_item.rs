@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -126,8 +126,9 @@ impl BufferItem {
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
-    ) -> Self {
-        match self {
+        tolerate_assertion_failures: bool,
+    ) -> anyhow::Result<Self> {
+        let buffer_item = match self {
             Self::Ordered(ordered_item) => {
                 let OrderedItem {
                     ordered_blocks,
@@ -137,7 +138,12 @@ impl BufferItem {
                     ordered_proof,
                 } = *ordered_item;
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
-                    assert_eq!(b1.id(), b2.id());
+                    assert_eq_with_tolerance(
+                        b1.id(),
+                        b2.id(),
+                        tolerate_assertion_failures,
+                        "Ordered block and executed block don't match!",
+                    )?;
                 }
                 let mut commit_info = executed_blocks
                     .last()
@@ -145,10 +151,15 @@ impl BufferItem {
                     .block_info();
                 match epoch_end_timestamp {
                     Some(timestamp) if commit_info.timestamp_usecs() != timestamp => {
-                        assert!(executed_blocks
+                        let is_reconfiguration_suffix = executed_blocks
                             .last()
                             .expect("")
-                            .is_reconfiguration_suffix());
+                            .is_reconfiguration_suffix();
+                        assert_with_tolerance(
+                            is_reconfiguration_suffix,
+                            tolerate_assertion_failures,
+                            "Last executed block is not a reconfiguration suffix!",
+                        )?;
                         commit_info.change_timestamp(timestamp);
                     },
                     _ => (),
@@ -156,7 +167,12 @@ impl BufferItem {
                 if let Some(commit_proof) = commit_proof {
                     // We have already received the commit proof in fast forward sync path,
                     // we can just use that proof and proceed to aggregated
-                    assert_eq!(commit_proof.commit_info().clone(), commit_info);
+                    assert_eq_with_tolerance(
+                        commit_proof.commit_info().clone(),
+                        commit_info,
+                        tolerate_assertion_failures,
+                        "Commit proof and executed blocks commit info don't match!",
+                    )?;
                     debug!(
                         "{} advance to aggregated from ordered",
                         commit_proof.commit_info()
@@ -204,7 +220,9 @@ impl BufferItem {
             _ => {
                 panic!("Only ordered blocks can advance to executed blocks.")
             },
-        }
+        };
+
+        Ok(buffer_item)
     }
 
     pub fn advance_to_signed(self, author: Author, signature: bls12381::Signature) -> Self {
@@ -247,8 +265,9 @@ impl BufferItem {
     pub fn try_advance_to_aggregated_with_ledger_info(
         self,
         commit_proof: LedgerInfoWithSignatures,
-    ) -> Self {
-        match self {
+        tolerate_assertion_failures: bool,
+    ) -> anyhow::Result<Self> {
+        let buffer_item = match self {
             Self::Signed(signed_item) => {
                 let SignedItem {
                     executed_blocks,
@@ -256,10 +275,12 @@ impl BufferItem {
                     partial_commit_proof: local_commit_proof,
                     ..
                 } = *signed_item;
-                assert_eq!(
+                assert_eq_with_tolerance(
                     local_commit_proof.data().commit_info(),
-                    commit_proof.commit_info()
-                );
+                    commit_proof.commit_info(),
+                    tolerate_assertion_failures,
+                    "Local commit proof and given commit proof don't match!",
+                )?;
                 debug!(
                     "{} advance to aggregated with commit decision",
                     commit_proof.commit_info()
@@ -277,7 +298,12 @@ impl BufferItem {
                     commit_info,
                     ..
                 } = *executed_item;
-                assert_eq!(commit_info, *commit_proof.commit_info());
+                assert_eq_with_tolerance(
+                    &commit_info,
+                    commit_proof.commit_info(),
+                    tolerate_assertion_failures,
+                    "Executed item commit info and given commit proof don't match!",
+                )?;
                 debug!(
                     "{} advance to aggregated with commit decision",
                     commit_proof.commit_info()
@@ -290,10 +316,15 @@ impl BufferItem {
             },
             Self::Ordered(ordered_item) => {
                 let ordered = *ordered_item;
-                assert!(ordered
+                let match_ordered_commit_info = ordered
                     .ordered_proof
                     .commit_info()
-                    .match_ordered_only(commit_proof.commit_info()));
+                    .match_ordered_only(commit_proof.commit_info());
+                assert_with_tolerance(
+                    match_ordered_commit_info,
+                    tolerate_assertion_failures,
+                    "Ordered item commit info and given commit proof don't match ordered only!",
+                )?;
                 // can't aggregate it without execution, only store the signatures
                 debug!(
                     "{} received commit decision in ordered stage",
@@ -307,7 +338,9 @@ impl BufferItem {
             Self::Aggregated(_) => {
                 unreachable!("Found aggregated buffer item but any aggregated buffer item should get dequeued right away.");
             },
-        }
+        };
+
+        Ok(buffer_item)
     }
 
     pub fn try_advance_to_aggregated(self, validator: &ValidatorVerifier) -> Self {
@@ -474,6 +507,46 @@ impl BufferItem {
     }
 }
 
+/// Asserts that the given result is true. If `tolerate_assertion_failure`
+/// is true, this will return an error if the result is false.
+/// Otherwise, this will panic.
+fn assert_with_tolerance(
+    result: bool,
+    tolerate_assertion_failure: bool,
+    error_for_assertion_failure: &str,
+) -> anyhow::Result<()> {
+    assert_eq_with_tolerance(
+        result,
+        true,
+        tolerate_assertion_failure,
+        error_for_assertion_failure,
+    )
+}
+
+/// Compares two items for equality. If `tolerate_assertion_failure`
+/// is true, this will return an error if the items are not equal.
+/// Otherwise, this will panic.
+fn assert_eq_with_tolerance<T: PartialEq + Debug>(
+    item_1: T,
+    item_2: T,
+    tolerate_assertion_failure: bool,
+    error_for_assertion_failure: &str,
+) -> anyhow::Result<()> {
+    if tolerate_assertion_failure {
+        if item_1 != item_2 {
+            let error_message = format!(
+                "Equality check failed! Error: {}. Item 1: {:?}, Item 2: {:?}",
+                error_for_assertion_failure, item_1, item_2
+            );
+            return Err(anyhow!(error_message));
+        }
+    } else {
+        assert_eq!(item_1, item_2);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -588,12 +661,15 @@ mod test {
             .add_signature_if_matched(commit_votes[3].clone())
             .unwrap();
 
-        let mut executed_item = ordered_item.advance_to_executed_or_aggregated(
-            vec![pipelined_block.clone()],
-            &validator_verifier,
-            None,
-            true,
-        );
+        let mut executed_item = ordered_item
+            .advance_to_executed_or_aggregated(
+                vec![pipelined_block.clone()],
+                &validator_verifier,
+                None,
+                true,
+                false,
+            )
+            .unwrap();
 
         match executed_item {
             BufferItem::Executed(ref executed_item_inner) => {
@@ -694,12 +770,15 @@ mod test {
             .unwrap();
 
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 0);
-        let mut executed_item = ordered_item.advance_to_executed_or_aggregated(
-            vec![pipelined_block.clone()],
-            &validator_verifier,
-            None,
-            true,
-        );
+        let mut executed_item = ordered_item
+            .advance_to_executed_or_aggregated(
+                vec![pipelined_block.clone()],
+                &validator_verifier,
+                None,
+                true,
+                false,
+            )
+            .unwrap();
 
         match executed_item {
             BufferItem::Executed(ref executed_item_inner) => {

@@ -110,7 +110,8 @@ impl TExecutionClient for MockExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
         _new_pipeline_enabled: bool,
-    ) {
+    ) -> Option<futures_channel::mpsc::UnboundedReceiver<String>> {
+        None
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
