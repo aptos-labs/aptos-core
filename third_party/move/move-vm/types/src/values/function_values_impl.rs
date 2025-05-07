@@ -93,11 +93,7 @@ impl Display for Closure {
         let Self(fun, captured) = self;
         let captured = fun
             .closure_mask()
-            .merge_placeholder_strings(
-                captured.len(),
-                captured.iter().map(|v| v.to_string()).collect(),
-            )
-            .unwrap_or_else(|| vec!["*invalid*".to_string()]);
+            .merge_placeholder_strings(captured.iter().map(|v| v.to_string()).collect());
         write!(f, "{}({})", fun.to_stable_string(), captured.join(","))
     }
 }

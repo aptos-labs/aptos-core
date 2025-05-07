@@ -27,6 +27,7 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-genesis = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
@@ -40,6 +41,7 @@ move-model = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-transactional-test-runner = { workspace = true }
 move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
