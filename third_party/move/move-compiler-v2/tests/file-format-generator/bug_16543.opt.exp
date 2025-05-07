@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot implicitly pack a wrapper struct defined in a different module
+  ┌─ tests/file-format-generator/bug_16543.move:8:9
+  │
+8 │         || {}
+  │         ^^^^^

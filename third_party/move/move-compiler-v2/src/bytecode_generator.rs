@@ -856,6 +856,12 @@ impl<'env> Generator<'env> {
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
                 if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty {
+                    if wrapper_mid != *mid {
+                        self.error(
+                            id,
+                            "cannot implicitly pack a wrapper struct defined in a different module",
+                        );
+                    }
                     // Implicitly convert to a function wrapper.
                     let fun_ty = self
                         .env()
