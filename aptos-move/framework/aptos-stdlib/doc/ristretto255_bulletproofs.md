@@ -112,6 +112,17 @@ The domain separation tag exceeded the 256-byte limit.
 
 
 
+<a id="0x1_ristretto255_bulletproofs_E_INVOCATION_RESTRICTED"></a>
+
+A <code><a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs">ristretto255_bulletproofs</a></code> function is only allowed to run in transactions that call a system module entry function
+(e.g., <code>0x7::confidential_asset::confidential_transfer</code>).
+
+
+<pre><code><b>const</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_INVOCATION_RESTRICTED">E_INVOCATION_RESTRICTED</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x1_ristretto255_bulletproofs_E_RANGE_NOT_SUPPORTED"></a>
 
 The range proof system only supports proving ranges of type $[0, 2^b)$ where $b \in \{8, 16, 32, 64\}$.

@@ -714,6 +714,17 @@ module std::features {
         is_enabled(ORDERLESS_TRANSACTIONS)
     }
 
+    /// Unless this feature is enabled, `ristretto255_bulletproofs::verify_batch_range_proof` can only be used
+    /// in transactions that call an system module entry function.
+    /// A system module is a module stored in system addresses (0x1 - 0xf).
+    const UNRESTRICTED_BULLETPROOFS_BATCH_NATIVES: u64 = 95;
+
+    public fun get_unrestricted_bulletproofs_batch_feature(): u64 { UNRESTRICTED_BULLETPROOFS_BATCH_NATIVES }
+
+    public fun unrestricted_bulletproofs_batch_enabled(): bool acquires Features {
+        is_enabled(UNRESTRICTED_BULLETPROOFS_BATCH_NATIVES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

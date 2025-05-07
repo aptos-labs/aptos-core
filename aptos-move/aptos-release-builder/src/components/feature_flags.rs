@@ -146,6 +146,7 @@ pub enum FeatureFlag {
     JwkConsensusPerKeyMode,
     TransactionPayloadV2,
     OrderlessTransactions,
+    UnrestrictedBulletproofsBatchNatives,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -387,6 +388,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::JwkConsensusPerKeyMode => AptosFeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
             FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
+            FeatureFlag::UnrestrictedBulletproofsBatchNatives => {
+                AptosFeatureFlag::UNRESTRICTED_BULLETPROOFS_BATCH_NATIVES
+            },
         }
     }
 }
@@ -555,6 +559,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::JWK_CONSENSUS_PER_KEY_MODE => FeatureFlag::JwkConsensusPerKeyMode,
             AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
             AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
+            AptosFeatureFlag::UNRESTRICTED_BULLETPROOFS_BATCH_NATIVES => {
+                FeatureFlag::UnrestrictedBulletproofsBatchNatives
+            },
         }
     }
 }

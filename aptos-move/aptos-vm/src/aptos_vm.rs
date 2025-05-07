@@ -850,6 +850,10 @@ impl AptosVM {
             )])?;
         }
 
+        if entry_fn.module().address.is_special() {
+            session.mark_system_entry_function();
+        }
+
         if self.gas_feature_version() >= RELEASE_V1_27 {
             check_type_tag_dependencies_and_charge_gas(
                 module_storage,
