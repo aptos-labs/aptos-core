@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: cannot unpack a wrapper struct and invoke the wrapped function value defined in a different module
-   ┌─ tests/file-format-generator/bug_16222.move:13:9
-   │
-13 │         l();
-   │         ^^^
