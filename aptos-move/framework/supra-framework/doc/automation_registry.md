@@ -22,6 +22,8 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Struct `TaskCancelledCapacitySurpassed`](#0x1_automation_registry_TaskCancelledCapacitySurpassed)
 -  [Struct `ErrorTaskDoesNotExist`](#0x1_automation_registry_ErrorTaskDoesNotExist)
 -  [Struct `ErrorTaskDoesNotExistForWithdrawal`](#0x1_automation_registry_ErrorTaskDoesNotExistForWithdrawal)
+-  [Struct `EnabledRegistrationEvent`](#0x1_automation_registry_EnabledRegistrationEvent)
+-  [Struct `DisabledRegistrationEvent`](#0x1_automation_registry_DisabledRegistrationEvent)
 -  [Struct `AutomationTaskFee`](#0x1_automation_registry_AutomationTaskFee)
 -  [Struct `IntermediateState`](#0x1_automation_registry_IntermediateState)
 -  [Constants](#@Constants_0)
@@ -43,6 +45,7 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Function `get_automation_epoch_info`](#0x1_automation_registry_get_automation_epoch_info)
 -  [Function `estimate_automation_fee`](#0x1_automation_registry_estimate_automation_fee)
 -  [Function `estimate_automation_fee_with_committed_occupancy`](#0x1_automation_registry_estimate_automation_fee_with_committed_occupancy)
+-  [Function `is_registration_enabled`](#0x1_automation_registry_is_registration_enabled)
 -  [Function `estimate_automation_fee_with_committed_occupancy_internal`](#0x1_automation_registry_estimate_automation_fee_with_committed_occupancy_internal)
 -  [Function `validate_configuration_parameters_common`](#0x1_automation_registry_validate_configuration_parameters_common)
 -  [Function `create_registry_resource_account`](#0x1_automation_registry_create_registry_resource_account)
@@ -62,6 +65,8 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Function `withdraw_automation_task_fees`](#0x1_automation_registry_withdraw_automation_task_fees)
 -  [Function `transfer_fee_to_account_internal`](#0x1_automation_registry_transfer_fee_to_account_internal)
 -  [Function `update_config`](#0x1_automation_registry_update_config)
+-  [Function `enable_registration`](#0x1_automation_registry_enable_registration)
+-  [Function `disable_registration`](#0x1_automation_registry_disable_registration)
 -  [Function `register`](#0x1_automation_registry_register)
 -  [Function `check_registration_task_duration`](#0x1_automation_registry_check_registration_task_duration)
 -  [Function `cancel_task`](#0x1_automation_registry_cancel_task)
@@ -763,6 +768,64 @@ but it does not exist in the list.
 
 </details>
 
+<a id="0x1_automation_registry_EnabledRegistrationEvent"></a>
+
+## Struct `EnabledRegistrationEvent`
+
+Emitted when the registration in the automation registry is enabled.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="automation_registry.md#0x1_automation_registry_EnabledRegistrationEvent">EnabledRegistrationEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_automation_registry_DisabledRegistrationEvent"></a>
+
+## Struct `DisabledRegistrationEvent`
+
+Emitted when the registration in the automation registry is disabled.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="automation_registry.md#0x1_automation_registry_DisabledRegistrationEvent">DisabledRegistrationEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_automation_registry_AutomationTaskFee"></a>
 
 ## Struct `AutomationTaskFee`
@@ -1082,6 +1145,16 @@ Requested amount exceeds the locked balance
 
 
 <pre><code><b>const</b> <a href="automation_registry.md#0x1_automation_registry_EREQUEST_EXCEEDS_LOCKED_BALANCE">EREQUEST_EXCEEDS_LOCKED_BALANCE</a>: u64 = 17;
+</code></pre>
+
+
+
+<a id="0x1_automation_registry_ETASK_REGISTRATION_DISABLED"></a>
+
+Task registration is currently disabled.
+
+
+<pre><code><b>const</b> <a href="automation_registry.md#0x1_automation_registry_ETASK_REGISTRATION_DISABLED">ETASK_REGISTRATION_DISABLED</a>: u64 = 24;
 </code></pre>
 
 
@@ -1664,6 +1737,32 @@ maximum allowed occupancy for the next epoch.
 
 </details>
 
+<a id="0x1_automation_registry_is_registration_enabled"></a>
+
+## Function `is_registration_enabled`
+
+Returns the current status of the registration in the automation registry.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_is_registration_enabled">is_registration_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_is_registration_enabled">is_registration_enabled</a>(): bool <b>acquires</b> <a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a> {
+    <b>borrow_global</b>&lt;<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a>&gt;(@supra_framework).registration_enabled
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_automation_registry_estimate_automation_fee_with_committed_occupancy_internal"></a>
 
 ## Function `estimate_automation_fee_with_committed_occupancy_internal`
@@ -1735,7 +1834,7 @@ maximum allowed occupancy for the next epoch.
     registry_max_gas_cap: u64,
     congestion_threshold_percentage: u8,
     congestion_exponent: u8,
-)  {
+){
     <b>assert</b>!(congestion_threshold_percentage &lt;= <a href="automation_registry.md#0x1_automation_registry_MAX_PERCENTAGE">MAX_PERCENTAGE</a>, <a href="automation_registry.md#0x1_automation_registry_EMAX_CONGESTION_THRESHOLD">EMAX_CONGESTION_THRESHOLD</a>);
     <b>assert</b>!(congestion_exponent &gt; 0, <a href="automation_registry.md#0x1_automation_registry_ECONGESTION_EXP_NON_ZERO">ECONGESTION_EXP_NON_ZERO</a>);
     <b>assert</b>!(task_duration_cap_in_secs &gt; epoch_interval_secs, <a href="automation_registry.md#0x1_automation_registry_EUNACCEPTABLE_TASK_DURATION_CAP">EUNACCEPTABLE_TASK_DURATION_CAP</a>);
@@ -2616,6 +2715,62 @@ Update Automation Registry Config
 
 </details>
 
+<a id="0x1_automation_registry_enable_registration"></a>
+
+## Function `enable_registration`
+
+Enables the registration process in the automation registry.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_enable_registration">enable_registration</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_enable_registration">enable_registration</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
+    <b>let</b> automation_registry_config = <b>borrow_global_mut</b>&lt;<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a>&gt;(@supra_framework);
+    automation_registry_config.registration_enabled = <b>true</b>;
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_EnabledRegistrationEvent">EnabledRegistrationEvent</a> {});
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_automation_registry_disable_registration"></a>
+
+## Function `disable_registration`
+
+Disables the registration process in the automation registry.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_disable_registration">disable_registration</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_disable_registration">disable_registration</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
+    <b>let</b> automation_registry_config = <b>borrow_global_mut</b>&lt;<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a>&gt;(@supra_framework);
+    automation_registry_config.registration_enabled = <b>false</b>;
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="automation_registry.md#0x1_automation_registry_DisabledRegistrationEvent">DisabledRegistrationEvent</a> {});
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_automation_registry_register"></a>
 
 ## Function `register`
@@ -2647,6 +2802,8 @@ Registers a new automation task entry.
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&aux_data), <a href="automation_registry.md#0x1_automation_registry_ENO_AUX_DATA_SUPPORTED">ENO_AUX_DATA_SUPPORTED</a>);
 
     <b>let</b> automation_registry_config = <b>borrow_global</b>&lt;<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">ActiveAutomationRegistryConfig</a>&gt;(@supra_framework);
+    <b>assert</b>!(automation_registry_config.registration_enabled, <a href="automation_registry.md#0x1_automation_registry_ETASK_REGISTRATION_DISABLED">ETASK_REGISTRATION_DISABLED</a>);
+
     // If registry is full, reject task registration
     <b>assert</b>!((<a href="automation_registry.md#0x1_automation_registry_get_task_count">get_task_count</a>() <b>as</b> u16) &lt; automation_registry_config.main_config.task_capacity, <a href="automation_registry.md#0x1_automation_registry_EREGISTRY_IS_FULL">EREGISTRY_IS_FULL</a>);
 

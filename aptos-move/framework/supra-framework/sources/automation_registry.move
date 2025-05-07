@@ -72,6 +72,8 @@ module supra_framework::automation_registry {
     const EREGISTRY_MAX_GAS_CAP_NON_ZERO: u64 = 22;
     /// Registry task capacity has reached.
     const EREGISTRY_IS_FULL: u64 = 23;
+    /// Task registration is currently disabled.
+    const ETASK_REGISTRATION_DISABLED: u64 = 24;
 
     /// The length of the transaction hash.
     const TXN_HASH_LENGTH: u64 = 32;
@@ -264,6 +266,14 @@ module supra_framework::automation_registry {
         task_index: u64,
     }
 
+    #[event]
+    /// Emitted when the registration in the automation registry is enabled.
+    struct EnabledRegistrationEvent has drop, store {}
+
+    #[event]
+    /// Emitted when the registration in the automation registry is disabled.
+    struct DisabledRegistrationEvent has drop, store {}
+
     /// Represents the fee charged for an automation task execution and some additional information.
     struct AutomationTaskFee has drop {
         task_index: u64,
@@ -416,6 +426,12 @@ module supra_framework::automation_registry {
         estimate_automation_fee_with_committed_occupancy_internal(task_occupancy, committed_occupancy, epoch_info, config)
     }
 
+    #[view]
+    /// Returns the current status of the registration in the automation registry.
+    public fun is_registration_enabled(): bool acquires ActiveAutomationRegistryConfig {
+        borrow_global<ActiveAutomationRegistryConfig>(@supra_framework).registration_enabled
+    }
+
     /// Estimates automation fee the next epoch for specified task occupancy for the configured epoch-interval
     /// referencing the current automation registry fee parameters, specified total/committed occupancy and registry
     /// maximum allowed occupancy for the next epoch.
@@ -452,7 +468,7 @@ module supra_framework::automation_registry {
         registry_max_gas_cap: u64,
         congestion_threshold_percentage: u8,
         congestion_exponent: u8,
-    )  {
+    ){
         assert!(congestion_threshold_percentage <= MAX_PERCENTAGE, EMAX_CONGESTION_THRESHOLD);
         assert!(congestion_exponent > 0, ECONGESTION_EXP_NON_ZERO);
         assert!(task_duration_cap_in_secs > epoch_interval_secs, EUNACCEPTABLE_TASK_DURATION_CAP);
@@ -989,6 +1005,22 @@ module supra_framework::automation_registry {
         event::emit(new_automation_registry_config);
     }
 
+    /// Enables the registration process in the automation registry.
+    public fun enable_registration(supra_framework: &signer) acquires ActiveAutomationRegistryConfig {
+        system_addresses::assert_supra_framework(supra_framework);
+        let automation_registry_config = borrow_global_mut<ActiveAutomationRegistryConfig>(@supra_framework);
+        automation_registry_config.registration_enabled = true;
+        event::emit(EnabledRegistrationEvent {});
+    }
+
+    /// Disables the registration process in the automation registry.
+    public fun disable_registration(supra_framework: &signer) acquires ActiveAutomationRegistryConfig {
+        system_addresses::assert_supra_framework(supra_framework);
+        let automation_registry_config = borrow_global_mut<ActiveAutomationRegistryConfig>(@supra_framework);
+        automation_registry_config.registration_enabled = false;
+        event::emit(DisabledRegistrationEvent {});
+    }
+
     /// Registers a new automation task entry.
     fun register(
         owner_signer: &signer,
@@ -1005,6 +1037,8 @@ module supra_framework::automation_registry {
         assert!(vector::is_empty(&aux_data), ENO_AUX_DATA_SUPPORTED);
 
         let automation_registry_config = borrow_global<ActiveAutomationRegistryConfig>(@supra_framework);
+        assert!(automation_registry_config.registration_enabled, ETASK_REGISTRATION_DISABLED);
+
         // If registry is full, reject task registration
         assert!((get_task_count() as u16) < automation_registry_config.main_config.task_capacity, EREGISTRY_IS_FULL);
 
@@ -2811,4 +2845,36 @@ module supra_framework::automation_registry {
         assert!(result == 1039062500, 13); // ~10.39
     }
 
+    #[test(framework = @supra_framework, user = @0x1cafa)]
+    fun test_registration_enable_disable(framework: &signer, user: &signer) acquires ActiveAutomationRegistryConfig {
+        initialize_registry_test(framework, user);
+        assert!(is_registration_enabled(), 14);
+
+        disable_registration(framework);
+        assert!(!is_registration_enabled(), 15);
+
+        enable_registration(framework);
+        assert!(is_registration_enabled(), 16);
+    }
+
+    #[test(framework = @supra_framework, user = @0x1cafe)]
+    #[expected_failure(abort_code = ETASK_REGISTRATION_DISABLED, location = Self)]
+    fun test_register_fails_when_registration_disabled(
+        framework: &signer, user: &signer
+    ) acquires AutomationRegistry, AutomationEpochInfo, ActiveAutomationRegistryConfig {
+        initialize_registry_test(framework, user);
+
+        disable_registration(framework);
+        assert!(!is_registration_enabled(), 17);
+
+        register(user,
+            PAYLOAD,
+            86400,
+            50,
+            20,
+            1000,
+            PARENT_HASH,
+            AUX_DATA
+        );
+    }
 }
