@@ -1077,7 +1077,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 )
             },
             Unit => Type::Tuple(vec![]),
-            Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
+            Multiple(vst) => {
+                let (inner_locs, inner_types) = self.translate_types_with_loc(vst.as_ref());
+                for (inner_ty, inner_loc) in inner_types.iter().zip(inner_locs.iter()) {
+                    if inner_ty.is_tuple() {
+                        self.error(inner_loc, "tuples cannot be nested");
+                    }
+                }
+                Type::Tuple(inner_types)
+            },
             UnresolvedError => Type::Error,
         }
     }
