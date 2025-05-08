@@ -102,10 +102,7 @@ where
 
         // Next, check the environment. If the current environment has not been set, or is
         // different, we reset it to the new one, and flush the module cache.
-        let environment_requires_update = self
-            .environment
-            .as_ref()
-            .map_or(true, |environment| environment != &storage_environment);
+        let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             self.environment = Some(storage_environment);
             self.module_cache.flush();
@@ -226,7 +223,7 @@ pub enum AptosModuleCacheManagerGuard<'a> {
     },
 }
 
-impl<'a> AptosModuleCacheManagerGuard<'a> {
+impl AptosModuleCacheManagerGuard<'_> {
     /// Returns the references to the environment. If environment is not set, panics.
     pub fn environment(&self) -> &AptosEnvironment {
         use AptosModuleCacheManagerGuard::*;

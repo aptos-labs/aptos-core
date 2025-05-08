@@ -205,7 +205,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Shortcut for accessing the symbol pool.
     pub fn symbol_pool(&self) -> &SymbolPool {
         self.parent.env.symbol_pool()
@@ -356,7 +356,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Ability Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     pub(crate) fn translate_abilities(&self, set: &EA::AbilitySet) -> AbilitySet {
         let mut abilities = AbilitySet::EMPTY;
         if set.has_ability_(PA::Ability_::Key) {
@@ -377,7 +377,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Attribute Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     pub fn translate_attributes(&mut self, attrs: &EA::Attributes) -> Vec<Attribute> {
         attrs
             .iter()
@@ -466,7 +466,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Declaration Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     fn decl_ana(&mut self, module_def: &EA::ModuleDefinition) {
         for (name, struct_def) in module_def.structs.key_cloned_iter() {
             self.decl_ana_struct(&name, struct_def);
@@ -910,7 +910,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Returns `true` if language version is ok. Otherwise,
     /// issues an error message and returns `false`.
     pub fn test_language_version(
@@ -1222,7 +1222,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Constant Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     fn def_ana_constant(&mut self, name: &PA::ConstantName, def: &EA::Constant) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let (loc, ty) = {
@@ -1284,7 +1284,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Struct Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     fn def_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let struct_entry = self.parent.struct_table.get(&qsym).expect("struct invalid");
@@ -1420,7 +1420,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Move Function Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Definition analysis for Move functions.
     /// If we are operating as a Move compiler, we also translate its body.
     fn def_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function) {
@@ -1477,7 +1477,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Spec Block Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     fn def_ana_spec_block(&mut self, context: &SpecBlockContext, block: &EA::SpecBlock) {
         let block_loc = self.parent.env.to_loc(&block.loc);
         self.update_spec(context, move |spec| spec.loc = Some(block_loc));
@@ -1566,7 +1566,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Let Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     fn def_ana_let(
         &mut self,
         context: &SpecBlockContext,
@@ -1614,7 +1614,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Pragma Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Definition analysis for a pragma.
     fn def_ana_pragma(
         &mut self,
@@ -1970,7 +1970,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Condition Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Check whether the condition is allowed in the given context. Return true if so, otherwise
     /// report an error and return false.
     fn check_condition_is_valid(
@@ -2446,7 +2446,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Spec Function Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Definition analysis for a specification helper function.
     fn def_ana_spec_fun(
         &mut self,
@@ -2490,7 +2490,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// ## Global Variable Definition Analysis
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Definition analysis for a specification variable function.
     fn def_ana_global_var(&mut self, loc: &Loc, name: &Name, init: Option<&EA::Exp>) {
         if let Some(exp) = init {
@@ -3403,7 +3403,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Spec Block Infos
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Collect location and target information for all spec blocks. This is used for documentation
     /// generation.
     fn collect_spec_block_infos(&mut self, module_def: &EA::ModuleDefinition) {
@@ -3456,7 +3456,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Tweak application
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     /// Tweak the specifications at the AST level based on `ModuleBuilderOptions`.
     fn apply_tweaks(&mut self, module_def: &EA::ModuleDefinition) {
         self.tweak_pragma_opaque(module_def);
@@ -3540,7 +3540,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 /// # Environment Population and finalization
 
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+impl ModuleBuilder<'_, '_> {
     fn populate_and_finalize_env(&mut self, loc: Loc, attributes: Vec<Attribute>) {
         let mut struct_data: BTreeMap<StructId, StructData> = Default::default();
         for (name, entry) in &self.parent.struct_table {

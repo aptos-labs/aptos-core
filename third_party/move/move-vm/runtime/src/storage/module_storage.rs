@@ -441,7 +441,7 @@ impl<T: ModuleStorage> AsFunctionValueExtension for T {
     }
 }
 
-impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
+impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,

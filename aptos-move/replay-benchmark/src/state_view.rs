@@ -49,7 +49,7 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
     }
 }
 
-impl<'s, S: StateView> TStateView for ReadSetCapturingStateView<'s, S> {
+impl<S: StateView> TStateView for ReadSetCapturingStateView<'_, S> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {

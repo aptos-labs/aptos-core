@@ -376,8 +376,8 @@ impl MempoolMessageId {
                             assert!(timeline_index_identifier < 128);
                             assert!(sender_bucket < 128);
                             (
-                                sender_bucket << 56 | timeline_index_identifier << 48 | old,
-                                sender_bucket << 56 | timeline_index_identifier << 48 | new,
+                                (sender_bucket << 56) | (timeline_index_identifier << 48) | old,
+                                (sender_bucket << 56) | (timeline_index_identifier << 48) | new,
                             )
                         })
                 })
@@ -391,7 +391,7 @@ impl MempoolMessageId {
         let mut result = HashMap::new();
         for (start, end) in self.0.iter() {
             let sender_bucket = (start >> 56) as MempoolSenderBucket;
-            let timeline_index_identifier = (start >> 48 & 0xFF) as TimelineIndexIdentifier;
+            let timeline_index_identifier = ((start >> 48) & 0xFF) as TimelineIndexIdentifier;
             // Remove the leading two bytes that indicates the sender bucket.
             let start = start & 0x0000FFFFFFFFFFFF;
             let end = end & 0x0000FFFFFFFFFFFF;

@@ -399,7 +399,7 @@ impl<'env> BoogieTranslator<'env> {
 // =================================================================================================
 // Struct Translation
 
-impl<'env> StructTranslator<'env> {
+impl StructTranslator<'_> {
     fn inst(&self, ty: &Type) -> Type {
         ty.instantiate(self.type_inst)
     }
@@ -824,7 +824,7 @@ impl<'env> StructTranslator<'env> {
 // =================================================================================================
 // Function Translation
 
-impl<'env> FunctionTranslator<'env> {
+impl FunctionTranslator<'_> {
     /// Return whether a specific TempIndex involves in bitwise operations
     pub fn bv_flag_from_map(&self, i: &usize, operation_map: &FuncOperationMap) -> bool {
         let mid = self.fun_target.module_env().get_id();
@@ -1210,7 +1210,7 @@ impl<'env> FunctionTranslator<'env> {
 // =================================================================================================
 // Bytecode Translation
 
-impl<'env> FunctionTranslator<'env> {
+impl FunctionTranslator<'_> {
     /// Translates one bytecode instruction.
     fn translate_bytecode(
         &self,

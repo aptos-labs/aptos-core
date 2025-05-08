@@ -350,7 +350,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Dispatcher
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
@@ -521,7 +521,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Values
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_value(&mut self, target: Vec<TempIndex>, id: NodeId, val: &Value) {
         let target = self.require_unary_target(id, target);
         let ty = self.get_node_type(id);
@@ -593,7 +593,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Locals
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_local(&mut self, targets: Vec<TempIndex>, id: NodeId, name: Symbol) {
         let target = self.require_unary_target(id, targets);
         let temp = self.find_local(id, name);
@@ -638,7 +638,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Calls
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_invoke(&mut self, targets: Vec<TempIndex>, id: NodeId, fun: &Exp, args: &[Exp]) {
         // Arguments are first computed, finally the function. (On a stack machine, the
         // function is on the top).
@@ -1302,7 +1302,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // References
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_borrow(&mut self, target: TempIndex, id: NodeId, kind: ReferenceKind, arg: &Exp) {
         match arg.as_ref() {
             ExpData::Call(_arg_id, Operation::Select(mid, sid, fid), args) => {
@@ -1387,7 +1387,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Structs
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     /// Generate code for a field selection. This needs to deal with the combination of the
     /// following cases which the type checker allows:
     /// (1) the operand is a reference or is not.
@@ -1660,7 +1660,7 @@ impl MatchMode {
     }
 }
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     /// Generate code for assignment of an expression to a pattern. This involves
     /// flattening nested patterns as needed. The optional `next_scope` is a
     /// scope to enter after the rhs exp has been compiled.
@@ -2471,7 +2471,7 @@ impl ValueShape {
     }
 }
 
-impl<'a> fmt::Display for ValueShapeDisplay<'a> {
+impl fmt::Display for ValueShapeDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use ValueShape::*;
         let fmt_list = |list: &[ValueShape], sep: &str| {

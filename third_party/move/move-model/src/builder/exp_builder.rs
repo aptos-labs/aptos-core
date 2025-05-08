@@ -836,9 +836,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
 /// # Unification Context
 
-impl<'env, 'builder, 'module_builder> UnificationContext
-    for ExpTranslator<'env, 'builder, 'module_builder>
-{
+impl UnificationContext for ExpTranslator<'_, '_, '_> {
     fn get_struct_field_decls(
         &self,
         id: &QualifiedInstId<StructId>,
@@ -891,9 +889,7 @@ impl<'env, 'builder, 'module_builder> UnificationContext
 
 /// # Ability Context
 
-impl<'env, 'builder, 'module_builder> AbilityContext
-    for ExpTranslator<'env, 'builder, 'module_builder>
-{
+impl AbilityContext for ExpTranslator<'_, '_, '_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         let (name, _, kind, loc) = &self.type_params[idx as usize];
         TypeParameter(*name, kind.clone(), loc.clone())
@@ -922,7 +918,7 @@ impl<'env, 'builder, 'module_builder> AbilityContext
 
 /// # Type Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     /// Translates a source AST type into a target AST type.
     pub fn translate_type(&mut self, ty: &EA::Type) -> Type {
         use EA::Type_::*;
@@ -1148,7 +1144,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
 /// # Access Specifier Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     pub(crate) fn translate_access_specifiers(
         &mut self,
         specifiers: &Option<Vec<EA::AccessSpecifier>>,
@@ -1398,7 +1394,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
 /// # Expression Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     /// Translates an expression representing a modify target
     pub fn translate_modify_target(&mut self, exp: &EA::Exp) -> ExpData {
         let loc = self.to_loc(&exp.loc);

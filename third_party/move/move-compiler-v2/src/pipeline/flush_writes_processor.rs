@@ -252,7 +252,7 @@ impl FlushWritesProcessor {
         block_end: CodeOffset,
         use_def_links: &UseDefLinks,
     ) -> bool {
-        use_def_links.def_to_use.get(&def).map_or(true, |uses| {
+        use_def_links.def_to_use.get(&def).is_none_or(|uses| {
             let exactly_one_use = uses.len() == 1;
             if !exactly_one_use {
                 // If there is more than one use, flush right away.

@@ -60,13 +60,13 @@ struct StagingModuleBytesStorage<'a, M> {
     module_storage: &'a M,
 }
 
-impl<'a, M> WithRuntimeEnvironment for StagingModuleBytesStorage<'a, M> {
+impl<M> WithRuntimeEnvironment for StagingModuleBytesStorage<'_, M> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         &self.staged_runtime_environment
     }
 }
 
-impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
+impl<M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,

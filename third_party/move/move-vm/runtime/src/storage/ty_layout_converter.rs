@@ -387,7 +387,7 @@ impl<'a> StorageLayoutConverter<'a> {
     }
 }
 
-impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
+impl LayoutConverterBase for StorageLayoutConverter<'_> {
     fn vm_config(&self) -> &VMConfig {
         self.storage.runtime_environment().vm_config()
     }
@@ -410,4 +410,4 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
     }
 }
 
-impl<'a> LayoutConverter for StorageLayoutConverter<'a> {}
+impl LayoutConverter for StorageLayoutConverter<'_> {}

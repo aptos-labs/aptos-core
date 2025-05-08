@@ -330,12 +330,9 @@ impl SafetyRules {
                 }
             },
         };
-        initialize_result.map_err(|error| {
-            info!(
-                SafetyLogSchema::new(LogEntry::KeyReconciliation, LogEvent::Error).error(&error),
-            );
+        initialize_result.inspect_err(|error| {
+            info!(SafetyLogSchema::new(LogEntry::KeyReconciliation, LogEvent::Error).error(error),);
             self.validator_signer = None;
-            error
         })
     }
 
@@ -483,14 +480,12 @@ where
     trace!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Request)));
     counters::increment_query(log_entry.as_str(), "request");
     callback()
-        .map(|v| {
+        .inspect(|v| {
             trace!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Success)));
             counters::increment_query(log_entry.as_str(), "success");
-            v
         })
-        .map_err(|err| {
-            warn!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Error)).error(&err));
+        .inspect_err(|err| {
+            warn!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Error)).error(err));
             counters::increment_query(log_entry.as_str(), "error");
-            err
         })
 }

@@ -629,8 +629,7 @@ impl DbReader for AptosDB {
                 let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
                 if latest_version
-                    .as_ref()
-                    .map_or(false, |v| first_version <= *v)
+                    .as_ref().is_some_and(|v| first_version <= *v)
                 {
                     let event = self
                         .ledger_db

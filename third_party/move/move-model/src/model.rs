@@ -4044,7 +4044,7 @@ pub struct FieldEnv<'env> {
     data: &'env FieldData,
 }
 
-impl<'env> FieldEnv<'env> {
+impl FieldEnv<'_> {
     /// Gets the name of this field.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4149,7 +4149,7 @@ pub struct NamedConstantEnv<'env> {
     data: &'env NamedConstantData,
 }
 
-impl<'env> NamedConstantEnv<'env> {
+impl NamedConstantEnv<'_> {
     /// Returns the name of this constant
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -5294,7 +5294,7 @@ impl Loc {
     }
 }
 
-impl<'env> fmt::Display for LocDisplay<'env> {
+impl fmt::Display for LocDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
             match &self.mode {
@@ -5361,7 +5361,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5370,7 +5370,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedInstId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedInstId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5390,13 +5390,13 @@ where
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+impl fmt::Display for EnvDisplay<'_, Symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Parameter> {
+impl fmt::Display for EnvDisplay<'_, Parameter> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let p = self.val;
         write!(

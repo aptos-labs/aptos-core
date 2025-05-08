@@ -252,7 +252,7 @@ where
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
-        self.get_usage().map_err(Into::into)
+        self.get_usage()
     }
 }
 

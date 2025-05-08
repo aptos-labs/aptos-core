@@ -168,7 +168,7 @@ impl<Key: Eq + Hash + Clone + Debug> TokenBucketRateLimiter<Key> {
         let mut buckets = self.buckets.write();
         let remove = buckets
             .get(key)
-            .map_or(false, |bucket| Arc::strong_count(bucket) <= 1);
+            .is_some_and(|bucket| Arc::strong_count(bucket) <= 1);
         if remove {
             buckets.remove(key);
         }

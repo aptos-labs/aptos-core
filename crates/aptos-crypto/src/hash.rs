@@ -456,7 +456,7 @@ impl<'a> HashValueBitIterator<'a> {
     }
 }
 
-impl<'a> std::iter::Iterator for HashValueBitIterator<'a> {
+impl std::iter::Iterator for HashValueBitIterator<'_> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -468,13 +468,13 @@ impl<'a> std::iter::Iterator for HashValueBitIterator<'a> {
     }
 }
 
-impl<'a> std::iter::DoubleEndedIterator for HashValueBitIterator<'a> {
+impl std::iter::DoubleEndedIterator for HashValueBitIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.pos.next_back().map(|x| self.get_bit(x))
     }
 }
 
-impl<'a> std::iter::ExactSizeIterator for HashValueBitIterator<'a> {}
+impl std::iter::ExactSizeIterator for HashValueBitIterator<'_> {}
 
 /// A type that can be cryptographically hashed to produce a `HashValue`.
 ///
