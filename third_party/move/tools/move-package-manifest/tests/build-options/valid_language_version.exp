@@ -1,0 +1,29 @@
+success
+
+PackageManifest {
+    package: PackageInfo {
+        name: "some_package_name",
+        version: Version {
+            major: 0,
+            minor: 1,
+            patch: 2,
+        },
+        authors: {},
+        license: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: Some(
+        BuildInfo {
+            language_version: Some(
+                Version {
+                    major: 0,
+                    minor: 1,
+                    patch: 2,
+                },
+            ),
+        },
+    ),
+    dependencies: {},
+    dev_dependencies: {},
+}

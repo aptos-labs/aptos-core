@@ -1,0 +1,33 @@
+success
+
+PackageManifest {
+    package: PackageInfo {
+        name: "some_package_name",
+        version: Version {
+            major: 0,
+            minor: 1,
+            patch: 2,
+        },
+        authors: {},
+        license: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: None,
+    dependencies: {
+        "a": Dependency {
+            version: Some(
+                Version {
+                    major: 1,
+                    minor: 2,
+                    patch: 3,
+                },
+            ),
+            addr_subst: {},
+            location: Local {
+                path: "../a",
+            },
+        },
+    },
+    dev_dependencies: {},
+}

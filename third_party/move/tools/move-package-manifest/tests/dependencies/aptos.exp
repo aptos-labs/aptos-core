@@ -1,0 +1,28 @@
+success
+
+PackageManifest {
+    package: PackageInfo {
+        name: "some_package_name",
+        version: Version {
+            major: 0,
+            minor: 1,
+            patch: 2,
+        },
+        authors: {},
+        license: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: None,
+    dependencies: {
+        "a": Dependency {
+            version: None,
+            addr_subst: {},
+            location: Aptos {
+                node_url: "mainnet",
+                package_addr: "0x1",
+            },
+        },
+    },
+    dev_dependencies: {},
+}
