@@ -7,7 +7,8 @@ use crate::{
     counters::update_counters_for_committed_blocks,
     logging::{LogEvent, LogSchema},
     persistent_liveness_storage::PersistentLivenessStorage,
-    util::calculate_window_start_round,
+    util,
+    util::BlockStorage,
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::{
@@ -241,29 +242,11 @@ impl BlockTree {
         self.id_to_quorum_cert.get(block_id).cloned()
     }
 
-    /// Retrieves a Window of Recent Blocks
-    ///
-    /// Returns an [`OrderedBlockWindow`](OrderedBlockWindow) containing the previous `window_size`
-    /// blocks, EXCLUDING the provided `current_block`. Returns an `OrderedBlockWindow` containing
+    /// Retrieves a window of recent blocks based on the given window size.
+    /// The window excludes the provided `current_block` and returns
     /// the recent blocks in ascending order by round (oldest -> newest).
     ///
-    /// # Parameters
-    /// - `current_block`: The reference block to base the window on.
-    /// - `window_size`: The number of recent blocks to include in the window, excluding the `current_block`.
-    ///
-    /// # Example
-    /// Given a `current_block` with `round: 30` and a `window_size` of 3:
-    ///
-    /// ```text
-    /// get_block_window(current_block, window_size)
-    /// // returns vec![
-    /// //     Block { BlockData { round: 28 } },
-    /// //     Block { BlockData { round: 29 } }
-    /// // ]
-    /// ```
-    ///
-    /// *Note*: The output vector in this example contains 2 blocks, not 3, as only blocks with rounds
-    /// preceding `current_block.round()` are included.
+    /// See `get_block_window_from_storage()` for the exact window logic.
     pub fn get_ordered_block_window(
         &self,
         block: &Block,
@@ -281,30 +264,10 @@ impl BlockTree {
         let Some(window_size) = window_size else {
             return Ok(OrderedBlockWindow::empty());
         };
-        let round = block.round();
-        let window_start_round = calculate_window_start_round(round, window_size);
-        let window_size = round - window_start_round + 1;
-        ensure!(window_size > 0, "window_size must be greater than 0");
 
-        let mut window = vec![];
-        let mut current_block = block.clone();
-
-        // Add each block to the window until you reach the start round
-        while !current_block.is_genesis_block()
-            && current_block.quorum_cert().certified_block().round() >= window_start_round
-        {
-            if let Some(current_pipelined_block) = self.get_block(&current_block.parent_id()) {
-                current_block = current_pipelined_block.block().clone();
-                window.push(current_pipelined_block);
-            } else {
-                bail!("Parent block not found for block {}", current_block.id());
-            }
-        }
-
-        // The window order is lower round -> higher round
-        window.reverse();
-        ensure!(window.len() < window_size as usize);
-        Ok(OrderedBlockWindow::new(window))
+        // Get the ordered block window (execution pool is enabled)
+        let block_window = util::get_block_window_from_storage(Arc::new(self), block, window_size)?;
+        Ok(OrderedBlockWindow::new(block_window))
     }
 
     pub(super) fn insert_block(
@@ -666,5 +629,13 @@ impl BlockTree {
     fn linkable_root(&self) -> &LinkableBlock {
         self.get_linkable_block(&self.commit_root_id)
             .expect("Root must exist")
+    }
+}
+
+/// Implement the BlockStorage trait for the BlockTree.
+/// This is required to calculate and fetch the block window.
+impl BlockStorage for BlockTree {
+    fn get_pipelined_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
+        self.get_block(block_id)
     }
 }
