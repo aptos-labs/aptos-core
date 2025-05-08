@@ -305,7 +305,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Returns specification associated with this function.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.func_env.get_spec()
     }
 

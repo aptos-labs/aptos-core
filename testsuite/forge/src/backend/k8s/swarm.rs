@@ -66,7 +66,7 @@ pub struct K8sSwarm {
 }
 
 impl K8sSwarm {
-    pub async fn new<'b>(
+    pub async fn new(
         root_key: &[u8],
         image_tag: &str,
         upgrade_image_tag: &str,

@@ -480,7 +480,7 @@ where
     trace!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Request)));
     counters::increment_query(log_entry.as_str(), "request");
     callback()
-        .inspect(|v| {
+        .inspect(|_v| {
             trace!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Success)));
             counters::increment_query(log_entry.as_str(), "success");
         })

@@ -989,7 +989,7 @@ impl TxnEmitter {
 }
 
 #[allow(dead_code)]
-fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
+fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 

@@ -93,7 +93,7 @@ pub struct DebuggerStateView {
     version: Version,
 }
 
-async fn handler_thread<'a>(
+async fn handler_thread(
     db: Arc<dyn AptosValidatorInterface + Send>,
     mut thread_receiver: UnboundedReceiver<(
         StateKey,

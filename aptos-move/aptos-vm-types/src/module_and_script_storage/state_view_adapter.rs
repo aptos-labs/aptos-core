@@ -199,7 +199,10 @@ where
     S: StateView,
     E: WithRuntimeEnvironment,
 {
-    fn as_aptos_code_storage(&'ctx self, environment: &'ctx E) -> AptosCodeStorageAdapter<S, E> {
+    fn as_aptos_code_storage(
+        &'ctx self,
+        environment: &'ctx E,
+    ) -> AptosCodeStorageAdapter<'ctx, S, E> {
         let adapter = StateViewAdapter {
             environment,
             state_view: self,

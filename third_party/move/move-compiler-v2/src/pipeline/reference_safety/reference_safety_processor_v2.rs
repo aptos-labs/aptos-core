@@ -819,7 +819,7 @@ impl LifetimeState {
     fn parent_edges<'a>(
         &'a self,
         label: &'a LifetimeLabel,
-    ) -> impl Iterator<Item = (LifetimeLabel, &'a BorrowEdge)> + '_ {
+    ) -> impl Iterator<Item = (LifetimeLabel, &'a BorrowEdge)> + 'a {
         self.node(label).parents.iter().flat_map(move |parent| {
             self.children(parent)
                 .filter(move |edge| &edge.target == label)
@@ -921,7 +921,7 @@ impl LifeTimeAnalysis<'_> {
         code_offset: CodeOffset,
         attr_id: AttrId,
         state: &'a mut LifetimeState,
-    ) -> LifetimeAnalysisStep {
+    ) -> LifetimeAnalysisStep<'a, 'a> {
         let alive = self
             .live_var_annotation
             .get_live_var_info_at(code_offset)

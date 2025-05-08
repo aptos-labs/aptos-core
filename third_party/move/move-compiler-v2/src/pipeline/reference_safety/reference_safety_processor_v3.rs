@@ -383,7 +383,7 @@ impl LifeTimeAnalysis<'_> {
         code_offset: CodeOffset,
         attr_id: AttrId,
         state: &'a mut LifetimeState,
-    ) -> LifetimeAnalysisStep {
+    ) -> LifetimeAnalysisStep<'a, 'a> {
         let alive = self
             .live_var_annotation
             .get_live_var_info_at(code_offset)

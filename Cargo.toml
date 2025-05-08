@@ -818,8 +818,8 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
-wasm-bindgen = "0.2.95"
-wasm-bindgen-futures = "0.4.42"
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
 which = "4.2.5"
 whoami = "1.5.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.

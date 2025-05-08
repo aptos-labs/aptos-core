@@ -4964,12 +4964,12 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns associated specification.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.data.spec.borrow()
     }
 
     /// Returns associated mutable reference to specification.
-    pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
+    pub fn get_mut_spec(&'env self) -> RefMut<'env, Spec> {
         self.data.spec.borrow_mut()
     }
 
