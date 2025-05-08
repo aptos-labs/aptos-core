@@ -252,7 +252,7 @@ module aptos_framework::ethereum_derivable_account {
     }
 
     #[test]
-    fun test_deserialize_abstract_signature() {
+    fun test_deserialize_abstract_signature_with_https() {
         let signature_bytes = vector[
             249, 247, 194, 250, 31, 233, 100, 234, 109, 142, 6, 193, 203, 33, 147, 199,
             236, 117, 69, 119, 252, 219, 150, 143, 28, 112, 33, 9, 95, 53, 0, 69,
@@ -271,6 +271,31 @@ module aptos_framework::ethereum_derivable_account {
             SIWEAbstractSignature::MessageV2 { signature, issued_at, scheme } => {
                 assert!(scheme == utf8(b"https"));
                 assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
+                assert!(signature == signature_bytes);
+            },
+        };
+    }
+
+    #[test]
+    fun test_deserialize_abstract_signature_with_http() {
+        let signature_bytes = vector[
+            1, 252, 18, 58, 243, 10, 152, 94, 33, 5, 76, 133, 39, 188, 25, 92,
+            242, 39, 32, 84, 181, 94, 231, 9, 49, 141, 131, 20, 108, 93, 76, 144,
+            47, 20, 83, 177, 107, 22, 148, 93, 191, 165, 86, 42, 181, 226, 116, 136,
+            133, 84, 35, 222, 24, 36, 176, 143, 15, 14, 182, 135, 153, 141, 238, 238,
+            28
+            ];
+        let abstract_signature = create_raw_signature(utf8(b"http"), utf8(b"2025-05-08T23:39:00.000Z"), signature_bytes);
+        let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
+        assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV2);
+        match (siwe_abstract_signature) {
+            SIWEAbstractSignature::MessageV1 { signature, issued_at } => {
+                assert!(issued_at == utf8(b"2025-05-08T23:39:00.000Z"));
+                assert!(signature == signature_bytes);
+            },
+            SIWEAbstractSignature::MessageV2 { signature, issued_at, scheme } => {
+                assert!(scheme == utf8(b"http"));
+                assert!(issued_at == utf8(b"2025-05-08T23:39:00.000Z"));
                 assert!(signature == signature_bytes);
             },
         };
