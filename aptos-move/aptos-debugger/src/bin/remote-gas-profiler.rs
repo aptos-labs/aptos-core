@@ -4,7 +4,7 @@
 use anyhow::{bail, Result};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::Client;
-use aptos_types::transaction::Transaction;
+use aptos_types::transaction::{BlockchainGeneratedInfo, Transaction};
 use aptos_vm::AptosVM;
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -49,13 +49,20 @@ async fn main() -> Result<()> {
         .get_committed_transaction_at_version(version)
         .await?;
 
-    let txn = match txn {
-        Transaction::UserTransaction(txn) => txn,
+    let (txn, blockchain_generated_info) = match txn {
+        Transaction::UserTransaction(txn) => (txn, BlockchainGeneratedInfo::default()),
+        Transaction::UserTransactionWithInfo(txn) => (
+            txn.transaction().clone(),
+            txn.blockchain_generated_info().clone(),
+        ),
         _ => bail!("not a user transaction"),
     };
 
-    let (_status, output, gas_log) =
-        debugger.execute_transaction_at_version_with_gas_profiler(version, txn)?;
+    let (_status, output, gas_log) = debugger.execute_transaction_at_version_with_gas_profiler(
+        version,
+        txn,
+        blockchain_generated_info,
+    )?;
 
     let txn_output =
         output.try_materialize_into_transaction_output(&debugger.state_view_at_version(version))?;

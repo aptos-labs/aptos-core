@@ -53,11 +53,11 @@ impl ExecutorTask for AptosExecutorTask {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
+        let log_context = AdapterLogSchema::new(self.id, txn_idx);
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         match self
             .vm
-            .execute_single_transaction(txn, &resolver, view, &log_context)
+            .execute_single_transaction(txn, &resolver, view, &log_context, txn_idx)
         {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {

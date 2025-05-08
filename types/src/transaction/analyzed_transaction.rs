@@ -268,17 +268,17 @@ impl AnalyzedTransactionProvider for Transaction {
                 ),
             }
         };
-        match self {
-            Transaction::UserTransaction(signed_txn) => match signed_txn.payload().executable_ref()
-            {
+        if let Some(signed_txn) = self.try_as_signed_user_txn() {
+            match signed_txn.payload().executable_ref() {
                 Ok(TransactionExecutableRef::EntryFunction(func))
                     if !signed_txn.payload().is_multisig() =>
                 {
                     process_entry_function(func, signed_txn.sender())
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
-            },
-            _ => empty_rw_set(),
+            }
+        } else {
+            empty_rw_set()
         }
     }
 }

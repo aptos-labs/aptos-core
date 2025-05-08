@@ -140,6 +140,7 @@ pub enum FeatureFlag {
     ORDERLESS_TRANSACTIONS = 94,
     // TODO(lazy-loading): Add link to AIP and its number + brief description.
     ENABLE_LAZY_LOADING = 95,
+    MONOTONICALLY_INCREASING_COUNTER = 96,
 }
 
 impl FeatureFlag {
@@ -235,6 +236,7 @@ impl FeatureFlag {
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
             FeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::ORDERLESS_TRANSACTIONS,
+            FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
         ]
     }
 }
