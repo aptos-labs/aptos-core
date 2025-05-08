@@ -174,14 +174,14 @@ impl DbReader for AptosDB {
     /// This API is best-effort in that it CANNOT provide absence proof.
     fn get_transaction_by_hash(
         &self,
-        hash: HashValue,
+        submitted_txn_hash: HashValue,
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
         gauged_api("get_transaction_by_hash", || {
             self.ledger_db
                 .transaction_db()
-                .get_transaction_version_by_hash(&hash, ledger_version)?
+                .get_transaction_version_by_hash(&submitted_txn_hash, ledger_version)?
                 .map(|v| self.get_transaction_with_proof(v, ledger_version, fetch_events))
                 .transpose()
         })

@@ -9,9 +9,7 @@ use crate::{
     common::{to_hex_lower, BlockHash, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_types::{
-    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionInfo,
-};
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::{TryFrom, TryInto},
@@ -522,14 +520,6 @@ impl PartialBlockIdentifier {
 pub struct TransactionIdentifier {
     /// The hash of the transaction so it can be looked up in mempool
     pub hash: String,
-}
-
-impl From<&TransactionInfo> for TransactionIdentifier {
-    fn from(txn: &TransactionInfo) -> Self {
-        TransactionIdentifier {
-            hash: to_hex_lower(&txn.transaction_hash()),
-        }
-    }
 }
 
 impl From<aptos_crypto::HashValue> for TransactionIdentifier {

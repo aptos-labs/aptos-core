@@ -10,7 +10,7 @@ pub fn transaction_hashes(transactions: &[&SignedTransaction]) -> Vec<String> {
         // This is clearly gross. If we commit to returning only txn hashes
         // we can simplify this: https://github.com/aptos-labs/aptos-tap/issues/20.
         let c = transaction.to_owned().to_owned();
-        let hash: HashValue = c.committed_hash();
+        let hash: HashValue = c.submitted_txn_hash();
         out.push(hash.to_string());
     }
     out

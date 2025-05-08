@@ -7,7 +7,7 @@ use crate::{
     transaction::{BlockExecutableTransaction, Transaction},
     write_set::WriteOp,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -61,18 +61,17 @@ impl SignatureVerifiedTransaction {
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => match txn {
-                Transaction::UserTransaction(txn) => Some(txn.sender()),
-                _ => None,
-            },
+            SignatureVerifiedTransaction::Valid(txn) => txn
+                .try_as_signed_user_txn()
+                .map(|signed_txn| signed_txn.sender()),
             SignatureVerifiedTransaction::Invalid(_) => None,
         }
     }
 
-    pub fn hash(&self) -> HashValue {
+    pub fn submitted_txn_hash(&self) -> HashValue {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn.hash(),
-            SignatureVerifiedTransaction::Invalid(txn) => txn.hash(),
+            SignatureVerifiedTransaction::Valid(txn) => txn.submitted_txn_hash(),
+            SignatureVerifiedTransaction::Invalid(txn) => txn.submitted_txn_hash(),
         }
     }
 
@@ -92,9 +91,9 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 
     fn user_txn_bytes_len(&self) -> usize {
         match self {
-            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => {
-                txn.txn_bytes_len()
-            },
+            SignatureVerifiedTransaction::Valid(txn) => txn
+                .try_as_signed_user_txn()
+                .map_or(0, |signed_txn| signed_txn.txn_bytes_len()),
             _ => 0,
         }
     }
@@ -106,6 +105,15 @@ impl From<Transaction> for SignatureVerifiedTransaction {
             Transaction::UserTransaction(txn) => match txn.verify_signature() {
                 Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
                 Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+            },
+            Transaction::UserTransactionWithInfo(txn) => match txn.transaction().verify_signature()
+            {
+                Ok(_) => {
+                    SignatureVerifiedTransaction::Valid(Transaction::UserTransactionWithInfo(txn))
+                },
+                Err(_) => {
+                    SignatureVerifiedTransaction::Invalid(Transaction::UserTransactionWithInfo(txn))
+                },
             },
             _ => SignatureVerifiedTransaction::Valid(txn),
         }

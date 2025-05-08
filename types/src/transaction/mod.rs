@@ -952,9 +952,14 @@ pub struct SignedTransaction {
     #[serde(skip)]
     authenticator_size: OnceCell<usize>,
 
-    /// A cached hash of the transaction.
+    /// A cached hash of Transaction::UserTransaction(signed_txn).
     #[serde(skip)]
-    committed_hash: OnceCell<HashValue>,
+    submitted_txn_hash: OnceCell<HashValue>,
+
+    /// A cached hash of how the transaction is stored on-chain, which could be either
+    /// as Transaction::UserTransaction or Transaction::UserTransactionWithInfo).
+    #[serde(skip)]
+    onchain_hash: OnceCell<HashValue>,
 }
 
 /// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
@@ -1013,7 +1018,8 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
+            submitted_txn_hash: OnceCell::new(),
+            onchain_hash: OnceCell::new(),
         }
     }
 
@@ -1028,7 +1034,8 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
+            submitted_txn_hash: OnceCell::new(),
+            onchain_hash: OnceCell::new(),
         }
     }
 
@@ -1219,11 +1226,15 @@ impl SignedTransaction {
         )
     }
 
-    /// Returns the hash when the transaction is committed onchain.
-    pub fn committed_hash(&self) -> HashValue {
-        *self
-            .committed_hash
-            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
+    /// Returns the hash of Transaction::UserTransaction(signed_txn).
+    pub fn submitted_txn_hash(&self) -> HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+        *self.submitted_txn_hash.get_or_init(|| {
+            let mut state = TransactionHasher::default();
+            bcs::serialize_into(&mut state, &Transaction::UserTransaction(self.clone()))
+                .expect("BCS serialization of Transaction should not fail");
+            state.finish()
+        })
     }
 
     pub fn replay_protector(&self) -> ReplayProtector {
@@ -1272,6 +1283,80 @@ impl IndexedTransactionSummary {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SignedTransactionWithInfo {
+    V1 {
+        transaction: SignedTransaction,
+
+        blockchain_generated_info: BlockchainGeneratedInfo,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BlockchainGeneratedInfo {
+    V1 { transaction_index: u32 },
+}
+
+impl SignedTransactionWithInfo {
+    pub fn new(
+        transaction: SignedTransaction,
+        blockchain_generated_info: BlockchainGeneratedInfo,
+    ) -> Self {
+        Self::V1 {
+            transaction,
+            blockchain_generated_info,
+        }
+    }
+
+    pub fn transaction(&self) -> &SignedTransaction {
+        match self {
+            Self::V1 { transaction, .. } => transaction,
+        }
+    }
+
+    pub fn into_transaction(self) -> SignedTransaction {
+        match self {
+            Self::V1 { transaction, .. } => transaction,
+        }
+    }
+
+    pub fn blockchain_generated_info(&self) -> &BlockchainGeneratedInfo {
+        match self {
+            Self::V1 {
+                blockchain_generated_info,
+                ..
+            } => blockchain_generated_info,
+        }
+    }
+
+    pub fn transaction_index(&self) -> u32 {
+        match self {
+            Self::V1 {
+                blockchain_generated_info,
+                ..
+            } => blockchain_generated_info.transaction_index(),
+        }
+    }
+}
+
+impl BlockchainGeneratedInfo {
+    pub fn transaction_index(&self) -> u32 {
+        match self {
+            Self::V1 {
+                transaction_index, ..
+            } => *transaction_index,
+        }
+    }
+}
+
+impl Default for BlockchainGeneratedInfo {
+    fn default() -> Self {
+        Self::V1 {
+            transaction_index: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {
     pub version: Version,
@@ -1296,12 +1381,12 @@ impl TransactionWithProof {
     }
 
     pub fn verify(&self, ledger_info: &LedgerInfo) -> Result<()> {
-        let txn_hash = self.transaction.hash();
+        let txn_onchain_hash = self.transaction.onchain_hash();
         ensure!(
-            txn_hash == self.proof.transaction_info().transaction_hash(),
-            "Transaction hash ({}) not expected ({}).",
-            txn_hash,
-            self.proof.transaction_info().transaction_hash(),
+            txn_onchain_hash == self.proof.transaction_info().transaction_onchain_hash(),
+            "Transaction onchain hash ({}) not expected ({}).",
+            txn_onchain_hash,
+            self.proof.transaction_info().transaction_onchain_hash(),
         );
 
         if let Some(events) = &self.events {
@@ -1850,7 +1935,7 @@ pub enum TransactionInfo {
 
 impl TransactionInfo {
     pub fn new(
-        transaction_hash: HashValue,
+        transaction_onchain_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
         state_checkpoint_hash: Option<HashValue>,
@@ -1858,7 +1943,7 @@ impl TransactionInfo {
         status: ExecutionStatus,
     ) -> Self {
         Self::V0(TransactionInfoV0::new(
-            transaction_hash,
+            transaction_onchain_hash,
             state_change_hash,
             event_root_hash,
             state_checkpoint_hash,
@@ -1918,6 +2003,7 @@ pub struct TransactionInfoV0 {
     status: ExecutionStatus,
 
     /// The hash of this transaction.
+    /// This is computed using transaction.onchain_hash() method.
     transaction_hash: HashValue,
 
     /// The root hash of Merkle Accumulator storing all events emitted during this transaction.
@@ -1938,7 +2024,7 @@ pub struct TransactionInfoV0 {
 
 impl TransactionInfoV0 {
     pub fn new(
-        transaction_hash: HashValue,
+        transaction_onchain_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
         state_checkpoint_hash: Option<HashValue>,
@@ -1948,7 +2034,7 @@ impl TransactionInfoV0 {
         Self {
             gas_used,
             status,
-            transaction_hash,
+            transaction_hash: transaction_onchain_hash,
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
@@ -1956,7 +2042,7 @@ impl TransactionInfoV0 {
         }
     }
 
-    pub fn transaction_hash(&self) -> HashValue {
+    pub fn transaction_onchain_hash(&self) -> HashValue {
         self.transaction_hash
     }
 
@@ -1994,8 +2080,8 @@ impl Display for TransactionInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "TransactionInfo: [txn_hash: {}, state_change_hash: {}, event_root_hash: {}, state_checkpoint_hash: {:?}, gas_used: {}, recorded_status: {:?}]",
-            self.transaction_hash(), self.state_change_hash(), self.event_root_hash(), self.state_checkpoint_hash(), self.gas_used(), self.status(),
+            "TransactionInfo: [txn_onchain_hash: {}, state_change_hash: {}, event_root_hash: {}, state_checkpoint_hash: {:?}, gas_used: {}, recorded_status: {:?}]",
+            self.transaction_onchain_hash(), self.state_change_hash(), self.event_root_hash(), self.state_checkpoint_hash(), self.gas_used(), self.status(),
         )
     }
 }
@@ -2190,13 +2276,13 @@ impl TransactionListWithProof {
             .par_iter()
             .zip_eq(self.proof.transaction_infos.par_iter())
             .map(|(txn, txn_info)| {
-                let txn_hash = CryptoHash::hash(txn);
+                let txn_onchain_hash = txn.onchain_hash();
                 ensure!(
-                    txn_hash == txn_info.transaction_hash(),
-                    "The hash of transaction does not match the transaction info in proof. \
-                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
-                    txn_hash,
-                    txn_info.transaction_hash(),
+                    txn_onchain_hash == txn_info.transaction_onchain_hash(),
+                    "The onchain hash of transaction does not match the transaction info in proof. \
+                     Transaction onchain hash: {:x}. Transaction onchain hash in txn_info: {:x}.",
+                    txn_onchain_hash,
+                    txn_info.transaction_onchain_hash(),
                 );
                 Ok(())
             })
@@ -2325,13 +2411,13 @@ impl TransactionOutputListWithProof {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_onchain_hash = txn.onchain_hash();
             ensure!(
-                txn_hash == txn_info.transaction_hash(),
+                txn_onchain_hash == txn_info.transaction_onchain_hash(),
                 "The transaction hash does not match the hash in transaction info. \
                      Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
-                txn_hash,
-                txn_info.transaction_hash(),
+                txn_onchain_hash,
+                txn_info.transaction_onchain_hash(),
             );
             Ok(())
         })
@@ -2451,7 +2537,7 @@ impl AccountOrderedTransactionsWithProof {
 /// transaction.
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
 pub enum Transaction {
     /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
     /// transaction, etc.
@@ -2483,6 +2569,10 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
+    /// transaction, etc., along with some blockchain generated info related to the transaction.
+    UserTransactionWithInfo(SignedTransactionWithInfo),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2495,6 +2585,63 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
+    // This hash of the transaction doesn't include BlockchainGeneratedInfo when hasing the transaction.
+    // It first converts Transaction::UserTransactionWithInfo(SignedTransactionWithInfo) to Transaction::UserTransaction(SignedTransaction)
+    // and then hashes the transaction.
+    // This is used in mempool, quorum store, block proof queue, transactions_by_hash DB schema, /transactions/by_hash/:hash API, transaction emitter,
+    // transaction summary, transaction filter, indexer, etc.
+    pub fn submitted_txn_hash(&self) -> HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+
+        // Check cache first
+        if let Some(signed_txn) = self.try_as_signed_user_txn() {
+            if let Some(hash) = signed_txn.submitted_txn_hash.get() {
+                return *hash;
+            }
+        }
+
+        // Compute hash
+        let mut state = TransactionHasher::default();
+        let txn_to_hash = match self {
+            Transaction::UserTransactionWithInfo(txn) => {
+                Transaction::UserTransaction(txn.transaction().clone())
+            },
+            _ => self.clone(),
+        };
+        bcs::serialize_into(&mut state, &txn_to_hash)
+            .expect("BCS serialization of Transaction should not fail");
+        let hash = state.finish();
+
+        // Cache the hash if possible
+        if let Some(signed_txn) = self.try_as_signed_user_txn() {
+            signed_txn.submitted_txn_hash.set(hash).unwrap();
+        }
+
+        hash
+    }
+
+    // This hash of the transaction includes BlockchainGeneratedInfo when hasing the transaction.
+    // It hashes the transaction as it is stored on-chain.
+    // This is used in transaction_info in accumulator, TransactionInfoSchema in transaction info db, TransactionWithProof.
+    // This hash is not stored in the indexer.
+    pub fn onchain_hash(&self) -> HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+
+        let mut state = TransactionHasher::default();
+        match self.try_as_signed_user_txn() {
+            Some(signed_txn) => *signed_txn.onchain_hash.get_or_init(|| {
+                bcs::serialize_into(&mut state, &self)
+                    .expect("BCS serialization of Transaction should not fail");
+                state.finish()
+            }),
+            None => {
+                bcs::serialize_into(&mut state, &self)
+                    .expect("BCS serialization of Transaction should not fail");
+                state.finish()
+            },
+        }
+    }
+
     pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V0 {
             block_id,
@@ -2505,6 +2652,15 @@ impl Transaction {
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::UserTransactionWithInfo(txn) => Some(txn.transaction()),
+            _ => None,
+        }
+    }
+
+    pub fn try_into_signed_user_txn(self) -> Option<SignedTransaction> {
+        match self {
+            Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::UserTransactionWithInfo(txn) => Some(txn.into_transaction()),
             _ => None,
         }
     }
@@ -2533,6 +2689,7 @@ impl Transaction {
     pub fn type_name(&self) -> &'static str {
         match self {
             Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::UserTransactionWithInfo(_) => "user_transaction",
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
@@ -2551,6 +2708,7 @@ impl Transaction {
         match self {
             Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
             Transaction::UserTransaction(_)
+            | Transaction::UserTransactionWithInfo(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
@@ -2564,6 +2722,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_)
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
+            | Transaction::UserTransactionWithInfo(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
         }
@@ -2576,6 +2735,7 @@ impl TryFrom<Transaction> for SignedTransaction {
     fn try_from(txn: Transaction) -> Result<Self> {
         match txn {
             Transaction::UserTransaction(txn) => Ok(txn),
+            Transaction::UserTransactionWithInfo(txn) => Ok(txn.into_transaction()),
             _ => Err(format_err!("Not a user transaction.")),
         }
     }

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ledger_db::transaction_db::TransactionDb, AptosDB};
-use aptos_crypto::hash::CryptoHash;
 use aptos_proptest_helpers::Index;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
@@ -31,11 +30,11 @@ proptest! {
 
         let num_txns = txns.len();
         for (version, txn) in txns.into_iter().enumerate() {
-            let hash = txn.hash();
+            let submitted_txn_hash = txn.submitted_txn_hash();
             prop_assert_eq!(transaction_db.get_transaction(version as Version).unwrap(), txn);
-            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash, num_txns as Version).unwrap(), Some(version as Version));
+            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&submitted_txn_hash, num_txns as Version).unwrap(), Some(version as Version));
             if version > 0 {
-                prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash, version as Version - 1).unwrap(), None);
+                prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&submitted_txn_hash, version as Version - 1).unwrap(), None);
             }
         }
 
@@ -120,25 +119,40 @@ proptest! {
 
         {
             prop_assert!(transaction_db.get_transaction(1).is_ok());
-            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), Some(1));
+            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].submitted_txn_hash(), num_txns as Version).unwrap(), Some(1));
             let mut batch = SchemaBatch::new();
-            transaction_db.prune_transaction_by_hash_indices(std::iter::once(txns[1].hash()), &mut batch).unwrap();
+            transaction_db.prune_transaction_by_hash_indices(std::iter::once(txns[1].submitted_txn_hash()), &mut batch).unwrap();
             transaction_db.write_schemas(batch).unwrap();
             prop_assert!(transaction_db.get_transaction(1).is_ok());
-            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), None);
+            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].submitted_txn_hash(), num_txns as Version).unwrap(), None);
         }
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
 pub(crate) fn init_db(
     mut universe: AccountInfoUniverse,
     gens: Vec<(Index, SignatureCheckedTransactionGen)>,
     transaction_db: &TransactionDb,
 ) -> Vec<Transaction> {
+    use aptos_types::transaction::{BlockchainGeneratedInfo, SignedTransactionWithInfo};
+
     let txns = gens
         .into_iter()
-        .map(|(index, gen)| {
-            Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+        .enumerate()
+        .map(|(i, (index, gen))| {
+            // Committing both Transaction::UserTransaction and Transaction::UserTransactionWithInfo
+            // to test the correctness of the transaction db.
+            if i % 2 == 0 {
+                Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+            } else {
+                Transaction::UserTransactionWithInfo(SignedTransactionWithInfo::new(
+                    gen.materialize(*index, &mut universe).into_inner(),
+                    BlockchainGeneratedInfo::V1 {
+                        transaction_index: i as u32,
+                    },
+                ))
+            }
         })
         .collect::<Vec<_>>();
 

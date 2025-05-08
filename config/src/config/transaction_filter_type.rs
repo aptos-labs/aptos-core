@@ -27,7 +27,7 @@ impl Matcher {
             Matcher::BlockId(id) => block_id == *id,
             Matcher::BlockTimeStampGreaterThan(ts) => timestamp > *ts,
             Matcher::BlockTimeStampLessThan(ts) => timestamp < *ts,
-            Matcher::TransactionId(id) => txn.committed_hash() == *id,
+            Matcher::TransactionId(id) => txn.submitted_txn_hash() == *id,
             Matcher::Sender(sender) => txn.sender() == *sender,
             Matcher::ModuleAddress(address) => match txn.payload().executable_ref() {
                 Ok(TransactionExecutableRef::EntryFunction(entry_function))

@@ -436,7 +436,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(0),
-        &txns[1].committed_hash(), // hash of other txn
+        &txns[1].submitted_txn_hash(), // hash of other txn
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -449,7 +449,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(1),
-        &txns[0].committed_hash(), // hash of other txn
+        &txns[0].submitted_txn_hash(), // hash of other txn
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -465,7 +465,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(0),
-        &txns[0].committed_hash(),
+        &txns[0].submitted_txn_hash(),
         &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
@@ -478,7 +478,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(1),
-        &txns[1].committed_hash(),
+        &txns[1].submitted_txn_hash(),
         &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
@@ -493,7 +493,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(0),
-        &txns[0].committed_hash(),
+        &txns[0].submitted_txn_hash(),
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -506,7 +506,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(1),
-        &txns[1].committed_hash(),
+        &txns[1].submitted_txn_hash(),
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -576,7 +576,7 @@ fn test_reset_sequence_number_on_failure() {
     let hashes: Vec<_> = txns
         .iter()
         .cloned()
-        .map(|txn| txn.make_signed_transaction().committed_hash())
+        .map(|txn| txn.make_signed_transaction().submitted_txn_hash())
         .collect();
     // Add two transactions for account.
     add_txns_to_mempool(&mut pool, vec![
@@ -1228,7 +1228,7 @@ fn test_parking_lot_eviction_benchmark() {
     // // Add one huge transaction that will evict all transactions from parking lot
     // let huge_signed_txn = TestTransaction::new_with_huge_script(0, 1, 1).make_signed_transaction();
     // // Pre-compute these values, as shared mempool would do
-    // huge_signed_txn.committed_hash();
+    // huge_signed_txn.submitted_txn_hash();
     // huge_signed_txn.txn_bytes_len();
     //
     // let now = Instant::now();
@@ -1265,7 +1265,7 @@ fn test_parking_lot_eviction_benchmark() {
         TestTransaction::new_with_huge_script(1, ReplayProtector::SequenceNumber(0), 1)
             .make_signed_transaction();
     // Pre-compute these values, as shared mempool would do
-    huge_signed_txn.committed_hash();
+    huge_signed_txn.submitted_txn_hash();
     huge_signed_txn.txn_bytes_len();
     let now = Instant::now();
     add_signed_txn(&mut pool, huge_signed_txn).unwrap();
@@ -1453,7 +1453,7 @@ fn test_get_transaction_by_hash() {
         None,
         Some(BroadcastPeerPriority::Primary),
     );
-    let hash = txn.committed_hash();
+    let hash = txn.submitted_txn_hash();
     let ret = pool.get_by_hash(hash);
     assert_eq!(ret, Some(txn));
 
@@ -1477,7 +1477,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         None,
         Some(BroadcastPeerPriority::Primary),
     );
-    let hash = txn.committed_hash();
+    let hash = txn.submitted_txn_hash();
 
     // new txn with higher gas price
     let new_txn = TestTransaction::new(0, ReplayProtector::SequenceNumber(db_sequence_number), 100)
@@ -1491,7 +1491,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         None,
         Some(BroadcastPeerPriority::Primary),
     );
-    let new_txn_hash = new_txn.committed_hash();
+    let new_txn_hash = new_txn.submitted_txn_hash();
 
     let txn_by_old_hash = pool.get_by_hash(hash);
     assert!(txn_by_old_hash.is_none());
@@ -1566,7 +1566,7 @@ fn test_transaction_store_remove_account_if_empty() {
 
     let txn =
         TestTransaction::new(2, ReplayProtector::SequenceNumber(2), 1).make_signed_transaction();
-    let hash = txn.committed_hash();
+    let hash = txn.submitted_txn_hash();
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
@@ -1714,7 +1714,7 @@ fn test_include_gas_upgraded() {
     let low_gas_txn = TransactionSummary::new(
         low_gas_signed_txn.sender(),
         ReplayProtector::SequenceNumber(low_gas_signed_txn.sequence_number()),
-        low_gas_signed_txn.committed_hash(),
+        low_gas_signed_txn.submitted_txn_hash(),
     );
     let batch = pool.get_batch(10, 10240, true, btreemap! {
         low_gas_txn => TransactionInProgress::new(low_gas_price)
@@ -1734,7 +1734,7 @@ fn test_include_gas_upgraded() {
     let high_gas_txn = TransactionSummary::new(
         high_gas_signed_txn.sender(),
         ReplayProtector::SequenceNumber(high_gas_signed_txn.sequence_number()),
-        high_gas_signed_txn.committed_hash(),
+        high_gas_signed_txn.submitted_txn_hash(),
     );
 
     // When the low gas txn (but not the high gas txn) is excluded, will the high gas txn be included.

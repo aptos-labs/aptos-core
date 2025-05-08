@@ -17,7 +17,7 @@ use crate::{
     TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::hash::CryptoHash;
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::DbReader;
@@ -183,23 +183,22 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::{
             BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            UserTransaction, UserTransactionWithInfo,
         };
         let aux_data = self
             .db
             .get_transaction_auxiliary_data_by_version(data.version)?;
-        let info = self.into_transaction_info(
-            data.version,
-            &data.info,
-            data.accumulator_root_hash,
-            data.changes,
-            aux_data,
-        );
+        let info = self.into_transaction_info(&data, aux_data);
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
             UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
+            },
+            UserTransactionWithInfo(txn) => {
+                let payload =
+                    self.try_into_transaction_payload(txn.transaction().payload().clone())?;
+                (txn.transaction(), info, payload, events, timestamp).into()
             },
             GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
@@ -248,31 +247,31 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     pub fn into_transaction_info(
         &self,
-        version: u64,
-        info: &aptos_types::transaction::TransactionInfo,
-        accumulator_root_hash: HashValue,
-        write_set: aptos_types::write_set::WriteSet,
+        onchain_data: &TransactionOnChainData,
         txn_aux_data: Option<TransactionAuxiliaryData>,
     ) -> TransactionInfo {
-        TransactionInfo {
-            version: version.into(),
-            hash: info.transaction_hash().into(),
-            state_change_hash: info.state_change_hash().into(),
-            event_root_hash: info.event_root_hash().into(),
-            state_checkpoint_hash: info.state_checkpoint_hash().map(|h| h.into()),
-            gas_used: info.gas_used().into(),
-            success: info.status().is_success(),
-            vm_status: self.explain_vm_status(info.status(), txn_aux_data),
-            accumulator_root_hash: accumulator_root_hash.into(),
+        TransactionInfo::new(
+            onchain_data.version.into(),
+            onchain_data.info.transaction_onchain_hash().into(),
+            onchain_data.info.state_change_hash().into(),
+            onchain_data.info.event_root_hash().into(),
+            onchain_data.info.state_checkpoint_hash().map(|h| h.into()),
+            onchain_data.info.gas_used().into(),
+            onchain_data.info.status().is_success(),
+            self.explain_vm_status(onchain_data.info.status(), txn_aux_data),
+            onchain_data.accumulator_root_hash.into(),
             // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
-            changes: write_set
+            onchain_data
+                .changes
+                .clone()
                 .into_iter()
                 .filter_map(|(sk, wo)| self.try_into_write_set_changes(sk, wo).ok())
                 .flatten()
                 .collect(),
-            block_height: None,
-            epoch: None,
-        }
+            None,
+            None,
+            onchain_data.transaction.submitted_txn_hash().into(),
+        )
     }
 
     pub fn try_into_transaction_payload(

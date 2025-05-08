@@ -139,7 +139,7 @@ impl BatchGenerator {
                     TransactionSummary::new(
                         txn.sender(),
                         txn.replay_protector(),
-                        txn.committed_hash(),
+                        txn.submitted_txn_hash(),
                     ),
                     TransactionInProgress::new(txn.gas_unit_price()),
                 )

@@ -242,7 +242,7 @@ async fn submit_and_check(
     }
     match rest_client
         .wait_for_transaction_by_hash_bcs(
-            txn.committed_hash(),
+            txn.submitted_txn_hash(),
             txn.expiration_timestamp_secs(),
             None,
             Some(wait_duration.saturating_sub(start.elapsed())),

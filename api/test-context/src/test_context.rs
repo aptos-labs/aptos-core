@@ -814,6 +814,7 @@ impl TestContext {
     ) -> Vec<TransactionStatus> {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
+        // TODO[MI Counter]: Check if we need to change this to UserTransactionWithInfo.
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
             .chain(
                 signed_txns

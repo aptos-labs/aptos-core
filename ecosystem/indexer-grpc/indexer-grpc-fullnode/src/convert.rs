@@ -557,7 +557,7 @@ pub fn convert_transaction_info(
     transaction_info: &TransactionInfo,
 ) -> transaction::TransactionInfo {
     transaction::TransactionInfo {
-        hash: transaction_info.hash.0.to_vec(),
+        hash: transaction_info.submitted_txn_hash().0.to_vec(),
         state_checkpoint_hash: transaction_info
             .state_checkpoint_hash
             .map(|hash| hash.0.to_vec()),

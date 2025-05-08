@@ -911,6 +911,12 @@ impl Transaction {
             UserTransaction(user_txn) => {
                 (TransactionType::User, Some(user_txn), txn.info, txn.events)
             },
+            UserTransactionWithInfo(user_txn_with_info) => (
+                TransactionType::User,
+                Some(user_txn_with_info.transaction()),
+                txn.info,
+                txn.events,
+            ),
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
             BlockMetadataExt(_) => (
@@ -1015,7 +1021,7 @@ impl Transaction {
         // TODO: Handle storage gas refund (though nothing currently in Rosetta refunds)
 
         Ok(Transaction {
-            transaction_identifier: (&txn_info).into(),
+            transaction_identifier: txn.transaction.submitted_txn_hash().into(),
             operations,
             metadata: TransactionMetadata {
                 transaction_type: txn_type,

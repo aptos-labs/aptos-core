@@ -756,7 +756,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         exclude_txns.push(TransactionSummary {
                             sender: txn.sender(),
                             replay_protector: txn.replay_protector(),
-                            hash: txn.committed_hash(),
+                            hash: txn.submitted_txn_hash(),
                         });
                     }
                 }

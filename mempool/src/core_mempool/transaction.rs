@@ -64,8 +64,8 @@ impl MempoolTransaction {
         self.txn.gas_unit_price()
     }
 
-    pub(crate) fn get_committed_hash(&self) -> HashValue {
-        self.txn.committed_hash()
+    pub(crate) fn get_submitted_txn_hash(&self) -> HashValue {
+        self.txn.submitted_txn_hash()
     }
 
     pub(crate) fn get_estimated_bytes(&self) -> usize {

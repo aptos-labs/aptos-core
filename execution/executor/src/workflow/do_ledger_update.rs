@@ -94,7 +94,7 @@ impl DoLedgerUpdate {
         .map(
             |((txn, txn_out), state_checkpoint_hash, event_root_hash, write_set_hash)| {
                 TransactionInfo::new(
-                    txn.hash(),
+                    txn.onchain_hash(),
                     write_set_hash,
                     event_root_hash,
                     state_checkpoint_hash,

@@ -51,7 +51,7 @@ async fn test_consensus_events_rejected_txns() {
     let transactions = vec![RejectedTransactionSummary {
         sender: rejected_txn.sender(),
         replay_protector: rejected_txn.replay_protector(),
-        hash: rejected_txn.committed_hash(),
+        hash: rejected_txn.submitted_txn_hash(),
         reason: DiscardedVMStatus::MALFORMED,
     }];
     let (callback, callback_rcv) = oneshot::channel();

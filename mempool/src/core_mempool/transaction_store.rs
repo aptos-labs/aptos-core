@@ -347,8 +347,10 @@ impl TransactionStore {
             // insert into storage and other indexes
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
-            self.hash_index
-                .insert(txn.get_committed_hash(), (address, txn_replay_protector));
+            self.hash_index.insert(
+                txn.get_submitted_txn_hash(),
+                (address, txn_replay_protector),
+            );
             if let Some(acc_seq_num) = account_sequence_number {
                 self.account_sequence_numbers.insert(address, acc_seq_num);
             }
@@ -753,7 +755,7 @@ impl TransactionStore {
             })
             .remove(txn);
         self.parking_lot_index.remove(txn);
-        self.hash_index.remove(&txn.get_committed_hash());
+        self.hash_index.remove(&txn.get_submitted_txn_hash());
         self.size_bytes -= txn.get_estimated_bytes();
 
         // Remove account datastructures if there are no more transactions for the account.
@@ -1019,7 +1021,7 @@ impl TransactionStore {
                         if self.parking_lot_index.contains(
                             account,
                             txn.get_replay_protector(),
-                            txn.get_committed_hash(),
+                            txn.get_submitted_txn_hash(),
                         ) {
                             "parked"
                         } else {

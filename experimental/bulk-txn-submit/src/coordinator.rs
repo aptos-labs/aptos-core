@@ -644,7 +644,7 @@ async fn submit_work_txns<T, B: SignedTransactionBuilder<T>>(
                         if let Some(txn) = txns.iter().find(|txn| txn.sequence_number() == max_seen)
                         {
                             match client
-                                .get_transaction_by_hash_bcs(txn.clone().committed_hash())
+                                .get_transaction_by_hash_bcs(txn.clone().submitted_txn_hash())
                                 .await
                             {
                                 Ok(res) => {

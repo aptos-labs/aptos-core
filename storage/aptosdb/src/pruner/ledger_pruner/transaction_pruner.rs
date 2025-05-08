@@ -10,7 +10,6 @@ use crate::{
     },
     transaction_store::TransactionStore,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey as IndexerMetadataKey, MetadataValue as IndexerMetadataValue},
@@ -41,7 +40,9 @@ impl DBSubPruner for TransactionPruner {
         self.ledger_db
             .transaction_db()
             .prune_transaction_by_hash_indices(
-                candidate_transactions.iter().map(|(_, txn)| txn.hash()),
+                candidate_transactions
+                    .iter()
+                    .map(|(_, txn)| txn.submitted_txn_hash()),
                 &mut batch,
             )?;
         self.ledger_db.transaction_db().prune_transactions(

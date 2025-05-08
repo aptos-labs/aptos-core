@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines physical storage schema mapping transaction hash to its version.
+//! This module defines physical storage schema mapping transaction.submitted_txn_hash() to its version.
 //! With the version one can resort to `TransactionSchema` for the transaction content.
 //!
 //! ```text

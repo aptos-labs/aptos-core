@@ -7,7 +7,7 @@ use crate::{
     gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
-        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
+        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28, RELEASE_V1_32,
     },
 };
 use aptos_gas_algebra::{
@@ -303,6 +303,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_get_script_hash_base: InternalGas, "transaction_context.get_script_hash.base", 735],
         // Based on SHA3-256's cost
         [transaction_context_generate_unique_address_base: InternalGas, { 10.. => "transaction_context.generate_unique_address.base" }, 14704],
+        // TODO[MI counter]: This is a dummy value. Compute the correct cost before landing the PR.
+        // TODO[MI counter]: Bump up the version to 32 before landing the PR.
+        [transaction_context_monotonically_increasing_counter_base: InternalGas, { RELEASE_V1_32.. => "transaction_context.monotonically_increasing_counter.base" }, 735],
         [transaction_context_sender_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.sender.base"}, 735],
         [transaction_context_secondary_signers_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.secondary_signers.base"}, 735],
         [transaction_context_secondary_signers_per_signer: InternalGasPerArg, {RELEASE_V1_12.. => "transaction_context.secondary_signers.per_signer"}, 576], // 18 * 32

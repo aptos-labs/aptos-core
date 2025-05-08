@@ -37,7 +37,7 @@ use aptos_types::{
     randomness::Randomness,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        SignedTransaction, Transaction,
+        BlockchainGeneratedInfo, SignedTransaction, SignedTransactionWithInfo, Transaction,
     },
     validator_signer::ValidatorSigner,
 };
@@ -549,7 +549,7 @@ impl PipelineBuilder {
         } else {
             block.new_block_metadata(&validator).into()
         };
-        let txns = [
+        let mut txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(
                 metadata_txn,
             ))],
@@ -561,9 +561,29 @@ impl PipelineBuilder {
                 .map(Transaction::ValidatorTransaction)
                 .map(SignatureVerifiedTransaction::from)
                 .collect(),
-            user_txns.as_ref().clone(),
         ]
         .concat();
+        let start_index = txns.len();
+        txns.extend(user_txns.iter().enumerate().map(|(i, txn)| {
+            // TODO[MI counter]: Check if clone operations can be eliminated.
+            if onchain_execution_config.blockchain_generated_info_version() == 1 {
+                if let SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(
+                    signed_txn,
+                )) = txn
+                {
+                    let info = BlockchainGeneratedInfo::V1 {
+                        transaction_index: (start_index + i) as u32,
+                    };
+                    SignatureVerifiedTransaction::Valid(Transaction::UserTransactionWithInfo(
+                        SignedTransactionWithInfo::new(signed_txn.clone(), info),
+                    ))
+                } else {
+                    txn.clone()
+                }
+            } else {
+                txn.clone()
+            }
+        }));
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor

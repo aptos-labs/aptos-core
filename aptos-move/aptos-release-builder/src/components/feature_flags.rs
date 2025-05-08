@@ -147,6 +147,7 @@ pub enum FeatureFlag {
     TransactionPayloadV2,
     OrderlessTransactions,
     EnableLazyLoading,
+    MonotonicallyIncreasingCounter,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -389,6 +390,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
             FeatureFlag::EnableLazyLoading => AptosFeatureFlag::ENABLE_LAZY_LOADING,
+            FeatureFlag::MonotonicallyIncreasingCounter => {
+                AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
+            },
         }
     }
 }
@@ -558,6 +562,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
             AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
             AptosFeatureFlag::ENABLE_LAZY_LOADING => FeatureFlag::EnableLazyLoading,
+            AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
+                FeatureFlag::MonotonicallyIncreasingCounter
+            },
         }
     }
 }

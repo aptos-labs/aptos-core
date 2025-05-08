@@ -1226,13 +1226,13 @@ mod tests {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_onchain_hash = txn.onchain_hash();
             ensure!(
-                txn_hash == txn_info.transaction_hash(),
-                "The transaction hash does not match the hash in transaction info. \
-                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
-                txn_hash,
-                txn_info.transaction_hash(),
+                txn_onchain_hash == txn_info.transaction_onchain_hash(),
+                "The transaction onchain hash does not match the hash in transaction info. \
+                     Transaction onchain hash: {:x}. Transaction hash in txn_info: {:x}.",
+                txn_onchain_hash,
+                txn_info.transaction_onchain_hash(),
             );
             Ok(())
         })

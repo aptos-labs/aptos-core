@@ -86,7 +86,7 @@ impl Transaction {
             payload,
             version: info.version.0 as i64,
             block_height,
-            hash: info.hash.to_string(),
+            hash: info.submitted_txn_hash().to_string(),
             state_change_hash: info.state_change_hash.to_string(),
             event_root_hash: info.event_root_hash.to_string(),
             state_checkpoint_hash: info.state_checkpoint_hash.map(|h| h.to_string()),

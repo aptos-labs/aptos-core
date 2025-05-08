@@ -33,7 +33,7 @@ pub struct AnalyzedTransaction {
     /// A transaction is predictable if neither the read_hint or the write_hint have wildcards.
     predictable_transaction: bool,
     /// The hash of the transaction - this is cached for performance reasons.
-    hash: HashValue,
+    submitted_txn_hash: HashValue,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -71,13 +71,13 @@ impl AnalyzedTransaction {
             .iter()
             .chain(write_hints.iter())
             .any(|hint| !matches!(hint, StorageLocation::Specific(_)));
-        let hash = transaction.hash();
+        let submitted_txn_hash = transaction.submitted_txn_hash();
         AnalyzedTransaction {
             transaction,
             read_hints,
             write_hints,
             predictable_transaction: !hints_contain_wildcard,
-            hash,
+            submitted_txn_hash,
         }
     }
 
@@ -127,7 +127,7 @@ impl AnalyzedTransaction {
 
 impl PartialEq<Self> for AnalyzedTransaction {
     fn eq(&self, other: &Self) -> bool {
-        self.hash == other.hash
+        self.submitted_txn_hash == other.submitted_txn_hash
     }
 }
 
@@ -135,7 +135,7 @@ impl Eq for AnalyzedTransaction {}
 
 impl Hash for AnalyzedTransaction {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(self.hash.as_ref());
+        state.write(self.submitted_txn_hash.as_ref());
     }
 }
 
@@ -268,17 +268,17 @@ impl AnalyzedTransactionProvider for Transaction {
                 ),
             }
         };
-        match self {
-            Transaction::UserTransaction(signed_txn) => match signed_txn.payload().executable_ref()
-            {
+        if let Some(signed_txn) = self.try_as_signed_user_txn() {
+            match signed_txn.payload().executable_ref() {
                 Ok(TransactionExecutableRef::EntryFunction(func))
                     if !signed_txn.payload().is_multisig() =>
                 {
                     process_entry_function(func, signed_txn.sender())
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
-            },
-            _ => empty_rw_set(),
+            }
+        } else {
+            empty_rw_set()
         }
     }
 }

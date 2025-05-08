@@ -67,7 +67,7 @@ impl PersistedValue {
                         txn.sender(),
                         txn.replay_protector(),
                         txn.expiration_timestamp_secs(),
-                        txn.committed_hash(),
+                        txn.submitted_txn_hash(),
                     )
                 })
                 .collect();

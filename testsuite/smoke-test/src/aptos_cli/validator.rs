@@ -500,6 +500,14 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
                 info!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
                 block_txns.push(txn);
             },
+            aptos_types::transaction::Transaction::UserTransactionWithInfo(txn) => {
+                info!(
+                    "from {}, seq_num {}",
+                    txn.transaction().sender(),
+                    txn.transaction().sequence_number()
+                );
+                block_txns.push(txn.into_transaction());
+            },
             aptos_types::transaction::Transaction::BlockMetadata(b) => {
                 info!("block metadata {}", b.round());
 

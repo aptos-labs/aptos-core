@@ -15,8 +15,8 @@ use aptos_types::{
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, Transaction, TransactionExecutableRef, TransactionInfo,
-        TransactionOutput, TransactionPayload, Version,
+        BlockchainGeneratedInfo, SignedTransaction, Transaction, TransactionExecutableRef,
+        TransactionInfo, TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };
@@ -119,6 +119,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
+        blockchain_generated_info: Option<BlockchainGeneratedInfo>,
     ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -162,6 +163,7 @@ impl AptosDebugger {
                 };
                 gas_profiler
             },
+            blockchain_generated_info,
         )?;
 
         Ok((status, output, gas_profiler.finish()))

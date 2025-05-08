@@ -427,7 +427,7 @@ fn test_transaction_list_with_proof() {
 
     // Verify transaction hashes match but info root hash verification fails (ledger info expected zero root hash)
     let transaction_list_proof =
-        create_single_transaction_info_proof(Some(transactions[0].hash()), None, None);
+        create_single_transaction_info_proof(Some(transactions[0].onchain_hash()), None, None);
     let transaction_list_with_proof = TransactionListWithProof::new(
         transactions.clone(),
         Some(vec![vec![event.clone()]]),
@@ -448,7 +448,7 @@ fn test_transaction_list_with_proof() {
 
     // Construct a new transaction list with proof where the transaction info and event hashes match
     let transaction_list_proof = create_single_transaction_info_proof(
-        Some(transactions[0].hash()),
+        Some(transactions[0].onchain_hash()),
         Some(event.hash()),
         None,
     );
@@ -480,7 +480,7 @@ fn test_transaction_and_output_list_with_proof() {
         vec![],
         0,
     ));
-    let txn_hash = transaction.hash();
+    let txn_onchain_hash = transaction.onchain_hash();
     let event = create_event();
     let event_root_hash = event.hash();
     let write_set = WriteSet::default();
@@ -497,7 +497,7 @@ fn test_transaction_and_output_list_with_proof() {
     let (_root_hash, transaction_output_list_proof) = create_txn_output_list_with_proof(
         &transaction,
         &transaction_output,
-        Some(txn_hash),
+        Some(txn_onchain_hash),
         Some(event_root_hash),
         Some(write_set_hash),
     );
@@ -512,7 +512,7 @@ fn test_transaction_and_output_list_with_proof() {
     let (root_hash, transaction_output_list_proof) = create_txn_output_list_with_proof(
         &transaction,
         &transaction_output,
-        Some(txn_hash),
+        Some(txn_onchain_hash),
         None,
         Some(write_set_hash),
     );
@@ -525,7 +525,7 @@ fn test_transaction_and_output_list_with_proof() {
     let (root_hash, transaction_output_list_proof) = create_txn_output_list_with_proof(
         &transaction,
         &transaction_output,
-        Some(txn_hash),
+        Some(txn_onchain_hash),
         Some(event_root_hash),
         None,
     );
@@ -538,7 +538,7 @@ fn test_transaction_and_output_list_with_proof() {
     let (root_hash, transaction_output_list_proof) = create_txn_output_list_with_proof(
         &transaction,
         &transaction_output,
-        Some(txn_hash),
+        Some(txn_onchain_hash),
         Some(event_root_hash),
         Some(write_set_hash),
     );
@@ -556,12 +556,15 @@ fn create_ledger_info_at_version0(root_hash: HashValue) -> LedgerInfo {
 fn create_txn_output_list_with_proof(
     transaction: &Transaction,
     transaction_output: &TransactionOutput,
-    transaction_hash: Option<HashValue>,
+    transaction_onchain_hash: Option<HashValue>,
     event_root_hash: Option<HashValue>,
     state_change_hash: Option<HashValue>,
 ) -> (HashValue, TransactionOutputListWithProof) {
-    let transaction_info_list_proof =
-        create_single_transaction_info_proof(transaction_hash, event_root_hash, state_change_hash);
+    let transaction_info_list_proof = create_single_transaction_info_proof(
+        transaction_onchain_hash,
+        event_root_hash,
+        state_change_hash,
+    );
     let root_hash = transaction_info_list_proof.transaction_infos[0].hash();
     let transaction_output_list_proof = TransactionOutputListWithProof::new(
         vec![(transaction.clone(), transaction_output.clone())],
@@ -573,12 +576,12 @@ fn create_txn_output_list_with_proof(
 }
 
 fn create_single_transaction_info_proof(
-    transaction_hash: Option<HashValue>,
+    transaction_onchain_hash: Option<HashValue>,
     event_root_hash: Option<HashValue>,
     state_change_hash: Option<HashValue>,
 ) -> TransactionInfoListWithProof {
     let transaction_infos = vec![create_transaction_info(
-        transaction_hash,
+        transaction_onchain_hash,
         event_root_hash,
         state_change_hash,
     )];
@@ -586,12 +589,12 @@ fn create_single_transaction_info_proof(
 }
 
 fn create_transaction_info(
-    transaction_hash: Option<HashValue>,
+    transaction_onchain_hash: Option<HashValue>,
     event_root_hash: Option<HashValue>,
     state_change_hash: Option<HashValue>,
 ) -> TransactionInfo {
     TransactionInfo::new(
-        transaction_hash.unwrap_or_else(HashValue::random),
+        transaction_onchain_hash.unwrap_or_else(HashValue::random),
         state_change_hash.unwrap_or_else(HashValue::random),
         event_root_hash.unwrap_or_else(HashValue::random),
         Some(HashValue::random()),

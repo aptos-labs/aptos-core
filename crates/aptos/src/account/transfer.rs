@@ -60,6 +60,7 @@ pub struct TransferSummary {
     pub success: bool,
     pub version: u64,
     pub vm_status: String,
+    // This is transaction.submitted_txn_hash().
     pub transaction_hash: HashValue,
 }
 
@@ -72,12 +73,12 @@ impl TransferSummary {
 impl From<Transaction> for TransferSummary {
     fn from(transaction: Transaction) -> Self {
         if let Transaction::UserTransaction(txn) = transaction {
-            let vm_status = txn.info.vm_status;
+            let vm_status = txn.info.vm_status.clone();
             let success = txn.info.success;
             let sender = *txn.request.sender.inner();
             let gas_unit_price = txn.request.gas_unit_price.0;
             let gas_used = txn.info.gas_used.0;
-            let transaction_hash = txn.info.hash;
+            let transaction_hash = txn.info.submitted_txn_hash();
             let version = txn.info.version.0;
             let balance_changes = txn
                 .info

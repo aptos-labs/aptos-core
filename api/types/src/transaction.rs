@@ -78,11 +78,10 @@ impl TransactionData {
         latest_ledger_version: u64,
     ) -> Result<Self> {
         if txn.version > latest_ledger_version {
-            match txn.transaction {
-                aptos_types::transaction::Transaction::UserTransaction(txn) => {
-                    Ok(Self::Pending(Box::new(txn)))
-                },
-                _ => bail!("convert non-user onchain transaction to pending shouldn't exist"),
+            if let Some(signed_txn) = txn.transaction.try_into_signed_user_txn() {
+                Ok(Self::Pending(Box::new(signed_txn)))
+            } else {
+                bail!("convert non-user onchain transaction to pending shouldn't exist")
             }
         } else {
             Ok(Self::OnChain(txn))
@@ -206,6 +205,8 @@ pub enum ReplayProtector {
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
+    // Question[MI counter]: When API returns transactions, it removes the blockchain generated info and just sends the user transaction.
+    // Is this okay? Should API return the blockchain generated info as well?
     UserTransaction(UserTransaction),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
@@ -299,7 +300,7 @@ impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
             request: (&txn, payload).into(),
-            hash: txn.committed_hash().into(),
+            hash: txn.submitted_txn_hash().into(),
         })
     }
 }
@@ -360,7 +361,10 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct TransactionInfo {
     pub version: U64,
-    pub hash: HashValue,
+    // This is transaction.onchain_hash().
+    // Question[MI counter]: Is this okay to change the name to onchain_hash?
+    // Is changing the definition of this hash backward compatible?
+    hash: HashValue,
     pub state_change_hash: HashValue,
     pub event_root_hash: HashValue,
     pub state_checkpoint_hash: Option<HashValue>,
@@ -380,6 +384,50 @@ pub struct TransactionInfo {
     #[oai(skip)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epoch: Option<U64>,
+    // This is transaction.submitted_txn_hash().
+    submitted_txn_hash: Option<HashValue>,
+}
+
+impl TransactionInfo {
+    pub fn new(
+        version: U64,
+        onchain_hash: HashValue,
+        state_change_hash: HashValue,
+        event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
+        gas_used: U64,
+        success: bool,
+        vm_status: String,
+        accumulator_root_hash: HashValue,
+        changes: Vec<WriteSetChange>,
+        block_height: Option<U64>,
+        epoch: Option<U64>,
+        submitted_txn_hash: HashValue,
+    ) -> Self {
+        Self {
+            version,
+            hash: onchain_hash,
+            state_change_hash,
+            event_root_hash,
+            state_checkpoint_hash,
+            gas_used,
+            success,
+            vm_status,
+            accumulator_root_hash,
+            changes,
+            block_height,
+            epoch,
+            submitted_txn_hash: Some(submitted_txn_hash),
+        }
+    }
+
+    pub fn onchain_hash(&self) -> HashValue {
+        self.hash
+    }
+
+    pub fn submitted_txn_hash(&self) -> HashValue {
+        self.submitted_txn_hash.unwrap()
+    }
 }
 
 /// A transaction waiting in mempool
@@ -395,7 +443,7 @@ impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         PendingTransaction {
             request: (&txn, payload).into(),
-            hash: txn.committed_hash().into(),
+            hash: txn.submitted_txn_hash().into(),
         }
     }
 }

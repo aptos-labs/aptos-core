@@ -386,7 +386,7 @@ pub async fn submit_transaction(
     match result {
         Ok(_) => {
             info!(
-                hash = signed_transaction.committed_hash(),
+                hash = signed_transaction.submitted_txn_hash(),
                 address = receiver_address,
                 event = event_on_success,
             );
@@ -395,7 +395,7 @@ pub async fn submit_transaction(
         Err(e) => {
             faucet_account.write().await.decrement_sequence_number();
             warn!(
-                hash = signed_transaction.committed_hash(),
+                hash = signed_transaction.submitted_txn_hash(),
                 address = receiver_address,
                 event = "transaction_failure",
                 error_message = format!("{:#}", e)

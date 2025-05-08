@@ -161,7 +161,7 @@ impl PriorityIndex {
             insertion_time: txn.insertion_info.insertion_time,
             address: txn.get_sender(),
             replay_protector: txn.get_replay_protector(),
-            hash: txn.get_committed_hash(),
+            hash: txn.get_submitted_txn_hash(),
         }
     }
 
@@ -555,7 +555,7 @@ impl ParkingLotIndex {
                 txn.was_parked = true;
 
                 let sender = &txn.txn.sender();
-                let hash = txn.get_committed_hash();
+                let hash = txn.get_submitted_txn_hash();
                 let is_new_entry = match self.account_indices.get(sender) {
                     Some(index) => {
                         if let Some((_account, seq_nums)) = self.data.get_mut(*index) {
@@ -595,7 +595,7 @@ impl ParkingLotIndex {
                 let sender = &txn.txn.sender();
                 if let Some(index) = self.account_indices.get(sender).cloned() {
                     if let Some((_account, txns)) = self.data.get_mut(index) {
-                        if txns.remove(&(sequence_number, txn.get_committed_hash())) {
+                        if txns.remove(&(sequence_number, txn.get_submitted_txn_hash())) {
                             self.size -= 1;
                         }
 
@@ -667,7 +667,7 @@ impl From<&MempoolTransaction> for TxnPointer {
         Self {
             sender: txn.get_sender(),
             replay_protector: txn.get_replay_protector(),
-            hash: txn.get_committed_hash(),
+            hash: txn.get_submitted_txn_hash(),
         }
     }
 }

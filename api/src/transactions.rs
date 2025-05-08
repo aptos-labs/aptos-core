@@ -28,7 +28,7 @@ use aptos_api_types::{
     TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
     VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_crypto::signing_message;
 use aptos_logger::error;
 use aptos_types::{
     account_address::AccountAddress,
@@ -1550,7 +1550,7 @@ impl TransactionsApi {
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {
-                format!("Script::{}", txn.committed_hash()).to_string()
+                format!("Script::{}", txn.submitted_txn_hash()).to_string()
             },
             TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
@@ -1583,7 +1583,7 @@ impl TransactionsApi {
                     stats_key += "Orderless::";
                 }
                 if let TransactionExecutable::Script(_) = executable {
-                    stats_key += format!("Script::{}", txn.committed_hash()).as_str();
+                    stats_key += format!("Script::{}", txn.submitted_txn_hash()).as_str();
                 } else if let TransactionExecutable::EntryFunction(entry_function) = executable {
                     stats_key += FunctionStats::function_to_key(
                         entry_function.module(),
@@ -1605,7 +1605,7 @@ impl TransactionsApi {
         let txn = aptos_types::transaction::Transaction::UserTransaction(txn);
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
-            txn.hash(),
+            txn.onchain_hash(),
             zero_hash,
             zero_hash,
             None,

@@ -11,7 +11,7 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use aptos_crypto::hash::{CryptoHash, HashValue};
+use aptos_crypto::hash::HashValue;
 use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
@@ -73,13 +73,15 @@ impl TransactionDb {
     /// Returns the version of a transaction given its hash.
     pub(crate) fn get_transaction_version_by_hash(
         &self,
-        hash: &HashValue,
+        submitted_txn_hash: &HashValue,
         ledger_version: Version,
     ) -> Result<Option<Version>> {
-        Ok(match self.db.get::<TransactionByHashSchema>(hash)? {
-            Some(version) if version <= ledger_version => Some(version),
-            _ => None,
-        })
+        Ok(
+            match self.db.get::<TransactionByHashSchema>(submitted_txn_hash)? {
+                Some(version) if version <= ledger_version => Some(version),
+                _ => None,
+            },
+        )
     }
 
     pub(crate) fn commit_transactions(
@@ -145,21 +147,21 @@ impl TransactionDb {
             }
         }
 
-        let transaction_hash = transaction.hash();
+        let submmitted_txn_hash = transaction.submitted_txn_hash();
 
         if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
             let txn_summary = IndexedTransactionSummary::V1 {
                 sender: signed_txn.sender(),
                 replay_protector: signed_txn.replay_protector(),
                 version,
-                transaction_hash,
+                transaction_hash: submmitted_txn_hash,
             };
             batch.put::<TransactionSummariesByAccountSchema>(
                 &(signed_txn.sender(), version),
                 &txn_summary,
             )?;
         }
-        batch.put::<TransactionByHashSchema>(&transaction_hash, &version)?;
+        batch.put::<TransactionByHashSchema>(&submmitted_txn_hash, &version)?;
         batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())

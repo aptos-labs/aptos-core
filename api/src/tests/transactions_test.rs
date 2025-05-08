@@ -508,7 +508,7 @@ async fn test_get_transaction_by_hash_with_delayed_internal_indexer() {
         1,
     );
     context.commit_block(&vec![txn1.clone()]).await;
-    let committed_hash = txn1.committed_hash().to_hex_literal();
+    let committed_hash = txn1.submitted_txn_hash().to_hex_literal();
 
     let _ = context
         .get_indexer_reader()
@@ -1080,7 +1080,7 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
         .get(
             format!(
                 "/transactions/by_hash/{}",
-                txn.committed_hash().to_hex_literal()
+                txn.submitted_txn_hash().to_hex_literal()
             )
             .as_str(),
         )
@@ -1199,7 +1199,7 @@ async fn test_transaction_vm_status(
         .get(
             format!(
                 "/transactions/by_hash/{}",
-                txn.committed_hash().to_hex_literal()
+                txn.submitted_txn_hash().to_hex_literal()
             )
             .as_str(),
         )

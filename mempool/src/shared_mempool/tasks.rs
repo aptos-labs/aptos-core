@@ -411,7 +411,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                 let result = smp.validator.read().validate_transaction(t.0.clone());
                 // Pre-compute the hash and length if the transaction is valid, before locking mempool
                 if result.is_ok() {
-                    t.0.committed_hash();
+                    t.0.submitted_txn_hash();
                     t.0.txn_bytes_len();
                 }
                 result

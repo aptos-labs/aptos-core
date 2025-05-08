@@ -228,7 +228,7 @@ async fn construction_hash(
         decode_bcs(&request.signed_transaction, "SignedTransaction")?;
 
     Ok(TransactionIdentifierResponse {
-        transaction_identifier: signed_transaction.committed_hash().into(),
+        transaction_identifier: signed_transaction.submitted_txn_hash().into(),
     })
 }
 
@@ -1544,7 +1544,7 @@ async fn construction_submit(
 
     // Submits the transaction, and returns the hash of the transaction
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
-    let hash = txn.committed_hash();
+    let hash = txn.submitted_txn_hash();
     rest_client.submit_bcs(&txn).await?;
     Ok(ConstructionSubmitResponse {
         transaction_identifier: hash.into(),

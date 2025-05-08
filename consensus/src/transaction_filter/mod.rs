@@ -164,7 +164,7 @@ mod test {
         let txns = get_transactions();
         let block_id = HashValue::random();
         let transaction_hash_filter = TransactionFilter::new(
-            Filter::empty().add_deny_transaction_id(txns[0].committed_hash()),
+            Filter::empty().add_deny_transaction_id(txns[0].submitted_txn_hash()),
         );
         let filtered_txns = transaction_hash_filter.filter(block_id, 0, txns.clone());
         assert_eq!(filtered_txns, txns[1..].to_vec());

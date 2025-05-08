@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 /// An implementation of TransactionDeduper. Duplicate filtering is done using the pair
-/// (raw_txn.hash(), authenticator). Both the hash and signature are required because dedup
+/// (signed_txn.submitted_txn_hash(), authenticator). Both the hash and signature are required because dedup
 /// happens before signatures are verified and transaction prologue is checked. (So, e.g., a bad
 /// transaction could contain a txn and signature that are unrelated.) If the checks are done
 /// beforehand only one of the txn hash or signature would be required.
@@ -65,7 +65,7 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
             .zip(&transactions)
             .with_min_len(optimal_min_len(num_txns, 48))
             .map(|(need_hash, txn)| match need_hash {
-                true => Some((txn.committed_hash(), txn.authenticator())),
+                true => Some((txn.submitted_txn_hash(), txn.authenticator())),
                 false => None,
             })
             .collect();

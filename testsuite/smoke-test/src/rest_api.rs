@@ -359,11 +359,15 @@ async fn test_bcs() {
     for (i, expected_transaction) in transactions.iter().enumerate() {
         let bcs_txn = transactions_bcs.get(i).unwrap();
         assert_eq!(bcs_txn.version, expected_transaction.version().unwrap());
-        let expected_hash =
-            aptos_crypto::HashValue::from(expected_transaction.transaction_info().unwrap().hash);
+        let expected_hash = aptos_crypto::HashValue::from(
+            expected_transaction
+                .transaction_info()
+                .unwrap()
+                .submitted_txn_hash(),
+        );
 
         let bcs_hash = if let Transaction::UserTransaction(ref txn) = bcs_txn.transaction {
-            txn.committed_hash()
+            txn.submitted_txn_hash()
         } else {
             panic!("BCS transaction is not a user transaction! {:?}", bcs_txn);
         };
@@ -410,8 +414,15 @@ async fn test_bcs() {
 
         assert_eq!(json_txn.version().unwrap(), bcs_txn.version);
         assert_eq!(
-            aptos_crypto::HashValue::from(json_txn.transaction_info().unwrap().hash),
-            bcs_txn.info.transaction_hash()
+            aptos_crypto::HashValue::from(json_txn.transaction_info().unwrap().onchain_hash()),
+            bcs_txn.info.transaction_onchain_hash()
+        );
+
+        assert_eq!(
+            aptos_crypto::HashValue::from(
+                json_txn.transaction_info().unwrap().submitted_txn_hash()
+            ),
+            bcs_txn.transaction.submitted_txn_hash()
         );
     }
 
@@ -433,8 +444,12 @@ async fn test_bcs() {
 
     let bcs_txn = client.simulate_bcs(&signed_txn).await.unwrap().into_inner();
     assert_eq!(
-        aptos_crypto::HashValue::from(json_txn.info.hash),
-        bcs_txn.info.transaction_hash()
+        aptos_crypto::HashValue::from(json_txn.info.onchain_hash()),
+        bcs_txn.info.transaction_onchain_hash()
+    );
+    assert_eq!(
+        aptos_crypto::HashValue::from(json_txn.info.submitted_txn_hash()),
+        bcs_txn.transaction.submitted_txn_hash()
     );
 
     // Actually submit the transaction, and ensure it submits and succeeds
@@ -479,8 +494,18 @@ async fn test_bcs() {
     let first_bcs_txn = bcs_txns.first().unwrap();
     assert_eq!(first_json_txn.version().unwrap(), first_bcs_txn.version);
     assert_eq!(
-        aptos_crypto::HashValue::from(first_json_txn.transaction_info().unwrap().hash),
-        first_bcs_txn.info.transaction_hash()
+        aptos_crypto::HashValue::from(first_json_txn.transaction_info().unwrap().onchain_hash()),
+        first_bcs_txn.info.transaction_onchain_hash()
+    );
+
+    assert_eq!(
+        aptos_crypto::HashValue::from(
+            first_json_txn
+                .transaction_info()
+                .unwrap()
+                .submitted_txn_hash()
+        ),
+        first_bcs_txn.transaction.submitted_txn_hash()
     );
 
     let json_block_by_height = client

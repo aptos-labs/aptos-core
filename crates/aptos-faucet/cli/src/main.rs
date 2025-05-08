@@ -111,7 +111,7 @@ impl FaucetCliArgs {
                     account,
                     response
                         .into_iter()
-                        .map(|r| r.committed_hash().to_string())
+                        .map(|r| r.submitted_txn_hash().to_string())
                         .collect::<Vec<_>>()
                 ),
                 Err(err) => println!("FAILURE: Account: {} Response: {:#}", account, err),

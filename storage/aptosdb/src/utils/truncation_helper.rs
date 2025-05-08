@@ -33,7 +33,6 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
@@ -379,7 +378,10 @@ fn delete_transaction_index_data(
         );
         ledger_db
             .transaction_db()
-            .prune_transaction_by_hash_indices(transactions.iter().map(|txn| txn.hash()), batch)?;
+            .prune_transaction_by_hash_indices(
+                transactions.iter().map(|txn| txn.submitted_txn_hash()),
+                batch,
+            )?;
 
         let transactions = (start_version..=start_version + transactions.len() as u64 - 1)
             .zip(transactions)

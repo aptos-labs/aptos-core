@@ -14,9 +14,7 @@ use aptos_db_indexer_schemas::schema::{
 use aptos_schemadb::{ReadOptions, DB};
 use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
-    contract_event::ContractEvent,
-    event::EventKey,
-    transaction::{Transaction::UserTransaction, TransactionListWithProof},
+    contract_event::ContractEvent, event::EventKey, transaction::TransactionListWithProof,
 };
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
@@ -195,25 +193,22 @@ fn verify_transactions(
     start_version: u64,
 ) -> Result<()> {
     for (idx, txn) in transaction_list.transactions.iter().enumerate() {
-        match txn {
-            UserTransaction(signed_transaction) => {
-                let key = (
-                    signed_transaction.sender(),
-                    signed_transaction.sequence_number(),
-                );
-                match internal_indexer_db.get::<OrderedTransactionByAccountSchema>(&key)? {
-                    Some(version) => {
-                        assert_eq!(version, start_version + idx as u64);
-                        if idx + start_version as usize % SAMPLE_RATE == 0 {
-                            println!("Processed {} at {:?}", idx + start_version as usize, key);
-                        }
-                    },
-                    None => {
-                        panic!("Transaction not found in internal indexer db: {:?}", key);
-                    },
-                }
-            },
-            _ => continue,
+        if let Some(signed_transaction) = txn.try_as_signed_user_txn() {
+            let key = (
+                signed_transaction.sender(),
+                signed_transaction.sequence_number(),
+            );
+            match internal_indexer_db.get::<OrderedTransactionByAccountSchema>(&key)? {
+                Some(version) => {
+                    assert_eq!(version, start_version + idx as u64);
+                    if idx + start_version as usize % SAMPLE_RATE == 0 {
+                        println!("Processed {} at {:?}", idx + start_version as usize, key);
+                    }
+                },
+                None => {
+                    panic!("Transaction not found in internal indexer db: {:?}", key);
+                },
+            }
         }
     }
     Ok(())

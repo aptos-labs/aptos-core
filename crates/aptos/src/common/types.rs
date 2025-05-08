@@ -1485,6 +1485,7 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 /// A shortened transaction output
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransactionSummary {
+    // This is transaction.submitted_txn_hash().
     pub transaction_hash: HashValue,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_used: Option<u64>,
@@ -1527,7 +1528,7 @@ impl From<&Transaction> for TransactionSummary {
                 timestamp_us: None,
             },
             Transaction::UserTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.info.hash,
+                transaction_hash: txn.info.submitted_txn_hash(),
                 sender: Some(*txn.request.sender.inner()),
                 gas_used: Some(txn.info.gas_used.0),
                 gas_unit_price: Some(txn.request.gas_unit_price.0),
@@ -1539,7 +1540,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
             },
             Transaction::GenesisTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.info.hash,
+                transaction_hash: txn.info.submitted_txn_hash(),
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
@@ -1551,7 +1552,7 @@ impl From<&Transaction> for TransactionSummary {
                 timestamp_us: None,
             },
             Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.info.hash,
+                transaction_hash: txn.info.submitted_txn_hash(),
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
@@ -1563,7 +1564,7 @@ impl From<&Transaction> for TransactionSummary {
                 sequence_number: None,
             },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.info.hash,
+                transaction_hash: txn.info.submitted_txn_hash(),
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
@@ -1575,7 +1576,7 @@ impl From<&Transaction> for TransactionSummary {
                 sequence_number: None,
             },
             Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.info.hash,
+                transaction_hash: txn.info.submitted_txn_hash(),
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
@@ -1587,7 +1588,7 @@ impl From<&Transaction> for TransactionSummary {
                 sequence_number: None,
             },
             Transaction::ValidatorTransaction(txn) => TransactionSummary {
-                transaction_hash: txn.transaction_info().hash,
+                transaction_hash: txn.transaction_info().submitted_txn_hash(),
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
@@ -1996,7 +1997,7 @@ impl TransactionOptions {
             .submit_bcs(&transaction)
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?;
-        let transaction_hash = transaction.clone().committed_hash();
+        let transaction_hash = transaction.clone().submitted_txn_hash();
         let network = self.profile_options.profile().ok().and_then(|profile| {
             if let Some(network) = profile.network {
                 Some(network)
@@ -2084,7 +2085,7 @@ impl TransactionOptions {
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let hash = transaction.committed_hash();
+        let hash = transaction.submitted_txn_hash();
 
         let debugger = AptosDebugger::rest_client(client).unwrap();
         let (vm_status, vm_output) = execute(&debugger, version, transaction, hash)?;

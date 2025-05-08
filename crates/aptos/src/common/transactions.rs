@@ -260,7 +260,7 @@ impl TxnOptions {
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let hash = transaction.committed_hash();
+        let hash = transaction.submitted_txn_hash();
 
         let debugger = AptosDebugger::rest_client(client)?;
         let (vm_status, vm_output) = execute(&debugger, version, transaction, hash)?;

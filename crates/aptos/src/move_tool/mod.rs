@@ -2337,7 +2337,7 @@ impl CliCommand<TransactionSummary> for Replay {
             },
         };
 
-        let hash = txn.committed_hash();
+        let hash = txn.submitted_txn_hash();
 
         // Execute the transaction.
         let (vm_status, vm_output) = if self.profile_gas {
@@ -2392,7 +2392,7 @@ impl CliCommand<TransactionSummary> for Replay {
         };
 
         let summary = TransactionSummary {
-            transaction_hash: txn.committed_hash().into(),
+            transaction_hash: txn.submitted_txn_hash().into(),
             gas_used: Some(txn_output.gas_used()),
             gas_unit_price: Some(txn.gas_unit_price()),
             pending: None,

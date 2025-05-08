@@ -1040,7 +1040,7 @@ async fn parse_block_transactions(
         // Ensure transaction identifier is correct
         let txn_hash = transaction.transaction_identifier.hash.clone();
         assert_eq!(
-            format!("{:x}", actual_txn_info.transaction_hash()),
+            actual_txn.transaction.submitted_txn_hash().to_string(),
             txn_hash,
             "Transaction hash should match the actual hash"
         );
@@ -1913,7 +1913,7 @@ fn assert_failed_transfer_transaction(
 ) {
     // Check the transaction
     assert_eq!(
-        format!("{:x}", actual_txn.info.hash),
+        format!("{:x}", actual_txn.info.submitted_txn_hash()),
         rosetta_txn.transaction_identifier.hash
     );
 

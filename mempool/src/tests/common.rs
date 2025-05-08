@@ -258,7 +258,7 @@ impl ConsensusMock {
         let block = mempool.get_batch(max_txns, max_bytes, true, self.0.clone());
         block.iter().for_each(|t| {
             let txn_summary =
-                TransactionSummary::new(t.sender(), t.replay_protector(), t.committed_hash());
+                TransactionSummary::new(t.sender(), t.replay_protector(), t.submitted_txn_hash());
             let txn_info = TransactionInProgress::new(t.gas_unit_price());
             self.0.insert(txn_summary, txn_info);
         });
