@@ -104,7 +104,7 @@ fn native_verify_range_proof(
     verify_range_proof(context, &comm_point, &pg, &proof_bytes[..], num_bits, dst)
 }
 
-fn native_verify_batch_range_proof(
+pub(crate) fn native_verify_batch_range_proof(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,

@@ -7,6 +7,7 @@ pub mod account;
 pub mod account_abstraction;
 pub mod aggregator_natives;
 pub mod code;
+pub mod confidential_proof;
 pub mod consensus_config;
 pub mod create_signer;
 pub mod cryptography;
@@ -112,6 +113,11 @@ pub fn all_natives(
             )])
         );
     }
+
+    add_natives_from_module!(
+        "confidential_proof",
+        confidential_proof::make_all(builder)
+    );
 
     make_table_from_iter(framework_addr, natives)
 }

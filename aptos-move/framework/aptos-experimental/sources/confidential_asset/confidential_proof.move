@@ -5,7 +5,8 @@ module aptos_experimental::confidential_proof {
     use std::option;
     use std::option::Option;
     use std::vector;
-    use aptos_std::ristretto255::{Self, CompressedRistretto, Scalar};
+    use aptos_std::ristretto255::{Self, CompressedRistretto, Scalar, RistrettoPoint};
+    use aptos_std::ristretto255_bulletproofs;
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
 
     use aptos_experimental::confidential_balance;
@@ -744,15 +745,15 @@ module aptos_experimental::confidential_proof {
         zkrp_new_balance: &RangeProof)
     {
         let balance_c = confidential_balance::balance_to_points_c(new_balance);
-
+        let comms = balance_c.map_ref(|com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
         assert!(
-            bulletproofs::verify_batch_range_proof(
-                &balance_c,
+            verify_batch_range_proof_internal(
+                comms,
                 &ristretto255::basepoint(),
                 &ristretto255::hash_to_point_base(),
-                zkrp_new_balance,
+                ristretto255_bulletproofs::range_proof_to_bytes(zkrp_new_balance),
                 BULLETPROOFS_NUM_BITS,
-                BULLETPROOFS_DST
+                BULLETPROOFS_DST,
             ),
             error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
         );
@@ -764,13 +765,13 @@ module aptos_experimental::confidential_proof {
         zkrp_transfer_amount: &RangeProof)
     {
         let balance_c = confidential_balance::balance_to_points_c(transfer_amount);
-
+        let comms = balance_c.map_ref(|com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
         assert!(
-            bulletproofs::verify_batch_range_proof(
-                &balance_c,
+            verify_batch_range_proof_internal(
+                comms,
                 &ristretto255::basepoint(),
                 &ristretto255::hash_to_point_base(),
-                zkrp_transfer_amount,
+                ristretto255_bulletproofs::range_proof_to_bytes(zkrp_transfer_amount),
                 BULLETPROOFS_NUM_BITS,
                 BULLETPROOFS_DST
             ),
@@ -1055,6 +1056,15 @@ module aptos_experimental::confidential_proof {
             }
         )
     }
+
+    native fun verify_batch_range_proof_internal(
+        comms: vector<vector<u8>>,
+        val_base: &RistrettoPoint,
+        rand_base: &RistrettoPoint,
+        proof: vector<u8>,
+        num_bits: u64,
+        dst: vector<u8>,
+    ): bool;
 
     //
     // Public view functions
