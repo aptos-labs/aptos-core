@@ -49,7 +49,14 @@ module aptos_framework::ethereum_derivable_account {
     const EUNEXPECTED_V: u64 = 5;
 
     enum SIWEAbstractSignature has drop {
+        /// Deprecated, use MessageV2 instead
         MessageV1 {
+            /// The date and time when the signature was issued
+            issued_at: String,
+            /// The signature of the message
+            signature: vector<u8>,
+        },
+        MessageV2 {
             /// The scheme in the URI of the message, e.g. the scheme of the website that requested the signature (http, https, etc.)
             scheme: String,
             /// The date and time when the signature was issued
@@ -81,10 +88,14 @@ module aptos_framework::ethereum_derivable_account {
         let stream = bcs_stream::new(*abstract_signature);
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
         if (signature_type == 0x00) {
+            let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            SIWEAbstractSignature::MessageV1 { issued_at: string::utf8(issued_at), signature }
+        } else if (signature_type == 0x01) {
             let scheme = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::MessageV1 { scheme: string::utf8(scheme), issued_at: string::utf8(issued_at), signature }
+            SIWEAbstractSignature::MessageV2 { scheme: string::utf8(scheme), issued_at: string::utf8(issued_at), signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
         }
@@ -226,7 +237,7 @@ module aptos_framework::ethereum_derivable_account {
 
     #[test_only]
     fun create_raw_signature(scheme: String, issued_at: String, signature: vector<u8>): vector<u8> {
-        let abstract_signature = SIWEAbstractSignature::MessageV1 { scheme, issued_at, signature };
+        let abstract_signature = SIWEAbstractSignature::MessageV2 { scheme, issued_at, signature };
         bcs::to_bytes(&abstract_signature)
     }
 
@@ -251,9 +262,13 @@ module aptos_framework::ethereum_derivable_account {
         ];
         let abstract_signature = create_raw_signature(utf8(b"https"), utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
         let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
-        assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV1);
+        assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV2);
         match (siwe_abstract_signature) {
-            SIWEAbstractSignature::MessageV1 { signature, issued_at, scheme } => {
+            SIWEAbstractSignature::MessageV1 { signature, issued_at } => {
+                assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
+                assert!(signature == signature_bytes);
+            },
+            SIWEAbstractSignature::MessageV2 { signature, issued_at, scheme } => {
                 assert!(scheme == utf8(b"https"));
                 assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
                 assert!(signature == signature_bytes);

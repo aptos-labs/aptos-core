@@ -38,6 +38,10 @@ struct SIWEAbstractPublicKey {
 #[derive(Serialize)]
 enum SIWEAbstractSignature {
     MessageV1 {
+        issued_at: String,
+        signature: Vec<u8>,
+    },
+    MessageV2 {
         scheme: String,
         issued_at: String,
         signature: Vec<u8>,
@@ -201,7 +205,7 @@ async fn test_ethereum_derivable_account() {
                 let signature = wallet.sign_hash(H256::from(hash)).unwrap();
                 let sig_bytes = signature.to_vec();
 
-                let signature = SIWEAbstractSignature::MessageV1 {
+                let signature = SIWEAbstractSignature::MessageV2 {
                     scheme: scheme.to_string(),
                     issued_at: "2025-01-01T00:00:00.000Z".to_string(),
                     signature: sig_bytes,
