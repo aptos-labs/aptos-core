@@ -18,6 +18,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::confidential_balance`](confidential_balance.md#0x7_confidential_balance)
 -  [`0x7::confidential_proof`](confidential_proof.md#0x7_confidential_proof)
 -  [`0x7::helpers`](helpers.md#0x7_helpers)
+-  [`0x7::large_packages`](large_packages.md#0x7_large_packages)
 -  [`0x7::market`](market.md#0x7_market)
 -  [`0x7::market_types`](market_types.md#0x7_market_types)
 -  [`0x7::order_book`](order_book.md#0x7_order_book)
