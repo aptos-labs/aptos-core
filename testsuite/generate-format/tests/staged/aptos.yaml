@@ -184,6 +184,12 @@ BlockMetadataWithRandomness:
     - randomness:
         OPTION:
           TYPENAME: Randomness
+BlockchainGeneratedInfo:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - transaction_index: U32
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -478,6 +484,15 @@ SignedTransaction:
         TYPENAME: RawTransaction
     - authenticator:
         TYPENAME: TransactionAuthenticator
+SignedTransactionWithInfo:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - transaction:
+              TYPENAME: SignedTransaction
+          - blockchain_generated_info:
+              TYPENAME: BlockchainGeneratedInfo
 SingleKeyAuthenticator:
   STRUCT:
     - public_key:
@@ -556,6 +571,10 @@ Transaction:
       BlockEpilogue:
         NEWTYPE:
           TYPENAME: BlockEpiloguePayload
+    7:
+      UserTransactionWithInfo:
+        NEWTYPE:
+          TYPENAME: SignedTransactionWithInfo
 TransactionArgument:
   ENUM:
     0:

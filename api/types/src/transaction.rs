@@ -78,11 +78,10 @@ impl TransactionData {
         latest_ledger_version: u64,
     ) -> Result<Self> {
         if txn.version > latest_ledger_version {
-            match txn.transaction {
-                aptos_types::transaction::Transaction::UserTransaction(txn) => {
-                    Ok(Self::Pending(Box::new(txn)))
-                },
-                _ => bail!("convert non-user onchain transaction to pending shouldn't exist"),
+            if let Some(signed_txn) = txn.transaction.try_into_signed_user_txn() {
+                Ok(Self::Pending(Box::new(signed_txn)))
+            } else {
+                bail!("convert non-user onchain transaction to pending shouldn't exist")
             }
         } else {
             Ok(Self::OnChain(txn))
@@ -206,6 +205,8 @@ pub enum ReplayProtector {
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
+    // Question[MI counter]: When API returns transactions, it removes the blockchain generated info and just sends the user transaction.
+    // Is this okay? Should API return the blockchain generated info as well?
     UserTransaction(UserTransaction),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),

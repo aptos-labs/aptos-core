@@ -166,8 +166,12 @@ impl ExecutionPipeline {
         let block_executor_onchain_config =
             block_executor_onchain_config.with_block_gas_limit_override(block_gas_limit);
         tokio::task::spawn_blocking(move || {
-            let txns_to_execute =
-                Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+            let txns_to_execute = Block::combine_to_input_transactions(
+                validator_txns,
+                input_txns.clone(),
+                metadata,
+                block_executor_onchain_config.clone(),
+            );
             let sig_verification_start = Instant::now();
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {

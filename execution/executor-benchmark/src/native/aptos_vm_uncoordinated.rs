@@ -52,7 +52,6 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                 .map(|(txn_idx, txn)| {
                     let log_context = AdapterLogSchema::new(state_view.id(), txn_idx);
                     let code_storage = state_view.as_aptos_code_storage(&env);
-
                     vm.execute_single_transaction(
                         txn,
                         &vm.as_move_resolver(state_view),

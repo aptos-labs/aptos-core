@@ -61,10 +61,9 @@ impl SignatureVerifiedTransaction {
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => match txn {
-                Transaction::UserTransaction(txn) => Some(txn.sender()),
-                _ => None,
-            },
+            SignatureVerifiedTransaction::Valid(txn) => txn
+                .try_as_signed_user_txn()
+                .map(|signed_txn| signed_txn.sender()),
             SignatureVerifiedTransaction::Invalid(_) => None,
         }
     }
@@ -92,9 +91,9 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 
     fn user_txn_bytes_len(&self) -> usize {
         match self {
-            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => {
-                txn.txn_bytes_len()
-            },
+            SignatureVerifiedTransaction::Valid(txn) => txn
+                .try_as_signed_user_txn()
+                .map_or(0, |signed_txn| signed_txn.txn_bytes_len()),
             _ => 0,
         }
     }
@@ -106,6 +105,15 @@ impl From<Transaction> for SignatureVerifiedTransaction {
             Transaction::UserTransaction(txn) => match txn.verify_signature() {
                 Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
                 Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+            },
+            Transaction::UserTransactionWithInfo(txn) => match txn.transaction().verify_signature()
+            {
+                Ok(_) => {
+                    SignatureVerifiedTransaction::Valid(Transaction::UserTransactionWithInfo(txn))
+                },
+                Err(_) => {
+                    SignatureVerifiedTransaction::Invalid(Transaction::UserTransactionWithInfo(txn))
+                },
             },
             _ => SignatureVerifiedTransaction::Valid(txn),
         }

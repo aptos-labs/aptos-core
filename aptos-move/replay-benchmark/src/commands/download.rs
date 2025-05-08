@@ -135,6 +135,7 @@ mod tests {
         DownloadCommand::command().debug_assert();
     }
 
+    // TODO[MI counter]: Return Transaction::UserTransactionWithInfo instead of Transaction::UserTransaction.
     fn user_transaction() -> Transaction {
         // The actual values for signed transaction do not matter.
         let entry_func = EntryFunction::new(

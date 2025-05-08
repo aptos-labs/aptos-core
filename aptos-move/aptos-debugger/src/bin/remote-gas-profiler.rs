@@ -49,13 +49,20 @@ async fn main() -> Result<()> {
         .get_committed_transaction_at_version(version)
         .await?;
 
-    let txn = match txn {
-        Transaction::UserTransaction(txn) => txn,
+    let (txn, blockchain_generated_info) = match txn {
+        Transaction::UserTransaction(txn) => (txn, None),
+        Transaction::UserTransactionWithInfo(txn) => (
+            txn.transaction().clone(),
+            Some(txn.blockchain_generated_info().clone()),
+        ),
         _ => bail!("not a user transaction"),
     };
 
-    let (_status, output, gas_log) =
-        debugger.execute_transaction_at_version_with_gas_profiler(version, txn)?;
+    let (_status, output, gas_log) = debugger.execute_transaction_at_version_with_gas_profiler(
+        version,
+        txn,
+        blockchain_generated_info,
+    )?;
 
     let txn_output =
         output.try_materialize_into_transaction_output(&debugger.state_view_at_version(version))?;
