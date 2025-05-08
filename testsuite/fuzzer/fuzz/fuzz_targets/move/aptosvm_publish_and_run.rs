@@ -55,9 +55,7 @@ const EXECUTION_TIME_GAS_RATIO: u8 = 100;
 
 // List of known false positive messages for invariant violations
 // If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
-const KNOWN_FALSE_POSITIVES: &[&str] = &[
-    "too many type parameters/arguments in the program",
-];
+const KNOWN_FALSE_POSITIVES: &[&str] = &["too many type parameters/arguments in the program"];
 
 #[inline(always)]
 fn is_coverage_enabled() -> bool {
@@ -67,7 +65,9 @@ fn is_coverage_enabled() -> bool {
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation {
         let is_known_false_positive = e.message().map_or(false, |msg| {
-            KNOWN_FALSE_POSITIVES.iter().any(|known| msg.starts_with(known))
+            KNOWN_FALSE_POSITIVES
+                .iter()
+                .any(|known| msg.starts_with(known))
         });
 
         if !is_known_false_positive {

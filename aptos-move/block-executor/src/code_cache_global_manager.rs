@@ -292,11 +292,14 @@ fn prefetch_aptos_framework(
     // If framework code exists in storage, the transitive closure will be verified and cached.
     let maybe_loaded = {
         #[cfg(fuzzing)]
-        let result = code_storage.fetch_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
+        let result =
+            code_storage.fetch_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
         #[cfg(not(fuzzing))]
-        let result = code_storage.fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
+        let result = code_storage
+            .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
         result
-    }.map_err(|err| {
+    }
+    .map_err(|err| {
         // There should be no errors when pre-fetching the framework, if there are, we
         // better return an error here.
         PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
