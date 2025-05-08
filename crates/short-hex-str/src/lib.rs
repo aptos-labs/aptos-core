@@ -92,6 +92,7 @@ fn byte2hex(byte: u8) -> (u8, u8) {
 /// Hex encode a byte slice into the destination byte slice.
 #[inline(always)]
 #[allow(clippy::arithmetic_side_effects)] // debug only assertion
+#[allow(unexpected_cfgs)] // Only for debug assertion
 fn hex_encode(src: &[u8], dst: &mut [u8]) {
     debug_checked_precondition!(dst.len() == 2 * src.len());
 
