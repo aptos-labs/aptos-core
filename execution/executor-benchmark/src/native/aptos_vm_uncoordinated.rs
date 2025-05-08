@@ -12,8 +12,7 @@ use aptos_types::{
     },
     state_store::StateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        TransactionOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, BlockchainGeneratedInfo, TransactionOutput
     },
     vm_status::VMStatus,
 };
@@ -52,12 +51,15 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                 .map(|(txn_idx, txn)| {
                     let log_context = AdapterLogSchema::new(state_view.id(), txn_idx);
                     let code_storage = state_view.as_aptos_code_storage(&env);
-
+                    let blockchain_generated_info = BlockchainGeneratedInfo::V1 {
+                        transaction_index: txn_idx,
+                    };
                     vm.execute_single_transaction(
                         txn,
                         &vm.as_move_resolver(state_view),
                         &code_storage,
                         &log_context,
+                        &blockchain_generated_info,
                     )
                     .map(|(_vm_status, vm_output)| {
                         vm_output

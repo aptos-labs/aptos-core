@@ -10,6 +10,9 @@ module aptos_framework::transaction_context {
     /// The transaction context extension feature is not enabled.
     const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 = 2;
 
+    /// The monotonically increasing counter feature is not enabled.
+    const EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED: u64 = 3;
+
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
     struct AUID has drop, store {
@@ -180,6 +183,12 @@ module aptos_framework::transaction_context {
     public fun inner_entry_function_payload(payload: &MultisigPayload): Option<EntryFunctionPayload> {
         assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.entry_function_payload
+    }
+
+    native fun monotonically_increasing_counter_internal(timestamp_us: u64): u128;
+    public fun monotonically_increasing_counter(): u128 {
+        assert!(features::monotonically_increasing_counter_enabled(), error::invalid_state(EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED));
+        monotonically_increasing_counter_internal(timestamp::now_microseconds())
     }
 
     #[test_only]

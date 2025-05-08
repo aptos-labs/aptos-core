@@ -39,6 +39,8 @@
 -  [Function `multisig_payload_internal`](#0x1_transaction_context_multisig_payload_internal)
 -  [Function `multisig_address`](#0x1_transaction_context_multisig_address)
 -  [Function `inner_entry_function_payload`](#0x1_transaction_context_inner_entry_function_payload)
+-  [Function `monotonically_increasing_counter_internal`](#0x1_transaction_context_monotonically_increasing_counter_internal)
+-  [Function `monotonically_increasing_counter`](#0x1_transaction_context_monotonically_increasing_counter)
 -  [Specification](#@Specification_1)
     -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
     -  [Function `get_transaction_hash`](#@Specification_1_get_transaction_hash)
@@ -184,6 +186,16 @@ Represents the multisig payload.
 <a id="@Constants_0"></a>
 
 ## Constants
+
+
+<a id="0x1_transaction_context_EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED"></a>
+
+The monotonically increasing counter feature is not enabled.
+
+
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED">EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED</a>: u64 = 3;
+</code></pre>
+
 
 
 <a id="0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED"></a>
@@ -958,6 +970,53 @@ Returns the inner entry function payload of the multisig payload.
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt; {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.entry_function_payload
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_monotonically_increasing_counter_internal"></a>
+
+## Function `monotonically_increasing_counter_internal`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter_internal">monotonically_increasing_counter_internal</a>(): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter_internal">monotonically_increasing_counter_internal</a>(): u128;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_monotonically_increasing_counter"></a>
+
+## Function `monotonically_increasing_counter`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">monotonically_increasing_counter</a>(): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">monotonically_increasing_counter</a>(): u128 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_monotonically_increasing_counter_enabled">features::monotonically_increasing_counter_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED">EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter_internal">monotonically_increasing_counter_internal</a>()
 }
 </code></pre>
 

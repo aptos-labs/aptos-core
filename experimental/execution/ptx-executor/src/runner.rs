@@ -261,7 +261,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
-                    let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
+                    let log_context = AdapterLogSchema::new(self.base_view.id(), Some(txn_idx));
 
                     let code_storage = state_view.as_aptos_code_storage(&env);
                     let vm_output = {
