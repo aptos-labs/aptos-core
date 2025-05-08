@@ -1,3 +1,4 @@
+pub use api_types;
 pub use aptos_bitvec;
 pub use aptos_bounded_executor;
 pub use aptos_build_info;

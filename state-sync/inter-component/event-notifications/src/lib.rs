@@ -275,14 +275,29 @@ impl EventSubscriptionService {
         Ok(())
     }
 
+    /// This notifies all the reconfiguration subscribers of the on-chain
+    /// configurations at the specified version.
+    fn notify_reconfiguration_subscribers_gravity(&mut self, version: Version) -> Result<(), Error> {
+        if self.reconfig_subscriptions.is_empty() {
+            return Ok(()); // No reconfiguration subscribers!
+        }
+
+        let new_configs = self.read_on_chain_configs(version)?;
+        for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
+            reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
+        }
+
+        Ok(())
+    }
+
     /// Fetches the configs on-chain at the specified version.
     /// Note: We cannot assume that all configs will exist on-chain. As such, we
     /// must fetch each resource one at a time. Reconfig subscribers must be able
     /// to handle on-chain configs not existing in a reconfiguration notification.
-    fn read_on_chain_configs(
+    fn read_on_chain_configs<T: OnChainConfigProvider>(
         &self,
         version: Version,
-    ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
+    ) -> Result<OnChainConfigPayload<T>, Error> {
         let db_state_view = &self
             .storage
             .read()
@@ -367,10 +382,10 @@ struct ReconfigSubscription {
 }
 
 impl ReconfigSubscription {
-    fn notify_subscriber_of_configs(
+    fn notify_subscriber_of_configs<T: OnChainConfigProvider>(
         &mut self,
         version: Version,
-        on_chain_configs: OnChainConfigPayload<DbBackedOnChainConfig>,
+        on_chain_configs: OnChainConfigPayload<T>,
     ) -> Result<(), Error> {
         let reconfig_notification = ReconfigNotification {
             version,

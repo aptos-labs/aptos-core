@@ -147,7 +147,7 @@ impl ExecutionProxy {
                         if let Err(e) = monitor!(
                             "notify_state_sync",
                             state_sync_notifier
-                                .notify_new_commit(txns, subscribable_events)
+                                .notify_new_commit(txns, subscribable_events, 0)
                                 .await
                         ) {
                             error!(error = ?e, "Failed to notify state synchronizer");

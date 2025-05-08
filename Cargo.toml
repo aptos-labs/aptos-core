@@ -9,6 +9,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+api-types = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-compression = { workspace = true }
@@ -133,6 +134,7 @@ members = [
     "consensus",
     "consensus/consensus-types",
     "consensus/safety-rules",
+    "crates/api-types",
     "crates/aptos",
     "crates/aptos-admin-service",
     "crates/aptos-api-tester",
@@ -549,6 +551,7 @@ aptos-vm-validator = { path = "vm-validator" }
 aptos-workspace-server = { path = "aptos-move/aptos-workspace-server" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
+api-types = { path = "crates/api-types" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.

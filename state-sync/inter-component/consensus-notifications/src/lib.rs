@@ -41,6 +41,7 @@ pub trait ConsensusNotificationSender: Send + Sync {
         &self,
         transactions: Vec<Transaction>,
         subscribable_events: Vec<ContractEvent>,
+        block_number: u64,
     ) -> Result<(), Error>;
 
     /// Notifies state sync to synchronize storage for at least the specified duration,
@@ -91,10 +92,12 @@ impl ConsensusNotifier {
 
 #[async_trait]
 impl ConsensusNotificationSender for ConsensusNotifier {
+    // pass the params to handle_consensus_commit_notification in gravity-sdk
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
         subscribable_events: Vec<ContractEvent>,
+        block_number: u64,
     ) -> Result<(), Error> {
         // Only send a notification if transactions have been committed
         if transactions.is_empty() {
@@ -103,7 +106,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
 
         // Create a consensus commit notification
         let (notification, callback_receiver) =
-            ConsensusCommitNotification::new(transactions, subscribable_events);
+            ConsensusCommitNotification::new(transactions, subscribable_events, block_number);
         let commit_notification = ConsensusNotification::NotifyCommit(notification);
 
         // Send the notification to state sync
@@ -296,18 +299,21 @@ pub struct ConsensusCommitNotification {
     transactions: Vec<Transaction>,
     subscribable_events: Vec<ContractEvent>,
     callback: oneshot::Sender<ConsensusNotificationResponse>,
+    block_number: u64,
 }
 
 impl ConsensusCommitNotification {
     pub fn new(
         transactions: Vec<Transaction>,
         subscribable_events: Vec<ContractEvent>,
+        block_number: u64,
     ) -> (Self, oneshot::Receiver<ConsensusNotificationResponse>) {
         let (callback, callback_receiver) = oneshot::channel();
         let commit_notification = ConsensusCommitNotification {
             transactions,
             subscribable_events,
             callback,
+            block_number,
         };
 
         (commit_notification, callback_receiver)
@@ -321,6 +327,11 @@ impl ConsensusCommitNotification {
     /// Returns a reference to the subscribable events
     pub fn get_subscribable_events(&self) -> &Vec<ContractEvent> {
         &self.subscribable_events
+    }
+
+    /// Returns the block number of the notification
+    pub fn get_block_number(&self) -> u64 {
+        self.block_number
     }
 }
 
