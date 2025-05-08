@@ -37,6 +37,7 @@ struct SIWEAbstractPublicKey {
 
 #[derive(Serialize)]
 enum SIWEAbstractSignature {
+    #[allow(dead_code)]
     MessageV1 {
         issued_at: String,
         signature: Vec<u8>,
