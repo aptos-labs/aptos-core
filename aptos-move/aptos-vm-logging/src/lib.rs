@@ -102,7 +102,7 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
         match &*BUFFERED_LOG_EVENTS.load() {
             Some(log_events) => {
                 let log_event = VMLogEntry::new(level, context.clone(), message);
-                if let Err(e) = log_events.record(txn_idx, log_event) {
+                if let Err(e) = log_events.record(txn_idx as usize, log_event) {
                     speculative_alert!("{:?}", e);
                 };
             },

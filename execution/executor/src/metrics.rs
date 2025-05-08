@@ -351,6 +351,8 @@ pub fn update_counters_for_processed_chunk<T>(
 
         let kind = match txn.get_transaction() {
             Some(Transaction::UserTransaction(_)) => "user_transaction",
+            // Question[MI counter]: Is it okay to use the same "kind" for both user_transaction and user_transaction_with_info?
+            Some(Transaction::UserTransactionWithInfo(_)) => "user_transaction",
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::BlockMetadataExt(_)) => "block_metadata_ext",
@@ -376,7 +378,10 @@ pub fn update_counters_for_processed_chunk<T>(
                 .inc();
         }
 
-        if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
+        if let Some(Some(user_txn)) = txn
+            .get_transaction()
+            .map(|txn| txn.try_as_signed_user_txn())
+        {
             if detailed_counters {
                 let mut signature_count = 0;
                 let account_authenticators = user_txn.authenticator_ref().all_signers();

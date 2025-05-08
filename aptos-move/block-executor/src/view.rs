@@ -1066,7 +1066,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -1088,8 +1088,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 match res {
                     Ok((value, _)) => Some(value),
                     Err(err) => {
-                        let log_context =
-                            AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+                        let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx);
                         alert!(
                             log_context,
                             "[VM, ResourceView] Error during value to id replacement: {}",

@@ -1272,6 +1272,89 @@ impl IndexedTransactionSummary {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SignedTransactionWithInfo {
+    V1 {
+        transaction: SignedTransaction,
+
+        blockchain_generated_info: BlockchainGeneratedInfo,
+
+        #[serde(skip)]
+        committed_hash: OnceCell<HashValue>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BlockchainGeneratedInfo {
+    V1 { transaction_index: u32 },
+}
+
+impl SignedTransactionWithInfo {
+    pub fn new(
+        transaction: SignedTransaction,
+        blockchain_generated_info: BlockchainGeneratedInfo,
+    ) -> Self {
+        Self::V1 {
+            transaction,
+            blockchain_generated_info,
+            committed_hash: OnceCell::new(),
+        }
+    }
+
+    pub fn transaction(&self) -> &SignedTransaction {
+        match self {
+            Self::V1 { transaction, .. } => transaction,
+        }
+    }
+
+    pub fn blockchain_generated_info(&self) -> &BlockchainGeneratedInfo {
+        match self {
+            Self::V1 {
+                blockchain_generated_info,
+                ..
+            } => blockchain_generated_info,
+        }
+    }
+
+    pub fn user_transaction_hash(&self) -> HashValue {
+        self.transaction().committed_hash()
+    }
+
+    pub fn committed_hash(&self) -> HashValue {
+        match self {
+            Self::V1 { committed_hash, .. } => *committed_hash
+                .get_or_init(|| Transaction::UserTransactionWithInfo(self.clone()).hash()),
+        }
+    }
+
+    pub fn transaction_index(&self) -> u32 {
+        match self {
+            Self::V1 {
+                blockchain_generated_info,
+                ..
+            } => blockchain_generated_info.transaction_index(),
+        }
+    }
+}
+
+impl BlockchainGeneratedInfo {
+    pub fn transaction_index(&self) -> u32 {
+        match self {
+            Self::V1 {
+                transaction_index, ..
+            } => *transaction_index,
+        }
+    }
+}
+
+impl Default for BlockchainGeneratedInfo {
+    fn default() -> Self {
+        Self::V1 {
+            transaction_index: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {
     pub version: Version,
@@ -2483,6 +2566,10 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
+    /// transaction, etc., along with some blockchain generated info related to the transaction.
+    UserTransactionWithInfo(SignedTransactionWithInfo),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2505,6 +2592,7 @@ impl Transaction {
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::UserTransactionWithInfo(txn) => Some(txn.transaction()),
             _ => None,
         }
     }
@@ -2533,6 +2621,7 @@ impl Transaction {
     pub fn type_name(&self) -> &'static str {
         match self {
             Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::UserTransactionWithInfo(_) => "user_transaction",
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
@@ -2551,6 +2640,7 @@ impl Transaction {
         match self {
             Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
             Transaction::UserTransaction(_)
+            | Transaction::UserTransactionWithInfo(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
@@ -2564,6 +2654,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_)
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
+            | Transaction::UserTransactionWithInfo(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
         }

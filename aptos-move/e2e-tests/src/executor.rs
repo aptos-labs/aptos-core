@@ -50,8 +50,9 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
-        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        BlockOutput, BlockchainGeneratedInfo, ExecutionStatus, SignedTransaction, Transaction,
+        TransactionExecutableRef, TransactionOutput, TransactionStatus, VMValidatorResult,
+        ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -922,6 +923,7 @@ impl FakeExecutor {
                 };
                 gas_profiler
             },
+            BlockchainGeneratedInfo::default(),
         )?;
 
         Ok((

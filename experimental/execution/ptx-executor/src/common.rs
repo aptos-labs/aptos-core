@@ -7,7 +7,7 @@
 
 use aptos_types::state_store::state_key::StateKey;
 
-pub(crate) type TxnIdx = usize;
+pub(crate) type TxnIdx = u32;
 
 pub(crate) type VersionedKey = (StateKey, TxnIdx);
 

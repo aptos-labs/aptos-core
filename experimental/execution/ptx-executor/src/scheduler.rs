@@ -164,7 +164,8 @@ impl Worker {
 
     pub fn inform_state_value(&mut self, versioned_key: VersionedKey, value: Option<StateValue>) {
         let _timer = TIMER.timer_with(&["scheduler_inform_state_value"]);
-        match self.state_values[versioned_key.txn_idx_shifted()].entry(versioned_key.key().clone())
+        match self.state_values[versioned_key.txn_idx_shifted() as usize]
+            .entry(versioned_key.key().clone())
         {
             Entry::Occupied(mut existing) => {
                 let old_state = existing.insert(StateValueState::Ready {
@@ -198,7 +199,7 @@ impl Worker {
         versioned_key: VersionedKey,
         value: Option<StateValue>,
     ) {
-        let pending_txn = self.transactions[txn_idx].as_mut().unwrap();
+        let pending_txn = self.transactions[txn_idx as usize].as_mut().unwrap();
         let found_dependency = pending_txn.pending_dependencies.remove(&versioned_key);
         assert!(found_dependency, "Pending dependency not found.");
         let (key, _txn_idx) = versioned_key;
@@ -212,7 +213,7 @@ impl Worker {
     fn take_pending_txn(&mut self, txn_idx: TxnIdx) -> PendingTransaction {
         self.num_pending_txns -= 1;
         trace!("pending txns: {}", self.num_pending_txns);
-        self.transactions[txn_idx]
+        self.transactions[txn_idx as usize]
             .take()
             .expect("Transaction is not Pending.")
     }
@@ -224,15 +225,15 @@ impl Worker {
         dependencies: HashSet<VersionedKey>,
     ) {
         let _timer = TIMER.timer_with(&["scheduler_add_txn"]);
-        assert_eq!(txn_idx, self.transactions.len());
+        assert_eq!(txn_idx as usize, self.transactions.len());
         self.transactions
             .push(Some(PendingTransaction::new(transaction)));
         self.state_values.push(HashMap::new());
         self.num_pending_txns += 1;
-        let pending_txn = self.transactions[txn_idx].as_mut().unwrap();
+        let pending_txn = self.transactions[txn_idx as usize].as_mut().unwrap();
 
         for versioned_key in dependencies {
-            match self.state_values[versioned_key.txn_idx_shifted()]
+            match self.state_values[versioned_key.txn_idx_shifted() as usize]
                 .entry(versioned_key.key().clone())
             {
                 Entry::Occupied(mut existing) => match existing.get_mut() {

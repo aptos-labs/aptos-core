@@ -271,6 +271,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                             &vm.as_move_resolver(&state_view),
                             &code_storage,
                             &log_context,
+                            txn_idx,
                         )
                     };
                     let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);

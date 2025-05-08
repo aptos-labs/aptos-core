@@ -19,6 +19,7 @@ pub enum OnChainExecutionConfig {
     // Reminder: Add V4 and future versions here, after Missing (order matters for enums).
     V4(ExecutionConfigV4),
     V5(ExecutionConfigV5),
+    V6(ExecutionConfigV6),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -32,6 +33,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V6(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -48,6 +50,7 @@ impl OnChainExecutionConfig {
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
             OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
             OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
+            OnChainExecutionConfig::V6(config) => config.block_gas_limit_type.clone(),
         }
     }
 
@@ -59,6 +62,7 @@ impl OnChainExecutionConfig {
             | OnChainExecutionConfig::V3(_)
             | OnChainExecutionConfig::V4(_) => false,
             OnChainExecutionConfig::V5(config) => config.enable_per_block_gas_limit,
+            OnChainExecutionConfig::V6(config) => config.enable_per_block_gas_limit,
         }
     }
 
@@ -66,6 +70,7 @@ impl OnChainExecutionConfig {
         BlockExecutorConfigFromOnchain::new(
             self.block_gas_limit_type(),
             self.enable_per_block_gas_limit(),
+            self.blockchain_generated_info_version(),
         )
     }
 
@@ -79,17 +84,26 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V6(config) => config.transaction_deduper_type.clone(),
+        }
+    }
+
+    pub fn blockchain_generated_info_version(&self) -> u32 {
+        match &self {
+            OnChainExecutionConfig::V6(config) => config.blockchain_generated_info_version,
+            _ => 0,
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V5(ExecutionConfigV5 {
+        OnChainExecutionConfig::V6(ExecutionConfigV6 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
+            blockchain_generated_info_version: 1,
         })
     }
 
@@ -165,6 +179,17 @@ pub struct ExecutionConfigV5 {
     pub block_gas_limit_type: BlockGasLimitType,
     pub enable_per_block_gas_limit: bool,
     pub transaction_deduper_type: TransactionDeduperType,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV6 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub enable_per_block_gas_limit: bool,
+    pub transaction_deduper_type: TransactionDeduperType,
+    // Version 0 means don't add blockchain generated info to the transaction
+    // Version 1 means add BlockchainGeneratedInfo::V1 containing transaction index to the transaction
+    pub blockchain_generated_info_version: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
