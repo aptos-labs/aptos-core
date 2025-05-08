@@ -53,19 +53,26 @@ const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-byte
 
 const EXECUTION_TIME_GAS_RATIO: u8 = 100;
 
+// List of known false positive messages for invariant violations
+// If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
+const KNOWN_FALSE_POSITIVES: &[&str] = &[
+    "too many type parameters/arguments in the program",
+];
+
 #[inline(always)]
 fn is_coverage_enabled() -> bool {
     cfg!(coverage_enabled) || std::env::var("LLVM_PROFILE_FILE").is_ok()
 }
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
-    if e.status_type() == StatusType::InvariantViolation
-        // ignore known false positive
-        && !e
-            .message()
-            .is_some_and(|m| m.starts_with("too many type parameters/arguments in the program"))
-    {
-        panic!("invariant violation {:?}", e);
+    if e.status_type() == StatusType::InvariantViolation {
+        let is_known_false_positive = e.message().map_or(false, |msg| {
+            KNOWN_FALSE_POSITIVES.iter().any(|known| msg.starts_with(known))
+        });
+
+        if !is_known_false_positive {
+            panic!("invariant violation {:?}", e);
+        }
     }
 }
 

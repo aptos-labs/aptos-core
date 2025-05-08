@@ -125,6 +125,27 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
+    /// Returns the module without verification, or [None] otherwise. The existing module can be
+    /// either in a cached state (it is then returned) or newly constructed. The error is returned
+    /// if the storage fails to fetch the deserialized module.
+    #[cfg(fuzzing)]
+    fn fetch_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>>;
+
+    /// Returns the module without verification. If it does not exist, a linker error is returned.
+    #[cfg(fuzzing)]
+    fn fetch_existing_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Arc<Module>> {
+        self.fetch_module(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
+    }
+
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
     fn fetch_struct_ty(
@@ -323,6 +344,38 @@ where
             &mut visited,
             self,
         )?))
+    }
+
+    #[cfg(fuzzing)]
+    fn fetch_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>> {
+        let id = ModuleId::new(*address, module_name.to_owned());
+
+        // Look up the module in cache, if it is not there, we need to load it
+        let (module, _) = match self.get_module_or_build_with(&id, self)? {
+            Some(module_and_version) => module_and_version,
+            None => return Ok(None),
+        };
+
+        // If module is already verified, return it
+        if module.code().is_verified() {
+            return Ok(Some(module.code().verified().clone()));
+        }
+
+        // Otherwise, create a new Module without verification
+        let runtime_environment = self.runtime_environment();
+        let module = Module::new(
+            runtime_environment.natives(),
+            module.extension().size_in_bytes(),
+            module.code().deserialized().clone(),
+            runtime_environment.struct_name_index_map(),
+        )
+        .map_err(|e| e.finish(Location::Undefined))?;
+
+        Ok(Some(Arc::new(module)))
     }
 }
 

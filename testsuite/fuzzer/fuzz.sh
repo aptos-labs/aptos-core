@@ -486,13 +486,14 @@ function samply() {
     fi
     fuzz_target=$1
     testcase=$2
-    if [ ! -f "$testcase" ]; then
+    if [ ! -e "$testcase" ]; then
         error "$testcase does not exist"
     fi
     # find the binary
     binary=$(find ./target/*/release/ -name $fuzz_target -type f -perm /111)
     if [ -z "$binary" ]; then
-        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
+        info "Building $fuzz_target"
+        build "$fuzz_target"
     fi
     info "Sampling $fuzz_target with $testcase"
     command samply record "$binary" "$testcase"
