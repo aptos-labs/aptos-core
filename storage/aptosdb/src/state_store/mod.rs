@@ -50,6 +50,7 @@ use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
         state::{LedgerState, State},
+        state_slot::StateSlot,
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -57,7 +58,7 @@ use aptos_storage_interface::{
             hot_state_view::HotStateView,
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{DbStateUpdate, MemorizedStateRead, StateUpdateRef},
+        versioned_state_value::StateUpdateRef,
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -867,30 +868,25 @@ impl StateStore {
 
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
-                    .insert(
-                        (*key).clone(),
-                        // TODO(aldenhu): Updates should carry DbStateValue directly which
-                        //     includes hot state eviction, access time refresh, etc.
-                        MemorizedStateRead::dummy_from_state_update_ref(update),
-                    )
+                    .insert((*key).clone(), update.to_hot_slot())
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        MemorizedStateRead::NonExistent
+                        StateSlot::ColdVacant
                     });
 
-                if let MemorizedStateRead::StateUpdate(DbStateUpdate {
-                    version: old_version,
-                    value: old_value_opt,
-                }) = old_entry
-                {
-                    if old_value_opt.map_or(false, |old_val| !old_val.is_hot_non_existent()) {
-                        // The value at `old_version` can be pruned once the pruning window hits
-                        // this `version`.
-                        Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
-                    }
+                if old_entry.is_occupied() {
+                    // The value at the old version can be pruned once the pruning window hits
+                    // this `version`.
+                    Self::put_state_kv_index(
+                        batch,
+                        enable_sharding,
+                        version,
+                        old_entry.expect_value_version(),
+                        key,
+                    )
                 }
             }
         }

@@ -888,6 +888,11 @@ fn get_hash<K>(
 where
     K: Key,
 {
+    // FIXME(aldenhu)
+    hash_cache
+        .and_then(|c| c.get(node_key.nibble_path()).cloned())
+        .unwrap_or_else(|| node.hash())
+    /*
     if let Some(cache) = hash_cache {
         match cache.get(node_key.nibble_path()) {
             Some(hash) => *hash,
@@ -896,6 +901,7 @@ where
     } else {
         node.hash()
     }
+     */
 }
 
 fn batch_update_subtree<K>(
