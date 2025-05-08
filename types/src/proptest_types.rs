@@ -152,7 +152,7 @@ impl EventKey {
         account_address_strategy: impl Strategy<Value = AccountAddress>,
     ) -> impl Strategy<Value = Self> {
         // We only generate small counters so that it won't overflow.
-        (account_address_strategy, 0..std::u64::MAX / 2)
+        (account_address_strategy, 0..u64::MAX / 2)
             .prop_map(|(account_address, counter)| EventKey::new(counter, account_address))
     }
 }
@@ -820,7 +820,7 @@ impl EventHandle {
         event_key_strategy: impl Strategy<Value = EventKey>,
     ) -> impl Strategy<Value = Self> {
         // We only generate small counters so that it won't overflow.
-        (event_key_strategy, 0..std::u64::MAX / 2)
+        (event_key_strategy, 0..u64::MAX / 2)
             .prop_map(|(event_key, counter)| EventHandle::new(event_key, counter))
     }
 }

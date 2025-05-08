@@ -4489,6 +4489,7 @@ dependencies = [
  "clap 4.5.21",
  "log",
  "move-binary-format",
+ "move-package",
  "once_cell",
  "rand 0.7.3",
  "serde",

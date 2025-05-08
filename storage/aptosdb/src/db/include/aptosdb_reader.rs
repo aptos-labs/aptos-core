@@ -613,7 +613,7 @@ impl DbReader for AptosDB {
             if !self.skip_index_and_usage {
                 return self.get_events(
                     &new_block_event_key(),
-                    u64::max_value(),
+                    u64::MAX,
                     Order::Descending,
                     num_events as u64,
                     latest_version.unwrap_or(0),
@@ -940,7 +940,7 @@ impl AptosDB {
             "This API is deprecated for sharded DB"
         );
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-        let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
+        let get_latest = order == Order::Descending && start_seq_num == u64::MAX;
 
         let cursor = if get_latest {
             // Caller wants the latest, figure out the latest seq_num.

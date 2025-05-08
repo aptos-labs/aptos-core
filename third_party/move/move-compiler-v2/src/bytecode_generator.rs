@@ -655,7 +655,11 @@ impl<'env> Generator<'env> {
             if struct_id.module_id != self.func_env.module_env.get_id() {
                 self.error(
                     id,
-                    "cannot unpack a wrapper struct and invoke the wrapped function value defined in a different module",
+                    format!(
+                    "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value ",
+                    wrapper_struct.get_full_name_str(),
+                    self.func_env.env().get_module(struct_id.module_id).get_full_name_str(),
+                    ),
                 )
             }
             let inst = inst.to_vec();
@@ -855,7 +859,17 @@ impl<'env> Generator<'env> {
                         .get_type_parameter_count(),
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
-                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty {
+                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty.clone() {
+                    if wrapper_mid != *mid {
+                        self.error(
+                            id,
+                            format!(
+                                "cannot implicitly pack a wrapper struct `{}` defined in a different module `{}`",
+                                target_ty.display(&self.func_env.get_type_display_ctx()),
+                                self.func_env.env().get_module(wrapper_mid).get_full_name_str(),
+                                ),
+                        );
+                    }
                     // Implicitly convert to a function wrapper.
                     let fun_ty = self
                         .env()

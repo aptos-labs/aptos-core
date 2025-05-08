@@ -945,7 +945,7 @@ pub fn run_single_with_default_params(
                 false,
                 "Benchmark shouldn't be run in debug mode, use --release instead."
             );
-            std::cmp::max(10, std::cmp::min(10000, approx_tps / 4))
+            (approx_tps / 4).clamp(10, 10000)
         },
     };
 

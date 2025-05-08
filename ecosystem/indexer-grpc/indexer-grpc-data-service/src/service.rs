@@ -272,15 +272,7 @@ async fn get_data_with_tasks(
             None => MAX_FETCH_TASKS_PER_REQUEST,
             Some(transactions_count) => {
                 let num_tasks = transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK;
-                if num_tasks >= MAX_FETCH_TASKS_PER_REQUEST {
-                    // Limit the max tasks to MAX_FETCH_TASKS_PER_REQUEST
-                    MAX_FETCH_TASKS_PER_REQUEST
-                } else if num_tasks < 1 {
-                    // Limit the min tasks to 1
-                    1
-                } else {
-                    num_tasks
-                }
+                num_tasks.clamp(1, MAX_FETCH_TASKS_PER_REQUEST)
             },
         },
         Err(_) => {
