@@ -280,7 +280,7 @@ impl StateByVersion {
             .shards
             .iter()
             .flat_map(|shard| shard.iter())
-            .flat_map(|(k, db_update)| db_update.to_jmt_update_opt(k, last_snapshot.next_version()))
+            .flat_map(|(key, slot)| slot.maybe_update_jmt(key, last_snapshot.next_version()))
             .collect::<HashMap<_, _>>();
 
         let expected_jmt_updates =
@@ -294,7 +294,7 @@ impl StateByVersion {
                 },
             );
 
-        assert_eq!(jmt_updates, expected_jmt_updates);
+        assert_eq!(jmt_updates, expected_jmt_updates, "JMT updates mismatch.");
     }
 }
 
@@ -343,7 +343,7 @@ fn update_state(
             hot_state.clone(),
             persisted_state.clone(),
             parent_state.deref().clone(),
-            1, // access_time_refresh_interval_secs
+            3, // hot_item_refresh_interval_versions
         );
         let read_keys = block.all_reads().collect_vec();
         pool.install(|| {

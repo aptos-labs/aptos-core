@@ -7,9 +7,12 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_view::hot_state_view::HotStateView, versioned_state_value::DbStateUpdate,
+    state::State, state_slot::StateSlot, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::state_store::{state_key::StateKey, StateViewResult};
+use aptos_types::{
+    state_store::{state_key::StateKey, StateViewResult},
+    transaction::Version,
+};
 use dashmap::DashMap;
 use std::{
     collections::BTreeSet,
@@ -25,7 +28,7 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 pub struct HotStateBase {
     capacity: usize,
     max_value_bytes: usize,
-    inner: DashMap<StateKey, DbStateUpdate>,
+    inner: DashMap<StateKey, StateSlot>,
 }
 
 impl HotStateBase {
@@ -37,13 +40,13 @@ impl HotStateBase {
         }
     }
 
-    fn get(&self, key: &StateKey) -> Option<DbStateUpdate> {
+    fn get(&self, key: &StateKey) -> Option<StateSlot> {
         self.inner.get(key).map(|val| val.clone())
     }
 }
 
 impl HotStateView for HotStateBase {
-    fn get_state_update(&self, state_key: &StateKey) -> StateViewResult<Option<DbStateUpdate>> {
+    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<Option<StateSlot>> {
         Ok(self.get(state_key))
     }
 }
@@ -92,7 +95,7 @@ pub struct Committer {
     base: Arc<HotStateBase>,
     committed: Arc<Mutex<State>>,
     rx: Receiver<State>,
-    key_by_access_time: BTreeSet<(u32, StateKey)>,
+    key_by_hot_since_version: BTreeSet<(Version, StateKey)>,
     total_key_bytes: usize,
     total_value_bytes: usize,
 }
@@ -110,7 +113,7 @@ impl Committer {
             base,
             committed,
             rx,
-            key_by_access_time: BTreeSet::new(),
+            key_by_hot_since_version: BTreeSet::new(),
             total_key_bytes: 0,
             total_value_bytes: 0,
         }
@@ -124,9 +127,12 @@ impl Committer {
             self.evict();
             *self.committed.lock() = to_commit;
 
-            assert_eq!(self.key_by_access_time.len(), self.base.inner.len());
+            assert_eq!(self.key_by_hot_since_version.len(), self.base.inner.len());
 
-            GAUGE.set_with(&["hot_state_items"], self.key_by_access_time.len() as i64);
+            GAUGE.set_with(
+                &["hot_state_items"],
+                self.key_by_hot_since_version.len() as i64,
+            );
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
             GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
         }
@@ -171,46 +177,43 @@ impl Committer {
         let mut n_insert = 0;
 
         let delta = to_commit.make_delta(&self.committed.lock());
-        for (key, update) in delta.shards.iter().flat_map(|shard| shard.iter()) {
-            let has_old_value = if let Some(old_upd) = self.base.get(&key) {
-                let old_val = old_upd.expect_non_delete();
-
+        for (key, slot) in delta.shards.iter().flat_map(|shard| shard.iter()) {
+            let has_old_entry = if let Some(old_slot) = self.base.get(&key) {
                 self.total_key_bytes -= key.size();
-                self.total_value_bytes -= old_val.size();
+                self.total_value_bytes -= old_slot.size();
 
-                self.key_by_access_time
-                    .remove(&(old_val.access_time_secs(), key.clone()));
+                self.key_by_hot_since_version
+                    .remove(&(old_slot.expect_hot_since_version(), key.clone()));
                 true
             } else {
                 false
             };
 
-            if update.value.is_none() {
+            if slot.is_cold() {
                 // deletion
-                if has_old_value {
+                if has_old_entry {
                     n_delete += 1;
                 }
 
                 self.base.inner.remove(&key);
-            } else if update.expect_non_delete().size() > self.base.max_value_bytes {
+            } else if slot.size() > self.base.max_value_bytes {
                 // item too large to hold in memory
                 n_too_large += 1;
 
                 self.base.inner.remove(&key);
             } else {
-                if has_old_value {
+                if has_old_entry {
                     n_update += 1;
                 } else {
                     n_insert += 1;
                 };
-                let new_val = update.expect_non_delete();
 
                 self.total_key_bytes += key.size();
-                self.total_value_bytes += new_val.size();
+                self.total_value_bytes += slot.size();
 
-                self.key_by_access_time
-                    .insert((new_val.access_time_secs(), key.clone()));
-                self.base.inner.insert(key, update);
+                self.key_by_hot_since_version
+                    .insert((slot.expect_hot_since_version(), key.clone()));
+                self.base.inner.insert(key, slot);
             }
         }
 
@@ -228,24 +231,28 @@ impl Committer {
             return;
         }
 
-        let latest = self.key_by_access_time.last().expect("Known Non-empty.").0;
+        let latest = self
+            .key_by_hot_since_version
+            .last()
+            .expect("Known Non-empty.")
+            .0;
         let mut last_evicted = 0;
 
         let to_evict = total - self.base.capacity;
         for _ in 0..to_evict {
-            let (ts, key) = self
-                .key_by_access_time
+            let (ver, key) = self
+                .key_by_hot_since_version
                 .pop_first()
                 .expect("Known Non-empty.");
-            last_evicted = ts;
-            let (k, v) = self.base.inner.remove(&key).expect("Known to exist.");
+            last_evicted = ver;
+            let (key, slot) = self.base.inner.remove(&key).expect("Known to exist.");
 
-            self.total_key_bytes -= k.size();
-            self.total_value_bytes -= v.expect_non_delete().size();
+            self.total_key_bytes -= key.size();
+            self.total_value_bytes -= slot.size();
         }
 
         GAUGE.set_with(
-            &["hot_state_item_evict_age"],
+            &["hot_state_item_evict_age_versions"],
             (latest - last_evicted) as i64,
         );
         COUNTER.inc_with_by(&["hot_state_evict"], to_evict as u64);
