@@ -1,0 +1,22 @@
+success
+
+PackageManifest {
+    package: PackageInfo {
+        name: "some_package_name",
+        version: Version {
+            major: 0,
+            minor: 1,
+            patch: 2,
+        },
+        authors: {},
+        license: None,
+        upgrade_policy: None,
+    },
+    addresses: {
+        "addr1": Wildcard,
+    },
+    dev_addresses: {},
+    build: None,
+    dependencies: {},
+    dev_dependencies: {},
+}
