@@ -179,6 +179,7 @@ impl HashValue {
         HashValue::from_keccak(sha3)
     }
 
+    /// Convenience function that sha3_256 the set of buffers
     #[cfg(test)]
     pub fn from_iter_sha3<'a, I>(buffers: I) -> Self
     where

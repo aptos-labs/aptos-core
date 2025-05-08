@@ -480,7 +480,7 @@ nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
 ambassador = "0.4.1"
-anyhow = "1.0.71"
+anyhow = "1.0.98"
 anstyle = "1.0.1"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 arc-swap = "1.6.0"
@@ -700,7 +700,7 @@ prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.4.0"
-proptest-derive = "0.4.0"
+proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
 prost-types = "0.13.3"
 quanta = "0.10.1"
