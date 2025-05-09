@@ -868,6 +868,7 @@ impl StateStore {
 
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
+                    // TODO(HotState): Revisit: assuming every write op results in a hot slot
                     .insert((*key).clone(), update.to_hot_slot())
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,

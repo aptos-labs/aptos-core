@@ -155,6 +155,7 @@ impl StateSlot {
         })
     }
 
+    // TODO(HotState): db returns cold slot directly
     pub fn from_db_get(tuple_opt: Option<(Version, StateValue)>) -> Self {
         match tuple_opt {
             None => Self::ColdVacant,
