@@ -12,6 +12,7 @@ use hashbrown::HashSet;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
+    access::ModuleAccess,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -355,7 +356,7 @@ where
         let id = ModuleId::new(*address, module_name.to_owned());
 
         // Look up the module in cache, if it is not there, we need to load it
-        let (module, _) = match self.get_module_or_build_with(&id, self)? {
+        let (module, version) = match self.get_module_or_build_with(&id, self)? {
             Some(module_and_version) => module_and_version,
             None => return Ok(None),
         };
@@ -365,17 +366,16 @@ where
             return Ok(Some(module.code().verified().clone()));
         }
 
-        // Otherwise, create a new Module without verification
-        let runtime_environment = self.runtime_environment();
-        let module = Module::new(
-            runtime_environment.natives(),
-            module.extension().size_in_bytes(),
-            module.code().deserialized().clone(),
-            runtime_environment.struct_name_index_map(),
-        )
-        .map_err(|e| e.finish(Location::Undefined))?;
-
-        Ok(Some(Arc::new(module)))
+        // Otherwise, load the module and its dependencies without verification
+        let mut visited = HashSet::new();
+        visited.insert(id.clone());
+        Ok(Some(visit_dependencies_and_load(
+            id,
+            module,
+            version,
+            &mut visited,
+            self,
+        )?))
     }
 }
 
@@ -474,6 +474,88 @@ where
         version,
     )?;
     Ok(module.code().verified().clone())
+}
+
+/// Visits the dependencies of the given module and loads them without verification. If dependencies form a cycle,
+/// an error is returned.
+#[cfg(fuzzing)]
+fn visit_dependencies_and_load<T, E, V>(
+    module_id: ModuleId,
+    module: Arc<ModuleCode<CompiledModule, Module, E>>,
+    version: V,
+    visited: &mut HashSet<ModuleId>,
+    module_cache_with_context: &T,
+) -> VMResult<Arc<Module>>
+where
+    T: WithRuntimeEnvironment
+        + ModuleCache<
+            Key = ModuleId,
+            Deserialized = CompiledModule,
+            Verified = Module,
+            Extension = E,
+            Version = V,
+        > + ModuleCodeBuilder<
+            Key = ModuleId,
+            Deserialized = CompiledModule,
+            Verified = Module,
+            Extension = E,
+        >,
+    E: WithBytes + WithSize + WithHash,
+    V: Clone + Default + Ord,
+{
+    let runtime_environment = module_cache_with_context.runtime_environment();
+
+    // Step 2: Traverse and collect all immediate dependencies
+    let mut loaded_dependencies = vec![];
+    for (addr, name) in module.code().deserialized().immediate_dependencies_iter() {
+        let dependency_id = ModuleId::new(*addr, name.to_owned());
+
+        let (dependency, dependency_version) = module_cache_with_context
+            .get_module_or_build_with(&dependency_id, module_cache_with_context)?
+            .ok_or_else(|| module_linker_error!(addr, name))?;
+
+        // If dependency is already loaded, use it
+        if dependency.code().is_verified() {
+            loaded_dependencies.push(dependency.code().verified().clone());
+            continue;
+        }
+
+        if visited.insert(dependency_id.clone()) {
+            // Dependency is not loaded, and we have not visited it yet
+            let loaded_dependency = visit_dependencies_and_load(
+                dependency_id.clone(),
+                dependency,
+                dependency_version,
+                visited,
+                module_cache_with_context,
+            )?;
+            loaded_dependencies.push(loaded_dependency);
+        } else {
+            // We must have found a cycle otherwise
+            return Err(module_cyclic_dependency_error!(
+                dependency_id.address(),
+                dependency_id.name()
+            ));
+        }
+    }
+
+    // Create a new Module without verification
+    let code = Module::new(
+        runtime_environment.natives(),
+        module.extension().size_in_bytes(),
+        module.code().deserialized().clone(),
+        runtime_environment.struct_name_index_map(),
+    )
+    .map_err(|e| e.finish(Location::Undefined))?;
+
+    let verified_module = module_cache_with_context.insert_verified_module(
+        module_id,
+        code,
+        module.extension().clone(),
+        version,
+    )?;
+
+    Ok(verified_module.code().verified().clone())
 }
 
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
