@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext, storage::loader::traits::StructDefinitionLoader,
-    RuntimeEnvironment, WithRuntimeEnvironment,
+    storage::loader::traits::StructDefinitionLoader, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use claims::assert_none;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -11,7 +10,7 @@ use move_core_types::{
     ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::GasMeter,
+    gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{
         runtime_types::{AbilityInfo, StructIdentifier, StructLayout, StructType, Type},
         struct_name_indexing::StructNameIndex,
@@ -160,7 +159,7 @@ impl StructDefinitionLoader for MockStructDefinitionLoader {
     fn load_struct_definition(
         &self,
         _gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        _traversal_context: &mut impl ModuleTraversalContext,
         idx: &StructNameIndex,
     ) -> PartialVMResult<Arc<StructType>> {
         self.struct_definitions

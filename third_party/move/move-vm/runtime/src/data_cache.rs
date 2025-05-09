@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    module_traversal::TraversalContext,
     storage::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
@@ -20,6 +21,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::ModuleTraversalContext,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
     value_serde::ValueSerDeContext,
@@ -73,12 +75,16 @@ impl TransactionDataCache {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub fn into_effects(self, module_storage: &dyn ModuleStorage) -> PartialVMResult<ChangeSet> {
+    pub fn into_effects(
+        self,
+        module_storage: &dyn ModuleStorage,
+        traversal_context: &TraversalContext,
+    ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
                 ValueSerDeContext::new()
-                    .with_func_args_deserialization(&function_value_extension)
+                    .with_function_value_extension(&function_value_extension, traversal_context)
                     .serialize(&value, &layout)?
                     .map(Into::into)
                     .ok_or_else(|| {
@@ -128,6 +134,7 @@ impl TransactionDataCache {
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
     pub(crate) fn create_data_cache_entry(
+        traversal_context: &mut impl ModuleTraversalContext,
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
@@ -171,7 +178,7 @@ impl TransactionDataCache {
         let value = match data {
             Some(blob) => {
                 let val = ValueSerDeContext::new()
-                    .with_func_args_deserialization(&function_value_extension)
+                    .with_function_value_extension(&function_value_extension, traversal_context)
                     .with_delayed_fields_serde()
                     .deserialize(&blob, &layout)
                     .ok_or_else(|| {

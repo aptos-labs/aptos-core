@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext,
     storage::loader::traits::{Loader, StructDefinitionLoader},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::{
-    gas::GasMeter,
+    gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
 };
 use std::sync::Arc;
@@ -47,7 +46,7 @@ where
     fn load_struct_definition(
         &self,
         _gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        _traversal_context: &mut impl ModuleTraversalContext,
         idx: &StructNameIndex,
     ) -> PartialVMResult<Arc<StructType>> {
         let struct_name = self

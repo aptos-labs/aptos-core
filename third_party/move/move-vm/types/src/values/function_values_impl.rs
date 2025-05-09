@@ -115,9 +115,11 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
             .ctx
             .required_function_extension()
             .map_err(S::Error::custom)?;
+
         let data = fun_ext
             .get_serialization_data(fun.as_ref())
             .map_err(S::Error::custom)?;
+
         let mut seq = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
         seq.serialize_element(&data.format_version)?;
         seq.serialize_element(&data.module_id)?;

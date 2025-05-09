@@ -59,6 +59,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{AsFunctionValueExtension, Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
+    gas::NoOpTraversalContext,
     value_serde::ValueSerDeContext,
 };
 use std::{
@@ -1169,13 +1170,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
         state_value
             .map_bytes(|bytes| {
+                let no_op_traversal_context = NoOpTraversalContext;
+
                 // This call will replace all occurrences of aggregator / snapshot
                 // values with unique identifiers with the same type layout.
                 // The values are stored in aggregators multi-version data structure,
                 // see the actual trait implementation for more details.
                 let patched_value = ValueSerDeContext::new()
                     .with_delayed_fields_replacement(&mapping)
-                    .with_func_args_deserialization(&function_value_extension)
+                    .with_function_value_extension(
+                        &function_value_extension,
+                        &no_op_traversal_context,
+                    )
                     .deserialize(bytes.as_ref(), layout)
                     .ok_or_else(|| {
                         anyhow::anyhow!("Failed to deserialize resource during id replacement")
@@ -1183,7 +1189,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
                 ValueSerDeContext::new()
                     .with_delayed_fields_serde()
-                    .with_func_args_deserialization(&function_value_extension)
+                    .with_function_value_extension(
+                        &function_value_extension,
+                        &no_op_traversal_context,
+                    )
                     .serialize(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
@@ -1206,8 +1215,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
         let function_value_extension = self.as_function_value_extension();
+        let no_op_traversal_context = NoOpTraversalContext;
+
         let value = ValueSerDeContext::new()
-            .with_func_args_deserialization(&function_value_extension)
+            .with_function_value_extension(&function_value_extension, &no_op_traversal_context)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
             .ok_or_else(|| {
@@ -1220,7 +1231,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
         let patched_bytes = ValueSerDeContext::new()
             .with_delayed_fields_replacement(&mapping)
-            .with_func_args_deserialization(&function_value_extension)
+            .with_function_value_extension(&function_value_extension, &no_op_traversal_context)
             .serialize(&value, layout)?
             .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
             .into();
