@@ -3,6 +3,7 @@
 
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
+    gas::ModuleTraversalContext,
     values::{
         AbstractFunction, DeserializationSeed, SerializationReadyValue, SerializedFunctionData,
         Value,
@@ -30,6 +31,7 @@ pub trait FunctionValueExtension {
     fn get_serialization_data(
         &self,
         fun: &dyn AbstractFunction,
+        traversal_context: &dyn ModuleTraversalContext,
     ) -> PartialVMResult<SerializedFunctionData>;
 }
 
@@ -62,11 +64,30 @@ impl DelayedFieldsExtension<'_> {
     }
 }
 
+/// Contains information on how to resolve function values. In addition, stores all visited
+/// modules so that during (de)serialization one can check if module loading has been metered or
+/// not.
+#[derive(Copy, Clone)]
+pub(crate) struct FunctionValueExtensionWithContext<'a> {
+    pub(crate) extension: &'a dyn FunctionValueExtension,
+    traversal_context: &'a dyn ModuleTraversalContext,
+}
+
+impl<'a> FunctionValueExtensionWithContext<'a> {
+    /// Returns serialized function data.
+    pub(crate) fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        self.extension
+            .get_serialization_data(fun, self.traversal_context)
+    }
+}
+
 /// A (de)serializer context for a single Move [Value], containing optional extensions. If
 /// extension is not provided, but required at (de)serialization time, (de)serialization fails.
 pub struct ValueSerDeContext<'a> {
-    #[allow(dead_code)]
-    pub(crate) function_extension: Option<&'a dyn FunctionValueExtension>,
+    pub(crate) function_extension: Option<FunctionValueExtensionWithContext<'a>>,
     pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
     pub(crate) legacy_signer: bool,
 }
@@ -88,18 +109,23 @@ impl<'a> ValueSerDeContext<'a> {
         self
     }
 
-    /// Custom (de)serializer such that supports lookup of the argument types of a function during
-    /// function value deserialization.
-    pub fn with_func_args_deserialization(
+    /// Custom (de)serializer such that supports lookup of serialized function data.
+    pub fn with_function_value_extension(
         mut self,
-        function_extension: &'a dyn FunctionValueExtension,
+        extension: &'a dyn FunctionValueExtension,
+        traversal_context: &'a dyn ModuleTraversalContext,
     ) -> Self {
-        self.function_extension = Some(function_extension);
+        self.function_extension = Some(FunctionValueExtensionWithContext {
+            extension,
+            traversal_context,
+        });
         self
     }
 
-    pub fn required_function_extension(&self) -> PartialVMResult<&dyn FunctionValueExtension> {
-        self.function_extension.ok_or_else(|| {
+    pub(crate) fn required_function_extension(
+        &self,
+    ) -> PartialVMResult<&FunctionValueExtensionWithContext<'a>> {
+        self.function_extension.as_ref().ok_or_else(|| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                 "require function extension context for serialization of closures".to_string(),
             )

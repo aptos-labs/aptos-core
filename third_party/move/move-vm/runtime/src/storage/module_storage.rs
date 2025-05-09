@@ -27,6 +27,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
+    gas::{ModuleTraversalContext, UnvisitableModuleTraversalContext},
     loaded_data::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
@@ -581,6 +582,7 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
     fn get_serialization_data(
         &self,
         fun: &dyn AbstractFunction,
+        traversal_context: &dyn ModuleTraversalContext,
     ) -> PartialVMResult<SerializedFunctionData> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
@@ -598,11 +600,31 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                         ty_builder.create_ty_with_subst(ty, &fun.ty_args)
                     }
                 };
+
+                // For resolved closures, these layout constructions may access modules. They must
+                // have been already accessed though:
+                //   1. Captured arguments from storage have their layouts already constructed (and
+                //      so, the corresponding modules loaded).
+                //   2. Captured arguments created during execution: by construction, their modules
+                //      also must have been loaded.
+                //
+                //      Note: enum layouts are "non-lazy": for example, it is possible to have a
+                //      variant A::V1 is constructed during execution, but layout of some A::V2 is
+                //      also constructed loading more modules. The current implementation in MoveVM
+                //      ensures that modules from A::V2 variant will be visited: when an enum is
+                //      packed, all modules from all variants are loaded for value depth checks. In
+                //      case this change, we will be able to detect it as we pass traversal context
+                //      to check if this invariant has been violated.
+                // TODO(lazy-loading):
+                //   Use the context to check the invariant that all modules for layout are indeed
+                //   loaded. Will be coupled with native loader (later PRs).
+                let _ctx = UnvisitableModuleTraversalContext::new(traversal_context);
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()
                     .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
                     .collect::<PartialVMResult<Vec<_>>>()?;
+
                 Ok(SerializedFunctionData {
                     format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun
