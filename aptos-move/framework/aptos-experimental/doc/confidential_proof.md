@@ -47,6 +47,7 @@ These proofs ensure correctness for operations such as <code>confidential_transf
 -  [Function `deserialize_transfer_sigma_proof`](#0x7_confidential_proof_deserialize_transfer_sigma_proof)
 -  [Function `deserialize_normalization_sigma_proof`](#0x7_confidential_proof_deserialize_normalization_sigma_proof)
 -  [Function `deserialize_rotation_sigma_proof`](#0x7_confidential_proof_deserialize_rotation_sigma_proof)
+-  [Function `verify_batch_range_proof_internal`](#0x7_confidential_proof_verify_batch_range_proof_internal)
 -  [Function `get_fiat_shamir_withdrawal_sigma_dst`](#0x7_confidential_proof_get_fiat_shamir_withdrawal_sigma_dst)
 -  [Function `get_fiat_shamir_transfer_sigma_dst`](#0x7_confidential_proof_get_fiat_shamir_transfer_sigma_dst)
 -  [Function `get_fiat_shamir_normalization_sigma_dst`](#0x7_confidential_proof_get_fiat_shamir_normalization_sigma_dst)
@@ -1753,15 +1754,15 @@ Verifies the validity of the <code>NewBalanceRangeProof</code>.
     zkrp_new_balance: &RangeProof)
 {
     <b>let</b> balance_c = <a href="confidential_balance.md#0x7_confidential_balance_balance_to_points_c">confidential_balance::balance_to_points_c</a>(new_balance);
-
+    <b>let</b> comms = balance_c.map_ref(|com| <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)));
     <b>assert</b>!(
-        bulletproofs::verify_batch_range_proof(
-            &balance_c,
+        <a href="confidential_proof.md#0x7_confidential_proof_verify_batch_range_proof_internal">verify_batch_range_proof_internal</a>(
+            comms,
             &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(),
             &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_hash_to_point_base">ristretto255::hash_to_point_base</a>(),
-            zkrp_new_balance,
+            <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_range_proof_to_bytes">ristretto255_bulletproofs::range_proof_to_bytes</a>(zkrp_new_balance),
             <a href="confidential_proof.md#0x7_confidential_proof_BULLETPROOFS_NUM_BITS">BULLETPROOFS_NUM_BITS</a>,
-            <a href="confidential_proof.md#0x7_confidential_proof_BULLETPROOFS_DST">BULLETPROOFS_DST</a>
+            <a href="confidential_proof.md#0x7_confidential_proof_BULLETPROOFS_DST">BULLETPROOFS_DST</a>,
         ),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="confidential_proof.md#0x7_confidential_proof_ERANGE_PROOF_VERIFICATION_FAILED">ERANGE_PROOF_VERIFICATION_FAILED</a>)
     );
@@ -1793,13 +1794,13 @@ Verifies the validity of the <code>TransferBalanceRangeProof</code>.
     zkrp_transfer_amount: &RangeProof)
 {
     <b>let</b> balance_c = <a href="confidential_balance.md#0x7_confidential_balance_balance_to_points_c">confidential_balance::balance_to_points_c</a>(transfer_amount);
-
+    <b>let</b> comms = balance_c.map_ref(|com| <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)));
     <b>assert</b>!(
-        bulletproofs::verify_batch_range_proof(
-            &balance_c,
+        <a href="confidential_proof.md#0x7_confidential_proof_verify_batch_range_proof_internal">verify_batch_range_proof_internal</a>(
+            comms,
             &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(),
             &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_hash_to_point_base">ristretto255::hash_to_point_base</a>(),
-            zkrp_transfer_amount,
+            <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_range_proof_to_bytes">ristretto255_bulletproofs::range_proof_to_bytes</a>(zkrp_transfer_amount),
             <a href="confidential_proof.md#0x7_confidential_proof_BULLETPROOFS_NUM_BITS">BULLETPROOFS_NUM_BITS</a>,
             <a href="confidential_proof.md#0x7_confidential_proof_BULLETPROOFS_DST">BULLETPROOFS_DST</a>
         ),
@@ -2252,6 +2253,35 @@ Returns <code>Some(<a href="confidential_proof.md#0x7_confidential_proof_Rotatio
         }
     )
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_confidential_proof_verify_batch_range_proof_internal"></a>
+
+## Function `verify_batch_range_proof_internal`
+
+
+
+<pre><code><b>fun</b> <a href="confidential_proof.md#0x7_confidential_proof_verify_batch_range_proof_internal">verify_batch_range_proof_internal</a>(comms: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, val_base: &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, num_bits: u64, dst: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="confidential_proof.md#0x7_confidential_proof_verify_batch_range_proof_internal">verify_batch_range_proof_internal</a>(
+    comms: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    val_base: &RistrettoPoint,
+    rand_base: &RistrettoPoint,
+    proof: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    num_bits: u64,
+    dst: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+): bool;
 </code></pre>
 
 

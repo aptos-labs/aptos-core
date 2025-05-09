@@ -32,12 +32,20 @@ use aptos_native_interface::{RawSafeNative, SafeNativeBuilder};
 use cryptography::ed25519;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
+use std::str::FromStr;
 
 pub mod status {
     // Failure in parsing a struct type tag
     pub const NFE_EXPECTED_STRUCT_TYPE_TAG: u64 = 0x1;
     // Failure in address parsing (likely no correct length)
     pub const NFE_UNABLE_TO_PARSE_ADDRESS: u64 = 0x2;
+}
+
+pub fn experimental_natives(builder: &SafeNativeBuilder) -> NativeFunctionTable {
+    make_table_from_iter(
+        AccountAddress::from_str("0x07").unwrap(),
+        confidential_proof::make_all(builder).map(|(func_name, func)| ("confidential_proof".to_string(), func_name, func)),
+    )
 }
 
 pub fn all_natives(
@@ -114,10 +122,10 @@ pub fn all_natives(
         );
     }
 
-    add_natives_from_module!(
-        "confidential_proof",
-        confidential_proof::make_all(builder)
-    );
+    // add_natives_from_module!(
+    //     "confidential_proof",
+    //     confidential_proof::make_all(builder)
+    // );
 
     make_table_from_iter(framework_addr, natives)
 }

@@ -42,5 +42,6 @@ pub fn aptos_natives_with_builder(
             CORE_CODE_ADDRESS,
             builder,
         ))
+        .chain(aptos_framework::natives::experimental_natives(builder))
         .collect()
 }
