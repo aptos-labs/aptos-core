@@ -478,7 +478,7 @@ fn accumulator_poly_scheduled_inner(
         return accumulator_poly(S, batch_dom, fft_thresh);
     }
 
-    let batch_size = len.div_ceil(2);
+    let batch_size = len.div_ceil(2) - 1;
     debug_assert_eq!(batch_size * 2 + 1, len);
 
     let mut b1 =

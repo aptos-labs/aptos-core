@@ -347,6 +347,7 @@ impl SpecTranslator<'_> {
         }
     }
 
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
             // This function is native and expected to be found in the prelude.
@@ -553,6 +554,7 @@ impl SpecTranslator<'_> {
     }
 
     /// Translate lifted functions for choice expressions.
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_choice_functions(&self) {
         let env = self.env;
         let infos_ref = self.lifted_choice_infos.borrow();

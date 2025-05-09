@@ -150,6 +150,7 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    #[allow(clippy::literal_string_with_formatting_args)]
     pub fn translate(&mut self) {
         let writer = self.writer;
         let env = self.env;
@@ -807,6 +808,7 @@ impl StructTranslator<'_> {
         emitln!(writer);
     }
 
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn emit_function(&self, signature: &str, body_fn: impl Fn()) {
         self.emit_function_with_attr("{:inline} ", signature, body_fn)
     }
