@@ -96,7 +96,7 @@ fn native_write_to_event_store(
     let function_value_extension = context.function_value_extension();
     let blob = ValueSerDeContext::new()
         .with_delayed_fields_serde()
-        .with_func_args_deserialization(&function_value_extension)
+        .with_function_value_extension(&function_value_extension, context.traversal_context())
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -162,7 +162,10 @@ fn native_emitted_events_by_handle(
         .map(|blob| {
             let function_value_extension = context.function_value_extension();
             ValueSerDeContext::new()
-                .with_func_args_deserialization(&function_value_extension)
+                .with_function_value_extension(
+                    &function_value_extension,
+                    context.traversal_context(),
+                )
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
                     SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -195,7 +198,10 @@ fn native_emitted_events(
         .map(|blob| {
             let function_value_extension = context.function_value_extension();
             ValueSerDeContext::new()
-                .with_func_args_deserialization(&function_value_extension)
+                .with_function_value_extension(
+                    &function_value_extension,
+                    context.traversal_context(),
+                )
                 .with_delayed_fields_serde()
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
@@ -256,7 +262,7 @@ fn native_write_module_event_to_store(
     let function_value_extension = context.function_value_extension();
     let blob = ValueSerDeContext::new()
         .with_delayed_fields_serde()
-        .with_func_args_deserialization(&function_value_extension)
+        .with_function_value_extension(&function_value_extension, context.traversal_context())
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(
