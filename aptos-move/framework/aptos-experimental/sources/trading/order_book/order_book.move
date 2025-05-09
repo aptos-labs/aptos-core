@@ -279,6 +279,7 @@ module aptos_experimental::order_book {
         self.orders.borrow(&order_id).get_remaining_size_from_state()
     }
 
+    /// Removes and returns the orders that are ready to be executed based on the current price.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
         self: &mut OrderBook<M>, current_price: u64
     ): vector<Order<M>> {
@@ -308,6 +309,7 @@ module aptos_experimental::order_book {
         self.active_orders.get_slippage_price(is_buy, slippage_pct)
     }
 
+    /// Removes and returns the orders that are ready to be executed based on the time condition.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
         self: &mut OrderBook<M>
     ): vector<Order<M>> {
@@ -344,7 +346,6 @@ module aptos_experimental::order_book {
         option::some(self.orders.borrow(&order_id).get_unique_priority_idx_from_state())
     }
 
-    #[test_only]
     public fun place_order_and_get_matches<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ): vector<SingleOrderMatch<M>> {
