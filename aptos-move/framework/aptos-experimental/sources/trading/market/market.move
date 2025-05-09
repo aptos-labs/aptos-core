@@ -385,7 +385,7 @@ module aptos_experimental::market {
         if (
             !callbacks.validate_settlement_update(
                 user_addr, false, // is_taker
-                is_buy, price, orig_size
+                is_buy, price, orig_size, metadata
             )) {
             event::emit(
                 OrderEvent {
@@ -512,7 +512,7 @@ module aptos_experimental::market {
         if (
             !callbacks.validate_settlement_update(
                 user_addr, true, // is_taker
-                is_buy, price, remaining_size
+                is_buy, price, remaining_size, metadata
             )) {
             event::emit(
                 OrderEvent {
@@ -649,7 +649,9 @@ module aptos_experimental::market {
                     maker_address,
                     is_buy,
                     maker_order.get_price(), // Order is always matched at the price of the maker
-                    expected_settlement_size
+                    expected_settlement_size,
+                    metadata,
+                    maker_order.get_metadata_from_order()
                 );
 
             let maker_remaining_settled_size = expected_settlement_size;
