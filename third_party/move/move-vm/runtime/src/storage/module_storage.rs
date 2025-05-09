@@ -10,9 +10,9 @@ use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
 use move_binary_format::{
+    access::ModuleAccess,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
-    access::ModuleAccess,
 };
 use move_core_types::{
     account_address::AccountAddress,
