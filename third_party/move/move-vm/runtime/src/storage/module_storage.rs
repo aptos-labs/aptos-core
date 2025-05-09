@@ -9,12 +9,12 @@ use crate::{
 use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
+#[cfg(fuzzing)]
+use move_binary_format::access::ModuleAccess;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
-#[cfg(fuzzing)]
-use move_binary_format::access::ModuleAccess;
 use move_core_types::{
     account_address::AccountAddress,
     function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
