@@ -9,9 +9,9 @@ use crate::{
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageOptions, OverrideSizeCheckOption,
-            ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary, GIT_IGNORE,
+            LargePackagesModuleOption, MoveManifestAccountWrapper, MovePackageOptions,
+            OverrideSizeCheckOption, ProfileOptions, PromptOptions, RestOptions, SaveFile,
+            ScriptFunctionArguments, TransactionOptions, TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -33,7 +33,6 @@ use aptos_crypto::HashValue;
 use aptos_framework::{
     chunked_publish::{
         chunk_package_and_create_payloads, large_packages_cleanup_staging_area, PublishType,
-        LARGE_PACKAGES_MODULE_ADDRESS,
     },
     docgen::DocgenOptions,
     extended_checks,
@@ -841,7 +840,10 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             package,
             PublishType::AccountDeploy,
             None,
-            self.chunked_publish_option.large_packages_module_address,
+            self.chunked_publish_option
+                .large_packages_module
+                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .await?,
             self.chunked_publish_option.chunk_size,
         )?;
 
@@ -1045,7 +1047,10 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             submit_chunked_publish_transactions(
                 chunked_package_payloads.payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option
+                    .large_packages_module
+                    .large_packages_module_address(&self.txn_options.rest_client()?)
+                    .await?,
             )
             .await
         } else {
@@ -1141,6 +1146,18 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
 
+        let chunked_publish_large_packages_module_address =
+            if self.chunked_publish_option.chunked_publish {
+                Some(
+                    self.chunked_publish_option
+                        .large_packages_module
+                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .await?,
+                )
+            } else {
+                None
+            };
+
         let sequence_number = if self.chunked_publish_option.chunked_publish {
             // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
             // This involves building the package with mock account address `0xcafe` to calculate the transaction count.
@@ -1152,7 +1169,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1179,7 +1196,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1195,7 +1212,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
             )
             .await
         } else {
@@ -1288,11 +1305,17 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
+            let chunked_publish_large_packages_module_address = self
+                .chunked_publish_option
+                .large_packages_module
+                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .await?;
+
             let payloads = create_chunked_publish_payloads(
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1307,7 +1330,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
             )
             .await
         } else {
@@ -1374,6 +1397,19 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
     // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
+
+        let chunked_publish_large_packages_module_address =
+            if self.chunked_publish_option.chunked_publish {
+                Some(
+                    self.chunked_publish_option
+                        .large_packages_module
+                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .await?,
+                )
+            } else {
+                None
+            };
+
         let sequence_number = if self.chunked_publish_option.chunked_publish {
             // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
             // This involves building the package with mock account address `0xcafe` to calculate the transaction count.
@@ -1385,7 +1421,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1412,7 +1448,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1428,7 +1464,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
             )
             .await
         } else {
@@ -1527,11 +1563,17 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
+            let chunked_publish_large_packages_module_address = self
+                .chunked_publish_option
+                .large_packages_module
+                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .await?;
+
             let payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1546,7 +1588,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
             )
             .await
         } else {
@@ -1605,7 +1647,7 @@ async fn submit_chunked_publish_transactions(
     let payloads_length = payloads.len() as u64;
     let mut tx_hashes = vec![];
 
-    let account_address = txn_options.profile_options.account_address()?;
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
 
     if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
         let message = format!(
@@ -1671,12 +1713,12 @@ async fn is_staging_area_empty(
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<bool> {
-    let url = txn_options.rest_options.url(&txn_options.profile_options)?;
-    let client = Client::new(url);
+    let client = txn_options.rest_client()?;
 
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
     let staging_area_response = client
         .get_account_resource(
-            txn_options.profile_options.account_address()?,
+            account_address,
             &format!(
                 "{}::large_packages::StagingArea",
                 large_packages_module_address
@@ -1704,9 +1746,8 @@ pub struct ClearStagingArea {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
-    /// Address of the `large_packages` move module for chunked publishing
-    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
-    pub(crate) large_packages_module_address: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) large_packages_module: LargePackagesModuleOption,
 }
 
 #[async_trait]
@@ -1716,12 +1757,17 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let (_, account_address) = self.txn_options.get_public_key_and_address()?;
+
+        let large_packages_module_address = self
+            .large_packages_module
+            .large_packages_module_address(&self.txn_options.rest_client()?)
+            .await?;
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
-            &self.large_packages_module_address,
-            self.txn_options.profile_options.account_address()?
+            &large_packages_module_address, account_address,
         );
-        let payload = large_packages_cleanup_staging_area(self.large_packages_module_address);
+        let payload = large_packages_cleanup_staging_area(large_packages_module_address);
         self.txn_options
             .submit_transaction(payload)
             .await
