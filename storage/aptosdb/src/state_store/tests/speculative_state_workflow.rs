@@ -40,6 +40,10 @@ use std::{
 };
 
 const NUM_KEYS: usize = 10;
+const HOT_STATE_MAX_ITEMS: usize = NUM_KEYS / 2;
+const HOT_STATE_MAX_BYTES: usize = NUM_KEYS / 2 * ARB_STATE_VALUE_MAX_SIZE / 3;
+const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = ARB_STATE_VALUE_MAX_SIZE / 2;
+const HOT_ITEM_REFRESH_INTERVAL_VERSIONS: usize = 8;
 
 #[derive(Debug)]
 struct Txn {
@@ -343,7 +347,7 @@ fn update_state(
             hot_state.clone(),
             persisted_state.clone(),
             parent_state.deref().clone(),
-            3, // hot_item_refresh_interval_versions
+            HOT_ITEM_REFRESH_INTERVAL_VERSIONS,
         );
         let read_keys = block.all_reads().collect_vec();
         pool.install(|| {
@@ -455,9 +459,9 @@ fn test_impl(blocks: Vec<Block>) {
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
     let persisted_state = PersistedState::new_empty_with_config(
-        NUM_KEYS / 2,
-        NUM_KEYS / 2 * ARB_STATE_VALUE_MAX_SIZE / 3,
-        ARB_STATE_VALUE_MAX_SIZE / 2,
+        HOT_STATE_MAX_ITEMS,
+        HOT_STATE_MAX_BYTES,
+        HOT_STATE_MAX_SINGLE_VALUE_BYTES,
     );
     persisted_state.hack_reset(empty.deref().clone());
 
@@ -525,7 +529,7 @@ fn test_impl(blocks: Vec<Block>) {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
+    #![proptest_config(ProptestConfig::with_cases(50))]
 
     #[test]
     fn test_speculative_state_workflow(
