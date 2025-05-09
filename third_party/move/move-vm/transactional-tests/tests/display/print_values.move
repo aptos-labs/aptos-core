@@ -58,6 +58,8 @@ module 0x42::print_values {
         a + b
     }
 
+    // Note: fails with invariant violation because MoveVM serializes the return value, and returned value is not
+    // serializable because it is an anonymous lambda-lifted function.
     public fun return_anonymous(): || {
         || {}
     }
@@ -79,8 +81,7 @@ module 0x42::print_values {
     }
 
     public fun return_closure_capture_struct(): ||B {
-        let b = B { a: A::V1 { x: 23 }, data: vector[1, 2, 3] };
-        || { b }
+        return_struct
     }
 }
 
