@@ -193,18 +193,13 @@ impl State {
             // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
             // n.b. all updated state items must be read and recorded in the state cache,
             // otherwise we can't calculate the correct usage.
-            let old_value = overlay
+            let old_slot = overlay
                 .get(k)
-                .map(StateSlot::into_state_value_opt)
-                .or_else(|| {
-                    cache
-                        .get(k)
-                        .map(|entry| entry.value().to_state_value_ref_opt().cloned())
-                })
+                .or_else(|| cache.get(k).map(|entry| entry.value().clone()))
                 .expect("Must cache read");
-            if let Some(old_v) = old_value {
+            if old_slot.is_occupied() {
                 items_delta -= 1;
-                bytes_delta -= (key_size + old_v.size()) as i64;
+                bytes_delta -= (key_size + old_slot.size()) as i64;
             }
         }
         (items_delta, bytes_delta)

@@ -14,6 +14,7 @@ pub struct StateUpdateRef<'kv> {
 }
 
 impl StateUpdateRef<'_> {
+    /// TODO(HotState): Revisit: assuming every write op results in a hot slot
     pub fn to_hot_slot(&self) -> StateSlot {
         match self.value {
             None => StateSlot::HotVacant {

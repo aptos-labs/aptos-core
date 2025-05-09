@@ -145,10 +145,7 @@ impl Committer {
 
             assert_eq!(self.key_by_hot_since_version.len(), self.base.inner.len());
 
-            GAUGE.set_with(
-                &["hot_state_items"],
-                self.key_by_hot_since_version.len() as i64,
-            );
+            GAUGE.set_with(&["hot_state_items"], self.base.inner.len() as i64);
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
             GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
         }
@@ -249,7 +246,7 @@ impl Committer {
             },
             Some((hot_since_version, _key)) => *hot_since_version,
         };
-        let mut evicted_version = 0;
+        let mut max_evicted_version = 0;
         let mut num_evicted = 0;
 
         while self.should_evict() {
@@ -257,18 +254,19 @@ impl Committer {
                 .key_by_hot_since_version
                 .pop_first()
                 .expect("Known Non-empty.");
-            evicted_version = ver;
             let (key, slot) = self.base.inner.remove(&key).expect("Known to exist.");
 
             self.total_key_bytes -= key.size();
             self.total_value_bytes -= slot.size();
+
             num_evicted += 1;
+            max_evicted_version = ver;
         }
 
         if num_evicted > 0 {
             GAUGE.set_with(
                 &["hot_state_item_evict_age_versions"],
-                (latest_version - evicted_version) as i64,
+                (latest_version - max_evicted_version) as i64,
             );
             COUNTER.inc_with_by(&["hot_state_evict"], num_evicted as u64);
         }
