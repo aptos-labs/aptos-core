@@ -455,7 +455,11 @@ fn test_impl(blocks: Vec<Block>) {
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
     let persisted_state =
-        PersistedState::new_empty_with_config(NUM_KEYS / 2, ARB_STATE_VALUE_MAX_SIZE / 2);
+        PersistedState::new_empty_with_config(
+            NUM_KEYS / 2,
+            NUM_KEYS / 2 * ARB_STATE_VALUE_MAX_SIZE / 3,
+            ARB_STATE_VALUE_MAX_SIZE / 2
+        );
     persisted_state.hack_reset(empty.deref().clone());
 
     let (to_summary_update, from_state_update) = channel();
