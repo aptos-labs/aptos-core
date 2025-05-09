@@ -220,13 +220,13 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             block_gas_limit_override = self.block_gas_limit_override.unwrap_or(0),
             block_gas_limit_exceeded = self
                 .block_gas_limit()
-                .map_or(false, |limit| accumulated_effective_block_gas >= limit),
+                .is_some_and(|limit| accumulated_effective_block_gas >= limit),
             approx_output_size = accumulated_approx_output_size,
             block_output_limit = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
             block_output_limit_exceeded = self
                 .block_gas_limit_type
                 .block_output_limit()
-                .map_or(false, |limit| accumulated_approx_output_size >= limit),
+                .is_some_and(|limit| accumulated_approx_output_size >= limit),
             elapsed_ms = self.start_time.elapsed().as_millis(),
             num_committed = num_committed,
             num_total = num_total,

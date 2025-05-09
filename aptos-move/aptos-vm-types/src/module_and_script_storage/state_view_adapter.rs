@@ -46,7 +46,7 @@ struct StateViewAdapter<'ctx, S, E> {
     state_view: &'ctx S,
 }
 
-impl<'ctx, S, E> WithRuntimeEnvironment for StateViewAdapter<'ctx, S, E>
+impl<S, E> WithRuntimeEnvironment for StateViewAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -56,7 +56,7 @@ where
     }
 }
 
-impl<'ctx, S, E> ModuleBytesStorage for StateViewAdapter<'ctx, S, E>
+impl<S, E> ModuleBytesStorage for StateViewAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -73,7 +73,7 @@ where
     }
 }
 
-impl<'ctx, S, E> Deref for StateViewAdapter<'ctx, S, E>
+impl<S, E> Deref for StateViewAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -99,7 +99,7 @@ pub struct AptosCodeStorageAdapter<'ctx, S, E> {
     storage: UnsyncCodeStorage<UnsyncModuleStorage<'ctx, StateViewAdapter<'ctx, S, E>>>,
 }
 
-impl<'ctx, S, E> AptosCodeStorageAdapter<'ctx, S, E>
+impl<S, E> AptosCodeStorageAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -156,8 +156,8 @@ where
     }
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
-    for AptosCodeStorageAdapter<'s, S, E>
+impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
+    for AptosCodeStorageAdapter<'_, S, E>
 {
     fn fetch_state_value_metadata(
         &self,
@@ -176,8 +176,8 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
     }
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> BlockSynchronizationKillSwitch
-    for AptosCodeStorageAdapter<'s, S, E>
+impl<S: StateView, E: WithRuntimeEnvironment> BlockSynchronizationKillSwitch
+    for AptosCodeStorageAdapter<'_, S, E>
 {
     fn interrupt_requested(&self) -> bool {
         false
@@ -199,7 +199,10 @@ where
     S: StateView,
     E: WithRuntimeEnvironment,
 {
-    fn as_aptos_code_storage(&'ctx self, environment: &'ctx E) -> AptosCodeStorageAdapter<S, E> {
+    fn as_aptos_code_storage(
+        &'ctx self,
+        environment: &'ctx E,
+    ) -> AptosCodeStorageAdapter<'ctx, S, E> {
         let adapter = StateViewAdapter {
             environment,
             state_view: self,

@@ -3504,7 +3504,7 @@ impl Type {
     }
 }
 
-impl<'a> fmt::Display for TypeDisplay<'a> {
+impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Type::*;
         let comma_list = |f: &mut Formatter<'_>, ts: &[Type]| -> fmt::Result {
@@ -3617,7 +3617,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
     }
 }
 
-impl<'a> TypeDisplay<'a> {
+impl TypeDisplay<'_> {
     fn type_var_str(&self, idx: u32) -> String {
         if self.context.display_type_vars {
             format!("_{}", idx)
@@ -3779,7 +3779,7 @@ impl<'a> AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityContext for AbilityInferer<'a> {
+impl AbilityContext for AbilityInferer<'_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         self.type_params[idx as usize].clone()
     }
@@ -3797,4 +3797,4 @@ impl<'a> AbilityContext for AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityInference for AbilityInferer<'a> {}
+impl AbilityInference for AbilityInferer<'_> {}

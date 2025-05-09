@@ -81,7 +81,7 @@ macro_rules! ark_msm_bigint_wnaf_cost {
     ($cost_add:expr, $cost_double:expr, $num_entries:expr $(,)?) => {{
         let num_entries: usize = $num_entries;
         let window_size = ark_msm_window_size(num_entries);
-        let num_windows = (255 + window_size - 1) / window_size;
+        let num_windows = 255_usize.div_ceil(window_size);
         let num_buckets = 1_usize << window_size;
         $cost_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
             + $cost_double * NumArgs::from((num_buckets * num_windows) as u64)

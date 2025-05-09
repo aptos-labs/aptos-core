@@ -1031,11 +1031,7 @@ fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
 }
 
 fn rand_string(rng: &mut StdRng, len: usize) -> String {
-    let res = rng
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect();
+    let res = rng.sample_iter(&Alphanumeric).take(len).collect();
     assert_eq!(
         bcs::serialized_size(&res).unwrap(),
         bcs_size_of_byte_array(len)

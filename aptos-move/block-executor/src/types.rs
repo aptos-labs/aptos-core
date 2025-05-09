@@ -35,7 +35,7 @@ impl<T: Transaction> ReadWriteSummary<T> {
     pub fn find_conflicts<'a>(
         &'a self,
         previous: &'a Self,
-    ) -> HashSet<&InputOutputKey<T::Key, T::Tag>> {
+    ) -> HashSet<&'a InputOutputKey<T::Key, T::Tag>> {
         self.reads
             .intersection(&previous.writes)
             .collect::<HashSet<_>>()

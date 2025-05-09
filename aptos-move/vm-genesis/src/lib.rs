@@ -1183,11 +1183,7 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
-        let stake_amount = if let Some(amount) = initial_stake {
-            amount
-        } else {
-            1
-        };
+        let stake_amount = initial_stake.unwrap_or(1);
         let data = Validator {
             owner_address,
             consensus_pubkey,

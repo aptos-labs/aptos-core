@@ -366,7 +366,7 @@ static PRECOMPILED_APTOS_FRAMEWORK_V2_WITH_EXPERIMENTAL: Lazy<PrecompiledFilesMo
  * Test Adapter Implementation
  */
 
-impl<'a> AptosTestAdapter<'a> {
+impl AptosTestAdapter<'_> {
     /// Look up the named private key in the mapping.
     fn resolve_named_private_key(&self, s: &IdentStr) -> Ed25519PrivateKey {
         if let Some(private_key) = self.private_key_mapping.get(s.as_str()) {
@@ -1033,7 +1033,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
 struct PrettyEvent<'a>(&'a ContractEvent);
 
-impl<'a> fmt::Display for PrettyEvent<'a> {
+impl fmt::Display for PrettyEvent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{{")?;
         match self.0 {
@@ -1051,7 +1051,7 @@ impl<'a> fmt::Display for PrettyEvent<'a> {
 
 struct PrettyEvents<'a>(&'a [ContractEvent]);
 
-impl<'a> fmt::Display for PrettyEvents<'a> {
+impl fmt::Display for PrettyEvents<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Events:")?;
         for event in self.0.iter() {

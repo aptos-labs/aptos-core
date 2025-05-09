@@ -216,7 +216,7 @@ impl RoundState {
 
     /// Return if already voted for timeout
     pub fn is_timeout_sent(&self) -> bool {
-        self.vote_sent.as_ref().map_or(false, |v| v.is_timeout()) || self.timeout_sent.is_some()
+        self.vote_sent.as_ref().is_some_and(|v| v.is_timeout()) || self.timeout_sent.is_some()
     }
 
     /// Return the current round.

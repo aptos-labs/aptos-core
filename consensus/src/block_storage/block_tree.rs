@@ -161,12 +161,11 @@ impl BlockTree {
 
     /// fetch all the quorum certs with non-empty commit info
     pub fn get_all_quorum_certs_with_commit_info(&self) -> Vec<QuorumCert> {
-        return self
-            .id_to_quorum_cert
+        self.id_to_quorum_cert
             .values()
             .filter(|qc| qc.commit_info() != &BlockInfo::empty())
             .map(|qc| (**qc).clone())
-            .collect::<Vec<QuorumCert>>();
+            .collect::<Vec<QuorumCert>>()
     }
 
     fn linkable_window_root(&self) -> &LinkableBlock {
@@ -348,6 +347,7 @@ impl BlockTree {
         }
     }
 
+    #[allow(unexpected_cfgs)]
     pub(super) fn insert_quorum_cert(&mut self, qc: QuorumCert) -> anyhow::Result<()> {
         let block_id = qc.certified_block().id();
         let qc = Arc::new(qc);

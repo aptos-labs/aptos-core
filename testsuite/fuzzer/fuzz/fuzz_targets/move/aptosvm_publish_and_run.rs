@@ -92,6 +92,7 @@ fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
     Ok(())
 }
 
+#[allow(clippy::literal_string_with_formatting_args)]
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     tdbg!(&input);
 
