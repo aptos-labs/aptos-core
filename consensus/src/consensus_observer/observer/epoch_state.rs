@@ -33,7 +33,8 @@ use aptos_types::{
 use futures::StreamExt;
 use std::{collections::BTreeMap, sync::Arc};
 
-pub struct ActiveObserverState {
+/// The epoch state used by the consensus observer
+pub struct ObserverEpochState {
     // The configuration of the node
     node_config: NodeConfig,
 
@@ -56,7 +57,7 @@ pub struct ActiveObserverState {
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
 }
 
-impl ActiveObserverState {
+impl ObserverEpochState {
     pub fn new(
         node_config: NodeConfig,
         db_reader: Arc<dyn DbReader>,
@@ -68,11 +69,11 @@ impl ActiveObserverState {
             .get_latest_ledger_info()
             .expect("Failed to read latest ledger info from storage!");
 
-        // Create the active observer state
-        ActiveObserverState::new_with_root(node_config, reconfig_events, consensus_publisher, root)
+        // Create the observer epoch state
+        ObserverEpochState::new_with_root(node_config, reconfig_events, consensus_publisher, root)
     }
 
-    /// Creates a returns a new active observer state with the given root ledger info
+    /// Creates a returns a new observer epoch state with the given root ledger info
     fn new_with_root(
         node_config: NodeConfig,
         reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -386,10 +387,10 @@ mod test {
         let round = 5;
         let root = create_ledger_info(epoch, round);
 
-        // Create the active observer state
+        // Create the observer epoch state
         let (_, reconfig_events) = create_reconfig_notifier_and_listener();
         let observer_state =
-            ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
+            ObserverEpochState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
         // Check the root epoch and round
         assert!(observer_state.check_root_epoch_and_round(epoch, round));
@@ -414,9 +415,9 @@ mod test {
         let round = 50;
         let root = create_ledger_info(epoch, round);
 
-        // Create the active observer state
+        // Create the observer epoch state
         let (_, reconfig_events) = create_reconfig_notifier_and_listener();
-        let observer_state = ActiveObserverState::new_with_root(
+        let observer_state = ObserverEpochState::new_with_root(
             NodeConfig::default(),
             reconfig_events,
             None,
@@ -521,10 +522,10 @@ mod test {
         let round = 5;
         let root = create_ledger_info(epoch, round);
 
-        // Create the active observer state
+        // Create the observer epoch state
         let (_, reconfig_events) = create_reconfig_notifier_and_listener();
         let mut observer_state =
-            ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
+            ObserverEpochState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
         // Verify that the execution pool window size is not set
         assert!(observer_state.execution_pool_window_size().is_none());
