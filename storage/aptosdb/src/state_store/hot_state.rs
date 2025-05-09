@@ -26,18 +26,23 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 
 #[derive(Debug)]
 pub struct HotStateBase {
+    /// After committing a new batch to `inner`, items are evicted so that
+    ///  1. total number of items doesn't exceed this number
     max_items: usize,
+    ///  2. total number of bytes, incl. both keys and values doesn't exceed this number
     max_bytes: usize,
-    max_value_size: usize,
+    /// No item is accepted to `inner` if the size of the value exceeds this number
+    max_single_value_bytes: usize,
+
     inner: DashMap<StateKey, StateSlot>,
 }
 
 impl HotStateBase {
-    fn new_empty(max_items: usize, max_bytes: usize, max_value_size: usize) -> Self {
+    fn new_empty(max_items: usize, max_bytes: usize, max_single_value_bytes: usize) -> Self {
         Self {
             max_items,
             max_bytes,
-            max_value_size,
+            max_single_value_bytes,
             inner: DashMap::with_capacity(max_items),
         }
     }
@@ -61,8 +66,17 @@ pub struct HotState {
 }
 
 impl HotState {
-    pub fn new(state: State, max_items: usize, max_bytes: usize, max_value_size: usize) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(max_items, max_bytes, max_value_size));
+    pub fn new(
+        state: State,
+        max_items: usize,
+        max_bytes: usize,
+        max_single_value_bytes: usize,
+    ) -> Self {
+        let base = Arc::new(HotStateBase::new_empty(
+            max_items,
+            max_bytes,
+            max_single_value_bytes,
+        ));
         let committed = Arc::new(Mutex::new(state));
         let commit_tx = Committer::spawn(base.clone(), committed.clone());
 
@@ -198,7 +212,7 @@ impl Committer {
                 }
 
                 self.base.inner.remove(&key);
-            } else if slot.size() > self.base.max_value_size {
+            } else if slot.size() > self.base.max_single_value_bytes {
                 // item too large to hold in memory
                 n_too_large += 1;
 
