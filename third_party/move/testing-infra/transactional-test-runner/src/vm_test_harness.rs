@@ -47,7 +47,10 @@ use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
-use move_vm_types::{resolver::ResourceResolver, value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    gas::NoOpTraversalContext, resolver::ResourceResolver, value_serde::ValueSerDeContext,
+    values::Value,
+};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -377,7 +380,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let module_storage = self.storage.as_unsync_module_storage();
         ValueSerDeContext::new()
-            .with_func_args_deserialization(&module_storage.as_function_value_extension())
+            .with_function_value_extension(
+                &module_storage.as_function_value_extension(),
+                &NoOpTraversalContext,
+            )
             .deserialize(bytes, layout)
     }
 }
@@ -397,6 +403,7 @@ impl SimpleVMTestAdapter<'_> {
         .unwrap();
 
         let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
 
         let mut data_cache = TransactionDataCache::empty();
@@ -405,14 +412,14 @@ impl SimpleVMTestAdapter<'_> {
             args,
             &mut data_cache,
             &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
+            &mut traversal_context,
             &mut extensions,
             module_storage,
             &self.storage,
         )?;
 
         let change_set = data_cache
-            .into_effects(module_storage)
+            .into_effects(module_storage, &traversal_context)
             .map_err(|err| err.finish(Location::Undefined))?;
         self.storage.apply(change_set).unwrap();
         Ok(return_values)

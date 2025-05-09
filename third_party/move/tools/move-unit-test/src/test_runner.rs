@@ -297,7 +297,7 @@ impl SharedTestingConfig {
         let test_run_info = TestRunInfo::new(function_name.to_string(), now.elapsed());
 
         let result = data_cache
-            .into_effects(&module_storage)
+            .into_effects(&module_storage, &traversal_context)
             .map_err(|err| err.finish(Location::Undefined));
         match result {
             Ok(change_set) => {

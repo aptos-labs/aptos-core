@@ -46,7 +46,7 @@ fn native_from_bytes(
     let function_value_extension = context.function_value_extension();
     let val = match ValueSerDeContext::new()
         .with_legacy_signer()
-        .with_func_args_deserialization(&function_value_extension)
+        .with_function_value_extension(&function_value_extension, context.traversal_context())
         .deserialize(&bytes, &layout)
     {
         Some(val) => val,

@@ -146,6 +146,8 @@ impl AptosVM {
         ];
 
         let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
         session
             .execute_function_bypass_visibility(
                 &JWKS_MODULE,
@@ -153,7 +155,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&traversal_storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map_err(|e| {
@@ -164,6 +166,7 @@ impl AptosVM {
         let output = get_system_transaction_output(
             session,
             module_storage,
+            &traversal_context,
             &self
                 .storage_gas_params(log_context)
                 .map_err(Unexpected)?

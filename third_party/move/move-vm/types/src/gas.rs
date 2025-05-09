@@ -3,7 +3,9 @@
 
 use crate::views::{TypeView, ValueView};
 use move_binary_format::{
-    errors::PartialVMResult, file_format::CodeOffset, file_format_common::Opcodes,
+    errors::{PartialVMError, PartialVMResult},
+    file_format::CodeOffset,
+    file_format_common::Opcodes,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -590,5 +592,74 @@ impl GasMeter for UnmeteredGasMeter {
 
     fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
+    }
+}
+
+/// Defines the context for modules accessed by the Move program. Modules are accessed when calls
+/// are made, layouts for types are constructed, etc.
+pub trait ModuleTraversalContext {
+    /// If the address of the specified module id is not special, adds the address-name pair to the
+    /// visited set and returns true. If the address is special, or if the set already contains the
+    /// pair, returns false.
+    fn visit_if_not_special_module_id(&mut self, module_id: &ModuleId) -> PartialVMResult<bool>;
+
+    /// Returns an error if the address is not special and is not in a visited set.
+    fn check_is_special_or_visited(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> PartialVMResult<()>;
+}
+
+/// A simple no-op traversal context which treats all module accesses as visited. Used where the
+/// traversal context and gas charging are irrelevant, and in block executor where values may be
+/// deserialized and serialized back to pre-process delayed fields (no checks needed).
+pub struct NoOpTraversalContext;
+
+impl ModuleTraversalContext for NoOpTraversalContext {
+    fn visit_if_not_special_module_id(&mut self, _module_id: &ModuleId) -> PartialVMResult<bool> {
+        Ok(false)
+    }
+
+    fn check_is_special_or_visited(
+        &self,
+        _addr: &AccountAddress,
+        _name: &IdentStr,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+}
+
+/// A wrapper around traversal context to pass to serializer or in contexts where we do not expect
+/// any modules to be visited or special, if enabled, and instead we only check that they are all
+/// visited. This allows to use `&mut` with the wrapper around `&dyn ModuleTraversalContext`.
+pub struct ImmutableTraversalContext<'a> {
+    ctx: &'a dyn ModuleTraversalContext,
+}
+
+impl<'a> ImmutableTraversalContext<'a> {
+    pub fn new(ctx: &'a dyn ModuleTraversalContext) -> Self {
+        Self { ctx }
+    }
+}
+
+impl<'a> ModuleTraversalContext for ImmutableTraversalContext<'a> {
+    /// This method is not supposed to be called when in non-visitable context, so it returns an
+    /// invariant violation error. Only checks for visited modules can be performed in the context.
+    fn visit_if_not_special_module_id(&mut self, module_id: &ModuleId) -> PartialVMResult<bool> {
+        let msg = format!(
+            "Should not be visiting {}::{} in non-visitable context",
+            module_id.address(),
+            module_id.name()
+        );
+        Err(PartialVMError::new_invariant_violation(msg))
+    }
+
+    fn check_is_special_or_visited(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> PartialVMResult<()> {
+        self.ctx.check_is_special_or_visited(addr, name)
     }
 }
