@@ -1053,7 +1053,7 @@ impl Context {
                         v1.sequence_number() + count,
                         v1.type_tag().clone(),
                         v1.event_data().to_vec(),
-                    );
+                    )?;
                     *event = ContractEvent::V1(v1_adjusted);
                     count_map.insert(*v1.key(), count + 1);
                 }
