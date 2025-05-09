@@ -3,29 +3,43 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     check_dependencies_and_charge_gas,
     data_cache::TransactionDataCache,
     interpreter::InterpreterDebugInterface,
+    loader::{LazyLoadedFunction, LazyLoadedFunctionState},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
     },
-    ModuleStorage,
+    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult};
+use ambassador::delegate_to_methods;
+use bytes::Bytes;
+use move_binary_format::{
+    errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::NativeGasMeter, loaded_data::runtime_types::Type, natives::function::NativeResult,
-    resolver::ResourceResolver, values::Value,
+    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
+    natives::function::NativeResult,
+    resolver::ResourceResolver,
+    values::{AbstractFunction, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -232,5 +246,63 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
+    }
+
+    /// Returns a vector of layouts for captured arguments. Used to format captured arguments as
+    /// strings.
+    pub fn get_captured_layouts_for_string_utils(
+        &mut self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<Vec<MoveTypeLayout>> {
+        Ok(
+            match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
+                LazyLoadedFunctionState::Unresolved { data, .. } => data.captured_layouts.clone(),
+                LazyLoadedFunctionState::Resolved {
+                    fun,
+                    mask,
+                    captured_layouts,
+                    ..
+                } => match captured_layouts.as_ref() {
+                    Some(captured_layouts) => captured_layouts.clone(),
+                    None => LazyLoadedFunction::construct_captured_layouts(
+                        &ModuleStorageWrapper {
+                            module_storage: self.module_storage,
+                        },
+                        &mut DependencyGasMeterWrapper {
+                            gas_meter: self.gas_meter,
+                        },
+                        self.traversal_context,
+                        fun,
+                        *mask,
+                    )?,
+                },
+            },
+        )
+    }
+}
+
+// Wrappers to use trait objects where static dispatch is expected.
+struct ModuleStorageWrapper<'a> {
+    module_storage: &'a dyn ModuleStorage,
+}
+
+#[delegate_to_methods]
+#[delegate(WithRuntimeEnvironment, target_ref = "inner")]
+#[delegate(ModuleStorage, target_ref = "inner")]
+impl<'a> ModuleStorageWrapper<'a> {
+    fn inner(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+}
+
+struct DependencyGasMeterWrapper<'a> {
+    gas_meter: &'a mut dyn DependencyGasMeter,
+}
+
+#[delegate_to_methods]
+#[delegate(DependencyGasMeter, target_mut = "inner_mut")]
+impl<'a> DependencyGasMeterWrapper<'a> {
+    fn inner_mut(&mut self) -> &mut dyn DependencyGasMeter {
+        self.gas_meter
     }
 }
