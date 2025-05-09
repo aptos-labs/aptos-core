@@ -14,6 +14,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
+    opt_proposal_msg::OptProposalMsg,
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
@@ -88,6 +89,8 @@ pub enum ConsensusMsg {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     /// RPC to get a chain of block of the given length starting from the given block id, using epoch and round.
     BlockRetrievalRequest(Box<BlockRetrievalRequest>),
+    /// OptProposalMsg contains the optimistic proposal and sync info.
+    OptProposalMsg(Box<OptProposalMsg>),
 }
 
 /// Network type for consensus
@@ -100,6 +103,7 @@ impl ConsensusMsg {
             ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
             ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
             ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg::OptProposalMsg(_) => "OptProposalMsg",
             ConsensusMsg::SyncInfo(_) => "SyncInfo",
             ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
