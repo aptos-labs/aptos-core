@@ -587,7 +587,7 @@ Genesis step 1: Initialize supra framework account and core modules on chain.
     <b>let</b> (supra_framework_account, supra_framework_signer_cap) = <a href="account.md#0x1_account_create_framework_reserved_account">account::create_framework_reserved_account</a>(
         @supra_framework
     );
-    // Initialize <a href="account.md#0x1_account">account</a> configs on aptos framework <a href="account.md#0x1_account">account</a>.
+    // Initialize <a href="account.md#0x1_account">account</a> configs on supra framework <a href="account.md#0x1_account">account</a>.
     <a href="account.md#0x1_account_initialize">account::initialize</a>(&supra_framework_account);
 
     <a href="transaction_validation.md#0x1_transaction_validation_initialize">transaction_validation::initialize</a>(

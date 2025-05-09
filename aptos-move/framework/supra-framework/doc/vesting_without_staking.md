@@ -1343,6 +1343,10 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
     );
     <b>assert</b>!(
+        sum &lt;= denominator,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>)
+    );
+    <b>assert</b>!(
         denominator != 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
     );
@@ -1717,9 +1721,6 @@ Unlock any vested portion of the grant.
 
     <b>if</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount != 0) {
         <b>let</b> final_fraction = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1);
-        <b>let</b> final_fraction_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(
-            vesting_record.init_amount, final_fraction
-        );
         // Determine how many periods is needed based on the left_amount
         periods_fast_forward = last_completed_period - next_period_to_vest + 1;
         <b>let</b> added_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64_return_fixpoint32">fixed_point32::multiply_u64_return_fixpoint32</a>(
@@ -1731,10 +1732,6 @@ Unlock any vested portion of the grant.
         );
 
     };
-    <b>let</b> total_vesting_fraction_amount = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(
-        vesting_record.init_amount,
-        total_vesting_fraction,
-    );
     // We don't need <b>to</b> check vesting_record.left_amount &gt; 0 because vest_transfer will handle that.
     <b>let</b> transfer_happened = <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(
         vesting_record, signer_cap, beneficiary, total_vesting_fraction
@@ -1794,14 +1791,12 @@ Unlock any vested portion of the grant.
             vesting_record.left_amount,
             <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(vesting_record.init_amount, vesting_fraction),
         );
-    <b>let</b> result =
         <b>if</b> (amount &gt; 0) {
             //<b>update</b> left_amount for the shareholder
             vesting_record.left_amount = vesting_record.left_amount - amount;
             <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(&vesting_signer, beneficiary, amount);
             <b>true</b>
-        } <b>else</b> { <b>false</b> };
-    result
+        } <b>else</b> { <b>false</b> }
 }
 </code></pre>
 
@@ -1841,9 +1836,7 @@ Unlock any vested portion of the grant.
     <b>let</b> schedule = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_map_ref">vector::map_ref</a>(
         &vesting_numerators,
         |numerator| {
-            <b>let</b> e =
-                <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, vesting_denominator);
-            e
+                <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, vesting_denominator)
         },
     );
 
@@ -1858,7 +1851,6 @@ Unlock any vested portion of the grant.
             <b>let</b> new_last_vested_period = (
                 msrecord.last_vested_period * old_period_duration
             ) / period_duration;
-            msrecord.last_vested_period = new_last_vested_period;
             msrecord.last_vested_period = new_last_vested_period;
         },
     );
