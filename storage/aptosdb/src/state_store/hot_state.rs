@@ -26,17 +26,24 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 
 #[derive(Debug)]
 pub struct HotStateBase {
-    capacity: usize,
-    max_value_bytes: usize,
+    /// After committing a new batch to `inner`, items are evicted so that
+    ///  1. total number of items doesn't exceed this number
+    max_items: usize,
+    ///  2. total number of bytes, incl. both keys and values doesn't exceed this number
+    max_bytes: usize,
+    /// No item is accepted to `inner` if the size of the value exceeds this number
+    max_single_value_bytes: usize,
+
     inner: DashMap<StateKey, StateSlot>,
 }
 
 impl HotStateBase {
-    fn new_empty(capacity: usize, max_value_bytes: usize) -> Self {
+    fn new_empty(max_items: usize, max_bytes: usize, max_single_value_bytes: usize) -> Self {
         Self {
-            capacity,
-            max_value_bytes,
-            inner: DashMap::with_capacity(capacity),
+            max_items,
+            max_bytes,
+            max_single_value_bytes,
+            inner: DashMap::with_capacity(max_items),
         }
     }
 
@@ -59,8 +66,17 @@ pub struct HotState {
 }
 
 impl HotState {
-    pub fn new(state: State, capacity: usize, max_item_bytes: usize) -> Self {
-        let base = Arc::new(HotStateBase::new_empty(capacity, max_item_bytes));
+    pub fn new(
+        state: State,
+        max_items: usize,
+        max_bytes: usize,
+        max_single_value_bytes: usize,
+    ) -> Self {
+        let base = Arc::new(HotStateBase::new_empty(
+            max_items,
+            max_bytes,
+            max_single_value_bytes,
+        ));
         let committed = Arc::new(Mutex::new(state));
         let commit_tx = Committer::spawn(base.clone(), committed.clone());
 
@@ -196,7 +212,7 @@ impl Committer {
                 }
 
                 self.base.inner.remove(&key);
-            } else if slot.size() > self.base.max_value_bytes {
+            } else if slot.size() > self.base.max_single_value_bytes {
                 // item too large to hold in memory
                 n_too_large += 1;
 
@@ -226,35 +242,40 @@ impl Committer {
     fn evict(&mut self) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_evict"]);
 
-        let total = self.base.inner.len();
-        if total <= self.base.capacity {
-            return;
-        }
+        let latest_version = match self.key_by_hot_since_version.last() {
+            None => {
+                // hot state is empty
+                return;
+            },
+            Some((hot_since_version, _key)) => *hot_since_version,
+        };
+        let mut evicted_version = 0;
+        let mut num_evicted = 0;
 
-        let latest = self
-            .key_by_hot_since_version
-            .last()
-            .expect("Known Non-empty.")
-            .0;
-        let mut last_evicted = 0;
-
-        let to_evict = total - self.base.capacity;
-        for _ in 0..to_evict {
+        while self.should_evict() {
             let (ver, key) = self
                 .key_by_hot_since_version
                 .pop_first()
                 .expect("Known Non-empty.");
-            last_evicted = ver;
+            evicted_version = ver;
             let (key, slot) = self.base.inner.remove(&key).expect("Known to exist.");
 
             self.total_key_bytes -= key.size();
             self.total_value_bytes -= slot.size();
+            num_evicted += 1;
         }
 
-        GAUGE.set_with(
-            &["hot_state_item_evict_age_versions"],
-            (latest - last_evicted) as i64,
-        );
-        COUNTER.inc_with_by(&["hot_state_evict"], to_evict as u64);
+        if num_evicted > 0 {
+            GAUGE.set_with(
+                &["hot_state_item_evict_age_versions"],
+                (latest_version - evicted_version) as i64,
+            );
+            COUNTER.inc_with_by(&["hot_state_evict"], num_evicted as u64);
+        }
+    }
+
+    fn should_evict(&self) -> bool {
+        self.base.inner.len() > self.base.max_items
+            || self.total_key_bytes + self.total_value_bytes > self.base.max_bytes
     }
 }
