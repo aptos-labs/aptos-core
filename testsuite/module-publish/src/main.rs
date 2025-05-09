@@ -20,32 +20,32 @@ struct Args {
 fn additional_packages() -> Vec<(&'static str, &'static str, bool)> {
     // Pairs of (package_name, package_path)
     vec![
-        ("simple", "src/packages/simple", false),
+        ("simple", "src/packages/simple", true),
         (
             "framework_usecases",
             "src/packages/framework_usecases",
-            false,
+            true,
         ),
         (
             "experimental_usecases",
             "src/packages/experimental_usecases",
             true,
         ),
-        ("complex", "src/packages/complex", false),
+        ("complex", "src/packages/complex", true),
         (
             "ambassador_token",
             "../../aptos-move/move-examples/token_objects/ambassador",
-            false,
+            true,
         ),
         (
             "aggregator_examples",
             "../../aptos-move/move-examples/aggregator_examples",
-            false,
+            true,
         ),
         (
             "bcs_stream",
             "../../aptos-move/move-examples/bcs-stream",
-            false,
+            true,
         ),
     ]
 }
