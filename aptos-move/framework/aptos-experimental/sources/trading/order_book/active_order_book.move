@@ -9,7 +9,7 @@ module aptos_experimental::active_order_book {
         new_active_matched_order,
         ActiveMatchedOrder,
         get_slippage_pct_precision,
-        new_default_big_ordered_map,
+        new_default_big_ordered_map
     };
     #[test_only]
     use std::vector;
@@ -62,7 +62,7 @@ module aptos_experimental::active_order_book {
         // so that max_key never changes, and doesn't create conflict.
         ActiveOrderBook::V1 {
             buys: new_default_big_ordered_map(),
-            sells: new_default_big_ordered_map(),
+            sells: new_default_big_ordered_map()
         }
     }
 
