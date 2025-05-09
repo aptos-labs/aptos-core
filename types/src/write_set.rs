@@ -146,7 +146,7 @@ impl WriteOp {
                 //   shouldn't change due to the squash.
                 // And because the deposit or refund happens after all squashing is finished, it's
                 // not a concern of fairness.
-                *op = Modification(StateValue::new_with_metadata(c.into_bytes(), d_meta.clone()))
+                *op = Modification(StateValue::new_existing_with_metadata(c.into_bytes(), d_meta.clone()))
             },
             (Creation(c), Deletion(d_meta)) => {
                 Self::ensure_metadata_compatible(c.metadata(), &d_meta)?;
@@ -216,11 +216,11 @@ impl WriteOp {
     }
 
     pub fn creation(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self::Creation(StateValue::new_with_metadata(data, metadata))
+        Self::Creation(StateValue::new_existing_with_metadata(data, metadata))
     }
 
     pub fn modification(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self::Modification(StateValue::new_with_metadata(data, metadata))
+        Self::Modification(StateValue::new_existing_with_metadata(data, metadata))
     }
 
     pub fn deletion(metadata: StateValueMetadata) -> Self {

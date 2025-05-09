@@ -6,13 +6,11 @@ use crate::{
     state_store::state_key::StateKey, transaction::Version,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, Deref};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*};
-use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::ops::Deref;
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename = "StateValueMetadata")]
@@ -53,12 +51,21 @@ struct StateValueMetadataInner {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct StateValueMetadata {
+    /// Legacy stata values (before storage refund was introduced) doesn't have metadata persisted at all.
     inner: Option<StateValueMetadataInner>,
+    /// Indicates if the item is cached in the hot state, and since when.
+    hot_since_secs: Option<u32>,
 }
 
 impl StateValueMetadata {
     pub fn into_persistable(self) -> Option<PersistedStateValueMetadata> {
-        self.inner.map(|inner| {
+        let Self {
+            inner,
+            // TODO(HotState): Need to serialize when persisting the hot state.
+            hot_since_secs: _,
+        } = self;
+
+        inner.map(|inner| {
             let StateValueMetadataInner {
                 slot_deposit,
                 bytes_deposit,
@@ -104,6 +111,8 @@ impl StateValueMetadata {
     }
 
     fn new_impl(slot_deposit: u64, bytes_deposit: u64, creation_time_usecs: u64) -> Self {
+        todo!()
+        /* FIXME(aldenhu)
         Self {
             inner: Some(StateValueMetadataInner {
                 slot_deposit,
@@ -111,10 +120,17 @@ impl StateValueMetadata {
                 creation_time_usecs,
             }),
         }
+         */
     }
 
     pub fn is_none(&self) -> bool {
         self.inner.is_none()
+    }
+
+    pub fn is_hot(&self) -> bool {
+        self.inner
+            .as_ref()
+            .map_or(false, |inner| inner.hot_since_usecs.is_some())
     }
 
     fn inner(&self) -> Option<&StateValueMetadataInner> {
@@ -174,7 +190,7 @@ impl PersistedStateValue {
         match self {
             PersistedStateValue::V0(data) => StateValue::new_legacy(data),
             PersistedStateValue::WithMetadata { data, metadata } => {
-                StateValue::new_with_metadata(data, metadata.into_in_mem_form())
+                StateValue::new_existing_with_metadata(data, metadata.into_in_mem_form())
             },
         }
     }
@@ -187,6 +203,7 @@ pub struct ExistingStateValue {
     access_time_secs: u32,
 }
 
+/*
 /// Shared memory layout between StateValue and DbStateValue. Avoids unnecessary memory movement
 /// when converting between the two.
 #[derive(Clone, Debug)]
@@ -199,78 +216,26 @@ pub enum Store {
 }
 
 impl Store {
-    fn new_existing_without_access_ts(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self::Existing(ExistingStateValue {
-            data,
-            metadata,
-            access_time_secs: 0,
-        })
-    }
-
-    fn new_hot_non_existent(access_time_secs: u32) -> Self {
-        Self::HotNonExistent { access_time_secs }
-    }
-
-    fn set_access_time_secs(&mut self, secs: u32) {
-        match self {
-            Self::HotNonExistent { access_time_secs } => *access_time_secs = secs,
-            Self::Existing(existing) => existing.access_time_secs = secs,
-        }
-    }
-
-    pub fn is_hot_non_existent(&self) -> bool {
-        matches!(self, Self::HotNonExistent { .. })
-    }
-
-    pub fn size(&self) -> usize {
-        match self {
-            Self::HotNonExistent { .. } => 0,
-            Self::Existing(existing) => existing.data.len(),
-        }
-    }
 }
+ */
 
-/// StateValue for usage by the VM / `StateView`.
+/// Content of a state slot, or the lack thereof.
 ///
-/// 1. It's guaranteed by constructors that it's not `HotNonExistent`.
-/// 2. Access time is just placeholder, must be set when converting to DbStateValue.
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, RefCast)]
-#[repr(transparent)]
-pub struct StateValue(Store);
-
-impl StateValue {
-    fn to_persistable_form(&self) -> PersistedStateValue {
-        let ExistingStateValue {
-            data,
-            metadata,
-            access_time_secs: _,
-        } = self.inner().clone();
-        let metadata = metadata.into_persistable();
-        match metadata {
-            None => PersistedStateValue::V0(data),
-            Some(metadata) => PersistedStateValue::WithMetadata { data, metadata },
-        }
-    }
+/// | data | metadata.is_hot() | meaning                                 |
+/// | ---- | ----------------- | --------------------------------------- |
+/// | Some | Some              | has data and in the hot state           |
+/// | Some | None              | has data and cold                       |
+/// | None | Some              | empty slot, cached in the hot state     |
+/// | None | None              | empty slot, not cached in the hot state |
+// TODO(HotState): Should not be serializable and hash-able, instead, add ways to convert to
+//                 ColdStateValue and HotStateValue
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
+pub struct StateValue {
+    data: Option<Bytes>,
+    metadata: StateValueMetadata,
 }
 
-impl Deref for StateValue {
-    type Target = ExistingStateValue;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner()
-    }
-}
-
-impl PartialEq for StateValue {
-    fn eq(&self, other: &Self) -> bool {
-        // Ignoring access_time_secs for equality check for now.
-        // TODO: change after access time is actual part of the metadata.
-        self.data == other.data && self.metadata == other.metadata
-    }
-}
-
-impl Eq for StateValue {}
-
+#[cfg(any(test, feature = "fuzzing"))]
 pub const ARB_STATE_VALUE_MAX_SIZE: usize = 100;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -303,96 +268,6 @@ impl Serialize for StateValue {
     }
 }
 
-impl StateValue {
-    pub fn new_legacy(bytes: Bytes) -> Self {
-        Self::new_with_metadata(bytes, StateValueMetadata::none())
-    }
-
-    pub fn new_with_metadata(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self(Store::new_existing_without_access_ts(data, metadata))
-    }
-
-    /// Becomes a DbStateValue. It's expected to be an `Existing` flavor.
-    pub fn into_db_state_value(mut self, access_time_secs: u32) -> DbStateValue {
-        self.0.set_access_time_secs(access_time_secs);
-        DbStateValue(self.0)
-    }
-
-    fn inner(&self) -> &ExistingStateValue {
-        match &self.0 {
-            Store::Existing(value) => value,
-            Store::HotNonExistent { .. } => {
-                unreachable!("Guaranteed to be the Existing flavor.")
-            },
-        }
-    }
-
-    fn inner_mut(&mut self) -> &mut ExistingStateValue {
-        match &mut self.0 {
-            Store::Existing(ref mut value) => value,
-            Store::HotNonExistent { .. } => {
-                unreachable!("Guaranteed to be the Existing flavor.")
-            },
-        }
-    }
-
-    fn into_inner(self) -> ExistingStateValue {
-        match self.0 {
-            Store::Existing(value) => value,
-            Store::HotNonExistent { .. } => {
-                unreachable!("Guaranteed to be the Existing flavor.")
-            },
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        self.bytes().len()
-    }
-
-    pub fn bytes(&self) -> &Bytes {
-        &self.data
-    }
-
-    /// Applies a bytes-to-bytes transformation on the state value contents,
-    /// leaving the state value metadata untouched.
-    pub fn map_bytes<F: FnOnce(Bytes) -> anyhow::Result<Bytes>>(
-        self,
-        f: F,
-    ) -> anyhow::Result<StateValue> {
-        let inner = self.into_inner();
-        Ok(Self::new_with_metadata(f(inner.data)?, inner.metadata))
-    }
-
-    pub fn into_bytes(self) -> Bytes {
-        self.into_inner().data
-    }
-
-    pub fn set_bytes(&mut self, data: Bytes) {
-        self.inner_mut().data = data;
-    }
-
-    pub fn metadata(&self) -> &StateValueMetadata {
-        &self.inner().metadata
-    }
-
-    pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
-        &mut self.inner_mut().metadata
-    }
-
-    pub fn into_metadata(self) -> StateValueMetadata {
-        self.into_inner().metadata
-    }
-
-    pub fn unpack(self) -> (StateValueMetadata, Bytes) {
-        let ExistingStateValue {
-            data,
-            metadata,
-            access_time_secs: _,
-        } = self.into_inner();
-        (metadata, data)
-    }
-}
-
 // #[cfg(any(test, feature = "fuzzing"))]
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
@@ -407,61 +282,84 @@ impl From<Bytes> for StateValue {
     }
 }
 
-/// StateValue for usage by the DB and execution pipeline
-///
-/// 1. `HotNonExistent` flavor is possible
-/// 2. Access time is properly set on construction.
-#[derive(Clone, Debug, Deref, RefCast)]
-#[repr(transparent)]
-pub struct DbStateValue(Store);
+impl StateValue {
 
-impl DbStateValue {
-    pub fn new_hot_non_existent(access_time_secs: u32) -> Self {
-        Self(Store::new_hot_non_existent(access_time_secs))
-    }
-
-    pub fn from_state_value_opt(value_opt: Option<StateValue>, access_time_secs: u32) -> Self {
-        value_opt.map_or_else(
-            || Self::new_hot_non_existent(access_time_secs),
-            |v| v.into_db_state_value(access_time_secs),
-        )
-    }
-
-    /// Returns None if self is HotNonExistent, otherwise return self as
-    /// Some(StateValue)
-    pub fn to_state_value_opt(&self) -> Option<&StateValue> {
-        match &self.0 {
-            Store::Existing(_) => Some(StateValue::ref_cast(&self.0)),
-            Store::HotNonExistent { .. } => None,
+    pub fn cold_empty() -> Self {
+        Self {
+            data: None,
+            metadata: StateValueMetadata::none(),
         }
     }
 
-    pub fn into_state_value_opt(self) -> Option<StateValue> {
-        match &self.0 {
-            Store::Existing(..) => Some(StateValue(self.0)),
-            Store::HotNonExistent { .. } => None,
+    // TODO(HotState): have separate logic for HotStateValue and ColdStateValue
+    fn to_persistable_form(&self) -> PersistedStateValue {
+        let Self { data, metadata } = self;
+        let data = data
+            .cloned()
+            .expect("Can't serialize non-existent state value");
+        let metadata = metadata.clone().into_persistable();
+        match metadata {
+            None => PersistedStateValue::V0(data),
+            Some(metadata) => PersistedStateValue::WithMetadata { data, metadata },
         }
     }
 
-    pub fn is_hot_non_existent(&self) -> bool {
-        self.0.is_hot_non_existent()
+    pub fn is_hot(&self) -> bool {
+        self.metadata.hot_since_secs.is_some()
     }
 
-    pub fn expect_state_value(&self) -> &StateValue {
-        assert!(!self.is_hot_non_existent());
-        StateValue::ref_cast(&self.0)
+    pub fn new_legacy(bytes: Bytes) -> Self {
+        Self::new_existing_with_metadata(bytes, StateValueMetadata::none())
     }
 
-    pub fn access_time_secs(&self) -> u32 {
-        match &self.0 {
-            Store::Existing(existing) => existing.access_time_secs,
-            Store::HotNonExistent { access_time_secs } => *access_time_secs,
+    pub fn new_existing_with_metadata(data: Bytes, metadata: StateValueMetadata) -> Self {
+        Self {
+            data: Some(data),
+            metadata,
         }
     }
 
-    pub fn with_access_time_secs(mut self, access_time_secs: u32) -> Self {
-        self.0.set_access_time_secs(access_time_secs);
+    pub fn set_hot_since_secs(&mut self, secs: u32) {
+        self.metadata.hot_since_secs = Some(secs)
+    }
+
+    pub fn with_hot_since_secs(mut self, hot_since_secs: u32) -> StateValue {
+        self.set_hot_since_secs(hot_since_secs);
         self
+    }
+
+    fn bytes_opt(&self) -> Option<&Bytes> {
+        self.data.as_ref()
+    }
+
+    fn expect_bytes(&self) -> &Bytes {
+        self.bytes_opt().expect("Non-existent state value.")
+    }
+
+    /// Applies a bytes-to-bytes transformation on the state value contents,
+    /// leaving the state value metadata untouched.
+    pub fn map_bytes<F: FnOnce(Bytes) -> anyhow::Result<Bytes>>(
+        mut self,
+        f: F,
+    ) -> anyhow::Result<StateValue> {
+        self.data = self.data.map(f).transpose()?;
+        Ok(self)
+    }
+
+    pub fn set_bytes(&mut self, data: Bytes) {
+        self.inner_mut().data = data;
+    }
+
+    pub fn metadata(&self) -> &StateValueMetadata {
+        &self.inner().metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
+        &mut self.inner_mut().metadata
+    }
+
+    pub fn size(&self) -> usize {
+        self.data.as_ref().map_or(0, Bytes::len)
     }
 }
 

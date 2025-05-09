@@ -5,19 +5,24 @@ use crate::metrics::COUNTER;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
-    state_store::{
-        state_key::StateKey,
-        state_value::{DbStateValue, StateValue},
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 
+/// State slot content with the version for the last change to it.
+///
+/// | value.is_existing() | version | meaning                                         |
+/// | ------------------- | ------- | ----------------------------------------------- |
+/// | true                | Some    | existing and last change version known          |
+/// | true                | None    | invalid -- non-empty slot version must be known |
+/// | false               | Some    | Deletion at known version                       |
+/// | false               | None    | Non-existent, unclear if ever existed           |
 #[derive(Clone, Debug)]
 pub struct DbStateUpdate {
-    /// The version where the key got updated (incl. deletion).
-    pub version: Version,
-    /// `None` indicates deletion.
-    pub value: Option<DbStateValue>,
+    /// TODO(HotState): Revisit: a mere move between the hot and cold state tiers doesn't change
+    ///                 the version.
+    pub version: Some(Version),
+    pub value: StateValue,
 }
 
 impl DbStateUpdate {
@@ -51,7 +56,7 @@ impl DbStateUpdate {
         }
     }
 
-    pub fn expect_non_delete(&self) -> &DbStateValue {
+    pub fn expect_non_delete(&self) -> &StateValue {
         self.value.as_ref().expect("Unexpected deletion.")
     }
 }
@@ -67,13 +72,13 @@ pub struct StateUpdateRef<'kv> {
 }
 
 impl<'kv> StateUpdateRef<'kv> {
-    pub fn to_db_state_update(&self, access_time_secs: u32) -> DbStateUpdate {
+    pub fn to_dbs_tate_update(&self, access_time_secs: u32) -> DbStateUpdate {
         DbStateUpdate {
             version: self.version,
             value: self
                 .value
                 .cloned()
-                .map(|val| val.into_db_state_value(access_time_secs)),
+                .map(|val| val.with_hot_since_usecs(access_time_secs)),
         }
     }
 
@@ -82,6 +87,7 @@ impl<'kv> StateUpdateRef<'kv> {
     }
 }
 
+/*
 #[derive(Clone, Debug)]
 pub enum MemorizedStateRead {
     /// Underlying storage doesn't have an entry for this state key.
@@ -97,7 +103,7 @@ impl MemorizedStateRead {
             Some((version, value)) => Self::StateUpdate(DbStateUpdate {
                 version,
                 // N.B. Item will end up in hot state with refreshed access time down the stack.
-                value: Some(value.into_db_state_value(0)),
+                value: Some(value.with_hot_since_usecs(0)),
             }),
         }
     }
@@ -146,9 +152,10 @@ impl MemorizedStateRead {
             MemorizedStateRead::NonExistent => {
                 COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
                 Some(DbStateUpdate {
+                    // TODO(HotState):
                     // Dummy creation version
                     version: 0,
-                    value: Some(DbStateValue::new_hot_non_existent(access_time_secs)),
+                    value: Some(StateValue::new_hot_non_existent(access_time_secs)),
                 })
             },
             MemorizedStateRead::StateUpdate(DbStateUpdate { version, value }) => {
@@ -183,3 +190,4 @@ impl MemorizedStateRead {
         } // end match
     }
 }
+*/

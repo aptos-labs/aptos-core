@@ -360,14 +360,14 @@ mod tests {
 
         // Create a state value with legacy metadata.
         let (b_state_key, b_bytes, b) = module("b");
-        let b_state_value = StateValue::new_with_metadata(
+        let b_state_value = StateValue::new_existing_with_metadata(
             b_bytes.clone(),
             StateValueMetadata::legacy(10, &CurrentTimeMicroseconds { microseconds: 100 }),
         );
 
         // Create a state value with non-legacy metadata.
         let (c_state_key, c_bytes, c) = module("c");
-        let c_state_value = StateValue::new_with_metadata(
+        let c_state_value = StateValue::new_existing_with_metadata(
             c_bytes.clone(),
             StateValueMetadata::new(20, 30, &CurrentTimeMicroseconds { microseconds: 200 }),
         );
@@ -459,7 +459,7 @@ mod tests {
 
         let data = HashMap::from([(
             key.clone(),
-            StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
+            StateValue::new_existing_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
 
         let expected_size = group_size_as_sum(
@@ -515,7 +515,7 @@ mod tests {
 
         let data = HashMap::from([(
             key.clone(),
-            StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
+            StateValue::new_existing_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
 
         let s = MockStateView::new(data);
@@ -582,7 +582,7 @@ mod tests {
 
         let data = HashMap::from([(
             key.clone(),
-            StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
+            StateValue::new_existing_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
 
         let s = MockStateView::new(data);

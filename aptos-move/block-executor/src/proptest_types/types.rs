@@ -106,7 +106,7 @@ where
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
             let bytes = bcs::to_bytes(&group).unwrap();
-            Ok(Some(StateValue::new_with_metadata(
+            Ok(Some(StateValue::new_existing_with_metadata(
                 bytes.into(),
                 raw_metadata(5),
             )))
@@ -263,7 +263,7 @@ impl TransactionWrite for ValueType {
 
     fn as_state_value(&self) -> Option<StateValue> {
         self.extract_raw_bytes()
-            .map(|bytes| StateValue::new_with_metadata(bytes, self.metadata.clone()))
+            .map(|bytes| StateValue::new_existing_with_metadata(bytes, self.metadata.clone()))
     }
 
     fn set_bytes(&mut self, bytes: Bytes) {
