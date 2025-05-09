@@ -105,7 +105,7 @@ async fn jwk_consensus_per_issuer() {
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Wait for 60 secs and there should only update for Bob, not Alice.");
-    sleep(Duration::from_secs(60)).await;
+    sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
     assert_eq!(

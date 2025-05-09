@@ -114,7 +114,7 @@ async fn jwk_consensus_per_key() {
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Wait for 30 secs, and `b0, b1` should be on chain.");
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     assert_eq!(
         AllProvidersJWKs {
@@ -174,7 +174,7 @@ async fn jwk_consensus_per_key() {
     ))));
 
     info!("Wait for 30 secs and `a1, a2, b1 (new ver.), b2` should be on chain.");
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     assert_eq!(
         AllProvidersJWKs {

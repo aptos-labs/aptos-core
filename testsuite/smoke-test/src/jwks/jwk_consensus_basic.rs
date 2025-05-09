@@ -153,7 +153,7 @@ async fn jwk_consensus_basic() {
     ))));
 
     info!("Waiting for an on-chain update. 30 sec should be enough.");
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
     assert_eq!(
