@@ -36,7 +36,7 @@ proptest = { workspace = true }
 rand = { workspace = true }
 
 [target.'cfg(unix)'.dev-dependencies]
-jemallocator = { workspace = true }
+tikv-jemallocator = { workspace = true }
 
 [features]
 fuzzing = ["aptos-types/fuzzing", "proptest"]

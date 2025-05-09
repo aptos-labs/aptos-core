@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 #[cfg(unix)]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 const M: usize = 1024 * 1024;
 const K: usize = 1024;

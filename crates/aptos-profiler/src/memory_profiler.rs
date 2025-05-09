@@ -21,99 +21,102 @@ impl MemProfiler {
 
 impl Profiler for MemProfiler {
     fn profile_for(&self, duration_secs: u64, binary_path: &str) -> Result<()> {
-        let mut prof_active: bool = true;
+        todo!()
+        // let mut prof_active: bool = true;
 
-        let result = unsafe {
-            jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut prof_active as *mut _ as *mut _,
-                std::mem::size_of::<bool>(),
-            )
-        };
+        // let result = unsafe {
+        //     tikv_jemalloc_sys::mallctl(
+        //         b"prof.active\0".as_ptr() as *const _,
+        //         std::ptr::null_mut(),
+        //         std::ptr::null_mut(),
+        //         &mut prof_active as *mut _ as *mut _,
+        //         std::mem::size_of::<bool>(),
+        //     )
+        // };
 
-        if result != 0 {
-            return Err(anyhow!("Failed to activate jemalloc profiling"));
-        }
+        // if result != 0 {
+        //     return Err(anyhow!("Failed to activate jemalloc profiling"));
+        // }
 
-        thread::sleep(Duration::from_secs(duration_secs));
+        // thread::sleep(Duration::from_secs(duration_secs));
 
-        let mut prof_active: bool = false;
-        let result = unsafe {
-            jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut prof_active as *mut _ as *mut _,
-                std::mem::size_of::<bool>(),
-            )
-        };
+        // let mut prof_active: bool = false;
+        // let result = unsafe {
+        //     tikv_jemalloc_sys::mallctl(
+        //         b"prof.active\0".as_ptr() as *const _,
+        //         std::ptr::null_mut(),
+        //         std::ptr::null_mut(),
+        //         &mut prof_active as *mut _ as *mut _,
+        //         std::mem::size_of::<bool>(),
+        //     )
+        // };
 
-        if result != 0 {
-            return Err(anyhow!("Failed to deactivate jemalloc profiling"));
-        }
+        // if result != 0 {
+        //     return Err(anyhow!("Failed to deactivate jemalloc profiling"));
+        // }
 
-        // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
-        Command::new("python3")
-            .arg("./crates/aptos-profiler/src/jeprof.py")
-            .arg(self.txt_result_path.to_string_lossy().as_ref())
-            .arg(self.svg_result_path.to_string_lossy().as_ref())
-            .arg(binary_path)
-            .output()
-            .expect("Failed to execute command");
+        // // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
+        // Command::new("python3")
+        //     .arg("./crates/aptos-profiler/src/jeprof.py")
+        //     .arg(self.txt_result_path.to_string_lossy().as_ref())
+        //     .arg(self.svg_result_path.to_string_lossy().as_ref())
+        //     .arg(binary_path)
+        //     .output()
+        //     .expect("Failed to execute command");
 
-        Ok(())
+        // Ok(())
     }
 
     /// Enable memory profiling until it is disabled
     fn start_profiling(&mut self) -> Result<()> {
-        let mut prof_active: bool = true;
+        todo!()
+        // let mut prof_active: bool = true;
 
-        let result = unsafe {
-            jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut prof_active as *mut _ as *mut _,
-                std::mem::size_of::<bool>(),
-            )
-        };
+        // let result = unsafe {
+        //     tikv_jemalloc_sys::mallctl(
+        //         b"prof.active\0".as_ptr() as *const _,
+        //         std::ptr::null_mut(),
+        //         std::ptr::null_mut(),
+        //         &mut prof_active as *mut _ as *mut _,
+        //         std::mem::size_of::<bool>(),
+        //     )
+        // };
 
-        if result != 0 {
-            return Err(anyhow!("Failed to activate jemalloc profiling"));
-        }
+        // if result != 0 {
+        //     return Err(anyhow!("Failed to activate jemalloc profiling"));
+        // }
 
-        Ok(())
+        // Ok(())
     }
 
     /// Disable profiling and run jeprof to obtain results
     fn end_profiling(&mut self, binary_path: &str) -> Result<()> {
-        let mut prof_active: bool = false;
-        let result = unsafe {
-            jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut prof_active as *mut _ as *mut _,
-                std::mem::size_of::<bool>(),
-            )
-        };
+        todo!()
+        // let mut prof_active: bool = false;
+        // let result = unsafe {
+        //     tikv_jemalloc_sys::mallctl(
+        //         b"prof.active\0".as_ptr() as *const _,
+        //         std::ptr::null_mut(),
+        //         std::ptr::null_mut(),
+        //         &mut prof_active as *mut _ as *mut _,
+        //         std::mem::size_of::<bool>(),
+        //     )
+        // };
 
-        if result != 0 {
-            return Err(anyhow!("Failed to deactivate jemalloc profiling"));
-        }
+        // if result != 0 {
+        //     return Err(anyhow!("Failed to deactivate jemalloc profiling"));
+        // }
 
-        // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
-        Command::new("python3")
-            .arg("./crates/aptos-profiler/src/jeprof.py")
-            .arg(self.txt_result_path.to_string_lossy().as_ref())
-            .arg(self.svg_result_path.to_string_lossy().as_ref())
-            .arg(binary_path)
-            .output()
-            .expect("Failed to execute command");
+        // // TODO: Run jeprof commands from within Rust, current tries give unresolved errors
+        // Command::new("python3")
+        //     .arg("./crates/aptos-profiler/src/jeprof.py")
+        //     .arg(self.txt_result_path.to_string_lossy().as_ref())
+        //     .arg(self.svg_result_path.to_string_lossy().as_ref())
+        //     .arg(binary_path)
+        //     .output()
+        //     .expect("Failed to execute command");
 
-        Ok(())
+        // Ok(())
     }
 
     /// Expose the results in TXT format

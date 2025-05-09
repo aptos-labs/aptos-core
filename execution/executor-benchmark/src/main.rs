@@ -49,7 +49,7 @@ use std::{
 
 #[cfg(unix)]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.

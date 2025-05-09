@@ -61,8 +61,8 @@ thread_local = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+# [target.'cfg(unix)'.dependencies]
+tikv-jemallocator = { workspace = true }
 aptos-profiler = { workspace = true }
 
 [dev-dependencies]

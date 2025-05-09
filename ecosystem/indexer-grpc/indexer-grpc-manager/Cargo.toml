@@ -39,4 +39,4 @@ aptos-config = { workspace = true }
 serde_json = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+tikv-jemallocator = { workspace = true }

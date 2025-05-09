@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 #[cfg(unix)]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn recursive_bin_search(sorted_data: &[u64], depth: u8) {
     if sorted_data.len() <= 1 || depth >= 64 {

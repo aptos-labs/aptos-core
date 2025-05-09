@@ -31,7 +31,7 @@ serde = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
+# [target.'cfg(unix)'.dependencies]
 tikv-jemallocator.workspace = true
 tikv-jemalloc-ctl.workspace = true
 tikv-jemalloc-sys.workspace = true

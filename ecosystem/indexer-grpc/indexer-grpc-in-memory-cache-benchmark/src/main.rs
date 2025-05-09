@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 #[cfg(unix)]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 lazy_static! {
     static ref TRANSACTION_CONTENT: OnceCell<Vec<u8>> = OnceCell::new();

@@ -267,6 +267,7 @@ impl EventSubscriptionService {
             return Ok(()); // No reconfiguration subscribers!
         }
 
+        // todo 感觉还是只能在dbbackendprovidoer上做文章，改成范性返回值涉及的范围太广了
         let new_configs = self.read_on_chain_configs(version)?;
         for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
@@ -294,10 +295,10 @@ impl EventSubscriptionService {
     /// Note: We cannot assume that all configs will exist on-chain. As such, we
     /// must fetch each resource one at a time. Reconfig subscribers must be able
     /// to handle on-chain configs not existing in a reconfiguration notification.
-    fn read_on_chain_configs<T: OnChainConfigProvider>(
+    fn read_on_chain_configs(
         &self,
         version: Version,
-    ) -> Result<OnChainConfigPayload<T>, Error> {
+    ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
         let db_state_view = &self
             .storage
             .read()
@@ -382,10 +383,10 @@ struct ReconfigSubscription {
 }
 
 impl ReconfigSubscription {
-    fn notify_subscriber_of_configs<T: OnChainConfigProvider>(
+    fn notify_subscriber_of_configs(
         &mut self,
         version: Version,
-        on_chain_configs: OnChainConfigPayload<T>,
+        on_chain_configs: OnChainConfigPayload<DbBackedOnChainConfig>,
     ) -> Result<(), Error> {
         let reconfig_notification = ReconfigNotification {
             version,
@@ -410,6 +411,7 @@ impl DbBackedOnChainConfig {
     }
 }
 
+// TODO(gravity_alex): Pass config_storage_gravity here to replace the current impl
 impl OnChainConfigProvider for DbBackedOnChainConfig {
     fn get<T: OnChainConfig>(&self) -> Result<T> {
         let bytes = self
