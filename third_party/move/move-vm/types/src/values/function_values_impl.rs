@@ -121,9 +121,12 @@ impl<'c, 'l, 'v> serde::Serialize
             .ctx
             .required_function_extension()
             .map_err(S::Error::custom)?;
+
         let data = fun_ext
-            .get_serialization_data(fun.as_ref())
+            .extension
+            .get_serialization_data(fun.as_ref(), fun_ext.traversal_context)
             .map_err(S::Error::custom)?;
+
         let mut seq = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
         seq.serialize_element(&data.format_version)?;
         seq.serialize_element(&data.module_id)?;
@@ -193,6 +196,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
             return Err(A::Error::invalid_length(captured.len(), &self));
         }
         let fun = fun_ext
+            .extension
             .create_from_serialization_data(SerializedFunctionData {
                 format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                 module_id,

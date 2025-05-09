@@ -10,6 +10,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     vm_status::StatusCode,
 };
+use move_vm_types::gas::ModuleTraversalContext;
 use std::{collections::BTreeMap, sync::Arc};
 use typed_arena::Arena;
 
@@ -117,6 +118,37 @@ impl<'a> TraversalContext<'a> {
     }
 }
 
+impl<'a> ModuleTraversalContext for TraversalContext<'a> {
+    fn visit_if_not_special_module_id(&mut self, module_id: &ModuleId) -> PartialVMResult<bool> {
+        let addr = module_id.address();
+        if addr.is_special() {
+            return Ok(false);
+        }
+
+        let name = module_id.name();
+        Ok(if self.visited.contains_key(&(addr, name)) {
+            false
+        } else {
+            let module_id = self.referenced_module_ids.alloc(module_id.clone());
+            self.visited
+                .insert((module_id.address(), module_id.name()), ());
+            true
+        })
+    }
+
+    fn check_is_special_or_visited(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> PartialVMResult<()> {
+        if addr.is_special() {
+            return Ok(());
+        }
+
+        self.check_visited_impl(addr, name)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -128,8 +160,9 @@ mod test {
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         let special = AccountAddress::ONE;
-        let non_special = AccountAddress::from_hex_literal("0x123").unwrap();
-        assert!(special.is_special() && !non_special.is_special());
+        let non_special_1 = AccountAddress::from_hex_literal("0x123").unwrap();
+        let non_special_2 = AccountAddress::from_hex_literal("0x234").unwrap();
+        assert!(special.is_special() && !non_special_1.is_special() && !non_special_2.is_special());
 
         let allocated_module_id = |addr| {
             let module_id = ModuleId::new(addr, ident_str!("foo").to_owned());
@@ -145,25 +178,41 @@ mod test {
             .expect_err("0x1 is special address and should not be visited");
 
         assert!(!traversal_context.visit_if_not_special_address(special.address(), special.name()));
+        assert!(!traversal_context
+            .visit_if_not_special_module_id(special)
+            .unwrap());
         assert!(traversal_context.visited.is_empty());
         traversal_context
             .legacy_check_visited(special.address(), special.name())
             .expect_err("0x1 is special address but we don't allow them to be non-visited");
 
-        let non_special = allocated_module_id(non_special);
+        let non_special_1 = allocated_module_id(non_special_1);
+        let non_special_2 = ModuleId::new(non_special_2, ident_str!("foo").to_owned());
         traversal_context
-            .check_is_special_or_visited(non_special.address(), non_special.name())
+            .check_is_special_or_visited(non_special_1.address(), non_special_1.name())
             .expect_err("0x123 is non-special address and have not been visited");
+        traversal_context
+            .check_is_special_or_visited(non_special_2.address(), non_special_2.name())
+            .expect_err("0x234 is non-special address and have not been visited");
 
         assert!(traversal_context
-            .visit_if_not_special_address(non_special.address(), non_special.name()));
-        assert_eq!(traversal_context.visited.len(), 1);
+            .visit_if_not_special_address(non_special_1.address(), non_special_1.name()));
+        assert!(traversal_context
+            .visit_if_not_special_module_id(&non_special_2)
+            .unwrap());
+        assert_eq!(traversal_context.visited.len(), 2);
         traversal_context
-            .check_is_special_or_visited(non_special.address(), non_special.name())
+            .check_is_special_or_visited(non_special_1.address(), non_special_1.name())
             .expect("0x123 is non-special address but have been visited");
+        traversal_context
+            .check_is_special_or_visited(non_special_2.address(), non_special_2.name())
+            .expect("0x234 is non-special address but have been visited");
 
         // Double insertion: should not be visiting anymore.
         assert!(!traversal_context
-            .visit_if_not_special_address(non_special.address(), non_special.name()));
+            .visit_if_not_special_address(non_special_1.address(), non_special_1.name()));
+        assert!(!traversal_context
+            .visit_if_not_special_module_id(&non_special_2)
+            .unwrap());
     }
 }
