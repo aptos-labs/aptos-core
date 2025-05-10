@@ -337,6 +337,18 @@ impl NetworkSender {
             error!("Error broadcasting to self: {:?}", err);
         }
 
+        #[cfg(feature = "failpoints")]
+        {
+            let msg_ref = &msg;
+            fail_point!("consensus::send::broadcast_self_only", |maybe_msg_name| {
+                if let Some(msg_name) = maybe_msg_name {
+                    if msg_ref.name() != &msg_name {
+                        self.broadcast_without_self(msg_ref.clone());
+                    }
+                }
+            });
+        }
+
         self.broadcast_without_self(msg);
     }
 
@@ -508,6 +520,7 @@ impl QuorumStoreSender for NetworkSender {
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
+        fail_point!("consensus::send::request_batch", |_| Err(anyhow!("failed")));
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self.send_rpc(recipient, msg, timeout).await?;
