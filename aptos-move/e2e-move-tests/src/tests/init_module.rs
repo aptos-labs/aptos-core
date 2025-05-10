@@ -2,10 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
-use aptos_types::account_address::AccountAddress;
-use move_core_types::parser::parse_struct_tag;
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ExecutionStatus, TransactionStatus},
+};
+use claims::assert_ok;
+use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
+use test_case::test_case;
 
 /// Mimics `0xcafe::test::ModuleData`
 #[derive(Serialize, Deserialize)]
@@ -99,4 +105,41 @@ fn init_module_with_abort_and_republish() {
 
     // 2nd publish succeeds, not the old but the new init_module is called.
     assert_success!(res[1]);
+}
+
+#[test_case(true)]
+#[test_case(false)]
+fn invalid_init_module(allow_extended_checks_to_fail: bool) {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x42").unwrap());
+
+    let package_paths = [
+        "init_module.data/many_arguments",
+        "init_module.data/no_arguments",
+        "init_module.data/non_private",
+        "init_module.data/returns_values",
+        "init_module.data/type_arguments",
+        "init_module.data/wrong_arguments",
+    ];
+    for package_path in package_paths {
+        let path = common::test_dir_path(package_path).to_owned();
+        let mut options = BuildOptions::default();
+        let package = if allow_extended_checks_to_fail {
+            options
+                .experiments
+                .push("skip-bailout-on-extended-checks".to_string());
+            assert_ok!(BuiltPackage::build(path, options))
+        } else {
+            assert!(BuiltPackage::build(path, options).is_err());
+            continue;
+        };
+
+        let txn = h.create_publish_built_package(&acc, &package, |_| {});
+        assert!(matches!(
+            h.run(txn),
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                StatusCode::INVALID_INIT_MODULE
+            )))
+        ));
+    }
 }

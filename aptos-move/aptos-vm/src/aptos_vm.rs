@@ -1464,6 +1464,7 @@ impl AptosVM {
             gas_meter,
             traversal_context,
             self.features(),
+            self.gas_feature_version(),
             change_set_configs,
             destination,
             bundle,

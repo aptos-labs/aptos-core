@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
+use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::BuildOptions;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress,
@@ -151,7 +151,7 @@ fn test_bad_fun_attribute_in_compiled_module() {
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions::default())
         .expect("building package must succeed");
     let code = package.extract_code();
     // There should only be the above module
@@ -299,7 +299,7 @@ fn build_package_and_insert_attribute(
     builder.add_source("m.move", source);
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions::default())
         .expect("building package must succeed");
     let code = package.extract_code();
     // There should only be one module

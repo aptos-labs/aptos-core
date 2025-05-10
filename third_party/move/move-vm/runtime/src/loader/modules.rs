@@ -554,7 +554,7 @@ impl Module {
         self.single_signature_token_map.get(&idx).unwrap()
     }
 
-    pub(crate) fn get_function(&self, function_name: &IdentStr) -> VMResult<Arc<Function>> {
+    pub fn get_function(&self, function_name: &IdentStr) -> VMResult<Arc<Function>> {
         Ok(self
             .function_map
             .get(function_name)
