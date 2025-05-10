@@ -381,6 +381,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         .unwrap();
 
         let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
 
         let mut data_cache = TransactionDataCache::empty();
@@ -389,14 +390,14 @@ impl<'a> SimpleVMTestAdapter<'a> {
             args,
             &mut data_cache,
             &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
+            &mut traversal_context,
             &mut extensions,
             module_storage,
             &self.storage,
         )?;
 
         let change_set = data_cache
-            .into_effects(module_storage)
+            .into_effects(module_storage, &traversal_context)
             .map_err(|err| err.finish(Location::Undefined))?;
         self.storage.apply(change_set).unwrap();
         Ok(return_values)

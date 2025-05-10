@@ -7,6 +7,7 @@
 mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
+        gas::AlwaysVisitedModuleTraversalContext,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
         values::{values_impl, AbstractFunction, SerializedFunctionData, Struct, Value},
     };
@@ -403,7 +404,7 @@ mod tests {
         let mut ext_mock = MockFunctionValueExtension::new();
         ext_mock
             .expect_get_serialization_data()
-            .returning(move |af| {
+            .returning(move |af, _| {
                 Ok(af
                     .downcast_ref::<MockAbstractFunction>()
                     .expect("cast")
@@ -414,12 +415,14 @@ mod tests {
             .expect_create_from_serialization_data()
             .returning(move |data| Ok(Box::new(MockAbstractFunction::new_from_data(data))));
         let value = Value::closure(Box::new(fun), captured);
+
+        let always_visited_traversal_context = AlwaysVisitedModuleTraversalContext;
         let blob = assert_ok!(ValueSerDeContext::new()
-            .with_func_args_deserialization(&ext_mock)
+            .with_function_value_extension(&ext_mock, &always_visited_traversal_context)
             .serialize(&value, &fun_layout))
         .expect("serialization result not None");
         let de_value = ValueSerDeContext::new()
-            .with_func_args_deserialization(&ext_mock)
+            .with_function_value_extension(&ext_mock, &always_visited_traversal_context)
             .deserialize_or_err(&blob, &fun_layout);
         (value, de_value)
     }

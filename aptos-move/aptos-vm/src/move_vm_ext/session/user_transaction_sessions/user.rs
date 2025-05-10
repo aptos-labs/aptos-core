@@ -64,10 +64,15 @@ impl<'r> UserSession<'r> {
         self,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
+        traversal_context: &TraversalContext,
     ) -> Result<VMChangeSet, VMStatus> {
         let Self { session } = self;
-        let change_set =
-            session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
+        let change_set = session.finish_with_squashed_change_set(
+            change_set_configs,
+            module_storage,
+            traversal_context,
+            false,
+        )?;
         Ok(change_set)
     }
 
@@ -129,6 +134,7 @@ impl<'r> UserSession<'r> {
         let change_set = session.finish_with_squashed_change_set(
             change_set_configs,
             &staging_module_storage,
+            traversal_context,
             false,
         )?;
 

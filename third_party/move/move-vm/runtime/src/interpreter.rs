@@ -1117,14 +1117,21 @@ where
     /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
     /// of bytes loaded.
     fn create_and_charge_data_cache_entry(
+        &self,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
-        let (entry, bytes_loaded) =
-            TransactionDataCache::load_resource(module_storage, resource_resolver, &addr, ty)?;
+        let (entry, bytes_loaded) = TransactionDataCache::load_resource(
+            traversal_context,
+            module_storage,
+            resource_resolver,
+            &addr,
+            ty,
+        )?;
         gas_meter.charge_load_resource(
             addr,
             TypeWithRuntimeEnvironment {
@@ -1139,18 +1146,21 @@ where
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
+        &self,
         data_cache: &'c mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
         if !data_cache.contains_resource(&addr, ty) {
-            let entry = Self::create_and_charge_data_cache_entry(
+            let entry = self.create_and_charge_data_cache_entry(
                 resource_resolver,
                 module_storage,
                 gas_meter,
+                traversal_context,
                 addr,
                 ty,
             )?;
@@ -1168,19 +1178,22 @@ where
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = module_storage.runtime_environment();
-        let res = Self::load_resource(
-            data_cache,
-            resource_resolver,
-            module_storage,
-            gas_meter,
-            addr,
-            ty,
-        )?
-        .borrow_global();
+        let res = self
+            .load_resource(
+                data_cache,
+                resource_resolver,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                addr,
+                ty,
+            )?
+            .borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
@@ -1246,15 +1259,17 @@ where
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = module_storage.runtime_environment();
-        let gv = Self::load_resource(
+        let gv = self.load_resource(
             data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
             addr,
             ty,
         )?;
@@ -1280,19 +1295,22 @@ where
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = module_storage.runtime_environment();
-        let resource = match Self::load_resource(
-            data_cache,
-            resource_resolver,
-            module_storage,
-            gas_meter,
-            addr,
-            ty,
-        )?
-        .move_from()
+        let resource = match self
+            .load_resource(
+                data_cache,
+                resource_resolver,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                addr,
+                ty,
+            )?
+            .move_from()
         {
             Ok(resource) => {
                 gas_meter.charge_move_from(
@@ -1331,16 +1349,18 @@ where
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
         let runtime_environment = module_storage.runtime_environment();
-        let gv = Self::load_resource(
+        let gv = self.load_resource(
             data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
             addr,
             ty,
         )?;
@@ -2509,6 +2529,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                         )?;
@@ -2526,6 +2547,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                         )?;
@@ -2539,6 +2561,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                         )?;
@@ -2553,6 +2576,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                         )?;
@@ -2566,6 +2590,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                         )?;
@@ -2580,6 +2605,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                         )?;
@@ -2599,6 +2625,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             &ty,
                             resource,
@@ -2620,6 +2647,7 @@ impl Frame {
                             resource_resolver,
                             module_storage,
                             gas_meter,
+                            traversal_context,
                             addr,
                             ty,
                             resource,

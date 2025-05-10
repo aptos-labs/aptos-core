@@ -335,6 +335,8 @@ fn force_end_epoch(state_view: &impl SimulationStateStore) -> Result<()> {
         ChangeSetConfigs::unlimited_at_gas_feature_version(gas_feature_version);
 
     let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
+
     let mut sess = vm.new_session(&resolver, SessionId::void(), None);
     sess.execute_function_bypass_visibility(
         &MODULE_ID_APTOS_GOVERNANCE,
@@ -344,10 +346,10 @@ fn force_end_epoch(state_view: &impl SimulationStateStore) -> Result<()> {
             .simple_serialize()
             .unwrap()],
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
+        &mut traversal_context,
         &module_storage,
     )?;
-    let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
+    let mut change_set = sess.finish(&change_set_configs, &module_storage, &traversal_context)?;
 
     change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set

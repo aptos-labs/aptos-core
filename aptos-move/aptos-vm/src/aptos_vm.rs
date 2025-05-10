@@ -207,9 +207,10 @@ pub(crate) fn serialized_signer(account_address: &AccountAddress) -> Vec<u8> {
 pub(crate) fn get_system_transaction_output(
     session: SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
+    traversal_context: &TraversalContext,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let change_set = session.finish(change_set_configs, module_storage)?;
+    let change_set = session.finish(change_set_configs, module_storage, traversal_context)?;
 
     Ok(VMOutput::new(
         change_set,
@@ -615,7 +616,7 @@ impl AptosVM {
             })?;
 
             let mut abort_hook_session_change_set =
-                abort_hook_session.finish(change_set_configs, module_storage)?;
+                abort_hook_session.finish(change_set_configs, module_storage, traversal_context)?;
             if let Err(err) = self.charge_change_set(
                 &mut abort_hook_session_change_set,
                 gas_meter,
@@ -696,7 +697,13 @@ impl AptosVM {
                 self.is_simulation,
             )
         })?;
-        epilogue_session.finish(fee_statement, status, change_set_configs, module_storage)
+        epilogue_session.finish(
+            fee_statement,
+            status,
+            change_set_configs,
+            module_storage,
+            traversal_context,
+        )
     }
 
     fn success_transaction_cleanup(
@@ -749,6 +756,7 @@ impl AptosVM {
             ExecutionStatus::Success,
             change_set_configs,
             module_storage,
+            traversal_context,
         )?;
 
         Ok((VMStatus::Executed, output))
@@ -1346,7 +1354,8 @@ impl AptosVM {
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let maybe_publish_request = session.execute(|session| session.extract_publish_request());
         if maybe_publish_request.is_none() {
-            let change_set = session.finish(change_set_configs, module_storage)?;
+            let change_set =
+                session.finish(change_set_configs, module_storage, traversal_context)?;
             return UserSessionChangeSet::new(
                 change_set,
                 ModuleWriteSet::empty(),
@@ -1812,7 +1821,14 @@ impl AptosVM {
         let storage_gas_params = unwrap_or_discard!(self.storage_gas_params(log_context));
         let change_set_configs = &storage_gas_params.change_set_configs;
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
-            .into_user_session(self, &txn_data, resolver, change_set_configs, code_storage,));
+            .into_user_session(
+                self,
+                &txn_data,
+                resolver,
+                change_set_configs,
+                code_storage,
+                &traversal_context
+            ));
 
         let should_create_account_resource_timer =
             VM_TIMER.timer_with_label("AptosVM::create_account_resource_lazily");
@@ -2065,7 +2081,8 @@ impl AptosVM {
 
                 let change_set_configs =
                     ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version());
-                let change_set = tmp_session.finish(&change_set_configs, code_storage)?;
+                let change_set =
+                    tmp_session.finish(&change_set_configs, code_storage, &traversal_context)?;
 
                 // While scripts should be able to publish modules, this should be done through
                 // native context, and so the module write set must always be empty.
@@ -2188,7 +2205,9 @@ impl AptosVM {
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
         );
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
@@ -2196,7 +2215,7 @@ impl AptosVM {
                 vec![],
                 args,
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -2208,6 +2227,7 @@ impl AptosVM {
         let output = get_system_transaction_output(
             session,
             module_storage,
+            &traversal_context,
             &self.storage_gas_params(log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
@@ -2269,7 +2289,8 @@ impl AptosVM {
                 .as_move_value(),
         ];
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         session
             .execute_function_bypass_visibility(
@@ -2278,7 +2299,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -2290,6 +2311,7 @@ impl AptosVM {
         let output = get_system_transaction_output(
             session,
             module_storage,
+            &traversal_context,
             &self.storage_gas_params(log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))

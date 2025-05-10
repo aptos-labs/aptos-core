@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext,
     storage::loader::traits::{Loader, StructDefinitionLoader},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{gas_algebra::NumBytes, language_storage::ModuleId};
 use move_vm_types::{
-    gas::GasMeter,
+    gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
     module_linker_error,
 };
@@ -37,16 +36,13 @@ where
     fn charge_module(
         &self,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
+        traversal_context: &mut impl ModuleTraversalContext,
         module_id: &ModuleId,
     ) -> PartialVMResult<()> {
-        let module_id = traversal_context
-            .referenced_module_ids
-            .alloc(module_id.clone());
-        let addr = module_id.address();
-        let name = module_id.name();
+        if traversal_context.visit_if_not_special_module_id(module_id)? {
+            let addr = module_id.address();
+            let name = module_id.name();
 
-        if traversal_context.visit_if_not_special_address(addr, name) {
             let size = self
                 .module_storage
                 .unmetered_get_module_size(addr, name)
@@ -74,7 +70,7 @@ where
     fn load_struct_definition(
         &self,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
+        traversal_context: &mut impl ModuleTraversalContext,
         idx: &StructNameIndex,
     ) -> PartialVMResult<Arc<StructType>> {
         let struct_name = self
