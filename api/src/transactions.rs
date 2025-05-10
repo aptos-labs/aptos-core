@@ -49,6 +49,7 @@ use poem_openapi::{
     ApiRequest, OpenApi,
 };
 use std::{cmp::min, sync::Arc, time::Duration};
+use aptos_storage_interface::state_store::state_view::db_state_view::DbStateView;
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -632,26 +633,31 @@ impl TransactionsApi {
                             AptosErrorCode::InvalidInput,
                         )
                     })?;
-                let output = AptosVM::execute_view_function(
-                    &state_view,
-                    ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
-                    ident_str!("balance").into(),
-                    vec![AptosCoinType::type_tag()],
-                    vec![signed_transaction.sender().to_vec()],
-                    context.node_config.api.max_gas_view_function,
-                );
-                let values = output.values.map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                    )
-                })?;
-                let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                    )
-                })?;
+
+                let gas_unit_price =
+                    estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
+                let fee_payer_address = signed_transaction.authenticator_ref().fee_payer_address();
+                let balance = match fee_payer_address {
+                    Some(AccountAddress::ZERO) => {
+                        // If this is a fee payer, and there is no fee payer, use the "max amount" and assume it's okay
+                        if gas_unit_price == 0 {
+                            max_number_of_gas_units
+                        } else {
+                            max_number_of_gas_units * gas_unit_price
+                        }
+                    }
+                    Some(address) => {
+                        // If this is a fee payer, and it's specified, use the balance amount of the fee payer
+                        get_account_balance(context.clone(), &state_view, address)?
+                    }
+                    None => {
+                        // Otherwise, use the balance of the sender
+                        get_account_balance(context.clone(), &state_view, signed_transaction.sender())?
+                    }
+                };
+                
+                
+                
 
                 let gas_unit_price =
                     estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
@@ -1759,4 +1765,27 @@ enum GetByVersionResponse {
     VersionTooNew,
     VersionTooOld,
     Found(TransactionData),
+}
+
+fn get_account_balance(context: Arc<Context>, state_view: &DbStateView, address: AccountAddress) -> Result<u64, SubmitTransactionError> {
+    let output = AptosVM::execute_view_function(
+        state_view,
+        ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+        ident_str!("balance").into(),
+        vec![AptosCoinType::type_tag()],
+        vec![address.to_vec()],
+        context.node_config.api.max_gas_view_function,
+    );
+    let values = output.values.map_err(|err| {
+        SubmitTransactionError::bad_request_with_code_no_info(
+            err,
+            AptosErrorCode::InvalidInput,
+        )
+    })?;
+    Ok(bcs::from_bytes(&values[0]).map_err(|err| {
+        SubmitTransactionError::bad_request_with_code_no_info(
+            err,
+            AptosErrorCode::InvalidInput,
+        )
+    })?)
 }
