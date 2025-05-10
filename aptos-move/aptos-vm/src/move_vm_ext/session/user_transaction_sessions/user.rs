@@ -24,7 +24,10 @@ use move_binary_format::{compatibility::Compatibility, errors::Location, Compile
 use move_core_types::{
     account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
 };
-use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage, StagingModuleStorage};
+use move_vm_runtime::{
+    dispatch_loader, module_traversal::TraversalContext, InstantiatedFunctionLoader,
+    LegacyLoaderConfig, ModuleStorage, StagingModuleStorage,
+};
 
 #[derive(Deref, DerefMut)]
 pub struct UserSession<'r> {
@@ -120,22 +123,28 @@ impl<'r> UserSession<'r> {
             }
 
             self.session.execute(|session| {
-                let module_id = module.self_id();
-                if let Ok(init_func) =
-                    staging_module_storage.load_function(&module_id, init_func_name, &[])
-                {
-                    // We need to check that init_module function we found is well-formed.
-                    verifier::module_init::verify_module_init_function(module)
-                        .map_err(|err| err.finish(Location::Undefined))?;
-
-                    session.execute_loaded_function(
-                        init_func,
-                        vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
+                dispatch_loader!(&staging_module_storage, loader, {
+                    if let Ok(init_func) = loader.load_instantiated_function(
+                        &LegacyLoaderConfig::noop(),
                         gas_meter,
                         traversal_context,
-                        &staging_module_storage,
-                    )?;
-                }
+                        &module.self_id(),
+                        init_func_name,
+                        &[],
+                    ) {
+                        // We need to check that init_module function we found is well-formed.
+                        verifier::module_init::verify_module_init_function(module)
+                            .map_err(|err| err.finish(Location::Undefined))?;
+
+                        session.execute_loaded_function(
+                            init_func,
+                            vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
+                            gas_meter,
+                            traversal_context,
+                            &loader,
+                        )?;
+                    }
+                });
                 Ok::<_, VMStatus>(())
             })?;
         }

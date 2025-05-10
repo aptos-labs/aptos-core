@@ -2813,7 +2813,6 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
- "claims",
  "goldenfile",
  "move-binary-format",
  "move-command-line-common",
@@ -12545,6 +12544,7 @@ dependencies = [
  "move-vm-types",
  "smallvec",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
