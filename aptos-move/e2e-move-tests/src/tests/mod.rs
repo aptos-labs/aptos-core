@@ -18,6 +18,7 @@ mod enum_upgrade;
 mod enum_variant_count;
 mod error_map;
 mod fee_payer;
+mod friends;
 mod function_values;
 mod fungible_asset;
 mod gas;

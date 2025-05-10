@@ -2,9 +2,9 @@ processed 5 tasks
 
 task 4 'run'. lines 34-34:
 Error: Function execution failed with VMError: {
-    major_status: UNEXPECTED_VERIFIER_ERROR,
+    major_status: FUNCTION_RESOLUTION_FAILURE,
     sub_status: None,
-    location: 0x42::N,
-    indices: [(FunctionHandle, 1)],
+    location: undefined,
+    indices: [],
     offsets: [],
 }
