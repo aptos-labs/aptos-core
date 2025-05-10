@@ -106,22 +106,10 @@ impl Block {
         self.block_data.payload()
     }
 
-    pub fn payload_size(&self) -> usize {
-        match self.block_data.payload() {
-            None => 0,
-            Some(payload) => match payload {
-                Payload::InQuorumStore(pos) => pos.proofs.len(),
-                Payload::DirectMempool(_txns) => 0,
-                Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
-                | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
-                    inline_batches.len() + proof_with_data.proofs.len()
-                },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.num_txns()
-                },
-            },
-        }
+    pub fn num_batches(&self) -> usize {
+        self.block_data
+            .payload()
+            .map_or(0, |payload| payload.num_batches())
     }
 
     pub fn quorum_cert(&self) -> &QuorumCert {

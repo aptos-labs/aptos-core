@@ -17,7 +17,7 @@ use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -77,19 +77,6 @@ fn assert_payload_response(
     expected_block_gas_limit: Option<u64>,
 ) {
     match payload {
-        Payload::InQuorumStore(proofs) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof));
-            }
-        },
-        Payload::InQuorumStoreWithLimit(proofs) => {
-            assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
-            for proof in proofs.proof_with_data.proofs {
-                assert!(expected.contains(&proof));
-            }
-            assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
-        },
         Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
             assert_eq!(proofs.proofs.len(), expected.len());
             for proof in proofs.proofs {
@@ -148,7 +135,7 @@ async fn test_max_txns_from_block_to_execute() {
     let max_txns_from_block_to_execute = 10;
     let block_gas_limit = 10_000;
     assert_payload_response(
-        payload.transform_to_quorum_store_v2(
+        payload.transform_to_payload_with_limits(
             Some(max_txns_from_block_to_execute),
             Some(block_gas_limit),
         ),
