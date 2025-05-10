@@ -4,6 +4,8 @@ xclippy = [
   "--workspace",
   "--all-targets",
   "--",
+  "--check-cfg=cfg(fuzzing)",
+  "-Wunexpected_cfgs",
   "-Dwarnings",
   "-Wclippy::all", # TODO: at some point we need to clean up all the exceptions listed below
   "-Aclippy::upper_case_acronyms",
