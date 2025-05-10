@@ -3,12 +3,17 @@
 
 use crate::{
     config::VMConfig,
-    storage::{loader::traits::StructDefinitionLoader, ty_tag_converter::TypeTagConverter},
+    storage::{
+        loader::traits::{ModuleMetadataLoader, StructDefinitionLoader},
+        ty_tag_converter::TypeTagConverter,
+    },
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     function::MoveFunctionLayout,
     identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    metadata::Metadata,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -16,7 +21,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{
-        runtime_types::{StructIdentifier, StructLayout, Type},
+        runtime_types::{StructIdentifier, StructLayout, Type, TypeBuilder},
         struct_name_indexing::StructNameIndex,
     },
 };
@@ -50,18 +55,21 @@ impl LayoutWithDelayedFields {
 /// Converts runtime types to type layouts. The layout construction may load modules, and so, the
 /// functions may also charge gas.
 pub(crate) struct LayoutConverter<'a, T> {
-    struct_definition_loader: &'a T,
+    loader: &'a T,
 }
 
 impl<'a, T> LayoutConverter<'a, T>
 where
     T: StructDefinitionLoader,
 {
-    /// Creates a new layout converter with access to struct definition loader.
-    pub(crate) fn new(struct_definition_loader: &'a T) -> Self {
-        Self {
-            struct_definition_loader,
-        }
+    /// Creates a new layout converter with access to loader.
+    pub(crate) fn new(loader: &'a T) -> Self {
+        Self { loader }
+    }
+
+    /// Returns the type builder used by the loader.
+    pub(crate) fn ty_builder(&self) -> &TypeBuilder {
+        &self.loader.runtime_environment().vm_config().ty_builder
     }
 
     /// Returns the layout of a type, as well as a flag if it contains delayed fields or not.
@@ -107,16 +115,36 @@ where
         )
     }
 
+    /// Ensures that the modules used for layout construction of a type are loaded and metered. As
+    /// a result, any native call that uses type argument to construct the layout does not need to
+    /// charge gas for it.
+    pub(crate) fn ensure_modules_loaded_for_layout_construction_in_native_context(
+        &self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut impl ModuleTraversalContext,
+        ty_args: &[Type],
+    ) -> PartialVMResult<()> {
+        if self.loader.is_lazy_loading_enabled() {
+            for ty in ty_args {
+                // TODO(lazy-loading):
+                //   This works, but we can optimize it to also cache layouts to avoid constructing
+                //   them again in native context. Note that we have to be careful because with
+                //   function values layouts may be outdated, so caching them is not possible
+                //   sometimes.
+                self.type_to_type_layout(gas_meter, traversal_context, ty)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Returns the VM config used in the system.
     fn vm_config(&self) -> &VMConfig {
-        self.struct_definition_loader
-            .runtime_environment()
-            .vm_config()
+        self.loader.runtime_environment().vm_config()
     }
 
     /// Returns the struct name for the specified index.
     fn get_struct_name(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructIdentifier>> {
-        self.struct_definition_loader
+        self.loader
             .runtime_environment()
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)
@@ -323,17 +351,14 @@ where
         use MoveTypeLayout as L;
 
         let apply_subst = |tys: &[(Identifier, Type)]| {
-            let ty_builder = &self.vm_config().ty_builder;
             tys.iter()
-                .map(|(_, ty)| ty_builder.create_ty_with_subst(ty, ty_args))
+                .map(|(_, ty)| self.ty_builder().create_ty_with_subst(ty, ty_args))
                 .collect::<PartialVMResult<Vec<_>>>()
         };
 
-        let struct_definition = self.struct_definition_loader.load_struct_definition(
-            gas_meter,
-            traversal_context,
-            idx,
-        )?;
+        let struct_definition =
+            self.loader
+                .load_struct_definition(gas_meter, traversal_context, idx)?;
 
         let result = match &struct_definition.layout {
             // For enums, construct layouts for all possible variants. No special handling for
@@ -384,9 +409,8 @@ where
                     (None, fields_contain_delayed_fields) => {
                         let struct_layout = L::Struct(
                             if ANNOTATED {
-                                let ty_tag_converter = TypeTagConverter::new(
-                                    self.struct_definition_loader.runtime_environment(),
-                                );
+                                let ty_tag_converter =
+                                    TypeTagConverter::new(self.loader.runtime_environment());
                                 let struct_tag =
                                     ty_tag_converter.struct_name_idx_to_struct_tag(idx, ty_args)?;
                                 let field_layouts = fields
@@ -449,6 +473,60 @@ where
         };
 
         Ok(result)
+    }
+}
+
+/// Aggregated information about a resource type: its tag, layout and metadata of the module where
+/// it is defined.
+pub(crate) struct LoadedTypeInfo {
+    struct_tag: StructTag,
+    layout_with_delayed_fields: LayoutWithDelayedFields,
+    metadata: Vec<Metadata>,
+}
+
+impl LoadedTypeInfo {
+    /// Returns the contents of the aggregated type info.
+    pub(crate) fn unpack(self) -> (StructTag, LayoutWithDelayedFields, Vec<Metadata>) {
+        (
+            self.struct_tag,
+            self.layout_with_delayed_fields,
+            self.metadata,
+        )
+    }
+}
+
+impl<'a, T> LayoutConverter<'a, T>
+where
+    T: StructDefinitionLoader + ModuleMetadataLoader,
+{
+    /// Loads type information, also charging gas for layout construction and for fetching the
+    /// module metadata.
+    /// The provided type must correspond to a resource type (struct / enum).
+    pub(crate) fn load_type_info(
+        &self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut impl ModuleTraversalContext,
+        ty: &Type,
+    ) -> PartialVMResult<LoadedTypeInfo> {
+        let struct_tag = match self.loader.runtime_environment().ty_to_ty_tag(ty)? {
+            TypeTag::Struct(struct_tag) => *struct_tag,
+            _ => {
+                // Since every resource is a struct, the tag must be also a struct tag.
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+            },
+        };
+        let layout_with_delayed_fields =
+            self.type_to_type_layout_with_delayed_field_check(gas_meter, traversal_context, ty)?;
+        let metadata = self.loader.load_module_metadata(
+            gas_meter,
+            traversal_context,
+            &struct_tag.module_id(),
+        )?;
+        Ok(LoadedTypeInfo {
+            struct_tag,
+            layout_with_delayed_fields,
+            metadata,
+        })
     }
 }
 

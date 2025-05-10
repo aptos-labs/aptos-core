@@ -10,10 +10,12 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, ModuleStorage,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, InstantiatedFunctionLoader,
+    LegacyLoaderConfig, ModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
@@ -88,19 +90,30 @@ fn execute_function_for_test(
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<SerializedReturnValues> {
+    let mut gas_meter = UnmeteredGasMeter;
     let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-    let func = module_storage.load_function(module_id, function_name, ty_args)?;
-    MoveVM::execute_loaded_function(
-        func,
-        args,
-        &mut TransactionDataCache::empty(),
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
-        &mut NativeContextExtensions::default(),
-        module_storage,
-        data_storage,
-    )
+    dispatch_loader!(module_storage, loader, {
+        let func = loader.load_instantiated_function(
+            &LegacyLoaderConfig::noop(),
+            &mut gas_meter,
+            &mut traversal_context,
+            module_id,
+            function_name,
+            ty_args,
+        )?;
+        MoveVM::execute_loaded_function(
+            func,
+            args,
+            &mut TransactionDataCache::empty(),
+            &mut gas_meter,
+            &mut traversal_context,
+            &mut NativeContextExtensions::default(),
+            &loader,
+            data_storage,
+        )
+    })
 }
 
 fn execute_script_impl(
@@ -116,16 +129,19 @@ fn execute_script_impl(
     let function = code_storage.load_script(script, ty_args)?;
     let mut data_cache = TransactionDataCache::empty();
 
-    MoveVM::execute_loaded_function(
-        function,
-        args,
-        &mut data_cache,
-        &mut UnmeteredGasMeter,
-        &mut traversal_context,
-        &mut NativeContextExtensions::default(),
-        &code_storage,
-        storage,
-    )?;
+    dispatch_loader!(&code_storage, loader, {
+        MoveVM::execute_loaded_function(
+            function,
+            args,
+            &mut data_cache,
+            &mut UnmeteredGasMeter,
+            &mut traversal_context,
+            &mut NativeContextExtensions::default(),
+            &loader,
+            storage,
+        )
+    })?;
+
     let change_set = data_cache
         .into_effects(&code_storage, &traversal_context)
         .map_err(|err| err.finish(Location::Undefined))?;

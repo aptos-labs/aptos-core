@@ -160,18 +160,25 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
         Ok(if !self.data_store.contains_resource(&address, ty) {
+            // Create a loader for this native call. Even with lazy loading, the invariant is that
+            // on call to native - all modules must have been loaded.
             let loader = NativeLoader::new(self.module_storage);
-            let layout_converter = LayoutConverter::new(&loader);
-            let (entry, bytes_loaded) = TransactionDataCache::load_resource(
-                &layout_converter,
-                // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
-                // be visited.
+
+            // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
+            // be visited.
+            let mut ctx = UnvisitableModuleTraversalContext::new(self.traversal_context);
+            let loaded_data = LayoutConverter::new(&loader).load_type_info(
                 &mut UnmeteredGasMeter,
-                &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
-                self.module_storage,
+                &mut ctx,
+                ty,
+            )?;
+
+            let (entry, bytes_loaded) = TransactionDataCache::load_resource(
+                loaded_data,
+                &ctx,
+                &self.function_value_extension(),
                 self.resource_resolver,
                 &address,
-                ty,
             )?;
             let exists = entry.value().exists()?;
             self.data_store
