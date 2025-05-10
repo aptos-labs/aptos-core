@@ -94,10 +94,10 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, is_taker_long, _price, size| {
+            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size| { validate_settlement_update() },
+            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
             |_user_addr, _is_buy, orig_size, _metadata| {
                 max_settlement_size<TestOrderMetadata>(orig_size)
             }

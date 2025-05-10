@@ -13,9 +13,9 @@ module aptos_experimental::market_types {
 
     struct MarketClearinghouseCallbacks<M: store + copy + drop> has drop {
         // settle_trade_f arguments: taker, maker, is_taker_long, price, size
-        settle_trade_f: |address, address, bool, u64, u64| SettleTradeResult has drop + copy,
+        settle_trade_f:  |address, address, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: account, is_taker, is_long, price, size
-        validate_settlement_update_f: |address, bool, bool, u64, u64| bool has drop + copy,
+        validate_settlement_update_f: |address, bool, bool, u64, u64, M| bool has drop + copy,
         // max_settlement_size_for_reduce_only_f arguments: account, is_long, orig_size
         max_settlement_size_f: |address, bool, u64, M| Option<u64> has drop + copy,
     }
@@ -34,9 +34,9 @@ module aptos_experimental::market_types {
 
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop>(
         // settle_trade_f arguments: taker, maker, is_taker_long, price, size
-        settle_trade_f: |address, address, bool, u64, u64| SettleTradeResult has drop + copy,
+        settle_trade_f: |address, address, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: accoun, is_taker, is_long, price, size
-        validate_settlement_update_f: |address, bool, bool, u64, u64| bool has drop + copy,
+        validate_settlement_update_f: |address, bool, bool, u64, u64, M| bool has drop + copy,
         // max_settlement_size_for_reduce_only_f arguments: account, is_long, orig_size
         max_settlement_size: |address, bool, u64, M| Option<u64> has drop + copy,
     ): MarketClearinghouseCallbacks<M> {
@@ -59,12 +59,12 @@ module aptos_experimental::market_types {
         self.taker_cancellation_reason
     }
 
-    public fun settle_trade<M: store + copy + drop>(self: &MarketClearinghouseCallbacks<M>, taker: address, maker: address, is_taker_long: bool, price: u64, size: u64): SettleTradeResult {
-        (self.settle_trade_f)(taker, maker, is_taker_long, price, size)
+    public fun settle_trade<M: store + copy + drop>(self: &MarketClearinghouseCallbacks<M>, taker: address, maker: address, is_taker_long: bool, price: u64, size: u64, taker_metadata: M, maker_metadata: M): SettleTradeResult {
+        (self.settle_trade_f)(taker, maker, is_taker_long, price, size, taker_metadata, maker_metadata)
     }
 
-    public fun validate_settlement_update<M: store + copy + drop>(self: &MarketClearinghouseCallbacks<M>, account: address, is_taker: bool, is_long: bool, price: u64, size: u64): bool {
-        (self.validate_settlement_update_f)(account, is_taker, is_long, price, size)
+    public fun validate_settlement_update<M: store + copy + drop>(self: &MarketClearinghouseCallbacks<M>, account: address, is_taker: bool, is_long: bool, price: u64, size: u64, order_metadata: M): bool {
+        (self.validate_settlement_update_f)(account, is_taker, is_long, price, size, order_metadata)
     }
 
     public fun max_settlement_size<M: store + copy + drop>(self: &MarketClearinghouseCallbacks<M>, account: address, is_long: bool, orig_size: u64, metadata: M): Option<u64> {
