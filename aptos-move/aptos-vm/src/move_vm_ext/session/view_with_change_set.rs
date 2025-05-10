@@ -231,6 +231,62 @@ impl TResourceView for ExecutorViewWithChangeSet<'_> {
                 .get_resource_state_value_metadata(state_key),
         }
     }
+
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+        match self.change_set.resource_write_set().get(state_key) {
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(write_op.bytes_size() as u64),
+            // We could either return from the read, or do the base read again.
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) | None => self
+                .base_executor_view
+                .get_resource_state_value_size(state_key),
+            Some(AbstractResourceWriteOp::WriteResourceGroup(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
+                // In case this is a resource group, and feature is enabled that creates these ops,
+                // this should never be called.
+                // Call to metadata should go through get_resource_state_value_metadata(), and
+                // calls to individual tagged resources should go through their trait.
+                Err(code_invariant_error(format!(
+                    "get_resource_state_value_size called for resource group with key {:?}",
+                    state_key
+                ))
+                .into())
+            },
+        }
+    }
+
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        match self.change_set.resource_write_set().get(state_key) {
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(write_op.bytes().is_some()),
+            // We could either return from the read, or do the base read again.
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) | None => {
+                self.base_executor_view.resource_exists(state_key)
+            },
+            Some(AbstractResourceWriteOp::WriteResourceGroup(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
+                // In case this is a resource group, and feature is enabled that creates these ops,
+                // this should never be called.
+                // Call to metadata should go through get_resource_state_value_metadata(), and
+                // calls to individual tagged resources should go through their trait.
+                Err(code_invariant_error(format!(
+                    "resource_exists called for resource group with key {:?}",
+                    state_key
+                ))
+                .into())
+            },
+        }
+    }
 }
 
 impl TResourceGroupView for ExecutorViewWithChangeSet<'_> {
@@ -245,20 +301,20 @@ impl TResourceGroupView for ExecutorViewWithChangeSet<'_> {
         use AbstractResourceWriteOp::*;
 
         if let Some(size) = self
-        .change_set
-        .resource_write_set()
-        .get(group_key)
-        .and_then(|write| match write {
-            WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
-            ResourceGroupInPlaceDelayedFieldChange(_) => None,
-            Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                // There should be no collisions, we cannot have group key refer to a resource.
-                Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
-            },
-        })
-        .transpose()? {
-            return Ok(size);
-        }
+            .change_set
+            .resource_write_set()
+            .get(group_key)
+            .and_then(|write| match write {
+                WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    // There should be no collisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
+                },
+            })
+            .transpose()? {
+                return Ok(size);
+            }
 
         self.base_resource_group_view.resource_group_size(group_key)
     }
@@ -293,6 +349,68 @@ impl TResourceGroupView for ExecutorViewWithChangeSet<'_> {
                 group_key,
                 resource_tag,
                 maybe_layout,
+            )
+        }
+    }
+
+    fn resource_size_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> PartialVMResult<usize> {
+        use AbstractResourceWriteOp::*;
+
+        if let Some((write_op, _)) = self
+            .change_set
+            .resource_write_set()
+            .get(group_key)
+            .and_then(|write| match write {
+                WriteResourceGroup(group_write) => Some(Ok(group_write)),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    // There should be no collisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in resource_size_in_group call for key {group_key:?}"))))
+                },
+            })
+            .transpose()?
+            .and_then(|g| g.inner_ops().get(resource_tag))
+        {
+            Ok(write_op.bytes_size())
+        } else {
+            self.base_resource_group_view.resource_size_in_group(
+                group_key,
+                resource_tag,
+            )
+        }
+    }
+
+    fn resource_exists_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> PartialVMResult<bool> {
+        use AbstractResourceWriteOp::*;
+
+        if let Some((write_op, _)) = self
+            .change_set
+            .resource_write_set()
+            .get(group_key)
+            .and_then(|write| match write {
+                WriteResourceGroup(group_write) => Some(Ok(group_write)),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None,
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    // There should be no collisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in resource_exists_in_group call for key {group_key:?}"))))
+                },
+            })
+            .transpose()?
+            .and_then(|g| g.inner_ops().get(resource_tag))
+        {
+            Ok(write_op.bytes().is_some())
+        } else {
+            self.base_resource_group_view.resource_exists_in_group(
+                group_key,
+                resource_tag,
             )
         }
     }
