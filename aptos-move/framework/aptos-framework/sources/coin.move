@@ -105,7 +105,7 @@ module aptos_framework::coin {
     /// The coin converison map is not created yet.
     const ECOIN_CONVERSION_MAP_NOT_FOUND: u64 = 27;
 
-    /// APT pairing is not eanbled yet.
+    /// APT pairing is not enabled yet.
     const EAPT_PAIRING_IS_NOT_ENABLED: u64 = 28;
 
     //
