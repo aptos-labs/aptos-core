@@ -24,12 +24,12 @@ pub struct AdapterLogSchema {
     base_version: Option<Version>,
 
     // transaction position in the list of transactions in the block,
-    // 0 if the transaction is not part of a block (i.e. validation).
-    txn_idx: usize,
+    // None if the transaction is not part of a block (i.e. validation).
+    txn_idx: Option<u32>,
 }
 
 impl AdapterLogSchema {
-    pub fn new(view_id: StateViewId, txn_idx: usize) -> Self {
+    pub fn new(view_id: StateViewId, txn_idx: Option<u32>) -> Self {
         match view_id {
             StateViewId::BlockExecution { block_id } => Self {
                 name: LogEntry::Execution,
@@ -43,21 +43,21 @@ impl AdapterLogSchema {
                 block_id: None,
                 first_version: Some(first_version),
                 base_version: None,
-                txn_idx,
+                txn_idx: None,
             },
             StateViewId::TransactionValidation { base_version } => Self {
                 name: LogEntry::Validation,
                 block_id: None,
                 first_version: None,
                 base_version: Some(base_version),
-                txn_idx,
+                txn_idx: None,
             },
             StateViewId::Replay => Self {
                 name: LogEntry::Execution,
                 block_id: None,
                 first_version: None,
                 base_version: None,
-                txn_idx,
+                txn_idx: None,
             },
             StateViewId::Miscellaneous => Self {
                 name: LogEntry::Miscellaneous,
@@ -75,7 +75,7 @@ impl AdapterLogSchema {
         matches!(self.name, LogEntry::Execution)
     }
 
-    pub(crate) fn get_txn_idx(&self) -> usize {
+    pub fn get_txn_idx(&self) -> Option<u32> {
         self.txn_idx
     }
 }

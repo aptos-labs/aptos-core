@@ -138,6 +138,7 @@ pub enum FeatureFlag {
     JWK_CONSENSUS_PER_KEY_MODE = 92,
     TRANSACTION_PAYLOAD_V2 = 93,
     ORDERLESS_TRANSACTIONS = 94,
+    MONOTONICALLY_INCREASING_COUNTER = 96,
 }
 
 impl FeatureFlag {
@@ -233,6 +234,7 @@ impl FeatureFlag {
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
             FeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::ORDERLESS_TRANSACTIONS,
+            FeatureFlag::MONOTONICALLY_INCREASING_COUNTER,
         ]
     }
 }

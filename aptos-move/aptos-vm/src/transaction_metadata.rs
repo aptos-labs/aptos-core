@@ -8,10 +8,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
-        EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction,
-        TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
-        TransactionPayload, TransactionPayloadInner,
+        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext, BlockchainGeneratedInfo, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig, TransactionPayload, TransactionPayloadInner
     },
 };
 
@@ -35,10 +32,12 @@ pub struct TransactionMetadata {
     pub is_keyless: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
+    // Index of the transaction in the block.
+    pub transaction_index: u32,
 }
 
 impl TransactionMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &SignedTransaction, blockchain_generated_info: BlockchainGeneratedInfo) -> Self {
         Self {
             sender: txn.sender(),
             authentication_proof: txn.authenticator().sender().authentication_proof(),
@@ -107,6 +106,7 @@ impl TransactionMetadata {
                 }),
                 _ => None,
             },
+            transaction_index: blockchain_generated_info.transaction_index(),
         }
     }
 
@@ -201,6 +201,11 @@ impl TransactionMetadata {
                 .map(|entry_func| entry_func.as_entry_function_payload()),
             self.multisig_payload()
                 .map(|multisig| multisig.as_multisig_payload()),
+            self.transaction_index,
         )
+    }
+
+    pub fn transaction_index(&self) -> u32 {
+        self.transaction_index
     }
 }
