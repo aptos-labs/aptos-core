@@ -12,6 +12,7 @@ use aptos_native_interface::{
     safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
     SafeNativeError, SafeNativeResult,
 };
+use better_any::{Tid, TidAble};
 use bulletproofs::{BulletproofGens, PedersenGens};
 #[cfg(feature = "testing")]
 use byteorder::{ByteOrder, LittleEndian};
@@ -47,6 +48,9 @@ pub mod abort_codes {
     /// Abort code when the vector lengths of values and blinding factors do not match.
     /// NOTE: This must match the code in the Move implementation
     pub const NFE_VECTOR_LENGTHS_MISMATCH: u64 = 0x01_0005;
+
+    /// Abort code when configured restriction of invoking `native_verify_range_proof` is violated.
+    pub const NFE_INVOCATION_RESTRICTED: u64 = 0x03_0008;
 }
 
 /// The Bulletproofs library only seems to support proving [0, 2^{num_bits}) ranges where num_bits is
@@ -111,6 +115,13 @@ fn native_verify_batch_range_proof(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 6);
+
+    let ctx = context.extensions().get::<BulletproofContext>();
+    if ctx.verify_batch_restricted && !ctx.called_from_system_entry_function {
+        return Err(SafeNativeError::Abort {
+            abort_code: abort_codes::NFE_INVOCATION_RESTRICTED,
+        });
+    }
 
     let dst = safely_pop_arg!(args, Vec<u8>);
     let num_bits = safely_pop_arg!(args, u64) as usize;
@@ -448,4 +459,21 @@ pub fn make_all(
     ]);
 
     builder.make_named_natives(natives)
+}
+
+#[derive(Tid, Default)]
+pub struct BulletproofContext {
+    /// If true, `verify_batch_range_proof_internal` is only allowed
+    /// in transactions that calls a system entry function (module address in 0x0 - 0xa).
+    verify_batch_restricted: bool,
+    pub called_from_system_entry_function: bool,
+}
+
+impl BulletproofContext {
+    pub fn new(verify_batch_restricted: bool) -> Self {
+        Self {
+            verify_batch_restricted,
+            called_from_system_entry_function: false,
+        }
+    }
 }

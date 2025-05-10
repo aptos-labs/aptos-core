@@ -10,7 +10,10 @@ use crate::{
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
-    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    cryptography::{
+        algebra::AlgebraContext, bulletproofs::BulletproofContext,
+        ristretto255_point::NativeRistrettoPointContext,
+    },
     event::NativeEventContext,
     object::NativeObjectContext,
     randomness::RandomnessContext,
@@ -19,9 +22,12 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
+    chain_id::ChainId,
+    contract_event::ContractEvent,
+    on_chain_config::{FeatureFlag, Features},
     state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
+    transaction::user_transaction_context::UserTransactionContext,
+    write_set::WriteOp,
 };
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
@@ -98,6 +104,9 @@ where
             resolver,
         ));
         extensions.add(RandomnessContext::new());
+        extensions.add(BulletproofContext::new(
+            !features.is_enabled(FeatureFlag::UNRESTRICTED_BULLETPROOFS_BATCH_NATIVES),
+        ));
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
             session_id.into_script_hash(),
@@ -286,6 +295,11 @@ where
     pub(crate) fn mark_unbiasable(&mut self) {
         let txn_context = self.extensions.get_mut::<RandomnessContext>();
         txn_context.mark_unbiasable();
+    }
+
+    pub(crate) fn mark_system_entry_function(&mut self) {
+        let ctx = self.extensions.get_mut::<BulletproofContext>();
+        ctx.called_from_system_entry_function = true;
     }
 
     fn populate_v0_resource_group_change_set(

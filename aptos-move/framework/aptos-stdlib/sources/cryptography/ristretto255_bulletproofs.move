@@ -45,6 +45,10 @@ module aptos_std::ristretto255_bulletproofs {
     /// The native functions have not been rolled out yet.
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 7;
 
+    /// A `ristretto255_bulletproofs` function is only allowed to run in transactions that call a system module entry function
+    /// (e.g., `0x7::confidential_asset::confidential_transfer`).
+    const E_INVOCATION_RESTRICTED: u64 = 8;
+
     //
     // Structs
     //
