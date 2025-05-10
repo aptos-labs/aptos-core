@@ -206,7 +206,7 @@ This handle is storable and thus should be treated very carefully as it serves s
 as signer delegation.
 
 
-<pre><code>enum <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> <b>has</b> store
+<pre><code>enum <a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">StorablePermissionedHandle</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 

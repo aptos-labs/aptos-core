@@ -80,6 +80,7 @@ pub enum TransactionTypeArg {
     SimpleScript,
     APTTransferWithPermissionedSigner,
     APTTransferWithMasterSigner,
+    ScheduleTxnInsert,
     /// Basic market where sell and buy prices are in distinct ranges,
     /// and there are no matches.
     OrderBookNoMatches,
@@ -371,6 +372,9 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::APTTransferWithMasterSigner => {
                 call_custom_module(EntryPoints::APTTransferWithMasterSigner)
+            },
+            TransactionTypeArg::ScheduleTxnInsert => {
+                call_custom_module(EntryPoints::ScheduleTxnInsert)
             },
             TransactionTypeArg::OrderBookNoMatches => call_custom_module(EntryPoints::OrderBook {
                 state: OrderBookState::new(),

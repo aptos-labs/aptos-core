@@ -66,6 +66,7 @@ mod transaction_shuffler;
 #[cfg(feature = "fuzzing")]
 pub use transaction_shuffler::transaction_shuffler_fuzzing;
 mod txn_hash_and_authenticator_deduper;
+mod scheduled_txns_handler;
 
 use aptos_metrics_core::IntGauge;
 pub use consensusdb::create_checkpoint;
