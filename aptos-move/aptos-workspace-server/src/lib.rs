@@ -24,7 +24,7 @@
 //!       cleaning up resources like Docker containers, volumes and networks.
 
 mod common;
-mod services;
+pub mod services;
 
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::docker::get_docker;
