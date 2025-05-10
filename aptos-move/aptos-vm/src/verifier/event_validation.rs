@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm::module_metadata::{get_metadata_from_compiled_code, RuntimeModuleMetadataV1};
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+use aptos_types::{
+    on_chain_config::Features,
+    vm::module_metadata::{get_metadata_from_compiled_code, RuntimeModuleMetadataV1},
+};
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{Location, PartialVMError, VMError, VMResult},
@@ -12,9 +14,8 @@ use move_binary_format::{
     },
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, language_storage::ModuleId, vm_status::StatusCode,
-};
+use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage};
 use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
@@ -34,25 +35,35 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Extract the event metadata
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
 pub(crate) fn validate_module_events(
-    module_storage: &impl AptosModuleStorage,
-    modules: &[CompiledModule],
+    _features: &Features,
+    _gas_feature_version: u64,
+    module_storage: &impl ModuleStorage,
+    // TODO(lazy-loading): add a check that the old module has been visited.
+    _traversal_context: &TraversalContext,
+    new_modules: &[CompiledModule],
 ) -> VMResult<()> {
-    for module in modules {
-        let mut new_event_structs = get_metadata_from_compiled_code(module).map_or_else(
+    for new_module in new_modules {
+        let mut new_event_structs = get_metadata_from_compiled_code(new_module).map_or_else(
             || Ok(HashSet::new()),
             |metadata| extract_event_metadata(&metadata),
         )?;
 
         // Check all the emit calls have the correct struct with event attribute.
-        validate_emit_calls(&new_event_structs, module)?;
+        validate_emit_calls(&new_event_structs, new_module)?;
 
-        let original_event_structs =
-            extract_event_metadata_from_module(module_storage, &module.self_id())?;
-
-        for member in original_event_structs {
-            // Fail if we see a removal of an event attribute.
-            if !new_event_structs.remove(&member) {
-                metadata_validation_err("Invalid change in event attributes")?;
+        let old_module_metadata_if_exists = module_storage
+            .fetch_deserialized_module(new_module.address(), new_module.name())?
+            .and_then(|module| {
+                // TODO(loader_v2): We can optimize this to fetch metadata directly.
+                get_metadata_from_compiled_code(module.as_ref())
+            });
+        if let Some(metadata) = old_module_metadata_if_exists {
+            let original_event_structs = extract_event_metadata(&metadata)?;
+            for member in original_event_structs {
+                // Fail if we see a removal of an event attribute.
+                if !new_event_structs.remove(&member) {
+                    metadata_validation_err("Invalid change in event attributes")?;
+                }
             }
         }
     }
@@ -111,22 +122,6 @@ pub(crate) fn validate_emit_calls(
         }
     }
     Ok(())
-}
-
-/// Given a module id extract all event metadata
-pub(crate) fn extract_event_metadata_from_module(
-    module_storage: &impl AptosModuleStorage,
-    module_id: &ModuleId,
-) -> VMResult<HashSet<String>> {
-    // TODO(loader_v2): We can optimize metadata calls as well.
-    let metadata = module_storage
-        .fetch_deserialized_module(module_id.address(), module_id.name())?
-        .map(|module| get_metadata_from_compiled_code(module.as_ref()));
-    if let Some(Some(metadata)) = metadata {
-        extract_event_metadata(&metadata)
-    } else {
-        Ok(HashSet::new())
-    }
 }
 
 /// Given a module id extract all event metadata

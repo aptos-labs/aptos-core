@@ -104,19 +104,15 @@ impl<'r> UserSession<'r> {
 
             self.session.execute(|session| {
                 let module_id = module.self_id();
-                let init_function_exists = staging_module_storage
-                    .load_function(&module_id, init_func_name, &[])
-                    .is_ok();
-
-                if init_function_exists {
+                if let Ok(init_func) =
+                    staging_module_storage.load_function(&module_id, init_func_name, &[])
+                {
                     // We need to check that init_module function we found is well-formed.
                     verifier::module_init::verify_module_init_function(module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
+                        .map_err(|err| err.finish(Location::Undefined))?;
 
-                    session.execute_function_bypass_visibility(
-                        &module_id,
-                        init_func_name,
-                        vec![],
+                    session.execute_loaded_function(
+                        init_func,
                         vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
                         gas_meter,
                         traversal_context,
