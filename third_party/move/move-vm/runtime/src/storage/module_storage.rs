@@ -4,7 +4,7 @@
 use crate::{
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    storage::{loader::native::NativeLoader, ty_layout_converter::LayoutConverter},
     LoadedFunction, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
@@ -25,11 +25,8 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    gas::{ModuleTraversalContext, UnvisitableModuleTraversalContext},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    gas::{ModuleTraversalContext, UnmeteredGasMeter, UnvisitableModuleTraversalContext},
+    loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -130,9 +127,12 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
-    /// Returns a struct type corresponding to the specified name. The module containing the struct
-    /// will be fetched and cached beforehand.
-    fn fetch_struct_ty(
+    /// Returns a struct definition corresponding to the specified name. The module containing the
+    /// struct will be fetched and cached beforehand. Returns an error if the module or struct do
+    /// not exist.
+    ///
+    /// Note: This API is not metered.
+    fn unmetered_get_struct_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -146,19 +146,6 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .map_err(|err| err.to_partial())
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name_ref(*idx)?;
-
-        self.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
-    }
-
     /// Returns a runtime type corresponding to the specified type tag (file format type
     /// representation). If a struct type is constructed, the module containing the struct
     /// definition is fetched and cached.
@@ -170,7 +157,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .vm_config()
             .ty_builder
             .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
+                self.unmetered_get_struct_definition(
                     &st.address,
                     st.module.as_ident_str(),
                     st.name.as_ident_str(),
@@ -462,7 +449,6 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
             LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
-                let ty_converter = StorageLayoutConverter::new(self.module_storage);
                 let ty_builder = &self
                     .module_storage
                     .runtime_environment()
@@ -475,6 +461,9 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                         ty_builder.create_ty_with_subst(ty, &fun.ty_args)
                     }
                 };
+
+                let loader = NativeLoader::new(self.module_storage);
+                let layout_converter = LayoutConverter::new(&loader);
 
                 // For resolved closures, these layout constructions may access modules. They must
                 // have been already accessed though:
@@ -497,7 +486,17 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()
-                    .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
+                    .map(|t| {
+                        // TODO(georgemitenkov):
+                        //   Double check this is correct and aggregators work with closures.
+                        layout_converter.type_to_type_layout(
+                            // We do not expect gas to be metered here. The only thing that is
+                            // being checked is that all accessed modules have been loaded.
+                            &mut UnmeteredGasMeter,
+                            &mut UnvisitableModuleTraversalContext::new(traversal_context),
+                            &instantiate(t)?,
+                        )
+                    })
                     .collect::<PartialVMResult<Vec<_>>>()?;
 
                 Ok(SerializedFunctionData {

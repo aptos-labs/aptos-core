@@ -21,7 +21,7 @@ use crate::{
     },
     storage::{
         dependencies_gas_charging::check_dependencies_and_charge_gas, loader::traits::Loader,
-        ty_depth_checker::TypeDepthChecker,
+        ty_depth_checker::TypeDepthChecker, ty_layout_converter::LayoutConverter,
     },
     trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
 };
@@ -98,6 +98,8 @@ pub(crate) struct InterpreterImpl<'ctx, T> {
     reentrancy_checker: ReentrancyChecker,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, T>,
+    /// Converts runtime types ([Type]) to layouts for (de)serialization.
+    layout_converter: &'ctx LayoutConverter<'ctx, T>,
 }
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
@@ -114,23 +116,28 @@ impl<'a, 'b> TypeView for TypeWithRuntimeEnvironment<'a, 'b> {
 impl Interpreter {
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
-    pub(crate) fn entrypoint(
+    pub(crate) fn entrypoint<T>(
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
-        ty_depth_checker: &TypeDepthChecker<impl Loader>,
+        ty_depth_checker: &TypeDepthChecker<T>,
+        layout_converter: &LayoutConverter<T>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-    ) -> VMResult<Vec<Value>> {
+    ) -> VMResult<Vec<Value>>
+    where
+        T: Loader,
+    {
         InterpreterImpl::entrypoint(
             function,
             args,
             data_cache,
             module_storage,
             ty_depth_checker,
+            layout_converter,
             resource_resolver,
             gas_meter,
             traversal_context,
@@ -151,6 +158,7 @@ where
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
         ty_depth_checker: &TypeDepthChecker<T>,
+        layout_converter: &LayoutConverter<T>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -163,6 +171,7 @@ where
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
             ty_depth_checker,
+            layout_converter,
         };
 
         let function = Rc::new(function);
@@ -612,7 +621,12 @@ where
                     // Resolve the function. This may lead to loading the code related
                     // to this function.
                     let callee = lazy_function
-                        .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                        .as_resolved::<RTTCheck>(
+                            module_storage,
+                            self.layout_converter,
+                            gas_meter,
+                            traversal_context,
+                        )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     // Charge gas for call and for the parameters. The current APIs
@@ -1126,6 +1140,8 @@ where
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
         let (entry, bytes_loaded) = TransactionDataCache::load_resource(
+            self.layout_converter,
+            gas_meter,
             traversal_context,
             module_storage,
             resource_resolver,

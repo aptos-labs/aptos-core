@@ -151,6 +151,7 @@ pub struct FakeExecutor {
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
     allow_block_executor_fallback: bool,
+    traversal_storage: TraversalStorage,
 }
 
 pub enum GasMeterType {
@@ -220,6 +221,7 @@ impl FakeExecutor {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            traversal_storage: TraversalStorage::new(),
         };
         executor.apply_write_set(write_set);
         executor
@@ -244,6 +246,7 @@ impl FakeExecutor {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            traversal_storage: TraversalStorage::new(),
         };
         executor.apply_write_set(write_set);
         executor
@@ -288,6 +291,7 @@ impl FakeExecutor {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            traversal_storage: TraversalStorage::new(),
         }
     }
 
@@ -387,6 +391,7 @@ impl FakeExecutor {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            traversal_storage: TraversalStorage::new(),
         }
     }
 
@@ -589,6 +594,10 @@ impl FakeExecutor {
                     .unwrap();
             }
         }
+    }
+
+    pub fn traversal_context(&self) -> TraversalContext {
+        TraversalContext::new(&self.traversal_storage)
     }
 
     /// Adds a module to this executor's data store.
@@ -1307,7 +1316,6 @@ impl FakeExecutor {
             let resolver = self.state_store.as_move_resolver();
             let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let traversal_storage = TraversalStorage::new();
