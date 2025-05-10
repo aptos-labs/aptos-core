@@ -6,10 +6,8 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use serde::Serialize;
 
-pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
-
 /// Dynamic config options for the Move VM.
-#[derive(Clone, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct VMConfig {
     pub verifier_config: VerifierConfig,
     pub deserializer_config: DeserializerConfig,
@@ -39,7 +37,7 @@ impl Default for VMConfig {
             deserializer_config: DeserializerConfig::default(),
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
-            max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
+            max_value_nest_depth: Some(128),
             layout_max_size: 256,
             layout_max_depth: 128,
             type_max_cost: 0,

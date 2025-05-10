@@ -118,10 +118,7 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            experiments: vec![],
-        }
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![])
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -215,6 +212,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     TestRunConfig::CompilerV2 {
                         language_version,
                         experiments,
+                        vm_config: _,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -286,6 +284,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     TestRunConfig::CompilerV2 {
                         language_version,
                         experiments: v2_experiments,
+                        vm_config: _,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
