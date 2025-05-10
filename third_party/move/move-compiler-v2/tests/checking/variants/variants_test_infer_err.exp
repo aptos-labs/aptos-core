@@ -1,0 +1,51 @@
+
+Diagnostics:
+error: expected `S1<u8>` but found a value of type `S1<u16>`
+  ┌─ tests/checking/variants/variants_test_infer_err.move:7:14
+  │
+7 │         s is S1<u16>;
+  │              ^^^^^^^
+
+error: expected variant of enum type but found type `0x815::m::S1<u16>`
+  ┌─ tests/checking/variants/variants_test_infer_err.move:7:14
+  │
+7 │         s is S1<u16>;
+  │              ^^^^^^^
+
+error: expected `S1<u8>` but found a value of type `S2`
+   ┌─ tests/checking/variants/variants_test_infer_err.move:11:14
+   │
+11 │         s is S2;
+   │              ^^
+
+error: expected variant of enum type but found type `0x815::m::S2`
+   ┌─ tests/checking/variants/variants_test_infer_err.move:11:14
+   │
+11 │         s is S2;
+   │              ^^
+
+error: expected 0 type arguments but 1 were provided
+   ┌─ tests/checking/variants/variants_test_infer_err.move:15:14
+   │
+15 │         s is S2<u8>;
+   │              ^^
+
+error: cannot select field `inner` since it has different types in variants of enum `S3<G>`
+   ┌─ tests/checking/variants/variants_test_infer_err.move:21:9
+   │
+21 │         first.inner is One<G>|One<u8>;
+   │         ^^^^^
+   │
+   = field `inner` has type `S1<u8>` in variant `Four` and type `S1<G>` in variant `Three`
+
+error: undeclared struct `m::One`
+   ┌─ tests/checking/variants/variants_test_infer_err.move:21:24
+   │
+21 │         first.inner is One<G>|One<u8>;
+   │                        ^^^
+
+error: undeclared struct `m::One`
+   ┌─ tests/checking/variants/variants_test_infer_err.move:21:31
+   │
+21 │         first.inner is One<G>|One<u8>;
+   │                               ^^^
