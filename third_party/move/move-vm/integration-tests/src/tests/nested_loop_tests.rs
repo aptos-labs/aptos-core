@@ -12,6 +12,7 @@ use move_vm_runtime::{
     config::VMConfig, AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::AlwaysVisitedModuleTraversalContext;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -55,8 +56,12 @@ fn test_publish_module_with_nested_loops() {
         let storage = initialize_storage(2);
 
         let module_storage = storage.as_unsync_module_storage();
-        let result =
-            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
+        let result = StagingModuleStorage::create(
+            &TEST_ADDR,
+            &module_storage,
+            vec![m_blob.clone().into()],
+            &AlwaysVisitedModuleTraversalContext,
+        );
         assert_ok!(result);
     }
 
@@ -65,8 +70,12 @@ fn test_publish_module_with_nested_loops() {
         let storage = initialize_storage(1);
 
         let module_storage = storage.as_unsync_module_storage();
-        let result =
-            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()]);
+        let result = StagingModuleStorage::create(
+            &TEST_ADDR,
+            &module_storage,
+            vec![m_blob.clone().into()],
+            &AlwaysVisitedModuleTraversalContext,
+        );
         assert!(result.is_err());
     }
 }

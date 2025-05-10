@@ -25,8 +25,9 @@ use move_core_types::{
 };
 use move_vm_types::{
     code::ModuleBytesStorage,
+    gas::ModuleTraversalContext,
     loaded_data::runtime_types::{StructType, Type},
-    module_linker_error,
+    module_linker_error, sha3_256,
 };
 use std::{
     collections::{btree_map, BTreeMap},
@@ -52,7 +53,7 @@ impl<K: Ord, V: Clone> IntoIterator for VerifiedModuleBundle<K, V> {
 struct StagingModuleBytesStorage<'a, M> {
     staged_runtime_environment: RuntimeEnvironment,
     // Modules to be published, staged temporarily.
-    staged_module_bytes: BTreeMap<AccountAddress, BTreeMap<Identifier, Bytes>>,
+    staged_modules: BTreeMap<AccountAddress, BTreeMap<Identifier, (Bytes, Arc<CompiledModule>)>>,
     // Underlying ground-truth module storage, used as a raw byte storage.
     module_storage: &'a M,
 }
@@ -69,12 +70,13 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.staged_module_bytes.get(address) {
-            if let Some(bytes) = account_storage.get(module_name) {
+        if let Some(account_storage) = self.staged_modules.get(address) {
+            if let Some((bytes, _)) = account_storage.get(module_name) {
                 return Ok(Some(bytes.clone()));
             }
         }
-        self.module_storage.fetch_module_bytes(address, module_name)
+        self.module_storage
+            .unmetered_get_module_bytes(address, module_name)
     }
 }
 
@@ -98,12 +100,14 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         sender: &AccountAddress,
         existing_module_storage: &'a M,
         module_bundle: Vec<Bytes>,
+        traversal_context: &dyn ModuleTraversalContext,
     ) -> VMResult<Self> {
         Self::create_with_compat_config(
             sender,
             Compatibility::full_check(),
             existing_module_storage,
             module_bundle,
+            traversal_context,
         )
     }
 
@@ -114,6 +118,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         compatibility: Compatibility,
         existing_module_storage: &'a M,
         module_bundle: Vec<Bytes>,
+        traversal_context: &dyn ModuleTraversalContext,
     ) -> VMResult<Self> {
         // Create a new runtime environment, so that it is not shared with the existing one. This
         // is extremely important for correctness of module publishing: we need to make sure that
@@ -126,14 +131,19 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         // that cannot be invalidated by module upgrades using a shared pointer, so it is not a
         // deep copy. See implementation of Clone for this struct for more details.
         let staged_runtime_environment = existing_module_storage.runtime_environment().clone();
+        let is_lazy_loading_enabled = existing_module_storage
+            .runtime_environment()
+            .vm_config()
+            .enable_lazy_loading;
         let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
 
         // For every module in bundle, run compatibility checks and construct a new bytes storage
         // view such that added modules shadow any existing ones.
-        let mut staged_module_bytes = BTreeMap::new();
+        let mut staged_modules = BTreeMap::new();
         for module_bytes in module_bundle {
             let compiled_module =
                 CompiledModule::deserialize_with_config(&module_bytes, deserializer_config)
+                    .map(Arc::new)
                     .map_err(|err| {
                         err.append_message_with_separator(
                             '\n',
@@ -164,8 +174,16 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             // All modules can be republished, as long as the new module is compatible
             // with the old module.
             if compatibility.need_check_compat() {
+                // MODULE METERING SAFETY:
+                //   Old module must be metered at the caller side.
+                if is_lazy_loading_enabled {
+                    traversal_context
+                        .check_is_special_or_visited(addr, name)
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+
                 if let Some(old_module_ref) =
-                    existing_module_storage.fetch_deserialized_module(addr, name)?
+                    existing_module_storage.unmetered_get_deserialized_module(addr, name)?
                 {
                     let old_module = old_module_ref.as_ref();
                     compatibility
@@ -176,13 +194,14 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
 
             // Modules that pass compatibility checks are added to the staged storage.
             use btree_map::Entry::*;
-            let account_module_storage =
-                match staged_module_bytes.entry(*compiled_module.self_addr()) {
-                    Occupied(entry) => entry.into_mut(),
-                    Vacant(entry) => entry.insert(BTreeMap::new()),
-                };
-            let prev =
-                account_module_storage.insert(compiled_module.self_name().to_owned(), module_bytes);
+            let account_module_storage = match staged_modules.entry(*compiled_module.self_addr()) {
+                Occupied(entry) => entry.into_mut(),
+                Vacant(entry) => entry.insert(BTreeMap::new()),
+            };
+            let prev = account_module_storage.insert(
+                compiled_module.self_name().to_owned(),
+                (module_bytes, compiled_module.clone()),
+            );
 
             // Publishing the same module in the same bundle is not allowed.
             if prev.is_some() {
@@ -201,7 +220,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         // newly published bundle.
         let staged_module_bytes_storage = StagingModuleBytesStorage {
             staged_runtime_environment,
-            staged_module_bytes,
+            staged_modules,
             module_storage: existing_module_storage,
         };
 
@@ -210,32 +229,74 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         };
 
         // Finally, verify the bundle, performing linking checks for all staged modules.
-        for (addr, name) in staged_module_storage
+        let staged_runtime_environment = staged_module_storage.runtime_environment();
+        for (addr, name, bytes, compiled_module) in staged_module_storage
             .storage
             .byte_storage()
-            .staged_module_bytes
+            .staged_modules
             .iter()
             .flat_map(|(addr, account_storage)| {
                 account_storage
                     .iter()
-                    .map(move |(name, _)| (addr, name.as_ident_str()))
+                    .map(move |(name, (bytes, module))| (addr, name, bytes, module))
             })
         {
-            // Verify the module and its dependencies, and that they do not form a cycle.
-            let module = staged_module_storage
-                .fetch_verified_module(addr, name)?
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "Staged module {}::{} must always exist",
-                            addr, name
-                        ))
-                        .finish(Location::Undefined)
-                })?;
+            if is_lazy_loading_enabled {
+                // Local bytecode verification.
+                staged_runtime_environment.paranoid_check_module_address_and_name(
+                    compiled_module,
+                    compiled_module.self_addr(),
+                    compiled_module.self_name(),
+                )?;
+                let locally_verified_code = staged_runtime_environment
+                    .build_locally_verified_module(
+                        compiled_module.clone(),
+                        bytes.len(),
+                        &sha3_256(bytes),
+                    )?;
+
+                // Linking checks to immediate dependencies. Note that we do not check cyclic
+                // dependencies here.
+                let mut verified_dependencies = vec![];
+                for (dep_addr, dep_name) in locally_verified_code.immediate_dependencies_iter() {
+                    // MODULE METERING SAFETY:
+                    //   Immediate dependency of the module in a bundle must be metered at the
+                    //   caller side.
+                    traversal_context
+                        .check_is_special_or_visited(dep_addr, dep_name)
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                    let dependency =
+                        staged_module_storage.fetch_existing_verified_module(dep_addr, dep_name)?;
+                    verified_dependencies.push(dependency);
+                }
+                staged_runtime_environment
+                    .build_verified_module(locally_verified_code, &verified_dependencies)?;
+            } else {
+                // Verify the module and its dependencies, and that they do not form a cycle.
+                staged_module_storage
+                    .fetch_verified_module(addr, name)?
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(format!(
+                                "Staged module {}::{} must always exist",
+                                compiled_module.self_addr(),
+                                compiled_module.self_name()
+                            ))
+                            .finish(Location::Undefined)
+                    })?;
+            }
 
             // Also verify that all friends exist.
-            for (friend_addr, friend_name) in module.immediate_friends_iter() {
-                if !staged_module_storage.check_module_exists(friend_addr, friend_name)? {
+            for (friend_addr, friend_name) in compiled_module.immediate_friends_iter() {
+                if is_lazy_loading_enabled {
+                    // MODULE METERING SAFETY:
+                    //   Friends of the module in a bundle must be metered at the caller side.
+                    traversal_context
+                        .check_is_special_or_visited(friend_addr, friend_name)
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+
+                if !staged_module_storage.unmetered_check_module_exists(friend_addr, friend_name)? {
                     return Err(module_linker_error!(friend_addr, friend_name));
                 }
             }
@@ -246,11 +307,11 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
     }
 
     pub fn release_verified_module_bundle(self) -> VerifiedModuleBundle<ModuleId, Bytes> {
-        let staged_module_bytes = &self.storage.byte_storage().staged_module_bytes;
+        let staged_modules = &self.storage.byte_storage().staged_modules;
 
         let mut bundle = BTreeMap::new();
-        for (addr, account_storage) in staged_module_bytes {
-            for (name, bytes) in account_storage {
+        for (addr, account_storage) in staged_modules {
+            for (name, (bytes, _)) in account_storage {
                 bundle.insert(ModuleId::new(*addr, name.clone()), bytes.clone());
             }
         }

@@ -756,12 +756,15 @@ pub enum StatusCode {
     INVALID_CLOSURE_MASK = 1132,
     // Closure eval type is not a function
     CLOSURE_CALL_REQUIRES_FUNCTION = 1133,
+    // When publishing a module bundle, all friends declared there must be in this bundle. If it is
+    // not the case, an error with this status code is returned.
+    FRIEND_NOT_FOUND_IN_MODULE_BUNDLE = 1134,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1134,
-    RESERVED_VERIFICATION_ERROR_3 = 1135,
-    RESERVED_VERIFICATION_ERROR_4 = 1136,
-    RESERVED_VERIFICATION_ERROR_5 = 1137,
+    RESERVED_VERIFICATION_ERROR_1 = 1135,
+    RESERVED_VERIFICATION_ERROR_2 = 1136,
+    RESERVED_VERIFICATION_ERROR_3 = 1137,
+    RESERVED_VERIFICATION_ERROR_4 = 1138,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

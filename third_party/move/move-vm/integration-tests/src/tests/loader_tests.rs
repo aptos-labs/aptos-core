@@ -17,6 +17,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{AsUnsyncModuleStorage, ModuleStorage, StagingModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::AlwaysVisitedModuleTraversalContext;
 use std::path::PathBuf;
 
 const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
@@ -69,8 +70,13 @@ impl Adapter {
                 binary.into()
             })
             .collect();
-        StagingModuleStorage::create(&WORKING_ACCOUNT, module_storage, module_bundle)
-            .expect("failure publishing modules")
+        StagingModuleStorage::create(
+            &WORKING_ACCOUNT,
+            module_storage,
+            module_bundle,
+            &AlwaysVisitedModuleTraversalContext,
+        )
+        .expect("failure publishing modules")
     }
 
     fn call_functions(&self, module_storage: &impl ModuleStorage) {
