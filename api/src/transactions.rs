@@ -632,12 +632,16 @@ impl TransactionsApi {
                             AptosErrorCode::InvalidInput,
                         )
                     })?;
+                let fee_payer = signed_transaction
+                    .authenticator()
+                    .fee_payer_address()
+                    .unwrap_or(signed_transaction.sender());
                 let output = AptosVM::execute_view_function(
                     &state_view,
                     ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     ident_str!("balance").into(),
                     vec![AptosCoinType::type_tag()],
-                    vec![signed_transaction.sender().to_vec()],
+                    vec![fee_payer.to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
                 let values = output.values.map_err(|err| {
