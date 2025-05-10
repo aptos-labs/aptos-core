@@ -1,0 +1,72 @@
+# This defines a workflow to build and release a new version of the
+# aptos-protos crate. In order to trigger it go to the Actions tab of the
+# repo, click "Publish aptos-protos for Typescript" and then "Run Workflow".
+
+name: "Publish aptos-protos for TypeScript"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch name or tag to build the binaries from. Defaults to the workflow Git REV, but can be different than that:"
+
+jobs:
+  publish-crate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: "false"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        with:
+          working-directory: protos/typescript
+
+      # Get the version of the crate on npmjs.com
+      - name: Get current version
+        id: get_current_version
+        run: |
+          echo "::set-output name=current_version::$(pnpm view @aptos-labs/aptos-protos version --limit 1 | cut -d' ' -f3)"
+      # Get the version of the crate in the repo
+      - name: Get repo version
+        id: get_repo_version
+        run: |
+          echo "::set-output name=repo_version::$(grep -oP '"version":\s*"\K[0-9\.]+' protos/typescript/package.json)"
+      # Exit if the crate version in the repo matches the one on npmjs.com
+      - name: Exit if versions match
+        if: ${{ steps.get_current_version.outputs.current_version == steps.get_repo_version.outputs.repo_version }}
+        run: echo "Version of crate in repo matches version on npmjs.com, exiting..." && exit 1
+
+      # Generate the protos
+      - name: Generate protos
+        run: sh ./scripts/build.sh
+        with:
+          working-directory: protos
+
+      # Build the package
+      - name: Build package
+        run: pnpm build
+        with:
+          working-directory: protos/typescript
+
+      # Ensure the generated code matches the protos.
+      - name: Check generated code matches protos
+        run: git diff --ignore-space-at-eol --ignore-blank-lines
+        with:
+          working-directory: protos/typescript
+
+      - name: Publish to npm
+        run: NODE_AUTH_TOKEN=$NPM_JS_AUTH_TOKEN pnpm publish --non-interactive --dry-run
+        env:
+          NPM_JS_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }} 
