@@ -256,13 +256,14 @@ fn test_new_genesis() {
         .freeze()
         .unwrap(),
         vec![
-            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]),
+            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]).unwrap(),
             ContractEvent::new_v1(
                 new_block_event_key(),
                 0,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 vec![],
-            ),
+            )
+            .expect("Should always be able to create a new block event"),
         ],
     )));
 

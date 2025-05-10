@@ -428,10 +428,9 @@ mod tests {
     fn test_diff_events_allow_different_gas_usage() {
         let fee_statement_tag = TypeTag::Struct(Box::new(FeeStatement::struct_tag()));
 
-        let events_1 = vec![ContractEvent::new_v2(fee_statement_tag.clone(), vec![
-            0, 1, 2,
-        ])];
-        let events_2 = vec![ContractEvent::new_v2(fee_statement_tag, vec![0, 1, 3])];
+        let events_1 =
+            vec![ContractEvent::new_v2(fee_statement_tag.clone(), vec![0, 1, 2]).unwrap()];
+        let events_2 = vec![ContractEvent::new_v2(fee_statement_tag, vec![0, 1, 3]).unwrap()];
 
         let diffs = TransactionDiffBuilder::new(true).diff_events(events_1.clone(), events_2);
         assert!(diffs.is_empty());

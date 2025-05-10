@@ -21,9 +21,11 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{convert::TryFrom, ops::Deref, str::FromStr};
+use proptest::prelude::{any, Arbitrary, BoxedStrategy, Strategy};
+use serde::{
+    de::DeserializeOwned, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer,
+};
+use std::{convert::TryFrom, ops::Deref};
 
 pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
@@ -70,24 +72,19 @@ impl ContractEvent {
         sequence_number: u64,
         type_tag: TypeTag,
         event_data: Vec<u8>,
-    ) -> Self {
-        ContractEvent::V1(ContractEventV1::new(
+    ) -> anyhow::Result<Self> {
+        Ok(ContractEvent::V1(ContractEventV1::new(
             key,
             sequence_number,
             type_tag,
             event_data,
-        ))
+        )?))
     }
 
-    pub fn new_v2(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
-        ContractEvent::V2(ContractEventV2::new(type_tag, event_data))
-    }
-
-    pub fn new_v2_with_type_tag_str(type_tag_str: &str, event_data: Vec<u8>) -> Self {
-        ContractEvent::V2(ContractEventV2::new(
-            TypeTag::from_str(type_tag_str).unwrap(),
-            event_data,
-        ))
+    pub fn new_v2(type_tag: TypeTag, event_data: Vec<u8>) -> anyhow::Result<Self> {
+        Ok(ContractEvent::V2(ContractEventV2::new(
+            type_tag, event_data,
+        )?))
     }
 
     pub fn event_key(&self) -> Option<&EventKey> {
@@ -167,9 +164,20 @@ impl ContractEvent {
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
+impl ContractEvent {
+    /// Constructs a V2 event from a type tag string. Only used for tests or benchmarks. Panics if
+    /// type tag cannot be constructed from the string.
+    pub fn new_v2_with_type_tag_str(type_tag_str: &str, event_data: Vec<u8>) -> Self {
+        use std::str::FromStr;
+        ContractEvent::V2(
+            ContractEventV2::new(TypeTag::from_str(type_tag_str).unwrap(), event_data).unwrap(),
+        )
+    }
+}
+
 /// Entry produced via a call to the `emit_event` builtin.
-#[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[derive(Hash, Clone, Eq, PartialEq, CryptoHasher)]
 pub struct ContractEventV1 {
     /// The unique key that the event was emitted to
     key: EventKey,
@@ -178,8 +186,10 @@ pub struct ContractEventV1 {
     /// The type of the data
     type_tag: TypeTag,
     /// The data payload of the event
-    #[serde(with = "serde_bytes")]
     event_data: Vec<u8>,
+    /// Cached event size used for gas charging. This field is not included when serialized and
+    /// on deserialization is recomputed.
+    size: usize,
 }
 
 impl ContractEventV1 {
@@ -188,13 +198,15 @@ impl ContractEventV1 {
         sequence_number: u64,
         type_tag: TypeTag,
         event_data: Vec<u8>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        let size = key.size() + 8 /* u64 */ + bcs::serialized_size(&type_tag)? + event_data.len();
+        Ok(Self {
             key,
             sequence_number,
             type_tag,
             event_data,
-        }
+            size,
+        })
     }
 
     pub fn key(&self) -> &EventKey {
@@ -214,7 +226,67 @@ impl ContractEventV1 {
     }
 
     pub fn size(&self) -> usize {
-        self.key.size() + 8 /* u64 */ + bcs::serialized_size(&self.type_tag).unwrap() + self.event_data.len()
+        self.size
+    }
+}
+
+impl Serialize for ContractEventV1 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        const NUM_FIELDS: usize = 4;
+        let mut s = serializer.serialize_struct("ContractEventV1", NUM_FIELDS)?;
+        s.serialize_field("key", &self.key)?;
+        s.serialize_field("sequence_number", &self.sequence_number)?;
+        s.serialize_field("type_tag", &self.type_tag)?;
+        s.serialize_field("event_data", &serde_bytes::Bytes::new(&self.event_data))?;
+        s.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for ContractEventV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "ContractEventV1")]
+        struct ContractEventPlaceholder {
+            key: EventKey,
+            sequence_number: u64,
+            type_tag: TypeTag,
+            #[serde(with = "serde_bytes")]
+            event_data: Vec<u8>,
+        }
+
+        let placeholder = ContractEventPlaceholder::deserialize(deserializer)?;
+        Self::new(
+            placeholder.key,
+            placeholder.sequence_number,
+            placeholder.type_tag,
+            placeholder.event_data,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for ContractEventV1 {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        (
+            any::<EventKey>(),
+            any::<u64>(),
+            any::<TypeTag>(),
+            any::<Vec<u8>>(),
+        )
+            .prop_map(|(key, sequence_number, type_tag, event_data)| {
+                Self::new(key, sequence_number, type_tag, event_data).unwrap()
+            })
+            .boxed()
     }
 }
 
@@ -232,25 +304,29 @@ impl std::fmt::Debug for ContractEventV1 {
 }
 
 /// Entry produced via a call to the `emit` builtin.
-#[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
+#[derive(Hash, Clone, Eq, PartialEq, CryptoHasher)]
 pub struct ContractEventV2 {
     /// The type of the data
     type_tag: TypeTag,
     /// The data payload of the event
-    #[serde(with = "serde_bytes")]
     event_data: Vec<u8>,
+    /// Cached event size used for gas charging. This field is not included when serialized and
+    /// on deserialization is recomputed.
+    size: usize,
 }
 
 impl ContractEventV2 {
-    pub fn new(type_tag: TypeTag, event_data: Vec<u8>) -> Self {
-        Self {
+    pub fn new(type_tag: TypeTag, event_data: Vec<u8>) -> anyhow::Result<Self> {
+        let size = bcs::serialized_size(&type_tag)? + event_data.len();
+        Ok(Self {
             type_tag,
             event_data,
-        }
+            size,
+        })
     }
 
     pub fn size(&self) -> usize {
-        bcs::serialized_size(&self.type_tag).unwrap() + self.event_data.len()
+        self.size
     }
 
     pub fn type_tag(&self) -> &TypeTag {
@@ -259,6 +335,37 @@ impl ContractEventV2 {
 
     pub fn event_data(&self) -> &[u8] {
         &self.event_data
+    }
+}
+
+impl Serialize for ContractEventV2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        const NUM_FIELDS: usize = 2;
+        let mut s = serializer.serialize_struct("ContractEventV2", NUM_FIELDS)?;
+        s.serialize_field("type_tag", &self.type_tag)?;
+        s.serialize_field("event_data", &serde_bytes::Bytes::new(&self.event_data))?;
+        s.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for ContractEventV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "ContractEventV2")]
+        struct ContractEventPlaceholder {
+            type_tag: TypeTag,
+            #[serde(with = "serde_bytes")]
+            event_data: Vec<u8>,
+        }
+
+        let placeholder = ContractEventPlaceholder::deserialize(deserializer)?;
+        Self::new(placeholder.type_tag, placeholder.event_data).map_err(serde::de::Error::custom)
     }
 }
 
@@ -401,7 +508,6 @@ impl std::fmt::Display for ContractEvent {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct EventWithVersion {
     pub transaction_version: Version,
     pub event: ContractEvent,
@@ -424,5 +530,54 @@ impl EventWithVersion {
             transaction_version,
             event,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claims::assert_ok;
+    use move_core_types::account_address::AccountAddress;
+
+    fn dummy_struct_tag() -> TypeTag {
+        TypeTag::Struct(Box::new(StructTag {
+            address: AccountAddress::ONE,
+            module: ident_str!("foo").to_owned(),
+            name: ident_str!("Bar").to_owned(),
+            type_args: vec![],
+        }))
+    }
+
+    #[test]
+    fn test_contract_event_v1_serialization_roundtrip() {
+        let event = assert_ok!(ContractEventV1::new(
+            EventKey::new(12, AccountAddress::ONE),
+            42,
+            dummy_struct_tag(),
+            vec![1, 2, 3, 4, 5],
+        ));
+
+        let bytes = assert_ok!(bcs::to_bytes(&event));
+        let deserialized_event = assert_ok!(bcs::from_bytes::<ContractEventV1>(&bytes));
+
+        assert_eq!(deserialized_event.key, event.key);
+        assert_eq!(deserialized_event.sequence_number, event.sequence_number);
+        assert_eq!(deserialized_event.type_tag, event.type_tag);
+        assert_eq!(deserialized_event.event_data, event.event_data);
+        assert_eq!(deserialized_event.size, event.size);
+    }
+
+    #[test]
+    fn test_contract_event_v2_serialization_roundtrip() {
+        let event = assert_ok!(ContractEventV2::new(dummy_struct_tag(), vec![
+            1, 2, 3, 4, 5
+        ],));
+
+        let bytes = assert_ok!(bcs::to_bytes(&event));
+        let deserialized_event = assert_ok!(bcs::from_bytes::<ContractEventV2>(&bytes));
+
+        assert_eq!(deserialized_event.type_tag, event.type_tag);
+        assert_eq!(deserialized_event.event_data, event.event_data);
+        assert_eq!(deserialized_event.size, event.size);
     }
 }

@@ -23,6 +23,9 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
+/// Error code from events.move, returned when event creation fails.
+pub const ECANNOT_CREATE_EVENT: u64 = 1;
+
 /// Cached emitted module events.
 #[derive(Default, Tid)]
 pub struct NativeEventContext {
@@ -105,10 +108,12 @@ fn native_write_to_event_store(
     })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    ctx.events.push((
-        ContractEvent::new_v1(key, seq_num, ty_tag, blob),
-        has_aggregator_lifting.then_some(layout),
-    ));
+    let event =
+        ContractEvent::new_v1(key, seq_num, ty_tag, blob).map_err(|_| SafeNativeError::Abort {
+            abort_code: ECANNOT_CREATE_EVENT,
+        })?;
+    ctx.events
+        .push((event, has_aggregator_lifting.then_some(layout)));
     Ok(smallvec![])
 }
 
@@ -259,11 +264,13 @@ fn native_write_module_event_to_store(
                     .with_message("Event serialization failure".to_string()),
             )
         })?;
+
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    ctx.events.push((
-        ContractEvent::new_v2(type_tag, blob),
-        has_identifier_mappings.then_some(layout),
-    ));
+    let event = ContractEvent::new_v2(type_tag, blob).map_err(|_| SafeNativeError::Abort {
+        abort_code: ECANNOT_CREATE_EVENT,
+    })?;
+    ctx.events
+        .push((event, has_identifier_mappings.then_some(layout)));
 
     Ok(smallvec![])
 }
