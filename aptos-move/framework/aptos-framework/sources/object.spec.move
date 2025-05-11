@@ -59,7 +59,7 @@ spec aptos_framework::object {
 
     spec fun spec_exists_at<T: key>(object: address): bool;
 
-    spec exists_at<T: key>(object: address): bool {
+    spec native_exists_at<T: key>(object: address): bool {
         pragma opaque;
         ensures [abstract] result == spec_exists_at<T>(object);
     }
@@ -219,7 +219,7 @@ spec aptos_framework::object {
             }
         };
 
-        let bytes_spec = bcs::to_bytes(guid);
+        let bytes_spec = bcs::serialize(guid);
         let bytes = concat(bytes_spec, vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
         let hash_bytes = hash::sha3_256(bytes);
         let obj_addr = from_bcs::deserialize<address>(hash_bytes);
@@ -262,7 +262,7 @@ spec aptos_framework::object {
             }
         };
 
-        let bytes_spec = bcs::to_bytes(guid);
+        let bytes_spec = bcs::serialize(guid);
         let bytes = concat(bytes_spec, vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
         let hash_bytes = hash::sha3_256(bytes);
         let obj_addr = from_bcs::deserialize<address>(hash_bytes);
@@ -289,7 +289,7 @@ spec aptos_framework::object {
     }
 
     spec create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
-        let bytes_spec = bcs::to_bytes(guid);
+        let bytes_spec = bcs::serialize(guid);
         let bytes = concat(bytes_spec, vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
         let hash_bytes = hash::sha3_256(bytes);
         let obj_addr = from_bcs::deserialize<address>(hash_bytes);

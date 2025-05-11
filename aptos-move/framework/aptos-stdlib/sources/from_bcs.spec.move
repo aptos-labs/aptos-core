@@ -40,4 +40,15 @@ spec aptos_std::from_bcs {
         aborts_if !deserializable<T>(bytes);
         ensures result == deserialize<T>(bytes);
     }
+
+    spec native_load_layout<T>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec native_from_bytes<T>(bytes: vector<u8>): T {
+        pragma opaque;
+        aborts_if [abstract] !deserializable<T>(bytes);
+        ensures [abstract] result == deserialize<T>(bytes);
+    }
 }

@@ -151,6 +151,9 @@ impl SafeNativeBuilder {
                         args,
                     }),
                     LoadModule { module_name } => Ok(NativeResult::LoadModule { module_name }),
+                    LoadLayouts { tys, annotated } => {
+                        Ok(NativeResult::LoadLayouts { tys, annotated })
+                    },
                 },
             }
         };

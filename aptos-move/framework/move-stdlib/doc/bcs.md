@@ -12,9 +12,17 @@ details on BCS.
 -  [Function `to_bytes`](#0x1_bcs_to_bytes)
 -  [Function `serialized_size`](#0x1_bcs_serialized_size)
 -  [Function `constant_serialized_size`](#0x1_bcs_constant_serialized_size)
+-  [Function `native_load_layout`](#0x1_bcs_native_load_layout)
+-  [Function `native_to_bytes`](#0x1_bcs_native_to_bytes)
+-  [Function `native_serialized_size`](#0x1_bcs_native_serialized_size)
+-  [Function `native_constant_serialized_size`](#0x1_bcs_native_constant_serialized_size)
 -  [Specification](#@Specification_0)
+    -  [Function `to_bytes`](#@Specification_0_to_bytes)
     -  [Function `serialized_size`](#@Specification_0_serialized_size)
     -  [Function `constant_serialized_size`](#@Specification_0_constant_serialized_size)
+    -  [Function `native_load_layout`](#@Specification_0_native_load_layout)
+    -  [Function `native_serialized_size`](#@Specification_0_native_serialized_size)
+    -  [Function `native_constant_serialized_size`](#@Specification_0_native_constant_serialized_size)
 
 
 <pre><code><b>use</b> <a href="option.md#0x1_option">0x1::option</a>;
@@ -40,7 +48,10 @@ Aborts with <code>0x1c5</code> error code if serialization fails.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="bcs.md#0x1_bcs_native_load_layout">native_load_layout</a>&lt;MoveValue&gt;();
+    <a href="bcs.md#0x1_bcs_native_to_bytes">native_to_bytes</a>&lt;MoveValue&gt;(v)
+}
 </code></pre>
 
 
@@ -64,7 +75,10 @@ Aborts with <code>0x1c5</code> error code if there is a failure when calculating
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size">serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64;
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialized_size">serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64 {
+    <a href="bcs.md#0x1_bcs_native_load_layout">native_load_layout</a>&lt;MoveValue&gt;();
+    <a href="bcs.md#0x1_bcs_native_serialized_size">native_serialized_size</a>&lt;MoveValue&gt;(v)
+}
 </code></pre>
 
 
@@ -96,7 +110,98 @@ it might change in the future to return Some() instead, if size becomes "known".
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): Option&lt;u64&gt;;
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): Option&lt;u64&gt; {
+    <a href="bcs.md#0x1_bcs_native_load_layout">native_load_layout</a>&lt;MoveValue&gt;();
+    <a href="bcs.md#0x1_bcs_native_constant_serialized_size">native_constant_serialized_size</a>&lt;MoveValue&gt;()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_native_load_layout"></a>
+
+## Function `native_load_layout`
+
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_load_layout">native_load_layout</a>&lt;MoveValue&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_native_load_layout">native_load_layout</a>&lt;MoveValue&gt;();
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_native_to_bytes"></a>
+
+## Function `native_to_bytes`
+
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_to_bytes">native_to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_native_to_bytes">native_to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_native_serialized_size"></a>
+
+## Function `native_serialized_size`
+
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_serialized_size">native_serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_native_serialized_size">native_serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_bcs_native_constant_serialized_size"></a>
+
+## Function `native_constant_serialized_size`
+
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_constant_serialized_size">native_constant_serialized_size</a>&lt;MoveValue&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_native_constant_serialized_size">native_constant_serialized_size</a>&lt;MoveValue&gt;(): Option&lt;u64&gt;;
 </code></pre>
 
 
@@ -120,6 +225,24 @@ Native function which is defined in the prover's prelude.
 
 
 
+<a id="@Specification_0_to_bytes"></a>
+
+### Function `to_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="bcs.md#0x1_bcs_serialize">serialize</a>(v);
+</code></pre>
+
+
+
 <a id="@Specification_0_serialized_size"></a>
 
 ### Function `serialized_size`
@@ -132,6 +255,7 @@ Native function which is defined in the prover's prelude.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == len(<a href="bcs.md#0x1_bcs_serialize">serialize</a>(v));
 </code></pre>
 
@@ -149,6 +273,59 @@ Native function which is defined in the prover's prelude.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_native_load_layout"></a>
+
+### Function `native_load_layout`
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_load_layout">native_load_layout</a>&lt;MoveValue&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_native_serialized_size"></a>
+
+### Function `native_serialized_size`
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_serialized_size">native_serialized_size</a>&lt;MoveValue&gt;(v: &MoveValue): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == len(<a href="bcs.md#0x1_bcs_serialize">serialize</a>(v));
+</code></pre>
+
+
+
+<a id="@Specification_0_native_constant_serialized_size"></a>
+
+### Function `native_constant_serialized_size`
+
+
+<pre><code><b>fun</b> <a href="bcs.md#0x1_bcs_native_constant_serialized_size">native_constant_serialized_size</a>&lt;MoveValue&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 </code></pre>
 
 

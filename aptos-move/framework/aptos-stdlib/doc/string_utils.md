@@ -25,6 +25,10 @@ A module for formatting move values as strings.
 -  [Function `list2`](#0x1_string_utils_list2)
 -  [Function `list3`](#0x1_string_utils_list3)
 -  [Function `list4`](#0x1_string_utils_list4)
+-  [Function `native_load_annotated_layout1`](#0x1_string_utils_native_load_annotated_layout1)
+-  [Function `native_load_annotated_layout2`](#0x1_string_utils_native_load_annotated_layout2)
+-  [Function `native_load_annotated_layout3`](#0x1_string_utils_native_load_annotated_layout3)
+-  [Function `native_load_annotated_layout4`](#0x1_string_utils_native_load_annotated_layout4)
 -  [Function `native_format`](#0x1_string_utils_native_format)
 -  [Function `native_format_list`](#0x1_string_utils_native_format_list)
 -  [Specification](#@Specification_2)
@@ -36,6 +40,10 @@ A module for formatting move values as strings.
     -  [Function `format2`](#@Specification_2_format2)
     -  [Function `format3`](#@Specification_2_format3)
     -  [Function `format4`](#@Specification_2_format4)
+    -  [Function `native_load_annotated_layout1`](#@Specification_2_native_load_annotated_layout1)
+    -  [Function `native_load_annotated_layout2`](#@Specification_2_native_load_annotated_layout2)
+    -  [Function `native_load_annotated_layout3`](#@Specification_2_native_load_annotated_layout3)
+    -  [Function `native_load_annotated_layout4`](#@Specification_2_native_load_annotated_layout4)
     -  [Function `native_format`](#@Specification_2_native_format)
     -  [Function `native_format_list`](#@Specification_2_native_format_list)
 
@@ -201,6 +209,7 @@ For std::string::String the output is the string itself including quotes, eg.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string">to_string</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>false</b>, <b>false</b>, <b>true</b>, <b>false</b>)
 }
 </code></pre>
@@ -226,6 +235,7 @@ Format addresses as 64 zero-padded hexadecimals.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_canonical_addresses">to_string_with_canonical_addresses</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>false</b>, <b>true</b>, <b>true</b>, <b>false</b>)
 }
 </code></pre>
@@ -251,6 +261,7 @@ Format emitting integers with types ie. 6u8 or 128u32.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_integer_types">to_string_with_integer_types</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>false</b>, <b>true</b>, <b>true</b>, <b>false</b>)
 }
 </code></pre>
@@ -276,6 +287,7 @@ Format vectors and structs with newlines and indentation.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_debug_string">debug_string</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>true</b>, <b>false</b>, <b>false</b>, <b>false</b>)
 }
 </code></pre>
@@ -301,6 +313,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format1">format1</a>&lt;T0: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T0&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list1">list1</a>(a))
 }
 </code></pre>
@@ -325,6 +338,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format2">format2</a>&lt;T0: drop, T1: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout2">native_load_annotated_layout2</a>&lt;T0, T1&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list2">list2</a>(a, b))
 }
 </code></pre>
@@ -349,6 +363,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format3">format3</a>&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout3">native_load_annotated_layout3</a>&lt;T0, T1, T2&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list3">list3</a>(a, b, c))
 }
 </code></pre>
@@ -373,6 +388,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format4">format4</a>&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): String {
+    <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout4">native_load_annotated_layout4</a>&lt;T0, T1, T2, T3&gt;();
     <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d))
 }
 </code></pre>
@@ -507,6 +523,94 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list4">list4</a>&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T3, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt;&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list3">list3</a>(b, c, d)) }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_string_utils_native_load_annotated_layout1"></a>
+
+## Function `native_load_annotated_layout1`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T0&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T0&gt;();
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_string_utils_native_load_annotated_layout2"></a>
+
+## Function `native_load_annotated_layout2`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout2">native_load_annotated_layout2</a>&lt;T0, T1&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout2">native_load_annotated_layout2</a>&lt;T0, T1&gt;();
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_string_utils_native_load_annotated_layout3"></a>
+
+## Function `native_load_annotated_layout3`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout3">native_load_annotated_layout3</a>&lt;T0, T1, T2&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout3">native_load_annotated_layout3</a>&lt;T0, T1, T2&gt;();
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_string_utils_native_load_annotated_layout4"></a>
+
+## Function `native_load_annotated_layout4`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout4">native_load_annotated_layout4</a>&lt;T0, T1, T2, T3&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout4">native_load_annotated_layout4</a>&lt;T0, T1, T2, T3&gt;();
 </code></pre>
 
 
@@ -694,6 +798,74 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 <pre><code><b>aborts_if</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>(fmt, <a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d));
 <b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>(fmt, <a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d));
+</code></pre>
+
+
+
+<a id="@Specification_2_native_load_annotated_layout1"></a>
+
+### Function `native_load_annotated_layout1`
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout1">native_load_annotated_layout1</a>&lt;T0&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_2_native_load_annotated_layout2"></a>
+
+### Function `native_load_annotated_layout2`
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout2">native_load_annotated_layout2</a>&lt;T0, T1&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_2_native_load_annotated_layout3"></a>
+
+### Function `native_load_annotated_layout3`
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout3">native_load_annotated_layout3</a>&lt;T0, T1, T2&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_2_native_load_annotated_layout4"></a>
+
+### Function `native_load_annotated_layout4`
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_load_annotated_layout4">native_load_annotated_layout4</a>&lt;T0, T1, T2, T3&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 </code></pre>
 
 

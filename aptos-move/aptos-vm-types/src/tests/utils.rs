@@ -155,7 +155,7 @@ pub(crate) fn mock_tag_2() -> StructTag {
 
 pub(crate) struct VMChangeSetBuilder {
     resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+    events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
@@ -184,7 +184,7 @@ impl VMChangeSetBuilder {
     #[allow(dead_code)]
     pub(crate) fn with_events(
         mut self,
-        events: impl IntoIterator<Item = (ContractEvent, Option<MoveTypeLayout>)>,
+        events: impl IntoIterator<Item = (ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Self {
         assert!(self.events.is_empty());
         self.events.extend(events);
@@ -264,7 +264,7 @@ pub(crate) struct ExpandedVMChangeSetBuilder {
     reads_needing_delayed_field_exchange:
         BTreeMap<StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
     group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
-    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+    events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
 }
 
 #[allow(dead_code)]
@@ -357,7 +357,7 @@ impl ExpandedVMChangeSetBuilder {
 
     pub(crate) fn with_events(
         mut self,
-        events: impl IntoIterator<Item = (ContractEvent, Option<MoveTypeLayout>)>,
+        events: impl IntoIterator<Item = (ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Self {
         assert!(self.events.is_empty());
         self.events.extend(events);

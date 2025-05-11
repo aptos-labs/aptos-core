@@ -15,6 +15,8 @@ module aptos_framework::event {
 
     /// Emit a module event with payload `msg`.
     public fun emit<T: store + drop>(msg: T) {
+        // TODO(lazy-loading): no feature gating to experiment with performance.
+        native_load_layout<T>();
         write_module_event_to_store<T>(msg);
     }
 
@@ -53,6 +55,7 @@ module aptos_framework::event {
     #[deprecated]
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit_event<T: drop + store>(handle_ref: &mut EventHandle<T>, msg: T) {
+        native_load_layout<T>();
         write_to_event_store<T>(bcs::to_bytes(&handle_ref.guid), handle_ref.counter, msg);
         spec {
             assume handle_ref.counter + 1 <= MAX_U64;
@@ -92,4 +95,6 @@ module aptos_framework::event {
         use std::vector;
         vector::contains(&emitted_events_by_handle(handle), msg)
     }
+
+    native fun native_load_layout<T>();
 }

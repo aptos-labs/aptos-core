@@ -37,7 +37,7 @@ spec aptos_std::aptos_hash {
 
     spec sip_hash_from_value<MoveValue>(v: &MoveValue): u64 {
         pragma opaque;
-        ensures result == spec_sip_hash(bcs::serialize(v));
+        ensures [abstract] result == spec_sip_hash(bcs::serialize(v));
     }
 
     spec keccak256(bytes: vector<u8>): vector<u8> {

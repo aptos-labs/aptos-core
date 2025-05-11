@@ -49,6 +49,9 @@ pub enum SafeNativeError {
     /// It is critical to invoke this function before calling FunctionDispatch to make sure the module loading
     /// is charged properly, otherwise it would be a potential gas issue.
     LoadModule { module_name: ModuleId },
+
+    /// Converts types into layouts (annotated, if flag is set and runtime otherwise).
+    LoadLayouts { tys: Vec<Type>, annotated: bool },
 }
 
 // Allows us to keep using the `?` operator on function calls that return `PartialVMResult` inside safe natives.
