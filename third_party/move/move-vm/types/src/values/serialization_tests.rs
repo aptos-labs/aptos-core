@@ -24,7 +24,7 @@ mod tests {
         value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     };
     use serde::{Deserialize, Serialize};
-    use std::{cmp::Ordering, iter};
+    use std::{cmp::Ordering, iter, sync::Arc};
     // ==========================================================================
     // Enums
 
@@ -354,7 +354,7 @@ mod tests {
                     fun_id: Identifier::new(fun_name).unwrap(),
                     ty_args,
                     mask,
-                    captured_layouts,
+                    captured_layouts: captured_layouts.into_iter().map(Arc::new).collect(),
                 },
             }
         }

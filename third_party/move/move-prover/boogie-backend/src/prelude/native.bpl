@@ -599,10 +599,10 @@ axiom (forall v: {{T}} :: {$1_bcs_serialize{{S}}(v)}
                             LenVec(r) <= {{options.serialize_bound}} ));
 {% endif %}
 
-procedure $1_bcs_to_bytes{{S}}(v: {{T}}) returns (res: Vec int);
+procedure $1_bcs_native_to_bytes{{S}}(v: {{T}}) returns (res: Vec int);
 ensures res == $1_bcs_serialize{{S}}(v);
 
-function {:inline} $1_bcs_$to_bytes{{S}}(v: {{T}}): Vec int {
+function {:inline} $1_bcs_$native_to_bytes{{S}}(v: {{T}}): Vec int {
     $1_bcs_serialize{{S}}(v)
 }
 

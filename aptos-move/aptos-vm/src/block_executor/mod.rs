@@ -275,7 +275,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+    fn get_events(&self) -> Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)> {
         self.vm_output
             .lock()
             .as_ref()

@@ -596,7 +596,7 @@ impl NativeVMExecutorTask {
         view: &(impl ExecutorView + ResourceGroupView),
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: &mut Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), ()> {
         if fa_migration_complete {
             self.withdraw_fa_apt_from_signer(
@@ -627,7 +627,7 @@ impl NativeVMExecutorTask {
         view: &(impl ExecutorView + ResourceGroupView),
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: &mut Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), ()> {
         let sender_store_address = primary_apt_store(sender_address);
         let sender_fa_store_object_key = self
@@ -678,7 +678,7 @@ impl NativeVMExecutorTask {
         view: &(impl ExecutorView + ResourceGroupView),
         gas: u64,
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: &mut Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), ()> {
         let sender_coin_store_key = self.db_util.new_state_key_aptos_coin(&sender_address);
 
@@ -730,7 +730,7 @@ impl NativeVMExecutorTask {
         transfer_amount: u64,
         view: &(impl ExecutorView + ResourceGroupView),
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: &mut Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<bool, ()> {
         if fa_migration_complete {
             self.deposit_fa_apt(
@@ -758,7 +758,7 @@ impl NativeVMExecutorTask {
         transfer_amount: u64,
         view: &(impl ExecutorView + ResourceGroupView),
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: &mut Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<bool, ()> {
         let recipient_store_address = primary_apt_store(recipient_address);
         let recipient_fa_store_object_key = self
@@ -827,7 +827,7 @@ impl NativeVMExecutorTask {
         transfer_amount: u64,
         view: &(impl ExecutorView + ResourceGroupView),
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: &mut Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: &mut Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<bool, ()> {
         let recipient_coin_store_key = self.db_util.new_state_key_aptos_coin(&recipient_address);
         let (mut recipient_coin_store, recipient_coin_store_metadata, existed) =

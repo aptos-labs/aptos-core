@@ -8,6 +8,7 @@
 pub mod bcs;
 pub mod cmp;
 pub mod hash;
+pub mod layouts;
 pub mod mem;
 pub mod signer;
 pub mod string;

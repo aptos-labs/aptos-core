@@ -25,12 +25,14 @@ module aptos_std::table {
     /// key already exists. The entry itself is not stored in the
     /// table, and cannot be discovered from it.
     public fun add<K: copy + drop, V>(self: &mut Table<K, V>, key: K, val: V) {
+        native_load_layouts<K, Box<V>>();
         add_box<K, V, Box<V>>(self, key, Box { val })
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow<K: copy + drop, V>(self: &Table<K, V>, key: K): &V {
+        native_load_layouts<K, Box<V>>();
         &borrow_box<K, V, Box<V>>(self, key).val
     }
 
@@ -47,6 +49,7 @@ module aptos_std::table {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: copy + drop, V>(self: &mut Table<K, V>, key: K): &mut V {
+        native_load_layouts<K, Box<V>>();
         &mut borrow_box_mut<K, V, Box<V>>(self, key).val
     }
 
@@ -73,12 +76,14 @@ module aptos_std::table {
     /// Remove from `self` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(self: &mut Table<K, V>, key: K): V {
+        native_load_layouts<K, Box<V>>();
         let Box { val } = remove_box<K, V, Box<V>>(self, key);
         val
     }
 
     /// Returns true iff `self` contains an entry for `key`.
     public fun contains<K: copy + drop, V>(self: &Table<K, V>, key: K): bool {
+        native_load_layouts<K, Box<V>>();
         contains_box<K, V, Box<V>>(self, key)
     }
 
@@ -91,6 +96,7 @@ module aptos_std::table {
     /// Table cannot know if it is empty or not, so this method is not public,
     /// and can be used only in modules that know by themselves that table is empty.
     friend fun destroy_known_empty_unsafe<K: copy + drop, V>(self: Table<K, V>) {
+        native_load_layouts<K, Box<V>>();
         destroy_empty_box<K, V, Box<V>>(&self);
         drop_unchecked_box<K, V, Box<V>>(self)
     }
@@ -152,4 +158,6 @@ module aptos_std::table {
     native fun destroy_empty_box<K: copy + drop, V, B>(table: &Table<K, V>);
 
     native fun drop_unchecked_box<K: copy + drop, V, B>(table: Table<K, V>);
+
+    native fun native_load_layouts<K, B>();
 }
