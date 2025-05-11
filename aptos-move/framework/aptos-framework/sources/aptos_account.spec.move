@@ -81,7 +81,7 @@ spec aptos_framework::aptos_account {
     spec fun length_judgment(auth_key: address): bool {
         use std::bcs;
 
-        let authentication_key = bcs::to_bytes(auth_key);
+        let authentication_key = bcs::serialize(auth_key);
         len(authentication_key) != 32
     }
 

@@ -45,7 +45,9 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_user_derived_object_address_impl`](#0x1_object_create_user_derived_object_address_impl)
 -  [Function `create_user_derived_object_address`](#0x1_object_create_user_derived_object_address)
 -  [Function `create_guid_object_address`](#0x1_object_create_guid_object_address)
+-  [Function `native_exists_at`](#0x1_object_native_exists_at)
 -  [Function `exists_at`](#0x1_object_exists_at)
+-  [Function `native_load_layout`](#0x1_object_native_load_layout)
 -  [Function `object_address`](#0x1_object_object_address)
 -  [Function `convert`](#0x1_object_convert)
 -  [Function `create_named_object`](#0x1_object_create_named_object)
@@ -100,7 +102,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `create_user_derived_object_address_impl`](#@Specification_1_create_user_derived_object_address_impl)
     -  [Function `create_user_derived_object_address`](#@Specification_1_create_user_derived_object_address)
     -  [Function `create_guid_object_address`](#@Specification_1_create_guid_object_address)
-    -  [Function `exists_at`](#@Specification_1_exists_at)
+    -  [Function `native_exists_at`](#@Specification_1_native_exists_at)
     -  [Function `object_address`](#@Specification_1_object_address)
     -  [Function `convert`](#@Specification_1_convert)
     -  [Function `create_named_object`](#@Specification_1_create_named_object)
@@ -875,7 +877,7 @@ Produces an ObjectId from the given address. This is not verified.
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
     <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>));
-    <b>assert</b>!(<a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<a href="object.md#0x1_object_native_exists_at">native_exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
     <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: <a href="object.md#0x1_object">object</a> }
 }
 </code></pre>
@@ -926,7 +928,7 @@ Returns true if there exists an object with resource T.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_exists">object_exists</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>) && <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>)
+    <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>) && <a href="object.md#0x1_object_native_exists_at">native_exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>)
 }
 </code></pre>
 
@@ -1044,6 +1046,31 @@ Derives an object from an Account GUID.
 
 </details>
 
+<a id="0x1_object_native_exists_at"></a>
+
+## Function `native_exists_at`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_exists_at">native_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_exists_at">native_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool {
+    <a href="object.md#0x1_object_native_load_layout">native_load_layout</a>&lt;T&gt;();
+    <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_exists_at"></a>
 
 ## Function `exists_at`
@@ -1060,6 +1087,28 @@ Derives an object from an Account GUID.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_native_load_layout"></a>
+
+## Function `native_load_layout`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_load_layout">native_load_layout</a>&lt;T&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_native_load_layout">native_load_layout</a>&lt;T&gt;();
 </code></pre>
 
 
@@ -2669,12 +2718,12 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 
-<a id="@Specification_1_exists_at"></a>
+<a id="@Specification_1_native_exists_at"></a>
 
-### Function `exists_at`
+### Function `native_exists_at`
 
 
-<pre><code><b>fun</b> <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_exists_at">native_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool
 </code></pre>
 
 
@@ -2896,7 +2945,7 @@ Grant a transfer permission to the permissioned signer using TransferRef.
         addr,
     }
 };
-<b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(<a href="guid.md#0x1_guid">guid</a>);
+<b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(<a href="guid.md#0x1_guid">guid</a>);
 <b>let</b> bytes = concat(bytes_spec, vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
 <b>let</b> hash_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes);
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);
@@ -2948,7 +2997,7 @@ Grant a transfer permission to the permissioned signer using TransferRef.
         addr,
     }
 };
-<b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(<a href="guid.md#0x1_guid">guid</a>);
+<b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(<a href="guid.md#0x1_guid">guid</a>);
 <b>let</b> bytes = concat(bytes_spec, vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
 <b>let</b> hash_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes);
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);
@@ -2986,7 +3035,7 @@ Grant a transfer permission to the permissioned signer using TransferRef.
 
 
 
-<pre><code><b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(<a href="guid.md#0x1_guid">guid</a>);
+<pre><code><b>let</b> bytes_spec = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(<a href="guid.md#0x1_guid">guid</a>);
 <b>let</b> bytes = concat(bytes_spec, vec&lt;u8&gt;(<a href="object.md#0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME">OBJECT_FROM_GUID_ADDRESS_SCHEME</a>));
 <b>let</b> hash_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes);
 <b>let</b> obj_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(hash_bytes);

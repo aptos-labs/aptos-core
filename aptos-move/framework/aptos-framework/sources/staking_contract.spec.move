@@ -184,8 +184,8 @@ spec aptos_framework::staking_contract {
 
         // TODO: this property causes timeout
         // let staker_address = signer::address_of(staker);
-        // let seed_0 = bcs::to_bytes(staker_address);
-        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        // let seed_0 = bcs::serialize(staker_address);
+        // let seed_1 = concat(concat(concat(seed_0, bcs::serialize(operator)), SALT), contract_creation_seed);
         // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
         // ensures result == resource_addr;
     }
@@ -411,8 +411,8 @@ spec aptos_framework::staking_contract {
         let staker_address = signer::address_of(staker);
         // postconditions account::create_resource_account()
 
-        let seed_0 = bcs::to_bytes(staker_address);
-        let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        let seed_0 = bcs::serialize(staker_address);
+        let seed_1 = concat(concat(concat(seed_0, bcs::serialize(operator)), SALT), contract_creation_seed);
         let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
         include CreateStakePoolAbortsIf { resource_addr };
         ensures exists<account::Account>(resource_addr);
@@ -572,8 +572,8 @@ spec aptos_framework::staking_contract {
 
         // Verify create_stake_pool()
         // TODO: this property causes timeout
-        // let seed_0 = bcs::to_bytes(staker_address);
-        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        // let seed_0 = bcs::serialize(staker_address);
+        // let seed_1 = concat(concat(concat(seed_0, bcs::serialize(operator)), SALT), contract_creation_seed);
         // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
         // include CreateStakePoolAbortsIf {resource_addr};
 
@@ -609,7 +609,7 @@ spec aptos_framework::staking_contract {
         aborts_if exists<account::Account>(resource_addr) && (len(
             acc.signer_capability_offer.for.vec
         ) != 0 || acc.sequence_number != 0);
-        aborts_if !exists<account::Account>(resource_addr) && len(bcs::to_bytes(resource_addr)) != 32;
+        aborts_if !exists<account::Account>(resource_addr) && len(bcs::serialize(resource_addr)) != 32;
         aborts_if len(account::ZERO_AUTH_KEY) != 32;
 
         // postconditions stake::initialize_stake_owner()

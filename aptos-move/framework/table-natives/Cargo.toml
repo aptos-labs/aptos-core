@@ -13,6 +13,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-gas-schedule = { workspace = true }
+aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }

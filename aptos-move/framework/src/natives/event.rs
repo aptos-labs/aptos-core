@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_move_stdlib::natives::layouts::native_load_layouts;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
@@ -21,7 +22,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, value_serde::ValueSerDeContext, values::Value,
 };
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, sync::Arc};
 
 /// Error code from events.move, returned when event creation fails.
 pub const ECANNOT_CREATE_EVENT: u64 = 1;
@@ -29,11 +30,11 @@ pub const ECANNOT_CREATE_EVENT: u64 = 1;
 /// Cached emitted module events.
 #[derive(Default, Tid)]
 pub struct NativeEventContext {
-    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+    events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
 }
 
 impl NativeEventContext {
-    pub fn into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+    pub fn into_events(self) -> Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)> {
         self.events
     }
 
@@ -300,6 +301,8 @@ pub fn make_all(
 
     #[cfg(feature = "testing")]
     natives.extend([("emitted_events", native_emitted_events as RawSafeNative)]);
+
+    natives.extend([("native_load_layout", native_load_layouts as RawSafeNative)]);
 
     natives.extend([(
         "write_to_event_store",

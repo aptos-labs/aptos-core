@@ -684,6 +684,31 @@ impl Type {
         }
     }
 
+    /// If the type is an enum / struct, returns its index and type arguments (if any). Otherwise,
+    /// returns [None].
+    pub fn as_struct_idx_with_ty_args(&self) -> Option<(&StructNameIndex, &[Type])> {
+        use Type::*;
+
+        match self {
+            Struct { idx, .. } => Some((idx, &[])),
+            StructInstantiation { idx, ty_args, .. } => Some((idx, ty_args.as_slice())),
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Signer
+            | TyParam(_)
+            | Vector(_)
+            | Reference(_)
+            | MutableReference(_)
+            | Function { .. } => None,
+        }
+    }
+
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool

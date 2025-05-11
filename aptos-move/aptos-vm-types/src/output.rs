@@ -22,7 +22,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -82,7 +82,7 @@ impl VMOutput {
         self.change_set.delayed_field_change_set()
     }
 
-    pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
+    pub fn events(&self) -> &[(ContractEvent, Option<Arc<MoveTypeLayout>>)] {
         self.change_set.events()
     }
 

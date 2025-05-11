@@ -17,35 +17,59 @@ module aptos_std::string_utils {
     /// For std::string::String the output is the string itself including quotes, eg.
     /// `to_string(&std::string::utf8(b"My string")) == "\"My string\""`
     public fun to_string<T>(s: &T): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout1<T>();
+        };
         native_format(s, false, false, true, false)
     }
 
     /// Format addresses as 64 zero-padded hexadecimals.
     public fun to_string_with_canonical_addresses<T>(s: &T): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout1<T>();
+        };
         native_format(s, false, true, true, false)
     }
 
     /// Format emitting integers with types ie. 6u8 or 128u32.
     public fun to_string_with_integer_types<T>(s: &T): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout1<T>();
+        };
         native_format(s, false, true, true, false)
     }
 
     /// Format vectors and structs with newlines and indentation.
     public fun debug_string<T>(s: &T): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout1<T>();
+        };
         native_format(s, true, false, false, false)
     }
 
     /// Formatting with a rust-like format string, eg. `format2(&b"a = {}, b = {}", 1, 2) == "a = 1, b = 2"`.
     public fun format1<T0: drop>(fmt: &vector<u8>, a: T0): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout1<T0>();
+        };
         native_format_list(fmt, &list1(a))
     }
     public fun format2<T0: drop, T1: drop>(fmt: &vector<u8>, a: T0, b: T1): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout2<T0, T1>();
+        };
         native_format_list(fmt, &list2(a, b))
     }
     public fun format3<T0: drop, T1: drop, T2: drop>(fmt: &vector<u8>, a: T0, b: T1, c: T2): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout3<T0, T1, T2>();
+        };
         native_format_list(fmt, &list3(a, b, c))
     }
     public fun format4<T0: drop, T1: drop, T2: drop, T3: drop>(fmt: &vector<u8>, a: T0, b: T1, c: T2, d: T3): String {
+        if (std::features::is_lazy_loading_enabled()) {
+            native_load_annotated_layout4<T0, T1, T2, T3>();
+        };
         native_format_list(fmt, &list4(a, b, c, d))
     }
 
@@ -70,6 +94,10 @@ module aptos_std::string_utils {
     inline fun list4<T0, T1, T2, T3>(a: T0, b: T1, c: T2, d: T3): Cons<T0, Cons<T1, Cons<T2, Cons<T3, NIL>>>> { cons(a, list3(b, c, d)) }
 
     // Native functions
+    native fun native_load_annotated_layout1<T0>();
+    native fun native_load_annotated_layout2<T0, T1>();
+    native fun native_load_annotated_layout3<T0, T1, T2>();
+    native fun native_load_annotated_layout4<T0, T1, T2, T3>();
     native fun native_format<T>(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
     native fun native_format_list<T>(fmt: &vector<u8>, val: &T): String;
 

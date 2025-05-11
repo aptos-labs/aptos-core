@@ -5,6 +5,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::layouts::native_load_layouts;
 use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -254,7 +255,18 @@ pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let funcs = [
-        ("to_bytes", native_to_bytes as RawSafeNative),
+        ("native_load_layout", native_load_layouts as RawSafeNative),
+        ("native_to_bytes", native_to_bytes),
+        ("native_serialized_size", native_serialized_size),
+        (
+            "native_constant_serialized_size",
+            native_constant_serialized_size,
+        ),
+        // Note: These 3 functions are kept as natives for replay only. New frameworks have these
+        //       as non-native functions and so any linking will be resolved to these non-natives.
+        //       For old framework code, these functions are native, and so the implementations
+        //       must be available during replay.
+        ("to_bytes", native_to_bytes),
         ("serialized_size", native_serialized_size),
         ("constant_serialized_size", native_constant_serialized_size),
     ];

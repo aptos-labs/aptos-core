@@ -4,9 +4,11 @@
 
 use crate::{
     module_traversal::TraversalContext,
+    native_functions::NativeContext,
     storage::{
-        loader::traits::StructDefinitionLoader, module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::LayoutConverter,
+        loader::{native::NativeLoader, traits::StructDefinitionLoader},
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
     ModuleStorage,
 };
@@ -16,25 +18,28 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    language_storage::{StructTag, TypeTag},
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter, ModuleTraversalContext},
+    gas::{GasMeter, ModuleTraversalContext, UnmeteredGasMeter, UnvisitableModuleTraversalContext},
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
     value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::{
+    collections::btree_map::{BTreeMap, Entry},
+    sync::Arc,
+};
 
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
 pub(crate) struct DataCacheEntry {
     struct_tag: StructTag,
-    layout: MoveTypeLayout,
+    layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
     value: GlobalValue,
 }
@@ -81,7 +86,7 @@ impl TransactionDataCache {
         traversal_context: &TraversalContext,
     ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
-            |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
+            |value: Value, layout: Arc<MoveTypeLayout>, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
                 ValueSerDeContext::new()
                     .with_function_value_extension(&function_value_extension, traversal_context)
@@ -99,7 +104,7 @@ impl TransactionDataCache {
     /// produced effects for resources.
     pub fn into_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        resource_converter: &dyn Fn(Value, Arc<MoveTypeLayout>, bool) -> PartialVMResult<Resource>,
     ) -> PartialVMResult<Changes<Resource>> {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
@@ -142,17 +147,70 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
-        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
-            TypeTag::Struct(struct_tag) => *struct_tag,
-            _ => {
-                // Since every resource is a struct, the tag must be also a struct tag.
-                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
-            },
-        };
-
+        let struct_tag = module_storage
+            .runtime_environment()
+            .struct_ty_to_struct_tag(ty)?;
         let layout_with_delayed_fields = layout_converter
             .type_to_type_layout_with_delayed_field_check(gas_meter, traversal_context, ty)?;
 
+        Self::create_data_cache_entry_impl(
+            struct_tag,
+            layout_with_delayed_fields,
+            gas_meter,
+            traversal_context,
+            module_storage,
+            resource_resolver,
+            addr,
+        )
+    }
+
+    /// Retrieves data from remote storage, constructing a [DataCacheEntry]. This method is only
+    /// used by the native context where there is no layout construction and no access to the gas
+    /// meter.
+    pub(crate) fn create_data_cache_entry_for_native_context(
+        native_context: &NativeContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        let loader = NativeLoader::new(native_context.module_storage());
+        let layout_converter = LayoutConverter::new(&loader);
+
+        // These will not be used for any metering, only for checks (if lazy loading is enabled).
+        let mut gas_meter = UnmeteredGasMeter;
+        let mut traversal_context =
+            UnvisitableModuleTraversalContext::new(native_context.traversal_context());
+
+        let struct_tag = native_context
+            .module_storage()
+            .runtime_environment()
+            .struct_ty_to_struct_tag(ty)?;
+        let layout_with_delayed_fields = layout_converter
+            .type_to_type_layout_with_delayed_field_check(
+                &mut gas_meter,
+                &mut traversal_context,
+                ty,
+            )?;
+
+        Self::create_data_cache_entry_impl(
+            struct_tag,
+            layout_with_delayed_fields,
+            &mut gas_meter,
+            &mut traversal_context,
+            native_context.module_storage(),
+            native_context.resource_resolver(),
+            addr,
+        )
+    }
+
+    fn create_data_cache_entry_impl(
+        struct_tag: StructTag,
+        layout_with_delayed_fields: LayoutWithDelayedFields,
+        _gas_meter: &mut impl GasMeter,
+        traversal_context: &mut impl ModuleTraversalContext,
+        module_storage: &dyn ModuleStorage,
+        resource_resolver: &dyn ResourceResolver,
+        addr: &AccountAddress,
+    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
         let (data, bytes_loaded) = {
             let metadata = module_storage
                 .fetch_existing_module_metadata(

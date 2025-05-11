@@ -714,6 +714,14 @@ module std::features {
         is_enabled(ORDERLESS_TRANSACTIONS)
     }
 
+    /// Whether lazy loading is enabled.
+    /// Lifetime: transient
+    const ENABLE_LAZY_LOADING: u64 = 95;
+
+    public fun is_lazy_loading_enabled(): bool acquires Features {
+        is_enabled(ENABLE_LAZY_LOADING)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
