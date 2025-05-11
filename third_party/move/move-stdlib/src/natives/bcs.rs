@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
+use crate::natives::{helpers::make_module_natives, layouts::make_native_load_layouts};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
@@ -107,7 +107,10 @@ pub struct GasParameters {
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [("to_bytes", make_native_to_bytes(gas_params.to_bytes))];
+    let natives = [
+        ("native_load_layout", make_native_load_layouts()),
+        ("native_to_bytes", make_native_to_bytes(gas_params.to_bytes)),
+    ];
 
     make_module_natives(natives)
 }

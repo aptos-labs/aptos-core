@@ -19,6 +19,7 @@ events emitted to a handle and emit events to the event store.
 -  [Function `counter`](#0x1_event_counter)
 -  [Function `write_to_event_store`](#0x1_event_write_to_event_store)
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
+-  [Function `native_load_layout`](#0x1_event_native_load_layout)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -29,6 +30,7 @@ events emitted to a handle and emit events to the event store.
     -  [Function `counter`](#@Specification_1_counter)
     -  [Function `write_to_event_store`](#@Specification_1_write_to_event_store)
     -  [Function `destroy_handle`](#@Specification_1_destroy_handle)
+    -  [Function `native_load_layout`](#@Specification_1_native_load_layout)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -107,6 +109,8 @@ Emit a module event with payload <code>msg</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: T) {
+    // TODO(lazy-loading): no feature gating <b>to</b> experiment <b>with</b> performance.
+    <a href="event.md#0x1_event_native_load_layout">native_load_layout</a>&lt;T&gt;();
     <a href="event.md#0x1_event_write_module_event_to_store">write_module_event_to_store</a>&lt;T&gt;(msg);
 }
 </code></pre>
@@ -185,6 +189,7 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop + store&gt;(handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;, msg: T) {
+    <a href="event.md#0x1_event_native_load_layout">native_load_layout</a>&lt;T&gt;();
     <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&handle_ref.<a href="guid.md#0x1_guid">guid</a>), handle_ref.counter, msg);
     <b>spec</b> {
         <b>assume</b> handle_ref.counter + 1 &lt;= MAX_U64;
@@ -293,6 +298,28 @@ Destroy a unique handle.
 <pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop + store&gt;(handle: <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;) {
     <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; { counter: _, <a href="guid.md#0x1_guid">guid</a>: _ } = handle;
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_event_native_load_layout"></a>
+
+## Function `native_load_layout`
+
+
+
+<pre><code><b>fun</b> <a href="event.md#0x1_event_native_load_layout">native_load_layout</a>&lt;T&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_native_load_layout">native_load_layout</a>&lt;T&gt;();
 </code></pre>
 
 
@@ -491,6 +518,23 @@ Native function use opaque.
 
 <pre><code>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_native_load_layout"></a>
+
+### Function `native_load_layout`
+
+
+<pre><code><b>fun</b> <a href="event.md#0x1_event_native_load_layout">native_load_layout</a>&lt;T&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 </code></pre>
 
 

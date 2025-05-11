@@ -248,7 +248,7 @@ impl LazyLoadedFunction {
         fun_id: &IdentStr,
         ty_args: &[TypeTag],
         mask: ClosureMask,
-        captured_layouts: &[MoveTypeLayout],
+        captured_layouts: &[Arc<MoveTypeLayout>],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
         let function = module_storage
             .load_function(module_id, fun_id, ty_args)

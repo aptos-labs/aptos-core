@@ -957,8 +957,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         //TODO: replace this dummy value with actual txn return value
         let a = SerializedReturnValues {
-            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
-            return_values: vec![(vec![0], MoveTypeLayout::U8)],
+            mutable_reference_outputs: vec![(0, vec![0], Arc::new(MoveTypeLayout::U8))],
+            return_values: vec![(vec![0], Arc::new(MoveTypeLayout::U8))],
         };
         Ok((output, a))
     }

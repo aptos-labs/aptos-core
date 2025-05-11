@@ -27,16 +27,16 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, sync::Arc};
 
 /// Return values from function execution in [MoveVm].
 #[derive(Debug)]
 pub struct SerializedReturnValues {
     /// The value of any arguments that were mutably borrowed. Non-mut borrowed values are not
     /// included.
-    pub mutable_reference_outputs: Vec<(LocalIndex, Vec<u8>, MoveTypeLayout)>,
+    pub mutable_reference_outputs: Vec<(LocalIndex, Vec<u8>, Arc<MoveTypeLayout>)>,
     /// The return values from the function.
-    pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
+    pub return_values: Vec<(Vec<u8>, Arc<MoveTypeLayout>)>,
 }
 
 /// Move VM is completely stateless. It is used to execute a single loaded function with its type
@@ -273,7 +273,7 @@ fn serialize_return_value(
     traversal_context: &mut TraversalContext,
     ty: &Type,
     value: Value,
-) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
+) -> PartialVMResult<(Vec<u8>, Arc<MoveTypeLayout>)> {
     let (ty, value) = match ty.get_ref_inner_ty() {
         Some(inner_ty) => {
             let ref_value: Reference = value.cast()?;
@@ -314,7 +314,7 @@ fn serialize_return_values(
     traversal_context: &mut TraversalContext,
     return_tys: &[Type],
     return_values: Vec<Value>,
-) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
+) -> PartialVMResult<Vec<(Vec<u8>, Arc<MoveTypeLayout>)>> {
     if return_tys.len() != return_values.len() {
         return Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(

@@ -7,6 +7,7 @@ use crate::{
     interpreter::InterpreterDebugInterface,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
+    native_layout_cache::NativeLayoutCache,
     storage::{
         loader::native::NativeLoader,
         module_storage::FunctionValueExtensionAdapter,
@@ -111,6 +112,9 @@ pub struct NativeContext<'a, 'b> {
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
     traversal_context: &'a TraversalContext<'a>,
+    /// Stores all layouts available to the native functions. If layouts are not available, they
+    /// must be loaded beforehand.
+    native_layout_cache: &'a NativeLayoutCache,
 
     /// Counter used to record the (conceptual) heap memory usage by a native functions,
     /// measured in abstract memory unit.
@@ -129,6 +133,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
         traversal_context: &'a TraversalContext<'a>,
+        native_layout_cache: &'a NativeLayoutCache,
     ) -> Self {
         Self {
             interpreter,
@@ -138,6 +143,7 @@ impl<'a, 'b> NativeContext<'a, 'b> {
             extensions,
             gas_balance,
             traversal_context,
+            native_layout_cache,
 
             heap_memory_usage: 0,
         }
@@ -145,6 +151,13 @@ impl<'a, 'b> NativeContext<'a, 'b> {
 }
 
 impl<'b> NativeContext<'_, 'b> {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        self.module_storage
+            .runtime_environment()
+            .vm_config()
+            .enable_lazy_loading
+    }
+
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
@@ -160,19 +173,10 @@ impl<'b> NativeContext<'_, 'b> {
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
         Ok(if !self.data_store.contains_resource(&address, ty) {
-            let loader = NativeLoader::new(self.module_storage);
-            let layout_converter = LayoutConverter::new(&loader);
-            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-                &layout_converter,
-                // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
-                // be visited.
-                &mut UnmeteredGasMeter,
-                &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
-                self.module_storage,
-                self.resource_resolver,
-                &address,
-                ty,
-            )?;
+            let (entry, bytes_loaded) =
+                TransactionDataCache::create_data_cache_entry_for_native_context(
+                    self, &address, ty,
+                )?;
             let exists = entry.value().exists()?;
             self.data_store
                 .insert_resource(address, ty.clone(), entry)?;
@@ -191,14 +195,19 @@ impl<'b> NativeContext<'_, 'b> {
         &self,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        let loader = NativeLoader::new(self.module_storage);
-        LayoutConverter::new(&loader).type_to_type_layout_with_delayed_fields(
-            // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
-            // be visited.
-            &mut UnmeteredGasMeter,
-            &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
-            ty,
-        )
+        if self.is_lazy_loading_enabled() {
+            self.native_layout_cache
+                .type_to_type_layout_with_delayed_fields(ty)
+        } else {
+            let loader = NativeLoader::new(self.module_storage);
+            LayoutConverter::new(&loader).type_to_type_layout_with_delayed_fields(
+                // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
+                // be visited.
+                &mut UnmeteredGasMeter,
+                &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
+                ty,
+            )
+        }
     }
 
     /// Returns the annotated layout of a type. If type contains delayed fields, returns [None].
@@ -207,21 +216,29 @@ impl<'b> NativeContext<'_, 'b> {
     pub fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
-        let loader = NativeLoader::new(self.module_storage);
-        let layout = LayoutConverter::new(&loader)
-            .type_to_annotated_type_layout_with_delayed_fields(
-                // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
-                // be visited.
+    ) -> PartialVMResult<Option<Arc<MoveTypeLayout>>> {
+        let layout = if self.is_lazy_loading_enabled() {
+            self.native_layout_cache
+                .type_to_annotated_type_layout_with_delayed_fields(ty)?
+        } else {
+            let loader = NativeLoader::new(self.module_storage);
+            LayoutConverter::new(&loader).type_to_annotated_type_layout_with_delayed_fields(
+                // Gas meter will be ignored here. Passing as a no-op. All modules are expected
+                // to be visited.
                 &mut UnmeteredGasMeter,
                 &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
                 ty,
-            )?;
+            )?
+        };
         Ok(layout.into_layout_when_has_no_delayed_fields())
     }
 
     pub fn module_storage(&self) -> &dyn ModuleStorage {
         self.module_storage
+    }
+
+    pub(crate) fn resource_resolver(&self) -> &dyn ResourceResolver {
+        self.resource_resolver
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {

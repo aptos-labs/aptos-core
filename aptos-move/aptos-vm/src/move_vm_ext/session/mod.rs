@@ -170,7 +170,7 @@ where
         let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,
-                                  layout: MoveTypeLayout,
+                                  layout: Arc<MoveTypeLayout>,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
             let serialization_result = if has_aggregator_lifting {
@@ -181,7 +181,7 @@ where
                     .with_delayed_fields_serde()
                     .with_function_value_extension(&function_extension, traversal_context)
                     .serialize(&value, &layout)?
-                    .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
+                    .map(|bytes| (bytes.into(), Some(layout)))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
@@ -423,7 +423,7 @@ where
         woc: &WriteOpConverter,
         change_set: ChangeSet,
         resource_group_change_set: ResourceGroupChangeSet,
-        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         legacy_resource_creation_as_modification: bool,

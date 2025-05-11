@@ -66,7 +66,14 @@ module aptos_std::from_bcs {
     /// owned.
     ///
     /// Function would abort if T has signer in it.
-    native friend fun from_bytes<T>(bytes: vector<u8>): T;
+    friend fun from_bytes<T>(bytes: vector<u8>): T {
+        native_load_layout<T>();
+        native_from_bytes<T>(bytes)
+    }
+
+    native fun native_load_layout<T>();
+    native fun native_from_bytes<T>(bytes: vector<u8>): T;
+
     friend aptos_std::any;
     friend aptos_std::copyable_any;
 
