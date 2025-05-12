@@ -6,6 +6,7 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
+use strum::EnumIter;
 
 /// A grouping of common information between all networking code for logging.
 /// This should greatly reduce the groupings between these given everywhere, and will allow
@@ -74,7 +75,7 @@ impl NetworkContext {
 /// and handshakes should verify that the NetworkId being used is the same during a handshake,
 /// to effectively ensure communication is restricted to a network.  Network should be checked that
 /// it is not the `DEFAULT_NETWORK`
-#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord, EnumIter)]
 #[repr(u8)]
 pub enum NetworkId {
     Validator = 0,

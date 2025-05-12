@@ -280,11 +280,11 @@ impl ConsensusObserver {
                 Some(futs)
             } else {
                 warn!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
-                                ordered_block.proof_block_info()
-                            ))
-                        );
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                        ordered_block.proof_block_info()
+                    ))
+                );
                 return;
             };
             for block in ordered_block.blocks() {

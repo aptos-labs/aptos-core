@@ -71,7 +71,7 @@ impl Default for ConsensusObserverConfig {
             garbage_collection_interval_ms: 60_000,            // 60 seconds
             max_num_pending_blocks: 100,                       // 100 blocks
             progress_check_interval_ms: 5_000,                 // 5 seconds
-            max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
+            max_concurrent_subscriptions: 1,                   // 1 stream should be sufficient
             max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
             max_subscription_timeout_ms: 15_000,               // 15 seconds
             subscription_peer_change_interval_ms: 180_000,     // 3 minutes
