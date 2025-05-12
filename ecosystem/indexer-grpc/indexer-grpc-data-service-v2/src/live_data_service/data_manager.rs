@@ -3,9 +3,11 @@
 
 use crate::metrics::{
     CACHE_END_VERSION, CACHE_SIZE_BYTES, CACHE_SIZE_LIMIT_BYTES, CACHE_START_VERSION, COUNTER,
+    LATENCY_MS,
 };
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, trace, warn};
 
 // TODO(grao): Naive implementation for now. This can be replaced by a more performant
@@ -88,6 +90,14 @@ impl DataManager {
             self.end_version = end_version;
             if self.start_version + (self.num_slots as u64) < end_version {
                 self.start_version = end_version - self.num_slots as u64;
+            }
+            if let Some(txn_timestamp) = self.get_data(end_version - 1).as_ref().unwrap().timestamp
+            {
+                let timestamp_since_epoch =
+                    Duration::new(txn_timestamp.seconds as u64, txn_timestamp.nanos as u32);
+                let now_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                let latency = now_since_epoch.saturating_sub(timestamp_since_epoch);
+                LATENCY_MS.set(latency.as_millis() as i64);
             }
         }
 

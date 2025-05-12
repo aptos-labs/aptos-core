@@ -109,7 +109,7 @@ static INCONCLUSIVE_DIAG_STARTS: Lazy<Regex> = Lazy::new(|| {
 static INCONSISTENCY_DIAG_STARTS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^inconsistency_detected\((?P<args>[^)]*)\)").unwrap());
 
-impl<'env> BoogieWrapper<'env> {
+impl BoogieWrapper<'_> {
     /// Calls boogie on the given file. On success, returns a struct representing the analyzed
     /// output of boogie.
     pub fn call_boogie(&self, boogie_file: &str) -> anyhow::Result<BoogieOutput> {
@@ -1659,7 +1659,7 @@ impl From<ParseIntError> for ModelParseError {
 
 const MODEL_END_MARKER: &str = "*** END_MODEL";
 
-impl<'s> ModelParser<'s> {
+impl ModelParser<'_> {
     fn skip_space(&mut self) {
         while self.input[self.at..].starts_with(|ch| [' ', '\r', '\n', '\t'].contains(&ch)) {
             self.at = usize::saturating_add(self.at, 1);

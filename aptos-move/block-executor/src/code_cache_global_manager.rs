@@ -102,10 +102,7 @@ where
 
         // Next, check the environment. If the current environment has not been set, or is
         // different, we reset it to the new one, and flush the module cache.
-        let environment_requires_update = self
-            .environment
-            .as_ref()
-            .map_or(true, |environment| environment != &storage_environment);
+        let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             self.environment = Some(storage_environment);
             self.module_cache.flush();
@@ -226,7 +223,7 @@ pub enum AptosModuleCacheManagerGuard<'a> {
     },
 }
 
-impl<'a> AptosModuleCacheManagerGuard<'a> {
+impl AptosModuleCacheManagerGuard<'_> {
     /// Returns the references to the environment. If environment is not set, panics.
     pub fn environment(&self) -> &AptosEnvironment {
         use AptosModuleCacheManagerGuard::*;
@@ -290,13 +287,20 @@ fn prefetch_aptos_framework(
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
     // If framework code exists in storage, the transitive closure will be verified and cached.
-    let maybe_loaded = code_storage
-        .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
-        .map_err(|err| {
-            // There should be no errors when pre-fetching the framework, if there are, we
-            // better return an error here.
-            PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-        })?;
+    let maybe_loaded = if cfg!(fuzzing) {
+        code_storage.fetch_module_skip_verification(
+            &AccountAddress::ONE,
+            ident_str!("transaction_validation"),
+        )
+    } else {
+        code_storage
+            .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+    }
+    .map_err(|err| {
+        // There should be no errors when pre-fetching the framework, if there are, we
+        // better return an error here.
+        PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+    })?;
 
     if maybe_loaded.is_some() {
         // Framework must have been loaded. Drain verified modules from local cache into

@@ -23,12 +23,12 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::state_key::StateKey,
     transaction::{
-        block_epilogue::BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus, Module, Multisig,
-        MultisigTransactionPayload, RawTransaction, ReplayProtector, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionExecutable, TransactionExtraConfig, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionPayloadInner, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        block_epilogue::BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus,
+        IndexedTransactionSummary, Module, Multisig, MultisigTransactionPayload, RawTransaction,
+        ReplayProtector, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable,
+        TransactionExtraConfig, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionPayloadInner, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -62,6 +62,29 @@ use std::{
     iter::Iterator,
     sync::Arc,
 };
+
+impl Arbitrary for IndexedTransactionSummary {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (
+            any::<AccountAddress>(),
+            any::<ReplayProtector>(),
+            any::<Version>(),
+            any::<HashValue>(),
+        )
+            .prop_map(|(sender, replay_protector, version, transaction_hash)| {
+                IndexedTransactionSummary::V1 {
+                    sender,
+                    replay_protector,
+                    version,
+                    transaction_hash,
+                }
+            })
+            .boxed()
+    }
+}
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
@@ -129,7 +152,7 @@ impl EventKey {
         account_address_strategy: impl Strategy<Value = AccountAddress>,
     ) -> impl Strategy<Value = Self> {
         // We only generate small counters so that it won't overflow.
-        (account_address_strategy, 0..std::u64::MAX / 2)
+        (account_address_strategy, 0..u64::MAX / 2)
             .prop_map(|(account_address, counter)| EventKey::new(counter, account_address))
     }
 }
@@ -797,7 +820,7 @@ impl EventHandle {
         event_key_strategy: impl Strategy<Value = EventKey>,
     ) -> impl Strategy<Value = Self> {
         // We only generate small counters so that it won't overflow.
-        (event_key_strategy, 0..std::u64::MAX / 2)
+        (event_key_strategy, 0..u64::MAX / 2)
             .prop_map(|(event_key, counter)| EventHandle::new(event_key, counter))
     }
 }

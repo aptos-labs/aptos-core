@@ -3,7 +3,12 @@ module aptos_experimental::pending_order_book_index {
     use std::vector;
     use aptos_framework::timestamp;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_experimental::order_book_types::{OrderIdType, UniqueIdxType, TriggerCondition, new_default_big_ordered_map};
+    use aptos_experimental::order_book_types::{
+        OrderIdType,
+        UniqueIdxType,
+        TriggerCondition,
+        new_default_big_ordered_map
+    };
 
     friend aptos_experimental::order_book;
 
@@ -28,7 +33,7 @@ module aptos_experimental::pending_order_book_index {
         PendingOrderBookIndex::V1 {
             price_move_up_index: new_default_big_ordered_map(),
             price_move_down_index: new_default_big_ordered_map(),
-            time_based_index: new_default_big_ordered_map(),
+            time_based_index: new_default_big_ordered_map()
         }
     }
 

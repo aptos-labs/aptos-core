@@ -66,7 +66,7 @@ pub struct StateUpdateRef<'kv> {
     pub value: Option<&'kv StateValue>,
 }
 
-impl<'kv> StateUpdateRef<'kv> {
+impl StateUpdateRef<'_> {
     pub fn to_db_state_update(&self, access_time_secs: u32) -> DbStateUpdate {
         DbStateUpdate {
             version: self.version,

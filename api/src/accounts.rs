@@ -424,7 +424,8 @@ impl Account {
         }
     }
 
-    pub fn get_account_resource(&self) -> Result<Option<Vec<u8>>, BasicErrorWith404> {
+    /// Retrieves the account resource for the associated account
+    fn get_account_resource(&self) -> Result<Option<Vec<u8>>, BasicErrorWith404> {
         let state_key =
             StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
                 BasicErrorWith404::internal_with_code(

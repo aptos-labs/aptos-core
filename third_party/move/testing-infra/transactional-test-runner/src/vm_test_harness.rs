@@ -366,7 +366,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 }
 
-impl<'a> SimpleVMTestAdapter<'a> {
+impl SimpleVMTestAdapter<'_> {
     fn execute_loaded_function(
         &mut self,
         function: LoadedFunction,

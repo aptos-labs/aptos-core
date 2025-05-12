@@ -587,7 +587,7 @@ impl StateStore {
                 .into_iter()
                 .enumerate()
                 .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
-                .last()
+                .next_back()
                 .map(|(idx, _)| idx);
 
             let state_update_refs = StateUpdateRefs::index_write_sets(
@@ -886,7 +886,7 @@ impl StateStore {
                     value: old_value_opt,
                 }) = old_entry
                 {
-                    if old_value_opt.map_or(false, |old_val| !old_val.is_hot_non_existent()) {
+                    if old_value_opt.is_some_and(|old_val| !old_val.is_hot_non_existent()) {
                         // The value at `old_version` can be pruned once the pruning window hits
                         // this `version`.
                         Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
@@ -986,7 +986,7 @@ impl StateStore {
             version,
             start_idx,
         )?
-        .map(|it| it.map_err(Into::into))
+        .map(|it| it)
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1007,7 +1007,7 @@ impl StateStore {
             first_index,
         )?
         .take(chunk_size)
-        .map(|it| it.map_err(Into::into));
+        .map(|it| it);
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {
@@ -1062,7 +1062,6 @@ impl StateStore {
     ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
         aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
             .get_all_nodes_referenced(version)
-            .map_err(Into::into)
     }
 
     #[cfg(test)]

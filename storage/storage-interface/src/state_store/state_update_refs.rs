@@ -63,7 +63,7 @@ pub struct BatchedStateUpdateRefs<'kv> {
     pub shards: [HashMap<&'kv StateKey, StateUpdateRef<'kv>>; NUM_STATE_SHARDS],
 }
 
-impl<'kv> BatchedStateUpdateRefs<'kv> {
+impl BatchedStateUpdateRefs<'_> {
     pub fn new_empty(first_version: Version, num_versions: usize) -> Self {
         Self {
             first_version,

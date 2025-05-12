@@ -78,7 +78,7 @@ impl CachedPackageRegistry {
     }
 
     /// Finds the metadata for the given module in the registry by its unique name.
-    pub async fn get_module<'a>(
+    pub async fn get_module(
         &self,
         name: impl AsRef<str>,
     ) -> anyhow::Result<CachedModuleMetadata<'_>> {
@@ -94,7 +94,7 @@ impl CachedPackageRegistry {
     }
 
     /// Finds the metadata for the given package in the registry by its unique name.
-    pub async fn get_package<'a>(
+    pub async fn get_package(
         &self,
         name: impl AsRef<str>,
     ) -> anyhow::Result<CachedPackageMetadata<'_>> {
@@ -119,7 +119,7 @@ impl CachedPackageRegistry {
     }
 }
 
-impl<'a> CachedPackageMetadata<'a> {
+impl CachedPackageMetadata<'_> {
     pub fn name(&self) -> &str {
         &self.metadata.name
     }
@@ -243,7 +243,7 @@ impl<'a> CachedPackageMetadata<'a> {
     }
 }
 
-impl<'a> CachedModuleMetadata<'a> {
+impl CachedModuleMetadata<'_> {
     pub fn name(&self) -> &str {
         &self.metadata.name
     }

@@ -656,13 +656,23 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             gas_unit_price,
             expiration_timestamp_secs,
             payload,
+            replay_protection_nonce,
         } = user_transaction_request;
         Ok(RawTransaction::new(
             sender.into(),
-            sequence_number.into(),
-            // TODO[Orderless]: Change nonce from None to replay_protection_nonce.map(|nonce| nonce.into())
-            self.try_into_aptos_core_transaction_payload(payload, None)
-                .context("Failed to parse transaction payload")?,
+            // The `sequence_number` field is not used for processing orderless transactions.
+            // However, the `SignedTransaction` strucut has a mandatory sequence_number field.
+            // So, for orderless transactions, we chose to set the sequence_number to u64::MAX.
+            if replay_protection_nonce.is_none() {
+                sequence_number.into()
+            } else {
+                u64::MAX
+            },
+            self.try_into_aptos_core_transaction_payload(
+                payload,
+                replay_protection_nonce.map(|nonce| nonce.into()),
+            )
+            .context("Failed to parse transaction payload")?,
             max_gas_amount.into(),
             gas_unit_price.into(),
             expiration_timestamp_secs.into(),

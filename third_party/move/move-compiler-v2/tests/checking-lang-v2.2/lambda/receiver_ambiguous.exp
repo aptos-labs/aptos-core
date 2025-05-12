@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: undeclared receiver function `bar` for type `Func`
+  ┌─ tests/checking-lang-v2.2/lambda/receiver_ambiguous.move:8:9
+  │
+8 │         f.bar()
+  │         ^^^^^^^
+  │
+  = if you intend to call the closure stored in field `bar`, surround the entire field access with parenthesis `()`
+
+error: undeclared receiver function `bar` for type `Func`
+   ┌─ tests/checking-lang-v2.2/lambda/receiver_ambiguous.move:20:9
+   │
+20 │         f.bar()
+   │         ^^^^^^^
+   │
+   = if you intend to call the closure stored in field `bar`, surround the entire field access with parenthesis `()`
+
+error: undeclared receiver function `bar` for type `Func`
+   ┌─ tests/checking-lang-v2.2/lambda/receiver_ambiguous.move:32:9
+   │
+32 │         f.bar()
+   │         ^^^^^^^
+
+error: undeclared receiver function `0` for type `Func`
+   ┌─ tests/checking-lang-v2.2/lambda/receiver_ambiguous.move:41:9
+   │
+41 │         f.0(1)
+   │         ^^^^^^
+   │
+   = if you intend to call the closure stored in field `0`, surround the entire field access with parenthesis `()`

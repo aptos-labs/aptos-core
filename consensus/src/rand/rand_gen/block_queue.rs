@@ -199,7 +199,7 @@ mod tests {
             assert_eq!(
                 queue
                     .item_mut(round)
-                    .map_or(false, |item| item.offsets_by_round.contains_key(&round)),
+                    .is_some_and(|item| item.offsets_by_round.contains_key(&round)),
                 exists_rounds.contains(&round)
             );
         }

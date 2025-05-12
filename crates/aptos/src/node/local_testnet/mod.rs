@@ -111,7 +111,7 @@ impl RunLocalnet {
     /// Wait for many services to start up. This prints a message like "X is starting,
     /// please wait..." for each service and then "X is ready. Endpoint: <url>"
     /// when it's ready.
-    async fn wait_for_startup<'a>(
+    async fn wait_for_startup(
         &self,
         health_checkers: &HashSet<HealthChecker>,
         test_dir: &Path,

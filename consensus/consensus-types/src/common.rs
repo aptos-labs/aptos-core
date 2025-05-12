@@ -26,7 +26,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fmt::{self, Write},
-    u64,
 };
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases

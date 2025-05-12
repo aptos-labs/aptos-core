@@ -1631,6 +1631,15 @@ impl Type {
     pub fn is_tuple(&self) -> bool {
         matches!(self, Type::Tuple(_))
     }
+
+    /// Returns true if this type is a reference to a reference.
+    pub fn is_reference_to_a_reference(&self) -> bool {
+        if let Type::Reference(_, bt) = self {
+            bt.is_reference()
+        } else {
+            false
+        }
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
@@ -3208,9 +3217,28 @@ impl TypeUnificationError {
                         main_msg
                     },
                     Constraint::SomeReceiverFunction(name, ..) => {
+                        let name_display =
+                            name.display(display_context.env.symbol_pool()).to_string();
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            let sid = &mid.qualified_inst(*sid, inst.clone());
+                            let (field_decls, _) =
+                                unification_context.get_struct_field_decls(sid, *name);
+                            let field_is_function = !field_decls.is_empty()
+                                && field_decls
+                                    .iter()
+                                    .all(|(_, field_type)| field_type.is_function());
+                            if field_is_function {
+                                let hint = format!(
+                                    "if you intend to call the closure stored in field `{}`, \
+                                    surround the entire field access with parenthesis `()`",
+                                    name_display
+                                );
+                                hints.push(hint);
+                            }
+                        }
                         format!(
                             "undeclared receiver function `{}` for type `{}`",
-                            name.display(display_context.env.symbol_pool()),
+                            name_display,
                             ty.display(display_context)
                         )
                     },
@@ -3476,7 +3504,7 @@ impl Type {
     }
 }
 
-impl<'a> fmt::Display for TypeDisplay<'a> {
+impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Type::*;
         let comma_list = |f: &mut Formatter<'_>, ts: &[Type]| -> fmt::Result {
@@ -3511,13 +3539,19 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
-                write!(f, "{}", a.display(self.context))?;
+                if !a.is_unit() {
+                    write!(f, "{}", a.display(self.context))?;
+                }
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))?;
+                    if t.is_function() {
+                        write!(f, "({})", t.display(self.context))?;
+                    } else {
+                        write!(f, "{}", t.display(self.context))?;
+                    }
                 }
                 if !abilities.is_empty() {
-                    write!(f, " with {}", abilities)
+                    write!(f, " has {}", abilities)
                 } else {
                     Ok(())
                 }
@@ -3583,7 +3617,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
     }
 }
 
-impl<'a> TypeDisplay<'a> {
+impl TypeDisplay<'_> {
     fn type_var_str(&self, idx: u32) -> String {
         if self.context.display_type_vars {
             format!("_{}", idx)
@@ -3745,7 +3779,7 @@ impl<'a> AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityContext for AbilityInferer<'a> {
+impl AbilityContext for AbilityInferer<'_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         self.type_params[idx as usize].clone()
     }
@@ -3763,4 +3797,4 @@ impl<'a> AbilityContext for AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityInference for AbilityInferer<'a> {}
+impl AbilityInference for AbilityInferer<'_> {}

@@ -340,11 +340,7 @@ impl BuiltPackage {
 
             // If enabled generate docs.
             if options.with_docs {
-                let docgen = if let Some(opts) = options.docgen_options.clone() {
-                    opts
-                } else {
-                    DocgenOptions::default()
-                };
+                let docgen = options.docgen_options.clone().unwrap_or_default();
                 let dep_paths = package
                     .deps_compiled_units
                     .iter()

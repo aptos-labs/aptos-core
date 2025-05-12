@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::transaction_by_account::TransactionByAccountSchema;
+use crate::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_schemadb::iterator::SchemaIterator;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
@@ -41,9 +41,9 @@ pub fn get_first_seq_num_and_limit(order: Order, cursor: u64, limit: u64) -> Res
     })
 }
 
-// This is a replicate of the AccountTransactionVersionIter from storage/aptosdb crate.
-pub struct AccountTransactionVersionIter<'a> {
-    inner: SchemaIterator<'a, TransactionByAccountSchema>,
+// This is a replicate of the AccountOrderedTransactionsIter from storage/aptosdb crate.
+pub struct AccountOrderedTransactionsIter<'a> {
+    inner: SchemaIterator<'a, OrderedTransactionByAccountSchema>,
     address: AccountAddress,
     expected_next_seq_num: Option<u64>,
     end_seq_num: u64,
@@ -51,9 +51,9 @@ pub struct AccountTransactionVersionIter<'a> {
     ledger_version: Version,
 }
 
-impl<'a> AccountTransactionVersionIter<'a> {
+impl<'a> AccountOrderedTransactionsIter<'a> {
     pub fn new(
-        inner: SchemaIterator<'a, TransactionByAccountSchema>,
+        inner: SchemaIterator<'a, OrderedTransactionByAccountSchema>,
         address: AccountAddress,
         end_seq_num: u64,
         ledger_version: Version,
@@ -69,7 +69,7 @@ impl<'a> AccountTransactionVersionIter<'a> {
     }
 }
 
-impl<'a> AccountTransactionVersionIter<'a> {
+impl AccountOrderedTransactionsIter<'_> {
     fn next_impl(&mut self) -> Result<Option<(u64, Version)>> {
         Ok(match self.inner.next().transpose()? {
             Some(((address, seq_num), version)) => {
@@ -117,7 +117,7 @@ impl<'a> AccountTransactionVersionIter<'a> {
     }
 }
 
-impl<'a> Iterator for AccountTransactionVersionIter<'a> {
+impl Iterator for AccountOrderedTransactionsIter<'_> {
     type Item = Result<(u64, Version)>;
 
     fn next(&mut self) -> Option<Self::Item> {

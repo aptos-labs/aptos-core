@@ -215,7 +215,7 @@ There is a code bug that breaks internal invariant
     // so that max_key never changes, and doesn't create conflict.
     ActiveOrderBook::V1 {
         buys: new_default_big_ordered_map(),
-        sells: new_default_big_ordered_map(),
+        sells: new_default_big_ordered_map()
     }
 }
 </code></pre>

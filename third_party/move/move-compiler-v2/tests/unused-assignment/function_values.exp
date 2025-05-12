@@ -1,0 +1,48 @@
+
+Diagnostics:
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/function_values.move:9:24
+  │
+9 │     inline fun warn_02(x: u64) {}
+  │                        ^
+
+
+Diagnostics:
+warning: Unused value of parameter `z`. Consider removing the parameter, or prefixing with an underscore (e.g., `_z`), or binding to `_`
+  ┌─ tests/unused-assignment/function_values.move:3:24
+  │
+3 │         let f = |x, y, z: u64| {
+  │                        ^
+
+warning: This assignment/binding to the left-hand-side variable `f` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_f`), or renaming to `_`
+  ┌─ tests/unused-assignment/function_values.move:3:17
+  │
+3 │           let f = |x, y, z: u64| {
+  │ ╭─────────────────^
+4 │ │             x + y
+5 │ │         };
+  │ ╰─────────^
+
+warning: This assignment/binding to the left-hand-side variable `g` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_g`), or renaming to `_`
+  ┌─ tests/unused-assignment/function_values.move:6:17
+  │
+6 │         let g = |x| |y| |z: u64| x + y + z;
+  │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/unused-assignment/function_values.move:20:18
+   │
+20 │         let f = |S{x}| 1;
+   │                  ^^^^
+
+warning: Unused value of parameter `f`. Consider removing the parameter, or prefixing with an underscore (e.g., `_f`), or binding to `_`
+   ┌─ tests/unused-assignment/function_values.move:24:17
+   │
+24 │     fun warn_03(f: |&u64| has drop) {
+   │                 ^
+
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/unused-assignment/function_values.move:32:17
+   │
+32 │         run(0, |x| 1);
+   │                 ^

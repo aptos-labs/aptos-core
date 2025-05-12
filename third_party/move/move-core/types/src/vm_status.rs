@@ -890,7 +890,7 @@ pub enum StatusCode {
     RESERVED_RUNTIME_ERROR_4 = 4043,
 
     // A reserved status to represent an unknown vm status.
-    // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in
+    // this is u64::MAX, but we can't pattern match on that, so put the hardcoded value in
     UNKNOWN_STATUS = 18446744073709551615,
 }
 }
@@ -949,7 +949,7 @@ impl<'de> de::Deserialize<'de> for StatusCode {
         D: de::Deserializer<'de>,
     {
         struct StatusCodeVisitor;
-        impl<'de> de::Visitor<'de> for StatusCodeVisitor {
+        impl de::Visitor<'_> for StatusCodeVisitor {
             type Value = StatusCode;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

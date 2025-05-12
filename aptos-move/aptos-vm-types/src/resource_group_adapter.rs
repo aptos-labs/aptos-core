@@ -142,9 +142,8 @@ impl<'r> ResourceGroupAdapter<'r> {
             //     In this case, disabled will lead to a different gas behavior,
             //     but gas is not relevant for those contexts.
             resource_groups_split_in_vm_change_set_enabled
-                && maybe_resource_group_view.map_or(false, |v| {
-                    v.is_resource_groups_split_in_change_set_capable()
-                }),
+                && maybe_resource_group_view
+                    .is_some_and(|v| v.is_resource_groups_split_in_change_set_capable()),
         );
 
         Self {

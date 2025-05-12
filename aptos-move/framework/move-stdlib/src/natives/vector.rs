@@ -69,7 +69,7 @@ fn native_move_range(
 
     if removal_position
         .checked_add(length)
-        .map_or(true, |end| end > from_len)
+        .is_none_or(|end| end > from_len)
         || insert_position > to_len
     {
         return Err(SafeNativeError::Abort {
