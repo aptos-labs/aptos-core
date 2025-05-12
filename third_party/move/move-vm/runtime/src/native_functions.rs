@@ -391,6 +391,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
         dispatch_loader!(&self.module_storage, loader, {
             TransactionDataCache::create_data_cache_entry(
+                &loader,
                 &LayoutConverter::new(&loader),
                 &mut self.gas_meter,
                 self.traversal_context,

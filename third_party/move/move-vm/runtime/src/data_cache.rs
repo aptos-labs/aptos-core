@@ -5,7 +5,8 @@
 use crate::{
     module_traversal::TraversalContext,
     storage::{
-        loader::traits::StructDefinitionLoader, module_storage::FunctionValueExtensionAdapter,
+        loader::traits::{ModuleMetadataLoader, StructDefinitionLoader},
+        module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::LayoutConverter,
     },
     ModuleStorage,
@@ -131,6 +132,7 @@ impl TransactionDataCache {
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
     pub(crate) fn create_data_cache_entry(
+        metadata_loader: &impl ModuleMetadataLoader,
         layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
@@ -154,12 +156,11 @@ impl TransactionDataCache {
         )?;
 
         let (data, bytes_loaded) = {
-            let metadata = module_storage
-                .fetch_existing_module_metadata(
-                    &struct_tag.address,
-                    struct_tag.module.as_ident_str(),
-                )
-                .map_err(|err| err.to_partial())?;
+            let metadata = metadata_loader.load_module_metadata(
+                gas_meter,
+                traversal_context,
+                &struct_tag.module_id(),
+            )?;
 
             // If we need to process delayed fields, we pass type layout to remote storage. Remote
             // storage, in turn ensures that all delayed field values are pre-processed.
