@@ -127,6 +127,7 @@ impl MoveVM {
                 deserialized_args,
                 data_cache,
                 module_storage,
+                loader,
                 &ty_depth_checker,
                 &layout_converter,
                 resource_resolver,
