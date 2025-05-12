@@ -621,25 +621,23 @@ module aptos_experimental::market {
                 // if maker settlement size is less than maker matched size
                 if (maker_settlement_size.is_none()) {
                     let remaining_size = maker_order.get_remaining_size();
-                    if (remaining_size != 0) {
-                        event::emit(
-                            OrderEvent {
-                                parent: self.parent,
-                                market: self.market,
-                                order_id,
-                                user: maker_address,
-                                orig_size: maker_order.get_orig_size(),
-                                remaining_size: 0,
-                                size_delta: remaining_size,
-                                price,
-                                is_buy: !is_buy,
-                                is_taker: true,
-                                status: ORDER_STATUS_CANCELLED,
-                                details: std::string::utf8(b"Max settlement size violation")
-                            }
-                        );
-                        self.order_book.cancel_order(maker_address, maker_order_id);
-                    }
+                    event::emit(
+                        OrderEvent {
+                        parent: self.parent,
+                            market: self.market,
+                            order_id,
+                            user: maker_address,
+                            orig_size: maker_order.get_orig_size(),
+                            remaining_size: 0,
+                            size_delta: remaining_size,
+                            price,
+                            is_buy: !is_buy,
+                            is_taker: true,
+                            status: ORDER_STATUS_CANCELLED,
+                            details: std::string::utf8(b"Max settlement size violation")
+                        }
+                    );
+                    self.order_book.cancel_order(maker_address, maker_order_id);
                 };
                 maker_settlement_size.destroy_some()
             };
@@ -718,7 +716,9 @@ module aptos_experimental::market {
                     }
                 );
                 // If the maker is invalid cancel the maker order and continue to the next maker order
-                self.order_book.cancel_order(maker_address, maker_order_id);
+                if (maker_order.get_remaining_size() != 0) {
+                    self.order_book.cancel_order(maker_address, maker_order_id);
+                }
             };
 
             let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
