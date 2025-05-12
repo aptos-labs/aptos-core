@@ -20,7 +20,7 @@ use move_binary_format::{
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
-    vm_status::{StatusType, VMStatus, StatusCode},
+    vm_status::{StatusCode, StatusType, VMStatus},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -165,7 +165,13 @@ pub(crate) fn check_for_invariant_violation(e: VMStatus) {
     });
 
     if !is_known_false_positive {
-        panic!("invariant violation {:?}\n{}{:?} {}", e, "RUST_BACKTRACE=1 DEBUG_VM_STATUS=", e.status_code(), "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>");
+        panic!(
+            "invariant violation {:?}\n{}{:?} {}",
+            e,
+            "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
+            e.status_code(),
+            "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
+        );
     }
 }
 
@@ -197,7 +203,11 @@ pub(crate) fn publish_group(
         TransactionStatus::Keep(status) => status,
         TransactionStatus::Discard(e) => {
             if e.status_type() == StatusType::InvariantViolation {
-                panic!("invariant violation via TransactionStatus: {:?}, {:?}", e, res.auxiliary_data());
+                panic!(
+                    "invariant violation via TransactionStatus: {:?}, {:?}",
+                    e,
+                    res.auxiliary_data()
+                );
             }
             return Err(Corpus::Keep);
         },
@@ -210,8 +220,14 @@ pub(crate) fn publish_group(
         ExecutionStatus::Success => Ok(()),
         ExecutionStatus::MiscellaneousError(e) => {
             if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation && *e != StatusCode::VERIFICATION_ERROR {
-                    panic!("invariant violation via ExecutionStatus: {:?}, {:?}", e, res.auxiliary_data());
+                if e.status_type() == StatusType::InvariantViolation
+                    && *e != StatusCode::VERIFICATION_ERROR
+                {
+                    panic!(
+                        "invariant violation via ExecutionStatus: {:?}, {:?}",
+                        e,
+                        res.auxiliary_data()
+                    );
                 }
             }
             Err(Corpus::Keep)

@@ -12,9 +12,9 @@ use hashbrown::HashSet;
 #[cfg(fuzzing)]
 use move_binary_format::access::ModuleAccess;
 use move_binary_format::{
+    access::ModuleAccess,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
-    access::ModuleAccess,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -123,10 +123,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
-
         self.fetch_verified_module(address, module_name)
-                .map_err(expect_no_verification_errors)?
-                .ok_or_else(|| module_linker_error!(address, module_name))
+            .map_err(expect_no_verification_errors)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns the module without verification, or [None] otherwise. The existing module can be

@@ -71,7 +71,13 @@ fn check_for_invariant_violation_vmerror(e: VMError) {
         });
 
         if !is_known_false_positive && e.status_type() == StatusType::InvariantViolation {
-            panic!("invariant violation {:?}\n{}{:?} {}", e, "RUST_BACKTRACE=1 DEBUG_VM_STATUS=", e.major_status(), "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>");
+            panic!(
+                "invariant violation {:?}\n{}{:?} {}",
+                e,
+                "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
+                e.major_status(),
+                "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
+            );
         }
     }
 }
