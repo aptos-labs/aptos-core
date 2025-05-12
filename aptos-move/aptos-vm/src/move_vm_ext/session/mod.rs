@@ -207,9 +207,13 @@ where
             .into_custom_effects(&resource_converter)
             .map_err(|e| e.finish(Location::Undefined))?;
 
-        let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(resolver, module_storage, change_set)
-                .map_err(|e| e.finish(Location::Undefined))?;
+        let (change_set, resource_group_change_set) = Self::split_and_merge_resource_groups(
+            resolver,
+            module_storage,
+            traversal_context,
+            change_set,
+        )
+        .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -328,6 +332,7 @@ where
     fn split_and_merge_resource_groups(
         resolver: &impl AptosMoveResolver,
         module_storage: &impl ModuleStorage,
+        traversal_context: &TraversalContext,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -358,9 +363,25 @@ where
 
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = {
+                    // MODULE METERING SAFETY:
+                    //   If this resource is in data cache, we must have already fetched metadata
+                    //   for its tag. Note that we do this check for lazy loading only because the
+                    //   eager loader was never traversing modules loaded due to metadata accesses.
+                    if module_storage
+                        .runtime_environment()
+                        .vm_config()
+                        .enable_lazy_loading
+                    {
+                        traversal_context
+                            .check_is_special_or_visited(&struct_tag.address, &struct_tag.module)?;
+                    }
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .unmetered_get_existing_module_metadata(
+                            &struct_tag.address,
+                            &struct_tag.module,
+                        )
                         .map_err(|e| e.to_partial())?;
+
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 };
 
