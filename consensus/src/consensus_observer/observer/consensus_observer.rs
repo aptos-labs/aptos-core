@@ -400,7 +400,7 @@ impl ConsensusObserver {
         let maybe_last_ordered_block = self
             .ordered_block_store
             .lock()
-            .get_ordered_block(block.epoch(), block.round());
+            .get_ordered_block(block.epoch(), block.quorum_cert().certified_block().round());
         if let Some(last_ordered_block) = maybe_last_ordered_block {
             last_ordered_block.last_block().pipeline_futs()
         } else {
