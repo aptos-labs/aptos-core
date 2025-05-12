@@ -14,6 +14,7 @@ use move_binary_format::access::ModuleAccess;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
+    access::ModuleAccess,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -122,31 +123,20 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
+
         self.fetch_verified_module(address, module_name)
-            .map_err(expect_no_verification_errors)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+                .map_err(expect_no_verification_errors)?
+                .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns the module without verification, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module.
-    #[cfg(fuzzing)]
-    fn fetch_module(
+    fn fetch_module_skip_verification(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
-
-    /// Returns the module without verification. If it does not exist, a linker error is returned.
-    #[cfg(fuzzing)]
-    fn fetch_existing_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
-        self.fetch_module(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
-    }
 
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
@@ -348,8 +338,7 @@ where
         )?))
     }
 
-    #[cfg(fuzzing)]
-    fn fetch_module(
+    fn fetch_module_skip_verification(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -370,7 +359,7 @@ where
         // Otherwise, load the module and its dependencies without verification
         let mut visited = HashSet::new();
         visited.insert(id.clone());
-        Ok(Some(visit_dependencies_and_load(
+        Ok(Some(visit_dependencies_and_skip_verification(
             id,
             module,
             version,
@@ -479,8 +468,7 @@ where
 
 /// Visits the dependencies of the given module and loads them without verification. If dependencies form a cycle,
 /// an error is returned.
-#[cfg(fuzzing)]
-fn visit_dependencies_and_load<T, E, V>(
+fn visit_dependencies_and_skip_verification<T, E, V>(
     module_id: ModuleId,
     module: Arc<ModuleCode<CompiledModule, Module, E>>,
     version: V,
@@ -523,7 +511,7 @@ where
 
         if visited.insert(dependency_id.clone()) {
             // Dependency is not loaded, and we have not visited it yet
-            let loaded_dependency = visit_dependencies_and_load(
+            let loaded_dependency = visit_dependencies_and_skip_verification(
                 dependency_id.clone(),
                 dependency,
                 dependency_version,

@@ -290,14 +290,10 @@ fn prefetch_aptos_framework(
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
     // If framework code exists in storage, the transitive closure will be verified and cached.
-    let maybe_loaded = {
-        #[cfg(fuzzing)]
-        let result =
-            code_storage.fetch_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
-        #[cfg(not(fuzzing))]
-        let result = code_storage
-            .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"));
-        result
+    let maybe_loaded = if cfg!(fuzzing) {
+        code_storage.fetch_module_skip_verification(&AccountAddress::ONE, ident_str!("transaction_validation"))
+    } else {
+        code_storage.fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
     }
     .map_err(|err| {
         // There should be no errors when pre-fetching the framework, if there are, we

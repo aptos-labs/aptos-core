@@ -70,8 +70,8 @@ fn check_for_invariant_violation_vmerror(e: VMError) {
                 .any(|known| msg.starts_with(known))
         });
 
-        if !is_known_false_positive {
-            panic!("invariant violation {:?}", e);
+        if !is_known_false_positive && e.status_type() == StatusType::InvariantViolation {
+            panic!("invariant violation {:?}\n{}{:?} {}", e, "RUST_BACKTRACE=1 DEBUG_VM_STATUS=", e.major_status(), "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>");
         }
     }
 }
@@ -376,7 +376,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                     && *e != StatusCode::TYPE_RESOLUTION_FAILURE
                     && *e != StatusCode::STORAGE_ERROR
                 {
-                    panic!("invariant violation {:?}", e);
+                    panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
                 }
             }
             return Err(Corpus::Keep);

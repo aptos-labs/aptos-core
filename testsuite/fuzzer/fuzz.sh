@@ -362,7 +362,7 @@ function run() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 #-ignore_crashes=1
     else
-        cargo_fuzz run $features --sanitizer none -O $fuzz_target $testcase -- -fork=15 -ignore_crashes=1
+        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=10 #-ignore_crashes=1
     fi
 }
 
