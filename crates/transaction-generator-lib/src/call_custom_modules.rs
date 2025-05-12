@@ -256,10 +256,11 @@ impl CustomModulesDelegationGeneratorCreator {
             ));
 
             let package = package_handler.pick_package(&mut rng, publisher.address());
-
-            requests_publish.push(publisher.sign_with_transaction_builder(
-                init_txn_factory.payload(package.publish_transaction_payload()),
-            ));
+            for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
+                requests_publish.push(
+                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
+                );
+            }
 
             packages.push((package, publisher));
         }

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{EntryFunction, TransactionPayload},
+};
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 /// The default address where the `large_packages.move` module is deployed.
@@ -20,6 +23,14 @@ pub enum PublishType {
     AccountDeploy,
     ObjectDeploy,
     ObjectUpgrade,
+}
+
+pub fn default_large_packages_module_address(chain_id: &ChainId) -> &'static str {
+    if chain_id.is_mainnet() || chain_id.is_testnet() {
+        LARGE_PACKAGES_PROD_MODULE_ADDRESS
+    } else {
+        LARGE_PACKAGES_DEV_MODULE_ADDRESS
+    }
 }
 
 pub fn chunk_package_and_create_payloads(
