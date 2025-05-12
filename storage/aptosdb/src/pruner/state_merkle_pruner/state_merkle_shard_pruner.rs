@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_schemadb::{batch::SchemaBatch, schema::KeyCodec, DB};
 use aptos_types::transaction::Version;
 use std::{marker::PhantomData, sync::Arc};
@@ -60,6 +60,7 @@ where
         current_progress: Version,
         target_version: Version,
     ) -> Result<()> {
+        error!("---- {} pruning {current_progress} - {target_version} ", S::name());
         loop {
             let mut batch = SchemaBatch::new();
             let (indices, next_version) = StateMerklePruner::get_stale_node_indices(
@@ -67,6 +68,7 @@ where
                 current_progress,
                 target_version,
             )?;
+            error!("---- {} got indices {:?}", S::name(), &indices);
 
             indices.into_iter().try_for_each(|index| {
                 batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
@@ -93,6 +95,7 @@ where
                 break;
             }
         }
+        error!(" {} done.", S::name());
 
         Ok(())
     }

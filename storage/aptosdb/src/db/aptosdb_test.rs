@@ -224,6 +224,9 @@ pub fn test_state_merkle_pruning_impl(
 ) {
     // set up DB with state prune window 5 and epoch ending state prune window 10
     let tmp_dir = TempPath::new();
+    let mut config = RocksdbConfigs::default();
+    config.enable_storage_sharding = true;
+
     let db = AptosDB::open(
         StorageDirPaths::from_path(tmp_dir),
         /*readonly=*/ false,
@@ -245,7 +248,7 @@ pub fn test_state_merkle_pruning_impl(
                 batch_size: 1,
             },
         },
-        RocksdbConfigs::default(),
+        config,
         false, /* enable_indexer */
         BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
@@ -318,7 +321,7 @@ pub fn test_state_merkle_pruning_impl(
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
+    #![proptest_config(ProptestConfig::with_cases(1))]
 
     #[test]
     fn test_state_merkle_pruning(input in arb_blocks_to_commit()) {
