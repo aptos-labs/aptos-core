@@ -12,7 +12,6 @@ use hashbrown::HashSet;
 #[cfg(fuzzing)]
 use move_binary_format::access::ModuleAccess;
 use move_binary_format::{
-    access::ModuleAccess,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
@@ -131,6 +130,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns the module without verification, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module.
+    #[cfg(fuzzing)]
     fn fetch_module_skip_verification(
         &self,
         address: &AccountAddress,
@@ -337,6 +337,7 @@ where
         )?))
     }
 
+    #[cfg(fuzzing)]
     fn fetch_module_skip_verification(
         &self,
         address: &AccountAddress,
@@ -467,6 +468,7 @@ where
 
 /// Visits the dependencies of the given module and loads them without verification. If dependencies form a cycle,
 /// an error is returned.
+#[cfg(fuzzing)]
 fn visit_dependencies_and_skip_verification<T, E, V>(
     module_id: ModuleId,
     module: Arc<ModuleCode<CompiledModule, Module, E>>,
