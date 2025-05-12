@@ -353,3 +353,554 @@ pub fn create_commit_callback_deprecated(
             .handle_committed_blocks(ledger_info);
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::consensus_observer::{
+        network::observer_message::{BlockPayload, BlockTransactionPayload, OrderedBlock},
+        observer::execution_pool::ObservedOrderedBlock,
+    };
+    use aptos_config::network_id::PeerNetworkId;
+    use aptos_consensus_types::{
+        block::Block,
+        block_data::{BlockData, BlockType},
+        pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+        quorum_cert::QuorumCert,
+    };
+    use aptos_crypto::HashValue;
+    use aptos_types::{
+        aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
+        transaction::Version, validator_verifier::ValidatorVerifier,
+    };
+    use std::time::Instant;
+
+    #[test]
+    fn test_all_payloads_exist() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Create a pipelined block and payload
+        let pipelined_block = create_pipelined_block(root.commit_info().clone());
+        let block_payload = BlockPayload::new(
+            pipelined_block.block_info(),
+            BlockTransactionPayload::empty(),
+        );
+
+        // Verify that the payload does not exist
+        assert!(!observer_block_data.all_payloads_exist(&[pipelined_block.clone()]));
+
+        // Insert the block payload into the store
+        observer_block_data.insert_block_payload(block_payload.clone(), true);
+
+        // Verify that the inserted payload exists
+        assert!(observer_block_data.all_payloads_exist(&[pipelined_block]));
+    }
+
+    #[test]
+    fn test_check_root_epoch_and_round() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root);
+
+        // Check the root epoch and round
+        assert!(observer_block_data.check_root_epoch_and_round(epoch, round));
+        assert!(!observer_block_data.check_root_epoch_and_round(epoch, round + 1));
+        assert!(!observer_block_data.check_root_epoch_and_round(epoch + 1, round));
+
+        // Update the root ledger info
+        let new_epoch = epoch + 10;
+        let new_round = round + 100;
+        let new_root = create_ledger_info(new_epoch, new_round);
+        observer_block_data.update_root(new_root.clone());
+
+        // Check the updated root epoch and round
+        assert!(!observer_block_data.check_root_epoch_and_round(epoch, round));
+        assert!(observer_block_data.check_root_epoch_and_round(new_epoch, new_round));
+    }
+
+    #[test]
+    fn test_clear_block_data() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Create a pipelined block
+        let pipelined_block = create_pipelined_block(root.commit_info().clone());
+
+        // Create an observed ordered block
+        let ordered_block = OrderedBlock::new(
+            vec![pipelined_block.clone()],
+            create_ledger_info(epoch, round),
+        );
+        let observed_ordered_block = ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
+        // Creating a pending block
+        let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
+            PeerNetworkId::random(),
+            Instant::now(),
+            observed_ordered_block.clone(),
+        );
+
+        // Create a block payload
+        let block_payload = BlockPayload::new(
+            pipelined_block.block_info(),
+            BlockTransactionPayload::empty(),
+        );
+
+        // Insert the block into all stores
+        observer_block_data.insert_block_payload(block_payload.clone(), true);
+        observer_block_data.insert_ordered_block(observed_ordered_block);
+        observer_block_data.insert_pending_block(pending_block_with_metadata);
+
+        // Verify the block data is inserted
+        assert!(observer_block_data.existing_payload_entry(&block_payload));
+        assert!(observer_block_data
+            .get_ordered_block(epoch, round)
+            .is_some());
+        assert!(observer_block_data.existing_pending_block(&ordered_block));
+
+        // Clear the block data
+        let cleared_root = observer_block_data.clear_block_data();
+
+        // Verify that the block data is cleared
+        assert!(!observer_block_data.existing_payload_entry(&block_payload));
+        assert!(observer_block_data
+            .get_ordered_block(epoch, round)
+            .is_none());
+        assert!(!observer_block_data.existing_pending_block(&ordered_block));
+
+        // Verify the root ledger info and that all stores are empty
+        assert_eq!(cleared_root, root);
+        assert_eq!(observer_block_data.get_block_payloads().lock().len(), 0);
+        assert_eq!(observer_block_data.get_all_ordered_blocks().len(), 0);
+    }
+
+    #[test]
+    fn test_get_and_update_root() {
+        // Create a root ledger info
+        let epoch = 100;
+        let round = 50;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Check the root ledger info
+        assert_eq!(observer_block_data.root(), root);
+
+        // Update the root ledger info
+        let new_root = create_ledger_info(epoch, round + 1000);
+        observer_block_data.update_root(new_root.clone());
+
+        // Check the updated root ledger info
+        assert_eq!(observer_block_data.root(), new_root);
+    }
+
+    #[test]
+    fn test_get_highest_committed_epoch_round() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Verify the highest committed epoch and round (it should be the root)
+        let (highest_epoch, highest_round) =
+            observer_block_data.get_highest_committed_epoch_round();
+        assert_eq!(highest_epoch, epoch);
+        assert_eq!(highest_round, round);
+
+        // Add an ordered block (with a higher round)
+        let new_round = round + 1;
+        let _ = create_and_add_ordered_blocks(&mut observer_block_data, 1, epoch, new_round);
+
+        // Verify the highest committed epoch and round (it should still be the root)
+        let (highest_epoch, highest_round) =
+            observer_block_data.get_highest_committed_epoch_round();
+        assert_eq!(highest_epoch, epoch);
+        assert_eq!(highest_round, round);
+
+        // Update the commit decision for the ordered block
+        let commit_decision = CommitDecision::new(create_ledger_info(epoch, new_round));
+        observer_block_data.update_ordered_block_commit_decision(&commit_decision);
+
+        // Verify the highest committed epoch and round (it should be the new block)
+        let (highest_epoch, highest_round) =
+            observer_block_data.get_highest_committed_epoch_round();
+        assert_eq!(highest_epoch, epoch);
+        assert_eq!(highest_round, new_round);
+
+        // Add an ordered block (with a higher epoch)
+        let new_epoch = epoch + 1;
+        let new_round = 0;
+        let _ = create_and_add_ordered_blocks(&mut observer_block_data, 1, new_epoch, 0);
+
+        // Update the commit decision for the ordered block
+        let commit_decision = CommitDecision::new(create_ledger_info(new_epoch, new_round));
+        observer_block_data.update_ordered_block_commit_decision(&commit_decision);
+
+        // Verify the highest committed epoch and round (it should be the new block)
+        let (highest_epoch, highest_round) =
+            observer_block_data.get_highest_committed_epoch_round();
+        assert_eq!(highest_epoch, new_epoch);
+        assert_eq!(highest_round, new_round);
+    }
+
+    #[test]
+    fn test_get_last_ordered_block() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Verify the last ordered block (it should be the root)
+        let last_ordered_block = observer_block_data.get_last_ordered_block();
+        assert_eq!(last_ordered_block.epoch(), epoch);
+        assert_eq!(last_ordered_block.round(), round);
+
+        // Add an ordered block (with a higher round)
+        let new_round = round + 1;
+        let ordered_block =
+            create_and_add_ordered_blocks(&mut observer_block_data, 1, epoch, new_round);
+
+        // Verify the last ordered block (it should be the new block)
+        let last_ordered_block = observer_block_data.get_last_ordered_block();
+        assert_eq!(
+            last_ordered_block,
+            ordered_block[0].last_block().block_info()
+        );
+
+        // Add an ordered block (with a higher epoch)
+        let new_epoch = epoch + 1;
+        let new_round = 0;
+        let ordered_block =
+            create_and_add_ordered_blocks(&mut observer_block_data, 1, new_epoch, new_round);
+
+        // Verify the last ordered block (it should be the new block)
+        let last_ordered_block = observer_block_data.get_last_ordered_block();
+        assert_eq!(
+            last_ordered_block,
+            ordered_block[0].last_block().block_info()
+        );
+    }
+
+    #[test]
+    fn test_handle_committed_blocks() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root);
+
+        // Handle the committed blocks at the wrong epoch and verify the root is not updated
+        observer_block_data.handle_committed_blocks(create_ledger_info(epoch + 1, round + 1));
+        assert_eq!(observer_block_data.root().commit_info().epoch(), epoch);
+
+        // Handle the committed blocks at the wrong round and verify the root is not updated
+        observer_block_data.handle_committed_blocks(create_ledger_info(epoch, round - 1));
+        assert_eq!(observer_block_data.root().commit_info().round(), round);
+
+        // Add pending ordered blocks
+        let num_ordered_blocks = 10;
+        let ordered_blocks = create_and_add_ordered_blocks(
+            &mut observer_block_data,
+            num_ordered_blocks,
+            epoch,
+            round,
+        );
+
+        // Add block payloads for the ordered blocks
+        for ordered_block in &ordered_blocks {
+            create_and_add_payloads_for_ordered_block(&mut observer_block_data, ordered_block);
+        }
+
+        // Create the commit ledger info (for the second to last block)
+        let commit_round = round + (num_ordered_blocks as Round) - 2;
+        let committed_ledger_info = create_ledger_info(epoch, commit_round);
+
+        // Create the committed blocks and ledger info
+        let mut committed_blocks = vec![];
+        for ordered_block in ordered_blocks.iter().take(num_ordered_blocks - 1) {
+            let pipelined_block = create_pipelined_block(ordered_block.blocks()[0].block_info());
+            committed_blocks.push(pipelined_block);
+        }
+
+        // Handle the committed blocks
+        observer_block_data.handle_committed_blocks(committed_ledger_info.clone());
+
+        // Verify the committed blocks are removed from the stores, and the root is updated
+        assert_eq!(observer_block_data.get_all_ordered_blocks().len(), 1);
+        assert_eq!(observer_block_data.get_block_payloads().lock().len(), 1);
+        assert_eq!(observer_block_data.root(), committed_ledger_info);
+    }
+
+    #[test]
+    fn test_remove_ready_pending_block() {
+        // Create a root ledger info
+        let epoch = 100;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Create an observed ordered block
+        let pipelined_block = create_pipelined_block(root.commit_info().clone());
+        let ordered_block = OrderedBlock::new(
+            vec![pipelined_block.clone()],
+            create_ledger_info(epoch, round),
+        );
+        let observed_ordered_block = ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
+        // Creating a pending block
+        let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
+            PeerNetworkId::random(),
+            Instant::now(),
+            observed_ordered_block.clone(),
+        );
+
+        // Insert the pending block into the store
+        observer_block_data.insert_pending_block(pending_block_with_metadata);
+
+        // Create a block payload
+        let block_payload = BlockPayload::new(
+            pipelined_block.block_info(),
+            BlockTransactionPayload::empty(),
+        );
+
+        // Insert the block payload into the store
+        observer_block_data.insert_block_payload(block_payload.clone(), true);
+
+        // Remove the ready pending block
+        let removed_pending_block = observer_block_data
+            .remove_ready_pending_block(epoch, round)
+            .unwrap();
+
+        // Verify the removed pending block is the same as the inserted one
+        let last_removed_block = removed_pending_block.ordered_block().last_block();
+        assert_eq!(
+            last_removed_block.block_info(),
+            ordered_block.last_block().block_info()
+        );
+    }
+
+    #[test]
+    fn test_update_blocks_for_state_sync_commit() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Create a pipelined block
+        let pipelined_block = create_pipelined_block(root.commit_info().clone());
+
+        // Create an observed ordered block
+        let ordered_block = OrderedBlock::new(
+            vec![pipelined_block.clone()],
+            create_ledger_info(epoch, round),
+        );
+        let observed_ordered_block = ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
+        // Create a block payload
+        let block_payload = BlockPayload::new(
+            pipelined_block.block_info(),
+            BlockTransactionPayload::empty(),
+        );
+
+        // Insert the block and payload into the stores
+        observer_block_data.insert_block_payload(block_payload.clone(), true);
+        observer_block_data.insert_ordered_block(observed_ordered_block.clone());
+
+        // Verify the block and payload are inserted
+        assert!(observer_block_data.existing_payload_entry(&block_payload));
+        assert!(observer_block_data
+            .get_ordered_block(epoch, round)
+            .is_some());
+
+        // Update the blocks for a state sync commit
+        let commit_decision = CommitDecision::new(create_ledger_info(epoch, round));
+        observer_block_data.update_blocks_for_state_sync_commit(&commit_decision);
+
+        // Verify the root ledger info is updated
+        assert_eq!(&observer_block_data.root(), commit_decision.commit_proof());
+
+        // Verify the block and payload are removed
+        assert!(!observer_block_data.existing_payload_entry(&block_payload));
+        assert!(observer_block_data
+            .get_ordered_block(epoch, round)
+            .is_none());
+    }
+
+    #[test]
+    fn test_verify_payloads_against_ordered_block() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Create an observed ordered block
+        let pipelined_block = create_pipelined_block(root.commit_info().clone());
+        let ordered_block = OrderedBlock::new(
+            vec![pipelined_block.clone()],
+            create_ledger_info(epoch, round),
+        );
+
+        // Verify the payloads against the ordered block (payload not inserted yet)
+        assert!(observer_block_data
+            .verify_payloads_against_ordered_block(&ordered_block)
+            .is_err());
+    }
+
+    #[test]
+    fn test_verify_payload_signatures() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the observer block data
+        let mut observer_block_data =
+            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root.clone());
+
+        // Verify the payload signatures (no payloads inserted yet)
+        assert!(observer_block_data
+            .verify_payload_signatures(&EpochState::new(epoch, ValidatorVerifier::new(vec![])))
+            .is_empty());
+    }
+
+    /// Creates and adds the specified number of ordered blocks to the ordered blocks
+    fn create_and_add_ordered_blocks(
+        observer_block_data: &mut ObserverBlockData,
+        num_ordered_blocks: usize,
+        epoch: u64,
+        starting_round: Round,
+    ) -> Vec<OrderedBlock> {
+        let mut ordered_blocks = vec![];
+        for i in 0..num_ordered_blocks {
+            // Create a new block info
+            let round = starting_round + (i as Round);
+            let block_info = BlockInfo::new(
+                epoch,
+                round,
+                HashValue::random(),
+                HashValue::random(),
+                i as Version,
+                i as u64,
+                None,
+            );
+
+            // Create a pipelined block
+            let block_data = BlockData::new_for_testing(
+                block_info.epoch(),
+                block_info.round(),
+                block_info.timestamp_usecs(),
+                QuorumCert::dummy(),
+                BlockType::Genesis,
+            );
+            let block = Block::new_for_testing(block_info.id(), block_data, None);
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+                block,
+                OrderedBlockWindow::empty(),
+            ));
+
+            // Create an ordered block
+            let blocks = vec![pipelined_block];
+            let ordered_proof =
+                create_ledger_info(epoch, i as aptos_consensus_types::common::Round);
+            let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+
+            // Create an observed ordered block
+            let observed_ordered_block =
+                ObservedOrderedBlock::new_for_testing(ordered_block.clone());
+
+            // Insert the block into the ordered block store
+            observer_block_data.insert_ordered_block(observed_ordered_block.clone());
+
+            // Add the block to the ordered blocks
+            ordered_blocks.push(ordered_block);
+        }
+
+        ordered_blocks
+    }
+
+    /// Creates and adds payloads for the ordered block
+    fn create_and_add_payloads_for_ordered_block(
+        observer_block_data: &mut ObserverBlockData,
+        ordered_block: &OrderedBlock,
+    ) {
+        for block in ordered_block.blocks() {
+            let block_payload =
+                BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
+
+            observer_block_data.insert_block_payload(block_payload, true);
+        }
+    }
+
+    /// Creates and returns a new ledger info with the specified epoch and round
+    fn create_ledger_info(
+        epoch: u64,
+        round: aptos_consensus_types::common::Round,
+    ) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                BlockInfo::random_with_epoch(epoch, round),
+                HashValue::random(),
+            ),
+            AggregateSignature::empty(),
+        )
+    }
+
+    /// Creates and returns a new pipelined block with the given block info
+    fn create_pipelined_block(block_info: BlockInfo) -> Arc<PipelinedBlock> {
+        let block_data = BlockData::new_for_testing(
+            block_info.epoch(),
+            block_info.round(),
+            block_info.timestamp_usecs(),
+            QuorumCert::dummy(),
+            BlockType::Genesis,
+        );
+        let block = Block::new_for_testing(block_info.id(), block_data, None);
+
+        Arc::new(PipelinedBlock::new_ordered(
+            block,
+            OrderedBlockWindow::empty(),
+        ))
+    }
+}
