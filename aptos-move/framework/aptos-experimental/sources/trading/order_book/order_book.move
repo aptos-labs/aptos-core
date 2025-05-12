@@ -112,10 +112,7 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, account: address, account_order_id: u64
     ): Option<Order<M>> {
         let order_id = new_order_id_type(account, account_order_id);
-        // TODO(skedia) change the semantic to abort in case of order not found
-        if (!self.orders.contains(&order_id)) {
-            return option::none();
-        };
+        assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
         let (order, is_active) = order_with_state.destroy_order_from_state();
         if (is_active) {

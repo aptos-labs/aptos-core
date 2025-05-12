@@ -474,41 +474,9 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         assert!(orig_size > 0, EINVALID_ORDER);
-        // TODO(skedia) add support for trigger condition
         // TODO(skedia) is_taker_order API can actually return false positive as the maker orders might not be valid.
         // Changes are needed to ensure the maker order is valid for this order to be a valid taker order.
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
-        let settlement_size =
-            callbacks.max_settlement_size(
-                user_addr, is_buy, remaining_size, metadata
-            );
-        if (settlement_size.is_none()) {
-            event::emit(
-                OrderEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    order_id,
-                    user: user_addr,
-                    orig_size,
-                    remaining_size,
-                    size_delta: 0, // 0 because order was never placed
-                    price,
-                    is_buy,
-                    is_taker: false,
-                    status: ORDER_STATUS_REJECTED,
-                    details: std::string::utf8(b"Max settlement size violation")
-                }
-            );
-            return OrderMatchResult {
-                order_id,
-                remaining_size,
-                cancel_reason: option::some(
-                    OrderCancellationReason::ReduceOnlyViolation
-                ),
-                num_fills: 0
-            };
-        };
-        let remaining_size = settlement_size.destroy_some();
         if (
             !callbacks.validate_settlement_update(
                 user_addr, true, // is_taker
