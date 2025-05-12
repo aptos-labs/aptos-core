@@ -15,7 +15,7 @@ use std::{
 /// A structure that manages the execution queue for the BlockSTMv2 scheduler, and also
 /// exposes proxy interfaces to its implementation details (e.g. scheduler status).
 pub(crate) struct ExecutionQueueManager {
-    /// The first executed_once_max_idx many transctions have all finished their first
+    /// The first executed_once_max_idx many transactions have all finished their first
     /// incarnation, i.e. have been executed at least once.
     executed_once_max_idx: CachePadded<AtomicU32>,
     /// Queue for scheduling transactions for execution.
@@ -25,6 +25,13 @@ pub(crate) struct ExecutionQueueManager {
 }
 
 impl ExecutionQueueManager {
+    pub(crate) fn new(num_txns: TxnIndex) -> Self {
+        Self {
+            executed_once_max_idx: CachePadded::new(AtomicU32::new(0)),
+            execution_queue: Mutex::new((0..num_txns).collect()),
+        }
+    }
+
     // Note: is_first_reexecution must be determined and the method must be performed
     // while holding the idx-th status lock.
     pub(crate) fn add_to_schedule(&self, is_first_reexecution: bool, txn_idx: TxnIndex) {
