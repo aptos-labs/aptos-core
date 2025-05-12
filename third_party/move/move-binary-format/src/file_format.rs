@@ -3474,14 +3474,29 @@ pub fn empty_module_with_dependencies_and_friends<'a>(
     dependencies: impl IntoIterator<Item = &'a str>,
     friends: impl IntoIterator<Item = &'a str>,
 ) -> CompiledModule {
-    // Rename this empty module.
+    empty_module_with_dependencies_and_friends_at_addr(
+        AccountAddress::ZERO,
+        module_name,
+        dependencies,
+        friends,
+    )
+}
+
+/// Creates an empty compiled module with specified dependencies and friends. All
+/// modules (including itself) are stored at the specified address.
+pub fn empty_module_with_dependencies_and_friends_at_addr<'a>(
+    address: AccountAddress,
+    module_name: &'a str,
+    dependencies: impl IntoIterator<Item = &'a str>,
+    friends: impl IntoIterator<Item = &'a str>,
+) -> CompiledModule {
     let mut module = empty_module();
+    module.address_identifiers[0] = address;
     module.identifiers[0] = Identifier::new(module_name).unwrap();
 
     for name in dependencies {
         module.identifiers.push(Identifier::new(name).unwrap());
         module.module_handles.push(ModuleHandle {
-            // Empty module sets up this index to 0x0.
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
         });
@@ -3489,7 +3504,6 @@ pub fn empty_module_with_dependencies_and_friends<'a>(
     for name in friends {
         module.identifiers.push(Identifier::new(name).unwrap());
         module.friend_decls.push(ModuleHandle {
-            // Empty module sets up this index to 0x0.
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
         });
