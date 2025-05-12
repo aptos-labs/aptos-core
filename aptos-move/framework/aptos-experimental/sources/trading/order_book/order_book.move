@@ -1179,7 +1179,7 @@ module aptos_experimental::order_book {
         assert!(total_matched_size(&match_results) == 100);
 
         let (matched_order, _) = match_results[0].destroy_single_order_match();
-        let (order_id, unique_idx, price, orig_size, remaining_size, is_buy, _trigger_condition, metadata  ) = matched_order.destroy_order();
+        let (_order_id, unique_idx, price, orig_size, _remaining_size, is_buy, _trigger_condition, metadata  ) = matched_order.destroy_order();
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
         let order_req = OrderRequest {
             account: @0xAA,

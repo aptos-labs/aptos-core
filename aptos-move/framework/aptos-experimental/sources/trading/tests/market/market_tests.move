@@ -7,7 +7,7 @@ module aptos_experimental::market_tests {
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
         new_test_order_metadata,
-        get_position_size
+        get_position_size, test_market_callbacks_with_taker_cancelled
     };
     use aptos_experimental::market_test_utils::{
         place_maker_order_and_verify,
@@ -503,4 +503,63 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(taker_addr) == total_fill_size);
         market.destroy_market()
     }
+
+    #[test(
+        admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
+    )]
+    public fun test_taker_partial_cancelled_maker_reinserted(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+        taker: &signer
+    ) {
+        // Setup accounts
+        let market = new_market(admin, market_signer);
+        clearinghouse_test::initialize(admin);
+        let maker_addr = signer::address_of(maker);
+        let taker_addr = signer::address_of(taker);
+
+        let event_store = event_utils::new_event_store();
+        let maker_order_id =
+            place_maker_order_and_verify(
+                &mut market,
+                maker,
+                1000,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        // Order not filled yet, so size is 0
+        assert!(get_position_size(maker_addr) == 0);
+        assert!(get_position_size(taker_addr) == 0);
+
+        place_taker_order_and_verify_fill(
+            &mut market,
+            taker,
+            1000,
+            1000000,
+            false,
+            good_till_cancelled(),
+            vector[500000], // Half of the taker order is filled and half is cancelled
+            vector[1000],
+            maker_addr,
+            vector[maker_order_id],
+            vector[2000000],
+            &mut event_store,
+            true,
+            option::none(),
+            new_test_order_metadata(),
+            &test_market_callbacks_with_taker_cancelled()
+        );
+        // Make sure the maker order is reinserted
+        assert!(market.get_remaining_size(maker_addr, maker_order_id) == 1500000);
+        market.destroy_market()
+    }
+
 }

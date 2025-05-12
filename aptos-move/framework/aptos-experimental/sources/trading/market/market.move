@@ -684,7 +684,7 @@ module aptos_experimental::market {
                         order_id: maker_order_id,
                         user: maker_address,
                         orig_size: maker_order.get_orig_size(),
-                        remaining_size: maker_order.get_remaining_size(),
+                        remaining_size: maker_order.get_remaining_size() + maker_remaining_settled_size,
                         size_delta: settled_size,
                         price: maker_order.get_price(),
                         is_buy: !is_buy,
@@ -739,6 +739,24 @@ module aptos_experimental::market {
                         details: taker_cancellation_reason.destroy_some()
                     }
                 );
+                if (maker_cancellation_reason.is_none() && maker_remaining_settled_size > 0) {
+                    // If the taker is cancelled but the maker is not cancelled, then we need to re-insert
+                    // the maker order back into the order book
+                    self.order_book.reinsert_maker_order(
+                        new_order_request(
+                            maker_address,
+                            maker_order_id,
+                            option::some(maker_order.get_unique_priority_idx()),
+                            maker_order.get_price(),
+                            maker_order.get_orig_size(),
+                            maker_remaining_settled_size,
+                            !is_buy,
+                            option::none(),
+                            maker_order.get_metadata_from_order()
+                        )
+                    );
+
+                };
                 return OrderMatchResult {
                     order_id,
                     remaining_size,
