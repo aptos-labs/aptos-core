@@ -111,8 +111,9 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
     /// dispatch.
     pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> SafeNativeResult<()> {
         self.inner
+            .loader_context()
             .charge_gas_for_dependencies(module_id)
-            .map_err(|err| LimitExceededError::from_err(err.to_partial()))
+            .map_err(LimitExceededError::from_err)
     }
 
     /// Evaluates the given gas expression within the current context immediately.
