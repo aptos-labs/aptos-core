@@ -3,7 +3,7 @@
 
 use crate::{module_traversal::TraversalContext, WithRuntimeEnvironment};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::language_storage::ModuleId;
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::{
     gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
@@ -38,7 +38,19 @@ pub trait NativeModuleLoader {
     ) -> PartialVMResult<()>;
 }
 
+/// Provides access to module metadata.
+pub trait ModuleMetadataLoader {
+    /// Loads the module metadata, ensuring the module access gets charged. Returns an error if
+    /// out-of-gas, module does not exist, or if there is some miscellaneous storage error.
+    fn load_module_metadata(
+        &self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut impl ModuleTraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Vec<Metadata>>;
+}
+
 /// Encapsulates all possible module accesses in a safe, gas-metered way. This trait (and more
 /// fine-grained) traits should be used when working with modules, functions, structs, and other
 /// module information.
-pub trait Loader: StructDefinitionLoader + NativeModuleLoader {}
+pub trait Loader: StructDefinitionLoader + NativeModuleLoader + ModuleMetadataLoader {}
