@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: enable_bulletproofs_batch_natives
+proposals:
+  - name: enable_bulletproofs_batch_Natives
+    metadata:
+      title: "Enable Bulletproofs Batch Natives"
+      description: "Enable Bulletproofs Batch Natives"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bulletproofs_batch_natives
