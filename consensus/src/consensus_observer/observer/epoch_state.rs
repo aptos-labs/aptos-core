@@ -33,7 +33,8 @@ use aptos_types::{
 use futures::StreamExt;
 use std::{collections::BTreeMap, sync::Arc};
 
-pub struct ActiveObserverState {
+/// The epoch state used by the consensus observer
+pub struct ObserverEpochState {
     // The configuration of the node
     node_config: NodeConfig,
 
@@ -56,7 +57,7 @@ pub struct ActiveObserverState {
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
 }
 
-impl ActiveObserverState {
+impl ObserverEpochState {
     pub fn new(
         node_config: NodeConfig,
         db_reader: Arc<dyn DbReader>,
@@ -68,11 +69,11 @@ impl ActiveObserverState {
             .get_latest_ledger_info()
             .expect("Failed to read latest ledger info from storage!");
 
-        // Create the active observer state
-        ActiveObserverState::new_with_root(node_config, reconfig_events, consensus_publisher, root)
+        // Create the observer epoch state
+        ObserverEpochState::new_with_root(node_config, reconfig_events, consensus_publisher, root)
     }
 
-    /// Creates a returns a new active observer state with the given root ledger info
+    /// Creates a returns a new observer epoch state with the given root ledger info
     fn new_with_root(
         node_config: NodeConfig,
         reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -386,25 +387,25 @@ mod test {
         let round = 5;
         let root = create_ledger_info(epoch, round);
 
-        // Create the active observer state
+        // Create the observer epoch state
         let (_, reconfig_events) = create_reconfig_notifier_and_listener();
-        let observer_state =
-            ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
+        let observer_epoch_state =
+            ObserverEpochState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
         // Check the root epoch and round
-        assert!(observer_state.check_root_epoch_and_round(epoch, round));
-        assert!(!observer_state.check_root_epoch_and_round(epoch, round + 1));
-        assert!(!observer_state.check_root_epoch_and_round(epoch + 1, round));
+        assert!(observer_epoch_state.check_root_epoch_and_round(epoch, round));
+        assert!(!observer_epoch_state.check_root_epoch_and_round(epoch, round + 1));
+        assert!(!observer_epoch_state.check_root_epoch_and_round(epoch + 1, round));
 
         // Update the root ledger info
         let new_epoch = epoch + 10;
         let new_round = round + 100;
         let new_root = create_ledger_info(new_epoch, new_round);
-        observer_state.update_root(new_root.clone());
+        observer_epoch_state.update_root(new_root.clone());
 
         // Check the updated root epoch and round
-        assert!(!observer_state.check_root_epoch_and_round(epoch, round));
-        assert!(observer_state.check_root_epoch_and_round(new_epoch, new_round));
+        assert!(!observer_epoch_state.check_root_epoch_and_round(epoch, round));
+        assert!(observer_epoch_state.check_root_epoch_and_round(new_epoch, new_round));
     }
 
     #[test]
@@ -414,9 +415,9 @@ mod test {
         let round = 50;
         let root = create_ledger_info(epoch, round);
 
-        // Create the active observer state
+        // Create the observer epoch state
         let (_, reconfig_events) = create_reconfig_notifier_and_listener();
-        let observer_state = ActiveObserverState::new_with_root(
+        let observer_epoch_state = ObserverEpochState::new_with_root(
             NodeConfig::default(),
             reconfig_events,
             None,
@@ -424,14 +425,14 @@ mod test {
         );
 
         // Check the root ledger info
-        assert_eq!(observer_state.root(), root);
+        assert_eq!(observer_epoch_state.root(), root);
 
         // Update the root ledger info
         let new_root = create_ledger_info(epoch, round + 1000);
-        observer_state.update_root(new_root.clone());
+        observer_epoch_state.update_root(new_root.clone());
 
         // Check the updated root ledger info
-        assert_eq!(observer_state.root(), new_root);
+        assert_eq!(observer_epoch_state.root(), new_root);
     }
 
     #[test]
@@ -521,27 +522,27 @@ mod test {
         let round = 5;
         let root = create_ledger_info(epoch, round);
 
-        // Create the active observer state
+        // Create the observer epoch state
         let (_, reconfig_events) = create_reconfig_notifier_and_listener();
-        let mut observer_state =
-            ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
+        let mut observer_epoch_state =
+            ObserverEpochState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
         // Verify that the execution pool window size is not set
-        assert!(observer_state.execution_pool_window_size().is_none());
+        assert!(observer_epoch_state.execution_pool_window_size().is_none());
 
         // Verify that quorum store is not enabled
-        assert!(!observer_state.is_quorum_store_enabled());
+        assert!(!observer_epoch_state.is_quorum_store_enabled());
 
         // Manually update the epoch state, execution pool window, and quorum store flag
         let epoch_state = Arc::new(EpochState::empty());
-        observer_state.epoch_state = Some(epoch_state.clone());
-        observer_state.execution_pool_window_size = Some(1);
-        observer_state.quorum_store_enabled = true;
+        observer_epoch_state.epoch_state = Some(epoch_state.clone());
+        observer_epoch_state.execution_pool_window_size = Some(1);
+        observer_epoch_state.quorum_store_enabled = true;
 
         // Verify the epoch state and quorum store flag are updated
-        assert_eq!(observer_state.epoch_state(), epoch_state);
-        assert_eq!(observer_state.execution_pool_window_size(), Some(1));
-        assert!(observer_state.is_quorum_store_enabled());
+        assert_eq!(observer_epoch_state.epoch_state(), epoch_state);
+        assert_eq!(observer_epoch_state.execution_pool_window_size(), Some(1));
+        assert!(observer_epoch_state.is_quorum_store_enabled());
     }
 
     /// Creates and adds the specified number of ordered blocks to the ordered blocks
