@@ -70,3 +70,6 @@ fuzzing = ["criterion", "proptest", "proptest-derive"]
 name = "scheduler_benches"
 harness = false
 required-features = ["fuzzing"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
