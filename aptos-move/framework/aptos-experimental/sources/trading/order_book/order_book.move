@@ -46,6 +46,7 @@ module aptos_experimental::order_book {
     const EORDER_NOT_FOUND: u64 = 4;
     const EINVALID_INACTIVE_ORDER_STATE: u64 = 5;
     const EINVALID_ADD_SIZE_TO_ORDER: u64 = 6;
+    const E_NOT_ACTIVE_ORDER: u64 = 7;
 
     struct OrderRequest<M: store + copy + drop> has copy, drop {
         account: address,
@@ -188,6 +189,30 @@ module aptos_experimental::order_book {
             order_id,
             order_req.price,
             unique_priority_idx,
+            order_req.remaining_size,
+            order_req.is_buy
+        );
+    }
+
+    /// Reinserts a maker order to the order book. This is used when the order is removed from the order book
+    /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
+    /// it is added to the order book, if it exists, it's size is updated.
+    public fun reinsert_maker_order<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_req: OrderRequest<M>
+    ) {
+        assert!(order_req.trigger_condition.is_none(), E_NOT_ACTIVE_ORDER);
+        let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
+        if (!self.orders.contains(&order_id)) {
+            return self.place_maker_order(order_req);
+        };
+        let order_with_state = self.orders.remove(&order_id);
+        order_with_state.increase_remaining_size(
+            order_req.remaining_size
+        );
+        self.orders.add(order_id, order_with_state);
+        self.active_orders.increase_maker_order_size(
+            order_req.price,
+            order_req.unique_priority_idx.destroy_some(),
             order_req.remaining_size,
             order_req.is_buy
         );
@@ -1117,4 +1142,115 @@ module aptos_experimental::order_book {
         assert!(is_buy == true);
         order_book.destroy_order_book();
     }
+
+    #[test]
+    fun test_maker_order_reinsert_already_exists() {
+        let order_book = new_order_book<TestMetadata>();
+
+        // Place a GTC sell order
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: false,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+        order_book.place_maker_order(order_req);
+        assert!(order_book.get_remaining_size(@0xAA, 1) ==  1000);
+
+        // Taker order
+        let order_req = OrderRequest {
+            account: @0xBB,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 100,
+            remaining_size: 100,
+            is_buy: true,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+
+        let match_results = order_book.place_order_and_get_matches(order_req);
+        assert!(total_matched_size(&match_results) == 100);
+
+        let (matched_order, _) = match_results[0].destroy_single_order_match();
+        let (order_id, unique_idx, price, orig_size, remaining_size, is_buy, _trigger_condition, metadata  ) = matched_order.destroy_order();
+        // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::some(unique_idx),
+            price,
+            orig_size,
+            remaining_size: 50,
+            is_buy,
+            trigger_condition: option::none(),
+            metadata
+        };
+        order_book.reinsert_maker_order(order_req);
+        // Verify order was reinserted with updated size
+        assert!(order_book.get_remaining_size(@0xAA, 1) ==  950);
+        order_book.destroy_order_book();
+    }
+
+    #[test]
+    fun test_maker_order_reinsert_not_exists() {
+        let order_book = new_order_book<TestMetadata>();
+
+        // Place a GTC sell order
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: false,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+        order_book.place_maker_order(order_req);
+        assert!(order_book.get_remaining_size(@0xAA, 1) ==  1000);
+
+        // Taker order
+        let order_req = OrderRequest {
+            account: @0xBB,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: true,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+
+        let match_results = order_book.place_order_and_get_matches(order_req);
+        assert!(total_matched_size(&match_results) == 1000);
+
+        let (matched_order, _) = match_results[0].destroy_single_order_match();
+        let (_order_id, unique_idx, price, orig_size, _remaining_size, is_buy, _trigger_condition, metadata  ) = matched_order.destroy_order();
+        // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::some(unique_idx),
+            price,
+            orig_size,
+            remaining_size: 500,
+            is_buy,
+            trigger_condition: option::none(),
+            metadata
+        };
+        order_book.reinsert_maker_order(order_req);
+        // Verify order was reinserted with updated size
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 500);
+        order_book.destroy_order_book();
+    }
+
 }

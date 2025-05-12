@@ -301,6 +301,24 @@ module aptos_experimental::active_order_book {
         }
     }
 
+    public fun increase_maker_order_size(
+        self: &mut ActiveOrderBook,
+        price: u64,
+        unique_priority_idx: UniqueIdxType,
+        size: u64,
+        is_buy: bool
+    ) {
+        let tie_breaker = get_tie_breaker(unique_priority_idx, is_buy);
+        let key = ActiveBidKey { price, tie_breaker };
+        // Assert that this is not a taker order
+        assert!(!self.is_taker_order(price, is_buy), EINVALID_MAKER_ORDER);
+        if (is_buy) {
+            self.buys.borrow_mut(&key).size += size;
+        } else {
+            self.sells.borrow_mut(&key).size += size;
+        };
+    }
+
     public fun place_maker_order(
         self: &mut ActiveOrderBook,
         order_id: OrderIdType,
