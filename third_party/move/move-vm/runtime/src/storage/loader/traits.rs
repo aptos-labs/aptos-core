@@ -1,8 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::WithRuntimeEnvironment;
+use crate::{module_traversal::TraversalContext, WithRuntimeEnvironment};
 use move_binary_format::errors::PartialVMResult;
+use move_core_types::language_storage::ModuleId;
 use move_vm_types::{
     gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
@@ -25,7 +26,19 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
     ) -> PartialVMResult<Arc<StructType>>;
 }
 
+/// Charges gas for native module loading.
+pub trait NativeModuleLoader {
+    /// Charges gas when [move_vm_types::natives::function::NativeResult::LoadModule]) is returned
+    /// from the native context.
+    fn charge_native_result_load_module(
+        &self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<()>;
+}
+
 /// Encapsulates all possible module accesses in a safe, gas-metered way. This trait (and more
 /// fine-grained) traits should be used when working with modules, functions, structs, and other
 /// module information.
-pub trait Loader: StructDefinitionLoader {}
+pub trait Loader: StructDefinitionLoader + NativeModuleLoader {}
