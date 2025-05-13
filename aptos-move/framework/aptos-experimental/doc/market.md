@@ -11,11 +11,9 @@ A clearing house implementation is expected to implement the following APIs
 is an match between taker and maker. The clearinghouse is expected to settle the trade and return the result. Please
 note that the clearing house settlment size might not be the same as the order match size and the settlement might
 also fail.
-- validate_settlement_update(account, is_taker, is_long, price, size): bool -> Called by the market to validate
+- validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
-- max_settlement_size(account, is_long, orig_size): Option<u64> -> Called by the market to validate the size
-of the order when its placed. The clearinghouse is expected to validate the order and return the maximum settlement size
-of the order. Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
+Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 the position size of the user and does not do any validation.
 
 Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
