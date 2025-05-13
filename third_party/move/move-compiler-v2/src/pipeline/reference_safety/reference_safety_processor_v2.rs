@@ -2096,7 +2096,7 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             .env
             .get_extension::<Options>()
             .unwrap_or_default()
-            .experiment_on(Experiment::REFERENCE_SAFETY);
+            .experiment_on(Experiment::REPORT_ERRORS_REF_SAFETY);
         let analyzer = LifeTimeAnalysis {
             target: &target,
             live_var_annotation,

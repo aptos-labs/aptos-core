@@ -485,13 +485,12 @@ pub fn stackless_bytecode_check_pipeline(options: &Options) -> FunctionTargetPip
 
     // Reference safety checkers need live variable annotation.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+    // `Experiment::REPORT_ERRORS_REF_SAFETY` controls whether reference safety errors are reported.
     if options.experiment_on(Experiment::REFERENCE_SAFETY_V3) {
         pipeline.add_processor(Box::new(
             reference_safety_processor_v3::ReferenceSafetyProcessor {},
         ));
     } else {
-        // Reference check is always run, but the legacy processor decides internally
-        // based on `Experiment::REFERENCE_SAFETY` whether to report errors.
         pipeline.add_processor(Box::new(
             reference_safety_processor_v2::ReferenceSafetyProcessor {},
         ));
@@ -522,13 +521,12 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
 
     // Reference safety checkers need live variable annotation.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+    // `Experiment::REPORT_ERRORS_REF_SAFETY` controls whether reference safety errors are reported.
     if options.experiment_on(Experiment::REFERENCE_SAFETY_V3) {
         pipeline.add_processor(Box::new(
             reference_safety_processor_v3::ReferenceSafetyProcessor {},
         ));
     } else {
-        // Reference check is always run, but the legacy processor decides internally
-        // based on `Experiment::REFERENCE_SAFETY` whether to report errors.
         pipeline.add_processor(Box::new(
             reference_safety_processor_v2::ReferenceSafetyProcessor {},
         ));
