@@ -219,6 +219,12 @@ module aptos_experimental::order_book_types {
         self.trigger_condition
     }
 
+    public fun increase_remaining_size<M: store + copy + drop>(
+        self: &mut OrderWithState<M>, size: u64
+    ) {
+        self.order.remaining_size += size;
+    }
+
     public fun set_remaining_size<M: store + copy + drop>(
         self: &mut OrderWithState<M>, remaining_size: u64
     ) {

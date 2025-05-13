@@ -91,11 +91,35 @@ module aptos_experimental::clearinghouse_test {
         new_settle_trade_result(size, option::none(), option::none())
     }
 
+    public(package) fun settle_trade_with_taker_cancelled(
+        _taker: address,
+        _maker: address,
+        size: u64,
+        _is_taker_long: bool
+    ): SettleTradeResult {
+        new_settle_trade_result(size/2,
+            option::none(),
+            option::some(std::string::utf8(b"Max open interest violation")))
+    }
+
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
             |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
+            },
+            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
+            |_user_addr, _is_buy, orig_size, _metadata| {
+                max_settlement_size<TestOrderMetadata>(orig_size)
+            }
+        )
+    }
+
+    public(package) fun test_market_callbacks_with_taker_cancelled():
+    MarketClearinghouseCallbacks<TestOrderMetadata>{
+        new_market_clearinghouse_callbacks(
+            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+                settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
             |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
             |_user_addr, _is_buy, orig_size, _metadata| {

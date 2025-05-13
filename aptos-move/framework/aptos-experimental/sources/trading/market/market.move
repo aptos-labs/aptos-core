@@ -474,7 +474,6 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         assert!(orig_size > 0, EINVALID_ORDER);
-        // TODO(skedia) add support for trigger condition
         // TODO(skedia) is_taker_order API can actually return false positive as the maker orders might not be valid.
         // Changes are needed to ensure the maker order is valid for this order to be a valid taker order.
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
@@ -624,7 +623,7 @@ module aptos_experimental::market {
                     let remaining_size = maker_order.get_remaining_size();
                     event::emit(
                         OrderEvent {
-                            parent: self.parent,
+                        parent: self.parent,
                             market: self.market,
                             order_id,
                             user: maker_address,
@@ -685,7 +684,7 @@ module aptos_experimental::market {
                         order_id: maker_order_id,
                         user: maker_address,
                         orig_size: maker_order.get_orig_size(),
-                        remaining_size: maker_order.get_remaining_size(),
+                        remaining_size: maker_order.get_remaining_size() + maker_remaining_settled_size,
                         size_delta: settled_size,
                         price: maker_order.get_price(),
                         is_buy: !is_buy,
@@ -717,7 +716,9 @@ module aptos_experimental::market {
                     }
                 );
                 // If the maker is invalid cancel the maker order and continue to the next maker order
-                self.order_book.cancel_order(maker_address, maker_order_id);
+                if (maker_order.get_remaining_size() != 0) {
+                    self.order_book.cancel_order(maker_address, maker_order_id);
+                }
             };
 
             let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
@@ -738,6 +739,24 @@ module aptos_experimental::market {
                         details: taker_cancellation_reason.destroy_some()
                     }
                 );
+                if (maker_cancellation_reason.is_none() && maker_remaining_settled_size > 0) {
+                    // If the taker is cancelled but the maker is not cancelled, then we need to re-insert
+                    // the maker order back into the order book
+                    self.order_book.reinsert_maker_order(
+                        new_order_request(
+                            maker_address,
+                            maker_order_id,
+                            option::some(maker_order.get_unique_priority_idx()),
+                            maker_order.get_price(),
+                            maker_order.get_orig_size(),
+                            maker_remaining_settled_size,
+                            !is_buy,
+                            option::none(),
+                            maker_order.get_metadata_from_order()
+                        )
+                    );
+
+                };
                 return OrderMatchResult {
                     order_id,
                     remaining_size,
