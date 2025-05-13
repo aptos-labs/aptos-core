@@ -15,7 +15,6 @@
 -  [Function `get_taker_cancellation_reason`](#0x7_market_types_get_taker_cancellation_reason)
 -  [Function `settle_trade`](#0x7_market_types_settle_trade)
 -  [Function `validate_order_placement`](#0x7_market_types_validate_order_placement)
--  [Function `max_settlement_size`](#0x7_market_types_max_settlement_size)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -91,12 +90,6 @@
 <dd>
 
 </dd>
-<dt>
-<code>max_settlement_size_f: |(<b>address</b>, bool, u64, M)|<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt; <b>has</b> <b>copy</b> + drop</code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
 
@@ -163,7 +156,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <b>address</b>, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, bool, bool, u64, u64, M)|bool <b>has</b> <b>copy</b> + drop, max_settlement_size_f: |(<b>address</b>, bool, u64, M)|<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt; <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <b>address</b>, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, bool, bool, u64, u64, M)|bool <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
 </code></pre>
 
 
@@ -177,13 +170,10 @@
     settle_trade_f: |<b>address</b>, <b>address</b>, bool, u64, u64, M, M| <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> <b>has</b> drop + <b>copy</b>,
     // validate_settlement_update_f arguments: accoun, is_taker, is_long, price, size
     validate_order_placement_f: |<b>address</b>, bool, bool, u64, u64, M| bool <b>has</b> drop + <b>copy</b>,
-    // max_settlement_size_for_reduce_only_f arguments: <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, is_long, orig_size
-    max_settlement_size_f: |<b>address</b>, bool, u64, M| Option&lt;u64&gt; <b>has</b> drop + <b>copy</b>,
 ): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M&gt; {
     <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a> {
         settle_trade_f,
         validate_order_placement_f,
-        max_settlement_size_f,
     }
 }
 </code></pre>
@@ -305,30 +295,6 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_validate_order_placement">validate_order_placement</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_taker: bool, is_long: bool, price: u64, size: u64, order_metadata: M): bool {
     (self.validate_order_placement_f)(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, is_taker, is_long, price, size, order_metadata)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_market_types_max_settlement_size"></a>
-
-## Function `max_settlement_size`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_max_settlement_size">max_settlement_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_long: bool, orig_size: u64, metadata: M): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_max_settlement_size">max_settlement_size</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_long: bool, orig_size: u64, metadata: M): Option&lt;u64&gt; {
-    (self.max_settlement_size_f)(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, is_long, orig_size, metadata)
 }
 </code></pre>
 
