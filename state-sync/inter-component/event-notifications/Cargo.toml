@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+api-types = { workspace = true }
 anyhow = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-id-generator = { workspace = true }
@@ -22,6 +23,9 @@ aptos-types = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+aptos-logger = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true }

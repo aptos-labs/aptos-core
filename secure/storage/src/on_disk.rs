@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{CryptoKVStorage, Error, GetResponse, KVStorage};
+use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use serde::{de::DeserializeOwned, Serialize};
@@ -29,6 +30,7 @@ pub struct OnDiskStorage {
 
 impl OnDiskStorage {
     pub fn new(file_path: PathBuf) -> Self {
+        info!("OnDiskStorage::new: {:?}", file_path);
         Self::new_with_time_service(file_path, TimeService::real())
     }
 
@@ -59,6 +61,7 @@ impl OnDiskStorage {
             return Ok(HashMap::new());
         }
         let data = serde_json::from_str(&contents)?;
+        info!("OnDiskStorage::read: path {:?}, data {:?}", self.file_path, data);
         Ok(data)
     }
 

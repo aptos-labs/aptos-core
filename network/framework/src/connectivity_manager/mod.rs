@@ -893,10 +893,11 @@ where
         // Log the update event
         info!(
             NetworkSchema::new(&self.network_context),
-            "{} Received updated list of discovered peers! Source: {:?}, num peers: {:?}",
+            "{} Received updated list of discovered peers! Source: {:?}, num peers: {:?}, old discovered peers: {:?}",
             self.network_context,
             src,
-            new_discovered_peers.len()
+            new_discovered_peers.len(),
+            self.discovered_peers.read()
         );
 
         // Remove peers that no longer have relevant network information
@@ -929,6 +930,7 @@ where
 
         // Make updates to the peers accordingly
         for (peer_id, discovered_peer) in new_discovered_peers {
+            info!("handle_update_discovered_peers: peer_id {:?}, discovered_peer {:?}", peer_id, discovered_peer);
             // Don't include ourselves, because we don't need to dial ourselves
             if peer_id == self.network_context.peer_id() {
                 continue;
@@ -988,6 +990,7 @@ where
             // For each peer, union all of the pubkeys from each discovery source
             // to generate the new eligible peers set.
             let new_eligible = self.discovered_peers.read().get_eligible_peers();
+            info!("handle_update_discovered_peers: new_eligible {:?}", new_eligible);
 
             // Swap in the new eligible peers set
             if let Err(error) = self

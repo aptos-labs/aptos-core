@@ -433,7 +433,7 @@ impl TryFrom<&GravityEvent> for ContractEvent {
 
     fn try_from(event: &GravityEvent) -> Result<Self> {
         match event {
-            GravityEvent::NewEpoch(epoch) => {
+            GravityEvent::NewEpoch(epoch, _) => {
                 let data = NewEpochEvent { epoch: *epoch };
                 Ok(ContractEvent::V2(ContractEventV2::new(
                     TypeTag::Struct(Box::new(NewEpochEvent::struct_tag())),
@@ -448,6 +448,6 @@ impl TryFrom<&GravityEvent> for ContractEvent {
 
 impl Into<ContractEvent> for GravityEvent {
     fn into(self) -> ContractEvent {
-        ContractEvent::try_from(self).unwrap()
+        ContractEvent::try_from(&self).unwrap()
     }
 }

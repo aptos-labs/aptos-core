@@ -175,6 +175,7 @@ async fn warn_detailed_error(
             entry_function.function()
         ),
         Multisig(_) => "multisig".to_string(),
+        GTxnBytes(_) => "event".to_string(),
     };
     let (last_transactions, seq_num) =
         if let Ok(account) = rest_client.get_account_bcs(sender).await {

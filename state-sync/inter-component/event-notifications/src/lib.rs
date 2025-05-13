@@ -4,9 +4,11 @@
 
 #![forbid(unsafe_code)]
 use anyhow::{anyhow, Result};
+use api_types::config_storage::{ConfigStorage, GLOBAL_CONFIG_STORAGE};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
+use aptos_logger::info;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::DbStateViewAtVersion, DbReader, DbReaderWriter,
 };
@@ -19,6 +21,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::Version,
 };
+use bytes::Bytes;
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -26,6 +29,7 @@ use std::{
     fmt,
     iter::FromIterator,
     pin::Pin,
+    str::FromStr,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -90,7 +94,6 @@ pub struct EventSubscriptionService {
 }
 
 impl EventSubscriptionService {
-    /// 修改成可以让gravity-sdk传递一个ConfigStorage的实例.
     pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
         Self {
             event_key_subscriptions: HashMap::new(),
@@ -102,7 +105,6 @@ impl EventSubscriptionService {
         }
     }
 
-    /// TODO(gravity_alex): gravity-sdk中暂时不会订阅任何事件，以后会订阅jwk
     /// Returns an EventNotificationListener that can be monitored for
     /// subscribed events. If an event key is subscribed to, it means the
     /// EventNotificationListener will be sent a notification every time an
@@ -269,23 +271,8 @@ impl EventSubscriptionService {
             return Ok(()); // No reconfiguration subscribers!
         }
 
-        // todo 感觉还是只能在dbbackendprovidoer上做文章，改成范性返回值涉及的范围太广了
         let new_configs = self.read_on_chain_configs(version)?;
-        for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
-            reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
-        }
-
-        Ok(())
-    }
-
-    /// This notifies all the reconfiguration subscribers of the on-chain
-    /// configurations at the specified version.
-    fn notify_reconfiguration_subscribers_gravity(&mut self, version: Version) -> Result<(), Error> {
-        if self.reconfig_subscriptions.is_empty() {
-            return Ok(()); // No reconfiguration subscribers!
-        }
-
-        let new_configs = self.read_on_chain_configs(version)?;
+        info!("notify_reconfiguration_subscribers: {}", version);
         for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
         }
@@ -303,28 +290,40 @@ impl EventSubscriptionService {
     ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
         // 使用执行层提供的config storage的实例. 把version传递进去
         // let config_storage = ConfigStorageImpl::new(version);
-        let db_state_view = &self
-            .storage
-            .read()
-            .reader
-            .state_view_at_version(Some(version))
-            .map_err(|error| {
-                Error::UnexpectedErrorEncountered(format!(
-                    "Failed to create account state view {:?}",
-                    error
-                ))
-            })?;
-        let epoch = ConfigurationResource::fetch_config(&db_state_view)
-            .ok_or_else(|| {
-                Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
-            })?
-            .epoch();
+        // let db_state_view = &self
+        //     .storage
+        //     .read()
+        //     .reader
+        //     .state_view_at_version(Some(version))
+        //     .map_err(|error| {
+        //         Error::UnexpectedErrorEncountered(format!(
+        //             "Failed to create account state view {:?}",
+        //             error
+        //         ))
+        //     })?;
+        // let epoch = ConfigurationResource::fetch_config(&db_state_view)
+        //     .ok_or_else(|| {
+        //         Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
+        //     })?
+        //     .epoch();
+
+        info!("fetching epoch from on-chain for version: {}", version);
+        let gravity_config_storage = GLOBAL_CONFIG_STORAGE.get();
+        let epoch_bytes = gravity_config_storage
+            .unwrap()
+            .fetch_config_bytes(api_types::config_storage::OnChainConfig::Epoch, version)
+            .ok_or_else(|| anyhow!("no config epoch found in aptos root account state"))
+            .unwrap();
+
+        let epoch = TryInto::<u64>::try_into(epoch_bytes).unwrap();
+        info!("OnChainConfigPayload for epoch: {}", epoch);
+
+        let mut config = DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version);
+
+        let payload = OnChainConfigPayload::new(epoch, config);
 
         // Return the new on-chain config payload (containing all found configs at this version).
-        Ok(OnChainConfigPayload::new(
-            epoch,
-            DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version),
-        ))
+        Ok(payload)
     }
 }
 
@@ -336,6 +335,7 @@ impl EventNotificationSender for EventSubscriptionService {
 
         // Notify event subscribers and check if a reconfiguration event was processed
         let reconfig_event_processed = self.notify_event_subscribers(version, events)?;
+        info!("reconfig_event_processed: {}, version: {}", reconfig_event_processed, version);
 
         // If a reconfiguration event was found, also notify the reconfig subscribers
         // of the new configuration values.
@@ -403,20 +403,6 @@ impl ReconfigSubscription {
     }
 }
 
-
-/// 需要一个wrapper暂时保存version和config storage实例
-/// pub struct ConfigStorageWrapper {
-///     pub version: Version,
-///     pub config_storage: Arc<dyn ConfigStorage>,
-/// }
-/// 这样之后直接通过这个wrapper在请求的时候只传递conf name即可.
-/// 返回bytes让上层的范性自己负责反序列化就OK
-/// impl ConfigStorage for ConfigStorageWrapper {
-///     fn get_config(&self, name: &str) -> Result<bytes> {
-///         self.config_storage.get_config(name)
-///     }
-/// }
-
 #[derive(Clone)]
 pub struct DbBackedOnChainConfig {
     pub reader: Arc<dyn DbReader>,
@@ -425,24 +411,44 @@ pub struct DbBackedOnChainConfig {
 
 impl DbBackedOnChainConfig {
     pub fn new(reader: Arc<dyn DbReader>, version: Version) -> Self {
-        Self { reader, version }
+        Self {
+            reader,
+            version,
+        }
     }
 }
 
 // TODO(gravity_alex): Pass config_storage_gravity here to replace the current impl
 impl OnChainConfigProvider for DbBackedOnChainConfig {
     fn get<T: OnChainConfig>(&self) -> Result<T> {
-        let bytes = self
-            .reader
-            .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
+        let gravity_config_storage = GLOBAL_CONFIG_STORAGE.get();
+        let bytes = gravity_config_storage
+            .unwrap()
+            .fetch_config_bytes(
+                api_types::config_storage::OnChainConfig::from_str(T::TYPE_IDENTIFIER).unwrap(),
+                self.version,
+            )
             .ok_or_else(|| {
                 anyhow!(
                     "no config {} found in aptos root account state",
-                    T::CONFIG_ID
+                    T::TYPE_IDENTIFIER
                 )
-            })?
-            .bytes()
-            .clone();
+            })?;
+        let bytes = TryInto::<Bytes>::try_into(bytes).expect(&format!(
+            "Failed to convert type {} to Bytes",
+            T::TYPE_IDENTIFIER
+        ));
+        // let bytes = self
+        //     .reader
+        //     .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
+        //     .ok_or_else(|| {
+        //         anyhow!(
+        //             "no config {} found in aptos root account state",
+        //             T::CONFIG_ID
+        //         )
+        //     })?
+        //     .bytes()
+        //     .clone();
 
         T::deserialize_into_config(&bytes)
     }

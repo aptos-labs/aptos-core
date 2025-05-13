@@ -99,8 +99,10 @@ impl ConsensusNotificationSender for ConsensusNotifier {
         subscribable_events: Vec<ContractEvent>,
         block_number: u64,
     ) -> Result<(), Error> {
+        // Since now in Gravity we don't have a metadata txn
+        // we should check if the events and transactions are empty
         // Only send a notification if transactions have been committed
-        if transactions.is_empty() {
+        if transactions.is_empty() && subscribable_events.is_empty() {
             return Ok(());
         }
 

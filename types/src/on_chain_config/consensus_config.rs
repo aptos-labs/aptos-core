@@ -421,7 +421,9 @@ impl OnChainConfig for OnChainConsensusConfig {
     /// ```
     /// so we need two rounds of bcs deserilization to turn it back to OnChainConsensusConfig
     fn deserialize_into_config(bytes: &[u8]) -> Result<Self> {
-        let raw_bytes: Vec<u8> = bcs::from_bytes(bytes)?;
+        // let raw_bytes: Vec<u8> = bcs::from_bytes(bytes)?;
+        // TODO(gravity_alex): Some diff for aptos and gravity, need to check
+        let raw_bytes = bytes;
         bcs::from_bytes(&raw_bytes)
             .map_err(|e| format_err!("[on-chain config] Failed to deserialize into config: {}", e))
     }
