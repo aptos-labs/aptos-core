@@ -132,13 +132,9 @@ impl TransactionComposer {
     }
 
     // stored modules
-    pub fn store_module(
-        &mut self,
-        module_bytes: Vec<u8>,
-    ) -> Result<String, String> {
-        let module = CompiledModule::deserialize(
-            module_bytes_hex.as_slice(),
-        ).map_err(|e| e.to_string())?;
+    pub fn store_module(&mut self, module_bytes: Vec<u8>) -> Result<String, String> {
+        let module =
+            CompiledModule::deserialize(module_bytes_hex.as_slice()).map_err(|e| e.to_string())?;
         let module_id = module.self_id();
         self.insert_module(module);
         Ok(module_id.to_string())
@@ -467,11 +463,14 @@ impl TransactionComposer {
                 operation_type,
             }) => {
                 let local_idx = self.calls[*call_idx as usize].returns[*return_idx as usize];
-                assert_eq!(lhs, &AllocatedLocal {
-                    local_idx,
-                    op_type: operation_type.clone(),
-                    is_parameter: false,
-                });
+                assert_eq!(
+                    lhs,
+                    &AllocatedLocal {
+                        local_idx,
+                        op_type: operation_type.clone(),
+                        is_parameter: false,
+                    }
+                );
             },
             CallArgument::Raw(input) => {
                 assert!(lhs.is_parameter);
@@ -482,11 +481,14 @@ impl TransactionComposer {
                 );
             },
             CallArgument::Signer(idx) => {
-                assert_eq!(lhs, &AllocatedLocal {
-                    op_type: ArgumentOperation::Copy,
-                    is_parameter: true,
-                    local_idx: *idx
-                })
+                assert_eq!(
+                    lhs,
+                    &AllocatedLocal {
+                        op_type: ArgumentOperation::Copy,
+                        is_parameter: true,
+                        local_idx: *idx
+                    }
+                )
             },
         }
     }
