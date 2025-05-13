@@ -15380,7 +15380,7 @@
         "type": "string",
         "format": "hex",
         "description": "A hex encoded 32 byte Aptos account address.\n\nThis is represented in a string as a 64 character hex string, sometimes\nshortened by stripping leading 0s, and adding a 0x.\n\nFor example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.\n",
-        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
       },
       "AptosError": {
         "type": "object",
@@ -16362,7 +16362,7 @@
         "type": "string",
         "format": "hex",
         "description": "All bytes (Vec<u8>) data is represented as hex-encoded string prefixed with `0x` and fulfilled with\ntwo hex digits per byte.\n\nUnlike the `Address` type, HexEncodedBytes will not trim any zeros.\n",
-        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
       },
       "IdentifierWrapper": {
         "type": "string"
