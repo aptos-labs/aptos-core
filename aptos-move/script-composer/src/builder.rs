@@ -134,7 +134,7 @@ impl TransactionComposer {
     // stored modules
     pub fn store_module(&mut self, module_bytes: Vec<u8>) -> Result<String, String> {
         let module =
-            CompiledModule::deserialize(module_bytes_hex.as_slice()).map_err(|e| e.to_string())?;
+            CompiledModule::deserialize(module_bytes.as_slice()).map_err(|e| e.to_string())?;
         let module_id = module.self_id();
         self.insert_module(module);
         Ok(module_id.to_string())
