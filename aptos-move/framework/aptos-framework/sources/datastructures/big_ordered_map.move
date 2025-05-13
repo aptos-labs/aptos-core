@@ -29,6 +29,7 @@ module aptos_std::big_ordered_map {
     use aptos_std::storage_slots_allocator::{Self, StorageSlotsAllocator, StoredSlot};
     use aptos_std::math64::{max, min};
 
+    friend aptos_framework::scheduled_txns;
     // Error constants shared with ordered_map (so try using same values)
 
     /// Map key already exists

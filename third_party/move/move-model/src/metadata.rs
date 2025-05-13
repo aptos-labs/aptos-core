@@ -13,7 +13,7 @@ use std::{
 };
 
 const UNSTABLE_MARKER: &str = "-unstable";
-pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_1;
+pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_2;
 pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
 pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
 pub const LATEST_STABLE_COMPILER_VERSION: &str = LATEST_STABLE_COMPILER_VERSION_VALUE.to_str();

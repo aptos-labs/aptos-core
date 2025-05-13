@@ -28,6 +28,7 @@ use std::{
     time::Duration,
 };
 use tokio::{runtime::Handle, sync::Mutex as AsyncMutex};
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 
 struct DummyStateSyncNotifier {
     invocations: Mutex<Vec<(Vec<Transaction>, Vec<ContractEvent>)>>,
@@ -154,6 +155,10 @@ impl BlockExecutorTrait for DummyBlockExecutor {
     }
 
     fn finish(&self) {}
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        todo!()
+    }
 }
 
 #[tokio::test]

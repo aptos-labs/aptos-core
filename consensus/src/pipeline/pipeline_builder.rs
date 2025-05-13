@@ -50,6 +50,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+use aptos_types::transaction::scheduled_txn::ScheduledTransactionWithKey;
+use crate::scheduled_txns_handler::ScheduledTxnsHandler;
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -536,6 +538,13 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
+        let scheduled_txns: Vec<ScheduledTransactionWithKey> = {
+            if let Ok(state_view) = executor.state_view(block.parent_id()) {
+                ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs())
+            } else {
+                vec![]
+            }
+        };
         let (user_txns, block_gas_limit) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
@@ -559,6 +568,11 @@ impl PipelineBuilder {
                 .unwrap_or_default()
                 .into_iter()
                 .map(Transaction::ValidatorTransaction)
+                .map(SignatureVerifiedTransaction::from)
+                .collect(),
+            scheduled_txns
+                .into_iter()
+                .map(Transaction::ScheduledTransaction)
                 .map(SignatureVerifiedTransaction::from)
                 .collect(),
             user_txns.as_ref().clone(),
@@ -893,4 +907,9 @@ impl PipelineBuilder {
         )
         .await;
     }
+}
+
+#[test]
+fn test_pipeline_builder_creation() {
+    // I want to compile the file for now
 }

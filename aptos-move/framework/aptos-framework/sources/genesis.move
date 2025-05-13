@@ -20,6 +20,7 @@ module aptos_framework::genesis {
     use aptos_framework::gas_schedule;
     use aptos_framework::nonce_validation;
     use aptos_framework::reconfiguration;
+    use aptos_framework::scheduled_txns;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::staking_config;
@@ -131,6 +132,7 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         nonce_validation::initialize(&aptos_framework_account);
+        scheduled_txns::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.

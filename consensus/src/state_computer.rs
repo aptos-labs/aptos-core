@@ -43,6 +43,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex as AsyncMutex;
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
@@ -590,6 +591,10 @@ async fn test_commit_sync_race() {
         }
 
         fn finish(&self) {}
+
+        fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+            todo!()
+        }
     }
 
     #[async_trait::async_trait]

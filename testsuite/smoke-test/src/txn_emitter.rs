@@ -292,3 +292,8 @@ async fn test_txn_emmitter_low_funds() {
 
     assert!(txn_stat.submitted > 30);
 }
+
+#[tokio::test]
+async fn test_txn_emmitter_temp_test() {
+    assert!(false);
+}
