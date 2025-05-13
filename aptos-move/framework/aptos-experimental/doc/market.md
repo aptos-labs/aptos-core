@@ -1433,7 +1433,6 @@ of fill limit violation  in the previous transaction and the order is just a con
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
     <b>assert</b>!(orig_size &gt; 0, <a href="market.md#0x7_market_EINVALID_ORDER">EINVALID_ORDER</a>);
-    // TODO(skedia) add support for trigger condition
     // TODO(skedia) is_taker_order API can actually <b>return</b> <b>false</b> positive <b>as</b> the maker orders might not be valid.
     // Changes are needed <b>to</b> ensure the maker order is valid for this order <b>to</b> be a valid taker order.
     // TODO(skedia) reconsile the semantics around <b>global</b> order id vs <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> <b>local</b> id.
@@ -1583,7 +1582,7 @@ of fill limit violation  in the previous transaction and the order is just a con
                 <b>let</b> remaining_size = maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>();
                 <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
                     <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                        parent: self.parent,
+                    parent: self.parent,
                         <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
                         order_id,
                         user: maker_address,
@@ -1644,7 +1643,7 @@ of fill limit violation  in the previous transaction and the order is just a con
                     order_id: maker_order_id,
                     user: maker_address,
                     orig_size: maker_order.get_orig_size(),
-                    remaining_size: maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>(),
+                    remaining_size: maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>() + maker_remaining_settled_size,
                     size_delta: settled_size,
                     price: maker_order.get_price(),
                     is_buy: !is_buy,
@@ -1676,7 +1675,9 @@ of fill limit violation  in the previous transaction and the order is just a con
                 }
             );
             // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
-            self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(maker_address, maker_order_id);
+            <b>if</b> (maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>() != 0) {
+                self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(maker_address, maker_order_id);
+            }
         };
 
         <b>let</b> taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
@@ -1697,6 +1698,24 @@ of fill limit violation  in the previous transaction and the order is just a con
                     details: taker_cancellation_reason.destroy_some()
                 }
             );
+            <b>if</b> (maker_cancellation_reason.is_none() && maker_remaining_settled_size &gt; 0) {
+                // If the taker is cancelled but the maker is not cancelled, then we need <b>to</b> re-insert
+                // the maker order back into the order book
+                self.<a href="order_book.md#0x7_order_book">order_book</a>.reinsert_maker_order(
+                    new_order_request(
+                        maker_address,
+                        maker_order_id,
+                        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(maker_order.get_unique_priority_idx()),
+                        maker_order.get_price(),
+                        maker_order.get_orig_size(),
+                        maker_remaining_settled_size,
+                        !is_buy,
+                        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+                        maker_order.get_metadata_from_order()
+                    )
+                );
+
+            };
             <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
                 order_id,
                 remaining_size,
