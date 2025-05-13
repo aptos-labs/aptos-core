@@ -463,14 +463,11 @@ impl TransactionComposer {
                 operation_type,
             }) => {
                 let local_idx = self.calls[*call_idx as usize].returns[*return_idx as usize];
-                assert_eq!(
-                    lhs,
-                    &AllocatedLocal {
-                        local_idx,
-                        op_type: operation_type.clone(),
-                        is_parameter: false,
-                    }
-                );
+                assert_eq!(lhs, &AllocatedLocal {
+                    local_idx,
+                    op_type: operation_type.clone(),
+                    is_parameter: false,
+                });
             },
             CallArgument::Raw(input) => {
                 assert!(lhs.is_parameter);
@@ -481,14 +478,11 @@ impl TransactionComposer {
                 );
             },
             CallArgument::Signer(idx) => {
-                assert_eq!(
-                    lhs,
-                    &AllocatedLocal {
-                        op_type: ArgumentOperation::Copy,
-                        is_parameter: true,
-                        local_idx: *idx
-                    }
-                )
+                assert_eq!(lhs, &AllocatedLocal {
+                    op_type: ArgumentOperation::Copy,
+                    is_parameter: true,
+                    local_idx: *idx
+                })
             },
         }
     }
