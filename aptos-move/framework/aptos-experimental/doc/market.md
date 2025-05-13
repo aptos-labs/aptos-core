@@ -11,11 +11,9 @@ A clearing house implementation is expected to implement the following APIs
 is an match between taker and maker. The clearinghouse is expected to settle the trade and return the result. Please
 note that the clearing house settlment size might not be the same as the order match size and the settlement might
 also fail.
-- validate_settlement_update(account, is_taker, is_long, price, size): bool -> Called by the market to validate
+- validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
-- max_settlement_size(account, is_long, orig_size): Option<u64> -> Called by the market to validate the size
-of the order when its placed. The clearinghouse is expected to validate the order and return the maximum settlement size
-of the order. Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
+Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 the position size of the user and does not do any validation.
 
 Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
@@ -1322,7 +1320,7 @@ to verify that the transaction signer is authorized to place orders on behalf of
     };
 
     <b>if</b> (
-        !callbacks.validate_settlement_update(
+        !callbacks.validate_order_placement(
             user_addr, <b>false</b>, // is_taker
             is_buy, price, orig_size, metadata
         )) {
@@ -1432,45 +1430,18 @@ of fill limit violation  in the previous transaction and the order is just a con
     emit_taker_order_open: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-    <b>assert</b>!(orig_size &gt; 0, <a href="market.md#0x7_market_EINVALID_ORDER">EINVALID_ORDER</a>);
+    <b>assert</b>!(orig_size &gt; 0 && remaining_size &gt; 0, <a href="market.md#0x7_market_EINVALID_ORDER">EINVALID_ORDER</a>);
     // TODO(skedia) is_taker_order API can actually <b>return</b> <b>false</b> positive <b>as</b> the maker orders might not be valid.
     // Changes are needed <b>to</b> ensure the maker order is valid for this order <b>to</b> be a valid taker order.
     // TODO(skedia) reconsile the semantics around <b>global</b> order id vs <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> <b>local</b> id.
-    <b>let</b> settlement_size =
-        callbacks.max_settlement_size(
-            user_addr, is_buy, remaining_size, metadata
-        );
-    <b>if</b> (settlement_size.is_none()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                parent: self.parent,
-                <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                order_id,
-                user: user_addr,
-                orig_size,
-                remaining_size,
-                size_delta: 0, // 0 because order was never placed
-                price,
-                is_buy,
-                is_taker: <b>false</b>,
-                status: <a href="market.md#0x7_market_ORDER_STATUS_REJECTED">ORDER_STATUS_REJECTED</a>,
-                details: std::string::utf8(b"Max settlement size violation")
-            }
-        );
-        <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-            order_id,
-            remaining_size,
-            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                OrderCancellationReason::ReduceOnlyViolation
-            ),
-            num_fills: 0
-        };
-    };
-    <b>let</b> remaining_size = settlement_size.destroy_some();
     <b>if</b> (
-        !callbacks.validate_settlement_update(
-            user_addr, <b>true</b>, // is_taker
-            is_buy, price, remaining_size, metadata
+        !callbacks.validate_order_placement(
+            user_addr,
+            <b>true</b>, // is_taker
+            is_buy,
+            price,
+            remaining_size,
+            metadata
         )) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
@@ -1564,55 +1535,20 @@ of fill limit violation  in the previous transaction and the order is just a con
         <b>let</b> result =
             self.<a href="order_book.md#0x7_order_book">order_book</a>.get_single_match_for_taker(price, remaining_size, is_buy);
         <b>let</b> (maker_order, maker_matched_size) = result.destroy_single_order_match();
-        // <b>let</b> maker_reduce_only = maker_order.get_metadata_from_order().is_reduce_only;
         <b>let</b> (maker_address, maker_order_id) =
             maker_order.<a href="market.md#0x7_market_get_order_id">get_order_id</a>().destroy_order_id_type();
-
-        <b>let</b> expected_settlement_size = {
-            <b>let</b> maker_settlement_size =
-                callbacks.max_settlement_size(
-                    maker_address,
-                    !is_buy,
-                    maker_matched_size,
-                    maker_order.get_metadata_from_order()
-                );
-            // TODO(skedia) emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for partial order cancellation
-            // <b>if</b> maker settlement size is less than maker matched size
-            <b>if</b> (maker_settlement_size.is_none()) {
-                <b>let</b> remaining_size = maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>();
-                <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-                    <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                    parent: self.parent,
-                        <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                        order_id,
-                        user: maker_address,
-                        orig_size: maker_order.get_orig_size(),
-                        remaining_size: 0,
-                        size_delta: remaining_size,
-                        price,
-                        is_buy: !is_buy,
-                        is_taker: <b>true</b>,
-                        status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
-                        details: std::string::utf8(b"Max settlement size violation")
-                    }
-                );
-                self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(maker_address, maker_order_id);
-            };
-            maker_settlement_size.destroy_some()
-        };
-
         <b>let</b> settle_result =
             callbacks.settle_trade(
                 user_addr,
                 maker_address,
                 is_buy,
                 maker_order.get_price(), // Order is always matched at the price of the maker
-                expected_settlement_size,
+                maker_matched_size,
                 metadata,
                 maker_order.get_metadata_from_order()
             );
 
-        <b>let</b> maker_remaining_settled_size = expected_settlement_size;
+        <b>let</b> maker_remaining_settled_size = maker_matched_size;
         <b>let</b> settled_size = settle_result.get_settled_size();
         <b>if</b> (settled_size &gt; 0) {
             remaining_size -= settled_size;

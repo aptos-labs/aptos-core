@@ -6,11 +6,9 @@
 /// is an match between taker and maker. The clearinghouse is expected to settle the trade and return the result. Please
 /// note that the clearing house settlment size might not be the same as the order match size and the settlement might
 /// also fail.
-///  - validate_settlement_update(account, is_taker, is_long, price, size): bool -> Called by the market to validate
+///  - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 ///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
-///  - max_settlement_size(account, is_long, orig_size): Option<u64> -> Called by the market to validate the size
-///  of the order when its placed. The clearinghouse is expected to validate the order and return the maximum settlement size
-///  of the order. Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
+///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 ///  the position size of the user and does not do any validation.
 ///
 /// Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
@@ -383,7 +381,7 @@ module aptos_experimental::market {
         };
 
         if (
-            !callbacks.validate_settlement_update(
+            !callbacks.validate_order_placement(
                 user_addr, false, // is_taker
                 is_buy, price, orig_size, metadata
             )) {
@@ -473,45 +471,18 @@ module aptos_experimental::market {
         emit_taker_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
-        assert!(orig_size > 0, EINVALID_ORDER);
+        assert!(orig_size > 0 && remaining_size > 0, EINVALID_ORDER);
         // TODO(skedia) is_taker_order API can actually return false positive as the maker orders might not be valid.
         // Changes are needed to ensure the maker order is valid for this order to be a valid taker order.
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
-        let settlement_size =
-            callbacks.max_settlement_size(
-                user_addr, is_buy, remaining_size, metadata
-            );
-        if (settlement_size.is_none()) {
-            event::emit(
-                OrderEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    order_id,
-                    user: user_addr,
-                    orig_size,
-                    remaining_size,
-                    size_delta: 0, // 0 because order was never placed
-                    price,
-                    is_buy,
-                    is_taker: false,
-                    status: ORDER_STATUS_REJECTED,
-                    details: std::string::utf8(b"Max settlement size violation")
-                }
-            );
-            return OrderMatchResult {
-                order_id,
-                remaining_size,
-                cancel_reason: option::some(
-                    OrderCancellationReason::ReduceOnlyViolation
-                ),
-                num_fills: 0
-            };
-        };
-        let remaining_size = settlement_size.destroy_some();
         if (
-            !callbacks.validate_settlement_update(
-                user_addr, true, // is_taker
-                is_buy, price, remaining_size, metadata
+            !callbacks.validate_order_placement(
+                user_addr,
+                true, // is_taker
+                is_buy,
+                price,
+                remaining_size,
+                metadata
             )) {
             event::emit(
                 OrderEvent {
@@ -605,55 +576,20 @@ module aptos_experimental::market {
             let result =
                 self.order_book.get_single_match_for_taker(price, remaining_size, is_buy);
             let (maker_order, maker_matched_size) = result.destroy_single_order_match();
-            // let maker_reduce_only = maker_order.get_metadata_from_order().is_reduce_only;
             let (maker_address, maker_order_id) =
                 maker_order.get_order_id().destroy_order_id_type();
-
-            let expected_settlement_size = {
-                let maker_settlement_size =
-                    callbacks.max_settlement_size(
-                        maker_address,
-                        !is_buy,
-                        maker_matched_size,
-                        maker_order.get_metadata_from_order()
-                    );
-                // TODO(skedia) emit event for partial order cancellation
-                // if maker settlement size is less than maker matched size
-                if (maker_settlement_size.is_none()) {
-                    let remaining_size = maker_order.get_remaining_size();
-                    event::emit(
-                        OrderEvent {
-                        parent: self.parent,
-                            market: self.market,
-                            order_id,
-                            user: maker_address,
-                            orig_size: maker_order.get_orig_size(),
-                            remaining_size: 0,
-                            size_delta: remaining_size,
-                            price,
-                            is_buy: !is_buy,
-                            is_taker: true,
-                            status: ORDER_STATUS_CANCELLED,
-                            details: std::string::utf8(b"Max settlement size violation")
-                        }
-                    );
-                    self.order_book.cancel_order(maker_address, maker_order_id);
-                };
-                maker_settlement_size.destroy_some()
-            };
-
             let settle_result =
                 callbacks.settle_trade(
                     user_addr,
                     maker_address,
                     is_buy,
                     maker_order.get_price(), // Order is always matched at the price of the maker
-                    expected_settlement_size,
+                    maker_matched_size,
                     metadata,
                     maker_order.get_metadata_from_order()
                 );
 
-            let maker_remaining_settled_size = expected_settlement_size;
+            let maker_remaining_settled_size = maker_matched_size;
             let settled_size = settle_result.get_settled_size();
             if (settled_size > 0) {
                 remaining_size -= settled_size;

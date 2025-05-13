@@ -38,12 +38,6 @@ module aptos_experimental::clearinghouse_test {
         move_to(admin, GlobalState { user_positions: table::new() });
     }
 
-    public(package) fun max_settlement_size<M: store + copy + drop>(
-        orig_size: u64
-    ): Option<u64> {
-        return option::some(orig_size)
-    }
-
     public(package) fun validate_settlement_update(): bool {
         return true
     }
@@ -109,9 +103,6 @@ module aptos_experimental::clearinghouse_test {
                 settle_trade(taker, maker, size, is_taker_long)
             },
             |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
-            |_user_addr, _is_buy, orig_size, _metadata| {
-                max_settlement_size<TestOrderMetadata>(orig_size)
-            }
         )
     }
 
@@ -122,9 +113,6 @@ module aptos_experimental::clearinghouse_test {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
             |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
-            |_user_addr, _is_buy, orig_size, _metadata| {
-                max_settlement_size<TestOrderMetadata>(orig_size)
-            }
         )
     }
 }
