@@ -87,16 +87,18 @@ pub enum FeatureFlag {
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
     ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
-    GOVERNED_GAS_POOL = 73,
+    /// Enabled on mainnet, cannot be disabled.
+    _USE_COMPATIBILITY_CHECKER_V2 = 73,
     ENABLE_ENUM_TYPES = 74,
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
-    DECOMMISSION_CORE_RESOURCES = 222,
     /// covers mem::swap and vector::move_range
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     ACCOUNT_ABSTRACTION = 85,
+    DECOMMISSION_CORE_RESOURCES = 222,
+    GOVERNED_GAS_POOL = 223,
 }
 
 impl FeatureFlag {
@@ -106,6 +108,8 @@ impl FeatureFlag {
             FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
             FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
+            // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
             FeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
