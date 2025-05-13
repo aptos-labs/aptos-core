@@ -46,6 +46,16 @@ pub struct ActiveObserverState {
     // Execution pool window size (if none, execution pool is disabled)
     execution_pool_window_size: Option<u64>,
 
+    // The latest on-chain configs (from the most recent reconfiguration)
+    on_chain_configs: Option<(
+        OnChainConsensusConfig,
+        OnChainExecutionConfig,
+        OnChainRandomnessConfig,
+    )>,
+
+    // The payload manager used to manage the transaction payloads
+    payload_manager: Option<Arc<dyn TPayloadManager>>,
+
     // Whether quorum store is enabled for the current epoch
     quorum_store_enabled: bool,
 
@@ -82,9 +92,11 @@ impl ActiveObserverState {
         Self {
             node_config,
             consensus_publisher,
-            epoch_state: None,                // This is updated on epoch change
-            execution_pool_window_size: None, // This is updated by the on-chain configs
-            quorum_store_enabled: false,      // This is updated by the on-chain configs
+            epoch_state: None, // This is updated on each epoch change
+            execution_pool_window_size: None, // This is updated on each epoch change
+            on_chain_configs: None, // This is updated on each epoch change
+            payload_manager: None, // This is updated on each epoch change
+            quorum_store_enabled: false, // This is updated on each epoch change
             reconfig_events,
             root: Arc::new(Mutex::new(root)),
         }
@@ -146,6 +158,26 @@ impl ActiveObserverState {
             .expect("The epoch state is not set! This should never happen!")
     }
 
+    /// Returns the latest on-chain configs
+    pub fn on_chain_configs(
+        &self,
+    ) -> (
+        OnChainConsensusConfig,
+        OnChainExecutionConfig,
+        OnChainRandomnessConfig,
+    ) {
+        self.on_chain_configs
+            .clone()
+            .expect("The on-chain configs are not set! This should never happen!")
+    }
+
+    /// Returns the payload manager
+    pub fn payload_manager(&self) -> Arc<dyn TPayloadManager> {
+        self.payload_manager
+            .clone()
+            .expect("The payload manager is not set! This should never happen!")
+    }
+
     /// Returns the execution pool window size
     pub fn execution_pool_window_size(&self) -> Option<u64> {
         self.execution_pool_window_size
@@ -173,18 +205,20 @@ impl ActiveObserverState {
         block_payloads: Arc<
             Mutex<BTreeMap<(u64, aptos_consensus_types::common::Round), BlockPayloadStatus>>,
         >,
-    ) -> (
-        Arc<dyn TPayloadManager>,
-        OnChainConsensusConfig,
-        OnChainExecutionConfig,
-        OnChainRandomnessConfig,
     ) {
-        // Extract the epoch state and on-chain configs
+        // Extract the latest epoch state and on-chain configs
         let (epoch_state, consensus_config, execution_config, randomness_config) =
-            extract_on_chain_configs(&self.node_config, &mut self.reconfig_events).await;
+            extract_latest_on_chain_configs(&self.node_config, &mut self.reconfig_events).await;
 
-        // Update the local epoch state and quorum store config
+        // Update the local epoch state and on-chain configs
         self.epoch_state = Some(epoch_state.clone());
+        self.on_chain_configs = Some((
+            consensus_config.clone(),
+            execution_config.clone(),
+            randomness_config.clone(),
+        ));
+
+        // Update the on-chain flags
         self.execution_pool_window_size = consensus_config.window_size();
         self.quorum_store_enabled = consensus_config.quorum_store_enabled();
         info!(
@@ -204,13 +238,8 @@ impl ActiveObserverState {
             Arc::new(DirectMempoolPayloadManager {})
         };
 
-        // Return the payload manager and on-chain configs
-        (
-            payload_manager,
-            consensus_config,
-            execution_config,
-            randomness_config,
-        )
+        // Update the payload manager
+        self.payload_manager = Some(payload_manager.clone());
     }
 
     /// Returns whether the pipeline is enabled
@@ -219,8 +248,8 @@ impl ActiveObserverState {
     }
 }
 
-/// A simple helper function that extracts the on-chain configs from the reconfig events
-async fn extract_on_chain_configs(
+/// A simple helper function that extracts the latest on-chain configs from the reconfig events
+async fn extract_latest_on_chain_configs(
     node_config: &NodeConfig,
     reconfig_events: &mut ReconfigNotificationListener<DbBackedOnChainConfig>,
 ) -> (
@@ -515,7 +544,7 @@ mod test {
     }
 
     #[test]
-    fn test_simple_epoch_state() {
+    fn test_simple_state_accessors() {
         // Create a root ledger info
         let epoch = 10;
         let round = 5;
@@ -526,21 +555,30 @@ mod test {
         let mut observer_state =
             ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
 
-        // Verify that the execution pool window size is not set
-        assert!(observer_state.execution_pool_window_size().is_none());
+        // Verify that the epoch state, on-chain configs and internal states are not set
+        assert!(observer_state.epoch_state.is_none());
+        assert!(observer_state.execution_pool_window_size.is_none());
+        assert!(observer_state.on_chain_configs.is_none());
+        assert!(observer_state.payload_manager.is_none());
+        assert!(!observer_state.quorum_store_enabled);
 
-        // Verify that quorum store is not enabled
-        assert!(!observer_state.is_quorum_store_enabled());
-
-        // Manually update the epoch state, execution pool window, and quorum store flag
+        // Manually update the epoch state, on-chain configs and internal states
         let epoch_state = Arc::new(EpochState::empty());
         observer_state.epoch_state = Some(epoch_state.clone());
         observer_state.execution_pool_window_size = Some(1);
+        observer_state.on_chain_configs = Some((
+            OnChainConsensusConfig::default(),
+            OnChainExecutionConfig::Missing,
+            OnChainRandomnessConfig::Off,
+        ));
+        observer_state.payload_manager = Some(Arc::new(DirectMempoolPayloadManager::new()));
         observer_state.quorum_store_enabled = true;
 
-        // Verify the epoch state and quorum store flag are updated
+        // Verify the epoch state, on-chain configs and internal state accessors
         assert_eq!(observer_state.epoch_state(), epoch_state);
         assert_eq!(observer_state.execution_pool_window_size(), Some(1));
+        observer_state.on_chain_configs(); // Note: the accessor will panic if this is not set
+        observer_state.payload_manager(); // Note: the accessor will panic if this is not set
         assert!(observer_state.is_quorum_store_enabled());
     }
 
