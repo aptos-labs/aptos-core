@@ -1519,7 +1519,11 @@ where
                         num_workers as usize,
                         &mut custom_validation_pass.updated_module_keys,
                     )? {
-                        if txn_idx + 1 < upper_bound {
+                        custom_validation_pass.to_excl = upper_bound;
+                    }
+
+                    if !custom_validation_pass.updated_module_keys.is_empty() {
+                        if txn_idx + 1 < custom_validation_pass.to_excl {
                             if Self::module_access_verification_v2(
                                 txn_idx + 1,
                                 scheduler,
@@ -1529,11 +1533,11 @@ where
                                 versioned_cache,
                             )? {
                                 // txn_idx + 1 verification pass has been completed.
-                                custom_validation_pass.set(txn_idx + 2, upper_bound);
+                                custom_validation_pass.from_incl = txn_idx + 2;
                             } else {
                                 // txn_idx + 1 module accesses have not been verified
                                 // (read set not ready) - do it later.
-                                custom_validation_pass.set(txn_idx + 1, upper_bound);
+                                custom_validation_pass.from_incl = txn_idx + 1;
                                 // breaking here ensures committing idx gets blocked below before
                                 // the next iteration of the loop would happen.
                                 break;

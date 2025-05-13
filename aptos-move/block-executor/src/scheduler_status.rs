@@ -238,7 +238,7 @@ pub(crate) struct ExecutionStatus {
     //     ↓           finish_execution               ↓
     // Aborted(i) ---------------------------> PendingScheduling(i+1)
     //
-    inner_status: CachePadded<Mutex<InnerStatus>>,
+    pub(crate) inner_status: CachePadded<Mutex<InnerStatus>>,
 
     // It is guaranteed that each add_stall has a corresponding remove_stall, which occurs later,
     // whereby add_stall increments num_stalls (by 1), and remove_stall decrements num_stalls.

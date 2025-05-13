@@ -50,6 +50,13 @@ impl ArmedLock {
     }
 }
 
+#[cfg(test)]
+impl ArmedLock {
+    pub fn is_armed(&self) -> bool {
+        self.locked.load(Ordering::Relaxed) & 2 == 2
+    }
+}
+
 #[derive(Debug)]
 pub enum DependencyStatus {
     // The dependency is not resolved yet.

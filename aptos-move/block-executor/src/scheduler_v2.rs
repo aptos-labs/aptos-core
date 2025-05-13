@@ -15,6 +15,7 @@ use crossbeam::utils::CachePadded;
 use fail::fail_point;
 use std::{
     cell::RefCell,
+    cmp,
     collections::{
         btree_map::Entry::{Occupied, Vacant},
         BTreeMap, BTreeSet,
@@ -404,7 +405,6 @@ impl SchedulerV2 {
 
     // When block_commit_for_idx is called, the scheduler will not commit the transaction
     // at txn_idx until unblock_commit_for_idx is called.
-    // TODO(BlockSTMv2): Unit tests for this and unblock.
     pub(crate) fn block_commit_for_idx(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
         if next_to_commit_idx > txn_idx {
@@ -420,13 +420,19 @@ impl SchedulerV2 {
 
     pub(crate) fn unblock_commit_for_idx(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
-        if next_to_commit_idx > txn_idx {
-            return Err(code_invariant_error(format!(
-                "Asking to unblock commit for an already committed txn {}, next to commit idx = {}",
-                txn_idx, next_to_commit_idx
-            )));
-        } else if next_to_commit_idx == txn_idx {
-            self.queueing_commits_lock.arm();
+        match next_to_commit_idx.cmp(&txn_idx) {
+            cmp::Ordering::Greater => {
+                return Err(code_invariant_error(format!(
+                    "Asking to unblock commit for an already committed txn {}, next to commit idx = {}",
+                    txn_idx, next_to_commit_idx
+                )));
+            },
+            cmp::Ordering::Equal => {
+                self.queueing_commits_lock.arm();
+            },
+            cmp::Ordering::Less => {
+                // Do nothing.
+            },
         }
 
         let prev_blocked_count =
@@ -1414,6 +1420,157 @@ mod tests {
         assert_some_eq!(invalidations.get(&5), &Some(2));
 
         scenario.teardown();
+    }
+
+    // Tests for block_commit_for_idx and unblock_commit_for_idx methods
+    #[test]
+    fn test_block_and_unblock_commit() {
+        // Create a scheduler with 3 transactions
+        let num_txns = 3;
+        let scheduler = SchedulerV2::new(num_txns, 1);
+
+        // Initially, no transactions should be blocked
+        for i in 0..num_txns {
+            assert_eq!(
+                scheduler.blocked_for_commit[i as usize].load(Ordering::Relaxed),
+                0
+            );
+        }
+
+        // Block txn_idx 1 for commit
+        assert_ok!(scheduler.block_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 1);
+
+        // Block it again.
+        assert_ok!(scheduler.block_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 2);
+
+        // Check that other indices are not affected.
+        assert_eq!(scheduler.blocked_for_commit[0].load(Ordering::Relaxed), 0);
+        assert_eq!(scheduler.blocked_for_commit[2].load(Ordering::Relaxed), 0);
+
+        // Unblock once
+        assert_ok!(scheduler.unblock_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 1);
+
+        // Unblock again to clear it.
+        assert_ok!(scheduler.unblock_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_cannot_block_already_committed_txn() {
+        let num_txns = 3;
+        let scheduler = SchedulerV2::new(num_txns, 1);
+
+        // Simulate txn 0 being committed by advancing next_to_commit_idx
+        scheduler.next_to_commit_idx.store(1, Ordering::Relaxed);
+
+        // Trying to block txn 0 should fail
+        assert_err!(scheduler.block_commit_for_idx(0));
+        // Unblock must also fail, even if we set the blocked count to >0.
+        scheduler.blocked_for_commit[0].store(1, Ordering::Relaxed);
+        assert_err!(scheduler.unblock_commit_for_idx(0));
+
+        // Later txns should still be blockable
+        assert_ok!(scheduler.block_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn test_cannot_unblock_txn_that_wasn_t_blocked() {
+        let num_txns = 3;
+        let scheduler = SchedulerV2::new(num_txns, 1);
+
+        // Trying to unblock a txn that wasn't blocked should fail
+        assert_err!(scheduler.unblock_commit_for_idx(1));
+
+        // Block and then try to unblock too many times.
+        assert_ok!(scheduler.block_commit_for_idx(0));
+        assert_ok!(scheduler.unblock_commit_for_idx(0));
+        assert_err!(scheduler.unblock_commit_for_idx(0));
+    }
+
+    #[test]
+    fn test_arm_queueing_commits_lock() {
+        let num_txns = 3;
+        let scheduler = SchedulerV2::new(num_txns, 1);
+
+        assert!(scheduler.queueing_commits_lock.is_armed());
+        assert!(scheduler.queueing_commits_lock.try_lock());
+        scheduler.queueing_commits_lock.unlock();
+        assert!(!scheduler.queueing_commits_lock.is_armed());
+
+        // Block the next txn to commit (0), check still unarmed.
+        assert_ok!(scheduler.block_commit_for_idx(0));
+        assert!(!scheduler.queueing_commits_lock.is_armed());
+
+        // Unblock txn 0, and verify that the lock is now armed.
+        assert_ok!(scheduler.unblock_commit_for_idx(0));
+        assert!(scheduler.queueing_commits_lock.is_armed());
+    }
+
+    #[test]
+    fn test_interaction_with_commit_hooks() {
+        let num_txns = 3;
+        let scheduler = SchedulerV2::new(num_txns, 1);
+
+        // Set up txn 0 to be ready for commit
+        *scheduler.txn_status[0].inner_status.lock() =
+            InnerStatus::new_for_test(StatusEnum::Executed, 0);
+
+        // Block txn 0 from committing
+        assert_ok!(scheduler.block_commit_for_idx(0));
+
+        // Lock for commit hooks
+        assert!(scheduler.commit_hooks_try_lock());
+
+        // Should not be able to get a commit hook while blocked
+        assert_none!(scheduler.try_get_sequential_commit_hook().unwrap());
+
+        // Unblock
+        assert_ok!(scheduler.unblock_commit_for_idx(0));
+
+        // Now should be able to get a commit hook
+        assert_some_eq!(scheduler.try_get_sequential_commit_hook().unwrap(), (0, 0));
+
+        // Unlock
+        scheduler.commit_hooks_unlock();
+    }
+
+    #[test]
+    fn test_multiple_block_and_unblock() {
+        let num_txns = 5;
+        let scheduler = SchedulerV2::new(num_txns, 1);
+
+        // Block txns in different patterns
+        assert_ok!(scheduler.block_commit_for_idx(0)); // Block once
+        assert_ok!(scheduler.block_commit_for_idx(1));
+        assert_ok!(scheduler.block_commit_for_idx(1)); // Block twice
+        assert_ok!(scheduler.block_commit_for_idx(2));
+        assert_ok!(scheduler.block_commit_for_idx(2));
+        assert_ok!(scheduler.block_commit_for_idx(2)); // Block three times
+
+        // Verify block counts
+        assert_eq!(scheduler.blocked_for_commit[0].load(Ordering::Relaxed), 1);
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 2);
+        assert_eq!(scheduler.blocked_for_commit[2].load(Ordering::Relaxed), 3);
+
+        // Partially unblock
+        assert_ok!(scheduler.unblock_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 1);
+
+        // Completely unblock in reverse order
+        assert_ok!(scheduler.unblock_commit_for_idx(2));
+        assert_ok!(scheduler.unblock_commit_for_idx(2));
+        assert_ok!(scheduler.unblock_commit_for_idx(2));
+        assert_eq!(scheduler.blocked_for_commit[2].load(Ordering::Relaxed), 0);
+
+        assert_ok!(scheduler.unblock_commit_for_idx(1));
+        assert_eq!(scheduler.blocked_for_commit[1].load(Ordering::Relaxed), 0);
+
+        assert_ok!(scheduler.unblock_commit_for_idx(0));
+        assert_eq!(scheduler.blocked_for_commit[0].load(Ordering::Relaxed), 0);
     }
 
     #[test_case(1)]
