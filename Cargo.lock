@@ -1402,7 +1402,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-dynamic-transaction-composer"
-version = "0.1.1"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "aptos-types",
@@ -1413,7 +1413,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "reqwest 0.11.23",
  "serde",
  "serde_bytes",
  "serde_json",
