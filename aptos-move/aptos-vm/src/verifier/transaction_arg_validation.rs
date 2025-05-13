@@ -126,14 +126,8 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
     for ty in func.param_tys() {
-        match ty {
-            Type::Signer => signer_param_cnt += 1,
-            Type::Reference(inner_type) => {
-                if matches!(&**inner_type, Type::Signer) {
-                    signer_param_cnt += 1;
-                }
-            },
-            _ => (),
+        if ty.is_signer_or_signer_ref() {
+            signer_param_cnt += 1;
         }
     }
 

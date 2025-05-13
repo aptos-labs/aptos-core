@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_abort, assert_success, build_package, tests::common, MoveHarness};
+use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
@@ -142,7 +142,7 @@ fn deploy_code(
 ) -> anyhow::Result<(Account, BuiltPackage)> {
     let account = harness.new_account_at(addr);
 
-    let package = build_package(
+    let package = BuiltPackage::build(
         common::test_dir_path(code_path),
         aptos_framework::BuildOptions::default(),
     )?;

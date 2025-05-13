@@ -259,6 +259,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Fail compilation if there is a warning".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS.to_string(),
+            description: "Skip errors originating from extended checks, for testing only"
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -297,6 +303,7 @@ impl Experiment {
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
+    pub const SKIP_BAILOUT_ON_EXTENDED_CHECKS: &'static str = "skip-bailout-on-extended-checks";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
