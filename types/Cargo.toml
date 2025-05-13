@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+api-types = { workspace = true }
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }

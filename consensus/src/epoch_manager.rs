@@ -387,10 +387,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let default_proposer = proposers
                     .first()
                     .expect("INVARIANT VIOLATION: proposers is empty");
-                Arc::new(RoundProposer::new(
-                    round_proposers.clone(),
-                    *default_proposer,
-                ))
+                todo!("not invoked in Gravity")
+                // Arc::new(RoundProposer::new(
+                //     round_proposers.clone(),
+                //     *default_proposer,
+                // ))
             },
         }
     }

@@ -273,7 +273,7 @@ async fn test_entry_function_payload() {
             .expiration_timestamp_secs(gen_u64(&mut value_gen))
             .max_gas_amount(gen_u64(&mut value_gen))
             .gas_unit_price(gen_u64(&mut value_gen))
-            .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
+            .chain_id(ChainId::new(todo!())) //gen_chain_id(&mut value_gen)))
             .build();
         let mut signed_txn = sign_transaction(raw_txn);
         patch(&mut signed_txn);
@@ -313,7 +313,7 @@ async fn test_script_payload() {
             .expiration_timestamp_secs(gen_u64(&mut value_gen))
             .max_gas_amount(gen_u64(&mut value_gen))
             .gas_unit_price(gen_u64(&mut value_gen))
-            .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
+            .chain_id(ChainId::new(todo!())) // gen_chain_id(&mut value_gen)))
             .build();
         let mut signed_txn = sign_transaction(raw_txn);
         patch(&mut signed_txn);

@@ -43,7 +43,7 @@ pub fn offer_rotation_capability_v2(
         account_address: CORE_CODE_ADDRESS,
         module_name: String::from("account"),
         struct_name: String::from("RotationCapabilityOfferProofChallengeV2"),
-        chain_id: ChainId::test().id(),
+        chain_id: todo!(), // ChainId::test().id(),
         sequence_number: 0,
         source_address: *offerer_account.address(),
         recipient_address: *delegate_account.address(),

@@ -90,6 +90,7 @@ pub struct EventSubscriptionService {
 }
 
 impl EventSubscriptionService {
+    /// 修改成可以让gravity-sdk传递一个ConfigStorage的实例.
     pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
         Self {
             event_key_subscriptions: HashMap::new(),
@@ -101,6 +102,7 @@ impl EventSubscriptionService {
         }
     }
 
+    /// TODO(gravity_alex): gravity-sdk中暂时不会订阅任何事件，以后会订阅jwk
     /// Returns an EventNotificationListener that can be monitored for
     /// subscribed events. If an event key is subscribed to, it means the
     /// EventNotificationListener will be sent a notification every time an
@@ -299,6 +301,8 @@ impl EventSubscriptionService {
         &self,
         version: Version,
     ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
+        // 使用执行层提供的config storage的实例. 把version传递进去
+        // let config_storage = ConfigStorageImpl::new(version);
         let db_state_view = &self
             .storage
             .read()
@@ -398,6 +402,20 @@ impl ReconfigSubscription {
             .map_err(|error| Error::UnexpectedErrorEncountered(format!("{:?}", error)))
     }
 }
+
+
+/// 需要一个wrapper暂时保存version和config storage实例
+/// pub struct ConfigStorageWrapper {
+///     pub version: Version,
+///     pub config_storage: Arc<dyn ConfigStorage>,
+/// }
+/// 这样之后直接通过这个wrapper在请求的时候只传递conf name即可.
+/// 返回bytes让上层的范性自己负责反序列化就OK
+/// impl ConfigStorage for ConfigStorageWrapper {
+///     fn get_config(&self, name: &str) -> Result<bytes> {
+///         self.config_storage.get_config(name)
+///     }
+/// }
 
 #[derive(Clone)]
 pub struct DbBackedOnChainConfig {

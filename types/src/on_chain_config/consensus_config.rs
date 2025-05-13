@@ -2,194 +2,206 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_info::Round, on_chain_config::OnChainConfig};
+use crate::on_chain_config::OnChainConfig;
+pub use api_types::on_chain_config::{
+    consensus_config::{
+        ConsensusAlgorithmConfig, ConsensusConfigV1, LeaderReputationType,
+        ProposerAndVoterConfig, ProposerElectionType, ValidatorTxnConfig,
+        DEFAULT_WINDOW_SIZE
+    }, *
+};
 use anyhow::{format_err, Result};
-use move_core_types::account_address::AccountAddress;
+// use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Default Window Size for Execution Pool.
 /// This describes the number of blocks in the Execution Pool Window
-pub const DEFAULT_WINDOW_SIZE: Option<u64> = None;
+// pub const DEFAULT_WINDOW_SIZE: Option<u64> = None;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub enum ConsensusAlgorithmConfig {
-    Jolteon {
-        main: ConsensusConfigV1,
-        quorum_store_enabled: bool,
-    },
-    DAG(DagConsensusConfigV1),
-    JolteonV2 {
-        main: ConsensusConfigV1,
-        quorum_store_enabled: bool,
-        order_vote_enabled: bool,
-    },
-}
+// #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+// pub enum ConsensusAlgorithmConfig {
+//     Jolteon {
+//         main: ConsensusConfigV1,
+//         quorum_store_enabled: bool,
+//     },
+//     DAG(DagConsensusConfigV1),
+//     JolteonV2 {
+//         main: ConsensusConfigV1,
+//         quorum_store_enabled: bool,
+//         order_vote_enabled: bool,
+//     },
+// }
 
-impl ConsensusAlgorithmConfig {
-    pub fn default_for_genesis() -> Self {
-        Self::JolteonV2 {
-            main: ConsensusConfigV1::default(),
-            quorum_store_enabled: true,
-            order_vote_enabled: true,
-        }
-    }
+// impl ConsensusAlgorithmConfig {
+//     pub fn default_for_genesis() -> Self {
+//         Self::JolteonV2 {
+//             main: ConsensusConfigV1::default(),
+//             quorum_store_enabled: true,
+//             order_vote_enabled: true,
+//         }
+//     }
 
-    pub fn default_with_quorum_store_disabled() -> Self {
-        Self::JolteonV2 {
-            main: ConsensusConfigV1::default(),
-            quorum_store_enabled: false,
-            order_vote_enabled: true,
-        }
-    }
+//     pub fn default_with_quorum_store_disabled() -> Self {
+//         Self::JolteonV2 {
+//             main: ConsensusConfigV1::default(),
+//             quorum_store_enabled: false,
+//             order_vote_enabled: true,
+//         }
+//     }
 
-    pub fn default_if_missing() -> Self {
-        Self::JolteonV2 {
-            main: ConsensusConfigV1::default(),
-            quorum_store_enabled: true,
-            order_vote_enabled: false,
-        }
-    }
+//     pub fn default_if_missing() -> Self {
+//         Self::JolteonV2 {
+//             main: ConsensusConfigV1::default(),
+//             quorum_store_enabled: true,
+//             order_vote_enabled: false,
+//         }
+//     }
 
-    pub fn quorum_store_enabled(&self) -> bool {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon {
-                quorum_store_enabled,
-                ..
-            }
-            | ConsensusAlgorithmConfig::JolteonV2 {
-                quorum_store_enabled,
-                ..
-            } => *quorum_store_enabled,
-            ConsensusAlgorithmConfig::DAG(_) => true,
-        }
-    }
+//     pub fn quorum_store_enabled(&self) -> bool {
+//         match self {
+//             ConsensusAlgorithmConfig::Jolteon {
+//                 quorum_store_enabled,
+//                 ..
+//             }
+//             | ConsensusAlgorithmConfig::JolteonV2 {
+//                 quorum_store_enabled,
+//                 ..
+//             } => *quorum_store_enabled,
+//             ConsensusAlgorithmConfig::DAG(_) => true,
+//         }
+//     }
 
-    pub fn order_vote_enabled(&self) -> bool {
-        match self {
-            ConsensusAlgorithmConfig::JolteonV2 {
-                order_vote_enabled, ..
-            } => *order_vote_enabled,
-            _ => false,
-        }
-    }
+//     pub fn order_vote_enabled(&self) -> bool {
+//         match self {
+//             ConsensusAlgorithmConfig::JolteonV2 {
+//                 order_vote_enabled, ..
+//             } => *order_vote_enabled,
+//             _ => false,
+//         }
+//     }
 
-    pub fn is_dag_enabled(&self) -> bool {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { .. } => false,
-            ConsensusAlgorithmConfig::DAG(_) => true,
-        }
-    }
+//     pub fn is_dag_enabled(&self) -> bool {
+//         match self {
+//             ConsensusAlgorithmConfig::Jolteon { .. }
+//             | ConsensusAlgorithmConfig::JolteonV2 { .. } => false,
+//             ConsensusAlgorithmConfig::DAG(_) => true,
+//         }
+//     }
 
-    pub fn leader_reputation_exclude_round(&self) -> u64 {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
-            _ => unimplemented!("method not supported"),
-        }
-    }
+//     pub fn leader_reputation_exclude_round(&self) -> u64 {
+//         match self {
+//             ConsensusAlgorithmConfig::Jolteon { main, .. }
+//             | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
+//             _ => unimplemented!("method not supported"),
+//         }
+//     }
 
-    pub fn max_failed_authors_to_store(&self) -> usize {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
-            _ => unimplemented!("method not supported"),
-        }
-    }
+//     pub fn max_failed_authors_to_store(&self) -> usize {
+//         match self {
+//             ConsensusAlgorithmConfig::Jolteon { main, .. }
+//             | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
+//             _ => unimplemented!("method not supported"),
+//         }
+//     }
 
-    pub fn proposer_election_type(&self) -> &ProposerElectionType {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => &main.proposer_election_type,
-            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => &main.proposer_election_type,
-            _ => unimplemented!("method not supported"),
-        }
-    }
+//     pub fn proposer_election_type(&self) -> &ProposerElectionType {
+//         match self {
+//             ConsensusAlgorithmConfig::Jolteon { main, .. } => &main.proposer_election_type,
+//             ConsensusAlgorithmConfig::JolteonV2 { main, .. } => &main.proposer_election_type,
+//             _ => unimplemented!("method not supported"),
+//         }
+//     }
 
-    pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
-        match self {
-            ConsensusAlgorithmConfig::DAG(dag) => dag,
-            _ => unreachable!("not a dag config"),
-        }
-    }
+//     pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
+//         match self {
+//             ConsensusAlgorithmConfig::DAG(dag) => dag,
+//             _ => unreachable!("not a dag config"),
+//         }
+//     }
 
-    pub fn unwrap_jolteon_config_v1(&self) -> &ConsensusConfigV1 {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => main,
-            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main,
-            _ => unreachable!("not a jolteon config"),
-        }
-    }
-}
+//     pub fn unwrap_jolteon_config_v1(&self) -> &ConsensusConfigV1 {
+//         match self {
+//             ConsensusAlgorithmConfig::Jolteon { main, .. } => main,
+//             ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main,
+//             _ => unreachable!("not a jolteon config"),
+//         }
+//     }
+// }
 
-const VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT: u64 = 2;
-const VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT: u64 = 2097152; //2MB
+// const VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT: u64 = 2;
+// const VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT: u64 = 2097152; //2MB
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub enum ValidatorTxnConfig {
-    /// Disabled. In Jolteon, it also means to not use `BlockType::ProposalExt`.
-    V0,
-    /// Enabled. Per-block vtxn count and their total bytes are limited.
-    V1 {
-        per_block_limit_txn_count: u64,
-        per_block_limit_total_bytes: u64,
-    },
-}
+// #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+// pub enum ValidatorTxnConfig {
+//     /// Disabled. In Jolteon, it also means to not use `BlockType::ProposalExt`.
+//     V0,
+//     /// Enabled. Per-block vtxn count and their total bytes are limited.
+//     V1 {
+//         per_block_limit_txn_count: u64,
+//         per_block_limit_total_bytes: u64,
+//     },
+// }
 
-impl ValidatorTxnConfig {
-    pub fn default_for_genesis() -> Self {
-        Self::V1 {
-            per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
-            per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
-        }
-    }
+// impl ValidatorTxnConfig {
+//     pub fn default_for_genesis() -> Self {
+//         Self::V1 {
+//             per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
+//             per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
+//         }
+//     }
 
-    pub fn default_if_missing() -> Self {
-        Self::V0
-    }
+//     pub fn default_if_missing() -> Self {
+//         Self::V0
+//     }
 
-    pub fn default_disabled() -> Self {
-        Self::V0
-    }
+//     pub fn default_disabled() -> Self {
+//         Self::V0
+//     }
 
-    pub fn default_enabled() -> Self {
-        Self::V1 {
-            per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
-            per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
-        }
-    }
+//     pub fn default_enabled() -> Self {
+//         Self::V1 {
+//             per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
+//             per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
+//         }
+//     }
 
-    pub fn enabled(&self) -> bool {
-        match self {
-            ValidatorTxnConfig::V0 => false,
-            ValidatorTxnConfig::V1 { .. } => true,
-        }
-    }
+//     pub fn enabled(&self) -> bool {
+//         match self {
+//             ValidatorTxnConfig::V0 => false,
+//             ValidatorTxnConfig::V1 { .. } => true,
+//         }
+//     }
 
-    pub fn per_block_limit_txn_count(&self) -> u64 {
-        match self {
-            ValidatorTxnConfig::V0 => 0,
-            ValidatorTxnConfig::V1 {
-                per_block_limit_txn_count,
-                ..
-            } => *per_block_limit_txn_count,
-        }
-    }
+//     pub fn per_block_limit_txn_count(&self) -> u64 {
+//         match self {
+//             ValidatorTxnConfig::V0 => 0,
+//             ValidatorTxnConfig::V1 {
+//                 per_block_limit_txn_count,
+//                 ..
+//             } => *per_block_limit_txn_count,
+//         }
+//     }
 
-    pub fn per_block_limit_total_bytes(&self) -> u64 {
-        match self {
-            ValidatorTxnConfig::V0 => 0,
-            ValidatorTxnConfig::V1 {
-                per_block_limit_total_bytes,
-                ..
-            } => *per_block_limit_total_bytes,
-        }
-    }
-}
+//     pub fn per_block_limit_total_bytes(&self) -> u64 {
+//         match self {
+//             ValidatorTxnConfig::V0 => 0,
+//             ValidatorTxnConfig::V1 {
+//                 per_block_limit_total_bytes,
+//                 ..
+//             } => *per_block_limit_total_bytes,
+//         }
+//     }
+// }
 
+/// 得把gravity onchain config也放进去作为enum的一个类型. 但是这里依赖关系会不会出问题
+/// 为了避免依赖关系的问题，需要把aptos这里的config的声明挪动到api-types下面 不然肯定会循环引用.
+/// 得把这里的ConsensusConfigV1, ConsensusAlgorithmConfig. ValidatorTxnConfig LeaderReputationType ProposerAndVoterConfig挪动出去
+/// dag相关的不用动 我们不使用
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainConsensusConfig {
+    // VG(GravityConsensusConfigV),
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
     V3 {
@@ -292,7 +304,8 @@ impl OnChainConsensusConfig {
                 unreachable!("not a dag config")
             },
             OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
-                alg.unwrap_dag_config_v1()
+                unreachable!("not a dag config")
+                // alg.unwrap_dag_config_v1()
             },
         }
     }
@@ -394,6 +407,8 @@ impl Default for OnChainConsensusConfig {
     }
 }
 
+/// 得把gravity onchain config也放进去作为enum的一个类型. 但是这里依赖关系会不会出问题
+/// 为了避免依赖关系的问题，需要把aptos这里的config的声明挪动到api-types下面 不然肯定会循环引用.
 impl OnChainConfig for OnChainConsensusConfig {
     const MODULE_IDENTIFIER: &'static str = "consensus_config";
     const TYPE_IDENTIFIER: &'static str = "ConsensusConfig";
@@ -412,111 +427,111 @@ impl OnChainConfig for OnChainConsensusConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct ConsensusConfigV1 {
-    pub decoupled_execution: bool,
-    // Deprecated and unused, cannot be renamed easily, due to yaml on framework_upgrade test
-    pub back_pressure_limit: u64,
-    pub exclude_round: u64,
-    pub proposer_election_type: ProposerElectionType,
-    pub max_failed_authors_to_store: usize,
-}
+// #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+// pub struct ConsensusConfigV1 {
+//     pub decoupled_execution: bool,
+//     // Deprecated and unused, cannot be renamed easily, due to yaml on framework_upgrade test
+//     pub back_pressure_limit: u64,
+//     pub exclude_round: u64,
+//     pub proposer_election_type: ProposerElectionType,
+//     pub max_failed_authors_to_store: usize,
+// }
 
-impl Default for ConsensusConfigV1 {
-    fn default() -> Self {
-        Self {
-            decoupled_execution: true,
-            back_pressure_limit: 10,
-            exclude_round: 40,
-            max_failed_authors_to_store: 10,
-            proposer_election_type: ProposerElectionType::LeaderReputation(
-                LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
-                    active_weight: 1000,
-                    inactive_weight: 10,
-                    failed_weight: 1,
-                    failure_threshold_percent: 10, // = 10%
-                    // In each round we get stastics for the single proposer
-                    // and large number of validators. So the window for
-                    // the proposers needs to be significantly larger
-                    // to have enough useful statistics.
-                    proposer_window_num_validators_multiplier: 10,
-                    voter_window_num_validators_multiplier: 1,
-                    weight_by_voting_power: true,
-                    use_history_from_previous_epoch_max_count: 5,
-                }),
-            ),
-        }
-    }
-}
+// impl Default for ConsensusConfigV1 {
+//     fn default() -> Self {
+//         Self {
+//             decoupled_execution: true,
+//             back_pressure_limit: 10,
+//             exclude_round: 40,
+//             max_failed_authors_to_store: 10,
+//             proposer_election_type: ProposerElectionType::LeaderReputation(
+//                 LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+//                     active_weight: 1000,
+//                     inactive_weight: 10,
+//                     failed_weight: 1,
+//                     failure_threshold_percent: 10, // = 10%
+//                     // In each round we get stastics for the single proposer
+//                     // and large number of validators. So the window for
+//                     // the proposers needs to be significantly larger
+//                     // to have enough useful statistics.
+//                     proposer_window_num_validators_multiplier: 10,
+//                     voter_window_num_validators_multiplier: 1,
+//                     weight_by_voting_power: true,
+//                     use_history_from_previous_epoch_max_count: 5,
+//                 }),
+//             ),
+//         }
+//     }
+// }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
-pub enum ProposerElectionType {
-    // Choose the smallest PeerId as the proposer
-    // with specified param contiguous_rounds
-    FixedProposer(u32),
-    // Round robin rotation of proposers
-    // with specified param contiguous_rounds
-    RotatingProposer(u32),
-    // Committed history based proposer election
-    LeaderReputation(LeaderReputationType),
-    // Pre-specified proposers for each round,
-    // or default proposer if round proposer not
-    // specified
-    RoundProposer(HashMap<Round, AccountAddress>),
-}
+// #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+// #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
+// pub enum ProposerElectionType {
+//     // Choose the smallest PeerId as the proposer
+//     // with specified param contiguous_rounds
+//     FixedProposer(u32),
+//     // Round robin rotation of proposers
+//     // with specified param contiguous_rounds
+//     RotatingProposer(u32),
+//     // Committed history based proposer election
+//     LeaderReputation(LeaderReputationType),
+//     // Pre-specified proposers for each round,
+//     // or default proposer if round proposer not
+//     // specified
+//     RoundProposer(HashMap<Round, AccountAddress>),
+// }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LeaderReputationType {
-    // Proposer election based on whether nodes succeeded or failed
-    // their proposer election rounds, and whether they voted.
-    // Version 1:
-    // * use reputation window from stale end
-    // * simple (predictable) seed
-    ProposerAndVoter(ProposerAndVoterConfig),
-    // Version 2:
-    // * use reputation window from recent end
-    // * unpredictable seed, based on root hash
-    ProposerAndVoterV2(ProposerAndVoterConfig),
-}
+// #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+// #[serde(rename_all = "snake_case")]
+// pub enum LeaderReputationType {
+//     // Proposer election based on whether nodes succeeded or failed
+//     // their proposer election rounds, and whether they voted.
+//     // Version 1:
+//     // * use reputation window from stale end
+//     // * simple (predictable) seed
+//     ProposerAndVoter(ProposerAndVoterConfig),
+//     // Version 2:
+//     // * use reputation window from recent end
+//     // * unpredictable seed, based on root hash
+//     ProposerAndVoterV2(ProposerAndVoterConfig),
+// }
 
-impl LeaderReputationType {
-    pub fn use_root_hash_for_seed(&self) -> bool {
-        // all versions after V1 should use root hash
-        !matches!(self, Self::ProposerAndVoter(_))
-    }
+// impl LeaderReputationType {
+//     pub fn use_root_hash_for_seed(&self) -> bool {
+//         // all versions after V1 should use root hash
+//         !matches!(self, Self::ProposerAndVoter(_))
+//     }
 
-    pub fn use_reputation_window_from_stale_end(&self) -> bool {
-        // all versions after V1 shouldn't use from stale end
-        matches!(self, Self::ProposerAndVoter(_))
-    }
-}
+//     pub fn use_reputation_window_from_stale_end(&self) -> bool {
+//         // all versions after V1 shouldn't use from stale end
+//         matches!(self, Self::ProposerAndVoter(_))
+//     }
+// }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct ProposerAndVoterConfig {
-    // Selection weight for active validators with proposer failures below threshold
-    pub active_weight: u64,
-    // Selection weight for inactive validators with proposer failures below threshold
-    pub inactive_weight: u64,
-    // Selection weight for validators with proposer failures above threshold
-    pub failed_weight: u64,
-    // Thresholed of failures in the rounds validator was selected to be proposer
-    // integer values representing percentages, i.e. 12 is 12%.
-    pub failure_threshold_percent: u32,
-    // Window into history considered for proposer statistics, multiplier
-    // on top of number of validators
-    pub proposer_window_num_validators_multiplier: usize,
-    // Window into history considered for votre statistics, multiplier
-    // on top of number of validators
-    pub voter_window_num_validators_multiplier: usize,
-    // Flag whether to use voting power as multiplier to the weights
-    pub weight_by_voting_power: bool,
-    // Flag whether to use history from previous epoch (0 if not),
-    // representing a number of historical epochs (beyond the current one)
-    // to consider.
-    pub use_history_from_previous_epoch_max_count: u32,
-}
+// #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+// pub struct ProposerAndVoterConfig {
+//     // Selection weight for active validators with proposer failures below threshold
+//     pub active_weight: u64,
+//     // Selection weight for inactive validators with proposer failures below threshold
+//     pub inactive_weight: u64,
+//     // Selection weight for validators with proposer failures above threshold
+//     pub failed_weight: u64,
+//     // Thresholed of failures in the rounds validator was selected to be proposer
+//     // integer values representing percentages, i.e. 12 is 12%.
+//     pub failure_threshold_percent: u32,
+//     // Window into history considered for proposer statistics, multiplier
+//     // on top of number of validators
+//     pub proposer_window_num_validators_multiplier: usize,
+//     // Window into history considered for votre statistics, multiplier
+//     // on top of number of validators
+//     pub voter_window_num_validators_multiplier: usize,
+//     // Flag whether to use voting power as multiplier to the weights
+//     pub weight_by_voting_power: bool,
+//     // Flag whether to use history from previous epoch (0 if not),
+//     // representing a number of historical epochs (beyond the current one)
+//     // to consider.
+//     pub use_history_from_previous_epoch_max_count: u32,
+// }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -554,6 +569,8 @@ impl Default for DagConsensusConfigV1 {
 
 #[cfg(test)]
 mod test {
+    use api_types::u256_define::AccountAddress;
+
     use super::*;
     use crate::on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload};
 

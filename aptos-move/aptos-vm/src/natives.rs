@@ -207,7 +207,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeTransactionContext::new(
         vec![1],
         vec![1],
-        ChainId::test().id(),
+        ChainId::test().id().try_into().unwrap(),
         None,
     ));
     exts.add(NativeAggregatorContext::new(
