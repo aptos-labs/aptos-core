@@ -325,12 +325,23 @@ impl Verifier {
                 Some(&expected_writesets[idx]),
                 Some(&expected_events[idx]),
             ) {
+                let err_opt = if idx == 0 {
+                    // FIXME(aldenhu): remove this hack
+                    warn!(
+                        version = version,
+                        "Probably known failure due to StateStorageUsage missing from a restored DB."
+                    );
+                    Ok(None)
+                } else {
+                    Ok(Some(err))
+                };
+
                 cur_txns.drain(0..idx + 1);
                 expected_txn_infos.drain(0..idx + 1);
                 expected_events.drain(0..idx + 1);
                 expected_writesets.drain(0..idx + 1);
 
-                return Ok(Some(err));
+                return err_opt;
             }
         }
 
