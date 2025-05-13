@@ -37,6 +37,7 @@
 -  [Function `get_unique_priority_idx`](#0x7_order_book_types_get_unique_priority_idx)
 -  [Function `get_metadata_from_order`](#0x7_order_book_types_get_metadata_from_order)
 -  [Function `get_trigger_condition_from_order`](#0x7_order_book_types_get_trigger_condition_from_order)
+-  [Function `increase_remaining_size`](#0x7_order_book_types_increase_remaining_size)
 -  [Function `set_remaining_size`](#0x7_order_book_types_set_remaining_size)
 -  [Function `get_remaining_size_from_state`](#0x7_order_book_types_get_remaining_size_from_state)
 -  [Function `get_unique_priority_idx_from_state`](#0x7_order_book_types_get_unique_priority_idx_from_state)
@@ -1050,6 +1051,32 @@
     self: &<a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;
 ): Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt; {
     self.trigger_condition
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_increase_remaining_size"></a>
+
+## Function `increase_remaining_size`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_increase_remaining_size">increase_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;, size: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_increase_remaining_size">increase_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt;, size: u64
+) {
+    self.order.remaining_size += size;
 }
 </code></pre>
 

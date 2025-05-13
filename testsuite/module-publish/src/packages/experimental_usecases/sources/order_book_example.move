@@ -2,12 +2,10 @@ module 0xABCD::order_book_example {
     use std::signer;
     use std::error;
     use std::option;
-    use std::vector;
 
     use aptos_experimental::active_order_book::{Self, ActiveOrderBook};
-    use aptos_experimental::order_book::{Self, OrderBook, new_order_request, OrderRequest};
+    use aptos_experimental::order_book::{Self, OrderBook};
     use aptos_experimental::order_book_types;
-    use aptos_experimental::order_book_types::SingleOrderMatch;
 
     const ENOT_AUTHORIZED: u64 = 1;
     // Resource being modified doesn't exist
