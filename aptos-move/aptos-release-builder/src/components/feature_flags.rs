@@ -121,6 +121,14 @@ pub enum FeatureFlag {
     DefaultToConcurrentFungibleBalance,
     LimitVMTypeSize,
     AbortIfMultisigPayloadMismatch,
+    AllowSerializedScriptArgs,
+    UseCompatibilityCheckerV2,
+    EnableEnumTypes,
+    FederatedKeyless,
+    TransactionSimulationEnhancement,
+    CollectionOwner,
+    NativeMemoryOperations,
+    AccountAbstraction,
     GovernedGasPool,
     DecommissionCoreResources,
 }
@@ -332,6 +340,20 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AbortIfMultisigPayloadMismatch => {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
+            FeatureFlag::AllowSerializedScriptArgs => {
+                AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS
+            },
+            FeatureFlag::UseCompatibilityCheckerV2 => {
+                AptosFeatureFlag::_USE_COMPATIBILITY_CHECKER_V2
+            },
+            FeatureFlag::EnableEnumTypes => AptosFeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::FederatedKeyless => AptosFeatureFlag::FEDERATED_KEYLESS,
+            FeatureFlag::TransactionSimulationEnhancement => {
+                AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
+            },
+            FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::GovernedGasPool => AptosFeatureFlag::GOVERNED_GAS_POOL,
             FeatureFlag::DecommissionCoreResources => AptosFeatureFlag::DECOMMISSION_CORE_RESOURCES,
         }
@@ -458,6 +480,20 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH => {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
+            AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => {
+                FeatureFlag::AllowSerializedScriptArgs
+            },
+            AptosFeatureFlag::_USE_COMPATIBILITY_CHECKER_V2 => {
+                FeatureFlag::UseCompatibilityCheckerV2
+            },
+            AptosFeatureFlag::ENABLE_ENUM_TYPES => FeatureFlag::EnableEnumTypes,
+            AptosFeatureFlag::FEDERATED_KEYLESS => FeatureFlag::FederatedKeyless,
+            AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT => {
+                FeatureFlag::TransactionSimulationEnhancement
+            },
+            AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
+            AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
+            AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
             AptosFeatureFlag::GOVERNED_GAS_POOL => FeatureFlag::GovernedGasPool,
             AptosFeatureFlag::DECOMMISSION_CORE_RESOURCES => FeatureFlag::DecommissionCoreResources,
         }
