@@ -5,7 +5,6 @@ use crate::{
     metrics::TIMER,
     state_store::{
         state_delta::StateDelta,
-        state_slot::StateSlot,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
             cached_state_view::{
@@ -22,7 +21,10 @@ use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage, StateViewId},
+    state_store::{
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        StateViewId,
+    },
     transaction::Version,
 };
 use arr_macro::arr;

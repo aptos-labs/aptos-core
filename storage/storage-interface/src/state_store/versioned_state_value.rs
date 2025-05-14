@@ -1,9 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_slot::StateSlot;
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::{state_slot::StateSlot, state_value::StateValue},
+    transaction::Version,
+};
 
 #[derive(Clone, Debug)]
 pub struct StateUpdateRef<'kv> {

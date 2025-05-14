@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::COUNTER;
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_metrics_core::IntCounterHelper;
-use aptos_types::{
+use crate::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use StateSlot::*;
 
 /// Represents the content of a state slot, or the lack there of, along with information indicating
@@ -49,7 +47,7 @@ impl StateSlot {
     ) -> Option<Self> {
         match self {
             ColdVacant => {
-                COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
+                // COUNTER.inc_with(&["memorized_read_new_hot_non_existent"]);
                 Some(HotVacant {
                     deletion_version: None,
                     hot_since_version: version,
@@ -60,7 +58,7 @@ impl StateSlot {
                 hot_since_version,
             } => {
                 if Self::should_refresh(version, refresh_interval_versions, hot_since_version) {
-                    COUNTER.inc_with(&["memorized_read_refreshed_hot_vacant"]);
+                    // COUNTER.inc_with(&["memorized_read_refreshed_hot_vacant"]);
                     Some(HotVacant {
                         deletion_version: *deletion_version,
                         hot_since_version: version,
@@ -73,7 +71,7 @@ impl StateSlot {
                 value_version,
                 value,
             } => {
-                COUNTER.inc_with(&["memorized_read_new_hot"]);
+                // COUNTER.inc_with(&["memorized_read_new_hot"]);
                 Some(HotOccupied {
                     value_version: *value_version,
                     value: value.clone(),
@@ -86,14 +84,14 @@ impl StateSlot {
                 hot_since_version,
             } => {
                 if Self::should_refresh(version, refresh_interval_versions, hot_since_version) {
-                    COUNTER.inc_with(&["memorized_read_refreshed_hot"]);
+                    // COUNTER.inc_with(&["memorized_read_refreshed_hot"]);
                     Some(HotOccupied {
                         value_version: *value_version,
                         value: value.clone(),
                         hot_since_version: version,
                     })
                 } else {
-                    COUNTER.inc_with(&["memorized_read_still_hot"]);
+                    // COUNTER.inc_with(&["memorized_read_still_hot"]);
                     None
                 }
             },
