@@ -292,22 +292,21 @@ impl TStateView for CachedStateView {
         self.id
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
+    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.
         if let Some(slot) = self.memorized.get_cloned(state_key) {
             COUNTER.inc_with(&["sv_memorized"]);
-            return Ok(slot.into_state_value_opt());
+            return Ok(slot);
         }
 
         // TODO(aldenhu): reduce duplicated gets
         let slot = self.get_unmemorized(state_key)?;
         Ok(self
             .memorized
-            .try_insert(state_key, slot, self.hot_item_refresh_interval_versions)
-            .into_state_value_opt())
+            .try_insert(state_key, slot, self.hot_item_refresh_interval_versions))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
