@@ -1509,14 +1509,7 @@ impl InterpreterImpl<'_> {
             }
             internal_state.push_str(format!("{}* {:?}\n", i, code[pc]).as_str());
         }
-        internal_state.push_str(
-            format!(
-                "Locals ({:x}):\n{}\n",
-                current_frame.locals.raw_address(),
-                current_frame.locals
-            )
-            .as_str(),
-        );
+        internal_state.push_str(format!("Locals:\n{}\n", current_frame.locals).as_str());
         internal_state.push_str("Operand Stack:\n");
         for value in &self.operand_stack.value {
             internal_state.push_str(format!("{}\n", value).as_str());
