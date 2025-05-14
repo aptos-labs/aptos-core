@@ -111,7 +111,7 @@ impl FeatureFlag {
             // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
             // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
-            FeatureFlag::VM_BINARY_FORMAT_V7,
+            //FeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
             FeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::RESOURCE_GROUPS,
@@ -121,12 +121,12 @@ impl FeatureFlag {
             FeatureFlag::BLS12_381_STRUCTURES,
             FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
             FeatureFlag::STRUCT_CONSTRUCTORS,
-            FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
-            FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
+            //FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
+            //FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
-            FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
+            //FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
@@ -151,7 +151,7 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
-            FeatureFlag::FEDERATED_KEYLESS,
+            //FeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
@@ -171,13 +171,13 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
-            FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
-            FeatureFlag::ENABLE_ENUM_TYPES,
-            FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
-            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
-            FeatureFlag::COLLECTION_OWNER,
-            FeatureFlag::ACCOUNT_ABSTRACTION,
-            // FeatureFlag::GOVERNED_GAS_POOL, // governed gas pool should be voted in
+            //FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
+            //FeatureFlag::ENABLE_ENUM_TYPES,
+            //FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            //FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            //FeatureFlag::COLLECTION_OWNER,
+            //FeatureFlag::ACCOUNT_ABSTRACTION,
+            //FeatureFlag::GOVERNED_GAS_POOL, // governed gas pool should be voted in
         ]
     }
 }
