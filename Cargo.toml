@@ -240,6 +240,7 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/testing-infra/transactional-test-runner",
+    "third_party/move/tools/move-asm",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",
     "third_party/move/tools/move-cli",
@@ -834,6 +835,7 @@ z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
+move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
 move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
 move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }

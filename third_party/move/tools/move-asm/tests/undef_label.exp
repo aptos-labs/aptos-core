@@ -1,0 +1,6 @@
+--- Aborting with assembler errors:
+error: unbound branch label `l3`
+  ┌─ tests/undef_label.masm:4:5
+  │
+4 │     br_false l3
+  │     ^^^^^^^^^^^
