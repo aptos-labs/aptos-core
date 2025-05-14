@@ -869,7 +869,7 @@ impl fmt::Display for Type {
 
 /// Controls creation of runtime types, i.e., methods offered by this struct
 /// should be the only way to construct any type.
-#[derive(Clone, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct TypeBuilder {
     // Maximum number of nodes a fully-instantiated type has.
     max_ty_size: u64,

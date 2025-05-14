@@ -1079,10 +1079,13 @@ fn precompiled_v2_framework_with_experimental() -> &'static PrecompiledFilesModu
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
-        language_version: LanguageVersion::default(),
-        experiments: vec![("attach-compiled-module".to_owned(), true)],
-    })
+    run_aptos_test_with_config(
+        path,
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![(
+            "attach-compiled-module".to_owned(),
+            true,
+        )]),
+    )
 }
 
 pub fn run_aptos_test_with_config(
