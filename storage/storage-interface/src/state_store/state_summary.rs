@@ -24,16 +24,19 @@ use rayon::prelude::*;
 pub struct StateSummary {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
+    pub hot_state_summary: SparseMerkleTree,
     pub global_state_summary: SparseMerkleTree,
 }
 
 impl StateSummary {
     pub fn new_at_version(
         version: Option<Version>,
+        hot_state_summary: SparseMerkleTree,
         global_state_summary: SparseMerkleTree,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
+            hot_state_summary,
             global_state_summary,
         }
     }
@@ -41,6 +44,7 @@ impl StateSummary {
     pub fn new_empty() -> Self {
         Self {
             next_version: 0,
+            hot_state_summary: SparseMerkleTree::new_empty(),
             global_state_summary: SparseMerkleTree::new_empty(),
         }
     }
@@ -98,8 +102,10 @@ impl StateSummary {
             .batch_update_sorted_uniq(&smt_updates, persisted)?
             .unfreeze();
 
+        // TODO(wqfish): add hot_state_summary computation.
         Ok(Self {
             next_version: updates.next_version(),
+            hot_state_summary: SparseMerkleTree::new_empty(),
             global_state_summary: smt,
         })
     }

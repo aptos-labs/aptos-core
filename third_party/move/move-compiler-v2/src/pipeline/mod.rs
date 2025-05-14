@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{
-    avail_copies_analysis::AvailCopiesAnalysisProcessor,
     exit_state_analysis::ExitStateAnalysisProcessor, flush_writes_processor::FlushWritesProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
@@ -12,9 +11,7 @@ use crate::pipeline::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_processor;
-pub mod avail_copies_analysis;
 pub mod control_flow_graph_simplifier;
-pub mod copy_propagation;
 pub mod dead_store_elimination;
 pub mod exit_state_analysis;
 pub mod flush_writes_processor;
@@ -37,7 +34,6 @@ pub fn register_formatters(target: &FunctionTarget) {
     FlushWritesProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
     reference_safety::register_formatters(target);
-    AvailCopiesAnalysisProcessor::register_formatters(target);
     UninitializedUseChecker::register_formatters(target);
     UnreachableCodeProcessor::register_formatters(target);
     VariableCoalescing::register_formatters(target);

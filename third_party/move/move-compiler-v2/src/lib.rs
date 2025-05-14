@@ -25,9 +25,7 @@ use crate::{
     },
     pipeline::{
         ability_processor::AbilityProcessor,
-        avail_copies_analysis::AvailCopiesAnalysisProcessor,
         control_flow_graph_simplifier::ControlFlowGraphSimplifier,
-        copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         flush_writes_processor::FlushWritesProcessor,
@@ -566,11 +564,6 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
             pipeline.add_processor(Box::new(VariableCoalescing::annotate_only()));
         }
         pipeline.add_processor(Box::new(VariableCoalescing::transform_only()));
-    }
-
-    if options.experiment_on(Experiment::COPY_PROPAGATION) {
-        pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
-        pipeline.add_processor(Box::new(CopyPropagation {}));
     }
 
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
