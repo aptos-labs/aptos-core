@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{state::State, state_slot::StateSlot, NUM_STATE_SHARDS};
+use crate::state_store::{state::State, NUM_STATE_SHARDS};
 use aptos_experimental_layered_map::LayeredMap;
-use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_slot::StateSlot},
+    transaction::Version,
+};
 use itertools::Itertools;
 use std::sync::Arc;
 

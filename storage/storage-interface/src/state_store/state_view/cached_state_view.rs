@@ -6,7 +6,6 @@ use crate::{
     state_store::{
         state::State,
         state_delta::StateDelta,
-        state_slot::StateSlot,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
             db_state_view::DbStateView,
@@ -20,8 +19,8 @@ use anyhow::Result;
 use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        StateViewId, StateViewResult, TStateView,
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
 };
