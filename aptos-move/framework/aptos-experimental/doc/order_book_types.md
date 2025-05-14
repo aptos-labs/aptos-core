@@ -38,6 +38,7 @@
 -  [Function `get_metadata_from_order`](#0x7_order_book_types_get_metadata_from_order)
 -  [Function `get_trigger_condition_from_order`](#0x7_order_book_types_get_trigger_condition_from_order)
 -  [Function `increase_remaining_size`](#0x7_order_book_types_increase_remaining_size)
+-  [Function `decrease_remaining_size`](#0x7_order_book_types_decrease_remaining_size)
 -  [Function `set_remaining_size`](#0x7_order_book_types_set_remaining_size)
 -  [Function `get_remaining_size_from_state`](#0x7_order_book_types_get_remaining_size_from_state)
 -  [Function `get_unique_priority_idx_from_state`](#0x7_order_book_types_get_unique_priority_idx_from_state)
@@ -50,6 +51,7 @@
 -  [Function `destroy_order_id_type`](#0x7_order_book_types_destroy_order_id_type)
 -  [Function `is_active_order`](#0x7_order_book_types_is_active_order)
 -  [Function `get_price`](#0x7_order_book_types_get_price)
+-  [Function `is_buy`](#0x7_order_book_types_is_buy)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -410,6 +412,15 @@
 
 
 
+<a id="0x7_order_book_types_EINVALID_ORDER_SIZE_DECREASE"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_EINVALID_ORDER_SIZE_DECREASE">EINVALID_ORDER_SIZE_DECREASE</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x7_order_book_types_EINVALID_TRIGGER_CONDITION"></a>
 
 
@@ -432,7 +443,7 @@
 
 
 
-<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_INVALID_MATCH_RESULT">INVALID_MATCH_RESULT</a>: u64 = 1;
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_INVALID_MATCH_RESULT">INVALID_MATCH_RESULT</a>: u64 = 3;
 </code></pre>
 
 
@@ -1084,6 +1095,33 @@
 
 </details>
 
+<a id="0x7_order_book_types_decrease_remaining_size"></a>
+
+## Function `decrease_remaining_size`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_decrease_remaining_size">decrease_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;, size: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_decrease_remaining_size">decrease_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt;, size: u64
+) {
+    <b>assert</b>!(self.order.remaining_size &gt; size, <a href="order_book_types.md#0x7_order_book_types_EINVALID_ORDER_SIZE_DECREASE">EINVALID_ORDER_SIZE_DECREASE</a>);
+    self.order.remaining_size -= size;
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_types_set_remaining_size"></a>
 
 ## Function `set_remaining_size`
@@ -1388,6 +1426,30 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_price">get_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;): u64 {
     self.price
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_is_buy"></a>
+
+## Function `is_buy`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_buy">is_buy</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_buy">is_buy</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;): bool {
+    self.is_buy
 }
 </code></pre>
 
