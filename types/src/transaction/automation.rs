@@ -53,6 +53,21 @@ impl RegistrationParams {
         v1_self.automated_function()
     }
 
+    pub fn expiration_timestamp_secs(&self) -> u64 {
+        let RegistrationParams::V1(v1_self) = self;
+        v1_self.expiration_timestamp_secs
+    }
+
+    pub fn gas_price_cap(&self) -> u64 {
+        let RegistrationParams::V1(v1_self) = self;
+        v1_self.gas_price_cap
+    }
+
+    pub fn max_gas_amount(&self) -> u64 {
+        let RegistrationParams::V1(v1_self) = self;
+        v1_self.max_gas_amount
+    }
+
     pub fn into_v1(self) -> Option<RegistrationParamsV1> {
         let RegistrationParams::V1(v1_self) = self;
         Some(v1_self)

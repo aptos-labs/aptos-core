@@ -56,6 +56,8 @@ pub mod user_transaction_context;
 pub mod webauthn;
 
 pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
+use crate::move_utils::MemberId;
+use crate::serde_helper::vec_bytes;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::transaction::automated_transaction::AutomatedTransaction;
@@ -68,6 +70,8 @@ use crate::{
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
+use move_core_types::identifier::{IdentStr, Identifier};
+use move_core_types::language_storage::{ModuleId, TypeTag};
 pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
 use move_vm_types::delayed_values::delayed_field_id::{
@@ -81,10 +85,6 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-use move_core_types::identifier::{IdentStr, Identifier};
-use move_core_types::language_storage::{ModuleId, TypeTag};
-use crate::move_utils::MemberId;
-use crate::serde_helper::vec_bytes;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -387,6 +387,20 @@ impl RawTransaction {
     /// Return the signing message for creating transaction signature.
     pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
+    }
+
+    /// Calculates size in bytes for the raw transaction with input payload.
+    pub fn estimate_size_in_bytes(payload: TransactionPayload) -> usize {
+        let mocked_txn = RawTransaction::new(
+            AccountAddress::ZERO,
+            0,
+            payload,
+            0,
+            0,
+            0,
+            ChainId::default(),
+        );
+        bcs::serialized_size(&mocked_txn).expect("RawTransaction should successfully serialize")
     }
 }
 
@@ -2050,7 +2064,6 @@ impl Transaction {
         }
     }
 
-
     pub fn type_name(&self) -> &'static str {
         match self {
             Transaction::UserTransaction(_) => "user_transaction",
@@ -2145,19 +2158,21 @@ pub struct ViewFunction {
 }
 
 impl ViewFunction {
-
-    pub fn from_function_name_and_args(function_ref: &'static str, ty_args: Vec<TypeTag>, args: Vec<Vec<u8>>) -> Result<Self> {
+    pub fn from_function_name_and_args(
+        function_ref: &'static str,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Result<Self> {
         let MemberId {
-            module_id, member_id
+            module_id,
+            member_id,
         } = str::parse(function_ref)?;
-        Ok(
-            Self {
-                module: module_id,
-                function: member_id,
-                ty_args,
-                args,
-            }
-        )
+        Ok(Self {
+            module: module_id,
+            function: member_id,
+            ty_args,
+            args,
+        })
     }
 
     pub fn new(

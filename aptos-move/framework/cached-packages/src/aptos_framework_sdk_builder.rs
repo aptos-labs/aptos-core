@@ -158,6 +158,15 @@ pub enum EntryFunctionCall {
         task_index: u64,
     },
 
+    /// Immediately stops automation tasks for the specified `task_indexes`.
+    /// Only tasks that exist and are owned by the sender can be stopped.
+    /// If any of the specified tasks are not owned by the sender, the transaction will abort.
+    /// When a task is stopped, the committed gas for the next epoch is reduced
+    /// by the max gas amount of the stopped task. Half of the remaining task fee is refunded.
+    AutomationRegistryStopTasks {
+        task_indexes: Vec<u64>,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -1263,6 +1272,9 @@ impl EntryFunctionCall {
             AutomationRegistryCancelTask { task_index } => {
                 automation_registry_cancel_task(task_index)
             },
+            AutomationRegistryStopTasks { task_indexes } => {
+                automation_registry_stop_tasks(task_indexes)
+            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -2295,6 +2307,26 @@ pub fn automation_registry_cancel_task(task_index: u64) -> TransactionPayload {
         ident_str!("cancel_task").to_owned(),
         vec![],
         vec![bcs::to_bytes(&task_index).unwrap()],
+    ))
+}
+
+/// Immediately stops automation tasks for the specified `task_indexes`.
+/// Only tasks that exist and are owned by the sender can be stopped.
+/// If any of the specified tasks are not owned by the sender, the transaction will abort.
+/// When a task is stopped, the committed gas for the next epoch is reduced
+/// by the max gas amount of the stopped task. Half of the remaining task fee is refunded.
+pub fn automation_registry_stop_tasks(task_indexes: Vec<u64>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("automation_registry").to_owned(),
+        ),
+        ident_str!("stop_tasks").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&task_indexes).unwrap()],
     ))
 }
 
@@ -5639,6 +5671,18 @@ mod decoder {
         }
     }
 
+    pub fn automation_registry_stop_tasks(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AutomationRegistryStopTasks {
+                task_indexes: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -7585,6 +7629,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "automation_registry_cancel_task".to_string(),
             Box::new(decoder::automation_registry_cancel_task),
+        );
+        map.insert(
+            "automation_registry_stop_tasks".to_string(),
+            Box::new(decoder::automation_registry_stop_tasks),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

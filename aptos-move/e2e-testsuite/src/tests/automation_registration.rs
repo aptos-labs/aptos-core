@@ -296,3 +296,69 @@ fn check_invalid_automation_txn() {
         StatusCode::INVALID_AUTOMATION_INNER_PAYLOAD,
     );
 }
+
+#[test]
+fn check_invalid_gas_params_of_automation_task() {
+    let mut test_context = AutomationRegistrationTestContext::new();
+    test_context.set_supra_native_automation(true);
+    // Create automation registration transaction with entry-function with invalid arguments.
+    let dest_account = test_context.new_account_data(0, 0);
+    let inner_entry_function =
+        aptos_framework_sdk_builder::supra_coin_mint(dest_account.address().clone(), 100)
+            .into_entry_function();
+    let automation_fee_cap = 100_000;
+    let aux_data = Vec::new();
+    let automation_txn = test_context.create_automation_txn(
+        0,
+        inner_entry_function.clone(),
+        3600,
+        2,
+        100,
+        automation_fee_cap,
+        aux_data.clone(),
+    );
+
+    let output = test_context.execute_transaction(automation_txn.clone());
+    AutomationRegistrationTestContext::check_discarded_output(
+        output,
+        StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+    );
+    let validation_output = test_context.validate_transaction(automation_txn);
+    assert_eq!(validation_output.status(), Some(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS));
+
+    let automation_txn = test_context.create_automation_txn(
+        0,
+        inner_entry_function.clone(),
+        3600,
+        aptos_global_constants::MAX_GAS_AMOUNT + 1,
+        100,
+        automation_fee_cap,
+        aux_data.clone(),
+    );
+
+    let output = test_context.execute_transaction(automation_txn.clone());
+    AutomationRegistrationTestContext::check_discarded_output(
+        output,
+        StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+    );
+    let validation_output = test_context.validate_transaction(automation_txn);
+    assert_eq!(validation_output.status(), Some(StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND));
+
+    let automation_txn = test_context.create_automation_txn(
+        0,
+        inner_entry_function.clone(),
+        3600,
+        100,
+        10_000_000_001,
+        automation_fee_cap,
+        aux_data,
+    );
+
+    let output = test_context.execute_transaction(automation_txn.clone());
+    AutomationRegistrationTestContext::check_discarded_output(
+        output,
+        StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+    );
+    let validation_output = test_context.validate_transaction(automation_txn);
+    assert_eq!(validation_output.status(), Some(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND));
+}

@@ -10,7 +10,6 @@ use move_core_types::language_storage::ModuleId;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
-use std::fmt::Display;
 use aptos_crypto::HashValue;
 
 /// A release bundle consists of a list of release packages.

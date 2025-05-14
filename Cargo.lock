@@ -9609,6 +9609,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
+ "aptos-global-constants",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-types",

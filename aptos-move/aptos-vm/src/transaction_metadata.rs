@@ -195,7 +195,7 @@ impl From<&AutomatedTransaction> for TransactionMetadata {
             script_hash: vec![],
             script_size: NumBytes::zero(),
             is_keyless: false,
-            payload_type_reference: PayloadTypeReferenceMeta::AutomationRegistration,
+            payload_type_reference: PayloadTypeReferenceMeta::UserEntryFunction(txn.payload().clone().into_entry_function()),
             txn_app_hash: txn.hash().to_vec(),
         }
     }
