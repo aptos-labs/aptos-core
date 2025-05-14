@@ -15,6 +15,11 @@
 /// * it allows for parallelism for keys that are not close to each other,
 ///   once it contains enough keys
 ///
+/// Note: Default configuration (used in new()) allows for keys and values of up to 5KB.
+/// If you need larger, use other constructor methods.
+/// Based on initial configuration, BigOrderMap will always accept insertion of keys and values
+/// up to the allowed size, and will abort with EKEY_BYTES_TOO_LARGE or EARGUMENT_BYTES_TOO_LARGE.
+///
 /// TODO: all iterator functions are public(friend) for now, so that they can be modified in a
 /// backward incompatible way. Type is also named IteratorPtr, so that Iterator is free to use later.
 /// They are waiting for Move improvement that will allow references to be part of the struct,
@@ -44,11 +49,13 @@ module aptos_std::big_ordered_map {
     const EINVALID_CONFIG_PARAMETER: u64 = 11;
     /// Map isn't empty
     const EMAP_NOT_EMPTY: u64 = 12;
-    /// Trying to insert too large of an object into the mp.
+    /// Trying to insert too large of an (key, value) pair into the mp.
     const EARGUMENT_BYTES_TOO_LARGE: u64 = 13;
     /// borrow_mut requires that key and value types have constant size
     /// (otherwise it wouldn't be able to guarantee size requirements are not violated)
     const EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE: u64 = 14;
+    /// Trying to insert too large of a key into the map.
+    const EKEY_BYTES_TOO_LARGE: u64 = 15;
 
     // Errors that should never be thrown
 
@@ -57,14 +64,35 @@ module aptos_std::big_ordered_map {
 
     // Internal constants.
 
-    const DEFAULT_TARGET_NODE_SIZE: u64 = 4096;
+    // Bounds on degrees:
+
+    /// Smallest allowed degree on inner nodes.
     const INNER_MIN_DEGREE: u16 = 4;
-    // We rely on 1 being valid size only for root node,
-    // so this cannot be below 3 (unless that is changed)
+    /// Smallest allowed degree on leaf nodes.
+    ///
+    /// We rely on 1 being valid size only for root node,
+    /// so this cannot be below 3 (unless that is changed)
     const LEAF_MIN_DEGREE: u16 = 3;
+    /// Largest degree allowed (both for inner and leaf nodes)
     const MAX_DEGREE: u64 = 4096;
 
-    const MAX_NODE_BYTES: u64 = 409600; // 400 KB, bellow the max resource limit.
+    // Bounds on serialized sizes:
+
+    /// Largest size all keys for inner nodes or key-value pairs for leaf nodes can have.
+    /// Node itself can be a bit larger, due to few other accounting fields.
+    /// This is a bit conservative, a bit less than half of the resource limit (which is 1MB)
+    const MAX_NODE_BYTES: u64 = 400 * 1024;
+    /// Target node size, from efficiency perspective.
+    const DEFAULT_TARGET_NODE_SIZE: u64 = 4096;
+
+    /// When using default constructors (new() / new_with_reusable() / new_with_config(0, 0, _))
+    /// making sure key or value of this size (5KB) will be accepted, which should satisfy most cases
+    /// If you need keys/values that are larger, use other constructors.
+    const DEFAULT_MAX_KEY_OR_VALUE_SIZE: u64 = 5 * 1024; // 5KB
+
+    /// Target max node size, when using hints (via new_with_type_size_hints).
+    /// Smaller than MAX_NODE_BYTES, to improve performence, as large nodes are innefficient.
+    const HINT_MAX_NODE_BYTES: u64 = 128 * 1024;
 
     // Constants aligned with storage_slots_allocator
     const NULL_INDEX: u64 = 0;
@@ -146,32 +174,24 @@ module aptos_std::big_ordered_map {
     // ======================= Constructors && Destructors ====================
 
     /// Returns a new BigOrderedMap with the default configuration.
-    /// Only allowed to be called with constant size types. For variable sized types,
-    /// it is required to use new_with_config, to explicitly select automatic or specific degree selection.
+    ///
+    /// If called with variable sized types, it is configured to accept keys and values up to 5KB in size,
+    /// or as large as 100x the size of the first insert. (100 = MAX_NODE_BYTES / DEFAULT_TARGET_NODE_SIZE)
+    /// If you need something more specific, you can use new_with_type_size_hints or new_with_config,
+    /// to explicitly select automatic or specific degree selection.
     public fun new<K: store, V: store>(): BigOrderedMap<K, V> {
-        // Use new_with_type_size_hints or new_with_config if your types have variable sizes.
-        assert!(
-            bcs::constant_serialized_size<K>().is_some() && bcs::constant_serialized_size<V>().is_some(),
-            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
-        );
-
         new_with_config(0, 0, false)
     }
 
-
     /// Returns a new BigOrderedMap with with reusable storage slots.
-    /// Only allowed to be called with constant size types. For variable sized types,
-    /// it is required to use new_with_config, to explicitly select automatic or specific degree selection.
+    ///
+    /// If called with variable sized types, it is configured to accept keys and values up to 5KB in size,
+    /// or as large as 10x the size of the first insert.
+    /// If you need something more specific, you can use new_with_type_size_hints or new_with_config,
+    /// to explicitly select automatic or specific degree selection.
     public fun new_with_reusable<K: store, V: store>(): BigOrderedMap<K, V> {
-        // Use new_with_type_size_hints or new_with_config if your types have variable sizes.
-        assert!(
-            bcs::constant_serialized_size<K>().is_some() && bcs::constant_serialized_size<V>().is_some(),
-            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
-        );
-
         new_with_config(0, 0, true)
     }
-
 
     /// Returns a new BigOrderedMap, configured based on passed key and value serialized size hints.
     public fun new_with_type_size_hints<K: store, V: store>(avg_key_bytes: u64, max_key_bytes: u64, avg_value_bytes: u64, max_value_bytes: u64): BigOrderedMap<K, V> {
@@ -179,14 +199,14 @@ module aptos_std::big_ordered_map {
         assert!(avg_value_bytes <= max_value_bytes, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
 
         let inner_max_degree_from_avg = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / avg_key_bytes), INNER_MIN_DEGREE as u64);
-        let inner_max_degree_from_max = MAX_NODE_BYTES / max_key_bytes;
+        let inner_max_degree_from_max = HINT_MAX_NODE_BYTES / max_key_bytes;
         assert!(inner_max_degree_from_max >= (INNER_MIN_DEGREE as u64), error::invalid_argument(EINVALID_CONFIG_PARAMETER));
 
         let avg_entry_size = avg_key_bytes + avg_value_bytes;
         let max_entry_size = max_key_bytes + max_value_bytes;
 
         let leaf_max_degree_from_avg = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / avg_entry_size), LEAF_MIN_DEGREE as u64);
-        let leaf_max_degree_from_max = MAX_NODE_BYTES / max_entry_size;
+        let leaf_max_degree_from_max = HINT_MAX_NODE_BYTES / max_entry_size;
         assert!(leaf_max_degree_from_max >= (INNER_MIN_DEGREE as u64), error::invalid_argument(EINVALID_CONFIG_PARAMETER));
 
         new_with_config(
@@ -723,25 +743,42 @@ module aptos_std::big_ordered_map {
         let key_size = bcs::constant_serialized_size<K>();
         let value_size = bcs::constant_serialized_size<V>();
 
-        if (key_size.is_some() && value_size.is_some()) {
-            self.validate_size_and_init_max_degrees(key_size.destroy_some(), value_size.destroy_some());
-            self.constant_kv_size = true;
-        };
+        if (key_size.is_some()) {
+            let key_size = key_size.destroy_some();
+            if (self.inner_max_degree == 0) {
+                self.inner_max_degree = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / key_size), INNER_MIN_DEGREE as u64) as u16;
+            };
+            assert!(key_size * (self.inner_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EKEY_BYTES_TOO_LARGE));
+
+            if (value_size.is_some()) {
+                let value_size = value_size.destroy_some();
+                let entry_size = key_size + value_size;
+
+                if (self.leaf_max_degree == 0) {
+                    self.leaf_max_degree = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / entry_size), LEAF_MIN_DEGREE as u64) as u16;
+                };
+                assert!(entry_size * (self.leaf_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE));
+
+                self.constant_kv_size = true;
+            };
+        }
     }
 
     fun validate_size_and_init_max_degrees<K: store, V: store>(self: &mut BigOrderedMap<K, V>, key_size: u64, value_size: u64) {
         let entry_size = key_size + value_size;
 
         if (self.inner_max_degree == 0) {
-            self.inner_max_degree = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / key_size), INNER_MIN_DEGREE as u64) as u16;
+            let default_max_degree = min(MAX_DEGREE, MAX_NODE_BYTES / DEFAULT_MAX_KEY_OR_VALUE_SIZE);
+            self.inner_max_degree = max(min(default_max_degree, DEFAULT_TARGET_NODE_SIZE / key_size), INNER_MIN_DEGREE as u64) as u16;
         };
 
         if (self.leaf_max_degree == 0) {
-            self.leaf_max_degree = max(min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / entry_size), LEAF_MIN_DEGREE as u64) as u16;
+            let default_max_degree = min(MAX_DEGREE, MAX_NODE_BYTES / DEFAULT_MAX_KEY_OR_VALUE_SIZE / 2);
+            self.leaf_max_degree = max(min(default_max_degree, DEFAULT_TARGET_NODE_SIZE / entry_size), LEAF_MIN_DEGREE as u64) as u16;
         };
 
         // Make sure that no nodes can exceed the upper size limit.
-        assert!(key_size * (self.inner_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE));
+        assert!(key_size * (self.inner_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EKEY_BYTES_TOO_LARGE));
         assert!(entry_size * (self.leaf_max_degree as u64) <= MAX_NODE_BYTES, error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE));
     }
 
@@ -1683,6 +1720,15 @@ module aptos_std::big_ordered_map {
         result
     }
 
+    #[test_only]
+    fun vector_bytes_range(from: u64, to: u64): vector<u8> {
+        let result = vector[];
+        for (i in from..to) {
+            result.push_back((i % 128) as u8);
+        };
+        result
+    }
+
     #[test]
     #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
     fun test_abort_add_existing_value_to_non_leaf() {
@@ -1801,11 +1847,27 @@ module aptos_std::big_ordered_map {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
+    fun test_default_allows_5kb() {
+        let map = new_with_config(0, 0, false);
+        map.add(vector[1u8], 1);
+        // default guarantees key up to 5KB
+        map.add(vector_bytes_range(0, 5000), 1);
+        map.destroy_and_validate();
+
+        let map = new_with_config(0, 0, false);
+        // default guarantees (key, value) pair up to 10KB
+        map.add(1, vector[1u8]);
+        map.add(2, vector_bytes_range(0, 10000));
+        map.destroy_and_validate();
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x1000F, location = Self)] /// EKEY_BYTES_TOO_LARGE
     fun test_adding_key_too_large() {
         let map = new_with_config(0, 0, false);
-        map.add(vector[1], 1);
-        map.add(vector_range(0, 143), 1);
+        map.add(vector[1u8], 1);
+        // default guarantees key up to 5KB
+        map.add(vector_bytes_range(0, 5200), 1);
         map.destroy_and_validate();
     }
 
@@ -1813,8 +1875,9 @@ module aptos_std::big_ordered_map {
     #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
     fun test_adding_value_too_large() {
         let map = new_with_config(0, 0, false);
-        map.add(1, vector[1]);
-        map.add(2, vector_range(0, 268));
+        // default guarantees (key, value) pair up to 10KB
+        map.add(1, vector[1u8]);
+        map.add(2, vector_bytes_range(0, 12000));
         map.destroy_and_validate();
     }
 
