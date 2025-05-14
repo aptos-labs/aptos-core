@@ -64,6 +64,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `place_maker_order`](#0x7_market_place_maker_order)
 -  [Function `place_order_with_order_id`](#0x7_market_place_order_with_order_id)
 -  [Function `cancel_order`](#0x7_market_cancel_order)
+-  [Function `decrease_order_size`](#0x7_market_decrease_order_size)
 -  [Function `get_remaining_size`](#0x7_market_get_remaining_size)
 -  [Function `take_ready_price_based_orders`](#0x7_market_take_ready_price_based_orders)
 -  [Function `take_ready_time_based_orders`](#0x7_market_take_ready_time_based_orders)
@@ -1806,6 +1807,35 @@ Cancels an order - this will cancel the order and emit an event for the order ca
             }
         )
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_decrease_order_size"></a>
+
+## Function `decrease_order_size`
+
+Cancels an order - this will cancel the order and emit an event for the order cancellation.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, order_id: u64, size_delta: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, order_id: u64, size_delta: u64
+) {
+    <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
+    // TODO(skedia) emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for order size decrease
 }
 </code></pre>
 
