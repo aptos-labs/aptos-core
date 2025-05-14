@@ -28,7 +28,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::MoveValue,
+    value::{MoveTypeLayout, MoveValue},
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
@@ -40,14 +40,14 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, LoadedFunction, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage,
+    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
+    LoadedFunction, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
-use move_vm_types::resolver::ResourceResolver;
+use move_vm_types::{resolver::ResourceResolver, value_serde::ValueSerDeContext, values::Value};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -372,6 +372,13 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
         unreachable!()
+    }
+
+    fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+        let module_storage = self.storage.as_unsync_module_storage();
+        ValueSerDeContext::new()
+            .with_func_args_deserialization(&module_storage.as_function_value_extension())
+            .deserialize(bytes, layout)
     }
 }
 

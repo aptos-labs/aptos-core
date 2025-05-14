@@ -53,6 +53,35 @@ module 0x42::print_values {
     public fun return_struct(): B {
         B { a: A::V1 { x: 23 }, data: vector[1, 2, 3] }
     }
+
+    public fun sum(a: u64, b: u64): u64 {
+        a + b
+    }
+
+    public fun return_anonymous(): || {
+        || {}
+    }
+
+    public fun return_add(): |u64,u64|u64 {
+        |x, y| sum(x, y)
+    }
+
+    public fun return_add_first(y: u64): |u64|u64 {
+        |x| sum(y, x)
+    }
+
+    public fun return_add_last(y: u64): |u64|u64 {
+        |x| sum(x, y)
+    }
+
+    public fun return_add_two_and_one(): ||u64 {
+        || sum(2, 1)
+    }
+
+    public fun return_closure_capture_struct(): ||B {
+        let b = B { a: A::V1 { x: 23 }, data: vector[1, 2, 3] };
+        || { b }
+    }
 }
 
 //# run 0x42::print_values::return_bool
@@ -74,3 +103,15 @@ module 0x42::print_values {
 //# run 0x42::print_values::return_signer --signers 0x42
 
 //# run 0x42::print_values::return_struct
+
+//# run 0x42::print_values::return_anonymous
+
+//# run 0x42::print_values::return_add
+
+//# run 0x42::print_values::return_add_first --args 5
+
+//# run 0x42::print_values::return_add_last --args 10
+
+//# run 0x42::print_values::return_add_two_and_one
+
+//# run 0x42::print_values::return_closure_capture_struct
