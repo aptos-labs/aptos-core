@@ -1,4 +1,65 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::consume($t0: u32) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: 0xc0ffee::m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: bool, $t1: u32) {
+     var $t2: u32
+     var $t3: bool
+  0: $t2 := copy($t1)
+  1: if ($t0) goto 2 else goto 5
+  2: label L0
+  3: m::consume($t2)
+  4: goto 7
+  5: label L1
+  6: m::consume($t1)
+  7: label L2
+  8: $t3 := !($t0)
+  9: if ($t3) goto 10 else goto 13
+ 10: label L3
+ 11: m::consume($t1)
+ 12: goto 15
+ 13: label L4
+ 14: m::consume($t2)
+ 15: label L5
+ 16: return ()
+}
+
+
+[variant baseline]
+public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
+     var $t2: 0xc0ffee::m::W
+     var $t3: bool
+  0: $t2 := copy($t1)
+  1: if ($t0) goto 2 else goto 5
+  2: label L0
+  3: m::consume_($t2)
+  4: goto 7
+  5: label L1
+  6: m::consume_($t1)
+  7: label L2
+  8: $t3 := !($t0)
+  9: if ($t3) goto 10 else goto 13
+ 10: label L3
+ 11: m::consume_($t1)
+ 12: goto 15
+ 13: label L4
+ 14: m::consume_($t2)
+ 15: label L5
+ 16: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::consume($t0: u32) {

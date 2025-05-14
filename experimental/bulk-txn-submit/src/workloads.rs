@@ -80,7 +80,6 @@ pub fn rand_string(len: usize) -> String {
     let res = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(len)
-        .map(char::from)
         .collect();
     assert_eq!(
         bcs::serialized_size(&res).unwrap(),

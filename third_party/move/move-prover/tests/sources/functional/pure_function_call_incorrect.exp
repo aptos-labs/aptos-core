@@ -1,4 +1,4 @@
-Move prover returns: exiting with checking errors
+Move prover returns: exiting with env checking errors
 error: specification expression cannot call impure Move function `init`
    ┌─ tests/sources/functional/pure_function_call_incorrect.move:32:20
    │

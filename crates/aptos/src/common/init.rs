@@ -82,6 +82,7 @@ impl CliCommand<()> for InitTool {
         "AptosInit"
     }
 
+    #[allow(clippy::literal_string_with_formatting_args)]
     async fn execute(self) -> CliTypedResult<()> {
         let mut config = if CliConfig::config_exists(ConfigSearchMode::CurrentDir) {
             CliConfig::load(ConfigSearchMode::CurrentDir)?

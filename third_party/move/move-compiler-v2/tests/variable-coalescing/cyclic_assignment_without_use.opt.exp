@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test($t0: u64) {
@@ -14,11 +14,25 @@ public fun m::test($t0: u64) {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `a` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_a`), or renaming to `_`
   ┌─ tests/variable-coalescing/cyclic_assignment_without_use.move:6:9
   │
 6 │         a = c;
   │         ^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t2 := infer($t1)
+  2: $t3 := infer($t2)
+  3: $t1 := infer($t3)
+  4: return ()
+}
 
 ============ after DeadStoreElimination: ================
 

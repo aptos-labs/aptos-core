@@ -77,7 +77,7 @@ impl ForgeDeployerManager {
         let deployer_type = self
             .image_repo
             .split('/')
-            .last()
+            .next_back()
             .expect("Failed to get deployer type from image repo");
         deployer_type.to_string()
     }

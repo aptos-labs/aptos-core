@@ -1,12 +1,12 @@
 
 Diagnostics:
-warning: Unused parameter `param`. Consider removing or prefixing with an underscore: `_param`
+warning: Unused value of parameter `param`. Consider removing the parameter, or prefixing with an underscore (e.g., `_param`), or binding to `_`
    ┌─ tests/file-format-generator/borrow.move:12:15
    │
 12 │     fun local(param: u64): u64 {
    │               ^^^^^
 
-warning: Unused parameter `param`. Consider removing or prefixing with an underscore: `_param`
+warning: Unused value of parameter `param`. Consider removing the parameter, or prefixing with an underscore (e.g., `_param`), or binding to `_`
    ┌─ tests/file-format-generator/borrow.move:29:19
    │
 29 │     fun mut_local(param: u64): u64 {

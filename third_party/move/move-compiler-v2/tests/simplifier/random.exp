@@ -1,12 +1,4 @@
-
-Diagnostics:
-warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
-   ┌─ tests/simplifier/random.move:48:13
-   │
-48 │         let q = v;
-   │             ^
-
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675::M {
     struct S {
         f: u64,
@@ -143,7 +135,7 @@ module 0x8675::M {
     }
 } // end 0x8675::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675::M {
     struct S {
         f: u64,
@@ -222,11 +214,148 @@ module 0x8675::M {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `q`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_q`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `q` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_q`), or renaming to `_`
    ┌─ tests/simplifier/random.move:48:17
    │
 48 │         let q = v;
    │                 ^
+
+// -- Model dump before second bytecode pipeline
+module 0x8675::M {
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    private fun id<T>(r: &T): &T {
+        r
+    }
+    private fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    private inline fun iterloop(x: u64,y: &u64): u64 {
+        {
+          let r: u64 = Add<u64>(x, 3);
+          loop {
+            if Gt<u64>(x, 0) {
+              x: u64 = Sub<u64>(x, Deref(y));
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Add<u64>(r, x)
+        }
+    }
+    private fun t0() {
+        {
+          let v: u64 = 0;
+          {
+            let x: &mut u64 = Borrow(Mutable)(v);
+            {
+              let y: &mut u64 = Borrow(Mutable)(v);
+              Deref(x);
+              Deref(y);
+              if Eq<u64>(v, 0) {
+                v: u64 = 3;
+                Tuple()
+              } else {
+                v: u64 = 2;
+                Tuple()
+              };
+              {
+                let q: u64 = v;
+                {
+                  let x: &mut u64 = M::id_mut<u64>(Borrow(Mutable)(v));
+                  {
+                    let y: &mut u64 = Borrow(Mutable)(v);
+                    Deref(x);
+                    Deref(y);
+                    {
+                      let x: &u64 = Borrow(Immutable)(v);
+                      {
+                        let y: &mut u64 = Borrow(Mutable)(v);
+                        Deref(y);
+                        Deref(x);
+                        Deref(y);
+                        {
+                          let x: &u64 = Borrow(Immutable)(v);
+                          {
+                            let y: &u64 = Borrow(Immutable)(v);
+                            Deref(x);
+                            Deref(y);
+                            Deref(x);
+                            {
+                              let x: &u64 = M::id<u64>(Borrow(Immutable)(v));
+                              {
+                                let y: &u64 = Borrow(Immutable)(v);
+                                Deref(x);
+                                Deref(y);
+                                Deref(x);
+                                Tuple()
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test1(r: u64): u64 {
+        {
+          let t: u64 = r;
+          {
+            let t2: u64 = 0;
+            loop {
+              if Gt<u64>(r, 0) {
+                {
+                  let x: u64 = r;
+                  r: u64 = Sub<u64>(r, 1);
+                  t2: u64 = Add<u64>(t2, x);
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            {
+              let t3: u64 = Add<u64>(Add<u64>(r, t), t2);
+              t3
+            }
+          }
+        }
+    }
+    private fun test1a(x: u64,r: &u64): u64 {
+        {
+          let t: u64 = Deref(r);
+          {
+            let t3: u64 = {
+              let (x: u64, y: &u64): (u64, &u64) = Tuple(x, r);
+              {
+                let r: u64 = Add<u64>(x, 3);
+                loop {
+                  if Gt<u64>(x, 0) {
+                    x: u64 = Sub<u64>(x, Deref(y));
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Add<u64>(r, x)
+              }
+            };
+            {
+              let t2: u64 = Add<u64>(Deref(r), t);
+              Add<u64>(Add<u64>(t2, t3), t)
+            }
+          }
+        }
+    }
+} // end 0x8675::M
 
 
 ============ bytecode verification succeeded ========

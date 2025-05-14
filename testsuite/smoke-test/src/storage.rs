@@ -325,6 +325,7 @@ fn get_backup_storage_state(
     std::str::from_utf8(&output)?.parse()
 }
 
+#[allow(clippy::zombie_processes)]
 pub(crate) fn db_backup(
     backup_service_port: u16,
     target_epoch: u64,

@@ -107,8 +107,8 @@ impl<Key: Eq + Hash + Clone + Debug> TokenBucketRateLimiter<Key> {
             log_info: String::new(),
             buckets: RwLock::new(HashMap::new()),
             new_bucket_start_percentage: 100,
-            default_bucket_size: std::usize::MAX,
-            default_fill_rate: std::usize::MAX,
+            default_bucket_size: usize::MAX,
+            default_fill_rate: usize::MAX,
             enabled: false,
             metrics: None,
         }
@@ -168,7 +168,7 @@ impl<Key: Eq + Hash + Clone + Debug> TokenBucketRateLimiter<Key> {
         let mut buckets = self.buckets.write();
         let remove = buckets
             .get(key)
-            .map_or(false, |bucket| Arc::strong_count(bucket) <= 1);
+            .is_some_and(|bucket| Arc::strong_count(bucket) <= 1);
         if remove {
             buckets.remove(key);
         }
@@ -240,9 +240,9 @@ impl Bucket {
             label,
             log_info: String::new(),
             key: String::new(),
-            tokens: std::usize::MAX,
-            size: std::usize::MAX,
-            rate: std::usize::MAX,
+            tokens: usize::MAX,
+            size: usize::MAX,
+            rate: usize::MAX,
             last_refresh_time: Instant::now(),
             enabled: false,
             allowed_in_period: 0,

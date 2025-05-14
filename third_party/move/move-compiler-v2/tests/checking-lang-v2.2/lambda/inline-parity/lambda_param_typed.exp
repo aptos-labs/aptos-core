@@ -1,15 +1,15 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::LambdaParam {
-    public fun inline_apply(f: |u64|u64 with drop,b: u64): u64 {
+    public fun inline_apply(f: |u64|u64 has drop,b: u64): u64 {
         (f)(b)
     }
-    public fun inline_apply2(f: |u64|u64 with drop,b: u64): u64 {
+    public fun inline_apply2(f: |u64|u64 has drop,b: u64): u64 {
         LambdaParam::inline_apply(f, b)
     }
-    public fun inline_apply3(f: |u64|u64 with drop,b: u64): u64 {
+    public fun inline_apply3(f: |u64|u64 has drop,b: u64): u64 {
         LambdaParam::inline_apply4(f, b)
     }
-    public fun inline_apply4(_f: |u64|u64 with drop,b: u64): u64 {
+    public fun inline_apply4(_f: |u64|u64 has drop,b: u64): u64 {
         b
     }
     private fun test_lambda_symbol_param1() {
@@ -64,18 +64,18 @@ module 0x42::LambdaParam {
     }
 } // end 0x42::LambdaParam
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::LambdaParam {
-    public fun inline_apply(f: |u64|u64 with drop, b: u64): u64 {
+    public fun inline_apply(f: |u64|u64 has drop, b: u64): u64 {
         f(b)
     }
-    public fun inline_apply2(f: |u64|u64 with drop, b: u64): u64 {
+    public fun inline_apply2(f: |u64|u64 has drop, b: u64): u64 {
         inline_apply(f, b)
     }
-    public fun inline_apply3(f: |u64|u64 with drop, b: u64): u64 {
+    public fun inline_apply3(f: |u64|u64 has drop, b: u64): u64 {
         inline_apply4(f, b)
     }
-    public fun inline_apply4(_f: |u64|u64 with drop, b: u64): u64 {
+    public fun inline_apply4(_f: |u64|u64 has drop, b: u64): u64 {
         b
     }
     fun test_lambda_symbol_param1() {

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: expected function of type `|_|_` but found `u64`
+  ┌─ tests/checking-lang-v2.2/lambda/returning_a_function.move:4:20
+  │
+4 │             return (|y| x + y)
+  │                    ^^^^^^^^^^^
+
+error: expected function type has argument of type `()` but `u64` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/returning_a_function.move:10:20
+   │
+10 │             return (|| x * y)
+   │                    ^^^^^^^^^^
+
+error: expected `u64` but found a value of type `(u64, u64)`
+   ┌─ tests/checking-lang-v2.2/lambda/returning_a_function.move:16:24
+   │
+16 │             return (|| (x, y))
+   │                        ^^^^^^

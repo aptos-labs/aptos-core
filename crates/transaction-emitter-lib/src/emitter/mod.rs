@@ -989,7 +989,7 @@ impl TxnEmitter {
 }
 
 #[allow(dead_code)]
-fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
+fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
@@ -1201,8 +1201,7 @@ pub fn get_needed_balance_per_account(
     max_gas_per_txn: u64,
 ) -> u64 {
     // round up:
-    let txnx_per_account =
-        (num_workload_transactions + num_accounts as u64 - 1) / num_accounts as u64;
+    let txnx_per_account = num_workload_transactions.div_ceil(num_accounts as u64);
     let coins_per_account = txnx_per_account
         .checked_mul(octas_per_workload_transaction + gas_per_workload_transaction * gas_price)
         .unwrap()

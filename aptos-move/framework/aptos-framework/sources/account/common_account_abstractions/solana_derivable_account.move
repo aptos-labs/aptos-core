@@ -18,6 +18,7 @@
 /// - OKX
 module aptos_framework::solana_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
+    use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
@@ -25,9 +26,8 @@ module aptos_framework::solana_derivable_account {
         public_key_into_unvalidated,
     };
     use std::bcs_stream::{Self, deserialize_u8};
-    use std::chain_id;
     use std::string_utils;
-    use std::transaction_context::{Self, EntryFunctionPayload};
+    use std::transaction_context;
     use std::vector;
 
     /// Signature failed to verify.
@@ -78,22 +78,6 @@ module aptos_framework::solana_derivable_account {
             SIWSAbstractSignature::MessageV1 { signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
-        }
-    }
-
-    fun network_name(): vector<u8> {
-        let chain_id = chain_id::get();
-        if (chain_id == 1) {
-            b"mainnet"
-        } else if (chain_id == 2) {
-            b"testnet"
-        } else if (chain_id == 4) {
-            b"local"
-        } else {
-            let network_name = &mut vector[];
-            network_name.append(b"custom network: ");
-            network_name.append(*string_utils::to_string(&chain_id).bytes());
-            *network_name
         }
     }
 
@@ -170,24 +154,6 @@ module aptos_framework::solana_derivable_account {
         bytes
     }
 
-    fun entry_function_name(entry_function_payload: &EntryFunctionPayload): vector<u8> {
-        let entry_function_name = &mut vector[];
-        let addr_str = string_utils::to_string(
-            &transaction_context::account_address(entry_function_payload)
-        ).bytes();
-        // .slice(1) to remove the leading '@' char
-        entry_function_name.append(addr_str.slice(1, addr_str.length()));
-        entry_function_name.append(b"::");
-        entry_function_name.append(
-            *transaction_context::module_name(entry_function_payload).bytes()
-        );
-        entry_function_name.append(b"::");
-        entry_function_name.append(
-            *transaction_context::function_name(entry_function_payload).bytes()
-        );
-        *entry_function_name
-    }
-
     spec authenticate_auth_data {
         // TODO: Issue with `cannot appear in both arithmetic and bitwise
         // operation`
@@ -247,6 +213,8 @@ module aptos_framework::solana_derivable_account {
     use std::string::{String, utf8};
     #[test_only]
     use aptos_framework::auth_data::{create_derivable_auth_data};
+    #[test_only]
+    use std::chain_id;
 
     #[test_only]
     struct SIWSAbstractPublicKey has drop {
@@ -310,43 +278,6 @@ module aptos_framework::solana_derivable_account {
         assert!(base64_public_key == vector[223, 236, 102, 141, 171, 166, 118,
         40, 172, 65, 89, 139, 197, 164, 172, 50, 133, 204, 100, 93, 136, 195,
         58, 158, 31, 22, 219, 93, 60, 40, 175, 12]);
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_mainnet(framework: &signer) {
-        chain_id::initialize_for_test(framework, 1);
-        assert!(network_name() == b"mainnet");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_testnet(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
-        assert!(network_name() == b"testnet");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_local(framework: &signer) {
-        chain_id::initialize_for_test(framework, 4);
-        assert!(network_name() == b"local");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_network_name_other(framework: &signer) {
-        chain_id::initialize_for_test(framework, 99);
-        assert!(network_name() == b"custom network: 99");
-    }
-
-    #[test(framework = @0x1)]
-    fun test_entry_function_name() {
-        let entry_function_payload = transaction_context::new_entry_function_payload(
-            @0x1,
-            utf8(b"coin"),
-            utf8(b"transfer"),
-            vector[],
-            vector[]
-        );
-        let entry_function_name = entry_function_name(&entry_function_payload);
-        assert!(entry_function_name == b"0x1::coin::transfer");
     }
 
     #[test(framework = @0x1)]

@@ -1,0 +1,36 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy {
+        0: || has drop,
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    public fun test(): 0xc0ffee::m::Lazy {
+        closure#0n::__lambda__1__test()
+    }
+    private fun __lambda__1__test() {
+        Tuple()
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy has drop {
+        0: || has drop,
+    }
+}
+module 0xc0ffee::n {
+    public fun test(): 0xc0ffee::m::Lazy {
+        <<wrongly typed closure expression>>
+    }
+    fun __lambda__1__test() {
+    }
+}
+
+
+Diagnostics:
+error: cannot implicitly pack a wrapper struct `0xc0ffee::m::Lazy` defined in a different module `0xc0ffee::m`
+  ┌─ tests/bytecode-generator/bug_16543.move:8:9
+  │
+8 │         || {}
+  │         ^^^^^

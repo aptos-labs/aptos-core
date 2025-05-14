@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: lambda expression has invalid type `|&&u64|(&&u64, &&u64)` (reference to a reference is disallowed)
+  ┌─ tests/checking-lang-v2.2/lambda/ref_to_ref_inferred.move:3:17
+  │
+3 │           let f = |x| {
+  │ ╭─────────────────^
+4 │ │             **x + 1;
+5 │ │             (x, x)
+6 │ │         };
+  │ ╰─────────^
+
+error: lambda expression has invalid type `|(&&u64, u64)|&&u64` (reference to a reference is disallowed)
+   ┌─ tests/checking-lang-v2.2/lambda/ref_to_ref_inferred.move:10:17
+   │
+10 │           let f = |x, y| {
+   │ ╭─────────────────^
+11 │ │             let p = *x;
+12 │ │             let q = *p + y;
+13 │ │             x
+14 │ │         };
+   │ ╰─────────^
+
+error: lambda expression has invalid type `|(&&&&&&u64, &&&u64)|u64` (reference to a reference is disallowed)
+   ┌─ tests/checking-lang-v2.2/lambda/ref_to_ref_inferred.move:18:17
+   │
+18 │           let f = |x, y| {
+   │ ╭─────────────────^
+19 │ │             ******x + ***y
+20 │ │         };
+   │ ╰─────────^

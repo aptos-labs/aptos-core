@@ -21,6 +21,7 @@ allow = [
     "Unicode-DFS-2016",
     "Unlicense",
     "Zlib",
+    "NCSA",
 ]
 
 # Since the tool cannot determine the license of this crate, we need to clarify it.

@@ -1,4 +1,103 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    public fun other(a: u64,b: u64): u64 {
+        {
+          let sum: u64 = 0;
+          loop {
+            if Lt<u64>(a, b) {
+              a: u64 = Add<u64>(a, 1);
+              sum: u64 = Add<u64>({
+                let (a: u64, b: u64): (u64, u64) = Tuple(a, b);
+                {
+                  let sum: u64 = 0;
+                  loop {
+                    if Lt<u64>(a, b) {
+                      a: u64 = Add<u64>(a, 1);
+                      sum: u64 = Add<u64>(sum, a);
+                      Tuple()
+                    } else {
+                      break
+                    }
+                  };
+                  sum
+                }
+              }, sum);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          sum
+        }
+    }
+    public inline fun nested(a: u64,b: u64): u64 {
+        {
+          let sum: u64 = 0;
+          loop {
+            if Lt<u64>(a, b) {
+              a: u64 = Add<u64>(a, 1);
+              sum: u64 = Add<u64>(sum, a);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          sum
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let a: u64 = 1;
+          {
+            let b: u64 = 4;
+            {
+              let z: u64 = Test::other(a, b);
+              if Eq<u64>(z, 10) {
+                Tuple()
+              } else {
+                Abort(z)
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    public fun other(a: u64, b: u64): u64 {
+        let sum = 0;
+        while (a < b) {
+            a = a + 1;
+            sum = {
+                let (a,b) = (a, b);
+                let sum = 0;
+                while (a < b) {
+                    a = a + 1;
+                    sum = sum + a;
+                };
+                sum
+            } + sum;
+        };
+        sum
+    }
+    public inline fun nested(a: u64, b: u64): u64 {
+        let sum = 0;
+        while (a < b) {
+            a = a + 1;
+            sum = sum + a;
+        };
+        sum
+    }
+    public fun test_shadowing() {
+        let a = 1;
+        let b = 4;
+        let z = other(a, b);
+        if (z == 10) () else abort z
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::Test {
     public fun other(a: u64,b: u64): u64 {
         {
@@ -56,38 +155,6 @@ module 0x42::Test {
         }
     }
 } // end 0x42::Test
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::Test {
-    public fun other(a: u64, b: u64): u64 {
-        let sum = 0;
-        while (a < b) {
-            a = a + 1;
-            sum = {
-                let (a,b) = (a, b);
-                let sum = 0;
-                while (a < b) {
-                    a = a + 1;
-                    sum = sum + a;
-                };
-                sum
-            } + sum;
-        };
-        sum
-    }
-    public inline fun nested(a: u64, b: u64): u64 {
-        let sum = 0;
-        while (a < b) {
-            a = a + 1;
-            sum = sum + a;
-        };
-        sum
-    }
-    public fun test_shadowing() {
-        let z = other(1, 4);
-        if (z == 10) () else abort z
-    }
-}
 
 
 ============ bytecode verification succeeded ========

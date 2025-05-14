@@ -38,7 +38,10 @@ mod test {
     use aptos_types::{
         chain_id::ChainId,
         move_utils::MemberId,
-        transaction::{EntryFunction, RawTransaction, SignedTransaction, TransactionPayload},
+        transaction::{
+            EntryFunction, RawTransaction, SignedTransaction, TransactionExecutableRef,
+            TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
 
@@ -52,6 +55,7 @@ mod test {
             member_id: function_id,
         } = function;
 
+        // TODO[Orderless]: Test with payload v2 format as well.
         let payload = TransactionPayload::EntryFunction(EntryFunction::new(
             module_id,
             function_id,
@@ -81,22 +85,28 @@ mod test {
     }
 
     fn get_module_address(txn: &SignedTransaction) -> AccountAddress {
-        match txn.payload() {
-            TransactionPayload::EntryFunction(entry_func) => *entry_func.module().address(),
+        match txn.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry_func)) => {
+                *entry_func.module().address()
+            },
             _ => panic!("Unexpected transaction payload"),
         }
     }
 
     fn get_module_name(txn: &SignedTransaction) -> String {
-        match txn.payload() {
-            TransactionPayload::EntryFunction(entry_func) => entry_func.module().name().to_string(),
+        match txn.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry_func)) => {
+                entry_func.module().name().to_string()
+            },
             _ => panic!("Unexpected transaction payload"),
         }
     }
 
     fn get_function_name(txn: &SignedTransaction) -> String {
-        match txn.payload() {
-            TransactionPayload::EntryFunction(entry_func) => entry_func.function().to_string(),
+        match txn.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry_func)) => {
+                entry_func.function().to_string()
+            },
             _ => panic!("Unexpected transaction payload"),
         }
     }

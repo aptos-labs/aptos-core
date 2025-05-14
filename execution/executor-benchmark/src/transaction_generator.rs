@@ -321,8 +321,7 @@ impl TransactionGenerator {
         let last_non_empty_phase = Arc::new(AtomicUsize::new(0));
         let transaction_generators = Mutex::new(transaction_generators);
         assert!(self.block_sender.is_some());
-        let num_senders_per_block =
-            (block_size + transactions_per_sender - 1) / transactions_per_sender;
+        let num_senders_per_block = block_size.div_ceil(transactions_per_sender);
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for i in 0..num_blocks {

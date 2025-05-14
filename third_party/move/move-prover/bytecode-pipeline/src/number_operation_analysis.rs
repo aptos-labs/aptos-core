@@ -162,7 +162,7 @@ fn table_funs_name_propogate_to_srcs(callee_name: &str) -> bool {
     callee_name == "add" || callee_name == "borrow_mut_with_default" || callee_name == "upsert"
 }
 
-impl<'a> NumberOperationAnalysis<'a> {
+impl NumberOperationAnalysis<'_> {
     /// Analyze the expression in the spec
     fn handle_exp(
         &self,
@@ -664,7 +664,7 @@ impl<'a> NumberOperationAnalysis<'a> {
     }
 }
 
-impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
+impl TransferFunctions for NumberOperationAnalysis<'_> {
     type State = NumberOperationState;
 
     const BACKWARD: bool = false;
@@ -1239,7 +1239,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for NumberOperationAnalysis<'a> {}
+impl DataflowAnalysis for NumberOperationAnalysis<'_> {}
 
 impl AbstractDomain for NumberOperationState {
     fn join(&mut self, other: &Self) -> JoinResult {

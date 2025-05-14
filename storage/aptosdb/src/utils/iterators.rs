@@ -2,19 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    schema::{event::EventSchema, ledger_info::LedgerInfoSchema, state_value::StateValueSchema},
+    schema::{
+        event::EventSchema, ledger_info::LedgerInfoSchema, state_value::StateValueSchema,
+        transaction_summaries_by_account::TransactionSummariesByAccountSchema,
+    },
     state_kv_db::StateKvDb,
 };
-use aptos_schemadb::{iterator::SchemaIterator, ReadOptions};
+use aptos_schemadb::{
+    iterator::{ScanDirection, SchemaIterator},
+    ReadOptions,
+};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
+    account_address::AccountAddress,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
     },
-    transaction::Version,
+    transaction::{IndexedTransactionSummary, Version},
 };
 use std::{iter::Peekable, marker::PhantomData};
 
@@ -172,7 +179,7 @@ impl<'a> PrefixedStateValueIterator<'a> {
     }
 }
 
-impl<'a> Iterator for PrefixedStateValueIterator<'a> {
+impl Iterator for PrefixedStateValueIterator<'_> {
     type Item = Result<(StateKey, StateValue)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -226,7 +233,7 @@ impl<'a> EpochEndingLedgerInfoIter<'a> {
     }
 }
 
-impl<'a> Iterator for EpochEndingLedgerInfoIter<'a> {
+impl Iterator for EpochEndingLedgerInfoIter<'_> {
     type Item = Result<LedgerInfoWithSignatures>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -278,8 +285,96 @@ impl<'a> EventsByVersionIter<'a> {
     }
 }
 
-impl<'a> Iterator for EventsByVersionIter<'a> {
+impl Iterator for EventsByVersionIter<'_> {
     type Item = Result<Vec<ContractEvent>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_impl().transpose()
+    }
+}
+
+pub struct AccountTransactionSummariesIter<'a> {
+    inner: SchemaIterator<'a, TransactionSummariesByAccountSchema>,
+    address: AccountAddress,
+    start_version: Option<Version>,
+    end_version: Option<Version>,
+    limit: u64,
+    direction: ScanDirection,
+    prev_version: Option<Version>,
+    ledger_version: Version,
+    count: u64,
+}
+
+impl<'a> AccountTransactionSummariesIter<'a> {
+    pub fn new(
+        inner: SchemaIterator<'a, TransactionSummariesByAccountSchema>,
+        address: AccountAddress,
+        start_version: Option<Version>,
+        end_version: Option<Version>,
+        limit: u64,
+        direction: ScanDirection,
+        ledger_version: Version,
+    ) -> Self {
+        Self {
+            inner,
+            address,
+            start_version,
+            end_version,
+            limit,
+            direction,
+            ledger_version,
+            prev_version: None,
+            count: 0,
+        }
+    }
+}
+
+impl AccountTransactionSummariesIter<'_> {
+    fn next_impl(&mut self) -> Result<Option<(Version, IndexedTransactionSummary)>> {
+        // If already iterated over `limit` transactions, return None.
+        if self.count >= self.limit {
+            return Ok(None);
+        }
+
+        Ok(match self.inner.next().transpose()? {
+            Some(((address, version), txn_summary)) => {
+                // No more transactions sent by this account.
+                if address != self.address {
+                    return Ok(None);
+                }
+
+                // This case ideally shouldn't occur if the iterator is initiated properly.
+                if (self.direction == ScanDirection::Backward
+                    && version > self.end_version.unwrap())
+                    || (self.direction == ScanDirection::Forward
+                        && version < self.start_version.unwrap())
+                {
+                    return Ok(None);
+                }
+
+                ensure!(
+                    version == txn_summary.version(),
+                    "DB corruption: version mismatch: version in key: {}, version in txn summary: {}",
+                    version,
+                    txn_summary.version(),
+                );
+
+                // No more transactions (in this view of the ledger).
+                if version > self.ledger_version {
+                    return Ok(None);
+                }
+
+                self.prev_version = Some(version);
+                self.count += 1;
+                Some((version, txn_summary))
+            },
+            None => None,
+        })
+    }
+}
+
+impl Iterator for AccountTransactionSummariesIter<'_> {
+    type Item = Result<(Version, IndexedTransactionSummary)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_impl().transpose()

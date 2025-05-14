@@ -77,10 +77,10 @@ impl CompiledModule {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct DeserializerConfig {
-    max_binary_format_version: u32,
-    max_identifier_size: u64,
+    pub max_binary_format_version: u32,
+    pub max_identifier_size: u64,
 }
 
 impl DeserializerConfig {

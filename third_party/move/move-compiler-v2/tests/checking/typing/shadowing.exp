@@ -1,84 +1,120 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
         b: bool,
     }
     private fun t0() {
-        false;
-        Tuple();
-        0;
-        false;
-        Tuple();
-        0;
-        0x0;
-        Tuple();
-        false;
-        Tuple();
-        0;
-        Tuple()
+        {
+          let x: u64 = 0;
+          {
+            let x: bool = false;
+            x;
+            Tuple()
+          };
+          x;
+          {
+            let x: bool = false;
+            x;
+            Tuple()
+          };
+          x;
+          {
+            let x: bool = false;
+            {
+              let x: address = 0x0;
+              x;
+              Tuple()
+            };
+            x;
+            Tuple()
+          };
+          x;
+          Tuple()
+        }
     }
     private fun t1(cond: bool) {
-        if cond {
-          false;
+        {
+          let x: u64 = 0;
+          if cond {
+            {
+              let (a: bool, x: bool): (bool, bool) = Tuple(false, false);
+              And(a, x);
+              Tuple()
+            }
+          } else {
+            {
+              let x: address = 0x0;
+              x;
+              Tuple()
+            }
+          };
+          x;
           Tuple()
-        } else {
-          0x0;
-          Tuple()
-        };
-        0;
-        Tuple()
+        }
     }
     private fun t2() {
-        loop {
-          {
-            let M::S{ f: _, b: x } = pack M::S(0, false);
-            false;
-            break
-          }
-        };
-        0;
-        Tuple()
+        {
+          let x: u64 = 0;
+          loop {
+            {
+              let M::S{ f: _, b: x } = pack M::S(0, false);
+              x;
+              break
+            }
+          };
+          x;
+          Tuple()
+        }
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
         b: bool,
     }
     fun t0() {
+        let x = 0;
         {
-            false;
+            let x = false;
+            x;
         };
-        0;
+        x;
         {
-            false;
+            let x = false;
+            x;
         };
-        0;
+        x;
         {
+            let x = false;
             {
-                0x0;
+                let x = 0x0;
+                x;
             };
-            false;
+            x;
         };
-        0;
+        x;
     }
     fun t1(cond: bool) {
+        let x = 0;
         if (cond) {
-            false;
+            let (a,x) = (false, false);
+            a && x;
         } else {
-            0x0;
+            let x = 0x0;
+            x;
         };
-        0;
+        x;
     }
     fun t2() {
+        let x = 0;
         loop {
             let S{f: _,b: x} = S{f: 0,b: false};
-            false;
+            x;
             break
         };
-        0;
+        x;
     }
 }

@@ -226,7 +226,7 @@ pub struct MoveClosure {
 #[allow(unused)] // Currently, we do not use the expected function layout
 pub(crate) struct ClosureVisitor<'a>(pub(crate) &'a MoveFunctionLayout);
 
-impl<'d, 'a> serde::de::Visitor<'d> for ClosureVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for ClosureVisitor<'_> {
     type Value = MoveClosure;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

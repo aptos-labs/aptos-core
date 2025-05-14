@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::A {
     friend fun bar() {
         Tuple()
@@ -32,7 +32,7 @@ module 0x42::C {
     }
 } // end 0x42::C
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::A {
     friend 0x42::B;
     friend fun bar() {

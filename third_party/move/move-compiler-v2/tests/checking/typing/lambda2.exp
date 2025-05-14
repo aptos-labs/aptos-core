@@ -6,12 +6,6 @@ error: Only inline functions may have function-typed parameters, but non-inline 
 84 │     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^ - Parameter `x` has function-valued type `|u64|`.
 
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking/typing/lambda2.move:84:43
-   │
-84 │     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
-   │                                           ^
-
 error: Functions may not return function-typed values, but function `M::inline_result_lambda_not_allowed` return type is the function type `|u64|`:
    ┌─ tests/checking/typing/lambda2.move:86:59
    │

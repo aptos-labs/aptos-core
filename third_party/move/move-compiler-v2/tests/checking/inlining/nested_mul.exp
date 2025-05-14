@@ -1,4 +1,51 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::mathtest {
+    public inline fun mul_div(a: u64,b: u64,c: u64): u64 {
+        Cast<u64>(Div<u128>(Mul<u128>(Cast<u128>(a), Cast<u128>(b)), Cast<u128>(c)))
+    }
+} // end 0x42::mathtest
+module 0x42::test {
+    use 0x42::mathtest; // resolved as: 0x42::mathtest
+    private fun test_nested_mul_div() {
+        {
+          let a: u64 = {
+            let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(1, {
+              let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(1, 1, 1);
+              Cast<u64>(Div<u128>(Mul<u128>(Cast<u128>(a), Cast<u128>(b)), Cast<u128>(c)))
+            }, 1);
+            Cast<u64>(Div<u128>(Mul<u128>(Cast<u128>(a), Cast<u128>(b)), Cast<u128>(c)))
+          };
+          if Eq<u64>(a, 1) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::mathtest {
+    public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
+        (a as u128) * (b as u128) / (c as u128) as u64
+    }
+}
+module 0x42::test {
+    use 0x42::mathtest;
+    fun test_nested_mul_div() {
+        let a = {
+            let (a,b,c) = (1, {
+                let (a,b,c) = (1, 1, 1);
+                (a as u128) * (b as u128) / (c as u128) as u64
+            }, 1);
+            (a as u128) * (b as u128) / (c as u128) as u64
+        };
+        if (a == 1) () else abort 0;
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::mathtest {
     public inline fun mul_div(a: u64,b: u64,c: u64): u64 {
         Cast<u64>(Div<u128>(Mul<u128>(Cast<u128>(a), Cast<u128>(b)), Cast<u128>(c)))
@@ -15,19 +62,6 @@ module 0x42::test {
         Tuple()
     }
 } // end 0x42::test
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::mathtest {
-    public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
-        (a as u128) * (b as u128) / (c as u128) as u64
-    }
-}
-module 0x42::test {
-    use 0x42::mathtest;
-    fun test_nested_mul_div() {
-        if (true) () else abort 0;
-    }
-}
 
 
 ============ bytecode verification succeeded ========

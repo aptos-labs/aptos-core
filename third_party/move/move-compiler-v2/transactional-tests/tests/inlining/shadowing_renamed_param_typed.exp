@@ -1,7 +1,13 @@
 processed 2 tasks
 
 task 0 'publish'. lines 1-46:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ TEMPFILE:10:31
+   │
+10 │     public fun test_shadowing(x: u64) {
+   │                               ^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ TEMPFILE:23:17
    │
 23 │         let x = q;

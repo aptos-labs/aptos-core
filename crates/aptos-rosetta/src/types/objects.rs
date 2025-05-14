@@ -1425,10 +1425,7 @@ fn parse_write_set<'a>(
         },
     };
 
-    let bytes = match write_op.bytes() {
-        Some(bytes) => bytes,
-        None => return None,
-    };
+    let bytes = write_op.bytes()?;
 
     Some((struct_tag, address, bytes))
 }

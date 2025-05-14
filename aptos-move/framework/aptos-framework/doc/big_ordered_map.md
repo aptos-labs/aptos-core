@@ -32,6 +32,7 @@ allowing cleaner iterator APIs.
 -  [Enum `BigOrderedMap`](#0x1_big_ordered_map_BigOrderedMap)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_big_ordered_map_new)
+-  [Function `new_with_reusable`](#0x1_big_ordered_map_new_with_reusable)
 -  [Function `new_with_type_size_hints`](#0x1_big_ordered_map_new_with_type_size_hints)
 -  [Function `new_with_config`](#0x1_big_ordered_map_new_with_config)
 -  [Function `new_from`](#0x1_big_ordered_map_new_from)
@@ -49,6 +50,7 @@ allowing cleaner iterator APIs.
 -  [Function `find`](#0x1_big_ordered_map_find)
 -  [Function `contains`](#0x1_big_ordered_map_contains)
 -  [Function `borrow`](#0x1_big_ordered_map_borrow)
+-  [Function `get`](#0x1_big_ordered_map_get)
 -  [Function `borrow_mut`](#0x1_big_ordered_map_borrow_mut)
 -  [Function `borrow_front`](#0x1_big_ordered_map_borrow_front)
 -  [Function `borrow_back`](#0x1_big_ordered_map_borrow_back)
@@ -555,6 +557,39 @@ it is required to use new_with_config, to explicitly select automatic or specifi
     );
 
     <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>(0, 0, <b>false</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_new_with_reusable"></a>
+
+## Function `new_with_reusable`
+
+Returns a new BigOrderedMap with with reusable storage slots.
+Only allowed to be called with constant size types. For variable sized types,
+it is required to use new_with_config, to explicitly select automatic or specific degree selection.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">new_with_reusable</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">new_with_reusable</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt; {
+    // Use new_with_type_size_hints or new_with_config <b>if</b> your types have variable sizes.
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;K&gt;().is_some() && <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;V&gt;().is_some(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>)
+    );
+
+    <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>(0, 0, <b>true</b>)
 }
 </code></pre>
 
@@ -1114,6 +1149,35 @@ Returns a reference to the element with its key, aborts if the key is not found.
     <b>assert</b>!(!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
 
     iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>(self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_get"></a>
+
+## Function `get`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get">get</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get">get</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): Option&lt;V&gt; {
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>(key);
+    <b>if</b> (iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>(self))
+    }
 }
 </code></pre>
 

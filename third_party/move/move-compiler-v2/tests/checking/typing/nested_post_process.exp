@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::simple_map {
     use std::error;
     use std::option;
@@ -51,7 +51,7 @@ module 0x42::simple_map {
     }
 } // end 0x42::simple_map
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::simple_map {
     struct Element<Key, Value> has copy, drop, store {
         key: Key,

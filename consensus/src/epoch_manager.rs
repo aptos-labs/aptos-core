@@ -1890,6 +1890,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum NoRandomnessReason {
     VTxnDisabled,

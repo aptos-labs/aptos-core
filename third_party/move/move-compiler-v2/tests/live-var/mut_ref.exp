@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::f1_ok() {

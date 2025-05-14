@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::if_else {
     private fun if_else(cond: bool,x: u64): u64 {
         if cond {
@@ -20,7 +20,7 @@ module 0x42::if_else {
     }
 } // end 0x42::if_else
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::if_else {
     fun if_else(cond: bool, x: u64): u64 {
         if (cond) x + 1 else x - 1
@@ -30,7 +30,94 @@ module 0x42::if_else {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun if_else::if_else($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: if ($t0) goto 1 else goto 6
+  1: label L0
+  2: $t3 := infer($t1)
+  3: $t4 := 1
+  4: $t2 := +($t3, $t4)
+  5: goto 10
+  6: label L1
+  7: $t5 := infer($t1)
+  8: $t6 := 1
+  9: $t2 := -($t5, $t6)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun if_else::if_else_nested($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+  0: if ($t0) goto 1 else goto 6
+  1: label L0
+  2: $t5 := infer($t1)
+  3: $t6 := 1
+  4: $t4 := +($t5, $t6)
+  5: goto 10
+  6: label L1
+  7: $t7 := infer($t1)
+  8: $t8 := 1
+  9: $t4 := -($t7, $t8)
+ 10: label L2
+ 11: $t9 := 10
+ 12: $t3 := >($t4, $t9)
+ 13: if ($t3) goto 14 else goto 19
+ 14: label L3
+ 15: $t10 := infer($t1)
+ 16: $t11 := 2
+ 17: $t2 := *($t10, $t11)
+ 18: goto 23
+ 19: label L4
+ 20: $t12 := infer($t1)
+ 21: $t13 := 2
+ 22: $t2 := /($t12, $t13)
+ 23: label L5
+ 24: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::if_else {
+    private fun if_else(cond: bool,x: u64): u64 {
+        if cond {
+          Add<u64>(x, 1)
+        } else {
+          Sub<u64>(x, 1)
+        }
+    }
+    private fun if_else_nested(cond: bool,x: u64): u64 {
+        if Gt<u64>(if cond {
+          Add<u64>(x, 1)
+        } else {
+          Sub<u64>(x, 1)
+        }, 10) {
+          Mul<u64>(x, 2)
+        } else {
+          Div<u64>(x, 2)
+        }
+    }
+} // end 0x42::if_else
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun if_else::if_else($t0: bool, $t1: u64): u64 {

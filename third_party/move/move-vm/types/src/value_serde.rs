@@ -43,7 +43,7 @@ pub(crate) struct DelayedFieldsExtension<'a> {
     pub(crate) mapping: Option<&'a dyn ValueToIdentifierMapping>,
 }
 
-impl<'a> DelayedFieldsExtension<'a> {
+impl DelayedFieldsExtension<'_> {
     // Temporarily limit the number of delayed fields per resource, until proper charges are
     // implemented.
     // TODO[agg_v2](clean):

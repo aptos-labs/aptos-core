@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
@@ -78,6 +78,420 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars: $t9
  15: $t2 := read_ref($t9)
      # live vars: $t2
+ 16: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: u8, $t1: &vector<u64>): u64 {
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: bool
+     var $t5: u8
+     var $t6: u8
+     var $t7: &0x42::m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: u64
+     # live vars: $t0, $t1
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t5
+  1: $t6 := 0
+     # live vars: $t1, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t1, $t4
+  3: if ($t4) goto 4 else goto 9
+     # live vars: $t1
+  4: label L0
+     # live vars:
+  5: $t8 := 0x1
+     # live vars: $t8
+  6: $t7 := borrow_global<0x42::m::R>($t8)
+     # live vars: $t7
+  7: $t3 := borrow_field<0x42::m::R>.data($t7)
+     # live vars: $t3
+  8: goto 11
+     # live vars: $t1
+  9: label L1
+     # live vars: $t1
+ 10: $t3 := infer($t1)
+     # live vars: $t3
+ 11: label L2
+     # live vars: $t3
+ 12: $t10 := infer($t3)
+     # live vars: $t10
+ 13: $t11 := 0
+     # live vars: $t10, $t11
+ 14: $t9 := vector::borrow<u64>($t10, $t11)
+     # live vars: $t9
+ 15: $t2 := read_ref($t9)
+     # live vars: $t2
+ 16: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun m::f($t0: u8, $t1: &vector<u64>): u64 {
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: bool
+     var $t5: u8
+     var $t6: u8
+     var $t7: &0x42::m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: u64
+     # live vars: $t0, $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t5
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t6 := 0
+     # live vars: $t1, $t5, $t6
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t1, $t4
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: if ($t4) goto 4 else goto 9
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: label L0
+     # live vars:
+     # refs: []
+     #
+  5: $t8 := 0x1
+     # live vars: $t8
+     # refs: []
+     #
+  6: $t7 := borrow_global<0x42::m::R>($t8)
+     # live vars: $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   -> #7 via [struct `m::R`] at line 12
+     #
+  7: $t3 := borrow_field<0x42::m::R>.data($t7)
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `m::R`] at line 12
+     #
+  8: goto 11
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  9: label L1
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 10: $t3 := infer($t1)
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `m::R`] at line 12
+     #
+ 11: label L2
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `m::R`] at line 12
+     #
+ 12: $t10 := infer($t3)
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `m::R`] at line 12
+     #
+ 13: $t11 := 0
+     # live vars: $t10, $t11
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `m::R`] at line 12
+     #
+ 14: $t9 := vector::borrow<u64>($t10, $t11)
+     # live vars: $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   -> #9 via [struct `m::R`] at line 16
+     #
+ 15: $t2 := read_ref($t9)
+     # live vars: $t2
+     # refs: []
+     #
+ 16: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: u8, $t1: &vector<u64>): u64 {
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: bool
+     var $t5: u8
+     var $t6: u8
+     var $t7: &0x42::m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t5
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t5, $t6
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := ==($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: if ($t4) goto 4 else goto 9
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: label L0
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  5: $t8 := 0x1
+     # abort state: {returns,aborts}
+     # live vars: $t8
+     # refs: []
+     #
+  6: $t7 := borrow_global<0x42::m::R>($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   -> #7 via [struct `m::R`] at line 12
+     #
+  7: $t3 := borrow_field<0x42::m::R>.data($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `m::R`] at line 12
+     #
+  8: goto 11
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  9: label L1
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 10: $t3 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `m::R`] at line 12
+     #
+ 11: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `m::R`] at line 12
+     #
+ 12: $t10 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `m::R`] at line 12
+     #
+ 13: $t11 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t10, $t11
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   -> #10 via [struct `m::R`] at line 12
+     #
+ 14: $t9 := vector::borrow<u64>($t10, $t11)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   -> #9 via [struct `m::R`] at line 16
+     #
+ 15: $t2 := read_ref($t9)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 16: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun m::f($t0: u8, $t1: &vector<u64>): u64 {
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: bool
+     var $t5: u8
+     var $t6: u8
+     var $t7: &0x42::m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: u64
+  0: $t5 := move($t0)
+  1: $t6 := 0
+  2: $t4 := ==($t5, $t6)
+  3: if ($t4) goto 4 else goto 10
+  4: label L0
+  5: drop($t1)
+  6: $t8 := 0x1
+  7: $t7 := borrow_global<0x42::m::R>($t8)
+  8: $t3 := borrow_field<0x42::m::R>.data($t7)
+  9: goto 12
+ 10: label L1
+ 11: $t3 := move($t1)
+ 12: label L2
+ 13: $t10 := move($t3)
+ 14: $t11 := 0
+ 15: $t9 := vector::borrow<u64>($t10, $t11)
+ 16: $t2 := read_ref($t9)
+ 17: return $t2
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::f($t0: u8, $t1: &vector<u64>): u64 {
+     var $t2: u64
+     var $t3: &vector<u64>
+     var $t4: bool
+     var $t5: u8
+     var $t6: u8
+     var $t7: &0x42::m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: u64
+  0: $t5 := infer($t0)
+  1: $t6 := 0
+  2: $t4 := ==($t5, $t6)
+  3: if ($t4) goto 4 else goto 9
+  4: label L0
+  5: $t8 := 0x1
+  6: $t7 := borrow_global<0x42::m::R>($t8)
+  7: $t3 := borrow_field<0x42::m::R>.data($t7)
+  8: goto 11
+  9: label L1
+ 10: $t3 := infer($t1)
+ 11: label L2
+ 12: $t10 := infer($t3)
+ 13: $t11 := 0
+ 14: $t9 := vector::borrow<u64>($t10, $t11)
+ 15: $t2 := read_ref($t9)
  16: return $t2
 }
 

@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
+use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_framework::{
+    natives::code::{PackageRegistry, UpgradePolicy},
+    BuiltPackage,
 };
-use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
@@ -293,7 +294,7 @@ fn code_publishing_using_resource_account() {
         ),
     );
     let pack_dir = pack.write_to_temp().unwrap();
-    let package = build_package(
+    let package = BuiltPackage::build(
         pack_dir.path().to_owned(),
         aptos_framework::BuildOptions::default(),
     )
@@ -501,7 +502,7 @@ fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
     builder.add_source(module_name, &source);
 
     let pack_dir = assert_ok!(builder.write_to_temp());
-    let package = assert_ok!(build_package(
+    let package = assert_ok!(BuiltPackage::build(
         pack_dir.path().to_owned(),
         aptos_framework::BuildOptions::default(),
     ));

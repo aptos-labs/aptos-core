@@ -1,3 +1,48 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    private fun t0(x: u64,r: R) {
+        Add<u64>(0, 0);
+        Add<u64>(1, 0);
+        Add<u64>(0, 1);
+        Add<u8>(0, 1);
+        Add<u8>(0, 1);
+        Add<u128>(0, 1);
+        Add<u128>(0, 1);
+        Add<u64>(0, 1);
+        Add<u64>(Copy(x), Move(x));
+        Add<u64>(select M::R.f<R>(r), select M::R.f<R>(r));
+        Add<u64>(Add<u64>(Add<u64>(1, select M::R.f<R>(r)), select M::R.f<R>(r)), 0);
+        {
+          let M::R{ f: _ } = r;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    fun t0(x: u64, r: R) {
+        0 + 0;
+        1 + 0;
+        0 + 1;
+        0u8 + 1u8;
+        0u8 + 1u8;
+        0u128 + 1u128;
+        0u128 + 1u128;
+        0 + 1;
+        (copy x) + (move x);
+        r.f + r.f;
+        1 + r.f + r.f + 0;
+        let R{f: _} = r;
+    }
+}
+
 
 Diagnostics:
 warning: Expression value unused and side-effect free, so eliminated as dead code
@@ -48,7 +93,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 14 │         (0) + (1);
    │         ^^^^^^^^^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before second bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
@@ -63,19 +108,6 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
-
-// -- Sourcified model before bytecode pipeline
-module 0x8675309::M {
-    struct R {
-        f: u64,
-    }
-    fun t0(x: u64, r: R) {
-        (copy x) + (move x);
-        r.f + r.f;
-        1 + r.f + r.f + 0;
-        let R{f: _} = r;
-    }
-}
 
 
 ============ bytecode verification succeeded ========

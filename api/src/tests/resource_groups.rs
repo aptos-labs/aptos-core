@@ -120,7 +120,7 @@ async fn test_gen_resource_group() {
 
 fn assert_writeset_contains_secondary_changes(writeset: &serde_json::Value) {
     let changes = &writeset["changes"].as_array().unwrap();
-    assert!(changes.iter().any(|c| c.get("data").map_or(false, |d| d
+    assert!(changes.iter().any(|c| c.get("data").is_some_and(|d| d
         .get("type")
-        .map_or(false, |t| t.as_str().unwrap().contains("secondary")))));
+        .is_some_and(|t| t.as_str().unwrap().contains("secondary")))));
 }

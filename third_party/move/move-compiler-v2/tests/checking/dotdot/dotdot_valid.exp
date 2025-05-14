@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::test {
     enum E1 {
         A {
@@ -291,16 +291,19 @@ module 0x42::test {
     }
     private fun test_lambda_param(): bool {
         {
-          let x: S2 = pack test::S2(true, pack test::S0(false));
+          let (): ();
           {
-            let (test::S2{ 0: x, 1: _ }): (S2) = Tuple(x);
-            x
+            let x: S2 = pack test::S2(true, pack test::S0(false));
+            {
+              let (test::S2{ 0: x, 1: _ }): (S2) = Tuple(x);
+              x
+            }
           }
         }
     }
 } // end 0x42::test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::test {
     enum E1 has drop {
         A {
@@ -453,6 +456,7 @@ module 0x42::test {
         let S7(_w,_x,_y,_z) = x;
     }
     fun test_lambda_param(): bool {
+        let ();
         let x = S2(true,S0{});
         let (S2(x,_)) = (x);
         x

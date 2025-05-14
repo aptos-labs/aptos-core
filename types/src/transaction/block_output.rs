@@ -21,7 +21,7 @@ impl<Output: Debug> BlockOutput<Output> {
     fn is_block_limit_reached(&self) -> bool {
         self.block_end_info
             .as_ref()
-            .map_or(false, BlockEndInfo::limit_reached)
+            .is_some_and(BlockEndInfo::limit_reached)
     }
 
     /// If block limit is not set (i.e. in tests), we can safely unwrap here

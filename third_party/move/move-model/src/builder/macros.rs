@@ -12,7 +12,7 @@ use crate::{
 use legacy_move_compiler::expansion::ast as EA;
 use move_ir_types::location::{sp, Loc, Spanned};
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     pub fn expand_macro(&self, loc: Loc, name: &str, args: &Spanned<Vec<EA::Exp>>) -> EA::Exp {
         // Currently, there is only the assert! macro, and no user definable ones.
         let expansion_ = match name {

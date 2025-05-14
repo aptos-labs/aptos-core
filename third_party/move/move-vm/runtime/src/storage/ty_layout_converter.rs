@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 /// A trait allowing to convert runtime types into other types used throughout the stack.
 #[allow(private_bounds)]
-pub trait LayoutConverter: LayoutConverterBase {
+pub(crate) trait LayoutConverter: LayoutConverterBase {
     /// Converts a runtime type to a type layout.
     fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
@@ -377,17 +377,17 @@ pub(crate) trait LayoutConverterBase {
 // --------------------------------------------------------------------------------------------
 // Layout converter based on ModuleStorage
 
-pub struct StorageLayoutConverter<'a> {
+pub(crate) struct StorageLayoutConverter<'a> {
     storage: &'a dyn ModuleStorage,
 }
 
 impl<'a> StorageLayoutConverter<'a> {
-    pub fn new(storage: &'a dyn ModuleStorage) -> Self {
+    pub(crate) fn new(storage: &'a dyn ModuleStorage) -> Self {
         Self { storage }
     }
 }
 
-impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
+impl LayoutConverterBase for StorageLayoutConverter<'_> {
     fn vm_config(&self) -> &VMConfig {
         self.storage.runtime_environment().vm_config()
     }
@@ -410,4 +410,4 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
     }
 }
 
-impl<'a> LayoutConverter for StorageLayoutConverter<'a> {}
+impl LayoutConverter for StorageLayoutConverter<'_> {}

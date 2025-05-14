@@ -12,7 +12,8 @@ module aptos_experimental::confidential_asset {
     use aptos_framework::chain_id;
     use aptos_framework::coin;
     use aptos_framework::event;
-    use aptos_framework::fungible_asset::{Self, Metadata};
+    use aptos_framework::dispatchable_fungible_asset;
+    use aptos_framework::fungible_asset::{Metadata};
     use aptos_framework::object::{Self, ExtendRef, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
@@ -649,7 +650,7 @@ module aptos_experimental::confidential_asset {
         let sender_fa_store = primary_fungible_store::ensure_primary_store_exists(from, token);
         let ca_fa_store = primary_fungible_store::ensure_primary_store_exists(get_fa_store_address(), token);
 
-        fungible_asset::transfer(sender, sender_fa_store, ca_fa_store, amount);
+        dispatchable_fungible_asset::transfer(sender, sender_fa_store, ca_fa_store, amount);
 
         let ca_store = borrow_global_mut<ConfidentialAssetStore>(get_user_address(to, token));
         let pending_balance = confidential_balance::decompress_balance(&ca_store.pending_balance);

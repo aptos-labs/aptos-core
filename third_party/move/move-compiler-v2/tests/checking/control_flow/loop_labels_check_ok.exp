@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x815::test {
     private fun f1() {
         loop {
@@ -23,7 +23,7 @@ module 0x815::test {
     }
 } // end 0x815::test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x815::test {
     fun f1() {
         'l0: loop {

@@ -104,4 +104,10 @@ module 0xc0ffee::m {
     y = y;
     y
   }
+
+  public fun no_warn_deref(): u64 {
+    let x = &3;
+    let x = *x;
+    x
+  }
 }

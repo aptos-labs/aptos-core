@@ -9,7 +9,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer::db_ops::open_internal_indexer_db;
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
-    state_keys::StateKeysSchema, transaction_by_account::TransactionByAccountSchema,
+    ordered_transaction_by_account::OrderedTransactionByAccountSchema, state_keys::StateKeysSchema,
 };
 use aptos_schemadb::{ReadOptions, DB};
 use aptos_storage_interface::{DbReader, Result};
@@ -201,7 +201,7 @@ fn verify_transactions(
                     signed_transaction.sender(),
                     signed_transaction.sequence_number(),
                 );
-                match internal_indexer_db.get::<TransactionByAccountSchema>(&key)? {
+                match internal_indexer_db.get::<OrderedTransactionByAccountSchema>(&key)? {
                     Some(version) => {
                         assert_eq!(version, start_version + idx as u64);
                         if idx + start_version as usize % SAMPLE_RATE == 0 {

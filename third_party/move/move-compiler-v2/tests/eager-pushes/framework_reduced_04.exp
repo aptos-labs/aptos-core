@@ -1,4 +1,199 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: signer, $t1: address) {
+     var $t2: u64
+     var $t3: &mut 0xc0ffee::m::Wrap
+     var $t4: &signer
+     var $t5: &mut u64
+     var $t6: 0xc0ffee::m::Wrap
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t2 := 0
+  1: $t3 := borrow_global<0xc0ffee::m::Wrap>($t1)
+  2: $t4 := borrow_local($t0)
+  3: $t5 := borrow_field<0xc0ffee::m::Wrap>.a($t3)
+  4: $t7 := infer($t2)
+  5: $t8 := 0
+  6: $t9 := m::zero($t2)
+  7: $t10 := 0
+  8: $t6 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10)
+  9: m::bar($t4, $t5, $t6)
+ 10: return ()
+}
+
+
+[variant baseline]
+fun m::zero($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := 0
+  1: return $t1
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: signer, $t1: address) {
+     var $t2: u64
+     var $t3: &mut 0xc0ffee::m::Wrap
+     var $t4: &signer
+     var $t5: &mut u64
+     var $t6: 0xc0ffee::m::Wrap
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t2 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  1: $t3 := borrow_global<0xc0ffee::m::Wrap>($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `m::Wrap`] at line 17
+     #
+  2: $t4 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `m::Wrap`] at line 17
+     #   => #4 via [local `x`] at line 18
+     #
+  3: $t5 := borrow_field<0xc0ffee::m::Wrap>.a($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4, $t5
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 18
+     #   -> (mut) #5 via [struct `m::Wrap`] at line 18
+     #
+  4: $t7 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4, $t5, $t7
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 18
+     #   -> (mut) #5 via [struct `m::Wrap`] at line 18
+     #
+  5: $t8 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4, $t5, $t7, $t8
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 18
+     #   -> (mut) #5 via [struct `m::Wrap`] at line 18
+     #
+  6: $t9 := m::zero($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t7, $t8, $t9
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 18
+     #   -> (mut) #5 via [struct `m::Wrap`] at line 18
+     #
+  7: $t10 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t7, $t8, $t9, $t10
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 18
+     #   -> (mut) #5 via [struct `m::Wrap`] at line 18
+     #
+  8: $t6 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5, $t6
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 18
+     #   -> (mut) #5 via [struct `m::Wrap`] at line 18
+     #
+  9: m::bar($t4, $t5, $t6)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 10: return ()
+}
+
+
+[variant baseline]
+fun m::zero($t0: u64): u64 {
+     var $t1: u64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := 0
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {

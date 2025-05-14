@@ -96,7 +96,7 @@ impl ModuleWriteSet {
     pub fn write_op_info_iter_mut<'a>(
         &'a mut self,
         module_storage: &'a impl ModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.writes.iter_mut().map(move |(key, write)| {
             let prev_size = module_storage
                 .fetch_module_size_in_bytes(write.module_address(), write.module_name())

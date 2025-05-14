@@ -1,57 +1,49 @@
 
 Diagnostics:
-warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:2:13
   │
 2 │     fun foo(a: u8, _b: u8) {
   │             ^
 
-warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
-  ┌─ tests/unused-assignment/unused_call_assign_shadow.move:5:13
-  │
-5 │         let y = 0;
-  │             ^
-
-warning: Unused local variable `w`. Consider removing or prefixing with an underscore: `_w`
-  ┌─ tests/unused-assignment/unused_call_assign_shadow.move:8:13
-  │
-8 │         let w = bar(false);
-  │             ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:22:13
-   │
-22 │         let x = 0;
-   │             ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:24:13
-   │
-24 │         let x = 1;
-   │             ^
-
-
-Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:4:9
   │
 4 │         x = x + 1;
   │         ^^^^^^^^^
 
-warning: Unused assignment/binding to `w`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_w`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+  ┌─ tests/unused-assignment/unused_call_assign_shadow.move:5:17
+  │
+5 │         let y = 0;
+  │                 ^
+
+warning: This assignment/binding to the left-hand-side variable `w` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_w`), or renaming to `_`
   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:8:17
   │
 8 │         let w = bar(false);
   │                 ^^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_call_assign_shadow.move:14:13
    │
 14 │             y = y + 1;
    │             ^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_call_assign_shadow.move:16:13
    │
 16 │             y = y + 2;
    │             ^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:22:17
+   │
+22 │         let x = 0;
+   │                 ^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:24:17
+   │
+24 │         let x = 1;
+   │                 ^

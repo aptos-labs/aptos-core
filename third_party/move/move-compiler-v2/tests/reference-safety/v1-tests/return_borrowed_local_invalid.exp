@@ -13,12 +13,12 @@ error: cannot return a reference derived from local `v1` since it is not based o
 26 │ │         id(&s4.f))
    │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from value since it is not based on a parameter
+error: cannot return a reference derived from local `v2` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
 20 │ │         &v2,
-   │ │         --- value previously borrowed here
+   │ │         --- local `v2` previously borrowed here
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
    · │
@@ -39,14 +39,14 @@ error: cannot return a reference derived from local `v3` since it is not based o
 26 │ │         id(&s4.f))
    │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from value since it is not based on a parameter
+error: cannot return a reference derived from local `v4` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
 20 │ │         &v2,
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
-   │ │         ------- value previously borrowed here
+   │ │         ------- local `v4` previously borrowed here
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))

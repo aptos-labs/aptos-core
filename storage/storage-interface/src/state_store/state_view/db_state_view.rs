@@ -48,7 +48,7 @@ impl TStateView for DbStateView {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        self.get(state_key).map_err(Into::into)
+        self.get(state_key)
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

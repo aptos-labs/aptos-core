@@ -1,4 +1,14 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64
+  0: $t0 := infer($t0)
+  1: $t1 := infer($t0)
+  2: return $t1
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::dead($t0: u64): u64 {

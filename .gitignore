@@ -141,3 +141,6 @@ genesis_antithesis_*/
 
 # ignore cursor rules
 .cursor/rules
+
+#ignore proptest regressions
+**/proptest_regressions/*

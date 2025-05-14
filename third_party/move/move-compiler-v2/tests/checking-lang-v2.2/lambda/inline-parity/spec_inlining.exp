@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::Test {
     private fun apply(v: u64,predicate: |u64|bool): bool {
         spec {
@@ -42,7 +42,7 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
     fun apply(v: u64, predicate: |u64|bool): bool {
 

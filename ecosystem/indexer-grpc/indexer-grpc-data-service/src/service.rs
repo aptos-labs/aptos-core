@@ -272,15 +272,7 @@ async fn get_data_with_tasks(
             None => MAX_FETCH_TASKS_PER_REQUEST,
             Some(transactions_count) => {
                 let num_tasks = transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK;
-                if num_tasks >= MAX_FETCH_TASKS_PER_REQUEST {
-                    // Limit the max tasks to MAX_FETCH_TASKS_PER_REQUEST
-                    MAX_FETCH_TASKS_PER_REQUEST
-                } else if num_tasks < 1 {
-                    // Limit the min tasks to 1
-                    1
-                } else {
-                    num_tasks
-                }
+                num_tasks.clamp(1, MAX_FETCH_TASKS_PER_REQUEST)
             },
         },
         Err(_) => {
@@ -1012,19 +1004,23 @@ fn strip_transactions(
 mod tests {
     use super::*;
     use aptos_protos::transaction::v1::{
-        transaction::TxnData, transaction_payload::Payload, EntryFunctionId, EntryFunctionPayload,
-        Event, MoveModuleId, Signature, Transaction, TransactionInfo, TransactionPayload,
-        UserTransaction, UserTransactionRequest, WriteSetChange,
+        transaction::TxnData,
+        transaction_payload::{ExtraConfig, Payload},
+        EntryFunctionId, EntryFunctionPayload, Event, ExtraConfigV1, MoveModuleId, Signature,
+        Transaction, TransactionInfo, TransactionPayload, UserTransaction, UserTransactionRequest,
+        WriteSetChange,
     };
     use aptos_transaction_filter::{
         boolean_transaction_filter::APIFilter, filters::UserTransactionFilterBuilder,
         EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder,
     };
+    use rstest::rstest;
 
     fn create_test_transaction(
         module_address: String,
         module_name: String,
         function_name: String,
+        is_orderless_txn: bool,
     ) -> Transaction {
         Transaction {
             version: 1,
@@ -1041,6 +1037,16 @@ mod tests {
                                 name: function_name,
                             }),
                             ..Default::default()
+                        })),
+                        extra_config: Some(ExtraConfig::ExtraConfigV1({
+                            ExtraConfigV1 {
+                                multisig_address: None,
+                                replay_protection_nonce: if is_orderless_txn {
+                                    Some(12345678)
+                                } else {
+                                    None
+                                },
+                            }
                         })),
                     }),
                     signature: Some(Signature::default()),
@@ -1155,12 +1161,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[test]
-    fn test_transactions_are_stripped_correctly_module_address() {
+    #[rstest(is_orderless_txn, case(false), case(true))]
+    fn test_transactions_are_stripped_correctly_module_address(is_orderless_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
+            is_orderless_txn,
         );
         // Testing filter with only address set
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
@@ -1196,12 +1203,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[test]
-    fn test_transactions_are_stripped_correctly_module_name() {
+    #[rstest(is_orderless_txn, case(false), case(true))]
+    fn test_transactions_are_stripped_correctly_module_name(is_orderless_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
+            is_orderless_txn,
         );
         // Testing filter with only module set
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
@@ -1237,12 +1245,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[test]
-    fn test_transactions_are_stripped_correctly_function_name() {
+    #[rstest(is_orderless_txn, case(false), case(true))]
+    fn test_transactions_are_stripped_correctly_function_name(is_orderless_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
+            is_orderless_txn,
         );
         // Testing filter with only function set
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
@@ -1277,12 +1286,14 @@ mod tests {
         assert_eq!(user_transaction.events.len(), 0);
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
-    #[test]
-    fn test_transactions_are_not_stripped() {
+
+    #[rstest(is_orderless_txn, case(false), case(true))]
+    fn test_transactions_are_not_stripped(is_orderless_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
+            is_orderless_txn,
         );
         // Testing filter with wrong filter
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(

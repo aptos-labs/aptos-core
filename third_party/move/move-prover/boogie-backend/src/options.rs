@@ -186,6 +186,7 @@ pub struct BoogieOptions {
 }
 
 impl Default for BoogieOptions {
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn default() -> Self {
         Self {
             bench_repeat: 1,

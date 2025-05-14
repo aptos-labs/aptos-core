@@ -1,16 +1,16 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: bool,
     }
     private fun t0(x: bool,r: R) {
-        true;
-        true;
-        true;
-        true;
+        Or(true, false);
+        Or(false, true);
+        Or(true, false);
+        Or(true, true);
         Or(Copy(x), Move(x));
         Or(select M::R.f<R>(r), select M::R.f<R>(r));
-        true;
+        Or(Or(true, false), Or(true, false));
         {
           let M::R{ f: _ } = r;
           Tuple()
@@ -18,19 +18,19 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: bool,
     }
     fun t0(x: bool, r: R) {
-        true;
-        true;
-        true;
-        true;
+        true || false;
+        false || true;
+        true || false;
+        true || true;
         (copy x) || (move x);
         r.f || r.f;
-        true;
+        true || false || (true || false);
         let R{f: _} = r;
     }
 }

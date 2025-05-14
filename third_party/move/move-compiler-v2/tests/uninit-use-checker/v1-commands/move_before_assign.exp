@@ -1,12 +1,4 @@
-
-Diagnostics:
-warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
-  ┌─ tests/uninit-use-checker/v1-commands/move_before_assign.move:4:9
-  │
-4 │     let y = move x;
-  │         ^
-
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun <SELF>_0::main() {

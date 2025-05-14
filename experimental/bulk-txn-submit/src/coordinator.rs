@@ -717,7 +717,7 @@ async fn fetch_work_txn_output<T: Clone>(
     loop {
         let client = pick_client(clients);
         match client
-            .get_account_transactions_bcs(account.address(), Some(start), None)
+            .get_account_ordered_transactions_bcs(account.address(), Some(start), None)
             .await
         {
             Ok(transactions) => {

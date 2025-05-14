@@ -492,12 +492,12 @@ fn verify_chain_id() {
 #[test]
 fn verify_max_sequence_number() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, std::u64::MAX);
+    let sender = executor.create_raw_account_data(900_000, u64::MAX);
     executor.add_account_data(&sender);
     let private_key = &sender.account().privkey;
     let txn = transaction_test_helpers::get_test_signed_transaction(
         *sender.address(),
-        std::u64::MAX, /* sequence_number */
+        u64::MAX, /* sequence_number */
         private_key,
         private_key.public_key(),
         None,     /* script */

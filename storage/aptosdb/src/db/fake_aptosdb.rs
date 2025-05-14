@@ -31,6 +31,7 @@ use aptos_types::{
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
+    indexer::indexer_db_reader::IndexedTransactionSummary,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, position::Position, AccumulatorConsistencyProof,
@@ -763,6 +764,23 @@ impl DbReader for FakeAptosDB {
             seq_num,
             limit,
             include_events,
+            ledger_version,
+        )
+    }
+
+    fn get_account_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<IndexedTransactionSummary>> {
+        self.inner.get_account_transaction_summaries(
+            address,
+            start_version,
+            end_version,
+            limit,
             ledger_version,
         )
     }

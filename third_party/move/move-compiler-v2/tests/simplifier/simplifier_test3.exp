@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675::M {
     public fun test(): u64 {
         M::test1(10)
@@ -29,7 +29,7 @@ module 0x8675::M {
     }
 } // end 0x8675::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675::M {
     public fun test(): u64 {
         test1(10)
@@ -47,6 +47,37 @@ module 0x8675::M {
         t3
     }
 }
+
+// -- Model dump before second bytecode pipeline
+module 0x8675::M {
+    public fun test(): u64 {
+        M::test1(10)
+    }
+    private fun test1(r: u64): u64 {
+        {
+          let t: u64 = r;
+          {
+            let t2: u64 = 0;
+            loop {
+              if {
+                let x: u64 = r;
+                r: u64 = Sub<u64>(r, 1);
+                t2: u64 = Add<u64>(t2, x);
+                Gt<u64>(r, 0)
+              } {
+                Tuple()
+              } else {
+                break
+              }
+            };
+            {
+              let t3: u64 = Add<u64>(Add<u64>(r, t), t2);
+              t3
+            }
+          }
+        }
+    }
+} // end 0x8675::M
 
 
 ============ bytecode verification succeeded ========

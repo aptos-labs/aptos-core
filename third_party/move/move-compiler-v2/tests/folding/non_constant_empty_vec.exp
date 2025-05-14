@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::M {
     struct S {
         dummy_field: bool,
@@ -23,7 +23,7 @@ module 0x42::M {
     }
 } // end 0x42::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::M {
     struct S {
     }
@@ -46,6 +46,31 @@ module 0x42::M {
         vector[]
     }
 }
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    struct S {
+        dummy_field: bool,
+    }
+    public fun empty_generic_vec<T>(): vector<T> {
+        Vector<T>()
+    }
+    public fun empty_generic_vec_vec<T>(): vector<vector<T>> {
+        Vector<vector<T>>()
+    }
+    public fun empty_signer_vec(): vector<signer> {
+        Vector<signer>()
+    }
+    public fun empty_signer_vec_vec(): vector<vector<signer>> {
+        Vector<vector<signer>>()
+    }
+    public fun empty_struct_vec(): vector<S> {
+        Vector<S>()
+    }
+    public fun empty_struct_vec_vec(): vector<vector<S>> {
+        Vector<vector<S>>()
+    }
+} // end 0x42::M
 
 
 ============ bytecode verification succeeded ========

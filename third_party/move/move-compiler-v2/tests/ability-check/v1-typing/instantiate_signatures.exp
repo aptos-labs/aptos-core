@@ -22,6 +22,12 @@ error: reference type `&u64` is not allowed as a type argument
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
+error: reference to a reference is not allowed
+   ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:13:13
+   │
+13 │         f3: &(&u64),
+   │             ^^^^^^^
+
 error: reference type `&&u64` is not allowed as a field type
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:13:13
    │
@@ -63,6 +69,12 @@ error: reference type `&u64` is not allowed as a type argument
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
+error: reference to a reference is not allowed
+   ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:20:14
+   │
+20 │         _f3: &(&u64),
+   │              ^^^^^^^
+
 error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:21:16
    │
@@ -95,6 +107,12 @@ error: reference type `&u64` is not allowed as a type argument
    │           ^^^^
    │
    = required by instantiating type parameter `T:drop` of struct `S`
+
+error: reference to a reference is not allowed
+   ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:30:9
+   │
+30 │         &(&u64),
+   │         ^^^^^^^
 
 error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:31:11
@@ -129,6 +147,12 @@ error: reference type `&u64` is not allowed as a type argument
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
+error: reference to a reference is not allowed
+   ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:39:17
+   │
+39 │         let f3: &(&u64) = abort 0;
+   │                 ^^^^^^^
+
 error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:40:19
    │
@@ -139,6 +163,12 @@ error: tuple type `(u64, u64)` is not allowed as a type argument
    │                   ^^^^^^^^^^
    │
    = required by instantiating type parameter `T:drop` of struct `S`
+
+error: reference to a reference is not allowed
+   ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:44:12
+   │
+44 │         id<&(&u64)>(abort 0);
+   │            ^^^^^^^
 
 error: reference type `&&u64` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:44:12
@@ -162,3 +192,9 @@ error: type `R` is missing required ability `drop`
    │
    = required by instantiating type parameter `T:drop` of struct `S`
    = required by instantiating type parameter `T:drop` of struct `S`
+
+error: reference to a reference is not allowed
+   ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:49:11
+   │
+49 │         S<&(&u64)> { f: abort 0 };
+   │           ^^^^^^^

@@ -23,7 +23,7 @@ pub struct ChunkToCommit<'a> {
     pub is_reconfig: bool,
 }
 
-impl<'a> ChunkToCommit<'a> {
+impl ChunkToCommit<'_> {
     pub fn len(&self) -> usize {
         self.transactions.len()
     }

@@ -819,7 +819,7 @@ impl LifetimeState {
     fn parent_edges<'a>(
         &'a self,
         label: &'a LifetimeLabel,
-    ) -> impl Iterator<Item = (LifetimeLabel, &'a BorrowEdge)> + '_ {
+    ) -> impl Iterator<Item = (LifetimeLabel, &'a BorrowEdge)> + 'a {
         self.node(label).parents.iter().flat_map(move |parent| {
             self.children(parent)
                 .filter(move |edge| &edge.target == label)
@@ -915,13 +915,13 @@ enum ReadMode {
     BranchCondition,
 }
 
-impl<'env> LifeTimeAnalysis<'env> {
+impl LifeTimeAnalysis<'_> {
     fn new_step<'a>(
         &'a self,
         code_offset: CodeOffset,
         attr_id: AttrId,
         state: &'a mut LifetimeState,
-    ) -> LifetimeAnalysisStep {
+    ) -> LifetimeAnalysisStep<'a, 'a> {
         let alive = self
             .live_var_annotation
             .get_live_var_info_at(code_offset)
@@ -939,7 +939,7 @@ impl<'env> LifeTimeAnalysis<'env> {
 // -------------------------------------------------------------------------------------------------
 // Analysing and Diagnosing
 
-impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
+impl LifetimeAnalysisStep<'_, '_> {
     /// Get the location associated with bytecode attribute.
     fn loc(&self, id: AttrId) -> Loc {
         self.target().get_bytecode_loc(id)
@@ -1517,7 +1517,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 // -------------------------------------------------------------------------------------------------
 // Program Steps
 
-impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
+impl LifetimeAnalysisStep<'_, '_> {
     /// Process an assign instruction. This checks whether the source is currently borrowed and
     /// rejects a move if so.
     fn assign(&mut self, dest: TempIndex, src: TempIndex, kind: AssignKind) {
@@ -1961,7 +1961,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 // -------------------------------------------------------------------------------------------------
 // Transfer Function
 
-impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
+impl TransferFunctions for LifeTimeAnalysis<'_> {
     type State = LifetimeState;
 
     const BACKWARD: bool = false;
@@ -2068,7 +2068,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
 }
 
 /// Instantiate the data flow analysis framework based on the transfer function
-impl<'env> DataflowAnalysis for LifeTimeAnalysis<'env> {}
+impl DataflowAnalysis for LifeTimeAnalysis<'_> {}
 
 // ===============================================================================
 // Processor
@@ -2158,7 +2158,7 @@ impl LifetimeInfo for LifetimeState {
 // Display
 
 struct BorrowEdgeDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdge, bool);
-impl<'a> Display for BorrowEdgeDisplay<'a> {
+impl Display for BorrowEdgeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let edge = &self.1;
         write!(f, "{}", edge.kind.display(self.0))?;
@@ -2182,7 +2182,7 @@ impl BorrowEdge {
 }
 
 struct BorrowEdgeKindDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdgeKind);
-impl<'a> Display for BorrowEdgeKindDisplay<'a> {
+impl Display for BorrowEdgeKindDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use BorrowEdgeKind::*;
         let mut_str = if self.1.is_mut() { "mut" } else { "imm" };
@@ -2214,7 +2214,7 @@ impl Display for LifetimeLabel {
 }
 
 struct MemoryLocationDisplay<'a>(&'a FunctionTarget<'a>, &'a MemoryLocation);
-impl<'a> Display for MemoryLocationDisplay<'a> {
+impl Display for MemoryLocationDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use MemoryLocation::*;
         let env = self.0.global_env();
@@ -2237,7 +2237,7 @@ impl MemoryLocation {
 }
 
 struct LifetimeNodeDisplay<'a>(&'a FunctionTarget<'a>, &'a LifetimeNode);
-impl<'a> Display for LifetimeNodeDisplay<'a> {
+impl Display for LifetimeNodeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -2262,7 +2262,7 @@ impl LifetimeNode {
 }
 
 struct LifetimeStateDisplay<'a>(&'a FunctionTarget<'a>, &'a LifetimeState);
-impl<'a> Display for LifetimeStateDisplay<'a> {
+impl Display for LifetimeStateDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let LifetimeState {
             graph,

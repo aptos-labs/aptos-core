@@ -19,5 +19,6 @@
     "signature": "0xbdc9e553e86cdee876de3318bccd8c6499923b719ab5f189e8b43ba91771645f01c3ded4061e20b3bb85767e475dfe24f76b4aed46860c9328baf28d11d2c701",
     "type": "ed25519_signature"
   },
+  "replay_protection_nonce": null,
   "type": "pending_transaction"
 }

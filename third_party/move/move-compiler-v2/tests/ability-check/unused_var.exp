@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ tests/ability-check/unused_var.move:6:26
   │
 6 │     fun unused_arg<T: drop>(x: T) {

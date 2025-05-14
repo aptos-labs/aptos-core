@@ -7,7 +7,7 @@ use move_core_types::{
     state::{self, VMState},
     vm_status::StatusCode,
 };
-use std::panic::{self, PanicInfo};
+use std::panic::{self, PanicHookInfo};
 
 // TODO: this tests must run in its own process since otherwise any crashing test here
 //   secondary-crashes in the panic handler.
@@ -17,7 +17,7 @@ fn test_unwind() {
     let scenario = FailScenario::setup();
     fail::cfg("verifier-failpoint-panic", "panic").unwrap();
 
-    panic::set_hook(Box::new(move |_: &PanicInfo<'_>| {
+    panic::set_hook(Box::new(move |_: &PanicHookInfo<'_>| {
         assert_eq!(state::get_state(), VMState::VERIFIER);
     }));
 

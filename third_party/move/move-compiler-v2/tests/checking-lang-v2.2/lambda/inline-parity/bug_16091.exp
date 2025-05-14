@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::Test {
     struct T {
         t: S<u64>,
@@ -11,7 +11,7 @@ module 0x42::Test {
     }
     public fun test() {
         {
-          let t: S<u64> = pack Test::S<u64>(2);
+          let t: S<u64> = pack Test::S<u64>(Cast<u64>(2));
           {
             let (self: &S<u64>): (&S<u64>) = Tuple(Borrow(Immutable)(t));
             {
@@ -31,7 +31,7 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
     struct T has drop, key {
         t: S<u64>,
@@ -43,7 +43,7 @@ module 0x42::Test {
         f(self)
     }
     public fun test() {
-        let t = S<u64>{t1: 2};
+        let t = S<u64>{t1: 2 as u64};
         {
             let (self) = (&t);
             let (t2) = (self);

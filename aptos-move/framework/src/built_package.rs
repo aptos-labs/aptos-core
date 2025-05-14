@@ -306,7 +306,13 @@ impl BuiltPackage {
             }
 
             let runtime_metadata = extended_checks::run_extended_checks(model);
-            if model.diag_count(Severity::Warning) > 0 {
+            if model.diag_count(Severity::Warning) > 0
+                && !model
+                    .get_extension::<Options>()
+                    .is_some_and(|model_options| {
+                        model_options.experiment_on(Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS)
+                    })
+            {
                 let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
                 model.report_diag(&mut error_writer, Severity::Warning);
                 if model.has_errors() {
@@ -340,11 +346,7 @@ impl BuiltPackage {
 
             // If enabled generate docs.
             if options.with_docs {
-                let docgen = if let Some(opts) = options.docgen_options.clone() {
-                    opts
-                } else {
-                    DocgenOptions::default()
-                };
+                let docgen = options.docgen_options.clone().unwrap_or_default();
                 let dep_paths = package
                     .deps_compiled_units
                     .iter()

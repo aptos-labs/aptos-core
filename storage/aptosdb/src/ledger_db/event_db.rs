@@ -109,7 +109,7 @@ impl EventDb {
             iter,
             start_version,
             start_version.checked_add(num_versions as u64).ok_or(
-                AptosDbError::TooManyRequested(num_versions as u64, Version::max_value()),
+                AptosDbError::TooManyRequested(num_versions as u64, Version::MAX),
             )?,
         ))
     }

@@ -6,7 +6,151 @@ warning: Unused parameter `z`. Consider removing or prefixing with an underscore
 6 │     public inline fun quux(f:|u64, u64|, z: u64) {
   │                                          ^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    public inline fun foo(f: |(u64, u64)|,z: u64) {
+        {
+          let (z: u64): (u64) = Tuple(z);
+          {
+            let x: u64 = 3;
+            {
+              let q: u64 = 5;
+              {
+                let (a: u64, b: u64): (u64, u64) = Tuple(x, q);
+                (f)(a, b)
+              };
+              Tuple()
+            }
+          }
+        };
+        Tuple()
+    }
+    public inline fun quux(f: |(u64, u64)|,z: u64) {
+        {
+          let x: u64 = 3;
+          {
+            let q: u64 = 5;
+            (f)(x, q);
+            Tuple()
+          }
+        }
+    }
+    public fun test_shadowing() {
+        {
+          let _x: u64 = 1;
+          {
+            let z: u64 = 4;
+            {
+              let (z: u64): (u64) = Tuple(z);
+              {
+                let (z: u64): (u64) = Tuple(z);
+                {
+                  let x: u64 = 3;
+                  {
+                    let q: u64 = 5;
+                    {
+                      let (a: u64, b: u64): (u64, u64) = Tuple(x, q);
+                      {
+                        let (y: u64, _q: u64): (u64, u64) = Tuple(a, b);
+                        _x: u64 = y
+                      }
+                    };
+                    Tuple()
+                  }
+                }
+              };
+              Tuple()
+            };
+            if Eq<u64>(_x, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            }
+          }
+        }
+    }
+    public fun test_shadowing2() {
+        {
+          let _x: u64 = 1;
+          {
+            let z: u64 = 4;
+            {
+              let (z: u64): (u64) = Tuple(z);
+              {
+                let x: u64 = 3;
+                {
+                  let q: u64 = 5;
+                  {
+                    let (y: u64, _q: u64): (u64, u64) = Tuple(x, q);
+                    _x: u64 = y
+                  };
+                  Tuple()
+                }
+              }
+            };
+            if Eq<u64>(_x, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            }
+          }
+        }
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    public inline fun foo(f: |(u64, u64)|, z: u64) {
+        {
+            let (z) = (z);
+            let x = 3;
+            let q = 5;
+            {
+                let (a,b) = (x, q);
+                f(a, b)
+            };
+        };
+    }
+    public inline fun quux(f: |(u64, u64)|, z: u64) {
+        let x = 3;
+        let q = 5;
+        f(x, q);
+    }
+    public fun test_shadowing() {
+        let _x = 1;
+        let z = 4;
+        {
+            let (z) = (z);
+            {
+                let (z) = (z);
+                let x = 3;
+                let q = 5;
+                {
+                    let (a,b) = (x, q);
+                    let (y,_q) = (a, b);
+                    _x = y
+                };
+            };
+        };
+        if (_x == 3) () else abort 0
+    }
+    public fun test_shadowing2() {
+        let _x = 1;
+        let z = 4;
+        {
+            let (z) = (z);
+            let x = 3;
+            let q = 5;
+            {
+                let (y,_q) = (x, q);
+                _x = y
+            };
+        };
+        if (_x == 3) () else abort 0
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::Test {
     public inline fun foo(f: |(u64, u64)|,z: u64) {
         {
@@ -46,35 +190,6 @@ module 0x42::Test {
         }
     }
 } // end 0x42::Test
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::Test {
-    public inline fun foo(f: |(u64, u64)|, z: u64) {
-        {
-            let (z) = (z);
-            f(3, 5);
-        };
-    }
-    public inline fun quux(f: |(u64, u64)|, z: u64) {
-        f(3, 5);
-    }
-    public fun test_shadowing() {
-        let _x = 1;
-        {
-            {
-                _x = 3;
-            };
-        };
-        if (_x == 3) () else abort 0
-    }
-    public fun test_shadowing2() {
-        let _x = 1;
-        {
-            _x = 3;
-        };
-        if (_x == 3) () else abort 0
-    }
-}
 
 
 ============ bytecode verification succeeded ========

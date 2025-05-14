@@ -4,7 +4,10 @@
 
 use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters, network::BroadcastPeerPriority};
 use aptos_crypto::HashValue;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ReplayProtector, SignedTransaction},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
@@ -53,8 +56,8 @@ impl MempoolTransaction {
         self.txn.sender()
     }
 
-    pub(crate) fn get_sequence_number(&self) -> u64 {
-        self.txn.sequence_number()
+    pub(crate) fn get_replay_protector(&self) -> ReplayProtector {
+        self.txn.replay_protector()
     }
 
     pub(crate) fn get_gas_price(&self) -> u64 {
@@ -154,15 +157,17 @@ mod test {
     use aptos_types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            RawTransaction, ReplayProtector, Script, SignedTransaction, TransactionExecutable,
+        },
     };
     use std::time::{Duration, SystemTime};
 
     #[test]
     fn test_estimated_bytes() {
-        let txn1 = create_test_transaction(0, vec![0x1]);
+        let txn1 = create_test_transaction(ReplayProtector::SequenceNumber(0), vec![0x1]);
         let mempool_txn1 = create_test_mempool_transaction(txn1);
-        let txn2 = create_test_transaction(0, vec![0x1, 0x2]);
+        let txn2 = create_test_transaction(ReplayProtector::SequenceNumber(0), vec![0x1, 0x2]);
         let mempool_txn2 = create_test_mempool_transaction(txn2);
 
         assert!(mempool_txn1.get_estimated_bytes() < mempool_txn2.get_estimated_bytes());
@@ -181,19 +186,24 @@ mod test {
     }
 
     /// Creates a signed transaction
-    fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> SignedTransaction {
+    fn create_test_transaction(
+        replay_protector: ReplayProtector,
+        code_bytes: Vec<u8>,
+    ) -> SignedTransaction {
         let private_key = Ed25519PrivateKey::generate_for_testing();
         let public_key = private_key.public_key();
 
-        let transaction_payload =
-            TransactionPayload::Script(Script::new(code_bytes, vec![], vec![]));
-        let raw_transaction = RawTransaction::new(
+        let transaction_executable =
+            TransactionExecutable::Script(Script::new(code_bytes, vec![], vec![]));
+
+        let raw_transaction = RawTransaction::new_txn(
             AccountAddress::random(),
-            sequence_number,
-            transaction_payload,
+            replay_protector,
+            transaction_executable,
+            None,
             0,
             0,
-            0,
+            u64::MAX,
             ChainId::new(10),
         );
         SignedTransaction::new(

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -33,7 +33,7 @@ module 0x42::c {
     }
 } // end 0x42::c
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::a {
     struct MyList has drop {
         len: u64,

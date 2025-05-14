@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::bit_vector_infer {
     use std::vector;
     public fun new(_length: u64) {
@@ -23,7 +23,7 @@ module 0x42::bit_vector_infer {
     }
 } // end 0x42::bit_vector_infer
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::bit_vector_infer {
     public fun new(_length: u64) {
         let counter = 1;

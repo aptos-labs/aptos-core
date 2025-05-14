@@ -1,11 +1,11 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x77::m {
     private fun f(s: |(&u64, bool)|(bool, &u64)): (bool, &u64) {
         (s)(Borrow(Immutable)(1), false)
     }
 } // end 0x77::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x77::m {
     fun f(s: |(&u64, bool)|(bool, &u64)): (bool, &u64) {
         s(&1, false)

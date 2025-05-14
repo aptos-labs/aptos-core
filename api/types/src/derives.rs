@@ -32,7 +32,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
+            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string()
         )),
         format = Some("hex"),
         description = Some(indoc! {"
@@ -88,7 +88,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
+            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string()
         )),
         format = Some("hex"),
         description = Some(indoc! {"

@@ -18,7 +18,7 @@ impl<'w, W: Write> JsonEmitter<'w, W> {
     }
 }
 
-impl<'w, W: Write> Emitter for JsonEmitter<'w, W> {
+impl<W: Write> Emitter for JsonEmitter<'_, W> {
     fn emit(&mut self, source_files: &Files<String>, diag: &Diagnostic<FileId>) {
         let fpath_labels = diag
             .labels

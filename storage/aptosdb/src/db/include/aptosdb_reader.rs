@@ -4,7 +4,7 @@
 use aptos_storage_interface::state_store::state::State;
 use aptos_storage_interface::state_store::state_summary::StateSummary;
 use aptos_storage_interface::state_store::state_view::hot_state_view::HotStateView;
-use aptos_types::block_info::BlockHeight;
+use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
 
 impl DbReader for AptosDB {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
@@ -111,7 +111,7 @@ impl DbReader for AptosDB {
         include_events: bool,
         ledger_version: Version,
     ) -> Result<AccountOrderedTransactionsWithProof> {
-        gauged_api("get_account_transactions", || {
+        gauged_api("get_account_ordered_transactions", || {
             ensure!(
                 !self.state_kv_db.enabled_sharding(),
                 "This API is not supported with sharded DB"
@@ -133,6 +133,41 @@ impl DbReader for AptosDB {
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(AccountOrderedTransactionsWithProof::new(txns_with_proofs))
+        })
+    }
+
+    fn get_account_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<IndexedTransactionSummary>> {
+        gauged_api("get_account_transaction_summaries", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+
+            let txn_summaries_iter = self
+                .transaction_store
+                .get_account_transaction_summaries_iter(address, start_version, end_version, limit, ledger_version)?
+                .map(|result| {
+                    let (_version, txn_summary) = result?;
+                    Ok(txn_summary)
+                });
+
+            if start_version.is_some() {
+                txn_summaries_iter
+                    .collect::<Result<Vec<_>>>()
+            } else {
+                let txn_summaries = txn_summaries_iter
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(
+                    txn_summaries
+                        .into_iter()
+                        .rev()
+                        .collect::<Vec<_>>()
+                )
+            }
         })
     }
 
@@ -578,7 +613,7 @@ impl DbReader for AptosDB {
             if !self.skip_index_and_usage {
                 return self.get_events(
                     &new_block_event_key(),
-                    u64::max_value(),
+                    u64::MAX,
                     Order::Descending,
                     num_events as u64,
                     latest_version.unwrap_or(0),
@@ -594,8 +629,7 @@ impl DbReader for AptosDB {
                 let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
                 if latest_version
-                    .as_ref()
-                    .map_or(false, |v| first_version <= *v)
+                    .as_ref().is_some_and(|v| first_version <= *v)
                 {
                     let event = self
                         .ledger_db
@@ -905,7 +939,7 @@ impl AptosDB {
             "This API is deprecated for sharded DB"
         );
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-        let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
+        let get_latest = order == Order::Descending && start_seq_num == u64::MAX;
 
         let cursor = if get_latest {
             // Caller wants the latest, figure out the latest seq_num.

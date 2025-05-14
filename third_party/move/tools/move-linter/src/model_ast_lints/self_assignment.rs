@@ -10,7 +10,7 @@
 use crate::utils;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
-    ast::{Exp, ExpData, Pattern},
+    ast::{ExpData, Pattern},
     model::{GlobalEnv, Loc},
 };
 
@@ -23,22 +23,35 @@ impl ExpChecker for SelfAssignment {
     }
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
-        let mut report_loc = env.get_node_loc(expr.node_id());
-        let (lhs, rhs) = match expr {
-            ExpData::Mutate(_, lhs, rhs) => (lhs.clone(), rhs),
-            ExpData::Assign(_, Pattern::Var(_, s), rhs) => {
-                (Exp::from(ExpData::LocalVar(rhs.node_id(), *s)), rhs)
+        let mut report_loc: Loc = env.get_node_loc(expr.node_id());
+        let mut error = false;
+        match expr {
+            ExpData::Mutate(_, lhs, rhs) => {
+                if utils::is_simple_access_equal(lhs.as_ref(), rhs) {
+                    error = true;
+                }
             },
-            ExpData::Block(_, Pattern::Var(lhs_id, s), Some(rhs), _) => {
-                report_loc = Loc::enclosing(&[
-                    env.get_node_loc(*lhs_id).at_start(),
-                    env.get_node_loc(rhs.node_id()).at_end(),
-                ]);
-                (Exp::from(ExpData::LocalVar(rhs.node_id(), *s)), rhs)
+            ExpData::Assign(_, Pattern::Var(_, lhs_sym), rhs) => {
+                if let ExpData::LocalVar(_, rhs_sym) = rhs.as_ref() {
+                    if lhs_sym == rhs_sym {
+                        error = true;
+                    }
+                }
+            },
+            ExpData::Block(_, Pattern::Var(lhs_id, lhs_sym), Some(rhs), _) => {
+                if let ExpData::LocalVar(_, rhs_sym) = rhs.as_ref() {
+                    if lhs_sym == rhs_sym {
+                        error = true;
+                        report_loc = Loc::enclosing(&[
+                            env.get_node_loc(*lhs_id).at_start(),
+                            env.get_node_loc(rhs.node_id()).at_end(),
+                        ]);
+                    }
+                }
             },
             _ => return,
         };
-        if utils::is_simple_access_equal(lhs.as_ref(), rhs) {
+        if error {
             self.report(
                 env,
                 &report_loc,

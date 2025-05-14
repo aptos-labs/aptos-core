@@ -1,17 +1,17 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0(x: u64,r: R) {
-        0;
-        1;
-        1;
-        1;
-        1;
-        1;
-        1;
-        1;
+        Add<u64>(0, 0);
+        Add<u64>(1, 0);
+        Add<u64>(0, 1);
+        Add<u8>(0, 1);
+        Add<u8>(0, 1);
+        Add<u128>(0, 1);
+        Add<u128>(0, 1);
+        Add<u64>(0, 1);
         Add<u64>(Copy(x), Move(x));
         Add<u64>(select M::R.f<R>(r), select M::R.f<R>(r));
         Add<u64>(Add<u64>(Add<u64>(1, select M::R.f<R>(r)), select M::R.f<R>(r)), 0);
@@ -22,20 +22,20 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     fun t0(x: u64, r: R) {
-        0;
-        1;
-        1;
-        1u8;
-        1u8;
-        1u128;
-        1u128;
-        1;
+        0 + 0;
+        1 + 0;
+        0 + 1;
+        0u8 + 1u8;
+        0u8 + 1u8;
+        0u128 + 1u128;
+        0u128 + 1u128;
+        0 + 1;
         (copy x) + (move x);
         r.f + r.f;
         1 + r.f + r.f + 0;

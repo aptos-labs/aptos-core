@@ -2402,7 +2402,7 @@ impl IntegerValue {
         match self {
             U8(x) => Ok(x),
             U16(x) => {
-                if x > (std::u8::MAX as u16) {
+                if x > (u8::MAX as u16) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u16({}) to u8", x)))
                 } else {
@@ -2410,7 +2410,7 @@ impl IntegerValue {
                 }
             },
             U32(x) => {
-                if x > (std::u8::MAX as u32) {
+                if x > (u8::MAX as u32) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u32({}) to u8", x)))
                 } else {
@@ -2418,7 +2418,7 @@ impl IntegerValue {
                 }
             },
             U64(x) => {
-                if x > (std::u8::MAX as u64) {
+                if x > (u8::MAX as u64) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u64({}) to u8", x)))
                 } else {
@@ -2426,7 +2426,7 @@ impl IntegerValue {
                 }
             },
             U128(x) => {
-                if x > (std::u8::MAX as u128) {
+                if x > (u8::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u8", x)))
                 } else {
@@ -2434,7 +2434,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u8::MAX)) {
+                if x > (u256::U256::from(u8::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u8", x)))
                 } else {
@@ -2451,7 +2451,7 @@ impl IntegerValue {
             U8(x) => Ok(x as u16),
             U16(x) => Ok(x),
             U32(x) => {
-                if x > (std::u16::MAX as u32) {
+                if x > (u16::MAX as u32) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u32({}) to u16", x)))
                 } else {
@@ -2459,7 +2459,7 @@ impl IntegerValue {
                 }
             },
             U64(x) => {
-                if x > (std::u16::MAX as u64) {
+                if x > (u16::MAX as u64) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u64({}) to u16", x)))
                 } else {
@@ -2467,7 +2467,7 @@ impl IntegerValue {
                 }
             },
             U128(x) => {
-                if x > (std::u16::MAX as u128) {
+                if x > (u16::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u16", x)))
                 } else {
@@ -2475,7 +2475,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u16::MAX)) {
+                if x > (u256::U256::from(u16::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u16", x)))
                 } else {
@@ -2493,7 +2493,7 @@ impl IntegerValue {
             U16(x) => Ok(x as u32),
             U32(x) => Ok(x),
             U64(x) => {
-                if x > (std::u32::MAX as u64) {
+                if x > (u32::MAX as u64) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u64({}) to u32", x)))
                 } else {
@@ -2501,7 +2501,7 @@ impl IntegerValue {
                 }
             },
             U128(x) => {
-                if x > (std::u32::MAX as u128) {
+                if x > (u32::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u32", x)))
                 } else {
@@ -2509,7 +2509,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u32::MAX)) {
+                if x > (u256::U256::from(u32::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u32", x)))
                 } else {
@@ -2528,7 +2528,7 @@ impl IntegerValue {
             U32(x) => Ok(x as u64),
             U64(x) => Ok(x),
             U128(x) => {
-                if x > (std::u64::MAX as u128) {
+                if x > (u64::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u64", x)))
                 } else {
@@ -2536,7 +2536,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u64::MAX)) {
+                if x > (u256::U256::from(u64::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u64", x)))
                 } else {
@@ -2556,7 +2556,7 @@ impl IntegerValue {
             U64(x) => Ok(x as u128),
             U128(x) => Ok(x),
             U256(x) => {
-                if x > (u256::U256::from(std::u128::MAX)) {
+                if x > (u256::U256::from(u128::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u128", x)))
                 } else {
@@ -3772,9 +3772,7 @@ fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
     )
 }
 
-impl<'c, 'l, 'v> serde::Serialize
-    for SerializationReadyValue<'c, 'l, 'v, MoveTypeLayout, ValueImpl>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, ValueImpl> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use MoveTypeLayout as L;
 
@@ -3928,9 +3926,7 @@ impl<'c, 'l, 'v> serde::Serialize
     }
 }
 
-impl<'c, 'l, 'v> serde::Serialize
-    for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveStructLayout, Vec<ValueImpl>> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut values = self.value.as_slice();
         if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
@@ -4009,7 +4005,7 @@ pub(crate) struct DeserializationSeed<'c, L> {
     pub(crate) layout: L,
 }
 
-impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTypeLayout> {
+impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLayout> {
     type Value = Value;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(
@@ -4572,7 +4568,7 @@ impl Vector {
             idx: usize,
         }
 
-        impl<'b> ValueView for ElemView<'b> {
+        impl ValueView for ElemView<'_> {
             fn visit(&self, visitor: &mut impl ValueVisitor) {
                 self.container.visit_indexed(visitor, 0, self.idx)
             }
@@ -4591,7 +4587,7 @@ impl Reference {
     pub fn value_view(&self) -> impl ValueView + '_ {
         struct ValueBehindRef<'b>(&'b ReferenceImpl);
 
-        impl<'b> ValueView for ValueBehindRef<'b> {
+        impl ValueView for ValueBehindRef<'_> {
             fn visit(&self, visitor: &mut impl ValueVisitor) {
                 use ReferenceImpl::*;
 
@@ -4612,7 +4608,7 @@ impl GlobalValue {
 
         struct Wrapper<'b>(&'b Rc<RefCell<Vec<ValueImpl>>>);
 
-        impl<'b> ValueView for Wrapper<'b> {
+        impl ValueView for Wrapper<'_> {
             fn visit(&self, visitor: &mut impl ValueVisitor) {
                 let r = self.0.borrow();
                 if visitor.visit_struct(0, r.len()) {

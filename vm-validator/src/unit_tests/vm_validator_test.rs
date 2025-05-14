@@ -290,7 +290,7 @@ fn test_validate_invalid_auth_key() {
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
-        1,
+        0,
         &other_private_key,
         other_private_key.public_key(),
         Some(program),

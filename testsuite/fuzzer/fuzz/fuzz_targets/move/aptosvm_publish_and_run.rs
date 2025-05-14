@@ -51,7 +51,11 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
-const EXECUTION_TIME_GAS_RATIO: u8 = 50;
+const EXECUTION_TIME_GAS_RATIO: u8 = 100;
+
+// List of known false positive messages for invariant violations
+// If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
+const KNOWN_FALSE_POSITIVES: &[&str] = &["too many type parameters/arguments in the program"];
 
 #[inline(always)]
 fn is_coverage_enabled() -> bool {
@@ -59,13 +63,22 @@ fn is_coverage_enabled() -> bool {
 }
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
-    if e.status_type() == StatusType::InvariantViolation
-        // ignore known false positive
-        && !e
-            .message()
-            .is_some_and(|m| m.starts_with("too many type parameters/arguments in the program"))
-    {
-        panic!("invariant violation {:?}", e);
+    if e.status_type() == StatusType::InvariantViolation {
+        let is_known_false_positive = e.message().map_or(false, |msg| {
+            KNOWN_FALSE_POSITIVES
+                .iter()
+                .any(|known| msg.starts_with(known))
+        });
+
+        if !is_known_false_positive && e.status_type() == StatusType::InvariantViolation {
+            panic!(
+                "invariant violation {:?}\n{}{:?} {}",
+                e,
+                "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
+                e.major_status(),
+                "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
+            );
+        }
     }
 }
 
@@ -92,6 +105,7 @@ fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
     Ok(())
 }
 
+#[allow(clippy::literal_string_with_formatting_args)]
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     tdbg!(&input);
 
@@ -369,7 +383,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                     && *e != StatusCode::TYPE_RESOLUTION_FAILURE
                     && *e != StatusCode::STORAGE_ERROR
                 {
-                    panic!("invariant violation {:?}", e);
+                    panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
                 }
             }
             return Err(Corpus::Keep);

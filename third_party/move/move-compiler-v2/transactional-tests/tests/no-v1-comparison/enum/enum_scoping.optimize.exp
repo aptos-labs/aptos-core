@@ -1,31 +1,19 @@
 processed 2 tasks
 
 task 0 'publish'. lines 1-43:
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ TEMPFILE:20:17
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ TEMPFILE:20:21
    │
 20 │             let x = 4;
-   │                 ^
+   │                     ^
 
-warning: Unused local variable `i`. Consider removing or prefixing with an underscore: `_i`
-   ┌─ TEMPFILE:35:17
-   │
-35 │             Two{i, b} => 3,
-   │                 ^
-
-warning: Unused local variable `b`. Consider removing or prefixing with an underscore: `_b`
-   ┌─ TEMPFILE:35:20
-   │
-35 │             Two{i, b} => 3,
-   │                    ^
-
-warning: Unused assignment/binding to `b`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_b`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `b` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_b`), or renaming to `_`
    ┌─ TEMPFILE:35:13
    │
 35 │             Two{i, b} => 3,
    │             ^^^^^^^^^
 
-warning: Unused assignment/binding to `i`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_i`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `i` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_i`), or renaming to `_`
    ┌─ TEMPFILE:35:13
    │
 35 │             Two{i, b} => 3,

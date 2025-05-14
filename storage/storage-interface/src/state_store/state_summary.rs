@@ -218,7 +218,7 @@ impl<'db> ProvableStateSummary<'db> {
     }
 }
 
-impl<'db> ProofRead for ProvableStateSummary<'db> {
+impl ProofRead for ProvableStateSummary<'_> {
     // TODO(aldenhu): return error
     fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
         self.version().map(|ver| {

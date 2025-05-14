@@ -57,7 +57,7 @@ pub const RECEIVER_PARAM_NAME: &str = "self";
 /// of the string "Move 2 Abort Code".
 const fn make_abort_code(reason: u16) -> u64 {
     let magic = 0xCA26CBD9BE; // sha256("Move 2 Abort code")
-    (magic << 24) | 0xB << 16 | (reason as u64)
+    (magic << 24) | (0xB << 16) | (reason as u64)
 }
 
 // Used when user omits an abort code in an `assert!`.

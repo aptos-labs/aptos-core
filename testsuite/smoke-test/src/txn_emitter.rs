@@ -277,7 +277,7 @@ async fn test_txn_emmitter_low_funds() {
         .expected_gas_per_txn(5)
         .init_gas_price_multiplier(1)
         .init_max_gas_per_txn(20000)
-        .max_gas_per_txn(530)
+        .max_gas_per_txn(1000)
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(5))
         .transaction_type(transaction_type)
         .mode(EmitJobMode::MaxLoad {

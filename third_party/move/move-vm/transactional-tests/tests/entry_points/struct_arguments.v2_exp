@@ -1,7 +1,0 @@
-processed 5 tasks
-
-task 3 'run'. lines 32-32:
-mutable inputs after call: local#2: { 0 }
-
-task 4 'run'. lines 34-34:
-mutable inputs after call: local#2: { 0 }

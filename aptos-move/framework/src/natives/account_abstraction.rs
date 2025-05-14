@@ -25,15 +25,12 @@ pub(crate) fn native_dispatch(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
-    // Check if the module is already properly charged in this transaction.
-    if !module_name.address().is_special()
-        && !context
-            .traversal_context()
-            .visited
-            .contains_key(&(module_name.address(), module_name.name()))
-    {
-        return Err(SafeNativeError::Abort { abort_code: 4 });
-    }
+
+    // Check that the module is already properly charged in this transaction.
+    context
+        .traversal_context()
+        .check_is_special_or_visited(module_name.address(), module_name.name())
+        .map_err(|_| SafeNativeError::Abort { abort_code: 4 })?;
 
     // Use Error to instruct the VM to perform a function call dispatch.
     Err(SafeNativeError::FunctionDispatch {

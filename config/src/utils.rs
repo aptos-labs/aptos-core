@@ -87,11 +87,7 @@ fn get_random_port() -> u16 {
 
 fn try_bind(port: Option<u16>) -> ::std::io::Result<u16> {
     // Use the provided port or 0 to request a random available port from the OS
-    let port = if let Some(provided_port) = port {
-        provided_port
-    } else {
-        0
-    };
+    let port = port.unwrap_or_default(); // Defaults to 0
     let listener = TcpListener::bind(("localhost", port))?;
     let addr = listener.local_addr()?;
 

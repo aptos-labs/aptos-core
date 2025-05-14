@@ -158,6 +158,21 @@ module aptos_std::big_ordered_map {
         new_with_config(0, 0, false)
     }
 
+
+    /// Returns a new BigOrderedMap with with reusable storage slots.
+    /// Only allowed to be called with constant size types. For variable sized types,
+    /// it is required to use new_with_config, to explicitly select automatic or specific degree selection.
+    public fun new_with_reusable<K: store, V: store>(): BigOrderedMap<K, V> {
+        // Use new_with_type_size_hints or new_with_config if your types have variable sizes.
+        assert!(
+            bcs::constant_serialized_size<K>().is_some() && bcs::constant_serialized_size<V>().is_some(),
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+
+        new_with_config(0, 0, true)
+    }
+
+
     /// Returns a new BigOrderedMap, configured based on passed key and value serialized size hints.
     public fun new_with_type_size_hints<K: store, V: store>(avg_key_bytes: u64, max_key_bytes: u64, avg_value_bytes: u64, max_value_bytes: u64): BigOrderedMap<K, V> {
         assert!(avg_key_bytes <= max_key_bytes, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
@@ -379,6 +394,15 @@ module aptos_std::big_ordered_map {
         assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
 
         iter.iter_borrow(self)
+    }
+
+    public fun get<K: drop + copy + store, V: copy + store>(self: &BigOrderedMap<K, V>, key: &K): Option<V> {
+        let iter = self.find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(*iter.iter_borrow(self))
+        }
     }
 
     /// Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.

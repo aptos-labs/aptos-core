@@ -72,6 +72,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="../../aptos-framework/doc/coin.md#0x1_coin">0x1::coin</a>;
+<b>use</b> <a href="../../aptos-framework/doc/dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">0x1::dispatchable_fungible_asset</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
@@ -1645,7 +1646,7 @@ Implementation of the <code>deposit_to</code> entry function.
     <b>let</b> sender_fa_store = <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(from, token);
     <b>let</b> ca_fa_store = <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(<a href="confidential_asset.md#0x7_confidential_asset_get_fa_store_address">get_fa_store_address</a>(), token);
 
-    <a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_transfer">fungible_asset::transfer</a>(sender, sender_fa_store, ca_fa_store, amount);
+    <a href="../../aptos-framework/doc/dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a>(sender, sender_fa_store, ca_fa_store, amount);
 
     <b>let</b> ca_store = <b>borrow_global_mut</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>&gt;(<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(<b>to</b>, token));
     <b>let</b> pending_balance = <a href="confidential_balance.md#0x7_confidential_balance_decompress_balance">confidential_balance::decompress_balance</a>(&ca_store.pending_balance);

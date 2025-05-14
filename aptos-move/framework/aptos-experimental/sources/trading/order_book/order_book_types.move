@@ -68,7 +68,9 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
         big_ordered_map::new_with_config(
-            BIG_MAP_INNER_DEGREE, BIG_MAP_LEAF_DEGREE, true,
+            BIG_MAP_INNER_DEGREE,
+            BIG_MAP_LEAF_DEGREE,
+            true
         )
     }
 
@@ -215,6 +217,12 @@ module aptos_experimental::order_book_types {
         self: &Order<M>
     ): Option<TriggerCondition> {
         self.trigger_condition
+    }
+
+    public fun increase_remaining_size<M: store + copy + drop>(
+        self: &mut OrderWithState<M>, size: u64
+    ) {
+        self.order.remaining_size += size;
     }
 
     public fun set_remaining_size<M: store + copy + drop>(

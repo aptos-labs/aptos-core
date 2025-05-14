@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     private fun apply(f: |u8|bool,x: u8): bool {
         (f)(x)
@@ -64,7 +64,7 @@ module 0xc0ffee::m {
         Tuple()
     }
     public fun test4(a: u8,b: u16,c: u32,d: u64,e: u128,f: u256) {
-        if Or(Gt<u8>(a, 255), Gt<u256>(f, 255)) {
+        if Or(Gt<u8>(a, 255), Gt<u256>(f, Cast<u256>(255))) {
           m::bar()
         } else {
           Tuple()
@@ -127,7 +127,7 @@ module 0xc0ffee::no_warn {
     }
 } // end 0xc0ffee::no_warn
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     fun apply(f: |u8|bool, x: u8): bool {
         f(x)
@@ -153,7 +153,7 @@ module 0xc0ffee::m {
         if (0u8 <= foo<u8>(x)) bar();
     }
     public fun test4(a: u8, b: u16, c: u32, d: u64, e: u128, f: u256) {
-        if (a > 255u8 || f > 255u256) bar();
+        if (a > 255u8 || f > (255u8 as u256)) bar();
         if (b >= 65535u16) bar();
         if (4294967295u32 < c) bar();
         if (18446744073709551615 <= d) bar();

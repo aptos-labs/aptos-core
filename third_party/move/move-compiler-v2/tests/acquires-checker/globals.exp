@@ -11,13 +11,7 @@ error: missing acquires annotation for `R`
 error: missing acquires annotation for `R`
    ┌─ tests/acquires-checker/globals.move:18:9
    │
-18 │     fun write(a: address, x: u64): u64 {
+18 │     fun write(a: address): u64 {
    │         ^^^^^
 19 │         let r = borrow_global_mut<R>(a);
    │                 ----------------------- acquired here
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/acquires-checker/globals.move:18:27
-   │
-18 │     fun write(a: address, x: u64): u64 {
-   │                           ^

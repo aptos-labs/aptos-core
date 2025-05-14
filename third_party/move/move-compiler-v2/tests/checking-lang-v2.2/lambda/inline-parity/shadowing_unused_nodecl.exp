@@ -1,11 +1,5 @@
 
 Diagnostics:
-warning: Unused parameter `z`. Consider removing or prefixing with an underscore: `_z`
-  ┌─ tests/checking-lang-v2.2/lambda/inline-parity/shadowing_unused_nodecl.move:6:35
-  │
-6 │     public fun quux(f:|u64, u64|, z: u64) {
-  │                                   ^
-
 error: captured variable `_x` cannot be modified inside of a lambda
    ┌─ tests/checking-lang-v2.2/lambda/inline-parity/shadowing_unused_nodecl.move:20:13
    │

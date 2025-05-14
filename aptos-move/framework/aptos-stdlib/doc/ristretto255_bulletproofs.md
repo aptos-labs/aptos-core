@@ -77,7 +77,7 @@ Represents a zero-knowledge range proof that a value committed inside a Pedersen
 The native functions have not been rolled out yet.
 
 
-<pre><code><b>const</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 4;
+<pre><code><b>const</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 7;
 </code></pre>
 
 

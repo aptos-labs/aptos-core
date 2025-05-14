@@ -601,7 +601,7 @@ fn convert_constant_value_u64_constant_or_value(
     let (severity, message) = match value {
         Value::Number(u) => match ty {
             Type::Primitive(PrimitiveType::U64) => {
-                if u <= BigInt::from(std::u64::MAX) {
+                if u <= BigInt::from(u64::MAX) {
                     return Some((vloc, mod_id, u.to_u64().unwrap()));
                 } else {
                     (
@@ -615,7 +615,7 @@ fn convert_constant_value_u64_constant_or_value(
                 }
             },
             Type::Primitive(PrimitiveType::Num) => {
-                if u <= BigInt::from(std::u64::MAX) {
+                if u <= BigInt::from(u64::MAX) {
                     return Some((vloc, mod_id, u.to_u64().unwrap()));
                 } else {
                     (
@@ -669,7 +669,7 @@ fn convert_module_id(env: &GlobalEnv, _vloc: Loc, module: Option<ModuleName>) ->
 fn convert_model_ast_value_u64(env: &GlobalEnv, loc: Loc, value: &Value) -> Option<(Loc, u64)> {
     match value {
         Value::Number(u) => {
-            if u <= &BigInt::from(std::u64::MAX) {
+            if u <= &BigInt::from(u64::MAX) {
                 Some((loc, u.to_u64().unwrap()))
             } else {
                 env.error(

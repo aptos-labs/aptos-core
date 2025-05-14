@@ -980,7 +980,7 @@ impl RoundManager {
             self.proposer_election.clone(),
         );
         ensure!(
-            proposal.block_data().failed_authors().map_or(false, |failed_authors| *failed_authors == expected_failed_authors),
+            proposal.block_data().failed_authors().is_some_and(|failed_authors| *failed_authors == expected_failed_authors),
             "[RoundManager] Proposal for block {} has invalid failed_authors list {:?}, expected {:?}",
             proposal.round(),
             proposal.block_data().failed_authors(),

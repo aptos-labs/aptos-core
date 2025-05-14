@@ -6,4 +6,4 @@ error: captured value is missing abilities `copy`
 26 │         let f: Func<S> = |x| { x.merge(s) };
    │                                        ^
    │
-   = expected function type: `|S|S with copy` (wrapped type of `Func<S>`)
+   = expected function type: `|S|S has copy` (wrapped type of `Func<S>`)

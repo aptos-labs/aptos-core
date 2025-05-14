@@ -174,6 +174,9 @@ pub struct BufferManager {
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
     // the vote will be cached. We can cache upto max_pending_rounds_in_commit_vote_cache (100) blocks.
     pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
+    // Items are popped from the buffer when sending to the persisting phase since callback is not clonable.
+    // but we need to keep the pending blocks for reset.
+    pending_commit_blocks: BTreeMap<Round, Arc<PipelinedBlock>>,
     new_pipeline_enabled: bool,
 }
 
@@ -271,6 +274,7 @@ impl BufferManager {
 
             max_pending_rounds_in_commit_vote_cache,
             pending_commit_votes: BTreeMap::new(),
+            pending_commit_blocks: BTreeMap::new(),
             new_pipeline_enabled,
         }
     }
@@ -533,6 +537,10 @@ impl BufferManager {
                         ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
                     consensus_publisher.publish_message(message);
                 }
+                for block in &blocks_to_persist {
+                    self.pending_commit_blocks
+                        .insert(block.round(), block.clone());
+                }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
@@ -559,6 +567,11 @@ impl BufferManager {
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
+        while let Some((_, block)) = self.pending_commit_blocks.pop_first() {
+            // Those blocks don't have any dependencies, should be able to finish commit_ledger.
+            // Abort them can cause error on epoch boundary.
+            block.wait_for_commit_ledger().await;
+        }
         while let Some(item) = self.buffer.pop_front() {
             for b in item.get_blocks() {
                 if let Some(futs) = b.abort_pipeline() {
@@ -583,7 +596,9 @@ impl BufferManager {
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
         info!("Receive reset");
-        self.reset_flag.store(true, Ordering::SeqCst);
+        if !self.new_pipeline_enabled {
+            self.reset_flag.store(true, Ordering::SeqCst);
+        }
 
         match signal {
             ResetSignal::Stop => self.stop = true,
@@ -597,7 +612,9 @@ impl BufferManager {
 
         self.reset().await;
         let _ = tx.send(ResetAck::default());
-        self.reset_flag.store(false, Ordering::SeqCst);
+        if !self.new_pipeline_enabled {
+            self.reset_flag.store(false, Ordering::SeqCst);
+        }
         info!("Reset finishes");
     }
 
@@ -1013,8 +1030,9 @@ impl BufferManager {
                 },
                 Some(Ok(round)) = self.persisting_phase_rx.next() => {
                     // see where `need_backpressure()` is called.
-                    self.pending_commit_votes.retain(|rnd, _| *rnd > round);
-                    self.highest_committed_round = round
+                    self.pending_commit_votes = self.pending_commit_votes.split_off(&(round + 1));
+                    self.highest_committed_round = round;
+                    self.pending_commit_blocks = self.pending_commit_blocks.split_off(&(round + 1));
                 },
                 Some(rpc_request) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",

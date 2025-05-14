@@ -1,14 +1,18 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun foo() {
-        Tuple();
-        Tuple()
+        {
+          let (): () = Tuple();
+          Tuple();
+          Tuple()
+        }
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun foo() {
+        let () = ();
         ();
     }
 }

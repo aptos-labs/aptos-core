@@ -9,7 +9,7 @@ module aptos_experimental::active_order_book {
         new_active_matched_order,
         ActiveMatchedOrder,
         get_slippage_pct_precision,
-        new_default_big_ordered_map,
+        new_default_big_ordered_map
     };
     #[test_only]
     use std::vector;
@@ -62,7 +62,7 @@ module aptos_experimental::active_order_book {
         // so that max_key never changes, and doesn't create conflict.
         ActiveOrderBook::V1 {
             buys: new_default_big_ordered_map(),
-            sells: new_default_big_ordered_map(),
+            sells: new_default_big_ordered_map()
         }
     }
 
@@ -299,6 +299,24 @@ module aptos_experimental::active_order_book {
         } else {
             self.get_single_match_for_sell_order(price, size)
         }
+    }
+
+    public fun increase_maker_order_size(
+        self: &mut ActiveOrderBook,
+        price: u64,
+        unique_priority_idx: UniqueIdxType,
+        size: u64,
+        is_buy: bool
+    ) {
+        let tie_breaker = get_tie_breaker(unique_priority_idx, is_buy);
+        let key = ActiveBidKey { price, tie_breaker };
+        // Assert that this is not a taker order
+        assert!(!self.is_taker_order(price, is_buy), EINVALID_MAKER_ORDER);
+        if (is_buy) {
+            self.buys.borrow_mut(&key).size += size;
+        } else {
+            self.sells.borrow_mut(&key).size += size;
+        };
     }
 
     public fun place_maker_order(

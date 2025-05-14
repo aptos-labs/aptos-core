@@ -1,0 +1,61 @@
+
+Diagnostics:
+error: reference to a reference is not allowed
+  ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:3:19
+  │
+3 │     struct Func1(|&mut &mut u64|);
+  │                   ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:5:19
+  │
+5 │     struct Func2(|& &u64|);
+  │                   ^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:7:20
+  │
+7 │     struct Func3(||(&mut &mut u64));
+  │                    ^^^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:9:21
+  │
+9 │     struct Func4(|(|&mut &mut u64|)|);
+  │                     ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+   ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:11:19
+   │
+11 │     fun test1(f: |&mut &mut u64|) {}
+   │                   ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+   ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:13:19
+   │
+13 │     fun test2(): |&(&u64)|u64 {
+   │                   ^^^^^^^
+
+error: lambda expression has invalid type `|&&u64|u64` (reference to a reference is disallowed)
+   ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:14:9
+   │
+14 │         |x| **x + 1
+   │         ^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+   ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:18:17
+   │
+18 │         let f: |& &u64|u64 = |x| {**x + 1};
+   │                 ^^^^^^
+
+error: lambda expression has invalid type `|&&u64|u64` (reference to a reference is disallowed)
+   ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:18:30
+   │
+18 │         let f: |& &u64|u64 = |x| {**x + 1};
+   │                              ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+   ┌─ tests/checking-lang-v2.2/lambda/ref_ref.move:21:18
+   │
+21 │     fun test4(f: & &|(&u64)|) {}
+   │                  ^^^^^^^^^^^

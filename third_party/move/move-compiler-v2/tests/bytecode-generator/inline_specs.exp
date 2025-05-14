@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::inline_specs {
     private fun specs(): u64 {
         {
@@ -20,7 +20,7 @@ module 0x42::inline_specs {
     }
 } // end 0x42::inline_specs
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::inline_specs {
     fun specs(): u64 {
         let x = 0;
@@ -44,7 +44,63 @@ module 0x42::inline_specs {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun inline_specs::specs(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t1 := 0
+  1: spec {
+  assert Eq<u64>($t1, 0);
+}
+
+  2: $t2 := inline_specs::succ($t1)
+  3: $t1 := infer($t2)
+  4: spec {
+  assert Eq<u64>($t1, 1);
+}
+
+  5: $t0 := infer($t1)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun inline_specs::succ($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::inline_specs {
+    private fun specs(): u64 {
+        {
+          let x: u64 = 0;
+          spec {
+            assert Eq<u64>(x, 0);
+          }
+          ;
+          x: u64 = inline_specs::succ(x);
+          spec {
+            assert Eq<u64>(x, 1);
+          }
+          ;
+          x
+        }
+    }
+    private fun succ(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+} // end 0x42::inline_specs
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun inline_specs::specs(): u64 {

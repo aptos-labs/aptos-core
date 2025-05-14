@@ -5,6 +5,7 @@ use crate::{
     metrics::TIMER,
     state_store::{
         state_delta::StateDelta,
+        state_slot::StateSlot,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
             cached_state_view::{
@@ -12,14 +13,13 @@ use crate::{
             },
             hot_state_view::HotStateView,
         },
-        versioned_state_value::{DbStateUpdate, StateUpdateRef},
+        versioned_state_value::StateUpdateRef,
         NUM_STATE_SHARDS,
     },
     DbReader,
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
-use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage, StateViewId},
@@ -38,10 +38,10 @@ pub struct State {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
     /// The updates made to the state at the current version.
-    ///  N.b. this is not directly iteratable, one needs to make a `StateDelta`
+    ///  N.b. this is not directly iterable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
-    shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
+    shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -49,7 +49,7 @@ pub struct State {
 impl State {
     pub fn new_with_updates(
         version: Option<Version>,
-        shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
+        shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
@@ -62,7 +62,7 @@ impl State {
     pub fn new_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
         Self::new_with_updates(
             version,
-            Arc::new(arr_macro::arr![MapLayer::new_family("state"); 16]),
+            Arc::new(arr![MapLayer::new_family("state"); 16]),
             usage,
         )
     }
@@ -83,7 +83,7 @@ impl State {
         self.usage
     }
 
-    pub fn shards(&self) -> &[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS] {
+    pub fn shards(&self) -> &[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS] {
         &self.shards
     }
 
@@ -129,7 +129,6 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
-        let access_time_secs = duration_since_epoch().as_secs() as u32;
         let (shards, usage_delta_per_shard): (Vec<_>, Vec<_>) = (
             state_cache.shards.as_slice(),
             hot_state_refreshes.as_slice(),
@@ -147,11 +146,7 @@ impl State {
                             .collect_vec()
                     })
                     .unwrap_or(vec![]);
-                new_items.extend(
-                    updates
-                        .iter()
-                        .map(|(k, u)| ((*k).clone(), u.to_db_state_update(access_time_secs))),
-                );
+                new_items.extend(updates.iter().map(|(k, u)| ((*k).clone(), u.to_hot_slot())));
 
                 (
                     // TODO(aldenhu): change interface to take iter of ref
@@ -183,7 +178,7 @@ impl State {
 
     fn usage_delta_for_shard<'kv>(
         cache: &StateCacheShard,
-        overlay: &LayeredMap<StateKey, DbStateUpdate>,
+        overlay: &LayeredMap<StateKey, StateSlot>,
         updates: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
     ) -> (i64, i64) {
         let mut items_delta: i64 = 0;
@@ -198,18 +193,13 @@ impl State {
             // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
             // n.b. all updated state items must be read and recorded in the state cache,
             // otherwise we can't calculate the correct usage.
-            let old_value = overlay
+            let old_slot = overlay
                 .get(k)
-                .map(|update| {
-                    update
-                        .value
-                        .and_then(|db_val| db_val.into_state_value_opt())
-                })
-                .or_else(|| cache.get(k).map(|entry| entry.value().to_state_value_opt()))
+                .or_else(|| cache.get(k).map(|entry| entry.value().clone()))
                 .expect("Must cache read");
-            if let Some(old_v) = old_value {
+            if old_slot.is_occupied() {
                 items_delta -= 1;
-                bytes_delta -= (key_size + old_v.size()) as i64;
+                bytes_delta -= (key_size + old_slot.size()) as i64;
             }
         }
         (items_delta, bytes_delta)

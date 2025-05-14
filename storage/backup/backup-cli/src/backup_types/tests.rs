@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unexpected_cfgs)]
+
 use crate::{
     backup_types::{
         state_snapshot::{
@@ -150,9 +152,7 @@ fn test_end_to_end_impl(d: TestData) {
         TransactionRestoreController::new(
             TransactionRestoreOpt {
                 manifest_handle: txn_manifest,
-                replay_from_version: Some(
-                    d.state_snapshot_ver.unwrap_or(Version::max_value() - 1) + 1,
-                ),
+                replay_from_version: Some(d.state_snapshot_ver.unwrap_or(Version::MAX - 1) + 1),
                 kv_only_replay: Some(false),
             },
             global_restore_opt,

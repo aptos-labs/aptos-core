@@ -1,0 +1,25 @@
+
+Diagnostics:
+warning: Unused value of parameter `p`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p`), or binding to `_`
+  ┌─ tests/unused-assignment/param_reassigned.move:2:16
+  │
+2 │     fun warn_1(p: u64): u64 {
+  │                ^
+
+warning: Unused value of parameter `p`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p`), or binding to `_`
+   ┌─ tests/unused-assignment/param_reassigned.move:25:16
+   │
+25 │     fun warn_2(p: u64) {
+   │                ^
+
+warning: This assignment/binding to the left-hand-side variable `p` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_p`), or renaming to `_`
+   ┌─ tests/unused-assignment/param_reassigned.move:26:9
+   │
+26 │         p = 1;
+   │         ^^^^^
+
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/unused-assignment/param_reassigned.move:37:22
+   │
+37 │     fun warn_3(s: S, x: u64): u64 {
+   │                      ^

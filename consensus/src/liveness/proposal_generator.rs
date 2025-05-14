@@ -615,7 +615,7 @@ impl ProposalGenerator {
 
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
-                && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
+                && max_txns_from_block_to_execute.is_some_and(|v| payload.len() as u64 > v)
             {
                 payload = payload.transform_to_quorum_store_v2(
                     max_txns_from_block_to_execute,

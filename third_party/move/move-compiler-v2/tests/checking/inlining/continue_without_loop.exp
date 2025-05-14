@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     private fun continued() {
         continue;
@@ -6,7 +6,7 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     fun continued() {
         continue;

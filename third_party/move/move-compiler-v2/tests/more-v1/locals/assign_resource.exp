@@ -1,16 +1,22 @@
 
 Diagnostics:
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
   ┌─ tests/more-v1/locals/assign_resource.move:5:17
   │
 5 │         let r = R{};
   │                 ^^^
 
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
    ┌─ tests/more-v1/locals/assign_resource.move:29:17
    │
 29 │         let r = R{};
    │                 ^^^
+
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/more-v1/locals/assign_resource.move:33:15
+   │
+33 │     fun t5<T>(x: T, y: T): T {
+   │               ^
 
 
 Diagnostics:

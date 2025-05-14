@@ -668,8 +668,8 @@ impl DnsName {
     fn validate(s: &str) -> Result<(), ParseError> {
         if s.is_empty() {
             Err(ParseError::EmptyDnsNameString)
-        } else if s.as_bytes().len() > MAX_DNS_NAME_SIZE {
-            Err(ParseError::DnsNameTooLong(s.as_bytes().len()))
+        } else if s.len() > MAX_DNS_NAME_SIZE {
+            Err(ParseError::DnsNameTooLong(s.len()))
         } else if s.contains('/') {
             Err(ParseError::InvalidDnsNameCharacter)
         } else if !s.is_ascii() {
@@ -743,7 +743,7 @@ impl Arbitrary for DnsName {
             // need this filter b/c the number of unicode characters does not
             // necessarily equal the number of bytes.
             .prop_filter_map("string too long", |s| {
-                if s.as_bytes().len() > MAX_DNS_NAME_SIZE {
+                if s.len() > MAX_DNS_NAME_SIZE {
                     None
                 } else {
                     Some(DnsName(s))

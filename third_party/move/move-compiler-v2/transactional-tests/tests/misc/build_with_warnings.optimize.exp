@@ -1,7 +1,7 @@
 processed 2 tasks
 
 task 0 'publish'. lines 1-10:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ TEMPFILE:3:20
   │
 3 │     public fun foo(x: u64): u64 {

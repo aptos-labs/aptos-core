@@ -1,4 +1,162 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::foo() {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+  0: $t0 := 1
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t1 := m::two()
+  1: $t4 := infer($t0)
+  2: $t5 := m::one()
+  3: $t3 := -($t4, $t5)
+  4: $t2 := >($t3, $t1)
+  5: if ($t2) goto 6 else goto 9
+  6: label L0
+  7: m::foo()
+  8: goto 10
+  9: label L1
+ 10: label L2
+ 11: return ()
+}
+
+
+[variant baseline]
+fun m::two(): u64 {
+     var $t0: u64
+  0: $t0 := 2
+  1: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo() {
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := 1
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := m::two()
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  1: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  2: $t5 := m::one()
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := -($t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  4: $t2 := >($t3, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  5: if ($t2) goto 6 else goto 9
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  6: label L0
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  7: m::foo()
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  8: goto 10
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 11: return ()
+}
+
+
+[variant baseline]
+fun m::two(): u64 {
+     var $t0: u64
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := 2
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::foo() {

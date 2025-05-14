@@ -70,6 +70,7 @@ claims = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 rand_core = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 default = []

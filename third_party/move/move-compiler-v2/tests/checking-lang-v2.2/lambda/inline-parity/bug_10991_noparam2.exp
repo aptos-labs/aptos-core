@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::Test {
     private fun foo(f: |u64|u64,g: |u64|u64,x: u64,_: u64): u64 {
         Add<u64>((f)(x), (g)(x))
@@ -25,7 +25,7 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
     fun foo(f: |u64|u64, g: |u64|u64, x: u64, _: u64): u64 {
         f(x) + g(x)

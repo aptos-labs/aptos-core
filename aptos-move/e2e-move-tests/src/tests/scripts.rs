@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, build_package, tests::common, MoveHarness};
+use crate::{assert_success, tests::common, MoveHarness};
+use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
@@ -80,7 +81,7 @@ fn test_script_with_object_parameter() {
     );
     assert_success!(result);
 
-    let package = build_package(
+    let package = BuiltPackage::build(
         common::test_dir_path("script_with_object_param.data/pack"),
         build_options,
     )
@@ -123,7 +124,7 @@ fn test_script_with_type_parameter() {
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
 
-    let package = build_package(
+    let package = BuiltPackage::build(
         common::test_dir_path("script_with_ty_param.data/pack"),
         aptos_framework::BuildOptions::default(),
     )
@@ -152,7 +153,7 @@ fn test_script_with_signer_parameter() {
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
 
-    let package = build_package(
+    let package = BuiltPackage::build(
         common::test_dir_path("script_with_signer.data/pack"),
         aptos_framework::BuildOptions::default(),
     )
@@ -207,7 +208,7 @@ fn test_two_to_two_transfer() {
         ..aptos_framework::BuildOptions::default()
     };
 
-    let package = build_package(
+    let package = BuiltPackage::build(
         common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
         build_options,
     )

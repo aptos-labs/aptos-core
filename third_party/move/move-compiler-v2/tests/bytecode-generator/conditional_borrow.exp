@@ -1,4 +1,439 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x8675::M {
+    struct S {
+        f: u64,
+    }
+    public fun test(): u64 {
+        Add<u64>(M::test1(7), M::test1(2))
+    }
+    private fun test1(r: u64): u64 {
+        {
+          let x: u64 = 3;
+          {
+            let tref: &mut u64 = Borrow(Mutable)(if Lt<u64>(r, 4) {
+              r
+            } else {
+              x
+            });
+            tref = 10;
+            {
+              let y: u64 = r;
+              {
+                let tref2: &mut u64 = Borrow(Mutable)(y);
+                tref2 = Add<u64>(Deref(tref2), 1);
+                {
+                  let z: u64 = y;
+                  {
+                    let tref3: &mut u64 = Borrow(Mutable)(Add<u64>(z, 0));
+                    tref3 = Add<u64>(Deref(tref3), 2);
+                    {
+                      let a: u64 = z;
+                      {
+                        let tref4: &mut u64 = Borrow(Mutable)({
+                          let _q: u64 = 1;
+                          a
+                        });
+                        tref4 = Add<u64>(Deref(tref4), 4);
+                        {
+                          let tref5: &mut u64 = Borrow(Mutable)(a);
+                          tref5 = Add<u64>(Deref(tref5), 8);
+                          {
+                            let tref6: &mut u64 = Borrow(Mutable)(3;
+                            a);
+                            tref6 = Add<u64>(Deref(tref6), 16);
+                            a
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test1b(r: S): u64 {
+        {
+          let x: S = pack M::S(3);
+          {
+            let tref: &mut S = Borrow(Mutable)(if Lt<u64>(select M::S.f<S>(r), 4) {
+              r
+            } else {
+              x
+            });
+            select M::S.f<S>(Deref(tref)) = 10;
+            {
+              let y: S = r;
+              {
+                let tref2: &mut S = Borrow(Mutable)(y);
+                select M::S.f<S>(Deref(tref2)) = Add<u64>(select M::S.f<S>(Deref(tref2)), 1);
+                {
+                  let z: S = y;
+                  {
+                    let tref3: &mut u64 = Borrow(Mutable)(select M::S.f<S>(z));
+                    tref3 = Add<u64>(Deref(tref3), 1);
+                    {
+                      let a: S = z;
+                      {
+                        let tref4: &mut u64 = Borrow(Mutable)({
+                          let _q: u64 = 1;
+                          select M::S.f<S>(a)
+                        });
+                        tref4 = Add<u64>(Deref(tref4), 1);
+                        {
+                          let tref5: &mut u64 = Borrow(Mutable)(select M::S.f<S>(a));
+                          tref5 = Add<u64>(Deref(tref5), 8);
+                          {
+                            let tref6: &mut u64 = Borrow(Mutable)(3;
+                            select M::S.f<S>(a));
+                            tref6 = Add<u64>(Deref(tref6), 16);
+                            select M::S.f<S>(a)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun testb(): u64 {
+        Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
+    }
+} // end 0x8675::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    public fun test(): u64 {
+        test1(7) + test1(2)
+    }
+    fun test1(r: u64): u64 {
+        let x = 3;
+        let tref = &mut (if (r < 4) r else x);
+        *tref = 10;
+        let y = r;
+        let tref2 = &mut y;
+        *tref2 = *tref2 + 1;
+        let z = y;
+        let tref3 = &mut (z + 0);
+        *tref3 = *tref3 + 2;
+        let a = z;
+        let tref4 = &mut {
+            let _q = 1;
+            a
+        };
+        *tref4 = *tref4 + 4;
+        let tref5 = &mut a;
+        *tref5 = *tref5 + 8;
+        let tref6 = &mut {
+            3;
+            a
+        };
+        *tref6 = *tref6 + 16;
+        a
+    }
+    fun test1b(r: S): u64 {
+        let x = S{f: 3};
+        let tref = &mut (if (r.f < 4) r else x);
+        (*tref).f = 10;
+        let y = r;
+        let tref2 = &mut y;
+        (*tref2).f = (*tref2).f + 1;
+        let z = y;
+        let tref3 = &mut z.f;
+        *tref3 = *tref3 + 1;
+        let a = z;
+        let tref4 = &mut {
+            let _q = 1;
+            a.f
+        };
+        *tref4 = *tref4 + 1;
+        let tref5 = &mut a.f;
+        *tref5 = *tref5 + 8;
+        let tref6 = &mut {
+            3;
+            a.f
+        };
+        *tref6 = *tref6 + 16;
+        a.f
+    }
+    public fun testb(): u64 {
+        test1b(S{f: 7}) + test1b(S{f: 2})
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := 7
+  1: $t1 := M::test1($t2)
+  2: $t4 := 2
+  3: $t3 := M::test1($t4)
+  4: $t0 := +($t1, $t3)
+  5: return $t0
+}
+
+
+[variant baseline]
+fun M::test1($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: &mut u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: &mut u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: u64
+     var $t23: &mut u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: u64
+     var $t27: u64
+     var $t28: u64
+     var $t29: &mut u64
+     var $t30: u64
+     var $t31: u64
+     var $t32: u64
+     var $t33: u64
+     var $t34: &mut u64
+     var $t35: u64
+     var $t36: u64
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+  0: $t2 := 3
+  1: $t6 := infer($t0)
+  2: $t7 := 4
+  3: $t5 := <($t6, $t7)
+  4: if ($t5) goto 5 else goto 8
+  5: label L0
+  6: $t4 := infer($t0)
+  7: goto 10
+  8: label L1
+  9: $t4 := infer($t2)
+ 10: label L2
+ 11: $t3 := borrow_local($t4)
+ 12: $t8 := 10
+ 13: write_ref($t3, $t8)
+ 14: $t9 := infer($t0)
+ 15: $t10 := borrow_local($t9)
+ 16: $t12 := read_ref($t10)
+ 17: $t13 := 1
+ 18: $t11 := +($t12, $t13)
+ 19: write_ref($t10, $t11)
+ 20: $t14 := infer($t9)
+ 21: $t17 := infer($t14)
+ 22: $t18 := 0
+ 23: $t16 := +($t17, $t18)
+ 24: $t15 := borrow_local($t16)
+ 25: $t20 := read_ref($t15)
+ 26: $t21 := 2
+ 27: $t19 := +($t20, $t21)
+ 28: write_ref($t15, $t19)
+ 29: $t22 := infer($t14)
+ 30: $t25 := 1
+ 31: $t24 := infer($t22)
+ 32: $t23 := borrow_local($t24)
+ 33: $t27 := read_ref($t23)
+ 34: $t28 := 4
+ 35: $t26 := +($t27, $t28)
+ 36: write_ref($t23, $t26)
+ 37: $t30 := infer($t22)
+ 38: $t29 := borrow_local($t30)
+ 39: $t32 := read_ref($t29)
+ 40: $t33 := 8
+ 41: $t31 := +($t32, $t33)
+ 42: write_ref($t29, $t31)
+ 43: $t36 := 3
+ 44: $t35 := infer($t22)
+ 45: $t34 := borrow_local($t35)
+ 46: $t38 := read_ref($t34)
+ 47: $t39 := 16
+ 48: $t37 := +($t38, $t39)
+ 49: write_ref($t34, $t37)
+ 50: $t1 := infer($t22)
+ 51: return $t1
+}
+
+
+[variant baseline]
+fun M::test1b($t0: 0x8675::M::S): u64 {
+     var $t1: u64
+     var $t2: 0x8675::M::S
+     var $t3: u64
+     var $t4: &mut 0x8675::M::S
+     var $t5: 0x8675::M::S
+     var $t6: bool
+     var $t7: u64
+     var $t8: &0x8675::M::S
+     var $t9: &u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: &mut u64
+     var $t13: 0x8675::M::S
+     var $t14: &mut 0x8675::M::S
+     var $t15: 0x8675::M::S
+     var $t16: &mut 0x8675::M::S
+     var $t17: u64
+     var $t18: u64
+     var $t19: 0x8675::M::S
+     var $t20: &0x8675::M::S
+     var $t21: &u64
+     var $t22: u64
+     var $t23: &mut u64
+     var $t24: 0x8675::M::S
+     var $t25: &mut 0x8675::M::S
+     var $t26: 0x8675::M::S
+     var $t27: &mut u64
+     var $t28: &mut 0x8675::M::S
+     var $t29: u64
+     var $t30: u64
+     var $t31: u64
+     var $t32: 0x8675::M::S
+     var $t33: &mut u64
+     var $t34: u64
+     var $t35: u64
+     var $t36: &0x8675::M::S
+     var $t37: &u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: u64
+     var $t41: &mut u64
+     var $t42: u64
+     var $t43: &0x8675::M::S
+     var $t44: &u64
+     var $t45: u64
+     var $t46: u64
+     var $t47: u64
+     var $t48: &mut u64
+     var $t49: u64
+     var $t50: u64
+     var $t51: &0x8675::M::S
+     var $t52: &u64
+     var $t53: u64
+     var $t54: u64
+     var $t55: u64
+     var $t56: &0x8675::M::S
+     var $t57: &u64
+  0: $t3 := 3
+  1: $t2 := pack 0x8675::M::S($t3)
+  2: $t8 := borrow_local($t0)
+  3: $t9 := borrow_field<0x8675::M::S>.f($t8)
+  4: $t7 := read_ref($t9)
+  5: $t10 := 4
+  6: $t6 := <($t7, $t10)
+  7: if ($t6) goto 8 else goto 11
+  8: label L0
+  9: $t5 := infer($t0)
+ 10: goto 13
+ 11: label L1
+ 12: $t5 := infer($t2)
+ 13: label L2
+ 14: $t4 := borrow_local($t5)
+ 15: $t11 := 10
+ 16: $t13 := read_ref($t4)
+ 17: $t14 := borrow_local($t13)
+ 18: $t12 := borrow_field<0x8675::M::S>.f($t14)
+ 19: write_ref($t12, $t11)
+ 20: $t15 := infer($t0)
+ 21: $t16 := borrow_local($t15)
+ 22: $t19 := read_ref($t16)
+ 23: $t20 := borrow_local($t19)
+ 24: $t21 := borrow_field<0x8675::M::S>.f($t20)
+ 25: $t18 := read_ref($t21)
+ 26: $t22 := 1
+ 27: $t17 := +($t18, $t22)
+ 28: $t24 := read_ref($t16)
+ 29: $t25 := borrow_local($t24)
+ 30: $t23 := borrow_field<0x8675::M::S>.f($t25)
+ 31: write_ref($t23, $t17)
+ 32: $t26 := infer($t15)
+ 33: $t28 := borrow_local($t26)
+ 34: $t27 := borrow_field<0x8675::M::S>.f($t28)
+ 35: $t30 := read_ref($t27)
+ 36: $t31 := 1
+ 37: $t29 := +($t30, $t31)
+ 38: write_ref($t27, $t29)
+ 39: $t32 := infer($t26)
+ 40: $t35 := 1
+ 41: $t36 := borrow_local($t32)
+ 42: $t37 := borrow_field<0x8675::M::S>.f($t36)
+ 43: $t34 := read_ref($t37)
+ 44: $t33 := borrow_local($t34)
+ 45: $t39 := read_ref($t33)
+ 46: $t40 := 1
+ 47: $t38 := +($t39, $t40)
+ 48: write_ref($t33, $t38)
+ 49: $t43 := borrow_local($t32)
+ 50: $t44 := borrow_field<0x8675::M::S>.f($t43)
+ 51: $t42 := read_ref($t44)
+ 52: $t41 := borrow_local($t42)
+ 53: $t46 := read_ref($t41)
+ 54: $t47 := 8
+ 55: $t45 := +($t46, $t47)
+ 56: write_ref($t41, $t45)
+ 57: $t50 := 3
+ 58: $t51 := borrow_local($t32)
+ 59: $t52 := borrow_field<0x8675::M::S>.f($t51)
+ 60: $t49 := read_ref($t52)
+ 61: $t48 := borrow_local($t49)
+ 62: $t54 := read_ref($t48)
+ 63: $t55 := 16
+ 64: $t53 := +($t54, $t55)
+ 65: write_ref($t48, $t53)
+ 66: $t56 := borrow_local($t32)
+ 67: $t57 := borrow_field<0x8675::M::S>.f($t56)
+ 68: $t1 := read_ref($t57)
+ 69: return $t1
+}
+
+
+[variant baseline]
+public fun M::testb(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: 0x8675::M::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: 0x8675::M::S
+     var $t6: u64
+  0: $t3 := 7
+  1: $t2 := pack 0x8675::M::S($t3)
+  2: $t1 := M::test1b($t2)
+  3: $t6 := 2
+  4: $t5 := pack 0x8675::M::S($t6)
+  5: $t4 := M::test1b($t5)
+  6: $t0 := +($t1, $t4)
+  7: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x8675::M {
     struct S {
         f: u64,
@@ -96,63 +531,7 @@ module 0x8675::M {
     }
 } // end 0x8675::M
 
-// -- Sourcified model before bytecode pipeline
-module 0x8675::M {
-    struct S has copy, drop {
-        f: u64,
-    }
-    public fun test(): u64 {
-        test1(7) + test1(2)
-    }
-    fun test1(r: u64): u64 {
-        let tref = &mut (if (r < 4) r else 3);
-        *tref = 10;
-        let y = r;
-        let tref2 = &mut y;
-        *tref2 = *tref2 + 1;
-        let z = y;
-        let tref3 = &mut (z + 0);
-        *tref3 = *tref3 + 2;
-        let a = z;
-        let tref4 = &mut a;
-        *tref4 = *tref4 + 4;
-        let tref5 = &mut a;
-        *tref5 = *tref5 + 8;
-        let tref6 = &mut {
-            3;
-            a
-        };
-        *tref6 = *tref6 + 16;
-        a
-    }
-    fun test1b(r: S): u64 {
-        let x = S{f: 3};
-        let tref = &mut (if (r.f < 4) r else x);
-        (*tref).f = 10;
-        let y = r;
-        let tref2 = &mut y;
-        (*tref2).f = (*tref2).f + 1;
-        let z = y;
-        let tref3 = &mut z.f;
-        *tref3 = *tref3 + 1;
-        let a = z;
-        let tref4 = &mut a.f;
-        *tref4 = *tref4 + 1;
-        let tref5 = &mut a.f;
-        *tref5 = *tref5 + 8;
-        let tref6 = &mut {
-            3;
-            a.f
-        };
-        *tref6 = *tref6 + 16;
-        a.f
-    }
-    public fun testb(): u64 {
-        test1b(S{f: 7}) + test1b(S{f: 2})
-    }
-}
-
-============ initial bytecode ================
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 public fun M::test(): u64 {

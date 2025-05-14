@@ -95,12 +95,7 @@ fn bls12381_keygen(num_signers: usize, mut rng: &mut OsRng) -> Vec<KeyPair<Priva
 
 /// Returns a 256-character unique string that can be signed by the BLS API.
 fn random_message_for_signing(rng: &mut OsRng) -> TestAptosCrypto {
-    TestAptosCrypto(
-        rng.sample_iter(&Alphanumeric)
-            .take(256)
-            .map(char::from)
-            .collect::<String>(),
-    )
+    TestAptosCrypto(rng.sample_iter(&Alphanumeric).take(256).collect::<String>())
 }
 
 /// Returns several 256-character unique strings that can be aggregate-signed by the BLS API.

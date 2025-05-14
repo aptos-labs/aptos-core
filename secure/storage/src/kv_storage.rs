@@ -30,7 +30,7 @@ pub trait KVStorage {
     fn reset_and_clear(&mut self) -> Result<(), Error>;
 }
 
-impl<'a, S> KVStorage for &'a mut S
+impl<S> KVStorage for &mut S
 where
     S: KVStorage,
 {

@@ -341,6 +341,7 @@ impl Block {
 
     /// Makes sure that the proposal makes sense, independently of the current state.
     /// If this is the genesis block, we skip these checks.
+    #[allow(unexpected_cfgs)]
     pub fn verify_well_formed(&self) -> anyhow::Result<()> {
         ensure!(
             !self.is_genesis_block(),

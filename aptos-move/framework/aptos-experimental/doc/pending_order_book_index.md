@@ -126,7 +126,7 @@
     PendingOrderBookIndex::V1 {
         price_move_up_index: new_default_big_ordered_map(),
         price_move_down_index: new_default_big_ordered_map(),
-        time_based_index: new_default_big_ordered_map(),
+        time_based_index: new_default_big_ordered_map()
     }
 }
 </code></pre>

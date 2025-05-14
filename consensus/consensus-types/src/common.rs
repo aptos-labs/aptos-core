@@ -14,8 +14,11 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
-    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId,
+    account_address::AccountAddress,
+    transaction::{ReplayProtector, SignedTransaction},
+    validator_verifier::ValidatorVerifier,
+    vm_status::DiscardedVMStatus,
+    PeerId,
 };
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
@@ -23,7 +26,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fmt::{self, Write},
-    u64,
 };
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -36,15 +38,15 @@ pub type Author = AccountAddress;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TransactionSummary {
     pub sender: AccountAddress,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub hash: HashValue,
 }
 
 impl TransactionSummary {
-    pub fn new(sender: AccountAddress, sequence_number: u64, hash: HashValue) -> Self {
+    pub fn new(sender: AccountAddress, replay_protector: ReplayProtector, hash: HashValue) -> Self {
         Self {
             sender,
-            sequence_number,
+            replay_protector,
             hash,
         }
     }
@@ -52,14 +54,14 @@ impl TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.replay_protector,)
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TxnSummaryWithExpiration {
     pub sender: AccountAddress,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub expiration_timestamp_secs: u64,
     pub hash: HashValue,
 }
@@ -67,13 +69,13 @@ pub struct TxnSummaryWithExpiration {
 impl TxnSummaryWithExpiration {
     pub fn new(
         sender: AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         expiration_timestamp_secs: u64,
         hash: HashValue,
     ) -> Self {
         Self {
             sender,
-            sequence_number,
+            replay_protector,
             expiration_timestamp_secs,
             hash,
         }
@@ -82,7 +84,7 @@ impl TxnSummaryWithExpiration {
 
 impl fmt::Display for TxnSummaryWithExpiration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{:?}", self.sender, self.replay_protector,)
     }
 }
 
@@ -118,7 +120,7 @@ impl TransactionInProgress {
 #[derive(Clone)]
 pub struct RejectedTransactionSummary {
     pub sender: AccountAddress,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub hash: HashValue,
     pub reason: DiscardedVMStatus,
 }
@@ -753,7 +755,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                     for txn in txns {
                         exclude_txns.push(TransactionSummary {
                             sender: txn.sender(),
-                            sequence_number: txn.sequence_number(),
+                            replay_protector: txn.replay_protector(),
                             hash: txn.committed_hash(),
                         });
                     }

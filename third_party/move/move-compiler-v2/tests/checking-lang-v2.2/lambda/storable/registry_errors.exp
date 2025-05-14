@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: cannot return `Option<|u64|u64 with store>` from a function with result type `Option<Function>`
+error: cannot return `Option<|u64|u64 has store>` from a function with result type `Option<Function>`
    ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:25:9
    │
 25 │         x
    │         ^
 
-error: expected `&mut Function` but found a value of type `|u64|u64 with store`
+error: expected `&mut Function` but found a value of type `|u64|u64 has store`
    ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:32:17
    │
 32 │                 f.f = f;
@@ -63,7 +63,7 @@ error: undeclared `func`
 70 │                 let Function { f: f, key: key } = &func;
    │                                                    ^^^^
 
-error: expected function of type `|u64|u64` but found `&|u64|u64 with store`
+error: expected function of type `|u64|u64` but found `&|u64|u64 has store`
    ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:71:22
    │
 71 │                 Some(f(x))

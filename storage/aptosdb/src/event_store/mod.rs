@@ -81,7 +81,7 @@ impl EventStore {
         event_key: &EventKey,
     ) -> Result<Option<u64>> {
         let mut iter = self.event_db.iter::<EventByVersionSchema>()?;
-        iter.seek_for_prev(&(*event_key, ledger_version, u64::max_value()));
+        iter.seek_for_prev(&(*event_key, ledger_version, u64::MAX));
 
         Ok(iter.next().transpose()?.and_then(
             |((key, _version, seq), _idx)| if &key == event_key { Some(seq) } else { None },
@@ -347,7 +347,7 @@ impl<'a> EventHashReader<'a> {
     }
 }
 
-impl<'a> HashReader for EventHashReader<'a> {
+impl HashReader for EventHashReader<'_> {
     fn get(&self, position: Position) -> Result<HashValue, anyhow::Error> {
         self.store
             .event_db

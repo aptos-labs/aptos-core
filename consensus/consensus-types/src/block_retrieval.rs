@@ -97,7 +97,7 @@ impl BlockRetrievalRequestV1 {
     }
 
     pub fn match_target_id(&self, hash_value: HashValue) -> bool {
-        self.target_block_id.map_or(false, |id| id == hash_value)
+        self.target_block_id == Some(hash_value)
     }
 }
 
@@ -222,7 +222,7 @@ impl BlockRetrievalResponse {
                         || self
                             .blocks
                             .last()
-                            .map_or(false, |block| retrieval_request.match_target_id(block.id())),
+                            .is_some_and(|block| retrieval_request.match_target_id(block.id())),
                     "target not found in blocks returned, expect {:?}",
                     retrieval_request.target_block_id(),
                 );
@@ -237,7 +237,7 @@ impl BlockRetrievalResponse {
                 );
                 ensure!(
                     self.status == BlockRetrievalStatus::SucceededWithTarget
-                        || !self.blocks.last().map_or(false, |block| {
+                        || !self.blocks.last().is_some_and(|block| {
                             block.round() < retrieval_request.target_round()
                                 || retrieval_request.is_window_start_block(block)
                         }),
@@ -245,8 +245,10 @@ impl BlockRetrievalResponse {
                 );
                 ensure!(
                     self.status != BlockRetrievalStatus::SucceededWithTarget
-                        || self.blocks.last().map_or(false, |block| retrieval_request
-                            .is_window_start_block(block)),
+                        || self
+                            .blocks
+                            .last()
+                            .is_some_and(|block| retrieval_request.is_window_start_block(block)),
                     "target not found in blocks returned, expect {},",
                     retrieval_request.target_round(),
                 );

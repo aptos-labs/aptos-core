@@ -1,4 +1,174 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x8675::M {
+    struct S {
+        f: u64,
+    }
+    public fun test(): u64 {
+        Add<u64>(M::test1(7), M::test1(2))
+    }
+    private fun test1(r: u64): u64 {
+        {
+          let x: u64 = 3;
+          {
+            let tref: &mut u64 = Borrow(Mutable)(if Lt<u64>(r, 4) {
+              r
+            } else {
+              x
+            });
+            tref = 10;
+            {
+              let y: u64 = r;
+              {
+                let tref2: &mut u64 = Borrow(Mutable)(y);
+                tref2 = Add<u64>(Deref(tref2), 1);
+                {
+                  let z: u64 = y;
+                  {
+                    let tref3: &mut u64 = Borrow(Mutable)(Add<u64>(z, 0));
+                    tref3 = Add<u64>(Deref(tref3), 2);
+                    {
+                      let a: u64 = z;
+                      {
+                        let tref4: &mut u64 = Borrow(Mutable)({
+                          let _q: u64 = 1;
+                          a
+                        });
+                        tref4 = Add<u64>(Deref(tref4), 4);
+                        {
+                          let tref5: &mut u64 = Borrow(Mutable)(a);
+                          tref5 = Add<u64>(Deref(tref5), 8);
+                          {
+                            let tref6: &mut u64 = Borrow(Mutable)(3;
+                            a);
+                            tref6 = Add<u64>(Deref(tref6), 16);
+                            a
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test1b(r: S): u64 {
+        {
+          let x: S = pack M::S(3);
+          {
+            let tref: &mut S = Borrow(Mutable)(if Lt<u64>(select M::S.f<S>(r), 4) {
+              r
+            } else {
+              x
+            });
+            select M::S.f<S>(Deref(tref)) = 10;
+            {
+              let y: S = r;
+              {
+                let tref2: &mut S = Borrow(Mutable)(y);
+                select M::S.f<S>(Deref(tref2)) = Add<u64>(select M::S.f<S>(Deref(tref2)), 1);
+                {
+                  let z: S = y;
+                  {
+                    let tref3: &mut u64 = Borrow(Mutable)(select M::S.f<S>(z));
+                    tref3 = Add<u64>(Deref(tref3), 1);
+                    {
+                      let a: S = z;
+                      {
+                        let tref4: &mut u64 = Borrow(Mutable)({
+                          let _q: u64 = 1;
+                          select M::S.f<S>(a)
+                        });
+                        tref4 = Add<u64>(Deref(tref4), 1);
+                        {
+                          let tref5: &mut u64 = Borrow(Mutable)(select M::S.f<S>(a));
+                          tref5 = Add<u64>(Deref(tref5), 8);
+                          {
+                            let tref6: &mut u64 = Borrow(Mutable)(3;
+                            select M::S.f<S>(a));
+                            tref6 = Add<u64>(Deref(tref6), 16);
+                            select M::S.f<S>(a)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun testb(): u64 {
+        Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
+    }
+} // end 0x8675::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    public fun test(): u64 {
+        test1(7) + test1(2)
+    }
+    fun test1(r: u64): u64 {
+        let x = 3;
+        let tref = &mut (if (r < 4) r else x);
+        *tref = 10;
+        let y = r;
+        let tref2 = &mut y;
+        *tref2 = *tref2 + 1;
+        let z = y;
+        let tref3 = &mut (z + 0);
+        *tref3 = *tref3 + 2;
+        let a = z;
+        let tref4 = &mut {
+            let _q = 1;
+            a
+        };
+        *tref4 = *tref4 + 4;
+        let tref5 = &mut a;
+        *tref5 = *tref5 + 8;
+        let tref6 = &mut {
+            3;
+            a
+        };
+        *tref6 = *tref6 + 16;
+        a
+    }
+    fun test1b(r: S): u64 {
+        let x = S{f: 3};
+        let tref = &mut (if (r.f < 4) r else x);
+        (*tref).f = 10;
+        let y = r;
+        let tref2 = &mut y;
+        (*tref2).f = (*tref2).f + 1;
+        let z = y;
+        let tref3 = &mut z.f;
+        *tref3 = *tref3 + 1;
+        let a = z;
+        let tref4 = &mut {
+            let _q = 1;
+            a.f
+        };
+        *tref4 = *tref4 + 1;
+        let tref5 = &mut a.f;
+        *tref5 = *tref5 + 8;
+        let tref6 = &mut {
+            3;
+            a.f
+        };
+        *tref6 = *tref6 + 16;
+        a.f
+    }
+    public fun testb(): u64 {
+        test1b(S{f: 7}) + test1b(S{f: 2})
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x8675::M {
     struct S {
         f: u64,
@@ -95,62 +265,6 @@ module 0x8675::M {
         Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
     }
 } // end 0x8675::M
-
-// -- Sourcified model before bytecode pipeline
-module 0x8675::M {
-    struct S has copy, drop {
-        f: u64,
-    }
-    public fun test(): u64 {
-        test1(7) + test1(2)
-    }
-    fun test1(r: u64): u64 {
-        let tref = &mut (if (r < 4) r else 3);
-        *tref = 10;
-        let y = r;
-        let tref2 = &mut y;
-        *tref2 = *tref2 + 1;
-        let z = y;
-        let tref3 = &mut (z + 0);
-        *tref3 = *tref3 + 2;
-        let a = z;
-        let tref4 = &mut a;
-        *tref4 = *tref4 + 4;
-        let tref5 = &mut a;
-        *tref5 = *tref5 + 8;
-        let tref6 = &mut {
-            3;
-            a
-        };
-        *tref6 = *tref6 + 16;
-        a
-    }
-    fun test1b(r: S): u64 {
-        let x = S{f: 3};
-        let tref = &mut (if (r.f < 4) r else x);
-        (*tref).f = 10;
-        let y = r;
-        let tref2 = &mut y;
-        (*tref2).f = (*tref2).f + 1;
-        let z = y;
-        let tref3 = &mut z.f;
-        *tref3 = *tref3 + 1;
-        let a = z;
-        let tref4 = &mut a.f;
-        *tref4 = *tref4 + 1;
-        let tref5 = &mut a.f;
-        *tref5 = *tref5 + 8;
-        let tref6 = &mut {
-            3;
-            a.f
-        };
-        *tref6 = *tref6 + 16;
-        a.f
-    }
-    public fun testb(): u64 {
-        test1b(S{f: 7}) + test1b(S{f: 2})
-    }
-}
 
 
 ============ bytecode verification succeeded ========

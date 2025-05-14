@@ -666,7 +666,7 @@ impl<'env> SimplifierRewriter<'env> {
     }
 }
 
-impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
+impl ExpRewriterFunctions for SimplifierRewriter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         let old_id = exp.as_ref().node_id().as_usize();
         trace!(

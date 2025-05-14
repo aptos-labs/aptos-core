@@ -991,7 +991,7 @@ impl ModuleGenerator {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Emits an error at the location.
     pub fn error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
         self.env.diag(Severity::Error, loc.as_ref(), msg.as_ref())
@@ -1063,7 +1063,7 @@ impl<'env> ModuleContext<'env> {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Acquires analysis. This is temporary until we have the full reference analysis.
     fn generate_acquires_map(&self, module: &ModuleEnv) -> BTreeMap<FunId, BTreeSet<StructId>> {
         // Compute map with direct usage of resources

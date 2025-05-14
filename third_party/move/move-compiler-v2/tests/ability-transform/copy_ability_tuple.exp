@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
@@ -59,6 +59,269 @@ public fun M::g($t0: &signer) {
      # live vars: $t1, $t4
   5: move_to<0x42::M::R>($t4, $t1)
      # live vars:
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t2 := 0
+     # live vars: $t1, $t2
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::g($t0: &signer) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: &signer
+     # live vars: $t0
+  0: $t2 := 1
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x42::M::R($t2)
+     # live vars: $t0, $t1
+  2: $t3 := 3
+     # live vars: $t0, $t1
+  3: ($t1, $t3) := M::f($t1)
+     # live vars: $t0, $t1
+  4: $t4 := infer($t0)
+     # live vars: $t1, $t4
+  5: move_to<0x42::M::R>($t4, $t1)
+     # live vars:
+  6: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 0
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::g($t0: &signer) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: &signer
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 1
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x42::M::R($t2)
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t3 := 3
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: ($t1, $t3) := M::f($t1)
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t4 := infer($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: move_to<0x42::M::R>($t4, $t1)
+     # live vars:
+     # refs: []
+     #
+  6: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t2 := 0
+     # abort state: {returns}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::g($t0: &signer) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: &signer
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x42::M::R($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t3 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: ($t1, $t3) := M::f($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: move_to<0x42::M::R>($t4, $t1)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  6: return ()
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+  0: $t1 := move($t0)
+  1: $t2 := 0
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::g($t0: &signer) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: &signer
+  0: $t2 := 1
+  1: $t1 := pack 0x42::M::R($t2)
+  2: $t3 := 3
+  3: ($t1, $t3) := M::f($t1)
+  4: $t4 := move($t0)
+  5: move_to<0x42::M::R>($t4, $t1)
+  6: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::f($t0: 0x42::M::R): (0x42::M::R, u64) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+  0: $t1 := infer($t0)
+  1: $t2 := 0
+  2: return ($t1, $t2)
+}
+
+
+[variant baseline]
+public fun M::g($t0: &signer) {
+     var $t1: 0x42::M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: &signer
+  0: $t2 := 1
+  1: $t1 := pack 0x42::M::R($t2)
+  2: $t3 := 3
+  3: ($t1, $t3) := M::f($t1)
+  4: $t4 := infer($t0)
+  5: move_to<0x42::M::R>($t4, $t1)
   6: return ()
 }
 

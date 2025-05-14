@@ -14,7 +14,7 @@ use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 use std::convert::Infallible;
-use std::{panic::PanicInfo, path::PathBuf, process};
+use std::{panic::PanicHookInfo, path::PathBuf, process};
 use tracing::error;
 use tracing_subscriber::EnvFilter;
 use warp::{http::Response, reply::Reply, Filter};
@@ -147,14 +147,14 @@ pub struct CrashInfo {
 /// ensure that all subsequent thread panics (even Tokio threads) will report the
 /// details/backtrace and then exit.
 pub fn setup_panic_handler() {
-    std::panic::set_hook(Box::new(move |pi: &PanicInfo<'_>| {
+    std::panic::set_hook(Box::new(move |pi: &PanicHookInfo<'_>| {
         handle_panic(pi);
     }));
 }
 
 // Formats and logs panic information
-fn handle_panic(panic_info: &PanicInfo<'_>) {
-    // The Display formatter for a PanicInfo contains the message, payload and location.
+fn handle_panic(panic_info: &PanicHookInfo<'_>) {
+    // The Display formatter for a PanicHookInfo contains the message, payload and location.
     let details = format!("{}", panic_info);
     let backtrace = format!("{:#?}", Backtrace::new());
     let info = CrashInfo { details, backtrace };

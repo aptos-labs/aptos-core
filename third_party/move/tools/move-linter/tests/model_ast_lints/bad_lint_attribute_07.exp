@@ -1,5 +1,5 @@
 Aborting with compilation errors:
-exiting with checking errors
+exiting with context checking errors
 error: duplicate declaration, item, or annotation
   ┌─ tests/model_ast_lints/bad_lint_attribute_07.move:2:30
   │

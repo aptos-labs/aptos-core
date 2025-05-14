@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from aptos_sdk.async_client import RestClient
 from common import METRICS_PORT, NODE_PORT, AccountInfo, Network, build_image_name
+from aptos_sdk.account_address import AccountAddress
 
 LOG = logging.getLogger(__name__)
 
@@ -207,7 +208,10 @@ class RunHelper:
             if "public_key: " in line:
                 public_key = line.split("public_key: ")[1].replace('"', "").replace("ed25519-pub-", "")
             if "account: " in line:
-                account_address = line.split("account: ")[1].replace('"', "")
+                addr_str = line.split("account: ")[1].replace('"', "")
+                if not addr_str.startswith("0x"):
+                    addr_str = "0x" + addr_str
+                account_address = AccountAddress.from_str(addr_str)
             if "network: " in line:
                 network = line.split("network: ")[1].replace('"', "")
         if not private_key or not public_key or not account_address:

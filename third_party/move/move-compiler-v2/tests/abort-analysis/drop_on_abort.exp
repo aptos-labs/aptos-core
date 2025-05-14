@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::from_vec<#0>($t0: vector<#0>): 0x42::m::Option<#0> {

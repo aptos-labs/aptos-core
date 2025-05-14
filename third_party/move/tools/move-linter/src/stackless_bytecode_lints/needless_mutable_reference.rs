@@ -4,7 +4,8 @@
 //! This module implements a stackless-bytecode linter that checks for mutable references
 //! that are never used mutably, and suggests to use immutable references instead.
 //! For example, if a mutable reference is never written to or passed as a mutable reference
-//! parameter to a function call, it can be replaced with an immutable reference.
+//! parameter to a function call, or is not returned as a mutable reference, it can be
+//! replaced with an immutable reference.
 //!
 //! Currently, we only track mutable references that are:
 //! - function parameters,
@@ -163,6 +164,11 @@ impl MutableReferenceUsageTracker {
                     .filter(|(_, ty)| ty.is_mutable_reference())
                     .map(|(i, _)| srcs[i])
                     .for_each(|src| self.set_and_propagate_mutably_used(src));
+            },
+            Ret(_, srcs) => {
+                for src in srcs {
+                    self.set_and_propagate_mutably_used(*src);
+                }
             },
             _ => {},
         }
