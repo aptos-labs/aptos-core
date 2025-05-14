@@ -148,11 +148,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
-            name: Experiment::COPY_PROPAGATION.to_string(),
-            description: "Whether copy propagation is run".to_string(),
-            default: Given(false),
-        },
-        Experiment {
             name: Experiment::DEAD_CODE_ELIMINATION.to_string(),
             description: "Whether to run dead store and unreachable code elimination".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -282,7 +277,6 @@ impl Experiment {
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
-    pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
