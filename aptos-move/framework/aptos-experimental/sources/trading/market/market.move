@@ -70,9 +70,6 @@ module aptos_experimental::market {
         TIME_IN_FORCE_IOC
     }
 
-    // TODO(skedia): Revisit this slippage tolerance for twap
-    const SLIPPAGE_TOLERANCE_FOR_TWAP: u64 = 300; // 3%
-
     struct Market<M: store + copy + drop> has store {
         /// Address of the parent object that created this market
         /// Purely for grouping events based on the source DEX, not used otherwise
@@ -852,39 +849,6 @@ module aptos_experimental::market {
         self: &mut Market<M>, oracle_price: u64
     ): vector<Order<M>> {
         self.order_book.take_ready_price_based_orders(oracle_price)
-    }
-
-    /// Triggers all the orders that are ready to be executed based on the oracle price.
-    public fun trigger_price_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>,
-        oracle_price: u64,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ) {
-        let ready_orders = self.order_book.take_ready_price_based_orders(oracle_price);
-        let i = 0;
-        while (i < ready_orders.length()) {
-            let order = ready_orders[i];
-            let (order_id, _unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
-
-                order.destroy_order();
-            let (user_addr, order_id) = order_id.destroy_order_id_type();
-            self.place_order_with_order_id(
-                user_addr,
-                price,
-                orig_size,
-                orig_size,
-                is_buy,
-                TIME_IN_FORCE_GTC,
-                option::none(),
-                metadata,
-                order_id,
-                1000, // TODO(skedia): Add support for fill limit here.
-                false,
-                true,
-                callbacks
-            );
-            i += 1;
-        };
     }
 
     /// Returns all the pending order that are ready to be executed based on current time stamp. The caller is responsible to
