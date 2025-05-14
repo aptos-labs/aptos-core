@@ -28,6 +28,7 @@ pub struct VMConfig {
     pub delayed_field_optimization_enabled: bool,
     pub ty_builder: TypeBuilder,
     pub use_call_tree_and_instruction_cache: bool,
+    pub enable_lazy_loading: bool,
 }
 
 impl Default for VMConfig {
@@ -46,6 +47,7 @@ impl Default for VMConfig {
             delayed_field_optimization_enabled: false,
             ty_builder: TypeBuilder::with_limits(128, 20),
             use_call_tree_and_instruction_cache: true,
+            enable_lazy_loading: false,
         }
     }
 }

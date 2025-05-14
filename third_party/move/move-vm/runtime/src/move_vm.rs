@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::Interpreter, module_traversal::TraversalContext,
-    native_extensions::NativeContextExtensions, AsFunctionValueExtension, LayoutConverter,
-    LoadedFunction, ModuleStorage, StorageLayoutConverter,
+    data_cache::TransactionDataCache,
+    interpreter::Interpreter,
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    AsFunctionValueExtension, LoadedFunction, ModuleStorage,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},

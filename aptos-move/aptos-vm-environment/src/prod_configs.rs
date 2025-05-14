@@ -145,6 +145,7 @@ pub fn aptos_prod_vm_config(
         ty_builder,
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
+        enable_lazy_loading: features.is_lazy_loading_enabled(),
     }
 }
 

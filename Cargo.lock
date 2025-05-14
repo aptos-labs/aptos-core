@@ -4747,6 +4747,7 @@ dependencies = [
  "rand_core 0.5.1",
  "rayon",
  "serde",
+ "test-case",
 ]
 
 [[package]]

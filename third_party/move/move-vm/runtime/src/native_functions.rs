@@ -3,19 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::InterpreterDebugInterface, loader::Function,
-    module_traversal::TraversalContext, native_extensions::NativeContextExtensions,
-    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
-    StorageLayoutConverter,
+    data_cache::TransactionDataCache,
+    interpreter::InterpreterDebugInterface,
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    },
+    ModuleStorage,
 };
-use move_binary_format::errors::{
-    ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
-};
+use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -96,7 +99,7 @@ impl NativeFunctions {
 }
 
 pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut dyn InterpreterDebugInterface,
+    interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
@@ -114,7 +117,7 @@ pub struct NativeContext<'a, 'b> {
 
 impl<'a, 'b> NativeContext<'a, 'b> {
     pub(crate) fn new(
-        interpreter: &'a mut dyn InterpreterDebugInterface,
+        interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
@@ -146,18 +149,26 @@ impl<'b> NativeContext<'_, 'b> {
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> VMResult<(bool, Option<NumBytes>)> {
-        // TODO(Rati, George): propagate exists call the way to resolver, because we
-        //                     can implement the check more efficiently, without the
-        //                     need to actually load bytes.
-        let (value, num_bytes) = self
-            .data_store
-            .load_resource(self.module_storage, self.resource_resolver, address, ty)
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let exists = value
-            .exists()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        Ok((exists, num_bytes))
+    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
+        // TODO(#16516):
+        //   Propagate exists call all the way to resolver, because we can implement the check more
+        //   efficiently, without the need to actually load bytes, deserialize the value and cache
+        //   it in the data cache.
+        Ok(if !self.data_store.contains_resource(&address, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+                self.module_storage,
+                self.resource_resolver,
+                &address,
+                ty,
+            )?;
+            let exists = entry.value().exists()?;
+            self.data_store
+                .insert_resource(address, ty.clone(), entry)?;
+            (exists, Some(bytes_loaded))
+        } else {
+            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
+            (exists, None)
+        })
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
@@ -178,6 +189,10 @@ impl<'b> NativeContext<'_, 'b> {
 
     pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
+    }
+
+    pub fn module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
@@ -214,18 +229,5 @@ impl<'b> NativeContext<'_, 'b> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
-    }
-
-    pub fn load_function(
-        &mut self,
-        module_id: &ModuleId,
-        function_name: &Identifier,
-    ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.module_storage.fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
-        Ok(function)
     }
 }

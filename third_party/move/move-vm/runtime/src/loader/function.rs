@@ -5,14 +5,14 @@
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    ModuleStorage, RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
     },
@@ -75,8 +75,38 @@ pub struct LoadedFunction {
 }
 
 impl LoadedFunction {
-    pub fn owner(&self) -> &LoadedFunctionOwner {
+    pub(crate) fn owner(&self) -> &LoadedFunctionOwner {
         &self.owner
+    }
+
+    /// Returns a reference to parent [Script] owning the script's entrypoint function. Returns an
+    /// invariant violation error if the function comes from a module.
+    pub fn owner_as_script(&self) -> VMResult<&Script> {
+        match &self.owner {
+            LoadedFunctionOwner::Script(script) => Ok(script.as_ref()),
+            LoadedFunctionOwner::Module(_) => {
+                let msg = "Expected function from script, got module instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
+
+    /// Returns a reference to parent [Module] owning the function. Returns an invariant violation
+    /// error if the function comes from a script.
+    pub fn owner_as_module(&self) -> VMResult<&Module> {
+        match &self.owner {
+            LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
+            LoadedFunctionOwner::Script(_) => {
+                let msg = "Expected function from module, but got script instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
     }
 }
 
@@ -112,14 +142,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        converter: &TypeTagConverter,
+        runtime_environment: &RuntimeEnvironment,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| converter.ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -351,9 +381,16 @@ impl LoadedFunction {
         self.function.is_public()
     }
 
-    /// Returns true if the loaded function is an entry function.
-    pub fn is_entry(&self) -> bool {
-        self.function.is_entry()
+    /// Returns an error if the loaded function is **NOT** an entry function.
+    pub fn is_entry_or_err(&self) -> VMResult<()> {
+        if !self.function.is_entry() {
+            let module_id = self.owner_as_module()?.self_id().clone();
+            let err = PartialVMError::new(
+                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+            );
+            return Err(err.finish(Location::Module(module_id)));
+        }
+        Ok(())
     }
 
     /// Returns parameter types from the function's definition signature.
