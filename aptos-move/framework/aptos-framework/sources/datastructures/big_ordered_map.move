@@ -322,7 +322,7 @@ module aptos_std::big_ordered_map {
     public fun add_all<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         // TODO: Can be optimized, both in insertion order (largest first, then from smallest),
         // as well as on initializing inner_max_degree/leaf_max_degree better
-        vector::zip(keys, values, |key, value| {
+        keys.zip(values, |key, value| {
             self.add(key, value);
         });
     }
@@ -494,7 +494,7 @@ module aptos_std::big_ordered_map {
         // TODO - this can be done more efficiently, by destroying the leaves directly
         // but that requires more complicated code and testing.
         self.for_each_and_clear(|k, v| f(k, v));
-        destroy_empty(self)
+        self.destroy_empty()
     }
 
     /// Apply the function to a reference of each element in the vector.
@@ -508,7 +508,7 @@ module aptos_std::big_ordered_map {
 
     /// Destroy a map, by destroying elements individually.
     public inline fun destroy<K: drop + copy + store, V: store>(self: BigOrderedMap<K, V>, dv: |V|) {
-        for_each(self, |_k, v| {
+        self.for_each(|_k, v| {
             dv(v);
         });
     }
@@ -607,7 +607,7 @@ module aptos_std::big_ordered_map {
             return new_iter(next_index, child_iter, iter_key);
         };
 
-        new_end_iter(map)
+        map.new_end_iter()
     }
 
     /// Returns the previous iterator.
@@ -1247,7 +1247,7 @@ module aptos_std::big_ordered_map {
         };
 
         assert!(!path_to_node.is_empty(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
-        let slot_to_remove = destroy_inner_child(self.remove_at(path_to_node, &key_to_remove));
+        let slot_to_remove = self.remove_at(path_to_node, &key_to_remove).destroy_inner_child();
         self.nodes.free_reserved_slot(reserved_slot_to_remove, slot_to_remove);
 
         old_child
@@ -1280,7 +1280,7 @@ module aptos_std::big_ordered_map {
     }
 
     #[test_only]
-    fun print_map_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64, level: u64) {
+    fun print_map_for_node<K: store + copy + drop, V: store>(self: &BigOrderedMap<K, V>, node_index: u64, level: u64) {
         let node = self.borrow_node(node_index);
 
         aptos_std::debug::print(&level);
@@ -1296,11 +1296,11 @@ module aptos_std::big_ordered_map {
 
     #[test_only]
     fun destroy_and_validate<K: drop + copy + store, V: drop + store>(self: BigOrderedMap<K, V>) {
-        let it = new_begin_iter(&self);
+        let it = self.new_begin_iter();
         while (!it.iter_is_end(&self)) {
-            remove(&mut self, it.iter_borrow_key());
-            assert!(find(&self, it.iter_borrow_key()).iter_is_end(&self), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
-            it = new_begin_iter(&self);
+            self.remove(it.iter_borrow_key());
+            assert!(self.find(it.iter_borrow_key()).iter_is_end(&self), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+            it = self.new_begin_iter();
             self.validate_map();
         };
 
@@ -1311,23 +1311,23 @@ module aptos_std::big_ordered_map {
     fun validate_iteration<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         let expected_num_elements = self.compute_length();
         let num_elements = 0;
-        let it = new_begin_iter(self);
+        let it = self.new_begin_iter();
         while (!it.iter_is_end(self)) {
-            num_elements = num_elements + 1;
+            num_elements += 1;
             it = it.iter_next(self);
         };
 
         assert!(num_elements == expected_num_elements, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
         let num_elements = 0;
-        let it = new_end_iter(self);
+        let it = self.new_end_iter();
         while (!it.iter_is_begin(self)) {
             it = it.iter_prev(self);
-            num_elements = num_elements + 1;
+            num_elements += 1;
         };
         assert!(num_elements == expected_num_elements, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        let it = new_end_iter(self);
+        let it = self.new_end_iter();
         if (!it.iter_is_begin(self)) {
             it = it.iter_prev(self);
             assert!(it.node_index == self.max_leaf_index, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
@@ -1359,13 +1359,13 @@ module aptos_std::big_ordered_map {
             previous_max_key = option::some(*key);
         });
 
-        if (option::is_some(&expected_max_key)) {
-            let expected_max_key = option::extract(&mut expected_max_key);
+        if (expected_max_key.is_some()) {
+            let expected_max_key = expected_max_key.extract();
             assert!(&expected_max_key == node.children.new_end_iter().iter_prev(&node.children).iter_borrow_key(&node.children), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         };
 
-        if (option::is_some(&expected_lower_bound_key)) {
-            let expected_lower_bound_key = option::extract(&mut expected_lower_bound_key);
+        if (expected_lower_bound_key.is_some()) {
+            let expected_lower_bound_key = expected_lower_bound_key.extract();
             assert!(cmp::compare(&expected_lower_bound_key, node.children.new_begin_iter().iter_borrow_key(&node.children)).is_lt(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         };
     }
@@ -1381,15 +1381,15 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(5, 3, true);
         map.allocate_spare_slots(2);
         map.print_map(); map.validate_map();
-        add(&mut map, 1, 1); map.print_map(); map.validate_map();
-        add(&mut map, 2, 2); map.print_map(); map.validate_map();
-        let r1 = upsert(&mut map, 3, 3); map.print_map(); map.validate_map();
+        map.add(1, 1); map.print_map(); map.validate_map();
+        map.add(2, 2); map.print_map(); map.validate_map();
+        let r1 = map.upsert(3, 3); map.print_map(); map.validate_map();
         assert!(r1 == option::none(), 1);
-        add(&mut map, 4, 4); map.print_map(); map.validate_map();
-        let r2 = upsert(&mut map, 4, 8); map.print_map(); map.validate_map();
+        map.add(4, 4); map.print_map(); map.validate_map();
+        let r2 = map.upsert(4, 8); map.print_map(); map.validate_map();
         assert!(r2 == option::some(4), 2);
-        add(&mut map, 5, 5); map.print_map(); map.validate_map();
-        add(&mut map, 6, 6); map.print_map(); map.validate_map();
+        map.add(5, 5); map.print_map(); map.validate_map();
+        map.add(6, 6); map.print_map(); map.validate_map();
 
         let expected_keys = vector[1, 2, 3, 4, 5, 6];
         let expected_values = vector[1, 2, 3, 8, 5, 6];
@@ -1401,19 +1401,19 @@ module aptos_std::big_ordered_map {
             index += 1;
         });
 
-        vector::zip(expected_keys, expected_values, |key, value| {
+        expected_keys.zip(expected_values, |key, value| {
             assert!(map.borrow(&key) == &value, key + 300);
             assert!(map.borrow_mut(&key) == &value, key + 400);
         });
 
-        remove(&mut map, &5); map.print_map(); map.validate_map();
-        remove(&mut map, &4); map.print_map(); map.validate_map();
-        remove(&mut map, &1); map.print_map(); map.validate_map();
-        remove(&mut map, &3); map.print_map(); map.validate_map();
-        remove(&mut map, &2); map.print_map(); map.validate_map();
-        remove(&mut map, &6); map.print_map(); map.validate_map();
+        map.remove(&5); map.print_map(); map.validate_map();
+        map.remove(&4); map.print_map(); map.validate_map();
+        map.remove(&1); map.print_map(); map.validate_map();
+        map.remove(&3); map.print_map(); map.validate_map();
+        map.remove(&2); map.print_map(); map.validate_map();
+        map.remove(&6); map.print_map(); map.validate_map();
 
-        destroy_empty(map);
+        map.destroy_empty();
     }
 
     #[test]
@@ -1450,28 +1450,28 @@ module aptos_std::big_ordered_map {
     fun test_variable_size() {
         let map = new_with_config<vector<u64>, vector<u64>>(0, 0, false);
         map.print_map(); map.validate_map();
-        add(&mut map, vector[1], vector[1]); map.print_map(); map.validate_map();
-        add(&mut map, vector[2], vector[2]); map.print_map(); map.validate_map();
-        let r1 = upsert(&mut map, vector[3], vector[3]); map.print_map(); map.validate_map();
+        map.add(vector[1], vector[1]); map.print_map(); map.validate_map();
+        map.add(vector[2], vector[2]); map.print_map(); map.validate_map();
+        let r1 = map.upsert(vector[3], vector[3]); map.print_map(); map.validate_map();
         assert!(r1 == option::none(), 1);
-        add(&mut map, vector[4], vector[4]); map.print_map(); map.validate_map();
-        let r2 = upsert(&mut map, vector[4], vector[8, 8, 8]); map.print_map(); map.validate_map();
+        map.add(vector[4], vector[4]); map.print_map(); map.validate_map();
+        let r2 = map.upsert(vector[4], vector[8, 8, 8]); map.print_map(); map.validate_map();
         assert!(r2 == option::some(vector[4]), 2);
-        add(&mut map, vector[5], vector[5]); map.print_map(); map.validate_map();
-        add(&mut map, vector[6], vector[6]); map.print_map(); map.validate_map();
+        map.add(vector[5], vector[5]); map.print_map(); map.validate_map();
+        map.add(vector[6], vector[6]); map.print_map(); map.validate_map();
 
-        vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
+        vector[1, 2, 3, 4, 5, 6].zip(vector[1, 2, 3, 8, 5, 6], |key, value| {
             assert!(map.borrow(&vector[key])[0] == value, key + 100);
         });
 
-        remove(&mut map, &vector[5]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[4]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[1]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[3]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[2]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[6]); map.print_map(); map.validate_map();
+        map.remove(&vector[5]); map.print_map(); map.validate_map();
+        map.remove(&vector[4]); map.print_map(); map.validate_map();
+        map.remove(&vector[1]); map.print_map(); map.validate_map();
+        map.remove(&vector[3]); map.print_map(); map.validate_map();
+        map.remove(&vector[2]); map.print_map(); map.validate_map();
+        map.remove(&vector[6]); map.print_map(); map.validate_map();
 
-        destroy_empty(map);
+        map.destroy_empty();
     }
     #[test]
     fun test_deleting_and_creating_nodes() {
@@ -1518,7 +1518,7 @@ module aptos_std::big_ordered_map {
             map.validate_map();
         };
 
-        destroy_empty(map);
+        map.destroy_empty();
     }
 
     #[test]
@@ -1529,17 +1529,17 @@ module aptos_std::big_ordered_map {
         let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
         while (data.length() != 0) {
             let element = data.pop_back();
-            add(&mut map, element, element);
+            map.add(element, element);
         };
 
-        let it = new_begin_iter(&map);
+        let it = map.new_begin_iter();
 
         let i = 0;
         while (!it.iter_is_end(&map)) {
             assert!(i == it.key, i);
             assert!(it.iter_borrow(&map) == &i, i);
             assert!(it.iter_borrow_mut(&mut map) == &i, i);
-            i = i + 1;
+            i += 1;
             it = it.iter_next(&map);
         };
 
@@ -1557,14 +1557,14 @@ module aptos_std::big_ordered_map {
         let i = 0;
         while (i < data.length()) {
             let element = data.borrow(i);
-            let it = find(&map, element);
+            let it = map.find(element);
             assert!(!it.iter_is_end(&map), i);
             assert!(it.iter_borrow_key() == element, i);
-            i = i + 1;
+            i += 1;
         };
 
-        assert!(find(&map, &4).iter_is_end(&map), 0);
-        assert!(find(&map, &9).iter_is_end(&map), 1);
+        assert!(map.find(&4).iter_is_end(&map), 0);
+        assert!(map.find(&9).iter_is_end(&map), 1);
 
         map.destroy(|_v| {});
     }
@@ -1580,22 +1580,22 @@ module aptos_std::big_ordered_map {
         let i = 0;
         while (i < data.length()) {
             let element = *data.borrow(i);
-            let it = lower_bound(&map, &element);
+            let it = map.lower_bound(&element);
             assert!(!it.iter_is_end(&map), i);
             assert!(it.key == element, i);
-            i = i + 1;
+            i += 1;
         };
 
-        assert!(lower_bound(&map, &0).key == 1, 0);
-        assert!(lower_bound(&map, &4).key == 5, 1);
-        assert!(lower_bound(&map, &9).key == 10, 2);
-        assert!(lower_bound(&map, &13).iter_is_end(&map), 3);
+        assert!(map.lower_bound(&0).key == 1, 0);
+        assert!(map.lower_bound(&4).key == 5, 1);
+        assert!(map.lower_bound(&9).key == 10, 2);
+        assert!(map.lower_bound(&13).iter_is_end(&map), 3);
 
-        remove(&mut map, &3);
-        assert!(lower_bound(&map, &3).key == 5, 4);
-        remove(&mut map, &5);
-        assert!(lower_bound(&map, &3).key == 6, 5);
-        assert!(lower_bound(&map, &4).key == 6, 6);
+        map.remove(&3);
+        assert!(map.lower_bound(&3).key == 5, 4);
+        map.remove(&5);
+        assert!(map.lower_bound(&3).key == 6, 5);
+        assert!(map.lower_bound(&4).key == 6, 6);
 
         map.destroy(|_v| {});
     }
@@ -1865,13 +1865,13 @@ module aptos_std::big_ordered_map {
         let y = 1234;
         comparison_test(500, 5, 5, false,
             || {
-                x = x + OFFSET;
-                if (x > MOD) { x = x - MOD};
+                x += OFFSET;
+                if (x > MOD) { x -= MOD};
                 x
             },
             || {
-                y = y + OFFSET;
-                if (y > MOD) { y = y - MOD};
+                y += OFFSET;
+                if (y > MOD) { y -= MOD};
                 y
             },
         );
@@ -1883,11 +1883,11 @@ module aptos_std::big_ordered_map {
         let y = 0;
         comparison_test(500, 5, 5, false,
             || {
-                x = x + 1;
+                x += 1;
                 x
             },
             || {
-                y = y + 1;
+                y += 1;
                 y
             },
         );
@@ -1899,11 +1899,11 @@ module aptos_std::big_ordered_map {
         let y = 100000;
         comparison_test(500, 5, 5, false,
             || {
-                x = x - 1;
+                x -= 1;
                 x
             },
             || {
-                y = y - 1;
+                y -= 1;
                 y
             },
         );

@@ -959,7 +959,7 @@ Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are pass
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_add_all">add_all</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
     // TODO: Can be optimized, both in insertion order (largest first, then from smallest),
     // <b>as</b> well <b>as</b> on initializing inner_max_degree/leaf_max_degree better
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_zip">vector::zip</a>(keys, values, |key, value| {
+    keys.zip(values, |key, value| {
         self.<a href="big_ordered_map.md#0x1_big_ordered_map_add">add</a>(key, value);
     });
 }
@@ -1448,7 +1448,7 @@ Apply the function to each element in the vector, consuming it, and consuming th
     // TODO - this can be done more efficiently, by destroying the leaves directly
     // but that <b>requires</b> more complicated <a href="code.md#0x1_code">code</a> and testing.
     self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_and_clear">for_each_and_clear</a>(|k, v| f(k, v));
-    <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty">destroy_empty</a>(self)
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty">destroy_empty</a>()
 }
 </code></pre>
 
@@ -1502,7 +1502,7 @@ Destroy a map, by destroying elements individually.
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_destroy">destroy</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, dv: |V|) {
-    <a href="big_ordered_map.md#0x1_big_ordered_map_for_each">for_each</a>(self, |_k, v| {
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each">for_each</a>(|_k, v| {
         dv(v);
     });
 }
@@ -1757,7 +1757,7 @@ Requires the map is not changed after the input iterator is generated.
         <b>return</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>(next_index, child_iter, iter_key);
     };
 
-    <a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>(map)
+    map.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>()
 }
 </code></pre>
 
@@ -2835,7 +2835,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
     };
 
     <b>assert</b>!(!path_to_node.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
-    <b>let</b> slot_to_remove = <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>(self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove));
+    <b>let</b> slot_to_remove = self.<a href="big_ordered_map.md#0x1_big_ordered_map_remove_at">remove_at</a>(path_to_node, &key_to_remove).<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_inner_child">destroy_inner_child</a>();
     self.nodes.free_reserved_slot(reserved_slot_to_remove, slot_to_remove);
 
     old_child
