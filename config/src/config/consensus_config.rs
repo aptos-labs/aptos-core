@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 3000;
-const MAX_SENDING_BLOCK_TXNS: u64 = 7000;
+const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
+const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
 // stop reducing size at this point, so 1MB transactions can still go through
@@ -222,21 +222,21 @@ impl Default for ConsensusConfig {
             execution_backpressure: Some(ExecutionBackpressureConfig {
                 txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
                     lookback_config: ExecutionBackpressureLookbackConfig {
-                        num_blocks_to_look_at: 12,
+                        num_blocks_to_look_at: 18,
                         min_block_time_ms_to_activate: 100,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Percentile(0.5),
-                        target_block_time_ms: 200,
+                        target_block_time_ms: 125,
                     },
                     min_calibrated_txns_per_block: 8,
                 }),
                 gas_limit: Some(ExecutionBackpressureGasLimitConfig {
                     lookback_config: ExecutionBackpressureLookbackConfig {
-                        num_blocks_to_look_at: 20,
+                        num_blocks_to_look_at: 30,
                         min_block_time_ms_to_activate: 10,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Mean,
-                        target_block_time_ms: 200,
+                        target_block_time_ms: 125,
                     },
                     block_execution_overhead_ms: 10,
                     min_calibrated_block_gas_limit: 2000,
