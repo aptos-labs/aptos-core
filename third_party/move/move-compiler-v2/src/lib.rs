@@ -17,11 +17,11 @@ pub mod plan_builder;
 use crate::{
     diagnostics::Emitter,
     env_pipeline::{
-        acquires_checker, ast_simplifier, closure_checker, cyclic_instantiation_checker,
-        flow_insensitive_checkers, function_checker, inliner, lambda_lifter,
-        lambda_lifter::LambdaLiftingOptions, model_ast_lints, recursive_struct_checker,
-        rewrite_target::RewritingScope, seqs_in_binop_checker, spec_checker, spec_rewriter,
-        unused_params_checker, EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
+        cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
+        lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
+        recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
+        spec_checker, spec_rewriter, unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -375,6 +375,20 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         // Perform all the model AST lint checks before inlining, to be closer "in form"
         // to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);
+    }
+
+    // The comparison rewriter is a new features in Aptos Move 2.2 and onwards
+    let rewrite_cmp = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+        && options.experiment_on(Experiment::CMP_REWRITE);
+
+    if rewrite_cmp {
+        env_pipeline.add("rewrite comparison operations", |env| {
+            // This rewrite is suggested to run before inlining to avoid repeated rewriting
+            cmp_rewriter::rewrite(env);
+        });
     }
 
     if options.experiment_on(Experiment::INLINING) {
