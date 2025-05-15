@@ -426,7 +426,7 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         .unwrap_or_default()
         .is_at_least(LanguageVersion::V2_2)
     {
-        env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
+        env_pipeline.add("closure-checker", |env: &mut GlobalEnv| {
             closure_checker::check_closures(env)
         });
     }

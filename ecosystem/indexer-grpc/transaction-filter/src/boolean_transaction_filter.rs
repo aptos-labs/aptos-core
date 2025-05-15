@@ -98,7 +98,11 @@ impl BooleanTransactionFilter {
         if let Some(max_filter_size) = max_filter_size {
             ensure!(
                 proto_filter.encoded_len() <= max_filter_size,
-                "Filter is too complicated."
+                format!(
+                    "Filter is too complicated. Max size: {} bytes, Actual size: {} bytes",
+                    max_filter_size,
+                    proto_filter.encoded_len()
+                )
             );
         }
         Ok(

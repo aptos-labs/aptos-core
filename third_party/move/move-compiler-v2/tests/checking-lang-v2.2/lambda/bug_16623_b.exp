@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: lambda lifting is not allowed in scripts
+   ┌─ tests/checking-lang-v2.2/lambda/bug_16623_b.move:11:13
+   │
+11 │ ╭             |
+12 │ │                 v2: || has copy+drop,
+13 │ │                 v3: || has copy+drop,
+14 │ │             |
+15 │ │             { }
+   │ ╰───────────────^
+   │
+   = lambda cannot be reduced to partial application of an existing function
+
+error: lambda lifting is not allowed in scripts
+   ┌─ tests/checking-lang-v2.2/lambda/bug_16623_b.move:10:9
+   │
+10 │ ╭         || {
+11 │ │             |
+12 │ │                 v2: || has copy+drop,
+13 │ │                 v3: || has copy+drop,
+14 │ │             |
+15 │ │             { }
+16 │ │         };
+   │ ╰─────────^
+   │
+   = lambda cannot be reduced to partial application of an existing function
+
+error: lambda lifting is not allowed in scripts
+   ┌─ tests/checking-lang-v2.2/lambda/bug_16623_b.move:18:13
+   │
+18 │ ╭             |v5: bool| {
+19 │ │                     *(&mut (true)) = v5;
+20 │ │             };
+   │ ╰─────────────^
+   │
+   = lambda cannot be reduced to partial application of an existing function

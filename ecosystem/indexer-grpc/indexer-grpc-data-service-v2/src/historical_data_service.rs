@@ -20,12 +20,12 @@ use tracing::info;
 use uuid::Uuid;
 
 const DEFAULT_MAX_NUM_TRANSACTIONS_PER_BATCH: usize = 10000;
-const MAX_FILTER_SIZE: usize = 1000;
 
 pub struct HistoricalDataService {
     chain_id: u64,
     connection_manager: Arc<ConnectionManager>,
     file_store_reader: Arc<FileStoreReader>,
+    max_transaction_filter_size_bytes: usize,
 }
 
 impl HistoricalDataService {
@@ -33,6 +33,7 @@ impl HistoricalDataService {
         chain_id: u64,
         config: HistoricalDataServiceConfig,
         connection_manager: Arc<ConnectionManager>,
+        max_transaction_filter_size_bytes: usize,
     ) -> Self {
         let file_store = block_on(config.file_store_config.create_filestore());
         let file_store_reader = Arc::new(block_on(FileStoreReader::new(chain_id, file_store)));
@@ -40,6 +41,7 @@ impl HistoricalDataService {
             chain_id,
             connection_manager: connection_manager.clone(),
             file_store_reader,
+            max_transaction_filter_size_bytes,
         }
     }
 
@@ -76,7 +78,7 @@ impl HistoricalDataService {
                 let filter = if let Some(proto_filter) = request.transaction_filter {
                     match BooleanTransactionFilter::new_from_proto(
                         proto_filter,
-                        Some(MAX_FILTER_SIZE),
+                        Some(self.max_transaction_filter_size_bytes),
                     ) {
                         Ok(filter) => Some(filter),
                         Err(e) => {

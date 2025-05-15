@@ -133,13 +133,14 @@ impl NetworkTest for FrameworkUpgrade {
             framework_git_rev: None,
         };
 
-        network_info.mint_to_validator().await?;
+        network_info.mint_to_validator(None).await?;
 
         let release_config = aptos_release_builder::current_release_config();
 
         aptos_release_builder::validate::validate_config(
             release_config.clone(),
             network_info.clone(),
+            None,
         )
         .await?;
 
@@ -153,6 +154,7 @@ impl NetworkTest for FrameworkUpgrade {
                 aptos_release_builder::validate::validate_config(
                     release_config.clone(),
                     network_info.clone(),
+                    None,
                 )
                 .await?;
             }
