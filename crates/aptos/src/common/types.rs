@@ -1178,7 +1178,7 @@ impl FromStr for OptimizationLevel {
             "" | "default" => Ok(Self::Default),
             "extra" => Ok(Self::Extra),
             _ => bail!(
-                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `extra`)",
                 s
             ),
         }
