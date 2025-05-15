@@ -4,4 +4,4 @@ error: Functions may not return function-typed values, but function `M::foreach_
   ┌─ tests/checking/typing/lambda_returning_lambda2.move:3:23
   │
 3 │     public inline fun foreach_caller2<T>(_v: &vector<T>, _action: ||(|&T|)) {
-  │                       ^^^^^^^^^^^^^^^                    ------- Parameter `_action` has type `|()||&T|`, which has function type `|&T|` as a function result type
+  │                       ^^^^^^^^^^^^^^^                    ------- Parameter `_action` has type `||(|&T|)`, which has function type `|&T|` as a function result type

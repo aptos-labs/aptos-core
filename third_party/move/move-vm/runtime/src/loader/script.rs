@@ -6,9 +6,11 @@ use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
+    file_format::{
+        Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility,
+    },
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{ident_str, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
     runtime_types::{StructIdentifier, Type},
@@ -107,19 +109,18 @@ impl Script {
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
-        // TODO: main does not have a name. Revisit.
-        let name = Identifier::new("main").unwrap();
-        let (native, def_is_native) = (None, false); // Script entries cannot be native
+
         let main: Arc<Function> = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
             ty_param_abilities,
-            native,
-            is_native: def_is_native,
-            is_friend_or_private: false,
+            native: None,
+            is_native: false,
+            visibility: Visibility::Private,
             is_entry: false,
-            name,
+            // TODO: main does not have a name. Revisit.
+            name: ident_str!("main").to_owned(),
             // Script must not return values.
             return_tys: vec![],
             local_tys,

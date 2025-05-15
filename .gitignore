@@ -138,3 +138,9 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 
 # ignore antithesis
 genesis_antithesis_*/
+
+# ignore cursor rules
+.cursor/rules
+
+#ignore proptest regressions
+**/proptest_regressions/*

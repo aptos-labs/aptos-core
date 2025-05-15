@@ -72,7 +72,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_29;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_31;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -97,4 +97,8 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_28: u64 = 32;
     pub const RELEASE_V1_29: u64 = 33;
     pub const RELEASE_V1_30: u64 = 34;
+    pub const RELEASE_V1_31: u64 = 35;
+    pub const RELEASE_V1_32: u64 = 36;
+    pub const RELEASE_V1_33: u64 = 37;
+    pub const RELEASE_V1_34: u64 = 38;
 }

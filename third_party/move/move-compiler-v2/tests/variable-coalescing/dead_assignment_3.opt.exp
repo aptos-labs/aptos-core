@@ -1,4 +1,34 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32
+  0: $t2 := 1
+  1: $t3 := infer($t2)
+  2: if ($t0) goto 3 else goto 8
+  3: label L0
+  4: $t3 := infer($t3)
+  5: $t3 := infer($t3)
+  6: $t1 := infer($t3)
+  7: goto 11
+  8: label L1
+  9: $t3 := infer($t3)
+ 10: $t1 := 9
+ 11: label L2
+ 12: return $t1
+}
+
+
+Diagnostics:
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ tests/variable-coalescing/dead_assignment_3.move:10:13
+   │
+10 │             y = y;
+   │             ^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test($t0: bool): u32 {
@@ -17,14 +47,6 @@ public fun m::test($t0: bool): u32 {
  10: label L2
  11: return $t1
 }
-
-
-Diagnostics:
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
-   ┌─ tests/variable-coalescing/dead_assignment_3.move:10:13
-   │
-10 │             y = y;
-   │             ^^^^^
 
 ============ after DeadStoreElimination: ================
 

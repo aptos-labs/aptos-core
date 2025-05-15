@@ -1,11 +1,11 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module <SELF>_0 {
     private fun main<T1,T2,T3>() {
         Tuple()
     }
 } // end <SELF>_0
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 script {
     fun main<T1: drop, T2, T3: key>() {
     }

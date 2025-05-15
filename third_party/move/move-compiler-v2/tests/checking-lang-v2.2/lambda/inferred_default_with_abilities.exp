@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: function resulting from lambda lifting is missing the `store` ability
+   ┌─ tests/checking-lang-v2.2/lambda/inferred_default_with_abilities.move:10:17
+   │
+10 │           let f = || {
+   │ ╭─────────────────^
+11 │ │             let a = one();
+12 │ │             let b = one();
+13 │ │             a + b
+14 │ │         };
+   │ ╰─────────^
+   │
+   = lambda cannot be reduced to partial application of existing function
+   = expected function type: `||u64 has store`

@@ -4,10 +4,10 @@
 use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
-    loader::{FunctionHandle, StructVariantInfo, VariantFieldInfo},
+    loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
     reentrancy_checker::CallType,
     runtime_type_checks::RuntimeTypeCheck,
-    LoadedFunction, LoadedFunctionOwner, ModuleStorage,
+    LoadedFunction, ModuleStorage,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},

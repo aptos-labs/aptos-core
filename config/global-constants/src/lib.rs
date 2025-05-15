@@ -19,7 +19,7 @@ pub const WAYPOINT: &str = "waypoint";
 pub const GENESIS_WAYPOINT: &str = "genesis-waypoint";
 
 // TODO(Gas): double check if this right
-/// Definitions of global gas constants
+// Definitions of global gas constants
 
 #[cfg(any(test, feature = "testing"))]
 pub const GAS_UNIT_PRICE: u64 = 0;

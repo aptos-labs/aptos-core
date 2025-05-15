@@ -3,7 +3,10 @@
 
 use aptos_types::transaction::BlockExecutableTransaction as Transaction;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::HashSet,
+    fmt::{self, Debug},
+};
 
 #[derive(Eq, Hash, PartialEq, Debug)]
 pub enum InputOutputKey<K, T> {
@@ -27,6 +30,15 @@ impl<T: Transaction> ReadWriteSummary<T> {
 
     pub fn conflicts_with_previous(&self, previous: &Self) -> bool {
         !self.reads.is_disjoint(&previous.writes)
+    }
+
+    pub fn find_conflicts<'a>(
+        &'a self,
+        previous: &'a Self,
+    ) -> HashSet<&'a InputOutputKey<T::Key, T::Tag>> {
+        self.reads
+            .intersection(&previous.writes)
+            .collect::<HashSet<_>>()
     }
 
     pub fn collapse_resource_group_conflicts(self) -> Self {

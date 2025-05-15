@@ -1,4 +1,161 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::test {
+    struct X {
+        value: bool,
+    }
+    private fun no_optimize_resource(): bool
+        acquires X(*)
+     {
+        {
+          let x: &mut X = Borrow(Mutable)(Deref(BorrowGlobal(Immutable)<X>(0x1)));
+          select test::X.value<&mut X>(x)
+        }
+    }
+    private fun no_optimize_vector() {
+        {
+          let x: vector<vector<u64>> = Vector<vector<u64>>(Vector<u64>(1, 2));
+          {
+            let _: &mut u64 = vector::borrow_mut<u64>(Borrow(Mutable)(Deref(vector::borrow<vector<u64>>(Borrow(Immutable)(x), 0))), 1);
+            Tuple()
+          }
+        }
+    }
+    private fun optimize_resource(): bool
+        acquires X(*)
+     {
+        {
+          let x: &X = Borrow(Immutable)(Deref(BorrowGlobal(Immutable)<X>(0x1)));
+          select test::X.value<&X>(x)
+        }
+    }
+    private fun optimize_vector() {
+        {
+          let x: vector<vector<u64>> = Vector<vector<u64>>(Vector<u64>(1, 2));
+          {
+            let _: &mut u64 = vector::borrow_mut<u64>(Borrow(Mutable)(Deref(vector::borrow_mut<vector<u64>>(Borrow(Mutable)(x), 0))), 1);
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::test {
+    struct X has copy, drop, key {
+        value: bool,
+    }
+    fun no_optimize_resource(): bool
+        acquires X
+    {
+        let x = &mut *borrow_global<X>(0x1);
+        x.value
+    }
+    fun no_optimize_vector() {
+        let x = vector[vector[1, 2]];
+        let _ = 0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow<vector<u64>>(&x, 0), 1);
+    }
+    fun optimize_resource(): bool
+        acquires X
+    {
+        let x = &*borrow_global<X>(0x1);
+        x.value
+    }
+    fun optimize_vector() {
+        let x = vector[vector[1, 2]];
+        let _ = 0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow_mut<vector<u64>>(&mut x, 0), 1);
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun test::no_optimize_resource(): bool {
+     var $t0: bool
+     var $t1: &mut 0x42::test::X
+     var $t2: 0x42::test::X
+     var $t3: &0x42::test::X
+     var $t4: address
+     var $t5: &bool
+  0: $t4 := 0x1
+  1: $t3 := borrow_global<0x42::test::X>($t4)
+  2: $t2 := read_ref($t3)
+  3: $t1 := borrow_local($t2)
+  4: $t5 := borrow_field<0x42::test::X>.value($t1)
+  5: $t0 := read_ref($t5)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun test::no_optimize_vector() {
+     var $t0: vector<vector<u64>>
+     var $t1: vector<u64>
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut vector<u64>
+     var $t6: vector<u64>
+     var $t7: &vector<u64>
+     var $t8: &vector<vector<u64>>
+     var $t9: u64
+     var $t10: u64
+     var $t11: &mut u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := vector($t2, $t3)
+  3: $t0 := vector($t1)
+  4: $t8 := borrow_local($t0)
+  5: $t9 := 0
+  6: $t7 := vector::borrow<vector<u64>>($t8, $t9)
+  7: $t6 := read_ref($t7)
+  8: $t5 := borrow_local($t6)
+  9: $t10 := 1
+ 10: $t4 := vector::borrow_mut<u64>($t5, $t10)
+ 11: $t11 := infer($t4)
+ 12: return ()
+}
+
+
+[variant baseline]
+fun test::optimize_resource(): bool {
+     var $t0: bool
+     var $t1: &0x42::test::X
+     var $t2: address
+     var $t3: &bool
+  0: $t2 := 0x1
+  1: $t1 := borrow_global<0x42::test::X>($t2)
+  2: $t3 := borrow_field<0x42::test::X>.value($t1)
+  3: $t0 := read_ref($t3)
+  4: return $t0
+}
+
+
+[variant baseline]
+fun test::optimize_vector() {
+     var $t0: vector<vector<u64>>
+     var $t1: vector<u64>
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: &mut vector<u64>
+     var $t6: &mut vector<vector<u64>>
+     var $t7: u64
+     var $t8: u64
+     var $t9: &mut u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t1 := vector($t2, $t3)
+  3: $t0 := vector($t1)
+  4: $t6 := borrow_local($t0)
+  5: $t7 := 0
+  6: $t5 := vector::borrow_mut<vector<u64>>($t6, $t7)
+  7: $t8 := 1
+  8: $t4 := vector::borrow_mut<u64>($t5, $t8)
+  9: $t9 := infer($t4)
+ 10: return ()
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::test {
     struct X {
         value: bool,
@@ -36,33 +193,7 @@ module 0x42::test {
     }
 } // end 0x42::test
 
-// -- Sourcified model before bytecode pipeline
-module 0x42::test {
-    struct X has copy, drop, key {
-        value: bool,
-    }
-    fun no_optimize_resource(): bool
-        acquires X
-    {
-        let x = &mut *borrow_global<X>(0x1);
-        x.value
-    }
-    fun no_optimize_vector() {
-        let _ = 0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow<vector<u64>>(&vector[vector[1, 2]], 0), 1);
-    }
-    fun optimize_resource(): bool
-        acquires X
-    {
-        let x = &*borrow_global<X>(0x1);
-        x.value
-    }
-    fun optimize_vector() {
-        let x = vector[vector[1, 2]];
-        let _ = 0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow_mut<vector<u64>>(&mut x, 0), 1);
-    }
-}
-
-============ initial bytecode ================
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun test::no_optimize_resource(): bool {

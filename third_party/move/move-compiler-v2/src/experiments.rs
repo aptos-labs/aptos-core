@@ -148,11 +148,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
-            name: Experiment::COPY_PROPAGATION.to_string(),
-            description: "Whether copy propagation is run".to_string(),
-            default: Given(false),
-        },
-        Experiment {
             name: Experiment::DEAD_CODE_ELIMINATION.to_string(),
             description: "Whether to run dead store and unreachable code elimination".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -259,6 +254,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Fail compilation if there is a warning".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS.to_string(),
+            description: "Skip errors originating from extended checks, for testing only"
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -276,7 +277,6 @@ impl Experiment {
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
-    pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
@@ -297,6 +297,7 @@ impl Experiment {
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
+    pub const SKIP_BAILOUT_ON_EXTENDED_CHECKS: &'static str = "skip-bailout-on-extended-checks";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";

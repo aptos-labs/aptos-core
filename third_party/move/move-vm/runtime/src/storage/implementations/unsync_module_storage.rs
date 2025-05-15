@@ -1,6 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::duplicated_attributes)]
+
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
@@ -40,7 +42,7 @@ pub enum BorrowedOrOwned<'a, T> {
     Owned(T),
 }
 
-impl<'a, T> Deref for BorrowedOrOwned<'a, T> {
+impl<T> Deref for BorrowedOrOwned<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -119,7 +121,7 @@ where
     }
 }
 
-impl<'ctx, Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'ctx, Ctx>
+impl<Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {
@@ -128,7 +130,7 @@ where
     }
 }
 
-impl<'ctx, Ctx> ModuleCodeBuilder for UnsyncModuleStorageImpl<'ctx, Ctx>
+impl<Ctx> ModuleCodeBuilder for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {

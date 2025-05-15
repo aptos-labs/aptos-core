@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
@@ -186,6 +186,197 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # live vars: $t22
  43: $t1 := vector::length<u8>($t22)
      # live vars: $t1
+ 44: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &vector<u8>
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u8
+     var $t9: &u8
+     var $t10: &vector<u8>
+     var $t11: u8
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: u8
+     var $t17: &u8
+     var $t18: &vector<u8>
+     var $t19: u8
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: &vector<u8>
+     # live vars: $t0
+  0: $t2 := 0
+     # live vars: $t0, $t2
+  1: $t3 := borrow_local($t0)
+     # live vars: $t0, $t2, $t3
+  2: label L0
+     # live vars: $t0, $t2, $t3
+  3: $t5 := infer($t2)
+     # live vars: $t0, $t2, $t3, $t5
+  4: $t6 := vector::length<u8>($t3)
+     # live vars: $t0, $t2, $t3, $t5, $t6
+  5: $t4 := <($t5, $t6)
+     # live vars: $t0, $t2, $t3, $t4
+  6: if ($t4) goto 7 else goto 35
+     # live vars: $t0, $t2, $t3
+  7: label L2
+     # live vars: $t0, $t2, $t3
+  8: $t10 := infer($t3)
+     # live vars: $t0, $t2, $t3, $t10
+  9: $t9 := vector::borrow<u8>($t10, $t2)
+     # live vars: $t0, $t2, $t3, $t9
+ 10: $t8 := read_ref($t9)
+     # live vars: $t0, $t2, $t3, $t8
+ 11: $t11 := 0
+     # live vars: $t0, $t2, $t3, $t8, $t11
+ 12: $t7 := !=($t8, $t11)
+     # live vars: $t0, $t2, $t3, $t7
+ 13: if ($t7) goto 14 else goto 17
+     # live vars: $t0, $t2, $t3
+ 14: label L5
+     # live vars: $t0, $t3
+ 15: goto 39
+     # live vars: $t0, $t2, $t3
+ 16: goto 18
+     # live vars: $t0, $t2, $t3
+ 17: label L6
+     # live vars: $t0, $t2, $t3
+ 18: label L7
+     # live vars: $t0, $t2, $t3
+ 19: $t13 := infer($t2)
+     # live vars: $t0, $t3, $t13
+ 20: $t14 := 1
+     # live vars: $t0, $t3, $t13, $t14
+ 21: $t12 := +($t13, $t14)
+     # live vars: $t0, $t3, $t12
+ 22: $t2 := infer($t12)
+     # live vars: $t0, $t2, $t3
+ 23: $t18 := infer($t3)
+     # live vars: $t0, $t2, $t3, $t18
+ 24: $t17 := vector::borrow<u8>($t18, $t2)
+     # live vars: $t0, $t2, $t3, $t17
+ 25: $t16 := read_ref($t17)
+     # live vars: $t0, $t2, $t3, $t16
+ 26: $t19 := 5
+     # live vars: $t0, $t2, $t3, $t16, $t19
+ 27: $t15 := ==($t16, $t19)
+     # live vars: $t0, $t2, $t3, $t15
+ 28: if ($t15) goto 29 else goto 32
+     # live vars: $t0, $t2, $t3
+ 29: label L8
+     # live vars: $t0, $t3
+ 30: goto 39
+     # live vars: $t0, $t2, $t3
+ 31: goto 33
+     # live vars: $t0, $t2, $t3
+ 32: label L9
+     # live vars: $t0, $t2, $t3
+ 33: label L10
+     # live vars: $t0, $t2, $t3
+ 34: goto 37
+     # live vars: $t0, $t2, $t3
+ 35: label L3
+     # live vars: $t0, $t3
+ 36: goto 39
+     # live vars: $t0, $t2, $t3
+ 37: label L4
+     # live vars: $t0, $t2, $t3
+ 38: goto 2
+     # live vars: $t0, $t3
+ 39: label L1
+     # live vars: $t0, $t3
+ 40: $t20 := copy($t0)
+     # live vars: $t0, $t3
+ 41: $t21 := infer($t0)
+     # live vars: $t3
+ 42: $t22 := infer($t3)
+     # live vars: $t22
+ 43: $t1 := vector::length<u8>($t22)
+     # live vars: $t1
+ 44: return $t1
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &vector<u8>
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u8
+     var $t9: &u8
+     var $t10: &vector<u8>
+     var $t11: u8
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: u8
+     var $t17: &u8
+     var $t18: &vector<u8>
+     var $t19: u8
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: &vector<u8>
+  0: $t2 := 0
+  1: $t3 := borrow_local($t0)
+  2: label L0
+  3: $t5 := infer($t2)
+  4: $t6 := vector::length<u8>($t3)
+  5: $t4 := <($t5, $t6)
+  6: if ($t4) goto 7 else goto 35
+  7: label L2
+  8: $t10 := infer($t3)
+  9: $t9 := vector::borrow<u8>($t10, $t2)
+ 10: $t8 := read_ref($t9)
+ 11: $t11 := 0
+ 12: $t7 := !=($t8, $t11)
+ 13: if ($t7) goto 14 else goto 17
+ 14: label L5
+ 15: goto 39
+ 16: goto 18
+ 17: label L6
+ 18: label L7
+ 19: $t13 := infer($t2)
+ 20: $t14 := 1
+ 21: $t12 := +($t13, $t14)
+ 22: $t2 := infer($t12)
+ 23: $t18 := infer($t3)
+ 24: $t17 := vector::borrow<u8>($t18, $t2)
+ 25: $t16 := read_ref($t17)
+ 26: $t19 := 5
+ 27: $t15 := ==($t16, $t19)
+ 28: if ($t15) goto 29 else goto 32
+ 29: label L8
+ 30: goto 39
+ 31: goto 33
+ 32: label L9
+ 33: label L10
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 2
+ 39: label L1
+ 40: $t20 := copy($t0)
+ 41: $t21 := infer($t0)
+ 42: $t22 := infer($t3)
+ 43: $t1 := vector::length<u8>($t22)
  44: return $t1
 }
 

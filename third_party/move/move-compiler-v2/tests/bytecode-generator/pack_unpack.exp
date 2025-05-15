@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::pack_unpack {
     struct T {
         h: u64,
@@ -18,7 +18,7 @@ module 0x42::pack_unpack {
     }
 } // end 0x42::pack_unpack
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::pack_unpack {
     struct T {
         h: u64,
@@ -36,7 +36,55 @@ module 0x42::pack_unpack {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun pack_unpack::pack($t0: u64, $t1: u64): 0x42::pack_unpack::S {
+     var $t2: 0x42::pack_unpack::S
+     var $t3: u64
+     var $t4: 0x42::pack_unpack::T
+  0: $t3 := infer($t0)
+  1: $t4 := pack 0x42::pack_unpack::T($t1)
+  2: $t2 := pack 0x42::pack_unpack::S($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+fun pack_unpack::unpack($t0: 0x42::pack_unpack::S): (u64, u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: 0x42::pack_unpack::T
+  0: ($t3, $t5) := unpack 0x42::pack_unpack::S($t0)
+  1: $t4 := unpack 0x42::pack_unpack::T($t5)
+  2: $t1 := infer($t3)
+  3: $t2 := infer($t4)
+  4: return ($t1, $t2)
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::pack_unpack {
+    struct T {
+        h: u64,
+    }
+    struct S {
+        f: u64,
+        g: T,
+    }
+    private fun pack(x: u64,y: u64): S {
+        pack pack_unpack::S(x, pack pack_unpack::T(y))
+    }
+    private fun unpack(s: S): (u64, u64) {
+        {
+          let pack_unpack::S{ f, g: pack_unpack::T{ h } } = s;
+          Tuple(f, h)
+        }
+    }
+} // end 0x42::pack_unpack
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun pack_unpack::pack($t0: u64, $t1: u64): 0x42::pack_unpack::S {

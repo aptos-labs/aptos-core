@@ -1,5 +1,5 @@
 Aborting with compilation errors:
-exiting with checking errors
+exiting with env checking errors
 error: did not expect an assigned value, expected only the names of the lint checks to be skipped
   ┌─ tests/model_ast_lints/bad_lint_attribute_05.move:2:18
   │

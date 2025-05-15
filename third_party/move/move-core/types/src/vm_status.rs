@@ -595,10 +595,18 @@ pub enum StatusCode {
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
     ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED = 41,
+    NONCE_ALREADY_USED = 42,
+    EMPTY_PAYLOAD_PROVIDED = 43,
+
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_7 = 42,
-    RESERVED_VALIDATION_ERROR_8 = 43,
     RESERVED_VALIDATION_ERROR_9 = 44,
+    RESERVED_VALIDATION_ERROR_10 = 45,
+    RESERVED_VALIDATION_ERROR_11 = 46,
+    RESERVED_VALIDATION_ERROR_12 = 47,
+    RESERVED_VALIDATION_ERROR_13 = 48,
+    RESERVED_VALIDATION_ERROR_14 = 49,
+    RESERVED_VALIDATION_ERROR_15 = 50,
+
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
@@ -748,12 +756,14 @@ pub enum StatusCode {
     INVALID_CLOSURE_MASK = 1132,
     // Closure eval type is not a function
     CLOSURE_CALL_REQUIRES_FUNCTION = 1133,
+    // Returned if init_module function is not valid during code publishing.
+    INVALID_INIT_MODULE = 1134,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1134,
-    RESERVED_VERIFICATION_ERROR_3 = 1135,
-    RESERVED_VERIFICATION_ERROR_4 = 1136,
-    RESERVED_VERIFICATION_ERROR_5 = 1137,
+    RESERVED_VERIFICATION_ERROR_1 = 1135,
+    RESERVED_VERIFICATION_ERROR_2 = 1136,
+    RESERVED_VERIFICATION_ERROR_3 = 1137,
+    RESERVED_VERIFICATION_ERROR_4 = 1138,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -882,7 +892,7 @@ pub enum StatusCode {
     RESERVED_RUNTIME_ERROR_4 = 4043,
 
     // A reserved status to represent an unknown vm status.
-    // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in
+    // this is u64::MAX, but we can't pattern match on that, so put the hardcoded value in
     UNKNOWN_STATUS = 18446744073709551615,
 }
 }
@@ -941,7 +951,7 @@ impl<'de> de::Deserialize<'de> for StatusCode {
         D: de::Deserializer<'de>,
     {
         struct StatusCodeVisitor;
-        impl<'de> de::Visitor<'de> for StatusCodeVisitor {
+        impl de::Visitor<'_> for StatusCodeVisitor {
             type Value = StatusCode;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

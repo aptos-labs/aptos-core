@@ -1,5 +1,5 @@
 Aborting with compilation errors:
-exiting with checking errors
+exiting with context checking errors
 error: invalid attribute
   ┌─ tests/model_ast_lints/bad_lint_attribute_09.move:2:7
   │

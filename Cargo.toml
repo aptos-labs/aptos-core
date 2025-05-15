@@ -233,7 +233,6 @@ members = [
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
     "third_party/move/move-vm/metrics",
-    "third_party/move/move-vm/paranoid-tests",
     "third_party/move/move-vm/runtime",
     "third_party/move/move-vm/test-utils",
     "third_party/move/move-vm/transactional-tests",
@@ -284,7 +283,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.78.0"
+rust-version = "1.80.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -480,9 +479,9 @@ nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
 ambassador = "0.4.1"
-anyhow = "1.0.71"
+anyhow = "1.0.98"
 anstyle = "1.0.1"
-arbitrary = { version = "1.3.2", features = ["derive"] }
+arbitrary = { version = "1.4.1", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
@@ -493,10 +492,10 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.0.0", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "bfb07a2b6985743fbc275d6fc621a80453f6742d", features = [
     "postgres_partial",
 ] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "bf4dd89677e6929ef21f898a7a4176514e606ebd" }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
 assert_approx_eq = "1.1.0"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
@@ -586,6 +585,7 @@ enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 erased-serde = "0.3.13"
 ethnum = "1.5.0"
+ethers = { version = "2" }
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
@@ -631,11 +631,6 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
-jemallocator = { version = "0.5.0", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
-jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
@@ -663,9 +658,9 @@ ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
-num-derive = "0.3.3"
+num-derive = "0.4.2"
 num-integer = "0.1.42"
-num-traits = "0.2.15"
+num-traits = "0.2.19"
 once_cell = "1.10.0"
 open = "5.3.1"
 ordered-float = "3.9.1"
@@ -696,7 +691,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.0.0", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", rev = "1449895f6e69425e2873b85c14182ac448732109", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -704,7 +699,7 @@ prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.4.0"
-proptest-derive = "0.4.0"
+proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
 prost-types = "0.13.3"
 quanta = "0.10.1"
@@ -822,11 +817,12 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
-wasm-bindgen = "0.2.95"
-wasm-bindgen-futures = "0.4.42"
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
 which = "4.2.5"
 whoami = "1.5.0"
-x25519-dalek = "1.2.0"
+# This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
+x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
@@ -912,7 +908,6 @@ debug = true
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
-x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

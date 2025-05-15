@@ -55,8 +55,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TemporaryValueToIdentifier
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'a, T, S>
+impl<T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
+    for TemporaryValueToIdentifierMapping<'_, T, S>
 {
     fn value_to_identifier(
         &self,
@@ -98,7 +98,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
     }
 }
 
-impl<'a, T, S> LatestView<'a, T, S>
+impl<T, S> LatestView<'_, T, S>
 where
     T: Transaction,
     S: TStateView<Key = T::Key>,

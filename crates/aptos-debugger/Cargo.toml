@@ -20,5 +20,10 @@ aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-push-metrics = { workspace = true }
 clap = { workspace = true }
-jemallocator = { workspace = true }
 tokio = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }

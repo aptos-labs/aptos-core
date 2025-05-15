@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::f($t0: &mut u64): &mut u64 {
@@ -56,11 +56,229 @@ fun m::g() {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
   ┌─ tests/ability-transform/destroy_after_call.move:8:9
   │
 8 │         r = f(r);
   │         ^^^^^^^^
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+     # live vars:
+  0: $t0 := 22
+     # live vars: $t0
+  1: $t1 := borrow_local($t0)
+     # live vars: $t0, $t1
+  2: $t2 := m::f($t1)
+     # live vars: $t0, $t2
+  3: $t1 := infer($t2)
+     # live vars: $t0
+  4: $t3 := borrow_local($t0)
+     # live vars:
+  5: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := 22
+     # live vars: $t0
+     # refs: []
+     #
+  1: $t1 := borrow_local($t0)
+     # live vars: $t0, $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   => (mut) #1 via [local `v`] at line 7
+     #
+  2: $t2 := m::f($t1)
+     # live vars: $t0, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [local `v`] at line 8
+     #
+  3: $t1 := infer($t2)
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t3 := borrow_local($t0)
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := 22
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  1: $t1 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   => (mut) #1 via [local `v`] at line 7
+     #
+  2: $t2 := m::f($t1)
+     # abort state: {returns}
+     # live vars: $t0, $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   -> (mut) #2 via [local `v`] at line 8
+     #
+  3: $t1 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t3 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+  0: $t0 := 22
+  1: $t1 := borrow_local($t0)
+  2: $t2 := m::f($t1)
+  3: $t1 := move($t2)
+  4: drop($t1)
+  5: $t3 := borrow_local($t0)
+  6: drop($t3)
+  7: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+  0: $t0 := 22
+  1: $t1 := borrow_local($t0)
+  2: $t2 := m::f($t1)
+  3: $t1 := infer($t2)
+  4: $t3 := borrow_local($t0)
+  5: return ()
+}
 
 ============ after LiveVarAnalysisProcessor: ================
 
