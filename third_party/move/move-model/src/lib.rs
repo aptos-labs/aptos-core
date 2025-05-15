@@ -269,7 +269,10 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut visited_modules = BTreeSet::new();
     // Extract the module dependency closure for the vector module
     let mut vector_and_its_dependencies = BTreeSet::new();
+    // Extract the module dependency closure for the std::cmp module
+    let mut cmp_and_its_dependencies = BTreeSet::new();
     let mut seen_vector = false;
+    let mut seen_cmp = false;
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
@@ -282,6 +285,15 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 mident,
                 &expansion_ast.modules,
                 &mut vector_and_its_dependencies,
+            );
+        }
+        if !seen_cmp && is_cmp(*mident) {
+            seen_cmp = true;
+            // Collect the cmp module and its dependencies.
+            collect_related_modules_recursive(
+                mident,
+                &expansion_ast.modules,
+                &mut cmp_and_its_dependencies,
             );
         }
     }
@@ -307,6 +319,9 @@ pub fn run_model_builder_with_options_and_compilation_flags<
             // E.g., index operation on a vector results in a call to `vector::borrow`.
             // TODO(#15483): consider refactoring code to avoid this special case.
             (vector_and_its_dependencies.contains(&mident.value)
+                // We also need to always include the `cmp` module and its dependencies,
+                // so that we can use interfaces offered by `cmp` to support comparison, Lt/Le/Gt/Ge, over non-integer types.
+                || cmp_and_its_dependencies.contains(&mident.value)
                 || visited_modules.contains(&mident.value))
             .then(|| {
                 mdef.is_source_module = true;
@@ -325,6 +340,12 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 fn is_vector(module_ident: ModuleIdent_) -> bool {
     module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
         && module_ident.module.0.value.as_str() == "vector"
+}
+
+/// Is `module_ident` the `0x1::cmp` module?
+fn is_cmp(module_ident: ModuleIdent_) -> bool {
+    module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+        && module_ident.module.0.value.as_str() == well_known::CMP_MODULE
 }
 
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {

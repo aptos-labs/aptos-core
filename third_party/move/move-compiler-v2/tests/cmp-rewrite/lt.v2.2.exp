@@ -1,0 +1,821 @@
+// -- Model dump before env processor pipeline:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor unused checks:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor type parameter check:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        Lt<T>(x, y)
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor rewrite comparison operations:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor inlining:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor acquires check:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor closure-checker:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor specification checker:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #   => #6 via [local `y`] at line 3
+     #
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+     # refs: []
+     #
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [value] at line 3
+     #
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #
+  1: $t6 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #   => #6 via [local `y`] at line 3
+     #
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t4
+     # refs: []
+     #
+  3: $t3 := borrow_local($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [value] at line 3
+     #
+  4: $t2 := cmp::is_lt($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+// -- Model dump before env processor pipeline:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+// -- Model dump after env processor simplifier:
+module 0xfff::cmp {
+    public fun test1<T>(x: T,y: T): bool {
+        cmp::is_lt(Borrow(Immutable)(cmp::compare<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))))
+    }
+} // end 0xfff::cmp
+
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #   => #6 via [local `y`] at line 3
+     #
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+     # refs: []
+     #
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [value] at line 3
+     #
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #
+  1: $t6 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 3
+     #   => #6 via [local `y`] at line 3
+     #
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t4
+     # refs: []
+     #
+  3: $t3 := borrow_local($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [value] at line 3
+     #
+  4: $t2 := cmp::is_lt($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # maybe
+  0: $t5 := borrow_local($t0)
+     # maybe
+  1: $t6 := borrow_local($t1)
+     # maybe
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # maybe
+  3: $t3 := borrow_local($t4)
+     # maybe
+  4: $t2 := cmp::is_lt($t3)
+     # maybe
+  5: return $t2
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+  3: $t3 := borrow_local($t4)
+  4: $t2 := cmp::is_lt($t3)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+public fun cmp::test1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &0x1::cmp::Ordering
+     var $t4: 0x1::cmp::Ordering
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t5, $t6
+  2: $t4 := cmp::compare<#0>($t5, $t6)
+     # live vars: $t4
+  3: $t3 := borrow_local($t4)
+     # live vars: $t3
+  4: $t2 := cmp::is_lt($t3)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module fff.cmp {
+use 0000000000000000000000000000000000000000000000000000000000000001::cmp as 1cmp;
+
+
+
+
+public test1<T: drop>(x: T, y: T): bool /* def_idx: 0 */ {
+L2:	$t4: Ordering
+B0:
+	0: ImmBorrowLoc[0](x: T)
+	1: ImmBorrowLoc[1](y: T)
+	2: Call 1cmp::compare<T>(&T, &T): Ordering
+	3: StLoc[2]($t4: Ordering)
+	4: ImmBorrowLoc[2]($t4: Ordering)
+	5: Call 1cmp::is_lt(&Ordering): bool
+	6: Ret
+}
+}
+============ bytecode verification succeeded ========

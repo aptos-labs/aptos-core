@@ -580,6 +580,32 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::SecondAstPipeline,
             ..config().exp(Experiment::MESSAGE_FORMAT_JSON)
         },
+        TestConfig {
+            name: "cmp-rewrite-lang-v2.1",
+            runner: |p| run_test(p, get_config_by_name("cmp-rewrite-lang-v2.1")),
+            include: vec!["/cmp-rewrite/"],
+            exp_suffix: Some("v2.1.exp"),
+            dump_ast: DumpLevel::AllStages,
+            dump_bytecode: DumpLevel::AllStages,
+            ..config().lang(LanguageVersion::V2_1)
+        },
+        TestConfig {
+            name: "cmp-rewrite-lang-v2.2",
+            runner: |p| {
+                let mut test_config = get_config_by_name("cmp-rewrite-lang-v2.2");
+                let mut options = test_config.options.clone();
+                options.dependencies.push(path_from_crate_root(
+                    "../../../aptos-move/framework/move-stdlib/sources",
+                ));
+                test_config.options = options;
+                run_test(p, test_config)
+            },
+            include: vec!["/cmp-rewrite/"],
+            exp_suffix: Some("v2.2.exp"),
+            dump_ast: DumpLevel::AllStages,
+            dump_bytecode: DumpLevel::AllStages,
+            ..config().lang(LanguageVersion::V2_2)
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -603,10 +629,16 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     options.compile_verify_code = path_str.contains("/verification/verify/");
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];
-    options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
-        vec![path_from_crate_root("../move-stdlib/sources")]
+    if extract_test_directives(path, "// no-stdlib")?.is_empty() {
+        // If no-stdlib is not specified and the test case does not config dependencies,
+        //  we add the standard library.
+        if options.dependencies.is_empty() {
+            options
+                .dependencies
+                .push(path_from_crate_root("../move-stdlib/sources"));
+        }
     } else {
-        vec![]
+        options.dependencies = vec![];
     };
     options.named_address_mapping = vec![
         "std=0x1".to_string(),

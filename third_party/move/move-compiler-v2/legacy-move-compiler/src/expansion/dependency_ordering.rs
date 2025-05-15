@@ -38,6 +38,7 @@ pub fn verify(
         .collect::<Vec<_>>();
     let graph = dependency_graph(&module_neighbors, &imm_module_idents);
     let graph = add_implicit_vector_dependencies(graph);
+    let graph = add_implicit_cmp_dependencies(graph);
     match petgraph_toposort(&graph, None) {
         Err(cycle_node) => {
             let cycle_ident = *cycle_node.node_id();
@@ -203,6 +204,38 @@ fn add_implicit_vector_dependencies(
         for module in all_modules {
             if !vector_dep_closure.contains(module) {
                 graph.add_edge(module, vector_module, ());
+            }
+        }
+    }
+    graph
+}
+
+/// If the `cmp` module is present in `graph`, then add dependency edges
+/// from every module (not in the `cmp` module's dependency closure) to the
+/// `cmp` module. This is because modules can have implicit dependencies
+/// on the `cmp` module via comparison operations on non-integer, non-reference types.
+fn add_implicit_cmp_dependencies(
+    mut graph: DiGraphMap<&ModuleIdent, ()>,
+) -> DiGraphMap<&ModuleIdent, ()> {
+    const CMP_MODULE: &str = "cmp";
+
+    let cmp_module = graph.nodes().find(|m| {
+        m.value.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+            // we should consider unifying the definition of constant strings like `cmp`
+            && m.value.module.0.value.as_str() == CMP_MODULE
+    });
+    if let Some(cmp_module) = cmp_module {
+        let mut dfs = Dfs::new(&graph, cmp_module);
+        // Get the transitive closure of the `cmp` module and its dependencies.
+        let mut cmp_dep_closure = BTreeSet::new();
+        while let Some(node) = dfs.next(&graph) {
+            cmp_dep_closure.insert(node);
+        }
+        // For every module that is not in `cmp_dep_closure`, add an edge to `cmp_module`.
+        let all_modules = graph.nodes().collect::<Vec<_>>();
+        for module in all_modules {
+            if !cmp_dep_closure.contains(module) {
+                graph.add_edge(module, cmp_module, ());
             }
         }
     }

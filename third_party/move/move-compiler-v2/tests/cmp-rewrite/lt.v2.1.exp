@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot use `T` with an operator which expects a value of type `integer`
+  ┌─ tests/cmp-rewrite/lt.move:3:9
+  │
+3 │         x < y
+  │         ^
