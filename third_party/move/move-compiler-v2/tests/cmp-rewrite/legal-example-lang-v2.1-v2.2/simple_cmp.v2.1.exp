@@ -1,0 +1,209 @@
+// -- Model dump before first bytecode pipeline
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: u64,y: u64): bool {
+        Eq<u64>(x, y)
+    }
+    public fun eq10(x: Test2,y: Test2): bool {
+        Eq<Test2>(x, y)
+    }
+    public fun eq2(x: u64,y: u64): bool {
+        Eq<u64>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq4<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq5(x: bool,y: bool): bool {
+        Eq<bool>(x, y)
+    }
+    public fun eq6(x: address,y: address): bool {
+        Eq<address>(x, y)
+    }
+    public fun eq7(x: vector<u8>,y: vector<u8>): bool {
+        Eq<vector<u8>>(x, y)
+    }
+    public fun eq8(x: vector<vector<u8>>,y: vector<vector<u8>>): bool {
+        Eq<vector<vector<u8>>>(x, y)
+    }
+    public fun eq9(x: Test1,y: Test1): bool {
+        Eq<Test1>(x, y)
+    }
+    public fun neq1(x: u64,y: u64): bool {
+        Neq<u64>(x, y)
+    }
+    public fun neq10(x: Test2,y: Test2): bool {
+        Neq<Test2>(x, y)
+    }
+    public fun neq2(x: u64,y: u64): bool {
+        Neq<u64>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq4<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq5(x: bool,y: bool): bool {
+        Neq<bool>(x, y)
+    }
+    public fun neq6(x: address,y: address): bool {
+        Neq<address>(x, y)
+    }
+    public fun neq7(x: vector<u8>,y: vector<u8>): bool {
+        Neq<vector<u8>>(x, y)
+    }
+    public fun neq8(x: vector<vector<u8>>,y: vector<vector<u8>>): bool {
+        Neq<vector<vector<u8>>>(x, y)
+    }
+    public fun neq9(x: Test1,y: Test1): bool {
+        Neq<Test1>(x, y)
+    }
+} // end 0xcffa::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcffa::m {
+    struct Test1 has drop {
+        a: u8,
+    }
+    struct Test2 has drop {
+        a: vector<u8>,
+    }
+    public fun eq1(x: u64, y: u64): bool {
+        x == y
+    }
+    public fun eq10(x: Test2, y: Test2): bool {
+        x == y
+    }
+    public fun eq2(x: u64, y: u64): bool {
+        &x == &y
+    }
+    public fun eq3<T: copy + drop>(x: T, y: T): bool {
+        x == y
+    }
+    public fun eq4<T: copy + drop>(x: T, y: T): bool {
+        &x == &y
+    }
+    public fun eq5(x: bool, y: bool): bool {
+        x == y
+    }
+    public fun eq6(x: address, y: address): bool {
+        x == y
+    }
+    public fun eq7(x: vector<u8>, y: vector<u8>): bool {
+        x == y
+    }
+    public fun eq8(x: vector<vector<u8>>, y: vector<vector<u8>>): bool {
+        x == y
+    }
+    public fun eq9(x: Test1, y: Test1): bool {
+        x == y
+    }
+    public fun neq1(x: u64, y: u64): bool {
+        x != y
+    }
+    public fun neq10(x: Test2, y: Test2): bool {
+        x != y
+    }
+    public fun neq2(x: u64, y: u64): bool {
+        &x != &y
+    }
+    public fun neq3<T: copy + drop>(x: T, y: T): bool {
+        x != y
+    }
+    public fun neq4<T: copy + drop>(x: T, y: T): bool {
+        &x != &y
+    }
+    public fun neq5(x: bool, y: bool): bool {
+        x != y
+    }
+    public fun neq6(x: address, y: address): bool {
+        x != y
+    }
+    public fun neq7(x: vector<u8>, y: vector<u8>): bool {
+        x != y
+    }
+    public fun neq8(x: vector<vector<u8>>, y: vector<vector<u8>>): bool {
+        x != y
+    }
+    public fun neq9(x: Test1, y: Test1): bool {
+        x != y
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: u64,y: u64): bool {
+        Eq<u64>(x, y)
+    }
+    public fun eq10(x: Test2,y: Test2): bool {
+        Eq<Test2>(x, y)
+    }
+    public fun eq2(x: u64,y: u64): bool {
+        Eq<u64>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq4<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq5(x: bool,y: bool): bool {
+        Eq<bool>(x, y)
+    }
+    public fun eq6(x: address,y: address): bool {
+        Eq<address>(x, y)
+    }
+    public fun eq7(x: vector<u8>,y: vector<u8>): bool {
+        Eq<vector<u8>>(x, y)
+    }
+    public fun eq8(x: vector<vector<u8>>,y: vector<vector<u8>>): bool {
+        Eq<vector<vector<u8>>>(x, y)
+    }
+    public fun eq9(x: Test1,y: Test1): bool {
+        Eq<Test1>(x, y)
+    }
+    public fun neq1(x: u64,y: u64): bool {
+        Neq<u64>(x, y)
+    }
+    public fun neq10(x: Test2,y: Test2): bool {
+        Neq<Test2>(x, y)
+    }
+    public fun neq2(x: u64,y: u64): bool {
+        Neq<u64>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq4<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq5(x: bool,y: bool): bool {
+        Neq<bool>(x, y)
+    }
+    public fun neq6(x: address,y: address): bool {
+        Neq<address>(x, y)
+    }
+    public fun neq7(x: vector<u8>,y: vector<u8>): bool {
+        Neq<vector<u8>>(x, y)
+    }
+    public fun neq8(x: vector<vector<u8>>,y: vector<vector<u8>>): bool {
+        Neq<vector<vector<u8>>>(x, y)
+    }
+    public fun neq9(x: Test1,y: Test1): bool {
+        Neq<Test1>(x, y)
+    }
+} // end 0xcffa::m

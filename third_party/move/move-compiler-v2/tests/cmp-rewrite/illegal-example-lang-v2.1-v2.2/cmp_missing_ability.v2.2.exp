@@ -1,0 +1,188 @@
+// -- Model dump before first bytecode pipeline
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcfff::m {
+    struct Test has copy {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T, y: T): bool {
+        x == y
+    }
+    public fun eq2<T>(x: T, y: T): bool {
+        &x == &y
+    }
+    public fun eq3<T>(x: vector<T>, y: vector<T>): bool {
+        &x == &y
+    }
+    public fun eq4(x: Test, y: Test): bool {
+        &x == &y
+    }
+    public fun neq1<T>(x: T, y: T): bool {
+        x != y
+    }
+    public fun neq2<T>(x: T, y: T): bool {
+        &x != &y
+    }
+    public fun neq3<T>(x: vector<T>, y: vector<T>): bool {
+        &x != &y
+    }
+    public fun neq4(x: Test, y: Test): bool {
+        &x != &y
+    }
+    public fun signer_eq(s1: signer, s2: signer): signer {
+        if (s1 == s2) s1 else s2
+    }
+}
+
+
+Diagnostics:
+error: local `y` of type `T` does not have the `drop` ability
+  ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:9:9
+  │
+9 │         x == y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `T` does not have the `drop` ability
+  ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:9:9
+  │
+9 │         x == y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `x` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:13:9
+   │
+13 │         &x == &y
+   │         ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:13:15
+   │
+13 │         &x == &y
+   │               ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `x` of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:17:9
+   │
+17 │         x == y
+   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:17:14
+   │
+17 │         x == y
+   │              ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `x` of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:21:9
+   │
+21 │         x == y
+   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:21:14
+   │
+21 │         x == y
+   │              ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:25:9
+   │
+25 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:25:9
+   │
+25 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `x` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:29:9
+   │
+29 │         &x != &y
+   │         ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:29:15
+   │
+29 │         &x != &y
+   │               ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `x` of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:33:9
+   │
+33 │         x != y
+   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:33:14
+   │
+33 │         x != y
+   │              ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `x` of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:37:9
+   │
+37 │         x != y
+   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:37:14
+   │
+37 │         x != y
+   │              ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `s1` of type `signer` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:41:13
+   │
+41 │         if (s1 == s2)
+   │             ^^ copy needed here because value is still in use
+42 │             s1
+   │             -- used here
+
+error: local `s2` of type `signer` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:41:13
+   │
+41 │         if (s1 == s2)
+   │             ^^^^^^^^ copy needed here because value is still in use
+   ·
+44 │             s2
+   │             -- used here

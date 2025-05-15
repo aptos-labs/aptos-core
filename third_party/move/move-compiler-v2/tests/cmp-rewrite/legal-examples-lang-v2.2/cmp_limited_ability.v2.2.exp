@@ -1,0 +1,109 @@
+// -- Model dump before first bytecode pipeline
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x0::test {
+    struct Test has drop {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test, y: Test): Test {
+        if (&x == &y) x else y
+    }
+    public fun eq2(x: Test, y: Test): Test {
+        if (&x == &y) x else y
+    }
+}
+module 0x1::test {
+    struct Test has drop {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>, y: vector<Test>): vector<Test> {
+        if (&x == &y) x else y
+    }
+    public fun eq2(x: vector<Test>, y: vector<Test>): vector<Test> {
+        if (&x == &y) x else y
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test

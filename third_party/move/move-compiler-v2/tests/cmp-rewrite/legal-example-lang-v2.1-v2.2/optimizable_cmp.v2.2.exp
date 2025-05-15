@@ -1,0 +1,62 @@
+// -- Model dump before first bytecode pipeline
+module 0xcfff::m {
+    struct Work {
+        0: |u64|u64 has drop,
+    }
+    public fun eq1<T>(_x: T,_y: T): bool {
+        Eq<u64>(1, 1)
+    }
+    public fun eq2<T>(_x: T,_y: T): bool {
+        {
+          let x: vector<u8> = Vector<u8>(1, 2, 3, 4, 5, 6);
+          {
+            let y: vector<u8> = Vector<u8>(1, 2, 3, 4, 5, 6);
+            Eq<vector<u8>>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+          }
+        }
+    }
+    private inline fun eq3(): bool {
+        {
+          let work: Work = pack m::Work(|x: u64| Add<u64>(x, 1));
+          Eq<Work>(Borrow(Immutable)(work), Borrow(Immutable)(|x: u64| Add<u64>(x, 1)))
+        }
+    }
+} // end 0xcfff::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcfff::m {
+    struct Work has drop {
+        0: |u64|u64 has drop,
+    }
+    public fun eq1<T: copy + drop>(_x: T, _y: T): bool {
+        1 == 1
+    }
+    public fun eq2<T: copy + drop>(_x: T, _y: T): bool {
+        let x = vector[1u8, 2u8, 3u8, 4u8, 5u8, 6u8];
+        let y = vector[1u8, 2u8, 3u8, 4u8, 5u8, 6u8];
+        &x == &y
+    }
+    inline fun eq3(): bool {
+        let work = Work(|x| x + 1);
+        &work == &(|x| x + 1)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xcfff::m {
+    struct Work {
+        0: |u64|u64 has drop,
+    }
+    public fun eq1<T>(_x: T,_y: T): bool {
+        true
+    }
+    public fun eq2<T>(_x: T,_y: T): bool {
+        Eq<vector<u8>>(Borrow(Immutable)([Number(1), Number(2), Number(3), Number(4), Number(5), Number(6)]), Borrow(Immutable)([Number(1), Number(2), Number(3), Number(4), Number(5), Number(6)]))
+    }
+    private inline fun eq3(): bool {
+        {
+          let work: Work = pack m::Work(|x: u64| Add<u64>(x, 1));
+          Eq<Work>(Borrow(Immutable)(work), Borrow(Immutable)(|x: u64| Add<u64>(x, 1)))
+        }
+    }
+} // end 0xcfff::m
