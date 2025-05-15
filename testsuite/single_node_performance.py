@@ -35,6 +35,8 @@ class Flow(Flag):
     EXECUTORS = auto()
     # Test Order Book
     ORDER_BOOK = auto()
+    # Tests that are run continuously on main
+    COLLECTIONS = auto()
     # For when testing locally, quick inclusion of specific cases
     ADHOC = auto()
 
@@ -86,6 +88,12 @@ CODE_PERF_VERSION = "v10"
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
     os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
+)
+WARMUP_NUMBER_OF_EXECUTION_THREADS = int(
+    os.environ.get(
+        "WARMUP_NUMBER_OF_EXECUTION_THREADS",
+        default=max(32, NUMBER_OF_EXECUTION_THREADS),
+    )
 )
 
 if os.environ.get("DETAILED"):
@@ -266,6 +274,10 @@ TESTS = [
 
     RunGroupConfig(key=RunGroupKey("vector-trim-append-len3000-size1"), included_in=Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("vector-remove-insert-len3000-size1"), included_in=Flow.CONTINUOUS, waived=True),
+
+    RunGroupConfig(key=RunGroupKey("collection-insert-none-smart-table", module_working_set_size=1), included_in=Flow.COLLECTIONS | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(key=RunGroupKey("collection-insert-none-b-tree-map", module_working_set_size=1), included_in=Flow.COLLECTIONS | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(key=RunGroupKey("collection-insert-max-b-tree-map", module_working_set_size=1), included_in=Flow.COLLECTIONS | Flow.CONTINUOUS, waived=True),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -670,7 +682,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+
+    create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {WARMUP_NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
