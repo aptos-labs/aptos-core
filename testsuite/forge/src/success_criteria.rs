@@ -3,8 +3,8 @@
 
 use crate::{
     prometheus_metrics::{
-        fetch_error_metrics, fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice,
-        SystemMetrics,
+        fetch_fullnode_failures, fetch_system_metrics, fetch_validator_error_metrics,
+        LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
     },
     Swarm, SwarmExt, TestReport,
 };
@@ -170,6 +170,7 @@ pub struct SuccessCriteria {
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     check_no_errors: bool,
+    check_no_fullnode_failures: bool,
     max_expired_tps: Option<f64>,
     max_failed_submission_tps: Option<f64>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
@@ -190,6 +191,7 @@ impl SuccessCriteria {
             latency_breakdown_thresholds: None,
             check_no_restarts: false,
             check_no_errors: true,
+            check_no_fullnode_failures: false,
             max_expired_tps: None,
             max_failed_submission_tps: None,
             wait_for_all_nodes_to_catchup: None,
@@ -205,6 +207,11 @@ impl SuccessCriteria {
 
     pub fn add_no_restarts(mut self) -> Self {
         self.check_no_restarts = true;
+        self
+    }
+
+    pub fn add_no_fullnode_failures(mut self) -> Self {
+        self.check_no_fullnode_failures = true;
         self
     }
 
@@ -339,6 +346,10 @@ impl SuccessCriteriaChecker {
 
         if success_criteria.check_no_errors {
             Self::check_no_errors(swarm.clone()).await?;
+        }
+
+        if success_criteria.check_no_fullnode_failures {
+            Self::check_no_fullnode_failures(swarm.clone()).await?;
         }
 
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
@@ -568,10 +579,27 @@ impl SuccessCriteriaChecker {
         }
     }
 
+    /// Checks if there are any fullnode failures. Note: this currently
+    /// only checks if consensus observer falls back to state sync.
+    async fn check_no_fullnode_failures(
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+    ) -> anyhow::Result<()> {
+        let fullnode_failures = fetch_fullnode_failures(swarm).await?;
+        if fullnode_failures > 0 {
+            bail!(
+                "Error! The number of fullnode failures was > 0 ({}), but must be 0!",
+                fullnode_failures
+            );
+        } else {
+            info!("No fullnode failures detected.");
+            Ok(())
+        }
+    }
+
     async fn check_no_errors(
         swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> anyhow::Result<()> {
-        let error_count = fetch_error_metrics(swarm).await?;
+        let error_count = fetch_validator_error_metrics(swarm).await?;
         if error_count > 0 {
             bail!(
                 "error!() count in validator logs was {}, and must be 0",
