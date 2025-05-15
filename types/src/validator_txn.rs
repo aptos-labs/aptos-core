@@ -3,7 +3,8 @@
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::dkg::DKGTranscriptMetadata;
-use crate::{dkg::DKGTranscript, jwks};
+use crate::{dkg::DKGTranscript, jwks, validator_verifier::ValidatorVerifier};
+use anyhow::Context;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use move_core_types::account_address::AccountAddress;
@@ -38,6 +39,15 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJWKUpdate(_) => {
                 "validator_transaction__observed_jwk_update"
             },
+        }
+    }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        match self {
+            ValidatorTransaction::DKGResult(dkg_result) => dkg_result
+                .verify(verifier)
+                .context("DKGResult verification failed"),
+            ValidatorTransaction::ObservedJWKUpdate(_) => Ok(()),
         }
     }
 }
