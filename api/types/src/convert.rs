@@ -368,8 +368,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     transaction_payload,
                 })
             },
-
-            // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
             GTxnBytes(_) => todo!(),
         };

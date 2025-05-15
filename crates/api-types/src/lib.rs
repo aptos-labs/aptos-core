@@ -8,7 +8,6 @@ pub mod on_chain_config;
 pub mod config_storage;
 use crate::account::{ExternalAccountAddress, ExternalChainId};
 use crate::u256_define::HashValue;
-use async_trait::async_trait;
 use compute_res::ComputeRes;
 use core::str;
 use std::collections::BTreeMap;
@@ -16,19 +15,10 @@ use std::sync::OnceLock;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use std::{fmt::Debug, hash::Hasher, sync::Arc};
+use std::{fmt::Debug, hash::Hasher};
 use u256_define::{BlockId, Random, TxnHash};
 
 pub type Round = u64;
-
-#[async_trait]
-pub trait ConsensusApi: Send + Sync {
-    async fn send_ordered_block(&self, parent_id: [u8; 32], ordered_block: ExternalBlock);
-
-    async fn recv_executed_block_hash(&self, head: ExternalBlockMeta) -> ComputeRes;
-
-    async fn commit_block_hash(&self, head: [u8; 32]);
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ExecutionBlocks {
@@ -77,56 +67,8 @@ pub struct VerifiedTxnWithAccountSeqNum {
     pub account_seq_num: u64,
 }
 
-#[async_trait]
-pub trait ExecutionChannel: Send + Sync {
-    ///
-    /// # Returns
-    /// A `Vec` containing tuples, where each tuple consists of:
-    /// - `TxnHash`: The committed hash for the newly added txn
-    /// - `sender_latest_committed_sequence_number`: The latest committed sequence number associated with the sender on the execution layer.
-    ///
-    async fn send_user_txn(&self, bytes: ExecTxn) -> Result<TxnHash, ExecError>;
-
-    async fn recv_unbroadcasted_txn(&self) -> Result<Vec<VerifiedTxn>, ExecError>;
-
-    async fn check_block_txns(
-        &self,
-        payload_attr: ExternalPayloadAttr,
-        txns: Vec<VerifiedTxn>,
-    ) -> Result<bool, ExecError>;
-
-    ///
-    /// # Returns
-    /// A `Vec` containing tuples, where each tuple consists of:
-    /// - `VerifiedTxn`: The transaction object.
-    /// - `sender_latest_committed_sequence_number`: The latest committed sequence number associated with the sender on the execution layer.
-    ///
-    async fn send_pending_txns(&self) -> Result<Vec<VerifiedTxnWithAccountSeqNum>, ExecError>;
-
-    // async fn send_ordered_block(&self, ordered_block: Vec<Txns>, block_number: BlockNumber, parent_mata_data: ExternalBlockMeta) -> Result<(), ExecError>;
-    async fn recv_ordered_block(
-        &self,
-        parent_id: BlockId,
-        ordered_block: ExternalBlock,
-    ) -> Result<(), ExecError>;
-
-    // the block hash is the hash of the block that has been executed, which is passed by the send_ordered_block
-    async fn send_executed_block_hash(
-        &self,
-        head: ExternalBlockMeta,
-    ) -> Result<ComputeRes, ExecError>;
-
-    // this function is called by the execution layer commit the block hash
-    async fn recv_committed_block_info(&self, block_id: BlockId) -> Result<(), ExecError>;
-}
-
 pub struct ExecutionArgs {
     pub block_number_to_block_id: BTreeMap<u64, HashValue>,
-}
-
-#[derive(Clone)]
-pub struct ExecutionLayer {
-    pub execution_api: Arc<dyn ExecutionChannel>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

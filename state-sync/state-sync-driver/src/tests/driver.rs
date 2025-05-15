@@ -67,7 +67,7 @@ async fn test_consensus_commit_notification() {
 
     // Verify that full nodes can't process commit notifications
     let result = consensus_notifier
-        .notify_new_commit(vec![create_transaction()], vec![])
+        .notify_new_commit(vec![create_transaction()], vec![], 0)
         .await;
     assert_err!(result);
 
@@ -77,7 +77,7 @@ async fn test_consensus_commit_notification() {
 
     // Send a new commit notification and verify the node isn't bootstrapped
     let result = consensus_notifier
-        .notify_new_commit(vec![create_transaction()], vec![])
+        .notify_new_commit(vec![create_transaction()], vec![], 0)
         .await;
     assert_err!(result);
 }
@@ -163,7 +163,7 @@ async fn test_consensus_commit_notifications() {
     let committed_events = events.clone();
     let join_handle = tokio::spawn(async move {
         consensus_notifier
-            .notify_new_commit(committed_transactions, committed_events)
+            .notify_new_commit(committed_transactions, committed_events, 0)
             .await
             .unwrap();
     });
@@ -219,7 +219,7 @@ async fn test_reconfiguration_notifications() {
         let consensus_notifier = consensus_notifier.clone();
         let join_handle = tokio::spawn(async move {
             consensus_notifier
-                .notify_new_commit(committed_transactions, committed_events)
+                .notify_new_commit(committed_transactions, committed_events, 0)
                 .await
                 .unwrap();
         });

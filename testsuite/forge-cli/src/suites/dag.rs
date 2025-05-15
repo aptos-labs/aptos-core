@@ -93,11 +93,11 @@ fn dag_realistic_env_max_load_test(
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
 
-            let onchain_consensus_config = OnChainConsensusConfig::V4 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                vtxn: ValidatorTxnConfig::default_for_genesis(),
-                window_size: DEFAULT_WINDOW_SIZE
-            };
+            let onchain_consensus_config = todo!(); // OnChainConsensusConfig::V4 {
+            //     alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+            //     vtxn: ValidatorTxnConfig::default_for_genesis(),
+            //     window_size: DEFAULT_WINDOW_SIZE
+            // };
 
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
@@ -182,11 +182,11 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
             helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
                 num_large_validators.into();
 
-            let onchain_consensus_config = OnChainConsensusConfig::V4 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                vtxn: ValidatorTxnConfig::default_for_genesis(),
-                window_size: DEFAULT_WINDOW_SIZE,
-            };
+            let onchain_consensus_config = todo!(); // OnChainConsensusConfig::V4 {
+            //     alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+            //     vtxn: ValidatorTxnConfig::default_for_genesis(),
+            //     window_size: DEFAULT_WINDOW_SIZE,
+            // };
 
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(onchain_consensus_config).expect("must serialize");

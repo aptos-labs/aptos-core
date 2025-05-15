@@ -480,7 +480,9 @@ pub fn update_counters_for_processed_chunk<T>(
                         .with_label_values(&[process_type, "deprecated_module_bundle", state])
                         .inc();
                 },
-                aptos_types::transaction::TransactionPayload::GTxnBytes(_) => todo!(),
+                aptos_types::transaction::TransactionPayload::GTxnBytes(_) => {
+                    todo!();
+                },
             }
         }
 

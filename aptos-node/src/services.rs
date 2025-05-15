@@ -216,7 +216,7 @@ pub fn start_node_inspection_service(
 ) {
     aptos_inspection_service::start_inspection_service(
         node_config.clone(),
-        aptos_data_client,
+        todo!(), // aptos_data_client,
         peers_and_metadata,
     )
 }

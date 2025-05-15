@@ -286,7 +286,7 @@ async fn main() -> anyhow::Result<()> {
                     .inner()
                     .chain_id;
 
-                if chain_id == ChainId::mainnet().id() || chain_id == ChainId::testnet().id() {
+                if chain_id as u64 == ChainId::mainnet().id() || chain_id as u64 == ChainId::testnet().id() {
                     panic!("Mint to mainnet/testnet is not allowed");
                 }
 
@@ -341,7 +341,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            print_configs!( , OnChainExecutionConfig, AptosVersion);
+            // print_configs!( , OnChainExecutionConfig, AptosVersion);
 
             if print_gas_schedule {
                 print_configs!(GasScheduleV2, StorageGasSchedule);

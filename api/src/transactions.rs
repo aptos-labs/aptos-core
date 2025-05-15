@@ -1106,6 +1106,7 @@ impl TransactionsApi {
                             ledger_info,
                         ))
                     },
+
                     TransactionPayload::GTxnBytes(_) => todo!(),
                 }
                 // TODO: Verify script args?

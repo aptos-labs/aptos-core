@@ -313,7 +313,7 @@ pub async fn chain_id(rest_client: &Client) -> CliTypedResult<ChainId> {
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?
         .into_inner();
-    Ok(ChainId::new(state.chain_id))
+    Ok(ChainId::new(state.chain_id as u64))
 }
 /// Error message for parsing a map
 const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map. Example: Name=Value,Name2=Value";

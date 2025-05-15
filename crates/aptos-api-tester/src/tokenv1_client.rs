@@ -25,7 +25,7 @@ async fn get_chain_id(client: &ApiClient) -> Result<ChainId> {
         .inner()
         .chain_id;
 
-    Ok(ChainId::new(id))
+    Ok(ChainId::new(id as u64))
 }
 
 /// Helper function to take care of a transaction after creating the payload.

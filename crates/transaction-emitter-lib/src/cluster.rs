@@ -111,7 +111,7 @@ impl Cluster {
 
         for (instance, state) in instance_states.into_iter() {
             let state_timestamp = state.timestamp_usecs / 1000000;
-            if state.chain_id != chain_id.id() {
+            if state.chain_id as u64 != chain_id.id() {
                 warn!(
                     "Excluding client {} running wrong chain {}, instead of {}",
                     instance.peer_name(),
@@ -242,7 +242,8 @@ fn get_chain_id_from_instances(instance_states: Vec<(Instance, State)>) -> Resul
             num_instances
         );
     }
-    Ok(ChainId::new(max_chain_id))
+    todo!()
+    // Ok(ChainId::new(max_chain_id))
 }
 
 #[cfg(test)]
@@ -279,7 +280,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_1.id()),
+                create_dummy_rest_api_state(chain_id_1.id().try_into().unwrap()),
             ),
             (
                 Instance::new(
@@ -288,7 +289,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_1.id()),
+                create_dummy_rest_api_state(chain_id_1.id().try_into().unwrap()),
             ),
             (
                 Instance::new(
@@ -297,7 +298,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_2.id()),
+                create_dummy_rest_api_state(chain_id_2.id().try_into().unwrap()),
             ),
             (
                 Instance::new(
@@ -306,7 +307,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_3.id()),
+                create_dummy_rest_api_state(chain_id_3.id().try_into().unwrap()),
             ),
         ];
 
@@ -327,7 +328,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_3.id()),
+                create_dummy_rest_api_state(chain_id_3.id().try_into().unwrap()),
             ),
             (
                 Instance::new(
@@ -336,7 +337,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_3.id()),
+                create_dummy_rest_api_state(chain_id_3.id().try_into().unwrap()),
             ),
             (
                 Instance::new(
@@ -345,7 +346,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_3.id()),
+                create_dummy_rest_api_state(chain_id_3.id().try_into().unwrap()),
             ),
             (
                 Instance::new(
@@ -354,7 +355,7 @@ mod test {
                     None,
                     None,
                 ),
-                create_dummy_rest_api_state(chain_id_3.id()),
+                create_dummy_rest_api_state(chain_id_3.id().try_into().unwrap()),
             ),
         ];
 

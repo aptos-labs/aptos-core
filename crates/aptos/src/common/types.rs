@@ -1824,7 +1824,7 @@ impl TransactionOptions {
         }
         let expiration_time_secs = now + self.gas_options.expiration_secs;
 
-        let chain_id = ChainId::new(state.chain_id);
+        let chain_id = ChainId::new(state.chain_id as u64);
         // TODO: Check auth key against current private key and provide a better message
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
@@ -1981,7 +1981,7 @@ impl TransactionOptions {
             .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
         let (account, state) = get_account_with_state(&client, sender_address).await?;
         let version = state.version;
-        let chain_id = ChainId::new(state.chain_id);
+        let chain_id = ChainId::new(state.chain_id as u64);
         let sequence_number = account.sequence_number;
 
         let balance = client

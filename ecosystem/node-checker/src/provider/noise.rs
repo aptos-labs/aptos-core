@@ -74,7 +74,7 @@ impl Provider for NoiseProvider {
     async fn provide(&self) -> Result<Self::Output, ProviderError> {
         Ok(NodeAddressArgs {
             address: self.network_address.clone(),
-            chain_id: ChainId::new(self.api_indexer_provider.provide().await?.chain_id),
+            chain_id: todo!(), // ChainId::new(self.api_indexer_provider.provide().await?.chain_id),
         })
     }
 

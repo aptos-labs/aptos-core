@@ -397,7 +397,7 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::GTxnBytes(bytes) => { todo!() }
+        TransactionPayload::GTxnBytes(bytes) => todo!(),
     }
 }
 

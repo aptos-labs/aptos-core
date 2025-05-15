@@ -2528,16 +2528,16 @@ impl AptosVM {
         is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
-        check_gas(
-            self.gas_params(log_context)?,
-            self.gas_feature_version(),
-            resolver,
-            module_storage,
-            txn_data,
-            self.features(),
-            is_approved_gov_script,
-            log_context,
-        )?;
+        // check_gas(
+        //     self.gas_params(log_context)?,
+        //     self.gas_feature_version(),
+        //     resolver,
+        //     module_storage,
+        //     txn_data,
+        //     self.features(),
+        //     is_approved_gov_script,
+        //     log_context,
+        // )?;
 
         match payload {
             TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {

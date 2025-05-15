@@ -600,6 +600,7 @@ async fn test_commit_sync_race() {
             &self,
             _transactions: Vec<Transaction>,
             _subscribable_events: Vec<ContractEvent>,
+            _block_number: u64,
         ) -> std::result::Result<(), Error> {
             Ok(())
         }

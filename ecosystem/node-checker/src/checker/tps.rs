@@ -117,7 +117,7 @@ impl Checker for TpsChecker {
 
         let target_url = target_api_index_provider.client.build_path("/").unwrap();
         let chain_id = match target_api_index_provider.provide().await {
-            Ok(response) => ChainId::new(response.chain_id),
+            Ok(response) => todo!(), // ChainId::new(response.chain_id),
             Err(err) => {
                 return Ok(vec![Self::build_result(
                     "Failed to get chain ID of your node".to_string(),

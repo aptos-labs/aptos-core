@@ -179,6 +179,7 @@ impl HashValue {
         HashValue::from_keccak(sha3)
     }
 
+    /// 
     #[cfg(test)]
     pub fn from_iter_sha3<'a, I>(buffers: I) -> Self
     where

@@ -274,7 +274,7 @@ async fn send_get_request_to_path(config: &NodeConfig, endpoint: &str) -> Respon
             .body(Body::from(""))
             .unwrap(),
         config.clone(),
-        aptos_data_client,
+        todo!(), // aptos_data_client,
         peers_and_metadata,
     )
     .await

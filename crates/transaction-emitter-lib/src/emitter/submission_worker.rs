@@ -450,102 +450,102 @@ pub async fn submit_transactions(
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,
 ) {
-    let cur_time = Instant::now();
-    let offset = cur_time - loop_start_time;
-    txn_offset_time.fetch_add(
-        txns.len() as u64 * offset.as_millis() as u64,
-        Ordering::Relaxed,
-    );
-    stats
-        .submitted
-        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+    // let cur_time = Instant::now();
+    // let offset = cur_time - loop_start_time;
+    // txn_offset_time.fetch_add(
+    //     txns.len() as u64 * offset.as_millis() as u64,
+    //     Ordering::Relaxed,
+    // );
+    // stats
+    //     .submitted
+    //     .fetch_add(txns.len() as u64, Ordering::Relaxed);
 
-    match client.submit_batch_bcs(txns).await {
-        Err(e) => {
-            stats
-                .failed_submission
-                .fetch_add(txns.len() as u64, Ordering::Relaxed);
-            sample!(
-                SampleRate::Duration(Duration::from_secs(60)),
-                warn!(
-                    "[{:?}] Failed to submit batch request: {:?}",
-                    client.path_prefix_string(),
-                    e
-                )
-            );
-        },
-        Ok(v) => {
-            let failures = v.into_inner().transaction_failures;
+    // match client.submit_batch_bcs(txns).await {
+    //     Err(e) => {
+    //         stats
+    //             .failed_submission
+    //             .fetch_add(txns.len() as u64, Ordering::Relaxed);
+    //         sample!(
+    //             SampleRate::Duration(Duration::from_secs(60)),
+    //             warn!(
+    //                 "[{:?}] Failed to submit batch request: {:?}",
+    //                 client.path_prefix_string(),
+    //                 e
+    //             )
+    //         );
+    //     },
+    //     Ok(v) => {
+    //         let failures = v.into_inner().transaction_failures;
 
-            stats
-                .failed_submission
-                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+    //         stats
+    //             .failed_submission
+    //             .fetch_add(failures.len() as u64, Ordering::Relaxed);
 
-            let by_error = failures
-                .iter()
-                .map(|f| {
-                    f.error
-                        .vm_error_code
-                        .and_then(|c| StatusCode::try_from(c).ok())
-                })
-                .counts();
-            if let Some(failure) = failures.first() {
-                sample!(SampleRate::Duration(Duration::from_secs(60)), {
-                    let first_failed_txn = &txns[failure.transaction_index];
-                    let sender = first_failed_txn.sender();
-                    use aptos_types::transaction::TransactionPayload::*;
-                    let payload = match first_failed_txn.payload() {
-                        Script(_) => "script".to_string(),
-                        ModuleBundle(_) => "module_bundle".to_string(),
-                        EntryFunction(entry_function) => format!(
-                            "entry {}::{}",
-                            entry_function.module(),
-                            entry_function.function()
-                        ),
-                        Multisig(_) => "multisig".to_string(),
-                    };
+    //         let by_error = failures
+    //             .iter()
+    //             .map(|f| {
+    //                 f.error
+    //                     .vm_error_code
+    //                     .and_then(|c| StatusCode::try_from(c).ok())
+    //             })
+    //             .counts();
+    //         if let Some(failure) = failures.first() {
+    //             sample!(SampleRate::Duration(Duration::from_secs(60)), {
+    //                 let first_failed_txn = &txns[failure.transaction_index];
+    //                 let sender = first_failed_txn.sender();
+    //                 use aptos_types::transaction::TransactionPayload::*;
+    //                 let payload = todo!(); // match first_failed_txn.payload() {
+    //                 //     Script(_) => "script".to_string(),
+    //                 //     ModuleBundle(_) => "module_bundle".to_string(),
+    //                 //     EntryFunction(entry_function) => format!(
+    //                 //         "entry {}::{}",
+    //                 //         entry_function.module(),
+    //                 //         entry_function.function()
+    //                 //     ),
+    //                 //     Multisig(_) => "multisig".to_string(),
+    //                 // };
 
-                    let first_failed_txn_info = format!(
-                        "due to {:?}, for account {}, max gas {}, payload {}",
-                        failure,
-                        first_failed_txn.sender(),
-                        first_failed_txn.max_gas_amount(),
-                        payload,
-                    );
+    //                 let first_failed_txn_info = format!(
+    //                     "due to {:?}, for account {}, max gas {}, payload {}",
+    //                     failure,
+    //                     first_failed_txn.sender(),
+    //                     first_failed_txn.max_gas_amount(),
+    //                     payload,
+    //                 );
 
-                    let last_transactions =
-                        if let Ok(account) = client.get_account_bcs(sender).await {
-                            client
-                                .get_account_transactions_bcs(
-                                    sender,
-                                    Some(account.into_inner().sequence_number().saturating_sub(1)),
-                                    Some(5),
-                                )
-                                .await
-                                .ok()
-                                .map(|r| r.into_inner())
-                        } else {
-                            None
-                        };
-                    let balance = client
-                        .view_apt_account_balance(sender)
-                        .await
-                        .map_or(-1, |v| v.into_inner() as i64);
+    //                 let last_transactions =
+    //                     if let Ok(account) = client.get_account_bcs(sender).await {
+    //                         client
+    //                             .get_account_transactions_bcs(
+    //                                 sender,
+    //                                 Some(account.into_inner().sequence_number().saturating_sub(1)),
+    //                                 Some(5),
+    //                             )
+    //                             .await
+    //                             .ok()
+    //                             .map(|r| r.into_inner())
+    //                     } else {
+    //                         None
+    //                     };
+    //                 let balance = client
+    //                     .view_apt_account_balance(sender)
+    //                     .await
+    //                     .map_or(-1, |v| v.into_inner() as i64);
 
-                    warn!(
-                        "[{:?}] Failed to submit {} txns in a batch, first failure: {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
-                        client.path_prefix_string(),
-                        failures.len(),
-                        first_failed_txn_info,
-                        txns[0].chain_id(),
-                        txns[0].sequence_number(),
-                        failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
-                        by_error,
-                        balance,
-                        last_transactions,
-                    );
-                });
-            }
-        },
-    };
+    //                 warn!(
+    //                     "[{:?}] Failed to submit {} txns in a batch, first failure: {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
+    //                     client.path_prefix_string(),
+    //                     failures.len(),
+    //                     first_failed_txn_info,
+    //                     txns[0].chain_id(),
+    //                     txns[0].sequence_number(),
+    //                     failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
+    //                     by_error,
+    //                     balance,
+    //                     last_transactions,
+    //                 );
+    //             });
+    //         }
+    //     },
+    // };
 }

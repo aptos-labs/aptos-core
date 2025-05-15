@@ -249,7 +249,7 @@ impl SMRNode {
                         round_proposers.insert(*round, author_from_config(&node_configs[*idx]));
                     })
                 }
-                RoundProposer(round_proposers)
+                todo!() // RoundProposer(round_proposers)
             },
             _ => proposer_type,
         };

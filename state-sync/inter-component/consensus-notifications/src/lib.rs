@@ -445,13 +445,13 @@ mod tests {
 
         // Send a commit notification and expect a timeout (no listener)
         let notify_result =
-            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
+            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![], 0));
         assert_matches!(notify_result, Err(Error::TimeoutWaitingForStateSync));
 
         // Drop the receiver and try again
         consensus_listener.notification_receiver.close();
         let notify_result =
-            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
+            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![], 0));
         assert_matches!(notify_result, Err(Error::NotificationError(_)));
     }
 
@@ -464,7 +464,7 @@ mod tests {
             crate::new_consensus_notifier_listener_pair(CONSENSUS_NOTIFICATION_TIMEOUT);
 
         // Send an empty commit notification
-        let notify_result = block_on(consensus_notifier.notify_new_commit(vec![], vec![]));
+        let notify_result = block_on(consensus_notifier.notify_new_commit(vec![], vec![], 0));
         assert_ok!(notify_result);
     }
 
@@ -480,7 +480,7 @@ mod tests {
         let transactions = vec![create_user_transaction()];
         let subscribable_events = vec![create_contract_event()];
         let _ = block_on(
-            consensus_notifier.notify_new_commit(transactions.clone(), subscribable_events.clone()),
+            consensus_notifier.notify_new_commit(transactions.clone(), subscribable_events.clone(), 0),
         );
 
         // Verify the notification arrives at the receiver
@@ -585,7 +585,7 @@ mod tests {
 
         // Send a commit notification and verify a successful response
         let notify_result =
-            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
+            block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![], 0));
         assert_ok!(notify_result);
 
         // Send a sync target notification and verify an error response

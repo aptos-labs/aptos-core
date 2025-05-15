@@ -20,42 +20,43 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::sync::{atomic::AtomicBool, Arc};
 
 pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
-    let swarm = SwarmBuilder::new_local(num_nodes)
-        .with_init_config(Arc::new(move |_, config, _| {
-            config.api.failpoints_enabled = true;
-            config
-                .state_sync
-                .state_sync_driver
-                .enable_auto_bootstrapping = true;
-            config
-                .state_sync
-                .state_sync_driver
-                .max_connection_deadline_secs = 3;
-            config.dag_consensus.fetcher_config = DagFetcherConfig {
-                retry_interval_ms: 30,
-                rpc_timeout_ms: 500,
-                min_concurrent_responders: 2,
-                max_concurrent_responders: 7,
-                max_concurrent_fetches: 4,
-            }
-        }))
-        .with_init_genesis_config(Arc::new(move |genesis_config| {
-            let onchain_consensus_config = OnChainConsensusConfig::V4 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                vtxn: ValidatorTxnConfig::default_for_genesis(),
-                window_size: DEFAULT_WINDOW_SIZE,
-            };
+    todo!()
+    // let swarm = SwarmBuilder::new_local(num_nodes)
+    //     .with_init_config(Arc::new(move |_, config, _| {
+    //         config.api.failpoints_enabled = true;
+    //         config
+    //             .state_sync
+    //             .state_sync_driver
+    //             .enable_auto_bootstrapping = true;
+    //         config
+    //             .state_sync
+    //             .state_sync_driver
+    //             .max_connection_deadline_secs = 3;
+    //         config.dag_consensus.fetcher_config = DagFetcherConfig {
+    //             retry_interval_ms: 30,
+    //             rpc_timeout_ms: 500,
+    //             min_concurrent_responders: 2,
+    //             max_concurrent_responders: 7,
+    //             max_concurrent_fetches: 4,
+    //         }
+    //     }))
+    //     .with_init_genesis_config(Arc::new(move |genesis_config| {
+    //         let onchain_consensus_config = OnChainConsensusConfig::V4 {
+    //             alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+    //             vtxn: ValidatorTxnConfig::default_for_genesis(),
+    //             window_size: DEFAULT_WINDOW_SIZE,
+    //         };
 
-            genesis_config.consensus_config = onchain_consensus_config;
-        }))
-        .build()
-        .await;
+    //         genesis_config.consensus_config = onchain_consensus_config;
+    //     }))
+    //     .build()
+    //     .await;
 
-    println!(
-        "Validators {:?}",
-        swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>()
-    );
-    swarm
+    // println!(
+    //     "Validators {:?}",
+    //     swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>()
+    // );
+    // swarm
 }
 
 #[tokio::test]

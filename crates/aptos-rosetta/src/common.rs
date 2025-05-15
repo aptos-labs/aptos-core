@@ -421,7 +421,7 @@ mod test {
             .block_height(ChainId::test())
             .expect("Matching chain id should work");
         block_hash
-            .block_height(ChainId::new(NamedChain::MAINNET.id()))
+            .block_height(ChainId::new(NamedChain::MAINNET.id().try_into().unwrap()))
             .expect_err("Mismatch chain id should not work");
     }
 
@@ -436,8 +436,8 @@ mod test {
     #[test]
     pub fn valid_block_hashes() {
         let valid_block_hashes: Vec<(&str, ChainId, u64)> = vec![
-            ("testnet-0", ChainId::new(NamedChain::TESTNET.id()), 0),
-            ("mainnet-20", ChainId::new(NamedChain::MAINNET.id()), 20),
+            ("testnet-0", ChainId::new(NamedChain::TESTNET.id().try_into().unwrap()), 0),
+            ("mainnet-20", ChainId::new(NamedChain::MAINNET.id().try_into().unwrap()), 20),
             ("5-2", ChainId::new(5), 2),
         ];
         for (str, chain_id, height) in valid_block_hashes {

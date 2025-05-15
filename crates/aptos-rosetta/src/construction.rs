@@ -458,7 +458,7 @@ async fn construction_metadata(
     let response = get_account(&rest_client, address).await?;
 
     // Ensure this network really is the one we expect it to be
-    if server_context.chain_id.id() != response.state().chain_id {
+    if server_context.chain_id.id() != response.state().chain_id as u64 {
         return Err(ApiError::ChainIdMismatch);
     }
 

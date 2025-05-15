@@ -130,7 +130,7 @@ pub async fn bootstrap_async(
                 .await
                 .expect("Should successfully get ledger information from Rest API on bootstap")
                 .into_inner()
-                .chain_id,
+                .chain_id as u64,
             "Failed to match Rosetta chain Id to upstream server"
         );
     }
