@@ -901,11 +901,14 @@ impl RoundManager {
 
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
+                let vtxn_type_name = vtxn.type_name();
                 ensure!(
                     is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                     "unexpected validator txn: {:?}",
-                    vtxn.type_name()
+                    vtxn_type_name
                 );
+                vtxn.verify(self.epoch_state.verifier.as_ref())
+                    .context(format!("{} verify failed", vtxn_type_name))?;
             }
         }
 
