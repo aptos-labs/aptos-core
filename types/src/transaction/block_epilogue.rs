@@ -116,7 +116,7 @@ impl BlockEndInfoExt {
             .map(|(key, slot)| Ok((key.clone(), HotStateOp::make_hot(slot.clone()))))
             .collect::<Result<_>>()?;
         Ok(TransactionOutput::new_success_with_write_set(
-            WriteSet::SkipSerde(write_ops),
+            WriteSet::Hotness(write_ops),
         ))
     }
 }

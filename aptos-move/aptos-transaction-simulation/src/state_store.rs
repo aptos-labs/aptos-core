@@ -371,7 +371,7 @@ where
     fn apply_write_set(&self, write_set: &WriteSet) -> Result<()> {
         let mut states = self.states.write();
 
-        for (state_key, write_op) in write_set {
+        for (state_key, write_op) in write_set.write_op_iter() {
             match write_op.as_state_value() {
                 None => match states.get_mut(state_key) {
                     Some(val) => *val = None,

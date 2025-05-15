@@ -1052,7 +1052,7 @@ fn emit_new_block_and_epoch_event(
 
 /// Verify the consistency of modules in the genesis write set.
 fn verify_genesis_module_write_set(write_set: &WriteSet) {
-    for (state_key, write_op) in write_set {
+    for (state_key, write_op) in write_set.expect_write_op_iter() {
         if state_key.is_module_path() {
             assert!(write_op.is_creation())
         }

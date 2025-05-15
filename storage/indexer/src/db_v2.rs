@@ -97,7 +97,7 @@ impl IndexerAsyncV2 {
         let end_version = first_version + write_sets.len() as Version;
         let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
         for write_set in write_sets {
-            for (state_key, write_op) in write_set.iter() {
+            for (state_key, write_op) in write_set.write_op_iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
             }
         }
