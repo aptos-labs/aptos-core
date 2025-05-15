@@ -5,40 +5,60 @@
 //! Peephole optimizations assume that the bytecode is valid, and all user-facing
 //! error checks have already been performed.
 
+pub mod inefficient_cmp;
 pub mod inefficient_loads;
 pub mod optimizers;
 pub mod reducible_pairs;
 
+use inefficient_cmp::InefficientCmps;
 use inefficient_loads::InefficientLoads;
 use move_binary_format::{
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
     file_format::{Bytecode, CodeOffset},
 };
+use move_model::model::FunctionEnv;
 use optimizers::{BasicBlockOptimizer, TransformedCodeChunk, WindowProcessor};
 use reducible_pairs::ReduciblePairs;
 use std::collections::BTreeMap;
+
+// Wrapper to pass arguments to the peephole optimizers.
+// Two lifetime parameters are used:
+//  - `'gen` for the code generation context,
+//  - `'env` for the function environment.
+pub struct TypedCodeBlock<'gen, 'env> {
+    pub fun_env:  &'gen FunctionEnv<'env>,
+    pub code: &'gen [Bytecode],
+}
+
+impl <'gen, 'env> TypedCodeBlock<'gen, 'env> {
+    /// Create a new `TypedCodeBlock` from the given function environment and code.
+    pub fn new(fun_env:  &'gen FunctionEnv<'env>, code: &'gen [Bytecode]) -> Self {
+        Self { fun_env, code }
+    }
+}
 
 /// Pre-requisite: `code` should not have spec block associations.
 /// Run peephole optimizers on the given `code`, possibly modifying it.
 /// Returns the optimized code, along with mapping to original offsets
 /// in `code`.
-pub fn optimize(code: &[Bytecode]) -> TransformedCodeChunk {
-    BasicBlockOptimizerPipeline::default().optimize(code)
+pub fn optimize<'gen, 'env>(typedblock: TypedCodeBlock<'gen, 'env>) -> TransformedCodeChunk {
+    BasicBlockOptimizerPipeline::new(typedblock.fun_env).optimize(typedblock.code)
 }
 
 /// A pipeline of basic block optimizers.
 /// Each optimizer is applied to each basic block in the code, in order.
-struct BasicBlockOptimizerPipeline {
-    optimizers: Vec<Box<dyn BasicBlockOptimizer>>,
+struct BasicBlockOptimizerPipeline<'gen> {
+    optimizers: Vec<Box<dyn BasicBlockOptimizer + 'gen>>,
 }
 
-impl BasicBlockOptimizerPipeline {
+impl<'gen> BasicBlockOptimizerPipeline<'gen> {
     /// Default optimization pipeline of basic block optimizers.
-    pub fn default() -> Self {
+    pub fn new<'env>(fun_env:  &'gen FunctionEnv<'env>) -> Self {
         Self {
             optimizers: vec![
                 Box::new(WindowProcessor::new(ReduciblePairs)),
                 Box::new(WindowProcessor::new(InefficientLoads)),
+                Box::new(WindowProcessor::new(InefficientCmps::new(fun_env))),
             ],
         }
     }
