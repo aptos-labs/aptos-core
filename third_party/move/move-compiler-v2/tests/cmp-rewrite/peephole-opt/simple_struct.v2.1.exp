@@ -1,0 +1,7248 @@
+// -- Model dump before env processor pipeline:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor unused checks:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor inlining:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor specification checker:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := infer($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := infer($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := infer($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := infer($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := infer($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := infer($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := infer($t0)
+  3: $t2 := infer($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := infer($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := infer($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := infer($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := infer($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := infer($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := infer($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := infer($t0)
+  3: $t2 := infer($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := infer($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := infer($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := infer($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := infer($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := infer($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := infer($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := infer($t0)
+  3: $t2 := infer($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t0)
+     # live vars: $t1, $t3, $t6
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t2 := true
+     # live vars: $t2
+  7: goto 10
+     # live vars: $t5
+  8: label L1
+     # live vars: $t5
+  9: $t2 := infer($t5)
+     # live vars: $t2
+ 10: label L2
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := infer($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 23
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t18 := infer($t7)
+     # live vars: $t0, $t3, $t7, $t18
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+ 22: goto 25
+     # live vars: $t0, $t3, $t7
+ 23: label L1
+     # live vars: $t3, $t7
+ 24: $t11 := false
+     # live vars: $t3, $t7, $t11
+ 25: label L2
+     # live vars: $t3, $t7, $t11
+ 26: if ($t11) goto 27 else goto 30
+     # live vars: $t3, $t7
+ 27: label L3
+     # live vars: $t3
+ 28: $t2 := infer($t3)
+     # live vars: $t2
+ 29: goto 32
+     # live vars: $t3, $t7
+ 30: label L4
+     # live vars: $t7
+ 31: $t2 := infer($t7)
+     # live vars: $t2
+ 32: label L5
+     # live vars: $t2
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+  2: $t5 := infer($t0)
+     # live vars: $t3
+  3: $t2 := infer($t3)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+Diagnostics:
+warning: This assignment/binding to the left-hand-side variable `x1` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x1`), or renaming to `_`
+   ┌─ tests/cmp-rewrite/peephole-opt/simple_struct.move:40:18
+   │
+40 │         let x1 = x;
+   │                  ^
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t0)
+     # live vars: $t1, $t3, $t6
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t2 := true
+     # live vars: $t2
+  7: goto 10
+     # live vars: $t5
+  8: label L1
+     # live vars: $t5
+  9: $t2 := infer($t5)
+     # live vars: $t2
+ 10: label L2
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := infer($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 23
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t18 := infer($t7)
+     # live vars: $t0, $t3, $t7, $t18
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+ 22: goto 25
+     # live vars: $t0, $t3, $t7
+ 23: label L1
+     # live vars: $t3, $t7
+ 24: $t11 := false
+     # live vars: $t3, $t7, $t11
+ 25: label L2
+     # live vars: $t3, $t7, $t11
+ 26: if ($t11) goto 27 else goto 30
+     # live vars: $t3, $t7
+ 27: label L3
+     # live vars: $t3
+ 28: $t2 := infer($t3)
+     # live vars: $t2
+ 29: goto 32
+     # live vars: $t3, $t7
+ 30: label L4
+     # live vars: $t7
+ 31: $t2 := infer($t7)
+     # live vars: $t2
+ 32: label L5
+     # live vars: $t2
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+  2: $t5 := infer($t0)
+     # live vars: $t3
+  3: $t2 := infer($t3)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t0)
+     # live vars: $t1, $t3, $t6
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t2 := true
+     # live vars: $t2
+  7: goto 10
+     # live vars: $t5
+  8: label L1
+     # live vars: $t5
+  9: $t2 := infer($t5)
+     # live vars: $t2
+ 10: label L2
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := infer($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 23
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t18 := infer($t7)
+     # live vars: $t0, $t3, $t7, $t18
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+ 22: goto 25
+     # live vars: $t0, $t3, $t7
+ 23: label L1
+     # live vars: $t3, $t7
+ 24: $t11 := false
+     # live vars: $t3, $t7, $t11
+ 25: label L2
+     # live vars: $t3, $t7, $t11
+ 26: if ($t11) goto 27 else goto 30
+     # live vars: $t3, $t7
+ 27: label L3
+     # live vars: $t3
+ 28: $t2 := infer($t3)
+     # live vars: $t2
+ 29: goto 32
+     # live vars: $t3, $t7
+ 30: label L4
+     # live vars: $t7
+ 31: $t2 := infer($t7)
+     # live vars: $t2
+ 32: label L5
+     # live vars: $t2
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+  2: $t5 := infer($t0)
+     # live vars: $t3
+  3: $t2 := infer($t3)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t0)
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t5
+     # refs: []
+     #
+  5: label L0
+     # live vars:
+     # refs: []
+     #
+  6: $t2 := true
+     # live vars: $t2
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t5
+     # refs: []
+     #
+  8: label L1
+     # live vars: $t5
+     # refs: []
+     #
+  9: $t2 := infer($t5)
+     # live vars: $t2
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [local `x`] at line 27
+     #
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `y`] at line 28
+     #
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  8: $t13 := infer($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+     # refs: []
+     #
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   -> #15 via [local `y`] at line 30
+     #
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+     # refs: []
+     #
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+     # refs: []
+     #
+ 14: if ($t12) goto 15 else goto 23
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 16: $t18 := infer($t7)
+     # live vars: $t0, $t3, $t7, $t18
+     # refs: []
+     #
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   -> #20 via [local `x`] at line 30
+     #
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+     # refs: []
+     #
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 22: goto 25
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 23: label L1
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 24: $t11 := false
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 25: label L2
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 26: if ($t11) goto 27 else goto 30
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 27: label L3
+     # live vars: $t3
+     # refs: []
+     #
+ 28: $t2 := infer($t3)
+     # live vars: $t2
+     # refs: []
+     #
+ 29: goto 32
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 30: label L4
+     # live vars: $t7
+     # refs: []
+     #
+ 31: $t2 := infer($t7)
+     # live vars: $t2
+     # refs: []
+     #
+ 32: label L5
+     # live vars: $t2
+     # refs: []
+     #
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  2: $t5 := infer($t0)
+     # live vars: $t3
+     # refs: []
+     #
+  3: $t2 := infer($t3)
+     # live vars: $t2
+     # refs: []
+     #
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := !=($t6, $t1)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  6: $t2 := true
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  9: $t2 := infer($t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  1: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [local `x`] at line 27
+     #
+  3: $t3 := read_ref($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  5: $t10 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t9, $t10
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `y`] at line 28
+     #
+  7: $t7 := read_ref($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  8: $t13 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7, $t13
+     # refs: []
+     #
+  9: $t16 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 10: $t17 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   -> #15 via [local `y`] at line 30
+     #
+ 12: $t14 := read_ref($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t14
+     # refs: []
+     #
+ 13: $t12 := ==($t13, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t12
+     # refs: []
+     #
+ 14: if ($t12) goto 15 else goto 23
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 15: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 16: $t18 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t18
+     # refs: []
+     #
+ 17: $t21 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t18, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 18: $t22 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t18, $t21, $t22
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t18, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   -> #20 via [local `x`] at line 30
+     #
+ 20: $t19 := read_ref($t20)
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t18, $t19
+     # refs: []
+     #
+ 21: $t11 := ==($t18, $t19)
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 22: goto 25
+     # abort state: {returns}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 23: label L1
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 24: $t11 := false
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 25: label L2
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 26: if ($t11) goto 27 else goto 30
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 27: label L3
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 28: $t2 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 29: goto 32
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 30: label L4
+     # abort state: {returns}
+     # live vars: $t7
+     # refs: []
+     #
+ 31: $t2 := infer($t7)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 32: label L5
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  2: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  3: $t2 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := move($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := move($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := copy($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := copy($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := move($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := move($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := move($t0)
+  3: $t2 := move($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+// -- Model dump before env processor pipeline:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+// -- Model dump after env processor simplifier:
+module 0xcffa::m {
+    struct Test1 {
+        a: u8,
+    }
+    struct Test2 {
+        a: vector<u8>,
+    }
+    public fun eq1(x: vector<u8>,y: vector<u8>): vector<u8> {
+        if Eq<vector<u8>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let neq: bool = Neq<vector<u8>>(x, y);
+            Or(eq, neq)
+          }
+        }
+    }
+    public fun eq3(x: vector<vector<u8>>,y: vector<vector<u8>>): vector<u8> {
+        {
+          let a: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0));
+          {
+            let b: vector<u8> = Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0));
+            if And(Eq<vector<u8>>(a, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(y), 0))), Eq<vector<u8>>(b, Deref(vector::borrow<vector<u8>>(Borrow(Immutable)(x), 0)))) {
+              a
+            } else {
+              b
+            }
+          }
+        }
+    }
+    public fun eq4(x: vector<u8>,y: vector<u8>): bool {
+        {
+          let eq: bool = Eq<vector<u8>>(x, y);
+          {
+            let x1: vector<u8> = x;
+            eq
+          }
+        }
+    }
+    public fun eq5(x: Test1,y: Test1): Test1 {
+        if Eq<Test1>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq6(x: Test2,y: Test2): Test2 {
+        if Eq<Test2>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcffa::m
+
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := infer($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := infer($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := infer($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := infer($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := infer($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := infer($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := infer($t0)
+  3: $t2 := infer($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := infer($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := infer($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := infer($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := infer($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := infer($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := infer($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := infer($t0)
+  3: $t2 := infer($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t0)
+     # live vars: $t1, $t3, $t6
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t2 := true
+     # live vars: $t2
+  7: goto 10
+     # live vars: $t5
+  8: label L1
+     # live vars: $t5
+  9: $t2 := infer($t5)
+     # live vars: $t2
+ 10: label L2
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := infer($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 23
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t18 := infer($t7)
+     # live vars: $t0, $t3, $t7, $t18
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+ 22: goto 25
+     # live vars: $t0, $t3, $t7
+ 23: label L1
+     # live vars: $t3, $t7
+ 24: $t11 := false
+     # live vars: $t3, $t7, $t11
+ 25: label L2
+     # live vars: $t3, $t7, $t11
+ 26: if ($t11) goto 27 else goto 30
+     # live vars: $t3, $t7
+ 27: label L3
+     # live vars: $t3
+ 28: $t2 := infer($t3)
+     # live vars: $t2
+ 29: goto 32
+     # live vars: $t3, $t7
+ 30: label L4
+     # live vars: $t7
+ 31: $t2 := infer($t7)
+     # live vars: $t2
+ 32: label L5
+     # live vars: $t2
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+  2: $t5 := infer($t0)
+     # live vars: $t3
+  3: $t2 := infer($t3)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t0)
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t5
+     # refs: []
+     #
+  5: label L0
+     # live vars:
+     # refs: []
+     #
+  6: $t2 := true
+     # live vars: $t2
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t5
+     # refs: []
+     #
+  8: label L1
+     # live vars: $t5
+     # refs: []
+     #
+  9: $t2 := infer($t5)
+     # live vars: $t2
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [local `x`] at line 27
+     #
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `y`] at line 28
+     #
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  8: $t13 := infer($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+     # refs: []
+     #
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   -> #15 via [local `y`] at line 30
+     #
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+     # refs: []
+     #
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+     # refs: []
+     #
+ 14: if ($t12) goto 15 else goto 23
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 16: $t18 := infer($t7)
+     # live vars: $t0, $t3, $t7, $t18
+     # refs: []
+     #
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   -> #20 via [local `x`] at line 30
+     #
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+     # refs: []
+     #
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 22: goto 25
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 23: label L1
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 24: $t11 := false
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 25: label L2
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 26: if ($t11) goto 27 else goto 30
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 27: label L3
+     # live vars: $t3
+     # refs: []
+     #
+ 28: $t2 := infer($t3)
+     # live vars: $t2
+     # refs: []
+     #
+ 29: goto 32
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 30: label L4
+     # live vars: $t7
+     # refs: []
+     #
+ 31: $t2 := infer($t7)
+     # live vars: $t2
+     # refs: []
+     #
+ 32: label L5
+     # live vars: $t2
+     # refs: []
+     #
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  2: $t5 := infer($t0)
+     # live vars: $t3
+     # refs: []
+     #
+  3: $t2 := infer($t3)
+     # live vars: $t2
+     # refs: []
+     #
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := !=($t6, $t1)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  6: $t2 := true
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  9: $t2 := infer($t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  1: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 27
+     #
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [local `x`] at line 27
+     #
+  3: $t3 := read_ref($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  5: $t10 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t9, $t10
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `y`] at line 28
+     #
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [local `y`] at line 28
+     #
+  7: $t7 := read_ref($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  8: $t13 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7, $t13
+     # refs: []
+     #
+  9: $t16 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 10: $t17 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `y`] at line 30
+     #
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   -> #15 via [local `y`] at line 30
+     #
+ 12: $t14 := read_ref($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t13, $t14
+     # refs: []
+     #
+ 13: $t12 := ==($t13, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t12
+     # refs: []
+     #
+ 14: if ($t12) goto 15 else goto 23
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 15: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 16: $t18 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t7, $t18
+     # refs: []
+     #
+ 17: $t21 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t18, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 18: $t22 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t7, $t18, $t21, $t22
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `x`] at line 30
+     #
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t18, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   -> #20 via [local `x`] at line 30
+     #
+ 20: $t19 := read_ref($t20)
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t18, $t19
+     # refs: []
+     #
+ 21: $t11 := ==($t18, $t19)
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 22: goto 25
+     # abort state: {returns}
+     # live vars: $t0, $t3, $t7
+     # refs: []
+     #
+ 23: label L1
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 24: $t11 := false
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 25: label L2
+     # abort state: {returns}
+     # live vars: $t3, $t7, $t11
+     # refs: []
+     #
+ 26: if ($t11) goto 27 else goto 30
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 27: label L3
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 28: $t2 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 29: goto 32
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: []
+     #
+ 30: label L4
+     # abort state: {returns}
+     # live vars: $t7
+     # refs: []
+     #
+ 31: $t2 := infer($t7)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 32: label L5
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  2: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  3: $t2 := infer($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := move($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t2 := true
+  7: goto 10
+  8: label L1
+  9: $t2 := move($t5)
+ 10: label L2
+ 11: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := copy($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 23
+ 15: label L0
+ 16: $t18 := copy($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: goto 25
+ 23: label L1
+ 24: $t11 := false
+ 25: label L2
+ 26: if ($t11) goto 27 else goto 30
+ 27: label L3
+ 28: $t2 := move($t3)
+ 29: goto 32
+ 30: label L4
+ 31: $t2 := move($t7)
+ 32: label L5
+ 33: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := move($t0)
+  3: $t2 := move($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := move($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 9
+  5: label L0
+  6: $t2 := true
+  7: label L2
+  8: return $t2
+  9: label L1
+ 10: $t2 := move($t5)
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := copy($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 31
+ 15: label L0
+ 16: $t18 := copy($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: label L2
+ 23: if ($t11) goto 24 else goto 28
+ 24: label L3
+ 25: $t2 := move($t3)
+ 26: label L5
+ 27: return $t2
+ 28: label L4
+ 29: $t2 := move($t7)
+ 30: goto 26
+ 31: label L1
+ 32: $t11 := false
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := move($t0)
+  3: $t2 := move($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := move($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 9
+  5: label L0
+  6: $t2 := true
+  7: label L2
+  8: return $t2
+  9: label L1
+ 10: $t2 := move($t5)
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := copy($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 31
+ 15: label L0
+ 16: $t18 := copy($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: label L2
+ 23: if ($t11) goto 24 else goto 28
+ 24: label L3
+ 25: $t2 := move($t3)
+ 26: label L5
+ 27: return $t2
+ 28: label L4
+ 29: $t2 := move($t7)
+ 30: goto 26
+ 31: label L1
+ 32: $t11 := false
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := move($t0)
+  3: $t2 := move($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := ==($t4, $t1)
+     # maybe
+  2: if ($t3) goto 3 else goto 7
+     # maybe
+  3: label L0
+     # maybe
+  4: $t2 := move($t0)
+     # maybe
+  5: label L2
+     # maybe
+  6: return $t2
+     # maybe
+  7: label L1
+     # maybe
+  8: $t2 := move($t1)
+     # maybe
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := ==($t4, $t1)
+     # maybe
+  2: $t6 := move($t0)
+     # maybe
+  3: $t5 := !=($t6, $t1)
+     # maybe
+  4: if ($t3) goto 5 else goto 9
+     # maybe
+  5: label L0
+     # maybe
+  6: $t2 := true
+     # maybe
+  7: label L2
+     # maybe
+  8: return $t2
+     # maybe
+  9: label L1
+     # maybe
+ 10: $t2 := move($t5)
+     # maybe
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # maybe
+  0: $t5 := borrow_local($t0)
+     # maybe
+  1: $t6 := 0
+     # maybe
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # maybe
+  3: $t3 := read_ref($t4)
+     # maybe
+  4: $t9 := borrow_local($t1)
+     # maybe
+  5: $t10 := 0
+     # maybe
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # maybe
+  7: $t7 := read_ref($t8)
+     # maybe
+  8: $t13 := copy($t3)
+     # maybe
+  9: $t16 := borrow_local($t1)
+     # maybe
+ 10: $t17 := 0
+     # maybe
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # maybe
+ 12: $t14 := read_ref($t15)
+     # maybe
+ 13: $t12 := ==($t13, $t14)
+     # maybe
+ 14: if ($t12) goto 15 else goto 31
+     # maybe
+ 15: label L0
+     # maybe
+ 16: $t18 := copy($t7)
+     # maybe
+ 17: $t21 := borrow_local($t0)
+     # maybe
+ 18: $t22 := 0
+     # maybe
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # maybe
+ 20: $t19 := read_ref($t20)
+     # maybe
+ 21: $t11 := ==($t18, $t19)
+     # maybe
+ 22: label L2
+     # maybe
+ 23: if ($t11) goto 24 else goto 28
+     # maybe
+ 24: label L3
+     # maybe
+ 25: $t2 := move($t3)
+     # maybe
+ 26: label L5
+     # maybe
+ 27: return $t2
+     # maybe
+ 28: label L4
+     # maybe
+ 29: $t2 := move($t7)
+     # maybe
+ 30: goto 26
+     # maybe
+ 31: label L1
+     # maybe
+ 32: $t11 := false
+     # maybe
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := ==($t4, $t1)
+     # maybe
+  2: $t5 := move($t0)
+     # maybe
+  3: $t2 := move($t3)
+     # maybe
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := ==($t4, $t1)
+     # maybe
+  2: if ($t3) goto 3 else goto 7
+     # maybe
+  3: label L0
+     # maybe
+  4: $t2 := move($t0)
+     # maybe
+  5: label L2
+     # maybe
+  6: return $t2
+     # maybe
+  7: label L1
+     # maybe
+  8: $t2 := move($t1)
+     # maybe
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := ==($t4, $t1)
+     # maybe
+  2: if ($t3) goto 3 else goto 7
+     # maybe
+  3: label L0
+     # maybe
+  4: $t2 := move($t0)
+     # maybe
+  5: label L2
+     # maybe
+  6: return $t2
+     # maybe
+  7: label L1
+     # maybe
+  8: $t2 := move($t1)
+     # maybe
+  9: goto 5
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := move($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 9
+  5: label L0
+  6: $t2 := true
+  7: label L2
+  8: return $t2
+  9: label L1
+ 10: $t2 := move($t5)
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := copy($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 31
+ 15: label L0
+ 16: $t18 := copy($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: label L2
+ 23: if ($t11) goto 24 else goto 28
+ 24: label L3
+ 25: $t2 := move($t3)
+ 26: label L5
+ 27: return $t2
+ 28: label L4
+ 29: $t2 := move($t7)
+ 30: goto 26
+ 31: label L1
+ 32: $t11 := false
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t5 := move($t0)
+  3: $t2 := move($t3)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := move($t0)
+     # live vars: $t1, $t3, $t6
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 9
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t2 := true
+     # live vars: $t2
+  7: label L2
+     # live vars: $t2
+  8: return $t2
+     # live vars: $t5
+  9: label L1
+     # live vars: $t5
+ 10: $t2 := move($t5)
+     # live vars: $t2
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 31
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t18 := copy($t7)
+     # live vars: $t0, $t3, $t7, $t18
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+ 22: label L2
+     # live vars: $t3, $t7, $t11
+ 23: if ($t11) goto 24 else goto 28
+     # live vars: $t3, $t7
+ 24: label L3
+     # live vars: $t3
+ 25: $t2 := move($t3)
+     # live vars: $t2
+ 26: label L5
+     # live vars: $t2
+ 27: return $t2
+     # live vars: $t3, $t7
+ 28: label L4
+     # live vars: $t7
+ 29: $t2 := move($t7)
+     # live vars: $t2
+ 30: goto 26
+     # live vars: $t0, $t3, $t7
+ 31: label L1
+     # live vars: $t3, $t7
+ 32: $t11 := false
+     # live vars: $t3, $t7, $t11
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t3
+  2: $t5 := move($t0)
+     # live vars: $t3
+  3: $t2 := move($t3)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t6 := move($t0)
+  3: $t5 := !=($t6, $t1)
+  4: if ($t3) goto 5 else goto 9
+  5: label L0
+  6: $t2 := true
+  7: label L2
+  8: return $t2
+  9: label L1
+ 10: $t2 := move($t5)
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t9 := borrow_local($t1)
+  5: $t10 := 0
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+  7: $t7 := read_ref($t8)
+  8: $t13 := copy($t3)
+  9: $t16 := borrow_local($t1)
+ 10: $t17 := 0
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+ 12: $t14 := read_ref($t15)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 31
+ 15: label L0
+ 16: $t18 := copy($t7)
+ 17: $t21 := borrow_local($t0)
+ 18: $t22 := 0
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+ 20: $t19 := read_ref($t20)
+ 21: $t11 := ==($t18, $t19)
+ 22: label L2
+ 23: if ($t11) goto 24 else goto 28
+ 24: label L3
+ 25: $t2 := move($t3)
+ 26: label L5
+ 27: return $t2
+ 28: label L4
+ 29: $t2 := move($t7)
+ 30: goto 26
+ 31: label L1
+ 32: $t11 := false
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8> [unused]
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t2 := move($t3)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := move($t0)
+     # live vars: $t1, $t3, $t6
+  3: $t5 := !=($t6, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 9
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t2 := true
+     # live vars: $t2
+  7: label L2
+     # live vars: $t2
+  8: return $t2
+     # live vars: $t5
+  9: label L1
+     # live vars: $t5
+ 10: $t2 := move($t5)
+     # live vars: $t2
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8>
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8>
+     var $t9: &vector<vector<u8>>
+     var $t10: u64
+     var $t11: bool
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8>
+     var $t16: &vector<vector<u8>>
+     var $t17: u64
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: &vector<u8>
+     var $t21: &vector<vector<u8>>
+     var $t22: u64
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t9 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t9
+  5: $t10 := 0
+     # live vars: $t0, $t1, $t3, $t9, $t10
+  6: $t8 := vector::borrow<vector<u8>>($t9, $t10)
+     # live vars: $t0, $t1, $t3, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t16 := borrow_local($t1)
+     # live vars: $t0, $t3, $t7, $t13, $t16
+ 10: $t17 := 0
+     # live vars: $t0, $t3, $t7, $t13, $t16, $t17
+ 11: $t15 := vector::borrow<vector<u8>>($t16, $t17)
+     # live vars: $t0, $t3, $t7, $t13, $t15
+ 12: $t14 := read_ref($t15)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 31
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t18 := copy($t7)
+     # live vars: $t0, $t3, $t7, $t18
+ 17: $t21 := borrow_local($t0)
+     # live vars: $t3, $t7, $t18, $t21
+ 18: $t22 := 0
+     # live vars: $t3, $t7, $t18, $t21, $t22
+ 19: $t20 := vector::borrow<vector<u8>>($t21, $t22)
+     # live vars: $t3, $t7, $t18, $t20
+ 20: $t19 := read_ref($t20)
+     # live vars: $t3, $t7, $t18, $t19
+ 21: $t11 := ==($t18, $t19)
+     # live vars: $t3, $t7, $t11
+ 22: label L2
+     # live vars: $t3, $t7, $t11
+ 23: if ($t11) goto 24 else goto 28
+     # live vars: $t3, $t7
+ 24: label L3
+     # live vars: $t3
+ 25: $t2 := move($t3)
+     # live vars: $t2
+ 26: label L5
+     # live vars: $t2
+ 27: return $t2
+     # live vars: $t3, $t7
+ 28: label L4
+     # live vars: $t7
+ 29: $t2 := move($t7)
+     # live vars: $t2
+ 30: goto 26
+     # live vars: $t0, $t3, $t7
+ 31: label L1
+     # live vars: $t3, $t7
+ 32: $t11 := false
+     # live vars: $t3, $t7, $t11
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t3
+  2: $t2 := move($t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8> [unused]
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t0 := move($t0)
+  3: $t5 := !=($t0, $t1)
+  4: if ($t3) goto 5 else goto 9
+  5: label L0
+  6: $t3 := true
+  7: label L2
+  8: return $t3
+  9: label L1
+ 10: $t3 := move($t5)
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8> [unused]
+     var $t9: &vector<vector<u8>> [unused]
+     var $t10: u64 [unused]
+     var $t11: bool [unused]
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8> [unused]
+     var $t16: &vector<vector<u8>> [unused]
+     var $t17: u64 [unused]
+     var $t18: vector<u8> [unused]
+     var $t19: vector<u8> [unused]
+     var $t20: &vector<u8> [unused]
+     var $t21: &vector<vector<u8>> [unused]
+     var $t22: u64 [unused]
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t5 := borrow_local($t1)
+  5: $t6 := 0
+  6: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  7: $t7 := read_ref($t4)
+  8: $t13 := copy($t3)
+  9: $t5 := borrow_local($t1)
+ 10: $t6 := 0
+ 11: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+ 12: $t14 := read_ref($t4)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 31
+ 15: label L0
+ 16: $t13 := copy($t7)
+ 17: $t5 := borrow_local($t0)
+ 18: $t6 := 0
+ 19: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+ 20: $t14 := read_ref($t4)
+ 21: $t12 := ==($t13, $t14)
+ 22: label L2
+ 23: if ($t12) goto 24 else goto 28
+ 24: label L3
+ 25: $t13 := move($t3)
+ 26: label L5
+ 27: return $t13
+ 28: label L4
+ 29: $t13 := move($t7)
+ 30: goto 26
+ 31: label L1
+ 32: $t12 := false
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8> [unused]
+     var $t5: vector<u8> [unused]
+  0: $t0 := copy($t0)
+  1: $t3 := ==($t0, $t1)
+  2: $t3 := move($t3)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3
+  3: $t5 := !=($t0, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 9
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t3 := true
+     # live vars: $t3
+  7: label L2
+     # live vars: $t3
+  8: return $t3
+     # live vars: $t5
+  9: label L1
+     # live vars: $t5
+ 10: $t3 := move($t5)
+     # live vars: $t3
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8> [unused]
+     var $t9: &vector<vector<u8>> [unused]
+     var $t10: u64 [unused]
+     var $t11: bool [unused]
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8> [unused]
+     var $t16: &vector<vector<u8>> [unused]
+     var $t17: u64 [unused]
+     var $t18: vector<u8> [unused]
+     var $t19: vector<u8> [unused]
+     var $t20: &vector<u8> [unused]
+     var $t21: &vector<vector<u8>> [unused]
+     var $t22: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t5
+  5: $t6 := 0
+     # live vars: $t0, $t1, $t3, $t5, $t6
+  6: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t3, $t4
+  7: $t7 := read_ref($t4)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t5 := borrow_local($t1)
+     # live vars: $t0, $t3, $t5, $t7, $t13
+ 10: $t6 := 0
+     # live vars: $t0, $t3, $t5, $t6, $t7, $t13
+ 11: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t3, $t4, $t7, $t13
+ 12: $t14 := read_ref($t4)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 31
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t13 := copy($t7)
+     # live vars: $t0, $t3, $t7, $t13
+ 17: $t5 := borrow_local($t0)
+     # live vars: $t3, $t5, $t7, $t13
+ 18: $t6 := 0
+     # live vars: $t3, $t5, $t6, $t7, $t13
+ 19: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t3, $t4, $t7, $t13
+ 20: $t14 := read_ref($t4)
+     # live vars: $t3, $t7, $t13, $t14
+ 21: $t12 := ==($t13, $t14)
+     # live vars: $t3, $t7, $t12
+ 22: label L2
+     # live vars: $t3, $t7, $t12
+ 23: if ($t12) goto 24 else goto 28
+     # live vars: $t3, $t7
+ 24: label L3
+     # live vars: $t3
+ 25: $t13 := move($t3)
+     # live vars: $t13
+ 26: label L5
+     # live vars: $t13
+ 27: return $t13
+     # live vars: $t3, $t7
+ 28: label L4
+     # live vars: $t7
+ 29: $t13 := move($t7)
+     # live vars: $t13
+ 30: goto 26
+     # live vars: $t0, $t3, $t7
+ 31: label L1
+     # live vars: $t3, $t7
+ 32: $t12 := false
+     # live vars: $t3, $t7, $t12
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8> [unused]
+     var $t5: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t0 := copy($t0)
+     # live vars: $t0, $t1
+  1: $t3 := ==($t0, $t1)
+     # live vars: $t3
+  2: $t3 := move($t3)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8> [unused]
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: $t0 := move($t0)
+  3: $t5 := !=($t0, $t1)
+  4: if ($t3) goto 5 else goto 9
+  5: label L0
+  6: $t3 := true
+  7: label L2
+  8: return $t3
+  9: label L1
+ 10: $t3 := move($t5)
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8> [unused]
+     var $t9: &vector<vector<u8>> [unused]
+     var $t10: u64 [unused]
+     var $t11: bool [unused]
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8> [unused]
+     var $t16: &vector<vector<u8>> [unused]
+     var $t17: u64 [unused]
+     var $t18: vector<u8> [unused]
+     var $t19: vector<u8> [unused]
+     var $t20: &vector<u8> [unused]
+     var $t21: &vector<vector<u8>> [unused]
+     var $t22: u64 [unused]
+  0: $t5 := borrow_local($t0)
+  1: $t6 := 0
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  3: $t3 := read_ref($t4)
+  4: $t5 := borrow_local($t1)
+  5: $t6 := 0
+  6: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+  7: $t7 := read_ref($t4)
+  8: $t13 := copy($t3)
+  9: $t5 := borrow_local($t1)
+ 10: $t6 := 0
+ 11: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+ 12: $t14 := read_ref($t4)
+ 13: $t12 := ==($t13, $t14)
+ 14: if ($t12) goto 15 else goto 31
+ 15: label L0
+ 16: $t13 := copy($t7)
+ 17: $t5 := borrow_local($t0)
+ 18: $t6 := 0
+ 19: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+ 20: $t14 := read_ref($t4)
+ 21: $t12 := ==($t13, $t14)
+ 22: label L2
+ 23: if ($t12) goto 24 else goto 28
+ 24: label L3
+ 25: $t13 := move($t3)
+ 26: label L5
+ 27: return $t13
+ 28: label L4
+ 29: $t13 := move($t7)
+ 30: goto 26
+ 31: label L1
+ 32: $t12 := false
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8> [unused]
+     var $t5: vector<u8> [unused]
+  0: $t0 := copy($t0)
+  1: $t3 := ==($t0, $t1)
+  2: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t0 := move($t0)
+     # live vars: $t0, $t1, $t3
+  3: $t5 := !=($t0, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 9
+     # live vars: $t5
+  5: label L0
+     # live vars:
+  6: $t3 := true
+     # live vars: $t3
+  7: label L2
+     # live vars: $t3
+  8: return $t3
+     # live vars: $t5
+  9: label L1
+     # live vars: $t5
+ 10: $t3 := move($t5)
+     # live vars: $t3
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8> [unused]
+     var $t9: &vector<vector<u8>> [unused]
+     var $t10: u64 [unused]
+     var $t11: bool [unused]
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8> [unused]
+     var $t16: &vector<vector<u8>> [unused]
+     var $t17: u64 [unused]
+     var $t18: vector<u8> [unused]
+     var $t19: vector<u8> [unused]
+     var $t20: &vector<u8> [unused]
+     var $t21: &vector<vector<u8>> [unused]
+     var $t22: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t5
+  5: $t6 := 0
+     # live vars: $t0, $t1, $t3, $t5, $t6
+  6: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t1, $t3, $t4
+  7: $t7 := read_ref($t4)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t5 := borrow_local($t1)
+     # live vars: $t0, $t3, $t5, $t7, $t13
+ 10: $t6 := 0
+     # live vars: $t0, $t3, $t5, $t6, $t7, $t13
+ 11: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t3, $t4, $t7, $t13
+ 12: $t14 := read_ref($t4)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 31
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t13 := copy($t7)
+     # live vars: $t0, $t3, $t7, $t13
+ 17: $t5 := borrow_local($t0)
+     # live vars: $t3, $t5, $t7, $t13
+ 18: $t6 := 0
+     # live vars: $t3, $t5, $t6, $t7, $t13
+ 19: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t3, $t4, $t7, $t13
+ 20: $t14 := read_ref($t4)
+     # live vars: $t3, $t7, $t13, $t14
+ 21: $t12 := ==($t13, $t14)
+     # live vars: $t3, $t7, $t12
+ 22: label L2
+     # live vars: $t3, $t7, $t12
+ 23: if ($t12) goto 24 else goto 28
+     # live vars: $t3, $t7
+ 24: label L3
+     # live vars: $t3
+ 25: $t13 := move($t3)
+     # live vars: $t13
+ 26: label L5
+     # live vars: $t13
+ 27: return $t13
+     # live vars: $t3, $t7
+ 28: label L4
+     # live vars: $t7
+ 29: $t13 := move($t7)
+     # live vars: $t13
+ 30: goto 26
+     # live vars: $t0, $t3, $t7
+ 31: label L1
+     # live vars: $t3, $t7
+ 32: $t12 := false
+     # live vars: $t3, $t7, $t12
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8> [unused]
+     var $t5: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t0 := copy($t0)
+     # live vars: $t0, $t1
+  1: $t3 := ==($t0, $t1)
+     # live vars: $t3
+  2: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+public fun m::eq1($t0: vector<u8>, $t1: vector<u8>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # flush: $t4
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # flush: $t4
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq2($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8>
+     var $t5: bool
+     var $t6: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t0 := move($t0)
+     # flush: $t5
+     # live vars: $t0, $t1, $t3
+  3: $t5 := !=($t0, $t1)
+     # live vars: $t3, $t5
+  4: if ($t3) goto 5 else goto 9
+     # live vars: $t5
+  5: label L0
+     # flush: $t3
+     # live vars:
+  6: $t3 := true
+     # live vars: $t3
+  7: label L2
+     # live vars: $t3
+  8: return $t3
+     # live vars: $t5
+  9: label L1
+     # flush: $t3
+     # live vars: $t5
+ 10: $t3 := move($t5)
+     # live vars: $t3
+ 11: goto 7
+}
+
+
+[variant baseline]
+public fun m::eq3($t0: vector<vector<u8>>, $t1: vector<vector<u8>>): vector<u8> {
+     var $t2: vector<u8> [unused]
+     var $t3: vector<u8>
+     var $t4: &vector<u8>
+     var $t5: &vector<vector<u8>>
+     var $t6: u64
+     var $t7: vector<u8>
+     var $t8: &vector<u8> [unused]
+     var $t9: &vector<vector<u8>> [unused]
+     var $t10: u64 [unused]
+     var $t11: bool [unused]
+     var $t12: bool
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: &vector<u8> [unused]
+     var $t16: &vector<vector<u8>> [unused]
+     var $t17: u64 [unused]
+     var $t18: vector<u8> [unused]
+     var $t19: vector<u8> [unused]
+     var $t20: &vector<u8> [unused]
+     var $t21: &vector<vector<u8>> [unused]
+     var $t22: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t6 := 0
+     # live vars: $t0, $t1, $t5, $t6
+  2: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # flush: $t3
+     # live vars: $t0, $t1, $t4
+  3: $t3 := read_ref($t4)
+     # live vars: $t0, $t1, $t3
+  4: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t3, $t5
+  5: $t6 := 0
+     # live vars: $t0, $t1, $t3, $t5, $t6
+  6: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # flush: $t7
+     # live vars: $t0, $t1, $t3, $t4
+  7: $t7 := read_ref($t4)
+     # live vars: $t0, $t1, $t3, $t7
+  8: $t13 := copy($t3)
+     # live vars: $t0, $t1, $t3, $t7, $t13
+  9: $t5 := borrow_local($t1)
+     # live vars: $t0, $t3, $t5, $t7, $t13
+ 10: $t6 := 0
+     # live vars: $t0, $t3, $t5, $t6, $t7, $t13
+ 11: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t0, $t3, $t4, $t7, $t13
+ 12: $t14 := read_ref($t4)
+     # live vars: $t0, $t3, $t7, $t13, $t14
+ 13: $t12 := ==($t13, $t14)
+     # live vars: $t0, $t3, $t7, $t12
+ 14: if ($t12) goto 15 else goto 31
+     # live vars: $t0, $t3, $t7
+ 15: label L0
+     # live vars: $t0, $t3, $t7
+ 16: $t13 := copy($t7)
+     # live vars: $t0, $t3, $t7, $t13
+ 17: $t5 := borrow_local($t0)
+     # live vars: $t3, $t5, $t7, $t13
+ 18: $t6 := 0
+     # live vars: $t3, $t5, $t6, $t7, $t13
+ 19: $t4 := vector::borrow<vector<u8>>($t5, $t6)
+     # live vars: $t3, $t4, $t7, $t13
+ 20: $t14 := read_ref($t4)
+     # flush: $t12
+     # live vars: $t3, $t7, $t13, $t14
+ 21: $t12 := ==($t13, $t14)
+     # live vars: $t3, $t7, $t12
+ 22: label L2
+     # live vars: $t3, $t7, $t12
+ 23: if ($t12) goto 24 else goto 28
+     # live vars: $t3, $t7
+ 24: label L3
+     # flush: $t13
+     # live vars: $t3
+ 25: $t13 := move($t3)
+     # live vars: $t13
+ 26: label L5
+     # live vars: $t13
+ 27: return $t13
+     # live vars: $t3, $t7
+ 28: label L4
+     # flush: $t13
+     # live vars: $t7
+ 29: $t13 := move($t7)
+     # live vars: $t13
+ 30: goto 26
+     # live vars: $t0, $t3, $t7
+ 31: label L1
+     # flush: $t12
+     # live vars: $t3, $t7
+ 32: $t12 := false
+     # live vars: $t3, $t7, $t12
+ 33: goto 22
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: vector<u8>, $t1: vector<u8>): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: vector<u8> [unused]
+     var $t5: vector<u8> [unused]
+     # live vars: $t0, $t1
+  0: $t0 := copy($t0)
+     # live vars: $t0, $t1
+  1: $t3 := ==($t0, $t1)
+     # live vars: $t3
+  2: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcffa::m::Test1, $t1: 0xcffa::m::Test1): 0xcffa::m::Test1 {
+     var $t2: 0xcffa::m::Test1 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # flush: $t4
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # flush: $t4
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcffa::m::Test2, $t1: 0xcffa::m::Test2): 0xcffa::m::Test2 {
+     var $t2: 0xcffa::m::Test2 [unused]
+     var $t3: bool
+     var $t4: 0xcffa::m::Test2
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # flush: $t4
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # flush: $t4
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module cffa.m {
+struct Test1 has copy, drop {
+	a: u8
+}
+struct Test2 has copy, drop {
+	a: vector<u8>
+}
+
+public eq1(x: vector<u8>, y: vector<u8>): vector<u8> /* def_idx: 0 */ {
+L2:	$t4: vector<u8>
+B0:
+	0: CopyLoc[0](x: vector<u8>)
+	1: CopyLoc[1](y: vector<u8>)
+	2: Eq
+	3: BrFalse(8)
+B1:
+	4: MoveLoc[0](x: vector<u8>)
+	5: StLoc[2]($t4: vector<u8>)
+B2:
+	6: MoveLoc[2]($t4: vector<u8>)
+	7: Ret
+B3:
+	8: MoveLoc[1](y: vector<u8>)
+	9: StLoc[2]($t4: vector<u8>)
+	10: Branch(6)
+}
+public eq2(x: vector<u8>, y: vector<u8>): bool /* def_idx: 1 */ {
+L2:	neq: bool
+L3:	eq: bool
+B0:
+	0: CopyLoc[0](x: vector<u8>)
+	1: CopyLoc[1](y: vector<u8>)
+	2: Eq
+	3: MoveLoc[0](x: vector<u8>)
+	4: MoveLoc[1](y: vector<u8>)
+	5: Neq
+	6: StLoc[2](neq: bool)
+	7: BrFalse(12)
+B1:
+	8: LdTrue
+	9: StLoc[3](eq: bool)
+B2:
+	10: MoveLoc[3](eq: bool)
+	11: Ret
+B3:
+	12: MoveLoc[2](neq: bool)
+	13: StLoc[3](eq: bool)
+	14: Branch(10)
+}
+public eq3(x: vector<vector<u8>>, y: vector<vector<u8>>): vector<u8> /* def_idx: 2 */ {
+L2:	a: vector<u8>
+L3:	b: vector<u8>
+L4:	$t12: bool
+L5:	$t13: vector<u8>
+B0:
+	0: ImmBorrowLoc[0](x: vector<vector<u8>>)
+	1: LdU64(0)
+	2: VecImmBorrow(1)
+	3: ReadRef
+	4: StLoc[2](a: vector<u8>)
+	5: ImmBorrowLoc[1](y: vector<vector<u8>>)
+	6: LdU64(0)
+	7: VecImmBorrow(1)
+	8: ReadRef
+	9: StLoc[3](b: vector<u8>)
+	10: CopyLoc[2](a: vector<u8>)
+	11: ImmBorrowLoc[1](y: vector<vector<u8>>)
+	12: LdU64(0)
+	13: VecImmBorrow(1)
+	14: ReadRef
+	15: Eq
+	16: BrFalse(33)
+B1:
+	17: CopyLoc[3](b: vector<u8>)
+	18: ImmBorrowLoc[0](x: vector<vector<u8>>)
+	19: LdU64(0)
+	20: VecImmBorrow(1)
+	21: ReadRef
+	22: Eq
+	23: StLoc[4]($t12: bool)
+B2:
+	24: MoveLoc[4]($t12: bool)
+	25: BrFalse(30)
+B3:
+	26: MoveLoc[2](a: vector<u8>)
+	27: StLoc[5]($t13: vector<u8>)
+B4:
+	28: MoveLoc[5]($t13: vector<u8>)
+	29: Ret
+B5:
+	30: MoveLoc[3](b: vector<u8>)
+	31: StLoc[5]($t13: vector<u8>)
+	32: Branch(28)
+B6:
+	33: LdFalse
+	34: StLoc[4]($t12: bool)
+	35: Branch(24)
+}
+public eq4(x: vector<u8>, y: vector<u8>): bool /* def_idx: 3 */ {
+B0:
+	0: CopyLoc[0](x: vector<u8>)
+	1: MoveLoc[1](y: vector<u8>)
+	2: Eq
+	3: Ret
+}
+public eq5(x: Test1, y: Test1): Test1 /* def_idx: 4 */ {
+L2:	$t4: Test1
+B0:
+	0: CopyLoc[0](x: Test1)
+	1: CopyLoc[1](y: Test1)
+	2: Eq
+	3: BrFalse(8)
+B1:
+	4: MoveLoc[0](x: Test1)
+	5: StLoc[2]($t4: Test1)
+B2:
+	6: MoveLoc[2]($t4: Test1)
+	7: Ret
+B3:
+	8: MoveLoc[1](y: Test1)
+	9: StLoc[2]($t4: Test1)
+	10: Branch(6)
+}
+public eq6(x: Test2, y: Test2): Test2 /* def_idx: 5 */ {
+L2:	$t4: Test2
+B0:
+	0: CopyLoc[0](x: Test2)
+	1: CopyLoc[1](y: Test2)
+	2: Eq
+	3: BrFalse(8)
+B1:
+	4: MoveLoc[0](x: Test2)
+	5: StLoc[2]($t4: Test2)
+B2:
+	6: MoveLoc[2]($t4: Test2)
+	7: Ret
+B3:
+	8: MoveLoc[1](y: Test2)
+	9: StLoc[2]($t4: Test2)
+	10: Branch(6)
+}
+}
+============ bytecode verification succeeded ========

@@ -1,0 +1,2005 @@
+// -- Model dump before env processor pipeline:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor unused checks:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor inlining:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor closure-checker:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor specification checker:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(x, y)
+    }
+    public fun eq2<T>(x: T,y: T): bool {
+        Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun eq3<T>(x: vector<T>,y: vector<T>): bool {
+        Eq<vector<T>>(x, y)
+    }
+    public fun eq4(x: Test,y: Test): bool {
+        Eq<Test>(x, y)
+    }
+    public fun neq1<T>(x: T,y: T): bool {
+        Neq<T>(x, y)
+    }
+    public fun neq2<T>(x: T,y: T): bool {
+        Neq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))
+    }
+    public fun neq3<T>(x: vector<T>,y: vector<T>): bool {
+        Neq<vector<T>>(x, y)
+    }
+    public fun neq4(x: Test,y: Test): bool {
+        Neq<Test>(x, y)
+    }
+    public fun signer_eq(s1: signer,s2: signer): signer {
+        if Eq<signer>(s1, s2) {
+          s1
+        } else {
+          s2
+        }
+    }
+} // end 0xcfff::m
+
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := ==($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := !=($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := ==($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := !=($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := ==($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := infer($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := !=($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := infer($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t2 := ==($t3, $t4)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t2 := !=($t3, $t4)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t2 := ==($t3, $t4)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t2 := !=($t3, $t4)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t2 := ==($t3, $t4)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t2 := !=($t3, $t4)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 13
+     #
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 13
+     #   => #4 via [local `y`] at line 13
+     #
+  2: $t2 := ==($t3, $t4)
+     # live vars: $t2
+     # refs: []
+     #
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := ==($t3, $t1)
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 29
+     #
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 29
+     #   => #4 via [local `y`] at line 29
+     #
+  2: $t2 := !=($t3, $t4)
+     # live vars: $t2
+     # refs: []
+     #
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := !=($t3, $t1)
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := ==($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 13
+     #
+  1: $t4 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 13
+     #   => #4 via [local `y`] at line 13
+     #
+  2: $t2 := ==($t3, $t4)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := ==($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := ==($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := !=($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 29
+     #
+  1: $t4 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 29
+     #   => #4 via [local `y`] at line 29
+     #
+  2: $t2 := !=($t3, $t4)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := !=($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := !=($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+Diagnostics:
+error: local `y` of type `T` does not have the `drop` ability
+  ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:9:9
+  │
+9 │         x == y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `T` does not have the `drop` ability
+  ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:9:9
+  │
+9 │         x == y
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `x` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:13:9
+   │
+13 │         &x == &y
+   │         ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:13:15
+   │
+13 │         &x == &y
+   │               ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:17:9
+   │
+17 │         x == y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:17:9
+   │
+17 │         x == y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `y` of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:21:9
+   │
+21 │         x == y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:21:9
+   │
+21 │         x == y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `y` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:25:9
+   │
+25 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:25:9
+   │
+25 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `x` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:29:9
+   │
+29 │         &x != &y
+   │         ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `T` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:29:15
+   │
+29 │         &x != &y
+   │               ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `y` of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:33:9
+   │
+33 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `vector<T>` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:33:9
+   │
+33 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `y` of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:37:9
+   │
+37 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `Test` does not have the `drop` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:37:9
+   │
+37 │         x != y
+   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `s1` of type `signer` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:41:13
+   │
+41 │         if (s1 == s2)
+   │             ^^ copy needed here because value is still in use
+42 │             s1
+   │             -- used here
+
+error: local `s2` of type `signer` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_missing_ability.move:41:13
+   │
+41 │         if (s1 == s2)
+   │             ^^^^^^^^ copy needed here because value is still in use
+   ·
+44 │             s2
+   │             -- used here
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := move($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := ==($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := move($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := move($t0)
+  1: $t2 := ==($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+  0: $t3 := move($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq2<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: &#0
+     var $t4: &#0
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t2 := !=($t3, $t4)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq3<#0>($t0: vector<#0>, $t1: vector<#0>): bool {
+     var $t2: bool
+     var $t3: vector<#0>
+  0: $t3 := move($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::neq4($t0: 0xcfff::m::Test, $t1: 0xcfff::m::Test): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+  0: $t3 := move($t0)
+  1: $t2 := !=($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun m::signer_eq($t0: signer, $t1: signer): signer {
+     var $t2: signer
+     var $t3: bool
+     var $t4: signer
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}

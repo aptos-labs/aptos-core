@@ -156,7 +156,8 @@ impl<'a> FunctionGenerator<'a> {
                 .get_extension::<Options>()
                 .expect("Options is available");
             if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
-                let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
+                let typed_block = peephole_optimizer::TypedCodeBlock::new(&fun_env, &code.code);
+                let transformed_code_chunk = peephole_optimizer::optimize(typed_block);
                 // Fix the source map for the optimized code.
                 fun_gen
                     .gen
