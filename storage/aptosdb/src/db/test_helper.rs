@@ -425,7 +425,7 @@ fn verify_snapshots(
         updates.extend(
             txns_to_commit[start..=end]
                 .iter()
-                .flat_map(|x| x.write_set().iter())
+                .flat_map(|x| x.write_set().write_op_iter())
                 .map(|(k, op)| (k.clone(), op.as_state_value())),
         );
         for (state_key, state_value) in &updates {

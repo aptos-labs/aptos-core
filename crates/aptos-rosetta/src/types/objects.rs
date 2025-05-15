@@ -934,7 +934,7 @@ impl Transaction {
             let mut store_to_currency = HashMap::new();
             let mut framework_changes = vec![];
             // Not the most efficient, parse all store owners, and assets associated with stores
-            for (state_key, write_op) in &txn.changes {
+            for (state_key, write_op) in txn.changes.write_op_iter() {
                 let new_changes = preprocess_write_set(
                     server_context,
                     state_key,
@@ -1766,7 +1766,7 @@ async fn parse_staking_contract_resource_changes(
     if let Ok(store) = bcs::from_bytes::<Store>(data) {
         // Collect all the stake pools that were created
         let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
-            .iter()
+            .write_op_iter()
             .filter_map(|(state_key, write_op)| {
                 let data = write_op.bytes();
 

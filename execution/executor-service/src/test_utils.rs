@@ -103,12 +103,12 @@ pub fn compare_txn_outputs(
         // we support global supply tracking in sharded execution.
         let unsharded_write_set_without_table_item = unsharded_txn_output[i]
             .write_set()
-            .into_iter()
+            .write_op_iter()
             .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
             .collect::<Vec<_>>();
         let sharded_write_set_without_table_item = sharded_txn_output[i]
             .write_set()
-            .into_iter()
+            .write_op_iter()
             .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
             .collect::<Vec<_>>();
         assert_eq!(

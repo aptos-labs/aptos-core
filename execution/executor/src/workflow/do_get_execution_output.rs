@@ -514,7 +514,7 @@ impl TStateView for WriteSetStateView<'_> {
     ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
         Ok(self
             .write_set
-            .get(state_key)
+            .get_write_op(state_key)
             .and_then(|write_op| write_op.as_state_value()))
     }
 

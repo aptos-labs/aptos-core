@@ -51,7 +51,7 @@ fn collect_per_version_write_op_refs(c: &mut Criterion, write_sets: &[WriteSet])
         b.iter(|| {
             write_sets
                 .iter()
-                .map(|w| w.iter().collect_vec())
+                .map(|w| w.write_op_iter().collect_vec())
                 .collect::<Vec<Vec<(&StateKey, &WriteOp)>>>()
         })
     });
@@ -61,7 +61,7 @@ fn collect_per_version_write_op_refs(c: &mut Criterion, write_sets: &[WriteSet])
         b.iter(|| {
             write_sets
                 .iter()
-                .map(|w| w.iter().map(|(k, v)| (k.clone(), v)).collect_vec())
+                .map(|w| w.write_op_iter().map(|(k, v)| (k.clone(), v)).collect_vec())
                 .collect::<Vec<Vec<(StateKey, &WriteOp)>>>()
         })
     });
@@ -71,7 +71,7 @@ fn collect_per_version_write_op_refs(c: &mut Criterion, write_sets: &[WriteSet])
         b.iter(|| {
             write_sets
                 .par_iter()
-                .map(|w| w.iter().collect_vec())
+                .map(|w| w.write_op_iter().collect_vec())
                 .collect::<Vec<Vec<(&StateKey, &WriteOp)>>>()
         })
     });
@@ -81,7 +81,7 @@ fn collect_per_version_write_op_refs(c: &mut Criterion, write_sets: &[WriteSet])
         b.iter(|| {
             write_sets
                 .iter()
-                .map(|w| w.iter().collect())
+                .map(|w| w.write_op_iter().collect())
                 .collect::<Vec<HashMap<&StateKey, &WriteOp>>>()
         })
     });
@@ -91,7 +91,7 @@ fn collect_per_version_write_op_refs(c: &mut Criterion, write_sets: &[WriteSet])
         b.iter(|| {
             write_sets
                 .par_iter()
-                .map(|w| w.iter().collect())
+                .map(|w| w.write_op_iter().collect())
                 .collect::<Vec<HashMap<&StateKey, &WriteOp>>>()
         })
     });
@@ -306,7 +306,11 @@ fn collect_per_version_cloned_write_ops(c: &mut Criterion, write_sets: &[WriteSe
         b.iter(|| {
             write_sets
                 .iter()
-                .map(|w| w.iter().map(|(k, op)| (k.clone(), op.clone())).collect())
+                .map(|w| {
+                    w.write_op_iter()
+                        .map(|(k, op)| (k.clone(), op.clone()))
+                        .collect()
+                })
                 .collect::<Vec<Vec<(StateKey, WriteOp)>>>()
         })
     });
@@ -316,7 +320,11 @@ fn collect_per_version_cloned_write_ops(c: &mut Criterion, write_sets: &[WriteSe
         b.iter(|| {
             write_sets
                 .par_iter()
-                .map(|w| w.iter().map(|(k, op)| (k.clone(), op.clone())).collect())
+                .map(|w| {
+                    w.write_op_iter()
+                        .map(|(k, op)| (k.clone(), op.clone()))
+                        .collect()
+                })
                 .collect::<Vec<Vec<(StateKey, WriteOp)>>>()
         })
     });
@@ -326,7 +334,11 @@ fn collect_per_version_cloned_write_ops(c: &mut Criterion, write_sets: &[WriteSe
         b.iter(|| {
             write_sets
                 .iter()
-                .map(|w| w.iter().map(|(k, op)| (k.clone(), op.clone())).collect())
+                .map(|w| {
+                    w.write_op_iter()
+                        .map(|(k, op)| (k.clone(), op.clone()))
+                        .collect()
+                })
                 .collect::<Vec<HashMap<StateKey, WriteOp>>>()
         })
     });
@@ -336,7 +348,11 @@ fn collect_per_version_cloned_write_ops(c: &mut Criterion, write_sets: &[WriteSe
         b.iter(|| {
             write_sets
                 .par_iter()
-                .map(|w| w.iter().map(|(k, op)| (k.clone(), op.clone())).collect())
+                .map(|w| {
+                    w.write_op_iter()
+                        .map(|(k, op)| (k.clone(), op.clone()))
+                        .collect()
+                })
                 .collect::<Vec<HashMap<StateKey, WriteOp>>>()
         })
     });

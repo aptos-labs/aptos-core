@@ -266,7 +266,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             accumulator_root_hash: accumulator_root_hash.into(),
             // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
             changes: write_set
-                .into_iter()
+                .into_write_op_iter()
                 .filter_map(|(sk, wo)| self.try_into_write_set_changes(sk, wo).ok())
                 .flatten()
                 .collect(),
@@ -426,7 +426,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Direct(d) => {
                 let (write_set, events) = d.into_inner();
                 let nested_writeset_changes: Vec<Vec<WriteSetChange>> = write_set
-                    .into_iter()
+                    .into_write_op_iter()
                     .map(|(state_key, op)| self.try_into_write_set_changes(state_key, op))
                     .collect::<Result<Vec<Vec<_>>>>()?;
                 WriteSetPayload {
