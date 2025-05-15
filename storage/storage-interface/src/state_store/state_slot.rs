@@ -8,6 +8,9 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
 use StateSlot::*;
 
 /// Represents the content of a state slot, or the lack there of, along with information indicating
@@ -16,7 +19,8 @@ use StateSlot::*;
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
