@@ -9,44 +9,53 @@ use 0000000000000000000000000000000000000000000000000000000000000001::string;
 
 test<T>(x: vector<u8>): T /* def_idx: 0 */ {
 L1:	y: String
+L2:	$t6: String
+L3:	$t12: String
+L4:	$t18: String
 B0:
 	0: Call foo<T>(): String
 	1: StLoc[1](y: String)
-	2: CopyLoc[1](y: String)
+	2: ImmBorrowLoc[1](y: String)
 	3: LdConst[0](Vector(U8): [4, 98, 111, 111, 108])
 	4: Call string::utf8(vector<u8>): String
-	5: Eq
-	6: BrFalse(11)
+	5: StLoc[2]($t6: String)
+	6: ImmBorrowLoc[2]($t6: String)
+	7: Eq
+	8: BrFalse(13)
 B1:
-	7: MoveLoc[0](x: vector<u8>)
-	8: Call baz<bool>(vector<u8>): bool
-	9: Call bar<T>(bool): T
-	10: Ret
+	9: MoveLoc[0](x: vector<u8>)
+	10: Call baz<bool>(vector<u8>): bool
+	11: Call bar<T>(bool): T
+	12: Ret
 B2:
-	11: CopyLoc[1](y: String)
-	12: LdConst[1](Vector(U8): [2, 117, 56])
-	13: Call string::utf8(vector<u8>): String
-	14: Eq
-	15: BrFalse(20)
+	13: ImmBorrowLoc[1](y: String)
+	14: LdConst[1](Vector(U8): [2, 117, 56])
+	15: Call string::utf8(vector<u8>): String
+	16: StLoc[3]($t12: String)
+	17: ImmBorrowLoc[3]($t12: String)
+	18: Eq
+	19: BrFalse(24)
 B3:
-	16: MoveLoc[0](x: vector<u8>)
-	17: Call baz<bool>(vector<u8>): bool
-	18: Call bar<T>(bool): T
-	19: Ret
+	20: MoveLoc[0](x: vector<u8>)
+	21: Call baz<bool>(vector<u8>): bool
+	22: Call bar<T>(bool): T
+	23: Ret
 B4:
-	20: MoveLoc[1](y: String)
-	21: LdConst[2](Vector(U8): [3, 117, 54, 52])
-	22: Call string::utf8(vector<u8>): String
-	23: Eq
-	24: BrFalse(29)
+	24: ImmBorrowLoc[1](y: String)
+	25: LdConst[2](Vector(U8): [3, 117, 54, 52])
+	26: Call string::utf8(vector<u8>): String
+	27: StLoc[4]($t18: String)
+	28: ImmBorrowLoc[4]($t18: String)
+	29: Eq
+	30: BrFalse(35)
 B5:
-	25: MoveLoc[0](x: vector<u8>)
-	26: Call baz<bool>(vector<u8>): bool
-	27: Call bar<T>(bool): T
-	28: Ret
+	31: MoveLoc[0](x: vector<u8>)
+	32: Call baz<bool>(vector<u8>): bool
+	33: Call bar<T>(bool): T
+	34: Ret
 B6:
-	29: LdU64(0)
-	30: Abort
+	35: LdU64(0)
+	36: Abort
 }
 bar<T>(_x: bool): T /* def_idx: 1 */ {
 B0:

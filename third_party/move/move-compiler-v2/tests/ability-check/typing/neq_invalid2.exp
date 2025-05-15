@@ -1,37 +1,49 @@
 
 Diagnostics:
-error: local `s2` of type `S` does not have the `drop` ability
+error: local `s` of type `S` does not have the `drop` ability
    ┌─ tests/ability-check/typing/neq_invalid2.move:17:9
    │
 17 │         s != s2;
-   │         ^^^^^^^ operator drops value here (consider borrowing the argument)
+   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
 
-error: value of type `S` does not have the `drop` ability
-   ┌─ tests/ability-check/typing/neq_invalid2.move:17:9
+error: local `s2` of type `S` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:17:14
    │
 17 │         s != s2;
-   │         ^^^^^^^ operator drops value here (consider borrowing the argument)
+   │              ^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `r1` of type `R` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
+   │
+22 │         r1 != r2;
+   │         ^^ still borrowed but will be implicitly dropped later since it is no longer used
 
 error: local `r2` of type `R` does not have the `drop` ability
-   ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
+   ┌─ tests/ability-check/typing/neq_invalid2.move:22:15
    │
 22 │         r1 != r2;
-   │         ^^^^^^^^ operator drops value here (consider borrowing the argument)
-
-error: value of type `R` does not have the `drop` ability
-   ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
-   │
-22 │         r1 != r2;
-   │         ^^^^^^^^ operator drops value here (consider borrowing the argument)
+   │               ^^ still borrowed but will be implicitly dropped later since it is no longer used
 
 error: value of type `G1<Key>` does not have the `drop` ability
    ┌─ tests/ability-check/typing/neq_invalid2.move:27:9
    │
 27 │         G1<Key>{} != G1<Key>{};
-   │         ^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)
+   │         ^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: value of type `G1<Key>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:27:22
+   │
+27 │         G1<Key>{} != G1<Key>{};
+   │                      ^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
 
 error: value of type `G2<Key>` does not have the `drop` ability
    ┌─ tests/ability-check/typing/neq_invalid2.move:28:9
    │
 28 │         G2<Key>{} != G2<Key>{};
-   │         ^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)
+   │         ^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: value of type `G2<Key>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:28:22
+   │
+28 │         G2<Key>{} != G2<Key>{};
+   │                      ^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used

@@ -6,7 +6,7 @@ module 0x66::test {
     private fun t1(): bool {
         {
           let work: Work = pack test::Work(closure#0test::__lambda__1__t1());
-          Eq<Work>(work, closure#0test::__lambda__2__t1())
+          Eq<Work>(Borrow(Immutable)(work), Borrow(Immutable)(closure#0test::__lambda__2__t1()))
         }
     }
     private fun t2() {
@@ -33,7 +33,7 @@ module 0x66::test {
     }
     fun t1(): bool {
         let work = Work(|arg0| __lambda__1__t1(arg0));
-        work == <<wrongly typed closure expression>>
+        &work == &<<wrongly typed closure expression>>
     }
     fun t2() {
         take_work(<<wrongly typed closure expression>>)

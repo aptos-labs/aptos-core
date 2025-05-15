@@ -1,28 +1,19 @@
 
 Diagnostics:
-error: local `r` of type `R` does not have the `copy` ability
-   ┌─ tests/ability-check/typing/eq_invalid2.move:11:9
-   │
-11 │         r == r;
-   │         ^-----
-   │         │
-   │         used here
-   │         copy needed here because value is still in use
-
 error: local `r` of type `R` does not have the `drop` ability
-   ┌─ tests/ability-check/typing/eq_invalid2.move:11:9
+   ┌─ tests/ability-check/typing/eq_invalid2.move:11:14
    │
 11 │         r == r;
-   │         ^^^^^^ operator drops value here (consider borrowing the argument)
-
-error: value of type `R` does not have the `drop` ability
-   ┌─ tests/ability-check/typing/eq_invalid2.move:11:9
-   │
-11 │         r == r;
-   │         ^^^^^^ operator drops value here (consider borrowing the argument)
+   │              ^ still borrowed but will be implicitly dropped later since it is no longer used
 
 error: value of type `G1<T>` does not have the `drop` ability
    ┌─ tests/ability-check/typing/eq_invalid2.move:15:9
    │
 15 │         G1{ f: t } == G1{ f: t };
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)
+   │         ^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: value of type `G1<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/eq_invalid2.move:15:23
+   │
+15 │         G1{ f: t } == G1{ f: t };
+   │                       ^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used

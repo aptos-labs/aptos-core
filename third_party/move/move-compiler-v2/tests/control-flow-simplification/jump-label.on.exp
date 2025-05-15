@@ -5,54 +5,60 @@ fun test::test<#0>($t0: vector<u8>): #0 {
      var $t1: #0
      var $t2: 0x1::string::String
      var $t3: bool
-     var $t4: 0x1::string::String
-     var $t5: 0x1::string::String
-     var $t6: vector<u8>
-     var $t7: bool
+     var $t4: &0x1::string::String
+     var $t5: &0x1::string::String
+     var $t6: 0x1::string::String
+     var $t7: vector<u8>
      var $t8: bool
-     var $t9: 0x1::string::String
-     var $t10: 0x1::string::String
-     var $t11: vector<u8>
-     var $t12: bool
-     var $t13: bool
-     var $t14: 0x1::string::String
-     var $t15: 0x1::string::String
-     var $t16: vector<u8>
-     var $t17: bool
-     var $t18: u64
+     var $t9: bool
+     var $t10: &0x1::string::String
+     var $t11: &0x1::string::String
+     var $t12: 0x1::string::String
+     var $t13: vector<u8>
+     var $t14: bool
+     var $t15: bool
+     var $t16: &0x1::string::String
+     var $t17: &0x1::string::String
+     var $t18: 0x1::string::String
+     var $t19: vector<u8>
+     var $t20: bool
+     var $t21: u64
   0: $t2 := test::foo<#0>()
-  1: $t4 := copy($t2)
-  2: $t6 := [98, 111, 111, 108]
-  3: $t5 := string::utf8($t6)
-  4: $t3 := ==($t4, $t5)
-  5: if ($t3) goto 6 else goto 10
-  6: label L0
-  7: $t7 := test::baz<bool>($t0)
-  8: $t1 := test::bar<#0>($t7)
-  9: return $t1
- 10: label L1
- 11: $t9 := copy($t2)
- 12: $t11 := [117, 56]
- 13: $t10 := string::utf8($t11)
- 14: $t8 := ==($t9, $t10)
- 15: if ($t8) goto 16 else goto 20
- 16: label L3
- 17: $t12 := test::baz<bool>($t0)
- 18: $t1 := test::bar<#0>($t12)
- 19: return $t1
- 20: label L4
- 21: $t14 := move($t2)
- 22: $t16 := [117, 54, 52]
- 23: $t15 := string::utf8($t16)
- 24: $t13 := ==($t14, $t15)
- 25: if ($t13) goto 26 else goto 30
- 26: label L6
- 27: $t17 := test::baz<bool>($t0)
- 28: $t1 := test::bar<#0>($t17)
- 29: return $t1
- 30: label L7
- 31: $t18 := 0
- 32: abort($t18)
+  1: $t4 := borrow_local($t2)
+  2: $t7 := [98, 111, 111, 108]
+  3: $t6 := string::utf8($t7)
+  4: $t5 := borrow_local($t6)
+  5: $t3 := ==($t4, $t5)
+  6: if ($t3) goto 7 else goto 11
+  7: label L0
+  8: $t8 := test::baz<bool>($t0)
+  9: $t1 := test::bar<#0>($t8)
+ 10: return $t1
+ 11: label L1
+ 12: $t10 := borrow_local($t2)
+ 13: $t13 := [117, 56]
+ 14: $t12 := string::utf8($t13)
+ 15: $t11 := borrow_local($t12)
+ 16: $t9 := ==($t10, $t11)
+ 17: if ($t9) goto 18 else goto 22
+ 18: label L3
+ 19: $t14 := test::baz<bool>($t0)
+ 20: $t1 := test::bar<#0>($t14)
+ 21: return $t1
+ 22: label L4
+ 23: $t16 := borrow_local($t2)
+ 24: $t19 := [117, 54, 52]
+ 25: $t18 := string::utf8($t19)
+ 26: $t17 := borrow_local($t18)
+ 27: $t15 := ==($t16, $t17)
+ 28: if ($t15) goto 29 else goto 33
+ 29: label L6
+ 30: $t20 := test::baz<bool>($t0)
+ 31: $t1 := test::bar<#0>($t20)
+ 32: return $t1
+ 33: label L7
+ 34: $t21 := 0
+ 35: abort($t21)
 }
 
 
@@ -93,44 +99,53 @@ use 0000000000000000000000000000000000000000000000000000000000000001::string;
 
 test<T>(x: vector<u8>): T /* def_idx: 0 */ {
 L1:	y: String
+L2:	$t6: String
+L3:	$t12: String
+L4:	$t18: String
 B0:
 	0: Call foo<T>(): String
 	1: StLoc[1](y: String)
-	2: CopyLoc[1](y: String)
+	2: ImmBorrowLoc[1](y: String)
 	3: LdConst[0](Vector(U8): [4, 98, 111, 111, 108])
 	4: Call string::utf8(vector<u8>): String
-	5: Eq
-	6: BrFalse(11)
+	5: StLoc[2]($t6: String)
+	6: ImmBorrowLoc[2]($t6: String)
+	7: Eq
+	8: BrFalse(13)
 B1:
-	7: MoveLoc[0](x: vector<u8>)
-	8: Call baz<bool>(vector<u8>): bool
-	9: Call bar<T>(bool): T
-	10: Ret
+	9: MoveLoc[0](x: vector<u8>)
+	10: Call baz<bool>(vector<u8>): bool
+	11: Call bar<T>(bool): T
+	12: Ret
 B2:
-	11: CopyLoc[1](y: String)
-	12: LdConst[1](Vector(U8): [2, 117, 56])
-	13: Call string::utf8(vector<u8>): String
-	14: Eq
-	15: BrFalse(20)
+	13: ImmBorrowLoc[1](y: String)
+	14: LdConst[1](Vector(U8): [2, 117, 56])
+	15: Call string::utf8(vector<u8>): String
+	16: StLoc[3]($t12: String)
+	17: ImmBorrowLoc[3]($t12: String)
+	18: Eq
+	19: BrFalse(24)
 B3:
-	16: MoveLoc[0](x: vector<u8>)
-	17: Call baz<bool>(vector<u8>): bool
-	18: Call bar<T>(bool): T
-	19: Ret
+	20: MoveLoc[0](x: vector<u8>)
+	21: Call baz<bool>(vector<u8>): bool
+	22: Call bar<T>(bool): T
+	23: Ret
 B4:
-	20: MoveLoc[1](y: String)
-	21: LdConst[2](Vector(U8): [3, 117, 54, 52])
-	22: Call string::utf8(vector<u8>): String
-	23: Eq
-	24: BrFalse(29)
+	24: ImmBorrowLoc[1](y: String)
+	25: LdConst[2](Vector(U8): [3, 117, 54, 52])
+	26: Call string::utf8(vector<u8>): String
+	27: StLoc[4]($t18: String)
+	28: ImmBorrowLoc[4]($t18: String)
+	29: Eq
+	30: BrFalse(35)
 B5:
-	25: MoveLoc[0](x: vector<u8>)
-	26: Call baz<bool>(vector<u8>): bool
-	27: Call bar<T>(bool): T
-	28: Ret
+	31: MoveLoc[0](x: vector<u8>)
+	32: Call baz<bool>(vector<u8>): bool
+	33: Call bar<T>(bool): T
+	34: Ret
 B6:
-	29: LdU64(0)
-	30: Abort
+	35: LdU64(0)
+	36: Abort
 }
 bar<T>(_x: bool): T /* def_idx: 1 */ {
 B0:

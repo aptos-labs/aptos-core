@@ -1,0 +1,793 @@
+// -- Model dump before env processor pipeline:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor unused checks:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor inlining:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor acquires check:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor specification checker:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(work1, work2) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(|x: u64| Add<u64>(x, 1));
+          {
+            let work2: Work = pack test::Work(|x: u64| Add<u64>(x, 2));
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+} // end 0x1::test
+
+
+
+Diagnostics:
+error: function values outside of inline functions not supported in this language version
+  ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:6:26
+  │
+6 │         let work1 = Work(|x| x + 1);
+  │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+  ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:7:26
+  │
+7 │         let work2 = Work(|x| x + 2);
+  │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:15:26
+   │
+15 │         let work1 = Work(|x| x + 1);
+   │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:16:26
+   │
+16 │         let work2 = Work(|x| x + 2);
+   │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:24:26
+   │
+24 │         let work1 = Work(|x| x + 1);
+   │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:25:26
+   │
+25 │         let work2 = Work(|x| x + 2);
+   │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:26:13
+   │
+26 │         if (work1(2) == work2(1))
+   │             ^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:26:25
+   │
+26 │         if (work1(2) == work2(1))
+   │                         ^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:33:26
+   │
+33 │         let work1 = Work(|x| x + 1);
+   │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:34:26
+   │
+34 │         let work2 = Work(|x| x + 2);
+   │                          ^^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:35:14
+   │
+35 │         if (&work1(2) == &work2(1))
+   │              ^^^^^^^^
+
+error: function values outside of inline functions not supported in this language version
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_func_value.move:35:27
+   │
+35 │         if (&work1(2) == &work2(1))
+   │                           ^^^^^^^^

@@ -1,0 +1,1794 @@
+// -- Model dump before env processor pipeline:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor unused checks:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor inlining:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor acquires check:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor closure-checker:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor specification checker:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x0::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: Test,y: Test): Test {
+        if Eq<Test>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: Test,y: Test): Test {
+        if Eq<Test>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x0::test
+module 0x1::test {
+    struct Test {
+        a: u8,
+        b: u16,
+    }
+    public fun eq1(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+    public fun eq2(x: vector<Test>,y: vector<Test>): vector<Test> {
+        if Eq<vector<Test>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0x1::test
+
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := infer($t1)
+  9: label L2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := infer($t1)
+  9: label L2
+ 10: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := infer($t1)
+  9: label L2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := infer($t1)
+  9: label L2
+ 10: return $t2
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := infer($t1)
+  9: label L2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := infer($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := infer($t1)
+  9: label L2
+ 10: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t0
+  5: $t2 := infer($t0)
+     # live vars: $t2
+  6: goto 9
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := infer($t1)
+     # live vars: $t2
+  9: label L2
+     # live vars: $t2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t0
+  5: $t2 := infer($t0)
+     # live vars: $t2
+  6: goto 9
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := infer($t1)
+     # live vars: $t2
+  9: label L2
+     # live vars: $t2
+ 10: return $t2
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t0
+  5: $t2 := infer($t0)
+     # live vars: $t2
+  6: goto 9
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := infer($t1)
+     # live vars: $t2
+  9: label L2
+     # live vars: $t2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t0
+  5: $t2 := infer($t0)
+     # live vars: $t2
+  6: goto 9
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := infer($t1)
+     # live vars: $t2
+  9: label L2
+     # live vars: $t2
+ 10: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t0
+  5: $t2 := infer($t0)
+     # live vars: $t2
+  6: goto 9
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := infer($t1)
+     # live vars: $t2
+  9: label L2
+     # live vars: $t2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+  4: label L0
+     # live vars: $t0
+  5: $t2 := infer($t0)
+     # live vars: $t2
+  6: goto 9
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := infer($t1)
+     # live vars: $t2
+  9: label L2
+     # live vars: $t2
+ 10: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 17
+     #
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 17
+     #   => #5 via [local `y`] at line 17
+     #
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  4: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  5: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  6: goto 9
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  7: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  8: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  9: label L2
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 41
+     #
+  1: $t5 := borrow_local($t1)
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 41
+     #   => #5 via [local `y`] at line 41
+     #
+  2: $t3 := ==($t4, $t5)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: if ($t3) goto 4 else goto 7
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  4: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  5: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  6: goto 9
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  7: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  8: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  9: label L2
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 17
+     #
+  1: $t5 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 17
+     #   => #5 via [local `y`] at line 17
+     #
+  2: $t3 := ==($t4, $t5)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: if ($t3) goto 4 else goto 7
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  4: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  5: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: goto 9
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  7: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  8: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 41
+     #
+  1: $t5 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: [$t4 => #4, $t5 => #5]
+     # #4
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 41
+     #   => #5 via [local `y`] at line 41
+     #
+  2: $t3 := ==($t4, $t5)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: if ($t3) goto 4 else goto 7
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  4: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  5: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: goto 9
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  7: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  8: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+Diagnostics:
+error: local `x` of type `Test` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_limited_ability.move:9:13
+   │
+ 9 │         if (x==y)
+   │             ^ copy needed here because value is still in use
+10 │             x
+   │             - used here
+
+error: local `y` of type `Test` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_limited_ability.move:9:13
+   │
+ 9 │         if (x==y)
+   │             ^^^^ copy needed here because value is still in use
+   ·
+12 │             y
+   │             - used here
+
+error: local `x` of type `vector<Test>` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_limited_ability.move:33:13
+   │
+33 │         if (x==y)
+   │             ^ copy needed here because value is still in use
+34 │             x
+   │             - used here
+
+error: local `y` of type `vector<Test>` does not have the `copy` ability
+   ┌─ tests/cmp-rewrite/legal-examples-lang-v2.2/cmp_limited_ability.move:33:13
+   │
+33 │         if (x==y)
+   │             ^^^^ copy needed here because value is still in use
+   ·
+36 │             y
+   │             - used here
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun test::eq1($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: 0x0::test::Test
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: 0x0::test::Test, $t1: 0x0::test::Test): 0x0::test::Test {
+     var $t2: 0x0::test::Test
+     var $t3: bool
+     var $t4: &0x0::test::Test
+     var $t5: &0x0::test::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := move($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := move($t1)
+  9: label L2
+ 10: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq1($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: vector<0x1::test::Test>
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+
+[variant baseline]
+public fun test::eq2($t0: vector<0x1::test::Test>, $t1: vector<0x1::test::Test>): vector<0x1::test::Test> {
+     var $t2: vector<0x1::test::Test>
+     var $t3: bool
+     var $t4: &vector<0x1::test::Test>
+     var $t5: &vector<0x1::test::Test>
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_local($t1)
+  2: $t3 := ==($t4, $t5)
+  3: if ($t3) goto 4 else goto 7
+  4: label L0
+  5: $t2 := move($t0)
+  6: goto 9
+  7: label L1
+  8: $t2 := move($t1)
+  9: label L2
+ 10: return $t2
+}
