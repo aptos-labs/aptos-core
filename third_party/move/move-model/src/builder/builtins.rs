@@ -7,6 +7,7 @@
 use crate::{
     ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
+    metadata::LanguageVersion,
     model::{Parameter, TypeParameter, TypeParameterKind},
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
@@ -165,24 +166,6 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                     visibility,
                 );
             }
-            for (op, oper) in [
-                (Lt, Operation::Lt),
-                (Le, Operation::Le),
-                (Ge, Operation::Ge),
-                (Gt, Operation::Gt),
-            ] {
-                declare_bin_gen(
-                    trans,
-                    op,
-                    oper,
-                    type_params,
-                    type_constraints,
-                    &ty,
-                    &ty,
-                    bool_t,
-                    visibility,
-                );
-            }
         };
 
         // Declare the specification arithm ops, based on Num type.
@@ -207,6 +190,76 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             param_t.clone(),
             Impl, // visible only in the impl language
         );
+
+        // Builtin function for comparison operations
+        let declare_cmp_ops = |trans: &mut ModelBuilder,
+                               type_params: &[TypeParameter],
+                               type_constraints: &BTreeMap<usize, Constraint>,
+                               ty: Type,
+                               visibility: EntryVisibility| {
+            for (op, oper) in [
+                (Lt, Operation::Lt),
+                (Le, Operation::Le),
+                (Ge, Operation::Ge),
+                (Gt, Operation::Gt),
+            ] {
+                declare_bin_gen(
+                    trans,
+                    op,
+                    oper,
+                    type_params,
+                    type_constraints,
+                    &ty,
+                    &ty,
+                    bool_t,
+                    visibility,
+                );
+            }
+        };
+
+        // Declare the specification cmp ops.
+        // Only Num type is supported for cmp ops in spec.
+        declare_cmp_ops(
+            trans,
+            &[],
+            &BTreeMap::new(),
+            Type::new_prim(PrimitiveType::Num),
+            Spec, // visible only in the spec language
+        );
+        // Declare the implementation cmp ops
+        if trans
+            .env
+            .language_version()
+            .is_at_least(LanguageVersion::V2_2)
+        {
+            // For LanguageVersion::V2_2 and later, we support comparison on all non-reference types.
+            // - integer types supported by the VM natively
+            // - other types supported by the `compare` native function
+            //      - implicitly through compiler rewrite at the AST level
+            declare_cmp_ops(
+                trans,
+                &[param_t_decl.clone()],
+                &[(0, Constraint::NoReference)].into_iter().collect(),
+                param_t.clone(),
+                Impl, // visible only in the impl language
+            );
+        } else {
+            // For LanguageVersion::V2_1 and earlier, we support only integer types.
+            // We use a generic function with a constraint, conceptually:
+            // `fun _cmp_<A>(x: A, y: A): bool where A: u8|u16|..|u256`.
+            declare_cmp_ops(
+                trans,
+                &[param_t_decl.clone()],
+                &[(
+                    0,
+                    Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
+                )]
+                .into_iter()
+                .collect(),
+                param_t.clone(),
+                Impl, // visible only in the impl language
+            );
+        }
 
         declare_bin(trans, Range, Operation::Range, num_t, num_t, range_t, Spec);
 
