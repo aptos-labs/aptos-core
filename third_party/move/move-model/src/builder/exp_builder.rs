@@ -4257,19 +4257,7 @@ impl ExpTranslator<'_, '_, '_> {
         for ty in tys {
             let ty_loc = self.to_loc(&ty.loc);
             if let EA::Type_::Apply(maccess, generics) = &ty.value {
-                let expected_type = self.subs.specialize(&exp_ty).drop_reference();
-
-                let (_, _, struct_entry) =
-                    match self.resolve_struct_access(&expected_type, maccess, true) {
-                        Some(x) => x,
-                        None => continue,
-                    };
-                let generics = if generics.is_empty() && !&struct_entry.type_params.is_empty() {
-                    None
-                } else {
-                    Some(generics.clone())
-                };
-
+                let generics = (!generics.is_empty()).then_some(generics.clone());
                 if let Some((inferred_struct_id, variant)) = self.translate_constructor_name(
                     &exp_ty,
                     WideningOrder::LeftToRight,
