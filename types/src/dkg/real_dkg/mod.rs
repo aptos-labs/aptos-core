@@ -9,8 +9,8 @@ use crate::{
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
-use anyhow::{anyhow, ensure};
-use aptos_crypto::{bls12381, bls12381::PrivateKey};
+use anyhow::{anyhow, ensure, Context};
+use aptos_crypto::{bls12381, bls12381::PrivateKey, Uniform};
 use aptos_dkg::{
     pvss,
     pvss::{
@@ -19,6 +19,7 @@ use aptos_dkg::{
     },
 };
 use fixed::types::U64F64;
+use move_core_types::account_address::AccountAddress;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -160,6 +161,27 @@ pub struct Transcripts {
     pub fast: Option<WTrx>,
 }
 
+impl Transcripts {
+    /// MAINTENANCE NOTE: do not call this in VM to keep it mutable.
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        let all_validator_addrs = verifier.get_ordered_account_addresses();
+        let main_trx_dealers = self.main.get_dealers();
+        let dealer_addrs: Vec<AccountAddress> = main_trx_dealers
+            .iter()
+            .map(|player| all_validator_addrs[player.id])
+            .collect();
+        verifier
+            .check_voting_power(dealer_addrs.iter(), true)
+            .context("not enough power")?;
+        if let Some(fast) = &self.fast {
+            ensure!(fast.get_dealers() == main_trx_dealers);
+            ensure!(self.main.get_dealt_public_key() == fast.get_dealt_public_key());
+        }
+        //TODO: move transcripts.main/fast.verify() from VM in the future.
+        Ok(())
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DealtPubKeyShares {
     // dealt public key share for main path
@@ -272,6 +294,7 @@ impl DKGTrait for RealDKG {
         }
     }
 
+    /// NOTE: this is used in VM.
     fn verify_transcript(
         params: &Self::PublicParams,
         trx: &Self::Transcript,
@@ -451,6 +474,64 @@ impl DKGTrait for RealDKG {
     }
 }
 
+impl RealDKG {
+    #[cfg(any(test, feature = "testing"))]
+    pub fn sample_secret_and_generate_transcript<R: CryptoRng + RngCore>(
+        rng: &mut R,
+        pub_params: &<RealDKG as DKGTrait>::PublicParams,
+        my_index: u64,
+        sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+    ) -> <RealDKG as DKGTrait>::Transcript {
+        let secret = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        Self::generate_transcript(rng, pub_params, &secret, my_index, sk)
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    pub fn generate_transcript_for_inconsistent_secrets<R: CryptoRng + RngCore>(
+        rng: &mut R,
+        pub_params: &<RealDKG as DKGTrait>::PublicParams,
+        my_index: u64,
+        sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+    ) -> <RealDKG as DKGTrait>::Transcript {
+        let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        let my_index = my_index as usize;
+        let my_addr = pub_params.session_metadata.dealer_validator_set[my_index].addr;
+        let aux = (pub_params.session_metadata.dealer_epoch, my_addr);
+
+        let wtrx = WTrx::deal(
+            &pub_params.pvss_config.wconfig,
+            &pub_params.pvss_config.pp,
+            sk,
+            &pub_params.pvss_config.eks,
+            &secret_0,
+            &aux,
+            &Player { id: my_index },
+            rng,
+        );
+        // transcript for fast path
+        let fast_wtrx = pub_params
+            .pvss_config
+            .fast_wconfig
+            .as_ref()
+            .map(|fast_wconfig| {
+                WTrx::deal(
+                    fast_wconfig,
+                    &pub_params.pvss_config.pp,
+                    sk,
+                    &pub_params.pvss_config.eks,
+                    &secret_1,
+                    &aux,
+                    &Player { id: my_index },
+                    rng,
+                )
+            });
+        Transcripts {
+            main: wtrx,
+            fast: fast_wtrx,
+        }
+    }
+}
 pub fn maybe_dk_from_bls_sk(
     sk: &PrivateKey,
 ) -> anyhow::Result<<WTrx as Transcript>::DecryptPrivKey> {
