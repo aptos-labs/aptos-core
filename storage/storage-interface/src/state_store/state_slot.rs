@@ -10,8 +10,19 @@ use aptos_types::{
 };
 use StateSlot::*;
 
-/// Represents the content of a state slot, or the lack there of, along with information indicating
-/// whether the slot is present in the cold or/and hot state.
+/// Represents the content of a state slot, or the lack thereof, along with information indicating
+/// whether the slot is present in the cold or/and hot state. This is output by the VM and will be
+/// used to determine how to update hot and cold state.
+///
+/// - If a slot is recently read in the latest block:
+///   - HotOccupied if the item exists.
+///   - HotVacant if the item does not exist (so this info will be cached in hot state).
+/// - If a slot is recently written to in the latest block:
+///   - HotOccupied if the value is added/updated.
+///   - HotVacant if the key is deleted.
+/// - If a slot is not referenced recently, and needs to be evicted from hot state:
+///   - ColdOccupied if it's HotOccupied before.
+///   - ColdVacant if it's HotVacant before.
 ///
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
