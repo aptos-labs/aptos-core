@@ -295,4 +295,8 @@ module aptos_experimental::order_book_types {
     public fun get_price<M: store + copy + drop>(self: &Order<M>): u64 {
         self.price
     }
+
+    public fun is_buy<M: store + copy + drop>(self: &Order<M>): bool {
+        self.is_buy
+    }
 }
