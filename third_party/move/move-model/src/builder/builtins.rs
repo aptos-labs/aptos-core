@@ -165,24 +165,6 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                     visibility,
                 );
             }
-            for (op, oper) in [
-                (Lt, Operation::Lt),
-                (Le, Operation::Le),
-                (Ge, Operation::Ge),
-                (Gt, Operation::Gt),
-            ] {
-                declare_bin_gen(
-                    trans,
-                    op,
-                    oper,
-                    type_params,
-                    type_constraints,
-                    &ty,
-                    &ty,
-                    bool_t,
-                    visibility,
-                );
-            }
         };
 
         // Declare the specification arithm ops, based on Num type.
@@ -238,6 +220,39 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             bool_t,
             SpecAndImpl,
         );
+        {
+            // 
+            let ty  = Type::new_prim(PrimitiveType::Num);
+            for (op, oper) in [
+                (Lt, Operation::Lt),
+                (Le, Operation::Le),
+                (Ge, Operation::Ge),
+                (Gt, Operation::Gt),
+            ] {
+                declare_bin_gen(
+                    trans,
+                    op,
+                    oper.clone(),
+                    &[],
+                    &BTreeMap::new(),
+                    &ty,
+                    &ty,
+                    bool_t,
+                    Spec,
+                );
+                declare_bin_gen(
+                    trans,
+                    op,
+                    oper,
+                    &[param_t_decl.clone()],
+                    &BTreeMap::new(),
+                    &param_t.clone(),
+                    &param_t.clone(),
+                    bool_t,
+                    Impl,
+                );
+            }
+        }
         {
             let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
 
