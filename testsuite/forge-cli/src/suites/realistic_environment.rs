@@ -324,6 +324,12 @@ pub(crate) fn realistic_env_max_load_test(
             max_non_epoch_round_gap: 4,
             max_epoch_round_gap: 4,
         });
+
+    // If the test is short lived, we should verify that there are no fullnode failures
+    if !long_running {
+        success_criteria = success_criteria.add_no_fullnode_failures();
+    }
+
     if !ha_proxy {
         success_criteria = success_criteria.add_latency_breakdown_threshold(
             LatencyBreakdownThreshold::new_with_breach_pct(
