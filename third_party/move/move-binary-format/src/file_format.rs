@@ -2961,6 +2961,108 @@ impl Bytecode {
 
         v
     }
+
+    /// Returns a signature index for instruction, if it exists. Signature index is used by:
+    ///   - Vector instructions (for vector element),
+    ///   - Calling a closure (for function signature).
+    pub fn get_signature_idx(&self) -> Option<SignatureIndex> {
+        use Bytecode::*;
+        match self {
+            // Instructions with single signature index.
+            VecPack(idx, _)
+            | VecLen(idx)
+            | VecImmBorrow(idx)
+            | VecMutBorrow(idx)
+            | VecPushBack(idx)
+            | VecPopBack(idx)
+            | VecUnpack(idx, _)
+            | VecSwap(idx)
+            | CallClosure(idx) => Some(*idx),
+
+            // Instructions without single signature index.
+            Pop
+            | Ret
+            | BrTrue(_)
+            | BrFalse(_)
+            | Branch(_)
+            | LdU8(_)
+            | LdU16(_)
+            | LdU32(_)
+            | LdU64(_)
+            | LdU128(_)
+            | LdU256(_)
+            | CastU8
+            | CastU16
+            | CastU32
+            | CastU64
+            | CastU128
+            | CastU256
+            | LdConst(_)
+            | LdTrue
+            | LdFalse
+            | CopyLoc(_)
+            | MoveLoc(_)
+            | StLoc(_)
+            | MutBorrowLoc(_)
+            | ImmBorrowLoc(_)
+            | MutBorrowField(_)
+            | ImmBorrowField(_)
+            | MutBorrowFieldGeneric(_)
+            | ImmBorrowFieldGeneric(_)
+            | Call(_)
+            | CallGeneric(_)
+            | Pack(_)
+            | PackGeneric(_)
+            | Unpack(_)
+            | UnpackGeneric(_)
+            | Exists(_)
+            | ExistsGeneric(_)
+            | MutBorrowGlobal(_)
+            | ImmBorrowGlobal(_)
+            | MutBorrowGlobalGeneric(_)
+            | ImmBorrowGlobalGeneric(_)
+            | MoveFrom(_)
+            | MoveFromGeneric(_)
+            | MoveTo(_)
+            | MoveToGeneric(_)
+            | FreezeRef
+            | ReadRef
+            | WriteRef
+            | Add
+            | Sub
+            | Mul
+            | Mod
+            | Div
+            | BitOr
+            | BitAnd
+            | Xor
+            | Shl
+            | Shr
+            | Or
+            | And
+            | Not
+            | Eq
+            | Neq
+            | Lt
+            | Gt
+            | Le
+            | Ge
+            | Abort
+            | Nop
+            | ImmBorrowVariantField(_)
+            | ImmBorrowVariantFieldGeneric(_)
+            | MutBorrowVariantField(_)
+            | MutBorrowVariantFieldGeneric(_)
+            | PackVariant(_)
+            | PackVariantGeneric(_)
+            | UnpackVariant(_)
+            | UnpackVariantGeneric(_)
+            | TestVariant(_)
+            | TestVariantGeneric(_)
+            | PackClosure(_, _)
+            | PackClosureGeneric(_, _) => None,
+        }
+    }
 }
 
 /// Contains the main function to execute and its dependencies.
