@@ -195,7 +195,7 @@ impl Default for ConsensusConfig {
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
-            round_initial_timeout_ms: 1500,
+            round_initial_timeout_ms: 1000,
             // 1.2^6 ~= 3
             // Timeout goes from initial_timeout to initial_timeout*3 in 6 steps
             round_timeout_backoff_exponent_base: 1.2,
