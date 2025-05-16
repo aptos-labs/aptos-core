@@ -9,11 +9,19 @@ module std::bcs {
 
     /// Returns the binary representation of `v` in BCS (Binary Canonical Serialization) format.
     /// Aborts with `0x1c5` error code if serialization fails.
-    native public fun to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
+    public fun to_bytes<MoveValue>(v: &MoveValue): vector<u8> {
+        native_load_layout<MoveValue>();
+        native_to_bytes<MoveValue>(v)
+    }
+
 
     /// Returns the size of the binary representation of `v` in BCS (Binary Canonical Serialization) format.
     /// Aborts with `0x1c5` error code if there is a failure when calculating serialized size.
-    native public fun serialized_size<MoveValue>(v: &MoveValue): u64;
+    public fun serialized_size<MoveValue>(v: &MoveValue): u64 {
+        native_load_layout<MoveValue>();
+        native_serialized_size<MoveValue>(v)
+    }
+
 
     /// If the type has known constant (always the same, independent of instance) serialized size
     /// in BCS (Binary Canonical Serialization) format, returns it, otherwise returns None.
@@ -25,7 +33,15 @@ module std::bcs {
     /// If this function returned Some() for some type before - it is guaranteed to continue returning Some().
     /// On the other hand, if function has returned None for some type,
     /// it might change in the future to return Some() instead, if size becomes "known".
-    native public fun constant_serialized_size<MoveValue>(): Option<u64>;
+    public fun constant_serialized_size<MoveValue>(): Option<u64> {
+        native_load_layout<MoveValue>();
+        native_constant_serialized_size<MoveValue>()
+    }
+
+    native fun native_load_layout<MoveValue>();
+    native fun native_to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
+    native fun native_serialized_size<MoveValue>(v: &MoveValue): u64;
+    native fun native_constant_serialized_size<MoveValue>(): Option<u64>;
 
     // ==============================
     // Module Specification
@@ -36,13 +52,36 @@ module std::bcs {
         native fun serialize<MoveValue>(v: &MoveValue): vector<u8>;
     }
 
+    spec to_bytes<MoveValue>(v: &MoveValue): vector<u8> {
+        pragma opaque;
+        aborts_if false;
+        ensures result == serialize(v);
+    }
+
     spec serialized_size<MoveValue>(v: &MoveValue): u64 {
         pragma opaque;
+        aborts_if false;
         ensures result == len(serialize(v));
     }
 
-    spec constant_serialized_size {
-        // TODO: temporary mockup.
+    spec native_serialized_size<MoveValue>(v: &MoveValue): u64 {
         pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == len(serialize(v));
+    }
+
+    spec constant_serialized_size<MoveValue>(): Option<u64> {
+        pragma opaque;
+        aborts_if false;
+    }
+
+    spec native_constant_serialized_size<MoveValue>(): Option<u64> {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec native_load_layout<MoveValue>() {
+        pragma opaque;
+        aborts_if [abstract] false;
     }
 }

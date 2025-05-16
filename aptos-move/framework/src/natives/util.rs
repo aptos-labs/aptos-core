@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_move_stdlib::natives::layouts::native_load_layouts;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
@@ -67,7 +68,15 @@ fn native_from_bytes(
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
-    let natives = [("from_bytes", native_from_bytes as RawSafeNative)];
+    let natives = [
+        ("native_load_layout", native_load_layouts as RawSafeNative),
+        ("native_from_bytes", native_from_bytes),
+        // Note: This function is kept as native for replay only. New frameworks have `from_bytes`
+        //       as a non-native public function, and so any linking will be resolved it. For old
+        //       framework code, `from_bytes` is still native, and so the implementation must be
+        //       available during replay.
+        ("from_bytes", native_from_bytes),
+    ];
 
     builder.make_named_natives(natives)
 }

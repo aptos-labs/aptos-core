@@ -199,7 +199,7 @@ module aptos_framework::object {
     /// Produces an ObjectId from the given address. This is not verified.
     public fun address_to_object<T: key>(object: address): Object<T> {
         assert!(exists<ObjectCore>(object), error::not_found(EOBJECT_DOES_NOT_EXIST));
-        assert!(exists_at<T>(object), error::not_found(ERESOURCE_DOES_NOT_EXIST));
+        assert!(native_exists_at<T>(object), error::not_found(ERESOURCE_DOES_NOT_EXIST));
         Object<T> { inner: object }
     }
 
@@ -210,7 +210,7 @@ module aptos_framework::object {
 
     /// Returns true if there exists an object with resource T.
     public fun object_exists<T: key>(object: address): bool {
-        exists<ObjectCore>(object) && exists_at<T>(object)
+        exists<ObjectCore>(object) && native_exists_at<T>(object)
     }
 
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
@@ -243,7 +243,13 @@ module aptos_framework::object {
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
+    fun native_exists_at<T: key>(object: address): bool {
+        native_load_layout<T>();
+        exists_at<T>(object)
+    }
+
     native fun exists_at<T: key>(object: address): bool;
+    native fun native_load_layout<T>();
 
     /// Returns the address of within an ObjectId.
     public fun object_address<T: key>(object: &Object<T>): address {

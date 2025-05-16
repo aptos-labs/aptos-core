@@ -4403,8 +4403,8 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>pragma</b> verify_duration_estimate = 300;
 <b>let</b> admin_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin);
 <b>let</b> admin_store = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a>&gt;(admin_addr);
-<b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(admin_addr);
-<b>let</b> nonce = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(admin_store.nonce);
+<b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(admin_addr);
+<b>let</b> nonce = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(admin_store.nonce);
 <b>let</b> first = concat(seed, nonce);
 <b>let</b> second = concat(first, <a href="vesting.md#0x1_vesting_VESTING_POOL_SALT">VESTING_POOL_SALT</a>);
 <b>let</b> end = concat(second, contract_creation_seed);

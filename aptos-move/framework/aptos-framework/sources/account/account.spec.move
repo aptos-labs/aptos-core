@@ -119,7 +119,7 @@ spec aptos_framework::account {
 
     /// Ensure that the account exists at the end of the call.
     spec create_account_if_does_not_exist(account_address: address) {
-        let authentication_key = bcs::to_bytes(account_address);
+        let authentication_key = bcs::serialize(account_address);
         modifies global<Account>(account_address);
         aborts_if !exists<Account>(account_address) && (
             account_address == @vm_reserved
@@ -167,7 +167,7 @@ spec aptos_framework::account {
 
     spec schema CreateAccountAbortsIf {
         addr: address;
-        let authentication_key = bcs::to_bytes(addr);
+        let authentication_key = bcs::serialize(addr);
         aborts_if len(authentication_key) != 32;
         aborts_if exists<Account>(addr);
         ensures len(authentication_key) == 32;

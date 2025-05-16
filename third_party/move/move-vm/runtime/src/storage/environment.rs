@@ -22,7 +22,7 @@ use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
@@ -257,35 +257,29 @@ impl RuntimeEnvironment {
     /// Returns the type tag for the given type. Construction of the tag can fail if it is too
     /// "complex": i.e., too deeply nested, or has large struct identifiers.
     pub fn ty_to_ty_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        let ty_tag_builder = TypeTagConverter::new(self);
-        ty_tag_builder.ty_to_ty_tag(ty)
+        let ty_tag_converter = TypeTagConverter::new(self);
+        ty_tag_converter.ty_to_ty_tag(ty)
+    }
+
+    /// Returns a [StructTag] for the type if it is a struct / enum. If not, an internal type error
+    /// is returned.
+    pub(crate) fn struct_ty_to_struct_tag(&self, ty: &Type) -> PartialVMResult<StructTag> {
+        let (idx, ty_args) = ty
+            .as_struct_idx_with_ty_args()
+            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
+        let ty_tag_converter = TypeTagConverter::new(self);
+        ty_tag_converter.struct_name_idx_to_struct_tag(idx, ty_args)
     }
 
     /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
     /// [None].
     pub fn get_struct_name(&self, ty: &Type) -> PartialVMResult<Option<(ModuleId, Identifier)>> {
-        use Type::*;
-
-        Ok(match ty {
-            Struct { idx, .. } | StructInstantiation { idx, .. } => {
+        ty.as_struct_idx_with_ty_args()
+            .map(|(idx, _)| {
                 let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                Some((struct_identifier.module, struct_identifier.name))
-            },
-            Bool
-            | U8
-            | U16
-            | U32
-            | U64
-            | U128
-            | U256
-            | Address
-            | Signer
-            | TyParam(_)
-            | Vector(_)
-            | Reference(_)
-            | MutableReference(_)
-            | Function { .. } => None,
-        })
+                Ok((struct_identifier.module, struct_identifier.name))
+            })
+            .transpose()
     }
 
     /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the

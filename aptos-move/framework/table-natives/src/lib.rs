@@ -11,6 +11,7 @@
 //! See [`README.md`](../README.md) for integration into an adapter.
 
 use aptos_gas_schedule::gas_params::natives::table::*;
+use aptos_move_stdlib::natives::layouts::native_load_layouts;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
@@ -82,7 +83,7 @@ struct LayoutInfo {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
+    key_layout: Arc<MoveTypeLayout>,
     value_layout_info: LayoutInfo,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
@@ -216,7 +217,7 @@ impl LayoutInfo {
             .type_to_type_layout_with_delayed_field_check(value_ty)?
             .unpack();
         Ok(Self {
-            layout: Arc::new(layout),
+            layout,
             contains_delayed_fields,
         })
     }
@@ -287,6 +288,7 @@ pub fn table_natives(
                 ("contains_box", native_contains_box),
                 ("destroy_empty_box", native_destroy_empty_box),
                 ("drop_unchecked_box", native_drop_unchecked_box),
+                ("native_load_layouts", native_load_layouts),
             ])
             .map(|(func_name, func)| {
                 (

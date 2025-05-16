@@ -321,9 +321,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn events(
         &self,
         txn_idx: TxnIndex,
-    ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
+    ) -> Box<dyn Iterator<Item = (T::Event, Option<Arc<MoveTypeLayout>>)>> {
         match self.outputs[txn_idx as usize].load().as_ref() {
-            None => Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
+            None => Box::new(empty::<(T::Event, Option<Arc<MoveTypeLayout>>)>()),
             Some(txn_output) => match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
@@ -332,7 +332,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
-                    Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
+                    Box::new(empty::<(T::Event, Option<Arc<MoveTypeLayout>>)>())
                 },
             },
         }

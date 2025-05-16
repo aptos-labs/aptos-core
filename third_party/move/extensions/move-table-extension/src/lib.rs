@@ -18,6 +18,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_stdlib::natives::layouts::make_native_load_layouts;
 use move_vm_runtime::{
     native_functions,
     native_functions::{NativeContext, NativeFunction, NativeFunctionTable},
@@ -133,8 +134,8 @@ struct TableData {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    key_layout: Arc<MoveTypeLayout>,
+    value_layout: Arc<MoveTypeLayout>,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
@@ -284,7 +285,8 @@ impl Table {
 
 /// Returns all natives for tables.
 pub fn table_natives(table_addr: AccountAddress, gas_params: GasParameters) -> NativeFunctionTable {
-    let natives: [(&str, &str, NativeFunction); 8] = [
+    let natives: [(&str, &str, NativeFunction); 9] = [
+        ("table", "load_layouts", make_native_load_layouts()),
         (
             "table",
             "new_table_handle",

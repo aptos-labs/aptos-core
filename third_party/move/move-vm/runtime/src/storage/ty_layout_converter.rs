@@ -23,15 +23,16 @@ use move_vm_types::{
 use std::sync::Arc;
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
+#[derive(Clone)]
 pub struct LayoutWithDelayedFields {
-    layout: MoveTypeLayout,
+    layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
 impl LayoutWithDelayedFields {
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
-    pub fn into_layout_expect_no_delayed_fields(self) -> Option<MoveTypeLayout> {
+    pub fn into_layout_expect_no_delayed_fields(self) -> Option<Arc<MoveTypeLayout>> {
         (!self.contains_delayed_fields).then_some(self.layout)
     }
 
@@ -42,7 +43,7 @@ impl LayoutWithDelayedFields {
     }
 
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
-    pub fn unpack(self) -> (MoveTypeLayout, bool) {
+    pub fn unpack(self) -> (Arc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
     }
 }
@@ -84,7 +85,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut impl ModuleTraversalContext,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<Arc<MoveTypeLayout>> {
         Ok(self
             .type_to_type_layout_with_delayed_field_check(gas_meter, traversal_context, ty)?
             .unpack()
@@ -179,7 +180,7 @@ where
             1,
         )?;
         Ok(LayoutWithDelayedFields {
-            layout,
+            layout: Arc::new(layout),
             contains_delayed_fields,
         })
     }

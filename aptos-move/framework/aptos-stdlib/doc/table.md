@@ -31,6 +31,7 @@ struct itself, while the operations are implemented as native functions. No trav
 -  [Function `remove_box`](#0x1_table_remove_box)
 -  [Function `destroy_empty_box`](#0x1_table_destroy_empty_box)
 -  [Function `drop_unchecked_box`](#0x1_table_drop_unchecked_box)
+-  [Function `native_load_layouts`](#0x1_table_native_load_layouts)
 -  [Specification](#@Specification_0)
     -  [Struct `Table`](#@Specification_0_Table)
     -  [Function `new`](#@Specification_0_new)
@@ -44,7 +45,8 @@ struct itself, while the operations are implemented as native functions. No trav
     -  [Function `destroy_known_empty_unsafe`](#@Specification_0_destroy_known_empty_unsafe)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+</code></pre>
 
 
 
@@ -150,6 +152,9 @@ table, and cannot be discovered from it.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_add">add</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, val: V) {
+    <b>if</b> (std::features::is_lazy_loading_enabled()) {
+        <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;();
+    };
     <a href="table.md#0x1_table_add_box">add_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key, <a href="table.md#0x1_table_Box">Box</a> { val })
 }
 </code></pre>
@@ -176,6 +181,9 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow">borrow</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): &V {
+    <b>if</b> (std::features::is_lazy_loading_enabled()) {
+        <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;();
+    };
     &<a href="table.md#0x1_table_borrow_box">borrow_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val
 }
 </code></pre>
@@ -232,6 +240,9 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): &<b>mut</b> V {
+    <b>if</b> (std::features::is_lazy_loading_enabled()) {
+        <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;();
+    };
     &<b>mut</b> <a href="table.md#0x1_table_borrow_box_mut">borrow_box_mut</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val
 }
 </code></pre>
@@ -318,6 +329,9 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_remove">remove</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): V {
+    <b>if</b> (std::features::is_lazy_loading_enabled()) {
+        <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;();
+    };
     <b>let</b> <a href="table.md#0x1_table_Box">Box</a> { val } = <a href="table.md#0x1_table_remove_box">remove_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key);
     val
 }
@@ -344,6 +358,9 @@ Returns true iff <code>self</code> contains an entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_contains">contains</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K): bool {
+    <b>if</b> (std::features::is_lazy_loading_enabled()) {
+        <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;();
+    };
     <a href="table.md#0x1_table_contains_box">contains_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key)
 }
 </code></pre>
@@ -370,6 +387,9 @@ and can be used only in modules that know by themselves that table is empty.
 
 
 <pre><code><b>friend</b> <b>fun</b> <a href="table.md#0x1_table_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;K: <b>copy</b> + drop, V&gt;(self: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;) {
+    <b>if</b> (std::features::is_lazy_loading_enabled()) {
+        <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;();
+    };
     <a href="table.md#0x1_table_destroy_empty_box">destroy_empty_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(&self);
     <a href="table.md#0x1_table_drop_unchecked_box">drop_unchecked_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self)
 }
@@ -549,6 +569,28 @@ and can be used only in modules that know by themselves that table is empty.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_drop_unchecked_box">drop_unchecked_box</a>&lt;K: <b>copy</b> + drop, V, B&gt;(<a href="table.md#0x1_table">table</a>: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;);
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_table_native_load_layouts"></a>
+
+## Function `native_load_layouts`
+
+
+
+<pre><code><b>fun</b> <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, B&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_native_load_layouts">native_load_layouts</a>&lt;K, B&gt;();
 </code></pre>
 
 

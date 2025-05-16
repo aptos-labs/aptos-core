@@ -179,8 +179,10 @@ mod testing {
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
-        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) = annotated_type_layout {
-            Ok(annotated_struct_layout)
+        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) =
+            annotated_type_layout.as_ref().map(|l| l.as_ref())
+        {
+            Ok(annotated_struct_layout.clone())
         } else {
             Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
@@ -262,13 +264,13 @@ mod testing {
         // get type layout in VM format
         let ty_layout = context.type_to_type_layout(&ty)?;
 
-        match &ty_layout {
+        match ty_layout.as_ref() {
             MoveTypeLayout::Vector(_) => {
                 // get the inner type T of a vector<T>
                 let inner_ty = get_vector_inner_type(&ty)?;
                 let inner_tyl = context.type_to_type_layout(inner_ty)?;
 
-                match inner_tyl {
+                match inner_tyl.as_ref() {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because
                     // there might be a struct in the vector that needs to be "decorated" using the
                     // logic in this function. Instead, we recursively "unpack" the vector until we
