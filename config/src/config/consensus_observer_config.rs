@@ -16,7 +16,7 @@ const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusObserverConfig {
-    /// Whether the consensus observer is enabled
+    /// Whether the consensus observer is enabled.
     pub observer_enabled: bool,
     /// Whether the consensus publisher is enabled
     pub publisher_enabled: bool,
