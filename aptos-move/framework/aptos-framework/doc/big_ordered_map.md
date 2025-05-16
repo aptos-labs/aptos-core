@@ -61,6 +61,8 @@ allowing cleaner iterator APIs.
 -  [Function `for_each_and_clear`](#0x1_big_ordered_map_for_each_and_clear)
 -  [Function `for_each`](#0x1_big_ordered_map_for_each)
 -  [Function `for_each_ref`](#0x1_big_ordered_map_for_each_ref)
+-  [Function `for_each_ref_friend`](#0x1_big_ordered_map_for_each_ref_friend)
+-  [Function `for_each_mut`](#0x1_big_ordered_map_for_each_mut)
 -  [Function `destroy`](#0x1_big_ordered_map_destroy)
 -  [Function `new_begin_iter`](#0x1_big_ordered_map_new_begin_iter)
 -  [Function `new_end_iter`](#0x1_big_ordered_map_new_end_iter)
@@ -447,7 +449,7 @@ Map key is not found
 
 <a id="0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE"></a>
 
-Trying to insert too large of an object into the mp.
+Trying to insert too large of an object into the map.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>: u64 = 13;
@@ -459,6 +461,7 @@ Trying to insert too large of an object into the mp.
 
 borrow_mut requires that key and value types have constant size
 (otherwise it wouldn't be able to guarantee size requirements are not violated)
+Use remove() + add() combo instead.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE">EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE</a>: u64 = 14;
@@ -1355,7 +1358,7 @@ Disclaimer: This function may be costly as the BigOrderedMap may be huge in size
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_to_ordered_map">to_ordered_map</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): OrderedMap&lt;K, V&gt; {
     <b>let</b> result = <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>();
-    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>(|k, v| {
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k, v| {
         result.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().iter_add(&<b>mut</b> result, *k, *v);
     });
     result
@@ -1387,7 +1390,7 @@ use iterartor or next_key/prev_key to iterate over across portion of the map.
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_keys">keys</a>&lt;K: store + <b>copy</b> + drop, V: store + <b>copy</b>&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt; {
     <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>(|k, _v| {
+    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k, _v| {
         result.push_back(*k);
     });
     result
@@ -1403,6 +1406,9 @@ use iterartor or next_key/prev_key to iterate over across portion of the map.
 ## Function `for_each_and_clear`
 
 Apply the function to each element in the vector, consuming it, leaving the map empty.
+
+Current implementation is O(n * log(n)). After function values will be optimized
+to O(n).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_and_clear">for_each_and_clear</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(K, V)|)
@@ -1434,6 +1440,9 @@ Apply the function to each element in the vector, consuming it, leaving the map 
 
 Apply the function to each element in the vector, consuming it, and consuming the map
 
+Current implementation is O(n * log(n)). After function values will be optimized
+to O(n).
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each">for_each</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(K, V)|)
 </code></pre>
@@ -1462,6 +1471,9 @@ Apply the function to each element in the vector, consuming it, and consuming th
 
 Apply the function to a reference of each element in the vector.
 
+Current implementation is O(n * log(n)). After function values will be optimized
+to O(n).
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
 </code></pre>
@@ -1473,11 +1485,107 @@ Apply the function to a reference of each element in the vector.
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
+    // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
+    // but is the only one available through the <b>public</b> API.
+    <b>if</b> (!self.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
+        <b>let</b> (k, v) = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_front">borrow_front</a>();
+        f(&k, v);
+
+        <b>let</b> cur_k = self.<a href="big_ordered_map.md#0x1_big_ordered_map_next_key">next_key</a>(&k);
+        <b>while</b> (cur_k.is_some()) {
+            <b>let</b> k = cur_k.destroy_some();
+            f(&k, self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow">borrow</a>(&k));
+
+            cur_k = self.<a href="big_ordered_map.md#0x1_big_ordered_map_next_key">next_key</a>(&k);
+        };
+    };
+
+    // TODO <b>use</b> this more efficient implementation when function values are enabled.
+    // self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_leaf_node_ref">for_each_leaf_node_ref</a>(|node| {
+    //     node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
+    //         f(k, &v.value);
+    //     });
+    // })
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_for_each_ref_friend"></a>
+
+## Function `for_each_ref_friend`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
     self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_leaf_node_ref">for_each_leaf_node_ref</a>(|node| {
-        node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref">for_each_ref</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
+        node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
             f(k, &v.value);
         });
     })
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to a mutable reference of each key-value pair in the map.
+
+Current implementation is O(n * log(n)). After function values will be optimized
+to O(n).
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b> + drop + store, V: store&gt;(self: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|) {
+    // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
+    // but is the only one available through the <b>public</b> API.
+    <b>if</b> (!self.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
+        <b>let</b> (k, _v) = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_front">borrow_front</a>();
+
+        <b>let</b> done = <b>false</b>;
+        <b>while</b> (!done) {
+            f(&k, self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_mut">borrow_mut</a>(&k));
+
+            <b>let</b> cur_k = self.<a href="big_ordered_map.md#0x1_big_ordered_map_next_key">next_key</a>(&k);
+            <b>if</b> (cur_k.is_some()) {
+                k = cur_k.destroy_some();
+            } <b>else</b> {
+                done = <b>true</b>;
+            }
+        };
+    };
+
+    // TODO: <b>if</b> we make iterator api <b>public</b> <b>update</b> <b>to</b>:
+    // <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>();
+    // <b>while</b> (!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+    //     <b>let</b> key = *iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(self);
+    //     f(key, iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(self));
+    //     iter = iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>(self);
+    // }
 }
 </code></pre>
 
@@ -1490,6 +1598,9 @@ Apply the function to a reference of each element in the vector.
 ## Function `destroy`
 
 Destroy a map, by destroying elements individually.
+
+Current implementation is O(n * log(n)). After function values will be optimized
+to O(n).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_destroy">destroy</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, dv: |V|)

@@ -44,10 +44,11 @@ module aptos_std::big_ordered_map {
     const EINVALID_CONFIG_PARAMETER: u64 = 11;
     /// Map isn't empty
     const EMAP_NOT_EMPTY: u64 = 12;
-    /// Trying to insert too large of an object into the mp.
+    /// Trying to insert too large of an object into the map.
     const EARGUMENT_BYTES_TOO_LARGE: u64 = 13;
     /// borrow_mut requires that key and value types have constant size
     /// (otherwise it wouldn't be able to guarantee size requirements are not violated)
+    /// Use remove() + add() combo instead.
     const EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE: u64 = 14;
 
     // Errors that should never be thrown
@@ -461,7 +462,7 @@ module aptos_std::big_ordered_map {
     /// Disclaimer: This function may be costly as the BigOrderedMap may be huge in size. Use it at your own discretion.
     public fun to_ordered_map<K: drop + copy + store, V: copy + store>(self: &BigOrderedMap<K, V>): OrderedMap<K, V> {
         let result = ordered_map::new();
-        self.for_each_ref(|k, v| {
+        self.for_each_ref_friend(|k, v| {
             result.new_end_iter().iter_add(&mut result, *k, *v);
         });
         result
@@ -473,13 +474,16 @@ module aptos_std::big_ordered_map {
     /// use iterartor or next_key/prev_key to iterate over across portion of the map.
     public fun keys<K: store + copy + drop, V: store + copy>(self: &BigOrderedMap<K, V>): vector<K> {
         let result = vector[];
-        self.for_each_ref(|k, _v| {
+        self.for_each_ref_friend(|k, _v| {
             result.push_back(*k);
         });
         result
     }
 
     /// Apply the function to each element in the vector, consuming it, leaving the map empty.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
     public inline fun for_each_and_clear<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, f: |K, V|) {
         // TODO - this can be done more efficiently, by destroying the leaves directly
         // but that requires more complicated code and testing.
@@ -490,6 +494,9 @@ module aptos_std::big_ordered_map {
     }
 
     /// Apply the function to each element in the vector, consuming it, and consuming the map
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
     public inline fun for_each<K: drop + copy + store, V: store>(self: BigOrderedMap<K, V>, f: |K, V|) {
         // TODO - this can be done more efficiently, by destroying the leaves directly
         // but that requires more complicated code and testing.
@@ -498,15 +505,78 @@ module aptos_std::big_ordered_map {
     }
 
     /// Apply the function to a reference of each element in the vector.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
     public inline fun for_each_ref<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
+        // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
+        // but is the only one available through the public API.
+        if (!self.is_empty()) {
+            let (k, v) = self.borrow_front();
+            f(&k, v);
+
+            let cur_k = self.next_key(&k);
+            while (cur_k.is_some()) {
+                let k = cur_k.destroy_some();
+                f(&k, self.borrow(&k));
+
+                cur_k = self.next_key(&k);
+            };
+        };
+
+        // TODO use this more efficient implementation when function values are enabled.
+        // self.for_each_leaf_node_ref(|node| {
+        //     node.children.for_each_ref(|k: &K, v: &Child<V>| {
+        //         f(k, &v.value);
+        //     });
+        // })
+    }
+
+    // TODO: Temporary friend implementaiton, until for_each_ref can be made efficient.
+    public(friend) inline fun for_each_ref_friend<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
         self.for_each_leaf_node_ref(|node| {
-            node.children.for_each_ref(|k: &K, v: &Child<V>| {
+            node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
                 f(k, &v.value);
             });
         })
     }
 
+    /// Apply the function to a mutable reference of each key-value pair in the map.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
+    public inline fun for_each_mut<K: copy + drop + store, V: store>(self: &mut BigOrderedMap<K, V>, f: |&K, &mut V|) {
+        // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
+        // but is the only one available through the public API.
+        if (!self.is_empty()) {
+            let (k, _v) = self.borrow_front();
+
+            let done = false;
+            while (!done) {
+                f(&k, self.borrow_mut(&k));
+
+                let cur_k = self.next_key(&k);
+                if (cur_k.is_some()) {
+                    k = cur_k.destroy_some();
+                } else {
+                    done = true;
+                }
+            };
+        };
+
+        // TODO: if we make iterator api public update to:
+        // let iter = self.new_begin_iter();
+        // while (!iter.iter_is_end(self)) {
+        //     let key = *iter.iter_borrow_key(self);
+        //     f(key, iter.iter_borrow_mut(self));
+        //     iter = iter.iter_next(self);
+        // }
+    }
+
     /// Destroy a map, by destroying elements individually.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
     public inline fun destroy<K: drop + copy + store, V: store>(self: BigOrderedMap<K, V>, dv: |V|) {
         self.for_each(|_k, v| {
             dv(v);
@@ -1288,7 +1358,7 @@ module aptos_std::big_ordered_map {
         aptos_std::debug::print(node);
 
         if (!node.is_leaf) {
-            node.children.for_each_ref(|_key, node| {
+            node.children.for_each_ref_friend(|_key, node| {
                 self.print_map_for_node(node.node_index.stored_to_index(), level + 1);
             });
         };
@@ -1350,7 +1420,7 @@ module aptos_std::big_ordered_map {
         node.children.validate_ordered();
 
         let previous_max_key = expected_lower_bound_key;
-        node.children.for_each_ref(|key: &K, child: &Child<V>| {
+        node.children.for_each_ref_friend(|key: &K, child: &Child<V>| {
             if (!node.is_leaf) {
                 self.validate_subtree(child.node_index.stored_to_index(), previous_max_key, option::some(*key));
             } else {
@@ -1401,6 +1471,13 @@ module aptos_std::big_ordered_map {
             index += 1;
         });
 
+        let index = 0;
+        map.for_each_ref_friend(|k, v| {
+            assert!(k == expected_keys.borrow(index), *k + 100);
+            assert!(v == expected_values.borrow(index), *k + 200);
+            index += 1;
+        });
+
         expected_keys.zip(expected_values, |key, value| {
             assert!(map.borrow(&key) == &value, key + 300);
             assert!(map.borrow_mut(&key) == &value, key + 400);
@@ -1444,6 +1521,35 @@ module aptos_std::big_ordered_map {
         });
 
         map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_for_each_variants() {
+        let keys = vector[1, 3, 5];
+        let values = vector[10, 30, 50];
+        let map = new_from(keys, values);
+
+        let index = 0;
+        map.for_each_ref(|k, v| {
+            assert!(keys[index] == *k);
+            assert!(values[index] == *v);
+            index += 1;
+        });
+
+        let index = 0;
+        map.for_each_mut(|k, v| {
+            assert!(keys[index] == *k);
+            assert!(values[index] == *v);
+            *v += 1;
+            index += 1;
+        });
+
+        let index = 0;
+        map.for_each(|k, v| {
+            assert!(keys[index] == k);
+            assert!(values[index] + 1 == v);
+            index += 1;
+        });
     }
 
     #[test]

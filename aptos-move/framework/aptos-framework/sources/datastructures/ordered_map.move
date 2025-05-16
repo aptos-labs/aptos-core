@@ -547,13 +547,42 @@ module aptos_std::ordered_map {
         values.destroy(|_v| dv(_v));
     }
 
-    /// Apply the function to a reference of each key-value pair in the table.
-    public inline fun for_each_ref<K, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
-        let iter = self.new_begin_iter();
-        while (!iter.iter_is_end(self)) {
-            f(iter.iter_borrow_key(self), iter.iter_borrow(self));
-            iter = iter.iter_next(self);
-        }
+    /// Apply the function to each key-value pair in the map, consuming it.
+    public inline fun for_each<K, V>(
+        self: OrderedMap<K, V>,
+        f: |K, V|
+    ) {
+        let (keys, values) = self.to_vec_pair();
+        keys.zip(values, |k, v| f(k, v));
+    }
+
+    /// Apply the function to a reference of each key-value pair in the map.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
+    public inline fun for_each_ref<K: copy + drop, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
+        // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
+        // but is the only one available through the public API.
+        if (!self.is_empty()) {
+            let (k, v) = self.borrow_front();
+            f(k, v);
+
+            let cur_k = self.next_key(k);
+            while (cur_k.is_some()) {
+                let k = cur_k.destroy_some();
+                f(&k, self.borrow(&k));
+
+                cur_k = self.next_key(&k);
+            };
+        };
+
+        // TODO: if we make iterator api public update to:
+        // let iter = self.new_begin_iter();
+        // while (!iter.iter_is_end(self)) {
+        //     f(iter.iter_borrow_key(self), iter.iter_borrow(self));
+        //     iter = iter.iter_next(self);
+        // }
+
         // TODO: once move supports private functions udpate to:
         // vector::for_each_ref(
         //     &self.entries,
@@ -563,14 +592,47 @@ module aptos_std::ordered_map {
         // );
     }
 
-    /// Apply the function to a mutable reference of each key-value pair in the table.
-    public inline fun for_each_mut<K, V>(self: &mut OrderedMap<K, V>, f: |K, &mut V|) {
+    // TODO: Temporary friend implementaiton, until for_each_ref can be made efficient.
+    public(friend) inline fun for_each_ref_friend<K: copy + drop, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
         let iter = self.new_begin_iter();
         while (!iter.iter_is_end(self)) {
-            let key = *iter.iter_borrow_key(self);
-            f(key, iter.iter_borrow_mut(self));
+            f(iter.iter_borrow_key(self), iter.iter_borrow(self));
             iter = iter.iter_next(self);
         }
+    }
+
+    /// Apply the function to a mutable reference of each key-value pair in the map.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
+    public inline fun for_each_mut<K: copy + drop, V>(self: &mut OrderedMap<K, V>, f: |&K, &mut V|) {
+        // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
+        // but is the only one available through the public API.
+        if (!self.is_empty()) {
+            let (k, _v) = self.borrow_front();
+
+            let k = *k;
+            let done = false;
+            while (!done) {
+                f(&k, self.borrow_mut(&k));
+
+                let cur_k = self.next_key(&k);
+                if (cur_k.is_some()) {
+                    k = cur_k.destroy_some();
+                } else {
+                    done = true;
+                }
+            };
+        };
+
+        // TODO: if we make iterator api public update to:
+        // let iter = self.new_begin_iter();
+        // while (!iter.iter_is_end(self)) {
+        //     let key = *iter.iter_borrow_key(self);
+        //     f(key, iter.iter_borrow_mut(self));
+        //     iter = iter.iter_next(self);
+        // }
+
         // TODO: once move supports private functions udpate to:
         // vector::for_each_mut(
         //     &mut self.entries,
@@ -700,7 +762,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    public fun test_add_remove_many() {
+    fun test_add_remove_many() {
         let map = new<u64, u64>();
 
         assert!(map.length() == 0, 0);
@@ -733,7 +795,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    public fun test_add_all() {
+    fun test_add_all() {
         let map = new<u64, u64>();
 
         assert!(map.length() == 0, 0);
@@ -749,12 +811,12 @@ module aptos_std::ordered_map {
 
     #[test]
     #[expected_failure(abort_code = 0x20002, location = Self)] /// EKEY_ALREADY_EXISTS
-    public fun test_add_all_mismatch() {
+    fun test_add_all_mismatch() {
         new_from(vector[1, 3], vector[10]);
     }
 
     #[test]
-    public fun test_upsert_all() {
+    fun test_upsert_all() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
         map.upsert_all(vector[7, 2, 3], vector[70, 20, 35]);
         assert!(map == new_from(vector[1, 2, 3, 5, 7], vector[10, 20, 35, 50, 70]), 1);
@@ -762,26 +824,26 @@ module aptos_std::ordered_map {
 
     #[test]
     #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
-    public fun test_new_from_duplicate() {
+    fun test_new_from_duplicate() {
         new_from(vector[1, 3, 1, 5], vector[10, 30, 11, 50]);
     }
 
     #[test]
     #[expected_failure(abort_code = 0x20002, location = Self)] /// EKEY_ALREADY_EXISTS
-    public fun test_upsert_all_mismatch() {
+    fun test_upsert_all_mismatch() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
         map.upsert_all(vector[2], vector[20, 35]);
     }
 
     #[test]
-    public fun test_to_vec_pair() {
+    fun test_to_vec_pair() {
         let (keys, values) = new_from(vector[3, 1, 5], vector[30, 10, 50]).to_vec_pair();
         assert!(keys == vector[1, 3, 5], 1);
         assert!(values == vector[10, 30, 50], 2);
     }
 
     #[test]
-    public fun test_keys() {
+    fun test_keys() {
         let map = new<u64, u64>();
         assert!(map.keys() == vector[], 0);
         map.add(2, 1);
@@ -791,7 +853,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    public fun test_values() {
+    fun test_values() {
         let map = new<u64, u64>();
         assert!(map.values() == vector[], 0);
         map.add(2, 1);
@@ -801,8 +863,37 @@ module aptos_std::ordered_map {
     }
 
     #[test]
+    fun test_for_each_variants() {
+        let keys = vector[1, 3, 5];
+        let values = vector[10, 30, 50];
+        let map = new_from(keys, values);
+
+        let index = 0;
+        map.for_each_ref(|k, v| {
+            assert!(keys[index] == *k);
+            assert!(values[index] == *v);
+            index += 1;
+        });
+
+        let index = 0;
+        map.for_each_mut(|k, v| {
+            assert!(keys[index] == *k);
+            assert!(values[index] == *v);
+            *v += 1;
+            index += 1;
+        });
+
+        let index = 0;
+        map.for_each(|k, v| {
+            assert!(keys[index] == k);
+            assert!(values[index] + 1 == v);
+            index += 1;
+        });
+    }
+
+    #[test]
     #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
-    public fun test_add_twice() {
+    fun test_add_twice() {
         let map = new<u64, u64>();
         map.add(3, 1);
         map.add(3, 1);
@@ -813,7 +904,7 @@ module aptos_std::ordered_map {
 
     #[test]
     #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
-    public fun test_remove_twice_1() {
+    fun test_remove_twice_1() {
         let map = new<u64, u64>();
         map.add(3, 1);
         map.remove(&3);
@@ -824,7 +915,7 @@ module aptos_std::ordered_map {
 
     #[test]
     #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
-    public fun test_remove_twice_2() {
+    fun test_remove_twice_2() {
         let map = new<u64, u64>();
         map.add(3, 1);
         map.add(4, 1);
@@ -835,7 +926,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    public fun test_upsert_test() {
+    fun test_upsert_test() {
         let map = new<u64, u64>();
         // test adding 3 elements using upsert
         map.upsert::<u64, u64>(1, 1);
