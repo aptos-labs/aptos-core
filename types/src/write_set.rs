@@ -527,6 +527,10 @@ impl HotStateOp {
     pub fn as_base_op(&self) -> &BaseStateOp {
         &self.0
     }
+
+    pub fn into_base_op(self) -> BaseStateOp {
+        self.0
+    }
 }
 
 impl Debug for HotStateOp {

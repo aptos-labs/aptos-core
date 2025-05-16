@@ -32,7 +32,7 @@ pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
     print_conflicts_info: bool,
-    hot_state_op_accumulator: BlockHotStateOpAccumulator<'s, T, S>,
+    hot_state_op_accumulator: BlockHotStateOpAccumulator<'s, T::Key, S>,
 }
 
 impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s, T, S> {
@@ -85,7 +85,8 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            self.hot_state_op_accumulator.add_transaction(&rw_summary);
+            self.hot_state_op_accumulator
+                .add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
