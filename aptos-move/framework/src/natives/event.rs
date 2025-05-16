@@ -90,8 +90,9 @@ fn native_write_to_event_store(
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let (layout, has_aggregator_lifting) =
-        context.type_to_type_layout_with_identifier_mappings(&ty)?;
+    let (layout, contains_delayed_fields) = context
+        .type_to_type_layout_with_delayed_field_check(&ty)?
+        .unpack();
 
     let function_value_extension = context.function_value_extension();
     let blob = ValueSerDeContext::new()
@@ -113,7 +114,7 @@ fn native_write_to_event_store(
             abort_code: ECANNOT_CREATE_EVENT,
         })?;
     ctx.events
-        .push((event, has_aggregator_lifting.then_some(layout)));
+        .push((event, contains_delayed_fields.then_some(layout)));
     Ok(smallvec![])
 }
 
@@ -256,8 +257,9 @@ fn native_write_module_event_to_store(
             )));
         }
     }
-    let (layout, has_identifier_mappings) =
-        context.type_to_type_layout_with_identifier_mappings(&ty)?;
+    let (layout, contains_delayed_fields) = context
+        .type_to_type_layout_with_delayed_field_check(&ty)?
+        .unpack();
 
     let function_value_extension = context.function_value_extension();
     let blob = ValueSerDeContext::new()
@@ -276,7 +278,7 @@ fn native_write_module_event_to_store(
         abort_code: ECANNOT_CREATE_EVENT,
     })?;
     ctx.events
-        .push((event, has_identifier_mappings.then_some(layout)));
+        .push((event, contains_delayed_fields.then_some(layout)));
 
     Ok(smallvec![])
 }

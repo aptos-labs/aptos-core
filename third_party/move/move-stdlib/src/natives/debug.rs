@@ -179,14 +179,15 @@ mod testing {
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
-        match annotated_type_layout {
-            MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
-            _ => Err(
+        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) = annotated_type_layout {
+            Ok(annotated_struct_layout)
+        } else {
+            Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
                     "Could not convert Type to fully-annotated MoveTypeLayout via NativeContext"
                         .to_string(),
                 ),
-            ),
+            )
         }
     }
 

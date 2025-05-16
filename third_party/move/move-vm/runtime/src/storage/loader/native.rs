@@ -1,0 +1,228 @@
+// Copyright (c) The Move Contributors
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{
+    storage::loader::traits::StructDefinitionLoader, ModuleStorage, RuntimeEnvironment,
+    WithRuntimeEnvironment,
+};
+use move_binary_format::errors::PartialVMResult;
+use move_vm_types::{
+    gas::{GasMeter, ModuleTraversalContext},
+    loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
+};
+use std::sync::Arc;
+
+/// Loader implementation used for contexts where there is no metering gas for modules. With lazy
+/// loading additional checks are performed: any accessed module must be visited in the traversal
+/// context.
+pub struct NativeLoader<'a> {
+    module_storage: &'a dyn ModuleStorage,
+}
+
+impl<'a> NativeLoader<'a> {
+    /// Returns a new native loader.
+    pub fn new(module_storage: &'a dyn ModuleStorage) -> Self {
+        Self { module_storage }
+    }
+}
+
+impl<'a> WithRuntimeEnvironment for NativeLoader<'a> {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.module_storage.runtime_environment()
+    }
+}
+
+impl<'a> StructDefinitionLoader for NativeLoader<'a> {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        self.runtime_environment().vm_config().enable_lazy_loading
+    }
+
+    fn load_struct_definition(
+        &self,
+        _gas_meter: &mut impl GasMeter,
+        traversal_context: &mut impl ModuleTraversalContext,
+        idx: &StructNameIndex,
+    ) -> PartialVMResult<Arc<StructType>> {
+        let struct_name = self
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*idx)?;
+
+        if self.is_lazy_loading_enabled() {
+            traversal_context.check_is_special_or_visited(
+                struct_name.module.address(),
+                struct_name.module.name(),
+            )?;
+        }
+
+        self.module_storage.unmetered_get_struct_definition(
+            struct_name.module.address(),
+            struct_name.module.name(),
+            struct_name.name.as_ident_str(),
+        )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{
+        config::VMConfig,
+        module_traversal::{TraversalContext, TraversalStorage},
+        Module,
+    };
+    use bytes::Bytes;
+    use claims::{assert_err, assert_ok};
+    use move_binary_format::{errors::VMResult, CompiledModule};
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, identifier::IdentStr,
+        language_storage::ModuleId, metadata::Metadata,
+    };
+    use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::StructIdentifier};
+    use std::str::FromStr;
+
+    struct MockModuleStorage {
+        runtime_environment: RuntimeEnvironment,
+        struct_definition: Arc<StructType>,
+    }
+
+    fn dummy_struct_module_id() -> ModuleId {
+        ModuleId::new(
+            AccountAddress::from_str("0x123").unwrap(),
+            ident_str!("foo").to_owned(),
+        )
+    }
+
+    impl MockModuleStorage {
+        fn new(enable_lazy_loading: bool) -> Self {
+            let vm_config = VMConfig {
+                paranoid_type_checks: true,
+                enable_lazy_loading,
+                ..VMConfig::default()
+            };
+            let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+
+            let dummy_struct_name = StructIdentifier {
+                module: dummy_struct_module_id(),
+                name: ident_str!("Bar").to_owned(),
+            };
+            let idx = assert_ok!(runtime_environment
+                .struct_name_index_map()
+                .struct_name_to_idx(&dummy_struct_name));
+            let mut struct_definition = StructType::for_test();
+            struct_definition.idx = idx;
+
+            Self {
+                runtime_environment,
+                struct_definition: Arc::new(struct_definition),
+            }
+        }
+
+        fn dummy_struct_idx(&self) -> StructNameIndex {
+            self.struct_definition.idx
+        }
+    }
+
+    impl WithRuntimeEnvironment for MockModuleStorage {
+        fn runtime_environment(&self) -> &RuntimeEnvironment {
+            &self.runtime_environment
+        }
+    }
+
+    impl ModuleStorage for MockModuleStorage {
+        fn check_module_exists(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> VMResult<bool> {
+            unreachable!("Irrelevant for tests")
+        }
+
+        fn fetch_module_bytes(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> VMResult<Option<Bytes>> {
+            unreachable!("Irrelevant for tests")
+        }
+
+        fn unmetered_get_module_size(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> VMResult<Option<usize>> {
+            unreachable!("Irrelevant for tests")
+        }
+
+        fn fetch_module_metadata(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> VMResult<Option<Vec<Metadata>>> {
+            unreachable!("Irrelevant for tests")
+        }
+
+        fn fetch_deserialized_module(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> VMResult<Option<Arc<CompiledModule>>> {
+            unreachable!("Irrelevant for tests")
+        }
+
+        fn fetch_verified_module(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> VMResult<Option<Arc<Module>>> {
+            unreachable!("Irrelevant for tests")
+        }
+
+        /// Returns a dummy struct for tests.
+        fn unmetered_get_struct_definition(
+            &self,
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+            _struct_name: &IdentStr,
+        ) -> PartialVMResult<Arc<StructType>> {
+            Ok(self.struct_definition.clone())
+        }
+    }
+
+    #[test]
+    fn test_eager_loader_no_checks() {
+        let storage = MockModuleStorage::new(false);
+        let idx = storage.dummy_struct_idx();
+
+        let mut gas_meter = UnmeteredGasMeter;
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+        let loader = NativeLoader::new(&storage);
+        assert!(!loader.is_lazy_loading_enabled());
+
+        assert_ok!(loader.load_struct_definition(&mut gas_meter, &mut traversal_context, &idx,));
+    }
+
+    #[test]
+    fn test_lazy_loader_checks() {
+        let storage = MockModuleStorage::new(true);
+        let idx = storage.dummy_struct_idx();
+
+        let mut gas_meter = UnmeteredGasMeter;
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+        let loader = NativeLoader::new(&storage);
+        assert!(loader.is_lazy_loading_enabled());
+
+        // Not visited, loader returns an error.
+        assert_err!(loader.load_struct_definition(&mut gas_meter, &mut traversal_context, &idx,));
+
+        let not_visited =
+            assert_ok!(traversal_context.visit_if_not_special_module_id(&dummy_struct_module_id()));
+        assert!(not_visited);
+
+        assert_ok!(loader.load_struct_definition(&mut gas_meter, &mut traversal_context, &idx,));
+    }
+}
