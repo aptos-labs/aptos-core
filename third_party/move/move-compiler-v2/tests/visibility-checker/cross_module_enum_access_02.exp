@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: Invalid operation: variant test on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/cross_module_enum_access_02.move:15:9
+   │
+15 │     fun test() {
+   │         ^^^^
+16 │         let x = m::make(22);
+17 │         assert!(x is m::Wrapper::V1, 1);
+   │                 ------------------- tested here
