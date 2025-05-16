@@ -745,19 +745,27 @@ impl StateStore {
             .par_iter_mut()
             .zip_eq(state_update_refs.shards.par_iter())
             .try_for_each(|(batch, updates)| {
-                updates.iter().try_for_each(|(key, update)| {
-                    if self.state_kv_db.enabled_sharding() {
-                        batch.put::<StateValueByKeyHashSchema>(
-                            &(CryptoHash::hash(*key), update.version),
-                            &update.value.cloned(),
-                        )
-                    } else {
-                        batch.put::<StateValueSchema>(
-                            &((*key).clone(), update.version),
-                            &update.value.cloned(),
-                        )
-                    }
-                })
+                updates
+                    .iter()
+                    .filter_map(|(key, update)| {
+                        update
+                            .state_op
+                            .as_write_op_opt()
+                            .map(|write_op| (key, update.version, write_op))
+                    })
+                    .try_for_each(|(key, version, write_op)| {
+                        if self.state_kv_db.enabled_sharding() {
+                            batch.put::<StateValueByKeyHashSchema>(
+                                &(CryptoHash::hash(*key), version),
+                                &write_op.as_state_value_opt().cloned(),
+                            )
+                        } else {
+                            batch.put::<StateValueSchema>(
+                                &((*key).clone(), version),
+                                &write_op.as_state_value_opt().cloned(),
+                            )
+                        }
+                    })
             })
     }
 
@@ -858,11 +866,15 @@ impl StateStore {
 
         let mut iter = updates.iter();
         for version in first_version..first_version + num_versions as Version {
-            let ver_iter = iter.take_while_ref(|(_k, u)| u.version == version);
+            let ver_iter = iter
+                .take_while_ref(|(_k, u)| u.version == version)
+                // ignore hot state only ops
+                // TODO(HotState): revisit
+                .filter(|(_key, update)| update.state_op.is_value_write_op());
 
-            for (key, update) in ver_iter {
-                if update.value.is_none() {
-                    // This is a tome stone, can be pruned once this `version` goes out of
+            for (key, update_to_cold) in ver_iter {
+                if update_to_cold.state_op.expect_as_write_op().is_delete() {
+                    // This is a tombstone, can be pruned once this `version` goes out of
                     // the pruning window.
                     Self::put_state_kv_index(batch, enable_sharding, version, version, key);
                 }
@@ -870,7 +882,7 @@ impl StateStore {
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
                     // TODO(HotState): Revisit: assuming every write op results in a hot slot
-                    .insert((*key).clone(), update.to_hot_slot())
+                    .insert((*key).clone(), update_to_cold.to_result_slot())
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
@@ -1263,6 +1275,7 @@ mod test_only {
     use aptos_types::{
         state_store::{state_key::StateKey, state_value::StateValue},
         transaction::Version,
+        write_set::{BaseStateOp, WriteOp},
     };
     use itertools::Itertools;
 
@@ -1270,6 +1283,32 @@ mod test_only {
         /// assumes state checkpoint at the last version
         pub fn commit_block_for_test<
             UpdateIter: IntoIterator<Item = (StateKey, Option<StateValue>)>,
+            VersionIter: IntoIterator<Item = UpdateIter>,
+        >(
+            &self,
+            first_version: Version,
+            updates_by_version: VersionIter,
+        ) -> HashValue {
+            self.commit_block_for_test_impl(
+                first_version,
+                updates_by_version.into_iter().map(|updates| {
+                    updates.into_iter().map(|(key, val_opt)| {
+                        (
+                            key,
+                            val_opt
+                                .map_or_else(
+                                    WriteOp::legacy_deletion,
+                                    WriteOp::modification_to_value,
+                                )
+                                .into_base_op(),
+                        )
+                    })
+                }),
+            )
+        }
+
+        fn commit_block_for_test_impl<
+            UpdateIter: IntoIterator<Item = (StateKey, BaseStateOp)>,
             VersionIter: IntoIterator<Item = UpdateIter>,
         >(
             &self,
@@ -1290,7 +1329,7 @@ mod test_only {
                 first_version,
                 updates_by_version
                     .iter()
-                    .map(|updates| updates.iter().map(|(k, v)| (k, v.as_ref()))),
+                    .map(|updates| updates.iter().map(|(k, op)| (k, op))),
                 num_versions,
                 Some(num_versions - 1),
             );
