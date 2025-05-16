@@ -17,7 +17,7 @@ pub mod plan_builder;
 use crate::{
     diagnostics::Emitter,
     env_pipeline::{
-        acquires_checker, ast_simplifier, closure_checker, cyclic_instantiation_checker,
+        acquires_checker, ast_simplifier, closure_checker, cmp_rewriter, cyclic_instantiation_checker,
         flow_insensitive_checkers, function_checker, inliner, lambda_lifter,
         lambda_lifter::LambdaLiftingOptions, model_ast_lints, recursive_struct_checker,
         rewrite_target::RewritingScope, seqs_in_binop_checker, spec_checker, spec_rewriter,
@@ -375,6 +375,13 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         // Perform all the model AST lint checks before inlining, to be closer "in form"
         // to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);
+    }
+
+    if options.experiment_on(Experiment::CMP_REWRITE) {
+        env_pipeline.add("rewrite comparison operations", |env| {
+            // This check should be done before inlining.
+            cmp_rewriter::rewrite(env);
+        });
     }
 
     if options.experiment_on(Experiment::INLINING) {
