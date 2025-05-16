@@ -16,6 +16,7 @@ use ark_std::iterable::Iterable;
 use bytes::Bytes;
 use itertools::Either;
 use once_cell::sync::Lazy;
+use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
@@ -82,7 +83,7 @@ impl PersistedWriteOp {
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
@@ -90,8 +91,43 @@ pub enum BaseStateOp {
     MakeHot { prev_slot: StateSlot },
 }
 
+impl BaseStateOp {
+    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
+        use BaseStateOp::*;
+
+        match self {
+            Creation(val) | Modification(val) => Some(val),
+            Deletion(_) => None,
+            MakeHot { prev_slot } => prev_slot.as_state_value_opt(),
+        }
+    }
+
+    pub fn as_write_op_opt(&self) -> Option<&WriteOp> {
+        use BaseStateOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion(_) => Some(WriteOp::ref_cast(self)),
+            MakeHot { .. } => None,
+        }
+    }
+
+    pub fn expect_as_write_op(&self) -> &WriteOp {
+        self.as_write_op_opt().expect("Expected write op")
+    }
+
+    pub fn is_value_write_op(&self) -> bool {
+        use BaseStateOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion(_) => true,
+            MakeHot { .. } => false,
+        }
+    }
+}
+
 /// Represents a change to a state value.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, RefCast)]
+#[repr(transparent)]
 pub struct WriteOp(BaseStateOp);
 
 impl WriteOp {
@@ -182,13 +218,7 @@ impl WriteOp {
     }
 
     pub fn as_state_value_opt(&self) -> Option<&StateValue> {
-        use BaseStateOp::*;
-
-        match &self.0 {
-            Creation(v) | Modification(v) => Some(v),
-            Deletion(..) => None,
-            MakeHot { .. } => unreachable!("malformed write op"),
-        }
+        self.0.as_state_value_opt()
     }
 
     pub fn bytes(&self) -> Option<&Bytes> {
@@ -242,6 +272,10 @@ impl WriteOp {
         )))
     }
 
+    pub fn modification_to_value(state_value: StateValue) -> Self {
+        Self(BaseStateOp::Modification(state_value))
+    }
+
     pub fn deletion(metadata: StateValueMetadata) -> Self {
         Self(BaseStateOp::Deletion(metadata))
     }
@@ -278,6 +312,20 @@ impl WriteOp {
 
     pub fn as_base_op(&self) -> &BaseStateOp {
         &self.0
+    }
+
+    pub fn into_base_op(self) -> BaseStateOp {
+        self.0
+    }
+
+    pub fn is_delete(&self) -> bool {
+        use BaseStateOp::*;
+
+        match &self.0 {
+            Creation(_) | Modification(_) => false,
+            Deletion(_) => true,
+            MakeHot { .. } => unreachable!("malformed write op"),
+        }
     }
 }
 
@@ -475,6 +523,10 @@ impl HotStateOp {
     pub fn make_hot(prev_slot: StateSlot) -> Self {
         Self(BaseStateOp::MakeHot { prev_slot })
     }
+
+    pub fn as_base_op(&self) -> &BaseStateOp {
+        &self.0
+    }
 }
 
 impl Debug for HotStateOp {
@@ -630,6 +682,17 @@ impl WriteSet {
         match self {
             WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.into_write_op_iter()),
             WriteSet::Hotness(_) => Either::Right(EMPTY.iter().cloned()),
+        }
+    }
+
+    pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => {
+                Either::Left(ws.iter().map(|(key, op)| (key, op.as_base_op())))
+            },
+            WriteSet::Hotness(ws) => {
+                Either::Right(ws.iter().map(|(key, op)| (key, op.as_base_op())))
+            },
         }
     }
 }

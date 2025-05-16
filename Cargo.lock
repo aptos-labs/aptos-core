@@ -4661,6 +4661,7 @@ dependencies = [
  "quick_cache",
  "rand 0.7.3",
  "rayon",
+ "ref-cast",
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
