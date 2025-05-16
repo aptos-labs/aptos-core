@@ -252,6 +252,84 @@ impl SuccessCriteria {
     }
 }
 
+enum CombinedError {
+    Single(anyhow::Error),
+    Multiple(CriteriaCheckerErrors),
+}
+
+impl From<anyhow::Error> for CombinedError {
+    fn from(error: anyhow::Error) -> Self {
+        CombinedError::Single(error)
+    }
+}
+
+impl From<CriteriaCheckerErrors> for CombinedError {
+    fn from(errors: CriteriaCheckerErrors) -> Self {
+        CombinedError::Multiple(errors)
+    }
+}
+
+#[derive(Debug)]
+struct CriteriaCheckerErrors {
+    errors: Vec<anyhow::Error>,
+}
+
+impl CriteriaCheckerErrors {
+    pub fn new() -> Self {
+        Self { errors: Vec::new() }
+    }
+
+    pub fn push(&mut self, error: anyhow::Error) {
+        self.errors.push(error);
+    }
+
+    pub fn extend(&mut self, errors: CriteriaCheckerErrors) {
+        self.errors.extend(errors.errors);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl std::fmt::Display for CriteriaCheckerErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "The following errors occurred:")?;
+        writeln!(f, "--------------------------------")?;
+        for (i, error) in self.errors.iter().enumerate() {
+            writeln!(f, "Error {}: {}", i + 1, error)?;
+            writeln!(f, "Caused by:")?;
+            for (j, cause) in error.chain().skip(1).enumerate() {
+                writeln!(f, "    {}. {}", j + 1, cause)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for CriteriaCheckerErrors {}
+
+macro_rules! collect_errors {
+    ($($expr:expr),+ $(,)?) => {{
+        let mut errors = CriteriaCheckerErrors::new();
+        $(
+            match $expr {
+                Err(e) => match e.into() {
+                    CombinedError::Single(err) => errors.push(err),
+                    CombinedError::Multiple(errs) => errors.extend(errs),
+                },
+                Ok(_) => {}
+            }
+        )+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }};
+}
+
 pub struct SuccessCriteriaChecker {}
 
 impl SuccessCriteriaChecker {
@@ -265,22 +343,29 @@ impl SuccessCriteriaChecker {
         let traffic_name_addition = traffic_name
             .map(|n| format!(" for {}", n))
             .unwrap_or_default();
-        Self::check_throughput(
-            success_criteria.min_avg_tps,
-            success_criteria.max_expired_tps,
-            success_criteria.max_failed_submission_tps,
-            stats_rate,
-            &traffic_name_addition,
+
+        collect_errors!(
+            Self::check_throughput(
+                success_criteria.min_avg_tps,
+                success_criteria.max_expired_tps,
+                success_criteria.max_failed_submission_tps,
+                stats_rate,
+                &traffic_name_addition,
+            ),
+            Self::check_latency(
+                &success_criteria.latency_thresholds,
+                stats_rate,
+                &traffic_name_addition,
+            ),
+            if let Some(latency_breakdown_thresholds) =
+                &success_criteria.latency_breakdown_thresholds
+            {
+                latency_breakdown_thresholds
+                    .ensure_threshold(latency_breakdown.unwrap(), &traffic_name_addition)
+            } else {
+                Ok(())
+            }
         )?;
-        Self::check_latency(
-            &success_criteria.latency_thresholds,
-            stats_rate,
-            &traffic_name_addition,
-        )?;
-        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
-            latency_breakdown_thresholds
-                .ensure_threshold(latency_breakdown.unwrap(), &traffic_name_addition)?;
-        }
         Ok(())
     }
 
@@ -304,76 +389,90 @@ impl SuccessCriteriaChecker {
         let stats_rate = stats.rate();
 
         let no_traffic_name_addition = "".to_string();
-        Self::check_throughput(
-            success_criteria.min_avg_tps,
-            success_criteria.max_expired_tps,
-            success_criteria.max_failed_submission_tps,
-            &stats_rate,
-            &no_traffic_name_addition,
+
+        collect_errors!(
+            Self::check_throughput(
+                success_criteria.min_avg_tps,
+                success_criteria.max_expired_tps,
+                success_criteria.max_failed_submission_tps,
+                &stats_rate,
+                &no_traffic_name_addition,
+            ),
+            Self::check_latency(
+                &success_criteria.latency_thresholds,
+                &stats_rate,
+                &no_traffic_name_addition,
+            ),
+            if let Some(latency_breakdown_thresholds) =
+                &success_criteria.latency_breakdown_thresholds
+            {
+                latency_breakdown_thresholds
+                    .ensure_threshold(latency_breakdown, &no_traffic_name_addition)
+            } else {
+                Ok(())
+            },
+            if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
+                swarm
+                    .read()
+                    .await
+                    .wait_for_all_nodes_to_catchup_to_next(timeout)
+                    .await
+                    .context("Failed waiting for all nodes to catchup to next version")
+            } else {
+                Ok(())
+            },
+            if success_criteria.check_no_restarts {
+                let swarm_read = swarm.read().await;
+                collect_errors!(
+                    swarm_read
+                        .ensure_no_validator_restart()
+                        .await
+                        .context("Failed ensuring no validator restarted"),
+                    swarm_read
+                        .ensure_no_fullnode_restart()
+                        .await
+                        .context("Failed ensuring no fullnode restarted"),
+                )
+            } else {
+                Ok(())
+            },
+            if success_criteria.check_no_errors {
+                Self::check_no_errors(swarm.clone()).await
+            } else {
+                Ok(())
+            },
+            if success_criteria.check_no_fullnode_failures {
+                Self::check_no_fullnode_failures(swarm.clone()).await
+            } else {
+                Ok(())
+            },
+            if let Some(system_metrics_threshold) =
+                success_criteria.system_metrics_threshold.clone()
+            {
+                Self::check_system_metrics(
+                    swarm.clone(),
+                    start_time,
+                    end_time,
+                    system_metrics_threshold,
+                )
+                .await
+            } else {
+                Ok(())
+            },
+            if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
+                Self::check_chain_progress(
+                    swarm.clone(),
+                    report,
+                    chain_progress_threshold,
+                    start_version,
+                    end_version,
+                )
+                .await
+                .context("Failed check chain progress")
+            } else {
+                Ok(())
+            }
         )?;
-
-        Self::check_latency(
-            &success_criteria.latency_thresholds,
-            &stats_rate,
-            &no_traffic_name_addition,
-        )?;
-
-        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
-            latency_breakdown_thresholds
-                .ensure_threshold(latency_breakdown, &no_traffic_name_addition)?;
-        }
-
-        if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
-            swarm
-                .read()
-                .await
-                .wait_for_all_nodes_to_catchup_to_next(timeout)
-                .await
-                .context("Failed waiting for all nodes to catchup to next version")?;
-        }
-
-        if success_criteria.check_no_restarts {
-            let swarm_read = swarm.read().await;
-            swarm_read
-                .ensure_no_validator_restart()
-                .await
-                .context("Failed ensuring no validator restarted")?;
-            swarm_read
-                .ensure_no_fullnode_restart()
-                .await
-                .context("Failed ensuring no fullnode restarted")?;
-        }
-
-        if success_criteria.check_no_errors {
-            Self::check_no_errors(swarm.clone()).await?;
-        }
-
-        if success_criteria.check_no_fullnode_failures {
-            Self::check_no_fullnode_failures(swarm.clone()).await?;
-        }
-
-        if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            Self::check_system_metrics(
-                swarm.clone(),
-                start_time,
-                end_time,
-                system_metrics_threshold,
-            )
-            .await?;
-        }
-
-        if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
-            Self::check_chain_progress(
-                swarm.clone(),
-                report,
-                chain_progress_threshold,
-                start_version,
-                end_version,
-            )
-            .await
-            .context("Failed check chain progress")?;
-        }
-
         Ok(())
     }
 
@@ -518,20 +617,22 @@ impl SuccessCriteriaChecker {
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
-        Self::check_tps(min_avg_tps, stats_rate, traffic_name_addition)?;
-        Self::check_max_value(
-            max_expired_config,
-            stats_rate,
-            stats_rate.expired,
-            "expired",
-            traffic_name_addition,
-        )?;
-        Self::check_max_value(
-            max_failed_submission_config,
-            stats_rate,
-            stats_rate.failed_submission,
-            "submission",
-            traffic_name_addition,
+        collect_errors!(
+            Self::check_tps(min_avg_tps, stats_rate, traffic_name_addition),
+            Self::check_max_value(
+                max_expired_config,
+                stats_rate,
+                stats_rate.expired,
+                "expired",
+                traffic_name_addition,
+            ),
+            Self::check_max_value(
+                max_failed_submission_config,
+                stats_rate,
+                stats_rate.failed_submission,
+                "submission",
+                traffic_name_addition,
+            ),
         )?;
         Ok(())
     }
