@@ -19,6 +19,7 @@ use move_vm_runtime::{
     config::VMConfig, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::AlwaysVisitedModuleTraversalContext;
 
 #[test]
 fn instantiation_err() {
@@ -134,9 +135,13 @@ fn instantiation_err() {
     let module_storage = storage.as_unsync_code_storage();
 
     // Publish (must succeed!) and then load the function.
-    let new_module_storage =
-        StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
-            .expect("Module must publish");
+    let new_module_storage = StagingModuleStorage::create(
+        &addr,
+        &module_storage,
+        vec![mod_bytes.into()],
+        &AlwaysVisitedModuleTraversalContext,
+    )
+    .expect("Module must publish");
     load_function(&new_module_storage, &cm.self_id(), &[ty_arg])
 }
 
