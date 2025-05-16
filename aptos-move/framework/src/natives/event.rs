@@ -23,7 +23,7 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-/// Error code from events.move, returned when event creation fails.
+/// Error code from `0x1::events.move`, returned when event creation fails.
 pub const ECANNOT_CREATE_EVENT: u64 = 1;
 
 /// Cached emitted module events.
@@ -228,28 +228,36 @@ fn native_write_module_event_to_store(
     let type_tag = context.type_to_type_tag(&ty)?;
 
     // Additional runtime check for module call.
-    if let (Some(id), _, _) = context
-        .stack_frames(1)
+    let stack_frames = context.stack_frames(1);
+    let id = stack_frames
         .stack_trace()
         .first()
+        .map(|(caller, _, _)| caller)
         .ok_or_else(|| {
-            SafeNativeError::InvariantViolation(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            ))
+            let err = PartialVMError::new_invariant_violation(
+                "Caller frame for 0x1::emit::event is not found",
+            );
+            SafeNativeError::InvariantViolation(err)
         })?
-    {
-        if let TypeTag::Struct(ref struct_tag) = type_tag {
-            if id != &struct_tag.module_id() {
-                return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
-                    StatusCode::INTERNAL_TYPE_ERROR,
-                )));
-            }
-        } else {
+        .as_ref()
+        .ok_or_else(|| {
+            // If module is not known, this call must come from the script, which is not allowed.
+            let err = PartialVMError::new_invariant_violation("Scripts cannot emit events");
+            SafeNativeError::InvariantViolation(err)
+        })?;
+
+    if let TypeTag::Struct(ref struct_tag) = type_tag {
+        if id != &struct_tag.module_id() {
             return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
                 StatusCode::INTERNAL_TYPE_ERROR,
             )));
         }
+    } else {
+        return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
+            StatusCode::INTERNAL_TYPE_ERROR,
+        )));
     }
+
     let (layout, has_identifier_mappings) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
 
@@ -259,10 +267,9 @@ fn native_write_module_event_to_store(
         .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
-            SafeNativeError::InvariantViolation(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Event serialization failure".to_string()),
-            )
+            SafeNativeError::InvariantViolation(PartialVMError::new_invariant_violation(
+                "Event serialization failure",
+            ))
         })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
