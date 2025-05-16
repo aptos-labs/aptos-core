@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
 aptos-infallible = { workspace = true }
-aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-node-resource-metrics = { workspace = true }

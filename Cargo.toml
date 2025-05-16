@@ -714,7 +714,12 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rlp = "0.5.1"
-rocksdb = { version = "0.22.0", features = ["lz4"] }
+
+# ######
+# We want normalize the rocksdb usage with smr-moonshot to reduce unncessary rocksdb build
+rocksdb = { version = "0.22.0", default-features = false, features = ["lz4", "snappy"] }
+#########
+
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
