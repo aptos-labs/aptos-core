@@ -182,7 +182,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
 }
 
 impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'_, T, S> {
-    fn fetch_state_value_metadata(
+    fn unmetered_get_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,

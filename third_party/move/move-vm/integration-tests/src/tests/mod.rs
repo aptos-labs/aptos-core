@@ -15,8 +15,8 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, InstantiatedFunctionLoader,
-    LegacyLoaderConfig, ModuleStorage,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, InstantiatedFunctionLoader, LegacyLoaderConfig,
+    ModuleStorage, ScriptLoader,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
@@ -133,18 +133,26 @@ fn execute_script_impl(
     args: Vec<Vec<u8>>,
 ) -> VMResult<ChangeSet> {
     let code_storage = storage.as_unsync_code_storage();
+
+    let mut gas_meter = UnmeteredGasMeter;
     let traversal_storage = TraversalStorage::new();
     let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-    let function = code_storage.load_script(script, ty_args)?;
     let mut data_cache = TransactionDataCache::empty();
 
     dispatch_loader!(&code_storage, loader, {
+        let function = loader.load_script(
+            &LegacyLoaderConfig::noop(),
+            &mut gas_meter,
+            &mut traversal_context,
+            script,
+            ty_args,
+        )?;
         MoveVM::execute_loaded_function(
             function,
             args,
             &mut data_cache,
-            &mut UnmeteredGasMeter,
+            &mut gas_meter,
             &mut traversal_context,
             &mut NativeContextExtensions::default(),
             &loader,
