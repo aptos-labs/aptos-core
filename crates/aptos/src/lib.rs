@@ -15,12 +15,14 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 pub mod update;
+#[cfg(feature = "local-testnet")]
 pub mod workspace;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
+#[cfg(feature = "local-testnet")]
 use aptos_workspace_server::WorkspaceCommand;
 use async_trait::async_trait;
 use clap::Parser;
@@ -53,6 +55,7 @@ pub enum Tool {
     #[clap(subcommand)]
     Update(update::UpdateTool),
     #[clap(subcommand, hide(true))]
+    #[cfg(feature = "local-testnet")]
     Workspace(WorkspaceCommand),
 }
 
@@ -73,6 +76,7 @@ impl Tool {
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute().await,
+            #[cfg(feature = "local-testnet")]
             Workspace(workspace) => workspace.execute_serialized_without_logger().await,
         }
     }
