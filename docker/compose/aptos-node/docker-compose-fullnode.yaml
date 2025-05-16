@@ -1,7 +1,6 @@
 # This compose file defines an Aptos Fullnode deployment.
 # Read the README.md files for instruction on how to install aptos-node
 
-version: "3.8"
 services:
   haproxy:
     image: haproxy:3.0.2
