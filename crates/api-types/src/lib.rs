@@ -40,6 +40,7 @@ pub struct ExternalBlockMeta {
     pub block_id: BlockId,
     pub block_number: u64,
     pub usecs: u64,
+    pub epoch: u64,
     pub randomness: Option<Random>,
     pub block_hash: Option<ComputeRes>,
 }
