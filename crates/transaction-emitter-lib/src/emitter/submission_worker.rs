@@ -23,7 +23,8 @@ use core::{
 };
 use futures::future::join_all;
 use itertools::Itertools;
-use log::{debug, error, info, warn};
+//use log::{debug, error, info, warn};
+use aptos_logger::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
@@ -477,6 +478,33 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
+            info!(
+                "[{:?}] txn_emitter worker: submitted {} txns, {} failed",
+                client.path_prefix_string(),
+                txns.len(),
+                failures.len()
+            );
+            if failures.is_empty() {
+                // Check transaction status after submission
+                for txn in txns {
+                    let hash = txn.clone().committed_hash();
+                    match client.get_transaction_by_hash(hash).await {
+                        Ok(response) => {
+                            let vm_status = response.into_inner().vm_status();
+                            warn!("[{:?}] Transaction failed with VM status: {:?}",
+                                    client.path_prefix_string(),
+                                    vm_status);
+                        }
+                        Err(e) => {
+                            warn!(
+                            "[{:?}] Failed to get transaction status: {:?}",
+                            client.path_prefix_string(),
+                            e
+                        );
+                        }
+                    }
+                }
+            }
 
             stats
                 .failed_submission

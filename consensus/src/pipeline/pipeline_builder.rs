@@ -535,16 +535,18 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
-    ) -> TaskResult<ExecuteResult> {
+    ) -> TaskResult<ExecuteResult> { ;
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
         let scheduled_txns: Vec<ScheduledTransactionWithKey> = {
             if let Ok(state_view) = executor.state_view(block.parent_id()) {
+                info!("[*****Pipeline] get_ready_txns()");
                 ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs())
             } else {
                 vec![]
             }
         };
+        info!("[*****Pipeline] scheduled txns size: {:?}", scheduled_txns.len());
         let (user_txns, block_gas_limit) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
@@ -558,6 +560,12 @@ impl PipelineBuilder {
         } else {
             block.new_block_metadata(&validator).into()
         };
+        let num_validator_txns = if block.validator_txns().is_some() {
+            block.validator_txns().unwrap().len()
+        } else {
+            0
+        };
+        info!("Txn counts: user: {}, validator: {}, scheduled: {}", user_txns.len(), num_validator_txns, scheduled_txns.len());
         let txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(
                 metadata_txn,
@@ -578,6 +586,7 @@ impl PipelineBuilder {
             user_txns.as_ref().clone(),
         ]
         .concat();
+        info!("Going to execute {} txns", txns.len());
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor

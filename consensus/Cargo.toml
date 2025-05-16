@@ -84,6 +84,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
 tokio-stream = { workspace = true }
+log = "0.4.27"
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

@@ -203,7 +203,10 @@ pub enum EntryPoints {
         repeats: u64,
         map_type: MapType,
     },
-    ScheduleTxnInsert,
+    ScheduleTxnInsert {
+        /// The current time in milliseconds
+        current_time_ms: u64,
+    },
     /// Initialize Token V1 NFT collection
     TokenV1InitializeCollection,
     /// Mint an NFT token. Should be called only after InitializeCollection is called
@@ -373,7 +376,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::VectorRemoveInsert { .. }
             | EntryPoints::VectorRangeMove { .. } => "vector_example",
             EntryPoints::MapInsertRemove { .. } => "maps_example",
-            EntryPoints::ScheduleTxnInsert { .. } => "schedule_txn",
+            EntryPoints::ScheduleTxnInsert { .. } => "scheduled_txns_example",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -634,10 +637,13 @@ impl EntryPointTrait for EntryPoints {
 
                 get_payload(module_id, func, args)
             },
-            EntryPoints::ScheduleTxnInsert => {
-                let current_time_ms = 1000;
+            EntryPoints::ScheduleTxnInsert {
+                current_time_ms
+            } => {
+                println!("Module name: {}; module_id {}", module_name, module_id);
+                assert!(false);
                 let mut args = vec![bcs::to_bytes(&current_time_ms).unwrap()];
-                get_payload(module_id, ident_str!("test_insert_transactions").to_owned(), vec![])
+                get_payload(module_id, ident_str!("test_insert_transactions").to_owned(), args)
             },
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
                 module_id,
@@ -962,7 +968,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::VectorRemoveInsert { .. }
             | EntryPoints::VectorRangeMove { .. } => AutomaticArgs::None,
             EntryPoints::MapInsertRemove { .. } => AutomaticArgs::Signer,
-            EntryPoints::ScheduleTxnInsert => AutomaticArgs::Signer,
+            EntryPoints::ScheduleTxnInsert { .. } => AutomaticArgs::Signer,
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential

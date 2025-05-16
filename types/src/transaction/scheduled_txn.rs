@@ -22,8 +22,6 @@ pub struct ScheduledTransaction {
     pub max_gas_unit_price: u64,
     /// Option to pass a signer when f is called
     pub pass_signer: bool,
-    /// BCS serialized function, we cannot deserialize move closure in rust
-    pub f: Vec<u8>
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -48,7 +46,9 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
             module_addr: CORE_CODE_ADDRESS,
             module_name: Identifier::new("scheduled_txns").unwrap(),
             get_ready_transactions_name: Identifier::new("get_ready_transactions").unwrap(),
+            get_ready_transactions_no_func_name: Identifier::new("get_ready_transactions_no_func").unwrap(),
             execute_user_function_wrapper_name: Identifier::new("execute_user_function_wrapper").unwrap(),
+            execute_user_function_wrapper_no_func_name: Identifier::new("execute_user_function_wrapper_no_func").unwrap(),
         }
     );
 
@@ -56,7 +56,9 @@ pub struct ScheduledTxnsModuleInfo {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub get_ready_transactions_name: Identifier,
+    pub get_ready_transactions_no_func_name: Identifier,
     pub execute_user_function_wrapper_name: Identifier,
+    pub execute_user_function_wrapper_no_func_name: Identifier,
 }
 
 impl ScheduledTxnsModuleInfo {

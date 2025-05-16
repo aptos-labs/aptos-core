@@ -50,6 +50,7 @@ use aptos_types::{
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
 use std::sync::Arc;
+use aptos_block_executor::txn_provider::TxnProvider;
 
 pub struct DoGetExecutionOutput;
 
@@ -108,6 +109,10 @@ impl DoGetExecutionOutput {
         let append_state_checkpoint_to_block =
             transaction_slice_metadata.append_state_checkpoint_to_block();
         let txn_provider = DefaultTxnProvider::new(transactions);
+        info!(
+            "by_transaction_execution_unsharded with {} transactions",
+            txn_provider.num_txns()
+        );
         let block_output = Self::execute_block::<V>(
             executor,
             &txn_provider,

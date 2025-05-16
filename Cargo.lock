@@ -959,6 +959,7 @@ dependencies = [
  "futures-channel",
  "hex",
  "itertools 0.13.0",
+ "log",
  "lru 0.7.8",
  "maplit",
  "mini-moka",

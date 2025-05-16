@@ -32,7 +32,8 @@ use aptos_transaction_generator_lib::{
 };
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
-use log::{error, info, warn};
+use log::{error, warn};
+use aptos_logger::info;
 use once_cell::sync::Lazy;
 use rand::{
     rngs::StdRng,
@@ -920,7 +921,6 @@ impl TxnEmitter {
         print_stats_interval: Option<u64>,
     ) -> Result<TxnStats> {
         let phases = emit_job_request.transaction_mix_per_phase.len();
-
         let mut job = self
             .start_job(source_account, emit_job_request, phases)
             .await?;

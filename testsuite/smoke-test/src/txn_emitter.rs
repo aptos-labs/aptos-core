@@ -7,15 +7,18 @@ use crate::{
     utils::create_and_fund_account,
 };
 use anyhow::ensure;
-use aptos_forge::{
-    args::TransactionTypeArg, emitter::NumAccountsMode, AccountType, EmitJobMode, EmitJobRequest,
-    EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
-};
+use aptos_forge::{args::TransactionTypeArg, emitter::NumAccountsMode, AccountType, EmitJobMode, EmitJobRequest, EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress, entry_point_trait};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use aptos_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_sample_jwt_token};
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, SeedableRng};
 use std::{sync::Arc, time::Duration};
+use aptos_logger::info;
+use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use move_core_types::account_address::AccountAddress;
+use move_core_types::ident_str;
+use move_core_types::language_storage::ModuleId;
+use crate::aptos::move_test_helpers;
 
 pub async fn generate_traffic(
     swarm: &mut dyn Swarm,
@@ -290,10 +293,125 @@ async fn test_txn_emmitter_low_funds() {
         .await
         .unwrap();
 
+    info!("submitted {}; comitted {}", txn_stat.submitted, txn_stat.committed);
     assert!(txn_stat.submitted > 30);
+    assert!(false);
 }
 
 #[tokio::test]
-async fn test_txn_emmitter_temp_test() {
+async fn test_txn_emmitter_scheduled_txn_test2() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    let rng = SeedableRng::from_rng(OsRng).unwrap();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_client.clone());
+
+    // Get current timestamp for scheduling
+    let current_time_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+
+    let transaction_type = TransactionType::CallCustomModules {
+        entry_point: Box::new(EntryPoints::ScheduleTxnInsert { current_time_ms }),
+        num_modules: 1,
+        use_account_pool: false,
+    };
+
+    let emit_job_request = EmitJobRequest::default()
+        .rest_clients(vec![rest_client])
+        .gas_price(100)
+        .transaction_type(transaction_type)
+        .mode(EmitJobMode::ConstTps { tps: 1 });
+
+    info!("emit_job_request created, submitting it************");
+    let txn_stat = emitter
+        .emit_txn_for_with_stats(
+            swarm.chain_info().root_account,
+            emit_job_request,
+            Duration::from_secs(5),
+            1,
+        )
+        .await
+        .unwrap();
+
+    assert!(txn_stat.submitted > 0);
+    assert!(txn_stat.committed > 0);
+    std::thread::sleep(Duration::from_secs(50));
+    info!("submitted {}; comitted {}", txn_stat.submitted, txn_stat.committed);
     assert!(false);
+
+    // Wait for scheduled transactions to be processed
+    std::thread::sleep(Duration::from_secs(5));
+}
+
+#[tokio::test]
+async fn test_txn_emmitter_scheduled_txn_test() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let mut chain_info = swarm.aptos_public_info();
+    let transaction_factory = chain_info.transaction_factory();
+
+    let mut account1 = chain_info
+        .create_and_fund_user_account(50_000_000_000)
+        .await
+        .unwrap();
+
+    // Get current timestamp for scheduling
+    let current_time_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    // Module Id: 4ae5a12d090afb49cb4de218972afd71379927c6e40f2254a25d2001fae0c901::scheduled_txns_example
+
+    let module_id = ModuleId::new(AccountAddress::from_hex(
+        "4ae5a12d090afb49cb4de218972afd71379927c6e40f2254a25d2001fae0c901"
+        ).unwrap(), ident_str!("scheduled_txns_example").to_owned()
+    );
+
+    /*let txn_builder = transaction_factory
+        .payload(entry_point_trait::get_payload(
+            module_id, ident_str!("test_insert_transactions").to_owned(),
+            vec![bcs::to_bytes(&current_time_ms).unwrap()],
+        ))
+        .max_gas_amount(200000)
+        .gas_unit_price(100)
+        .expiration_timestamp_secs(10000000000);*/
+    let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let base_path_v1 = base_dir.join("../module-publish/src/packages/framework_usecases");
+
+    info!("Gonna publish !!!!!!");
+    move_test_helpers::publish_package(&mut chain_info, base_path_v1)
+        .await
+        .unwrap();
+    info!("Done publishing!!!!!!");
+
+    let txn_builder = transaction_factory
+        .payload(TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::new([
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0xCD, 0xAB,
+                ]),
+                ident_str!("scheduled_txns_example").to_owned(),
+            ),
+            ident_str!("test_insert_transactions").to_owned(),
+            vec![],
+            vec![bcs::to_bytes(&current_time_ms).unwrap()],
+        )))
+        .max_gas_amount(200000)
+        .gas_unit_price(100)
+        .expiration_timestamp_secs(10000000000);
+
+    let mutate_txn = account1.sign_with_transaction_builder(txn_builder);
+    info!("Gonna submit_and_wait..........");
+    /*let response = chain_info.client().submit_and_wait(&mutate_txn).await.unwrap();
+    assert!(
+        response.inner().success(),
+        "Transaction failed: {:?}",
+        response.inner()
+    );*/
 }

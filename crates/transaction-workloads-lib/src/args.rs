@@ -374,7 +374,9 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::APTTransferWithMasterSigner)
             },
             TransactionTypeArg::ScheduleTxnInsert => {
-                call_custom_module(EntryPoints::ScheduleTxnInsert)
+                call_custom_module(EntryPoints::ScheduleTxnInsert {
+                    current_time_ms: 1000,
+                })
             },
             TransactionTypeArg::OrderBookNoMatches => call_custom_module(EntryPoints::OrderBook {
                 state: OrderBookState::new(),

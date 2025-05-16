@@ -196,7 +196,7 @@ module aptos_framework::block {
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
 
-        scheduled_txns::remove_txns();
+        //scheduled_txns::remove_txns();
 
         block_metadata_ref.epoch_interval
     }

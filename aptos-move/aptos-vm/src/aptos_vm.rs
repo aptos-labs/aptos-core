@@ -2666,6 +2666,7 @@ impl AptosVM {
                 (vm_status, output)
             },
             Transaction::ScheduledTransaction(txn) => {
+                info!("execute_single_transaction Transaction::ScheduledTransaction");
                 let storage = TraversalStorage::new();
                 let mut context = TraversalContext::new(&storage);
                 match self.process_scheduled_transaction(
@@ -2687,7 +2688,13 @@ impl AptosVM {
                                 .unwrap();
                         println!("scheduled transaction {:?} failed: {:?}", txn, e);
                         (VMStatus::Executed, output)*/
-                        unimplemented!()
+                        // print error and return
+                        error!(
+                            "process_scheduled_transaction failed: {:?}", e
+                        );
+                        (e, VMOutput::empty_with_status(
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                        ))
                     },
                 }
             },
@@ -2704,26 +2711,27 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         let balance = txn.txn.max_gas_amount;
         let storage_gas = self.storage_gas_params(log_context)?;
-        let mut gas_meter = make_prod_gas_meter(
+        /*let mut gas_meter = make_prod_gas_meter(
             self.gas_feature_version(),
             self.gas_params(log_context)?.vm.clone(),
             storage_gas.clone(),
             false,
             balance.into(),
             &NoopBlockSynchronizationKillSwitch {},
-        );
+        );*/
+        let mut gas_meter = UnmeteredGasMeter;
 
         // no need of scheduled txn prologue for now.
-
         let args = vec![
             MoveValue::Signer(txn.txn.sender_handle),
             MoveValue::Bool(txn.txn.pass_signer),
-            MoveValue::vector_u8(txn.txn.f),
         ];
         let mut session = self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
+        info!("Calling {}", &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_no_func_name);
         let result = session.execute_function_bypass_visibility(
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
-            &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
+            //&SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_no_func_name,
             vec![],
             serialize_values(&args),
             &mut gas_meter,

@@ -4,7 +4,9 @@ module aptos_framework::scheduled_txns {
     use std::hash::sha3_256;
     use std::option::{Option, some};
     use std::signer;
+    use std::string;
     use std::vector;
+    use aptos_std::debug;
     use aptos_std::from_bcs;
     use aptos_std::table;
     use aptos_std::table::Table;
@@ -81,9 +83,27 @@ module aptos_framework::scheduled_txns {
         f: |Option<signer>| has copy + store + drop,
     }
 
+    struct ScheduledTransactionNoFunc has copy, drop, store {
+        /// 32 bytes
+        sender_addr: address,
+        /// 100ms granularity
+        scheduled_time: u64,
+        /// Maximum gas to spend for this transaction
+        max_gas_amount: u64,
+        /// Charged @ lesser of {max_gas_unit_price, max_gas_unit_price other than this in the block executed}
+        max_gas_unit_price: u64,
+        /// Option to pass a signer to the function
+        pass_signer: bool,
+    }
+
     /// We pass the id around instead re-computing it
     struct ScheduledTransactionWithKey has drop {
         txn: ScheduledTransaction,
+        key: ScheduleMapKey
+    }
+
+    struct ScheduledTransactionNoFuncWithKey has drop {
+        txn: ScheduledTransactionNoFunc,
         key: ScheduleMapKey
     }
 
@@ -277,22 +297,26 @@ module aptos_framework::scheduled_txns {
     ): ScheduleMapKey acquires ScheduleQueue, AuxiliaryData {
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        debug::print(&string::utf8(b"0000000000000000000"));
         assert!(!aux_data.stop_scheduling, error::unavailable(EUNAVAILABLE));
 
         // Generate unique transaction ID
         let txn_id = sha3_256(bcs::to_bytes(&txn));
 
+        debug::print(&string::utf8(b"11111111111111111"));
         // we expect the sender to be a permissioned signer
         assert!(
             signer::address_of(sender) == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
 
+
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
 
         // Only schedule txns in the future
         let txn_time = txn.scheduled_time / MILLI_CONVERSION_FACTOR; // Round down to the nearest 100ms
         let block_time = timestamp::now_microseconds() / MICRO_CONVERSION_FACTOR;
+        debug::print(&string::utf8(b"22222222222222222222"));
         assert!(txn_time > block_time, error::invalid_argument(EINVALID_TIME));
 
         // Insert the transaction into the schedule_map
@@ -373,19 +397,19 @@ module aptos_framework::scheduled_txns {
         );
     }
 
-    /// Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
-    fun get_ready_transactions(
+    fun get_ready_transactions_no_func(
         timestamp: u64
-    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, AuxiliaryData {
+    ): vector<ScheduledTransactionNoFuncWithKey> acquires ScheduleQueue, AuxiliaryData {
+        debug::print(&string::utf8(b"get_ready_transactions_no_func executing"));
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         if (aux_data.stop_scheduling) {
-            return vector::empty<ScheduledTransactionWithKey>();
+            return vector::empty<ScheduledTransactionNoFuncWithKey>();
         };
 
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         let block_time = timestamp / MILLI_CONVERSION_FACTOR;
-        let scheduled_txns = vector::empty<ScheduledTransactionWithKey>();
+        let scheduled_txns = vector::empty<ScheduledTransactionNoFuncWithKey>();
         let count = 0;
         let txns_to_expire = vector::empty<KeyAndTxnInfo>();
 
@@ -393,15 +417,22 @@ module aptos_framework::scheduled_txns {
         while (!iter.iter_is_end(&queue.schedule_map) && count < GET_READY_TRANSACTIONS_LIMIT) {
             let key = iter.iter_borrow_key();
             if (key.time > block_time) {
-                break;
+                //break;
             };
             let txn = *iter.iter_borrow(&queue.schedule_map);
-            let scheduled_txn_with_id = ScheduledTransactionWithKey {
-                txn,
+            let txn_no_func = ScheduledTransactionNoFunc {
+                sender_addr: txn.sender_addr,
+                scheduled_time: txn.scheduled_time,
+                max_gas_amount: txn.max_gas_amount,
+                max_gas_unit_price: txn.max_gas_unit_price,
+                pass_signer: txn.pass_signer,
+            };
+            let scheduled_txn_with_id = ScheduledTransactionNoFuncWithKey {
+                txn: txn_no_func,
                 key: *key,
             };
 
-            if (key.time + EXPIRY_DELTA < block_time) {
+            /*if (key.time + EXPIRY_DELTA < block_time) {
                 // Transaction has expired
                 let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
                 txns_to_expire.push_back(KeyAndTxnInfo {
@@ -409,9 +440,9 @@ module aptos_framework::scheduled_txns {
                     account_addr: txn.sender_addr,
                     deposit_amt
                 });
-            } else {
-                scheduled_txns.push_back(scheduled_txn_with_id);
-            };
+            } else {*/
+            scheduled_txns.push_back(scheduled_txn_with_id);
+            //};
             // we do not want an unbounded size of ready or expirable txns; hence we increment either way
             count = count + 1;
             iter = iter.iter_next(&queue.schedule_map);
@@ -431,6 +462,77 @@ module aptos_framework::scheduled_txns {
                 cancelled_txn_code: CancelledTxnCode::Expired
             });
         };
+
+        let num_txns = scheduled_txns.length();
+        debug::print(&string::utf8(b"get_ready_transactions_no_func returning"));
+        debug::print(&num_txns);
+
+        scheduled_txns
+    }
+
+    /// Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
+    fun get_ready_transactions(
+        timestamp: u64
+    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, AuxiliaryData {
+        debug::print(&string::utf8(b"get_ready_transactions executing"));
+        // If scheduling is shutdown, we cannot schedule any more transactions
+        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        if (aux_data.stop_scheduling) {
+            return vector::empty<ScheduledTransactionWithKey>();
+        };
+
+        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
+        let block_time = timestamp / MILLI_CONVERSION_FACTOR;
+        let scheduled_txns = vector::empty<ScheduledTransactionWithKey>();
+        let count = 0;
+        let txns_to_expire = vector::empty<KeyAndTxnInfo>();
+
+        let iter = queue.schedule_map.new_begin_iter();
+        while (!iter.iter_is_end(&queue.schedule_map) && count < GET_READY_TRANSACTIONS_LIMIT) {
+            let key = iter.iter_borrow_key();
+            if (key.time > block_time) {
+                //break;
+            };
+            let txn = *iter.iter_borrow(&queue.schedule_map);
+            let scheduled_txn_with_id = ScheduledTransactionWithKey {
+                txn,
+                key: *key,
+            };
+
+            /*if (key.time + EXPIRY_DELTA < block_time) {
+                // Transaction has expired
+                let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
+                txns_to_expire.push_back(KeyAndTxnInfo {
+                    key: *key,
+                    account_addr: txn.sender_addr,
+                    deposit_amt
+                });
+            } else {*/
+                scheduled_txns.push_back(scheduled_txn_with_id);
+            //};
+            // we do not want an unbounded size of ready or expirable txns; hence we increment either way
+            count = count + 1;
+            iter = iter.iter_next(&queue.schedule_map);
+        };
+
+        // Cancel expired transactions
+        while (!txns_to_expire.is_empty()) {
+            let KeyAndTxnInfo { key, account_addr, deposit_amt } = txns_to_expire.pop_back();
+            cancel_internal(
+                account_addr,
+                key,
+                deposit_amt
+            );
+            event::emit(TransactionExpiredEvent {
+                key,
+                sender_addr: account_addr,
+                cancelled_txn_code: CancelledTxnCode::Expired
+            });
+        };
+
+        let num_txns = scheduled_txns.length();
+        debug::print(&string::utf8(b"get_ready_transactions returning"));
+        debug::print(&num_txns);
 
         scheduled_txns
     }
@@ -492,6 +594,13 @@ module aptos_framework::scheduled_txns {
         };
     }
 
+    fun execute_user_function_wrapper_no_func(
+        signer: signer,
+        pass_signer: bool,
+    ) {
+        debug::print(&string::utf8(b"Move: execute_user_function_wrapper_no_func"));
+    }
+
     // Wrapper to call the user function when the txn is scheduled
     fun execute_user_function_wrapper(
         signer: signer,
@@ -506,7 +615,7 @@ module aptos_framework::scheduled_txns {
     }
 
     ////////////////////////// TESTS //////////////////////////
-    #[test_only]
+    //#[test_only]
     public fun get_num_txns(): u64 acquires ScheduleQueue {
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         let num_txns = queue.schedule_map.compute_length();

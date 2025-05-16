@@ -942,6 +942,16 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    ScheduleTxnsUsageTestCancelTransaction {},
+
+    ScheduleTxnsUsageTestInitialize {},
+
+    ScheduleTxnsUsageTestInsertTransactions {
+        current_time_ms: u64,
+    },
+
+    ScheduleTxnsUsageTestShutdown {},
+
     /// Add `amount` of coins from the `account` owning the StakePool.
     StakeAddStake {
         amount: u64,
@@ -1789,6 +1799,14 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             ),
+            ScheduleTxnsUsageTestCancelTransaction {} => {
+                schedule_txns_usage_test_cancel_transaction()
+            },
+            ScheduleTxnsUsageTestInitialize {} => schedule_txns_usage_test_initialize(),
+            ScheduleTxnsUsageTestInsertTransactions { current_time_ms } => {
+                schedule_txns_usage_test_insert_transactions(current_time_ms)
+            },
+            ScheduleTxnsUsageTestShutdown {} => schedule_txns_usage_test_shutdown(),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
             StakeInitializeStakeOwner {
@@ -4454,6 +4472,66 @@ pub fn resource_account_create_resource_account_and_publish_package(
     ))
 }
 
+pub fn schedule_txns_usage_test_cancel_transaction() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("schedule_txns_usage").to_owned(),
+        ),
+        ident_str!("test_cancel_transaction").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn schedule_txns_usage_test_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("schedule_txns_usage").to_owned(),
+        ),
+        ident_str!("test_initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn schedule_txns_usage_test_insert_transactions(current_time_ms: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("schedule_txns_usage").to_owned(),
+        ),
+        ident_str!("test_insert_transactions").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&current_time_ms).unwrap()],
+    ))
+}
+
+pub fn schedule_txns_usage_test_shutdown() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("schedule_txns_usage").to_owned(),
+        ),
+        ident_str!("test_shutdown").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Add `amount` of coins from the `account` owning the StakePool.
 pub fn stake_add_stake(amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -6892,6 +6970,48 @@ mod decoder {
         }
     }
 
+    pub fn schedule_txns_usage_test_cancel_transaction(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduleTxnsUsageTestCancelTransaction {})
+        } else {
+            None
+        }
+    }
+
+    pub fn schedule_txns_usage_test_initialize(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduleTxnsUsageTestInitialize {})
+        } else {
+            None
+        }
+    }
+
+    pub fn schedule_txns_usage_test_insert_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ScheduleTxnsUsageTestInsertTransactions {
+                current_time_ms: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn schedule_txns_usage_test_shutdown(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ScheduleTxnsUsageTestShutdown {})
+        } else {
+            None
+        }
+    }
+
     pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
@@ -7959,6 +8079,22 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "resource_account_create_resource_account_and_publish_package".to_string(),
             Box::new(decoder::resource_account_create_resource_account_and_publish_package),
+        );
+        map.insert(
+            "schedule_txns_usage_test_cancel_transaction".to_string(),
+            Box::new(decoder::schedule_txns_usage_test_cancel_transaction),
+        );
+        map.insert(
+            "schedule_txns_usage_test_initialize".to_string(),
+            Box::new(decoder::schedule_txns_usage_test_initialize),
+        );
+        map.insert(
+            "schedule_txns_usage_test_insert_transactions".to_string(),
+            Box::new(decoder::schedule_txns_usage_test_insert_transactions),
+        );
+        map.insert(
+            "schedule_txns_usage_test_shutdown".to_string(),
+            Box::new(decoder::schedule_txns_usage_test_shutdown),
         );
         map.insert(
             "stake_add_stake".to_string(),
