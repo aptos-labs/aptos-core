@@ -7,8 +7,11 @@ use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
     move_types::{
-        account_address::AccountAddress, ident_str, identifier::Identifier,
+        account_address::AccountAddress,
+        ident_str,
+        identifier::Identifier,
         language_storage::ModuleId,
+        u256::{self, U256},
     },
     types::{
         serde_helper::bcs_utils::bcs_size_of_byte_array,
@@ -55,6 +58,12 @@ pub enum MapType {
         inner_max_degree: u16,
         leaf_max_degree: u16,
     },
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum StateMapType {
+    BigOrderedMap,
+    SmartTable,
 }
 
 #[derive(Debug)]
@@ -243,6 +252,11 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    CollectionInsert {
+        map_type: StateMapType,
+        key_size: Option<usize>,
+        value_size: Option<usize>,
+    },
     DeserializeU256,
     /// No-op script with dependencies in *::simple.move. The script has unreachable code that is
     /// there to slow down deserialization & verification, effectively making it more expensive to
@@ -330,7 +344,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
-            | EntryPoints::SmartTablePicture { .. } => "complex",
+            | EntryPoints::SmartTablePicture { .. }
+            | EntryPoints::CollectionInsert { .. } => "complex",
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
@@ -396,6 +411,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::CollectionInsert { .. } => "collections",
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
@@ -807,6 +823,57 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::CollectionInsert {
+                map_type,
+                key_size,
+                value_size,
+            } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let occurences = 1;
+                let args_for_none = vec![bcs::to_bytes(
+                    &((0..occurences).map(|_x| rng.next_u64()).collect::<Vec<_>>()),
+                )
+                .unwrap()];
+
+                let (func, args) = match (map_type, key_size, value_size) {
+                    (StateMapType::SmartTable, None, None) => (
+                        ident_str!("insert_none_into_smart_table").to_owned(),
+                        args_for_none,
+                    ),
+                    (StateMapType::BigOrderedMap, None, None) => (
+                        ident_str!("insert_none_into_btree_map").to_owned(),
+                        args_for_none,
+                    ),
+                    (StateMapType::BigOrderedMap, Some(key_size), Some(value_size)) => (
+                        ident_str!("insert_variable_into_btree_map").to_owned(),
+                        vec![
+                            bcs::to_bytes(
+                                &((0..occurences)
+                                    .map(|_x| {
+                                        let mut keys = vec![0; *key_size];
+                                        rng.fill_bytes(&mut keys);
+                                        keys
+                                    })
+                                    .collect::<Vec<_>>()),
+                            )
+                            .unwrap(),
+                            bcs::to_bytes(
+                                &((0..occurences)
+                                    .map(|_x| {
+                                        let mut values = vec![0; *value_size];
+                                        rng.fill_bytes(&mut values);
+                                        values
+                                    })
+                                    .collect::<Vec<_>>()),
+                            )
+                            .unwrap(),
+                        ],
+                    ),
+                    _ => unreachable!(),
+                };
+
+                get_payload(module_id, func, args)
+            },
             EntryPoints::DeserializeU256 => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 let mut u256_bytes = [0u8; 32];
@@ -981,6 +1048,7 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
+            EntryPoints::CollectionInsert { .. } => AutomaticArgs::None,
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
