@@ -14,7 +14,7 @@ use std::str::FromStr;
 /// Struct that represents a NewEpochEvent.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewEpochEvent {
-    epoch: u64,
+    pub epoch: u64,
 }
 
 impl NewEpochEvent {

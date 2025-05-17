@@ -13,6 +13,7 @@ use crate::{
     transaction::Version,
 };
 use anyhow::{bail, Error, Result};
+use api_types::events::contract_event::GravityEvent;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
     ident_str,
@@ -424,5 +425,29 @@ impl EventWithVersion {
             transaction_version,
             event,
         }
+    }
+}
+
+impl TryFrom<&GravityEvent> for ContractEvent {
+    type Error = Error;
+
+    fn try_from(event: &GravityEvent) -> Result<Self> {
+        match event {
+            GravityEvent::NewEpoch(epoch) => {
+                let data = NewEpochEvent { epoch: *epoch };
+                Ok(ContractEvent::V2(ContractEventV2::new(
+                    TypeTag::Struct(Box::new(NewEpochEvent::struct_tag())),
+                    serde_json::to_vec(&data).unwrap(),
+                )))
+            },
+            GravityEvent::JWK => todo!(),
+            GravityEvent::DKG => todo!(),
+        }
+    }
+}
+
+impl Into<ContractEvent> for GravityEvent {
+    fn into(self) -> ContractEvent {
+        ContractEvent::try_from(self).unwrap()
     }
 }

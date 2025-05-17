@@ -1,7 +1,8 @@
-use serde::{Deserialize, Serialize};
-use rand::Rng;
-use std::{fmt, sync::Arc};
+use crate::events::contract_event::GravityEvent;
 use hex;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::{fmt, sync::Arc};
 
 #[derive(Clone, Deserialize, Serialize, Hash, PartialEq, Eq, Copy)]
 pub struct TxnStatus {
@@ -17,17 +18,28 @@ pub struct ComputeRes {
     // todo(gravity_byteyue): Refactor to TxnInfo when refactoring
     pub txn_num: u64,
     pub txn_status: Arc<Option<Vec<TxnStatus>>>,
+    pub events: Vec<GravityEvent>,
 }
 
 impl fmt::Display for ComputeRes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ComputeRes({}, txn_num: {})", hex::encode(self.data), self.txn_num)
+        write!(
+            f,
+            "ComputeRes({}, txn_num: {})",
+            hex::encode(self.data),
+            self.txn_num
+        )
     }
 }
 
 impl fmt::Debug for ComputeRes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ComputeRes({}, txn_num: {})", hex::encode(self.data), self.txn_num)
+        write!(
+            f,
+            "ComputeRes({}, txn_num: {})",
+            hex::encode(self.data),
+            self.txn_num
+        )
     }
 }
 
@@ -36,11 +48,26 @@ impl ComputeRes {
         let mut rng = rand::thread_rng();
         let random_bytes: [u8; 32] = rng.gen();
         let txn_num = rng.gen();
-        Self { data: random_bytes, txn_num, txn_status: Arc::new(None) }
+        Self {
+            data: random_bytes,
+            txn_num,
+            txn_status: Arc::new(None),
+            events: vec![],
+        }
     }
 
-    pub fn new(data: [u8; 32], txn_num: u64, txn_status: Vec<TxnStatus>) -> Self {
-        Self { data, txn_num, txn_status: Arc::new(Some(txn_status)) }
+    pub fn new(
+        data: [u8; 32],
+        txn_num: u64,
+        txn_status: Vec<TxnStatus>,
+        events: Vec<GravityEvent>,
+    ) -> Self {
+        Self {
+            data,
+            txn_num,
+            txn_status: Arc::new(Some(txn_status)),
+            events,
+        }
     }
 
     pub fn bytes(&self) -> [u8; 32] {
