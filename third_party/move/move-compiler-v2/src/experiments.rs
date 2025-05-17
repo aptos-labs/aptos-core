@@ -47,7 +47,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(true),
         },
         Experiment {
-            name: Experiment::REFERENCE_SAFETY.to_string(),
+            name: Experiment::REPORT_ERRORS_REF_SAFETY.to_string(),
             description: "Turns on or off reference safety check error reporting".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
         },
@@ -56,6 +56,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Turns on or off whether to use the new v3 reference safety checker"
                 .to_string(),
             default: Given(true), // v3 is the default
+        },
+        Experiment {
+            name: Experiment::REPORT_ERRORS_ABILITY_SAFETY.to_string(),
+            description: "Turns on or off ability safety check error reporting".to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
             name: Experiment::USAGE_CHECK.to_string(),
@@ -294,8 +299,9 @@ impl Experiment {
         "optimize-waiting-for-compare-tests";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
-    pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
+    pub const REPORT_ERRORS_ABILITY_SAFETY: &'static str = "report-errors-ability-safety";
+    pub const REPORT_ERRORS_REF_SAFETY: &'static str = "report-errors-ref-safety";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
     pub const SKIP_BAILOUT_ON_EXTENDED_CHECKS: &'static str = "skip-bailout-on-extended-checks";
     pub const SPEC_CHECK: &'static str = "spec-check";
