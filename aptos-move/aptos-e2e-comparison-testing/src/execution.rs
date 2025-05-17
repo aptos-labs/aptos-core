@@ -448,8 +448,8 @@ impl Execution {
                 }
                 // compare write set
                 let mut write_set_error = false;
-                let res_1_write_set_vec = res_1.0.iter().collect_vec();
-                let res_2_write_set_vec = res_2.0.iter().collect_vec();
+                let res_1_write_set_vec = res_1.0.write_op_iter().collect_vec();
+                let res_2_write_set_vec = res_2.0.write_op_iter().collect_vec();
                 if res_1_write_set_vec.len() != res_2_write_set_vec.len() {
                     write_set_error = true;
                 }
