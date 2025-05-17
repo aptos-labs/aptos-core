@@ -714,6 +714,14 @@ module std::features {
         is_enabled(ORDERLESS_TRANSACTIONS)
     }
 
+    const MONOTONICALLY_INCREASING_COUNTER: u64 = 96;
+
+    public fun get_monotonically_increasing_counter_feature(): u64 { MONOTONICALLY_INCREASING_COUNTER }
+
+    public fun monotonically_increasing_counter_enabled(): bool acquires Features {
+        is_enabled(MONOTONICALLY_INCREASING_COUNTER)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

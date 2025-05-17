@@ -102,7 +102,7 @@ impl<'view> Worker<'view> {
     fn add_vm_output(&mut self, txn_idx: TxnIdx, vm_output: VMOutput) {
         trace!("seen txn: {}", txn_idx);
         assert!(txn_idx >= self.next_idx);
-        let idx_in_buffer = txn_idx - self.next_idx;
+        let idx_in_buffer = (txn_idx - self.next_idx) as usize;
         if self.buffer.len() < idx_in_buffer + 1 {
             self.buffer.resize(idx_in_buffer + 1, None);
         }

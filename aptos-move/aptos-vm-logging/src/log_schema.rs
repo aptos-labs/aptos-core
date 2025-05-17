@@ -7,6 +7,8 @@ use aptos_logger::Schema;
 use aptos_types::{state_store::StateViewId, transaction::Version};
 use serde::Serialize;
 
+pub type TxnIndex = u32;
+
 #[derive(Schema, Clone)]
 pub struct AdapterLogSchema {
     name: LogEntry,
@@ -23,13 +25,12 @@ pub struct AdapterLogSchema {
     // StateViewId::TransactionValidation - validation
     base_version: Option<Version>,
 
-    // transaction position in the list of transactions in the block,
-    // 0 if the transaction is not part of a block (i.e. validation).
-    txn_idx: usize,
+    // transaction position in the list of transactions in the block.
+    txn_idx: TxnIndex,
 }
 
 impl AdapterLogSchema {
-    pub fn new(view_id: StateViewId, txn_idx: usize) -> Self {
+    pub fn new(view_id: StateViewId, txn_idx: TxnIndex) -> Self {
         match view_id {
             StateViewId::BlockExecution { block_id } => Self {
                 name: LogEntry::Execution,
@@ -75,7 +76,7 @@ impl AdapterLogSchema {
         matches!(self.name, LogEntry::Execution)
     }
 
-    pub(crate) fn get_txn_idx(&self) -> usize {
+    pub fn get_txn_idx(&self) -> TxnIndex {
         self.txn_idx
     }
 }
