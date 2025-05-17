@@ -246,6 +246,7 @@ members = [
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
+    "third_party/move/tools/move-package-manifest",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
@@ -479,6 +480,7 @@ nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
 ambassador = "0.4.1"
+annotate-snippets = "0.11.5"
 anyhow = "1.0.98"
 anstyle = "1.0.1"
 arbitrary = { version = "1.4.1", features = ["derive"] }
@@ -851,6 +853,7 @@ move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-byt
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
+move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }

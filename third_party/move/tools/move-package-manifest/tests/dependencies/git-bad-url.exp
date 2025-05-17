@@ -1,0 +1,10 @@
+error: failed to parse manifest
+  |
+1 | [package]
+2 | name = "some_package_name"
+3 | version = "0.1.2"
+4 |
+5 | [dependencies]
+6 | a = { git = "bad" }
+  |             ^^^^^ invalid value: string "bad", expected relative URL without a base
+  |

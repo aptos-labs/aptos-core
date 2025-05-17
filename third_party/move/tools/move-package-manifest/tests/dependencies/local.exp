@@ -1,0 +1,27 @@
+success
+
+PackageManifest {
+    package: PackageMetadata {
+        name: "some_package_name",
+        version: Version {
+            major: 0,
+            minor: 1,
+            patch: 2,
+        },
+        authors: [],
+        license: None,
+        upgrade_policy: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: None,
+    dependencies: {
+        "a": Dependency {
+            version: None,
+            location: Local {
+                path: "../a",
+            },
+        },
+    },
+    dev_dependencies: {},
+}
