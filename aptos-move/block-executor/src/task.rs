@@ -56,8 +56,7 @@ pub struct Accesses<K> {
 }
 
 /// Trait for single threaded transaction executor.
-// TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
-pub trait ExecutorTask: Sync {
+pub trait ExecutorTask {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
