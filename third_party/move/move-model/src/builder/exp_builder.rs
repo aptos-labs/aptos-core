@@ -4253,13 +4253,14 @@ impl ExpTranslator<'_, '_, '_> {
         for ty in tys {
             let ty_loc = self.to_loc(&ty.loc);
             if let EA::Type_::Apply(maccess, generics) = &ty.value {
+                let generics = (!generics.is_empty()).then_some(generics.clone());
                 if let Some((inferred_struct_id, variant)) = self.translate_constructor_name(
                     &exp_ty,
                     WideningOrder::LeftToRight,
                     context,
                     &ty_loc,
                     maccess,
-                    &Some(generics.clone()),
+                    &generics,
                 ) {
                     if let Some(variant) = variant {
                         // Any time in the loop is the same if type unification succeeds, so
