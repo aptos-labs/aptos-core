@@ -184,7 +184,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
         Arc::new(MockOptQSPayloadProvider {}),
     );
 
