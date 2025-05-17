@@ -160,7 +160,7 @@ where
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
-                        "Current balance ({}) exceedes the initial balance ({}) -- how is this ever possible?",
+                        "Current balance ({}) exceeds the initial balance ({}) -- how is this ever possible?",
                         self.balance,
                         self.initial_balance
                     ),
