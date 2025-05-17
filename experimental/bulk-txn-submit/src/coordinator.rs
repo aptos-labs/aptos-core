@@ -238,6 +238,7 @@ pub async fn execute_return_worker_funds(
             .get_account_balance(account.address())
             .await
         {
+            eprintln!("account: {} balance: {}", account.address(), balance);
             if balance > txn_factory_ref.get_max_gas_amount() * txn_factory_ref.get_gas_unit_price()
             {
                 let txn = account.sign_with_transaction_builder(txn_factory_ref.payload(
