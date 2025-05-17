@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod hot_state_value;
 pub mod state;
 pub mod state_delta;
 pub mod state_slot;
