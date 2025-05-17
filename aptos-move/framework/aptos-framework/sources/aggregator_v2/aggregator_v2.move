@@ -23,7 +23,7 @@ module aptos_framework::aggregator_v2 {
     use std::features;
     use std::string::String;
 
-    /// The value of aggregator overflows. Raised by uncoditional add() call
+    /// The value of aggregator overflows. Raised by unconditional add() call
     const EAGGREGATOR_OVERFLOW: u64 = 1;
 
     /// The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call

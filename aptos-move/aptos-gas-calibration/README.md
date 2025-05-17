@@ -137,7 +137,7 @@ A good Calibration Function should run for many iterations (i.e., see `/samples_
 
 ### How are the gas parameters calculated?
 
-For every Calibration Function, the Abstract Gas Usage and running time are determined. This forms a linear equation. For all the Calibration Functions, we can create a system of lienar equations. To solve this system of linear equations, we compute the Least Squares Solution. 
+For every Calibration Function, the Abstract Gas Usage and running time are determined. This forms a linear equation. For all the Calibration Functions, we can create a system of linear equations. To solve this system of linear equations, we compute the Least Squares Solution. 
 
 If the matrix that represents this system is not invertible, then we report the undetermined gas parameters, or the linearly dependent combinations of gas parameters. The exact math can be found under `/src/math.rs`. 
 
