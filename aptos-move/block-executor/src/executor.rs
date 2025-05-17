@@ -1561,7 +1561,7 @@ where
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
 
-                    if latest_view.is_incorrect_use() {
+                    if sequential_reads.incorrect_use {
                         return Err(
                             code_invariant_error("Incorrect use in sequential execution").into(),
                         );

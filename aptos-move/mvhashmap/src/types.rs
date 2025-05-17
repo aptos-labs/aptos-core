@@ -6,8 +6,6 @@ use aptos_types::{
     error::PanicOr,
     write_set::{TransactionWrite, WriteOpKind},
 };
-use aptos_vm_types::resolver::ResourceGroupSize;
-use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
 
@@ -45,40 +43,6 @@ pub enum MVDataError {
     Dependency(TxnIndex),
     /// Delta application failed, txn execution should fail.
     DeltaApplicationFailure,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum GroupReadResult {
-    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
-    Size(ResourceGroupSize),
-    Uninitialized,
-}
-
-impl GroupReadResult {
-    pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
-        match self {
-            GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
-            GroupReadResult::Size(size) => {
-                unreachable!("Expected group value, found size {:?}", size)
-            },
-            GroupReadResult::Uninitialized => {
-                unreachable!("Expected group value, found uninitialized")
-            },
-        }
-    }
-
-    pub fn into_size(self) -> ResourceGroupSize {
-        match self {
-            GroupReadResult::Size(size) => size,
-            GroupReadResult::Value(maybe_bytes, maybe_layout) => unreachable!(
-                "Expected size, found value bytes = {:?}, layout = {:?}",
-                maybe_bytes, maybe_layout
-            ),
-            GroupReadResult::Uninitialized => {
-                unreachable!("Expected group size, found uninitialized")
-            },
-        }
-    }
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
@@ -213,6 +177,7 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
 #[derive(Clone, Debug)]
 pub enum UnknownOrLayout<'a> {
     Unknown,
+    // TODO: Make this Arc<MoveTypeLayout> to avoid deep cloning.
     Known(Option<&'a MoveTypeLayout>),
 }
 
