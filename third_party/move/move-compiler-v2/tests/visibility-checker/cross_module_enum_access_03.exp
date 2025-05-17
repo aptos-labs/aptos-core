@@ -1,0 +1,28 @@
+
+Diagnostics:
+error: Invalid operation: match on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/cross_module_enum_access_03.move:15:9
+   │
+15 │     fun test1() {
+   │         ^^^^^
+16 │         let x = m::make(22);
+17 │         match (x) {
+   │                - matched here
+
+error: Invalid operation: match on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/cross_module_enum_access_03.move:23:9
+   │
+23 │     fun test2() {
+   │         ^^^^^
+24 │         let x = m::make(22);
+25 │         match (&x) {
+   │                -- matched here
+
+error: Invalid operation: match on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/cross_module_enum_access_03.move:31:9
+   │
+31 │     fun test3() {
+   │         ^^^^^
+32 │         let x = m::make(22);
+33 │         match (&mut x) {
+   │                ------ matched here
