@@ -19,7 +19,8 @@ module aptos_experimental::confidential_proof_tests {
         new_amount: u128,
         current_balance: confidential_balance::ConfidentialBalance,
         new_balance: confidential_balance::ConfidentialBalance,
-        transfer_amount: confidential_balance::ConfidentialBalance,
+        sender_amount: confidential_balance::ConfidentialBalance,
+        recipient_amount: confidential_balance::ConfidentialBalance,
         auditor_eks: vector<twisted_elgamal::CompressedPubkey>,
         auditor_amounts: vector<confidential_balance::ConfidentialBalance>,
         proof: confidential_proof::TransferProof,
@@ -99,7 +100,8 @@ module aptos_experimental::confidential_proof_tests {
         let (
             proof,
             new_balance,
-            transfer_amount,
+            sender_amount,
+            recipient_amount,
             auditor_amounts,
         ) = confidential_proof::prove_transfer(
             &sender_dk,
@@ -118,7 +120,8 @@ module aptos_experimental::confidential_proof_tests {
             new_amount,
             current_balance,
             new_balance,
-            transfer_amount,
+            sender_amount,
+            recipient_amount,
             auditor_eks,
             auditor_amounts,
             proof,
@@ -273,7 +276,8 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &params.auditor_eks,
             &params.auditor_amounts,
             &params.proof);
@@ -289,7 +293,8 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &params.auditor_eks,
             &params.auditor_amounts,
             &params.proof);
@@ -305,7 +310,8 @@ module aptos_experimental::confidential_proof_tests {
             &params.sender_ek,
             &params.current_balance,
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &params.auditor_eks,
             &params.auditor_amounts,
             &params.proof);
@@ -325,7 +331,8 @@ module aptos_experimental::confidential_proof_tests {
                 &params.sender_ek
             ),
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &params.auditor_eks,
             &params.auditor_amounts,
             &params.proof);
@@ -343,7 +350,8 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &params.auditor_eks,
             &params.auditor_amounts,
             &params.proof);
@@ -351,7 +359,7 @@ module aptos_experimental::confidential_proof_tests {
 
     #[test]
     #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_transfer_amount() {
+    fun fail_transfer_if_wrong_sender_amount() {
         let params = transfer();
 
         confidential_proof::verify_transfer_proof(
@@ -359,6 +367,25 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
+            &confidential_balance::new_pending_balance_from_u64(
+                1000, &confidential_balance::generate_balance_randomness(), &params.recipient_ek),
+            &params.recipient_amount,
+            &params.auditor_eks,
+            &params.auditor_amounts,
+            &params.proof);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
+    fun fail_transfer_if_wrong_recipient_amount() {
+        let params = transfer();
+
+        confidential_proof::verify_transfer_proof(
+            &params.sender_ek,
+            &params.recipient_ek,
+            &params.current_balance,
+            &params.new_balance,
+            &params.sender_amount,
             &confidential_balance::new_pending_balance_from_u64(
                 1000, &confidential_balance::generate_balance_randomness(), &params.recipient_ek),
             &params.auditor_eks,
@@ -379,7 +406,8 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &auditor_eks,
             &params.auditor_amounts,
             &params.proof);
@@ -403,7 +431,8 @@ module aptos_experimental::confidential_proof_tests {
             &params.recipient_ek,
             &params.current_balance,
             &params.new_balance,
-            &params.transfer_amount,
+            &params.sender_amount,
+            &params.recipient_amount,
             &params.auditor_eks,
             &auditor_amounts,
             &params.proof);
