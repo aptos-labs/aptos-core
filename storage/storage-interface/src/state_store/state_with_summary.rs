@@ -29,12 +29,17 @@ impl StateWithSummary {
 
     pub fn new_at_version(
         version: Option<Version>,
+        hot_state_root_hash: HashValue,
         global_state_root_hash: HashValue,
         usage: StateStorageUsage,
     ) -> Self {
         Self::new(
             State::new_at_version(version, usage),
-            StateSummary::new_at_version(version, SparseMerkleTree::new(global_state_root_hash)),
+            StateSummary::new_at_version(
+                version,
+                SparseMerkleTree::new(hot_state_root_hash),
+                SparseMerkleTree::new(global_state_root_hash),
+            ),
         )
     }
 
