@@ -261,8 +261,12 @@ impl LazyLoadedFunction {
             for (actual_arg_ty, serialized_layout) in
                 captured_arg_types.into_iter().zip(captured_layouts)
             {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
+                // We do not allow function values to capture any delayed fields, for now. Note
+                // that this is enforced at serialization time. Here we cannot enforce it because
+                // function value could have stored an old version of an enum without an aggregator
+                // but the new layout has the new variant with the aggregator. In any case, the
+                // serializer will fail on this resolved closure if there is an attempt to put it
+                // back into storage.
                 let actual_arg_layout = if function.ty_args().is_empty() {
                     converter.type_to_type_layout(actual_arg_ty)?
                 } else {
@@ -270,6 +274,7 @@ impl LazyLoadedFunction {
                         ty_builder.create_ty_with_subst(actual_arg_ty, function.ty_args())?;
                     converter.type_to_type_layout(&actual_arg_ty)?
                 };
+
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
