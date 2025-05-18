@@ -276,7 +276,6 @@ module aptos_experimental::market {
             trigger_condition,
             metadata,
             order_id,
-            option::none(),
             max_fill_limit,
             emit_cancel_on_fill_limit,
             true,
@@ -316,7 +315,6 @@ module aptos_experimental::market {
             trigger_condition,
             metadata,
             order_id,
-            option::none(),
             max_fill_limit,
             emit_cancel_on_fill_limit,
             true,
@@ -335,7 +333,6 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: u64,
-        unique_priority_idx: Option<UniqueIdxType>,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         // Validate that the order is valid from position management perspective
@@ -414,7 +411,7 @@ module aptos_experimental::market {
             new_order_request(
                 user_addr,
                 order_id,
-                unique_priority_idx,
+                option::none(),
                 price,
                 orig_size,
                 remaining_size,
@@ -465,7 +462,6 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: u64,
-        unique_priority_idx: Option<UniqueIdxType>,
         max_fill_limit: u64,
         emit_cancel_on_fill_limit: bool,
         emit_taker_order_open: bool,
@@ -522,7 +518,6 @@ module aptos_experimental::market {
                 trigger_condition,
                 metadata,
                 order_id,
-                unique_priority_idx,
                 callbacks
             );
         };
@@ -757,7 +752,7 @@ module aptos_experimental::market {
                     new_order_request(
                         user_addr,
                         order_id,
-                        unique_priority_idx,
+                        option::none(),
                         price,
                         orig_size,
                         remaining_size,
@@ -869,7 +864,7 @@ module aptos_experimental::market {
         let i = 0;
         while (i < ready_orders.length()) {
             let order = ready_orders[i];
-            let (order_id, unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
+            let (order_id, _unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
 
                 order.destroy_order();
             let (user_addr, order_id) = order_id.destroy_order_id_type();
@@ -883,7 +878,6 @@ module aptos_experimental::market {
                 option::none(),
                 metadata,
                 order_id,
-                option::some(unique_priority_idx),
                 1000, // TODO(skedia): Add support for fill limit here.
                 false,
                 true,

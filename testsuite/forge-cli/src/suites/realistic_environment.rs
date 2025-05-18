@@ -324,6 +324,12 @@ pub(crate) fn realistic_env_max_load_test(
             max_non_epoch_round_gap: 4,
             max_epoch_round_gap: 4,
         });
+
+    // If the test is short lived, we should verify that there are no fullnode failures
+    if !long_running {
+        success_criteria = success_criteria.add_no_fullnode_failures();
+    }
+
     if !ha_proxy {
         success_criteria = success_criteria.add_latency_breakdown_threshold(
             LatencyBreakdownThreshold::new_with_breach_pct(
@@ -371,6 +377,15 @@ pub(crate) fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the consensus observer fallback thresholds
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 20_000; // 20 seconds
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 30_000; // 30 seconds
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(

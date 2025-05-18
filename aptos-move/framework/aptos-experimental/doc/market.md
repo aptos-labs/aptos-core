@@ -1155,7 +1155,6 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
         trigger_condition,
         metadata,
         order_id,
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         max_fill_limit,
         emit_cancel_on_fill_limit,
         <b>true</b>,
@@ -1235,7 +1234,6 @@ to verify that the transaction signer is authorized to place orders on behalf of
         trigger_condition,
         metadata,
         order_id,
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         max_fill_limit,
         emit_cancel_on_fill_limit,
         <b>true</b>,
@@ -1254,7 +1252,7 @@ to verify that the transaction signer is authorized to place orders on behalf of
 
 
 
-<pre><code><b>fun</b> <a href="market.md#0x7_market_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_buy: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, unique_priority_idx: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
+<pre><code><b>fun</b> <a href="market.md#0x7_market_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_buy: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
 </code></pre>
 
 
@@ -1274,7 +1272,6 @@ to verify that the transaction signer is authorized to place orders on behalf of
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     order_id: u64,
-    unique_priority_idx: Option&lt;UniqueIdxType&gt;,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
     // Validate that the order is valid from position management perspective
@@ -1353,7 +1350,7 @@ to verify that the transaction signer is authorized to place orders on behalf of
         new_order_request(
             user_addr,
             order_id,
-            unique_priority_idx,
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             price,
             orig_size,
             remaining_size,
@@ -1404,7 +1401,7 @@ the caller do not wants to emit an open order event for a taker in case the take
 of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_buy: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, unique_priority_idx: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>&gt;, max_fill_limit: u64, emit_cancel_on_fill_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_buy: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, max_fill_limit: u64, emit_cancel_on_fill_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
 </code></pre>
 
 
@@ -1424,7 +1421,6 @@ of fill limit violation  in the previous transaction and the order is just a con
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     order_id: u64,
-    unique_priority_idx: Option&lt;UniqueIdxType&gt;,
     max_fill_limit: u64,
     emit_cancel_on_fill_limit: bool,
     emit_taker_order_open: bool,
@@ -1481,7 +1477,6 @@ of fill limit violation  in the previous transaction and the order is just a con
             trigger_condition,
             metadata,
             order_id,
-            unique_priority_idx,
             callbacks
         );
     };
@@ -1716,7 +1711,7 @@ of fill limit violation  in the previous transaction and the order is just a con
                 new_order_request(
                     user_addr,
                     order_id,
-                    unique_priority_idx,
+                    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
                     price,
                     orig_size,
                     remaining_size,
@@ -1908,7 +1903,7 @@ Triggers all the orders that are ready to be executed based on the oracle price.
     <b>let</b> i = 0;
     <b>while</b> (i &lt; ready_orders.length()) {
         <b>let</b> order = ready_orders[i];
-        <b>let</b> (order_id, unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
+        <b>let</b> (order_id, _unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
 
             order.destroy_order();
         <b>let</b> (user_addr, order_id) = order_id.destroy_order_id_type();
@@ -1922,7 +1917,6 @@ Triggers all the orders that are ready to be executed based on the oracle price.
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             metadata,
             order_id,
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(unique_priority_idx),
             1000, // TODO(skedia): Add support for fill limit here.
             <b>false</b>,
             <b>true</b>,

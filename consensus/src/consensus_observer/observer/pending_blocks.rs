@@ -11,7 +11,6 @@ use crate::consensus_observer::{
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
 use aptos_types::block_info::Round;
 use std::{
@@ -202,7 +201,7 @@ impl PendingBlockStore {
         &mut self,
         received_payload_epoch: u64,
         received_payload_round: Round,
-        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        block_payload_store: &mut BlockPayloadStore,
     ) -> Option<Arc<PendingBlockWithMetadata>> {
         // Calculate the round at which to split the blocks
         let split_round = received_payload_round.saturating_add(1);
@@ -217,10 +216,7 @@ impl PendingBlockStore {
         let mut ready_block = None;
         if let Some((epoch_and_round, pending_block)) = self.blocks_without_payloads.pop_last() {
             // If all payloads exist for the block, then the block is ready
-            if block_payload_store
-                .lock()
-                .all_payloads_exist(pending_block.ordered_block().blocks())
-            {
+            if block_payload_store.all_payloads_exist(pending_block.ordered_block().blocks()) {
                 ready_block = Some(pending_block);
             } else {
                 // Otherwise, check if we're still waiting for higher payloads for the block
@@ -329,6 +325,7 @@ mod test {
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
+    use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
@@ -421,17 +418,15 @@ mod test {
         }
 
         // Create a new block payload store and insert payloads for the second block
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
         let second_block = pending_blocks[1].clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
+        insert_payloads_for_ordered_block(&mut block_payload_store, &second_block);
 
         // Remove the second block (which is now ready)
         let payload_round = second_block.first_block().round();
         let ready_block = pending_block_store
             .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
+            .remove_ready_block(current_epoch, payload_round, &mut block_payload_store)
             .unwrap();
         assert_eq!(ready_block.ordered_block().clone(), second_block);
 
@@ -743,12 +738,10 @@ mod test {
         }
 
         // Create a new block payload store and insert payloads for all pending blocks
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
         for pending_block_with_metadata in &pending_blocks_with_metadata {
             insert_payloads_for_ordered_block(
-                block_payload_store.clone(),
+                &mut block_payload_store,
                 pending_block_with_metadata.ordered_block(),
             );
         }
@@ -766,7 +759,7 @@ mod test {
                 .remove_ready_block(
                     first_block.epoch(),
                     first_block.round(),
-                    block_payload_store.clone(),
+                    &mut block_payload_store,
                 )
                 .unwrap();
 
@@ -810,17 +803,15 @@ mod test {
         );
 
         // Create a new block payload store and insert payloads for the second block
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
         let second_block = pending_blocks[1].clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
+        insert_payloads_for_ordered_block(&mut block_payload_store, &second_block);
 
         // Remove the second block (which is now ready)
         let payload_round = second_block.first_block().round();
         let ready_block = pending_block_store
             .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
+            .remove_ready_block(current_epoch, payload_round, &mut block_payload_store)
             .unwrap();
         assert_eq!(ready_block.ordered_block().clone(), second_block);
 
@@ -833,13 +824,13 @@ mod test {
 
         // Insert payloads for the last block
         let last_block = pending_blocks.last().unwrap().clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &last_block);
+        insert_payloads_for_ordered_block(&mut block_payload_store, &last_block);
 
         // Remove the last block (which is now ready)
         let payload_round = last_block.first_block().round();
         let ready_block = pending_block_store
             .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
+            .remove_ready_block(current_epoch, payload_round, &mut block_payload_store)
             .unwrap();
 
         // Verify that the last block was removed
@@ -873,9 +864,7 @@ mod test {
         );
 
         // Create an empty block payload store
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Incrementally insert and process each payload for the first block
         let first_block = pending_blocks.first().unwrap().clone();
@@ -883,16 +872,14 @@ mod test {
             // Insert the block
             let block_payload =
                 BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
-            block_payload_store
-                .lock()
-                .insert_block_payload(block_payload, true);
+            block_payload_store.insert_block_payload(block_payload, true);
 
             // Attempt to remove the block (which might not be ready)
             let payload_round = block.round();
             let ready_block = pending_block_store.lock().remove_ready_block(
                 current_epoch,
                 payload_round,
-                block_payload_store.clone(),
+                &mut block_payload_store,
             );
 
             // If the block is ready, verify that it was removed.
@@ -929,16 +916,14 @@ mod test {
             if payload_round != last_block.first_block().round() {
                 let block_payload =
                     BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
-                block_payload_store
-                    .lock()
-                    .insert_block_payload(block_payload, true);
+                block_payload_store.insert_block_payload(block_payload, true);
             }
 
             // Attempt to remove the block (which might not be ready)
             let ready_block = pending_block_store.lock().remove_ready_block(
                 current_epoch,
                 payload_round,
-                block_payload_store.clone(),
+                &mut block_payload_store,
             );
 
             // The block should not be ready
@@ -980,17 +965,15 @@ mod test {
         );
 
         // Create a new block payload store and insert payloads for the first block
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
         let first_block = pending_blocks.first().unwrap().clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &first_block);
+        insert_payloads_for_ordered_block(&mut block_payload_store, &first_block);
 
         // Remove the first block (which is now ready)
         let payload_round = first_block.first_block().round();
         let ready_block = pending_block_store
             .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
+            .remove_ready_block(current_epoch, payload_round, &mut block_payload_store)
             .unwrap();
         assert_eq!(ready_block.ordered_block().clone(), first_block);
 
@@ -1003,13 +986,13 @@ mod test {
 
         // Insert payloads for the second block
         let second_block = pending_blocks[1].clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
+        insert_payloads_for_ordered_block(&mut block_payload_store, &second_block);
 
         // Remove the second block (which is now ready)
         let payload_round = second_block.first_block().round();
         let ready_block = pending_block_store
             .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
+            .remove_ready_block(current_epoch, payload_round, &mut block_payload_store)
             .unwrap();
         assert_eq!(ready_block.ordered_block().clone(), second_block);
 
@@ -1022,13 +1005,13 @@ mod test {
 
         // Insert payloads for the last block
         let last_block = pending_blocks.last().unwrap().clone();
-        insert_payloads_for_ordered_block(block_payload_store.clone(), &last_block);
+        insert_payloads_for_ordered_block(&mut block_payload_store, &last_block);
 
         // Remove the last block (which is now ready)
         let payload_round = last_block.first_block().round();
         let ready_block = pending_block_store
             .lock()
-            .remove_ready_block(current_epoch, payload_round, block_payload_store.clone())
+            .remove_ready_block(current_epoch, payload_round, &mut block_payload_store)
             .unwrap();
 
         // Verify that the last block was removed
@@ -1062,9 +1045,7 @@ mod test {
         );
 
         // Create an empty block payload store
-        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
-            consensus_observer_config,
-        )));
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Remove the third block (which is not ready)
         let third_block = pending_blocks[2].clone();
@@ -1072,7 +1053,7 @@ mod test {
         let ready_block = pending_block_store.lock().remove_ready_block(
             current_epoch,
             third_block_round,
-            block_payload_store.clone(),
+            &mut block_payload_store,
         );
         assert!(ready_block.is_none());
 
@@ -1089,7 +1070,7 @@ mod test {
         let ready_block = pending_block_store.lock().remove_ready_block(
             current_epoch,
             last_block_round,
-            block_payload_store.clone(),
+            &mut block_payload_store,
         );
         assert!(ready_block.is_none());
 
@@ -1191,15 +1172,13 @@ mod test {
 
     /// Inserts payloads into the payload store for the ordered block
     fn insert_payloads_for_ordered_block(
-        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+        block_payload_store: &mut BlockPayloadStore,
         ordered_block: &OrderedBlock,
     ) {
         for block in ordered_block.blocks() {
             let block_payload =
                 BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
-            block_payload_store
-                .lock()
-                .insert_block_payload(block_payload, true);
+            block_payload_store.insert_block_payload(block_payload, true);
         }
     }
 

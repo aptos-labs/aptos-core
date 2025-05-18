@@ -1,7 +1,7 @@
 [package]
 name = "aptos-dynamic-transaction-composer"
 description = "Generating Move Script from a batched Move calls"
-version = "0.1.1"
+version = "0.1.4"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -19,14 +19,11 @@ crate-type = ["cdylib", "rlib"]
 anyhow = { workspace = true }
 bcs = { workspace = true }
 getrandom = { workspace = true, features = ["js"] }
-hex = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
-reqwest = { workspace = true, features = ["blocking"] }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
-serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
 

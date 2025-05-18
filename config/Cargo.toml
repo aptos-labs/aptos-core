@@ -34,6 +34,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_merge = { workspace = true }
 serde_yaml = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 
@@ -49,3 +51,6 @@ fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
 smoke-test = []
 testing = []
 tokio-console = []
+
+[package.metadata.cargo-machete]
+ignored = ["strum"]

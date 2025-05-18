@@ -187,6 +187,15 @@ pub static OBSERVER_STATE_SYNC_EXECUTING: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking state sync fallback invocations by the consensus observer
+pub static OBSERVER_STATE_SYNC_FALLBACK_COUNTER: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "consensus_observer_state_sync_fallback_counter",
+        "Counter for tracking state sync fallback invocations by the consensus observer",
+    )
+    .unwrap()
+});
+
 /// Counter for tracking terminated subscriptions for the consensus observer
 pub static OBSERVER_TERMINATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
