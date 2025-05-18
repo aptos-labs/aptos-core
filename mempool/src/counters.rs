@@ -456,7 +456,7 @@ pub fn shared_mempool_priority_change_count(change_count: i64) {
     SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT.set(change_count);
 }
 
-static SHARED_MEMPOOL_TRANSACTIONS_PROCESSED: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static SHARED_MEMPOOL_TRANSACTIONS_PROCESSED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_shared_mempool_transactions_processed",
         "Number of transactions received and handled by shared mempool",
@@ -475,7 +475,7 @@ pub fn shared_mempool_transactions_processed_inc(status: &str, network: &str) {
 }
 
 /// Counter for number of transactions in each mempool broadcast sent
-static SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+pub static SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_shared_mempool_transaction_broadcast",
         "Number of transactions in each mempool broadcast sent",
