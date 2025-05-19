@@ -34,6 +34,7 @@ pub struct DbPathConfig {
     pub ledger_db_path: Option<PathBuf>,
     pub state_kv_db_path: Option<ShardedDbPathConfig>,
     pub state_merkle_db_path: Option<ShardedDbPathConfig>,
+    pub hot_state_kv_db_path: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -372,6 +373,7 @@ impl StorageConfig {
         let mut ledger_db_path = None;
         let mut state_kv_db_paths = ShardedDbPaths::default();
         let mut state_merkle_db_paths = ShardedDbPaths::default();
+        let mut hot_state_kv_db_path = None;
 
         if let Some(db_path_overrides) = self.db_path_overrides.as_ref() {
             db_path_overrides
@@ -385,6 +387,8 @@ impl StorageConfig {
             if let Some(state_merkle_db_path) = db_path_overrides.state_merkle_db_path.as_ref() {
                 state_merkle_db_paths = ShardedDbPaths::new(state_merkle_db_path);
             }
+
+            hot_state_kv_db_path = db_path_overrides.hot_state_kv_db_path.clone();
         }
 
         StorageDirPaths::new(
@@ -392,6 +396,7 @@ impl StorageConfig {
             ledger_db_path,
             state_kv_db_paths,
             state_merkle_db_paths,
+            hot_state_kv_db_path,
         )
     }
 
@@ -411,6 +416,7 @@ pub struct StorageDirPaths {
     ledger_db_path: Option<PathBuf>,
     state_kv_db_paths: ShardedDbPaths,
     state_merkle_db_paths: ShardedDbPaths,
+    hot_state_kv_db_path: Option<PathBuf>,
 }
 
 impl StorageDirPaths {
@@ -450,12 +456,17 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn hot_state_kv_db_path(&self) -> Option<&PathBuf> {
+        self.hot_state_kv_db_path.as_ref()
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         Self {
             default_path: path.as_ref().to_path_buf(),
             ledger_db_path: None,
             state_kv_db_paths: Default::default(),
             state_merkle_db_paths: Default::default(),
+            hot_state_kv_db_path: None,
         }
     }
 
@@ -464,12 +475,14 @@ impl StorageDirPaths {
         ledger_db_path: Option<PathBuf>,
         state_kv_db_paths: ShardedDbPaths,
         state_merkle_db_paths: ShardedDbPaths,
+        hot_state_kv_db_path: Option<PathBuf>,
     ) -> Self {
         Self {
             default_path,
             ledger_db_path,
             state_kv_db_paths,
             state_merkle_db_paths,
+            hot_state_kv_db_path,
         }
     }
 }
