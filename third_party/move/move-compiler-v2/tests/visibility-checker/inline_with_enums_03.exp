@@ -1,5 +1,14 @@
 
 Diagnostics:
+warning: match on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`, but `m::use_me_not` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/inline_with_enums_03.move:10:23
+   │
+10 │     public inline fun use_me_not(): u64 {
+   │                       ^^^^^^^^^^
+11 │         let x = make(22);
+12 │         match (x) {
+   │                - matched here
+
 error: Invalid operation: match on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
    ┌─ tests/visibility-checker/inline_with_enums_03.move:21:9
    │

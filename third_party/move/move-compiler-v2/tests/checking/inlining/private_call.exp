@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: public inline function `foo` cannot be called from all locations it is accessible
+  ┌─ tests/checking/inlining/private_call.move:3:23
+  │
+3 │     public inline fun foo(): u64 {
+  │                       ^^^ if called from a location where `m::bar` is not accessible
+4 │         bar()
+  │         ----- inline expansion calls private function that may not be accessible in all locations that `m::foo` can be called
+
 error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because it is private to module `0x42::m`
    ┌─ tests/checking/inlining/private_call.move:7:9
    │
