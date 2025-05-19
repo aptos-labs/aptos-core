@@ -555,8 +555,6 @@ impl TransactionStore {
                 let sender_bucket = sender_bucket(address, self.num_sender_buckets);
                 let ready_for_quorum_store = self.priority_index.insert(txn);
 
-                
-
                 // If timeline_state is `NonQualified`, then the transaction is never added to the timeline_index,
                 // and never broadcasted to the shared mempool.
                 let ready_for_mempool_broadcast = txn.timeline_state == TimelineState::NotReady;
