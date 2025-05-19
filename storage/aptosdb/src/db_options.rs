@@ -139,6 +139,13 @@ pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn hot_state_kv_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
+    ]
+}
+
 fn gen_cfds<F>(
     rocksdb_config: &RocksdbConfig,
     cfs: Vec<ColumnFamilyName>,
@@ -233,4 +240,9 @@ pub(super) fn gen_state_kv_shard_cfds(
 
 fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
     &state_value_raw_key[..(state_value_raw_key.len() - VERSION_SIZE)]
+}
+
+pub(super) fn gen_hot_state_kv_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = hot_state_kv_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
