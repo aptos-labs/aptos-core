@@ -20,6 +20,11 @@ operation touch only few resources
 * it allows for parallelism for keys that are not close to each other,
 once it contains enough keys
 
+Note: Default configuration (used in new()) allows for keys and values of up to 5KB.
+If you need larger, use other constructor methods.
+Based on initial configuration, BigOrderMap will always accept insertion of keys and values
+up to the allowed size, and will abort with EKEY_BYTES_TOO_LARGE or EARGUMENT_BYTES_TOO_LARGE.
+
 TODO: all iterator functions are public(friend) for now, so that they can be modified in a
 backward incompatible way. Type is also named IteratorPtr, so that Iterator is free to use later.
 They are waiting for Move improvement that will allow references to be part of the struct,
@@ -436,8 +441,21 @@ Map key is not found
 
 
 
+<a id="0x1_big_ordered_map_DEFAULT_MAX_KEY_OR_VALUE_SIZE"></a>
+
+When using default constructors (new() / new_with_reusable() / new_with_config(0, 0, _))
+making sure key or value of this size (5KB) will be accepted, which should satisfy most cases
+If you need keys/values that are larger, use other constructors.
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_MAX_KEY_OR_VALUE_SIZE">DEFAULT_MAX_KEY_OR_VALUE_SIZE</a>: u64 = 5120;
+</code></pre>
+
+
+
 <a id="0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE"></a>
 
+Target node size, from efficiency perspective.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a>: u64 = 4096;
@@ -447,7 +465,7 @@ Map key is not found
 
 <a id="0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE"></a>
 
-Trying to insert too large of an object into the mp.
+Trying to insert too large of an (key, value) pair into the mp.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>: u64 = 13;
@@ -476,6 +494,16 @@ The provided configuration parameter is invalid.
 
 
 
+<a id="0x1_big_ordered_map_EKEY_BYTES_TOO_LARGE"></a>
+
+Trying to insert too large of a key into the map.
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_BYTES_TOO_LARGE">EKEY_BYTES_TOO_LARGE</a>: u64 = 15;
+</code></pre>
+
+
+
 <a id="0x1_big_ordered_map_EMAP_NOT_EMPTY"></a>
 
 Map isn't empty
@@ -486,8 +514,20 @@ Map isn't empty
 
 
 
+<a id="0x1_big_ordered_map_HINT_MAX_NODE_BYTES"></a>
+
+Target max node size, when using hints (via new_with_type_size_hints).
+Smaller than MAX_NODE_BYTES, to improve performence, as large nodes are innefficient.
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_HINT_MAX_NODE_BYTES">HINT_MAX_NODE_BYTES</a>: u64 = 131072;
+</code></pre>
+
+
+
 <a id="0x1_big_ordered_map_INNER_MIN_DEGREE"></a>
 
+Smallest allowed degree on inner nodes.
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a>: u16 = 4;
@@ -497,6 +537,10 @@ Map isn't empty
 
 <a id="0x1_big_ordered_map_LEAF_MIN_DEGREE"></a>
 
+Smallest allowed degree on leaf nodes.
+
+We rely on 1 being valid size only for root node,
+so this cannot be below 3 (unless that is changed)
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a>: u16 = 3;
@@ -506,6 +550,7 @@ Map isn't empty
 
 <a id="0x1_big_ordered_map_MAX_DEGREE"></a>
 
+Largest degree allowed (both for inner and leaf nodes)
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>: u64 = 4096;
@@ -515,6 +560,9 @@ Map isn't empty
 
 <a id="0x1_big_ordered_map_MAX_NODE_BYTES"></a>
 
+Largest size all keys for inner nodes or key-value pairs for leaf nodes can have.
+Node itself can be a bit larger, due to few other accounting fields.
+This is a bit conservative, a bit less than half of the resource limit (which is 1MB)
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>: u64 = 409600;
@@ -536,8 +584,11 @@ Map isn't empty
 ## Function `new`
 
 Returns a new BigOrderedMap with the default configuration.
-Only allowed to be called with constant size types. For variable sized types,
-it is required to use new_with_config, to explicitly select automatic or specific degree selection.
+
+If called with variable sized types, it is configured to accept keys and values up to 5KB in size,
+or as large as 100x the size of the first insert. (100 = MAX_NODE_BYTES / DEFAULT_TARGET_NODE_SIZE)
+If you need something more specific, you can use new_with_type_size_hints or new_with_config,
+to explicitly select automatic or specific degree selection.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new">new</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
@@ -550,12 +601,6 @@ it is required to use new_with_config, to explicitly select automatic or specifi
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new">new</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt; {
-    // Use new_with_type_size_hints or new_with_config <b>if</b> your types have variable sizes.
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;K&gt;().is_some() && <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;V&gt;().is_some(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>)
-    );
-
     <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>(0, 0, <b>false</b>)
 }
 </code></pre>
@@ -569,8 +614,11 @@ it is required to use new_with_config, to explicitly select automatic or specifi
 ## Function `new_with_reusable`
 
 Returns a new BigOrderedMap with with reusable storage slots.
-Only allowed to be called with constant size types. For variable sized types,
-it is required to use new_with_config, to explicitly select automatic or specific degree selection.
+
+If called with variable sized types, it is configured to accept keys and values up to 5KB in size,
+or as large as 10x the size of the first insert.
+If you need something more specific, you can use new_with_type_size_hints or new_with_config,
+to explicitly select automatic or specific degree selection.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">new_with_reusable</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;
@@ -583,12 +631,6 @@ it is required to use new_with_config, to explicitly select automatic or specifi
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">new_with_reusable</a>&lt;K: store, V: store&gt;(): <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt; {
-    // Use new_with_type_size_hints or new_with_config <b>if</b> your types have variable sizes.
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;K&gt;().is_some() && <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;V&gt;().is_some(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>)
-    );
-
     <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>(0, 0, <b>true</b>)
 }
 </code></pre>
@@ -618,14 +660,14 @@ Returns a new BigOrderedMap, configured based on passed key and value serialized
     <b>assert</b>!(avg_value_bytes &lt;= max_value_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
 
     <b>let</b> inner_max_degree_from_avg = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / avg_key_bytes), <a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64);
-    <b>let</b> inner_max_degree_from_max = <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a> / max_key_bytes;
+    <b>let</b> inner_max_degree_from_max = <a href="big_ordered_map.md#0x1_big_ordered_map_HINT_MAX_NODE_BYTES">HINT_MAX_NODE_BYTES</a> / max_key_bytes;
     <b>assert</b>!(inner_max_degree_from_max &gt;= (<a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
 
     <b>let</b> avg_entry_size = avg_key_bytes + avg_value_bytes;
     <b>let</b> max_entry_size = max_key_bytes + max_value_bytes;
 
     <b>let</b> leaf_max_degree_from_avg = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / avg_entry_size), <a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a> <b>as</b> u64);
-    <b>let</b> leaf_max_degree_from_max = <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a> / max_entry_size;
+    <b>let</b> leaf_max_degree_from_max = <a href="big_ordered_map.md#0x1_big_ordered_map_HINT_MAX_NODE_BYTES">HINT_MAX_NODE_BYTES</a> / max_entry_size;
     <b>assert</b>!(leaf_max_degree_from_max &gt;= (<a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINVALID_CONFIG_PARAMETER">EINVALID_CONFIG_PARAMETER</a>));
 
     <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">new_with_config</a>(
@@ -2011,10 +2053,25 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
     <b>let</b> key_size = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;K&gt;();
     <b>let</b> value_size = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_constant_serialized_size">bcs::constant_serialized_size</a>&lt;V&gt;();
 
-    <b>if</b> (key_size.is_some() && value_size.is_some()) {
-        self.<a href="big_ordered_map.md#0x1_big_ordered_map_validate_size_and_init_max_degrees">validate_size_and_init_max_degrees</a>(key_size.destroy_some(), value_size.destroy_some());
-        self.constant_kv_size = <b>true</b>;
-    };
+    <b>if</b> (key_size.is_some()) {
+        <b>let</b> key_size = key_size.destroy_some();
+        <b>if</b> (self.inner_max_degree == 0) {
+            self.inner_max_degree = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / key_size), <a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
+        };
+        <b>assert</b>!(key_size * (self.inner_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_BYTES_TOO_LARGE">EKEY_BYTES_TOO_LARGE</a>));
+
+        <b>if</b> (value_size.is_some()) {
+            <b>let</b> value_size = value_size.destroy_some();
+            <b>let</b> entry_size = key_size + value_size;
+
+            <b>if</b> (self.leaf_max_degree == 0) {
+                self.leaf_max_degree = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / entry_size), <a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
+            };
+            <b>assert</b>!(entry_size * (self.leaf_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>));
+
+            self.constant_kv_size = <b>true</b>;
+        };
+    }
 }
 </code></pre>
 
@@ -2041,15 +2098,17 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
     <b>let</b> entry_size = key_size + value_size;
 
     <b>if</b> (self.inner_max_degree == 0) {
-        self.inner_max_degree = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / key_size), <a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
+        <b>let</b> default_max_degree = <b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a> / <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_MAX_KEY_OR_VALUE_SIZE">DEFAULT_MAX_KEY_OR_VALUE_SIZE</a>);
+        self.inner_max_degree = max(<b>min</b>(default_max_degree, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / key_size), <a href="big_ordered_map.md#0x1_big_ordered_map_INNER_MIN_DEGREE">INNER_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
     };
 
     <b>if</b> (self.leaf_max_degree == 0) {
-        self.leaf_max_degree = max(<b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / entry_size), <a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
+        <b>let</b> default_max_degree = <b>min</b>(<a href="big_ordered_map.md#0x1_big_ordered_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a> / <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_MAX_KEY_OR_VALUE_SIZE">DEFAULT_MAX_KEY_OR_VALUE_SIZE</a> / 2);
+        self.leaf_max_degree = max(<b>min</b>(default_max_degree, <a href="big_ordered_map.md#0x1_big_ordered_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / entry_size), <a href="big_ordered_map.md#0x1_big_ordered_map_LEAF_MIN_DEGREE">LEAF_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
     };
 
     // Make sure that no nodes can exceed the upper size limit.
-    <b>assert</b>!(key_size * (self.inner_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>));
+    <b>assert</b>!(key_size * (self.inner_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_BYTES_TOO_LARGE">EKEY_BYTES_TOO_LARGE</a>));
     <b>assert</b>!(entry_size * (self.leaf_max_degree <b>as</b> u64) &lt;= <a href="big_ordered_map.md#0x1_big_ordered_map_MAX_NODE_BYTES">MAX_NODE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EARGUMENT_BYTES_TOO_LARGE">EARGUMENT_BYTES_TOO_LARGE</a>));
 }
 </code></pre>
