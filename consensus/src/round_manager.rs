@@ -749,9 +749,10 @@ impl RoundManager {
             ))
         });
 
-        if !self.onchain_config.opt_proposal_enabled() {
-            bail!("Opt proposal is disabled, but received opt proposal msg of epoch {} round {} from peer {}", proposal_msg.block_data().epoch(), proposal_msg.round(), proposal_msg.proposer());
-        }
+        ensure!(self.local_config.enable_optimistic_proposal_rx,
+            "Opt proposal is disabled, but received opt proposal msg of epoch {} round {} from peer {}", 
+            proposal_msg.block_data().epoch(), proposal_msg.round(), proposal_msg.proposer()
+        );
 
         observe_block(
             proposal_msg.block_data().timestamp_usecs(),
@@ -1373,8 +1374,8 @@ impl RoundManager {
         // 2. voted for round r block
         // 3. the round r block contains QC of round r-1
         // 4. does not propose in round r+1
-        let opt_proposal_round = proposal_round + 1;
-        if self.onchain_config.opt_proposal_enabled()
+        let opt_proposal_round = parent_round + 1;
+        if self.local_config.enable_optimistic_proposal_tx
             && self
                 .proposer_election
                 .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
