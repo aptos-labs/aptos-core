@@ -908,7 +908,13 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
 
 pub enum SingleRunMode {
     TEST,
-    BENCHMARK { approx_tps: usize },
+    BENCHMARK {
+        approx_tps: usize,
+        /// Number of blocks to run your test for. ~10-30 is a good number.
+        /// If your workflow has an end (generats no transactions after some point),
+        /// you can set a large number, and test will stop by itself.
+        run_for_blocks: Option<usize>,
+    },
 }
 
 pub fn run_single_with_default_params(
@@ -938,9 +944,14 @@ pub fn run_single_with_default_params(
         SingleRunMode::TEST => 100,
         SingleRunMode::BENCHMARK { .. } => 100000,
     };
+    let num_blocks = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK { run_for_blocks: None, .. } => 30,
+        SingleRunMode::BENCHMARK { run_for_blocks: Some(num_blocks), .. } => num_blocks,
+    };
     let benchmark_block_size = match mode {
         SingleRunMode::TEST => 10,
-        SingleRunMode::BENCHMARK { approx_tps } => {
+        SingleRunMode::BENCHMARK { approx_tps, .. } => {
             debug_assert!(
                 false,
                 "Benchmark shouldn't be run in debug mode, use --release instead."
@@ -991,7 +1002,7 @@ pub fn run_single_with_default_params(
 
     run_benchmark::<AptosVMBlockExecutor>(
         benchmark_block_size, /* block_size */
-        30,                   /* num_blocks */
+        num_blocks,                   /* num_blocks */
         BenchmarkWorkload::TransactionMix(vec![(transaction_type, 1)]),
         1, /* transactions per sender */
         num_main_signer_accounts,
