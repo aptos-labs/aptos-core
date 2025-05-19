@@ -896,7 +896,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
-        let max_sending_block_txns_after_filtering = if onchain_consensus_config.opt_proposal_enabled() {
+        let max_sending_block_txns_after_filtering = if self.config.enable_optimistic_proposal_rx {
             self.config.max_sending_opt_block_txns_after_filtering
         } else {
             self.config.max_sending_block_txns_after_filtering
