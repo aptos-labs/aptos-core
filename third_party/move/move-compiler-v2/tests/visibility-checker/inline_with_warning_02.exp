@@ -1,0 +1,192 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private inline fun inner(): u64 {
+        Add<u64>(m::secret(), m::secret())
+    }
+    private inline fun outer(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(m::secret(), m::secret())
+        }, {
+          let (): ();
+          Add<u64>(m::secret(), m::secret())
+        })
+    }
+    private fun secret(): u64 {
+        42
+    }
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(m::secret(), m::secret())
+          }, {
+            let (): ();
+            Add<u64>(m::secret(), m::secret())
+          })
+        }, 168) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    private inline fun inner(): u64 {
+        Add<u64>(n::non_secret(), n::non_secret())
+    }
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(n::non_secret(), n::non_secret())
+          }, {
+            let (): ();
+            Add<u64>(n::non_secret(), n::non_secret())
+          })
+        }, 168) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+    public fun non_secret(): u64 {
+        42
+    }
+    friend inline fun outer_friend(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(n::non_secret(), n::non_secret())
+        }, {
+          let (): ();
+          Add<u64>(n::non_secret(), n::non_secret())
+        })
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::o {
+    private inline fun inner(): u64 {
+        Add<u64>(o::non_secret(), o::non_secret())
+    }
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(o::non_secret(), o::non_secret())
+          }, {
+            let (): ();
+            Add<u64>(o::non_secret(), o::non_secret())
+          })
+        }, 168) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+    public fun non_secret(): u64 {
+        42
+    }
+    friend inline fun outer_package(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(o::non_secret(), o::non_secret())
+        }, {
+          let (): ();
+          Add<u64>(o::non_secret(), o::non_secret())
+        })
+    }
+} // end 0xc0ffee::o
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    inline fun inner(): u64 {
+        secret() + secret()
+    }
+    inline fun outer(): u64 {
+        {
+            let ();
+            secret() + secret()
+        } + {
+            let ();
+            secret() + secret()
+        }
+    }
+    fun secret(): u64 {
+        42
+    }
+    fun test() {
+        if ({
+            let ();
+            {
+                let ();
+                secret() + secret()
+            } + {
+                let ();
+                secret() + secret()
+            }
+        } == 168) () else abort 14566554180833181696;
+    }
+}
+module 0xc0ffee::n {
+    inline fun inner(): u64 {
+        non_secret() + non_secret()
+    }
+    fun test() {
+        if ({
+            let ();
+            {
+                let ();
+                non_secret() + non_secret()
+            } + {
+                let ();
+                non_secret() + non_secret()
+            }
+        } == 168) () else abort 14566554180833181696;
+    }
+    public fun non_secret(): u64 {
+        42
+    }
+    friend inline fun outer_friend(): u64 {
+        {
+            let ();
+            non_secret() + non_secret()
+        } + {
+            let ();
+            non_secret() + non_secret()
+        }
+    }
+}
+module 0xc0ffee::o {
+    inline fun inner(): u64 {
+        non_secret() + non_secret()
+    }
+    fun test() {
+        if ({
+            let ();
+            {
+                let ();
+                non_secret() + non_secret()
+            } + {
+                let ();
+                non_secret() + non_secret()
+            }
+        } == 168) () else abort 14566554180833181696;
+    }
+    public fun non_secret(): u64 {
+        42
+    }
+    friend inline fun outer_package(): u64 {
+        {
+            let ();
+            non_secret() + non_secret()
+        } + {
+            let ();
+            non_secret() + non_secret()
+        }
+    }
+}

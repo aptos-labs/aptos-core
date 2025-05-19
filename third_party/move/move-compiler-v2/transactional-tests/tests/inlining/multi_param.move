@@ -14,7 +14,7 @@ module 0x42::Test {
     struct Elem<K, V> has drop { k: K, v: V }
 
     // Checks a multi-mutality scenario.
-    public inline fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K,V>>, f: |&K, &mut V|u64): u64 {
+    inline fun elem_for_each_ref<K,V>(v: &mut vector<Elem<K,V>>, f: |&K, &mut V|u64): u64 {
         let result = 0;
         for_each_ref_mut(v, |elem| {
             let elem: &mut Elem<K, V> = elem; // Checks whether scoping is fine
