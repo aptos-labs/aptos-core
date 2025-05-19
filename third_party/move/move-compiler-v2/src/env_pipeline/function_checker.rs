@@ -237,21 +237,60 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                             }
                         }
                     },
-                    Operation::Select(mid, sid, fid) if *mid != caller_module_id => {
-                        let qualified_struct_id = mid.qualified(*sid);
-                        let struct_env = env.get_struct(qualified_struct_id);
-                        access_error(
-                            env,
-                            &fun_env.get_id_loc(),
-                            id,
-                            "accessed",
-                            format!(
-                                "access of the field `{}` on type `{}`",
-                                fid.symbol().display(struct_env.symbol_pool()),
-                                struct_env.get_full_name_str(),
-                            ),
-                            &struct_env.module_env,
-                        );
+                    Operation::Select(mid, sid, fid) => {
+                        if *mid != caller_module_id {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            access_error(
+                                env,
+                                &fun_env.get_id_loc(),
+                                id,
+                                "accessed",
+                                format!(
+                                    "access of the field `{}` on type `{}`",
+                                    fid.symbol().display(struct_env.symbol_pool()),
+                                    struct_env.get_full_name_str(),
+                                ),
+                                &struct_env.module_env,
+                            );
+                        }
+                    },
+                    Operation::SelectVariants(mid, sid, fids) => {
+                        if *mid != caller_module_id {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            // All field names are the same, so take one representative field id to report.
+                            let field_env = struct_env.get_field(fids[0]);
+                            access_error(
+                                env,
+                                &fun_env.get_id_loc(),
+                                id,
+                                "accessed",
+                                format!(
+                                    "access of the field `{}` on enum type `{}`",
+                                    field_env.get_name().display(struct_env.symbol_pool()),
+                                    struct_env.get_full_name_str(),
+                                ),
+                                &struct_env.module_env,
+                            );
+                        }
+                    },
+                    Operation::TestVariants(mid, sid, _) => {
+                        if *mid != caller_module_id {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            access_error(
+                                env,
+                                &fun_env.get_id_loc(),
+                                id,
+                                "tested",
+                                format!(
+                                    "variant test on enum type `{}`",
+                                    struct_env.get_full_name_str(),
+                                ),
+                                &struct_env.module_env,
+                            );
+                        }
                     },
                     Operation::Pack(mid, sid, _) => {
                         if *mid != caller_module_id {
@@ -267,7 +306,11 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                             );
                         }
                     },
-                    _ => {},
+                    _ => {
+                        // all the other operations are either:
+                        // - not related to structs
+                        // - spec-only
+                    },
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
@@ -289,11 +332,41 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                         }
                     });
                 },
+                ExpData::Match(_, discriminator, _) => {
+                    let discriminator_node_id = discriminator.node_id();
+                    if let Type::Struct(mid, sid, _) =
+                        env.get_node_type(discriminator_node_id).drop_reference()
+                    {
+                        if mid != caller_module_id {
+                            let qualified_struct_id = mid.qualified(sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            access_error(
+                                env,
+                                &fun_env.get_id_loc(),
+                                &discriminator_node_id,
+                                "matched",
+                                format!("match on enum type `{}`", struct_env.get_full_name_str()),
+                                &struct_env.module_env,
+                            );
+                        }
+                    }
+                },
+                ExpData::Invalid(_)
+                | ExpData::Value(..)
+                | ExpData::LocalVar(..)
+                | ExpData::Temporary(..)
+                | ExpData::Invoke(..)
+                | ExpData::Quant(..)
+                | ExpData::IfElse(..)
+                | ExpData::Return(..)
+                | ExpData::Sequence(..)
+                | ExpData::Loop(..)
+                | ExpData::LoopCont(..)
+                | ExpData::Mutate(..) => {},
                 // access in specs is not restricted
                 ExpData::SpecBlock(_, _) => {
                     return false;
                 },
-                _ => {},
             }
             true
         });
