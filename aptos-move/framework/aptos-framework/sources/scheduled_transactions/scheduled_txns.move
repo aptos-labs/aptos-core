@@ -569,6 +569,7 @@ module aptos_framework::scheduled_txns {
 
     /// Remove the txns that are run
     public(friend) fun remove_txns() acquires ToRemoveTbl, ScheduleQueue {
+        debug::print(&string::utf8(b"remove_txns"));
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
         let tbl_idx: u16 = 0;
@@ -597,8 +598,20 @@ module aptos_framework::scheduled_txns {
     fun execute_user_function_wrapper_no_func(
         signer: signer,
         pass_signer: bool,
-    ) {
+        txn_key: ScheduleMapKey,
+    ) acquires ScheduleQueue {
         debug::print(&string::utf8(b"Move: execute_user_function_wrapper_no_func"));
+
+        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
+        assert!(queue.schedule_map.contains(&txn_key), 0);
+
+        let txn = *queue.schedule_map.borrow(&txn_key);
+        let f = txn.f;
+        if (pass_signer) {
+            f(some(signer));
+        } else {
+            f(std::option::none());
+        };
     }
 
     // Wrapper to call the user function when the txn is scheduled

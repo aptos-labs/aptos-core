@@ -1315,6 +1315,7 @@ Remove the txns that are run
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>() <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"remove_txns"));
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
     <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
     <b>let</b> tbl_idx: u16 = 0;
@@ -1351,7 +1352,7 @@ Remove the txns that are run
 
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper_no_func">execute_user_function_wrapper_no_func</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pass_signer: bool)
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper_no_func">execute_user_function_wrapper_no_func</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pass_signer: bool, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>)
 </code></pre>
 
 
@@ -1363,8 +1364,20 @@ Remove the txns that are run
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper_no_func">execute_user_function_wrapper_no_func</a>(
     <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     pass_signer: bool,
-) {
+    txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>,
+) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"Move: execute_user_function_wrapper_no_func"));
+
+    <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
+    <b>assert</b>!(queue.schedule_map.contains(&txn_key), 0);
+
+    <b>let</b> txn = *queue.schedule_map.borrow(&txn_key);
+    <b>let</b> f = txn.f;
+    <b>if</b> (pass_signer) {
+        f(some(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>));
+    } <b>else</b> {
+        f(std::option::none());
+    };
 }
 </code></pre>
 

@@ -9,6 +9,8 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use move_core_types::identifier::Identifier;
 use move_core_types::language_storage::{CORE_CODE_ADDRESS, ModuleId};
+use move_core_types::value::{MoveStruct, MoveValue};
+use crate::move_utils::as_move_value::AsMoveValue;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -20,7 +22,7 @@ pub struct ScheduledTransaction {
     pub max_gas_amount: u64,
     /// Charged @ lesser of {max_gas_unit_price, max_gas_unit_price other than this in the block executed}
     pub max_gas_unit_price: u64,
-    /// Option to pass a signer when f is called
+    /// Option to pass a signer when f is called  ==> Not needed
     pub pass_signer: bool,
 }
 
@@ -31,6 +33,16 @@ pub struct ScheduleMapKey {
     gas_priority: u64,
     /// SHA3-256
     txn_id: Vec<u8>
+}
+
+impl AsMoveValue for ScheduleMapKey {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            self.time.as_move_value(),
+            self.gas_priority.as_move_value(),
+            self.txn_id.as_move_value()
+        ]))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]

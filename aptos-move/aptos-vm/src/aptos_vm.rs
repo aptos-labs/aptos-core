@@ -146,6 +146,7 @@ use std::{
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::transaction::scheduled_txn::{SCHEDULED_TRANSACTIONS_MODULE_INFO, ScheduledTransactionWithKey};
+use crate::transaction_validation::run_scheduled_txn_epilogue;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -450,11 +451,11 @@ impl AptosVM {
     }
 
     fn fee_statement_from_gas_meter(
-        txn_data: &TransactionMetadata,
+        max_gas_units: Gas,
         gas_meter: &impl AptosGasMeter,
         storage_fee_refund: u64,
     ) -> FeeStatement {
-        let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
+        let gas_used = Self::gas_used(max_gas_units, gas_meter);
         FeeStatement::new(
             gas_used,
             u64::from(gas_meter.execution_gas_used()),
@@ -629,7 +630,7 @@ impl AptosVM {
             };
 
             let fee_statement =
-                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                AptosVM::fee_statement_from_gas_meter(txn_data.max_gas_amount(), gas_meter, ZERO_STORAGE_REFUND);
 
             // Verify we charged sufficiently for creating an account slot
             let gas_params = self.gas_params(log_context)?;
@@ -661,7 +662,7 @@ impl AptosVM {
             (abort_hook_session_change_set, fee_statement)
         } else {
             let fee_statement =
-                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+                AptosVM::fee_statement_from_gas_meter(txn_data.max_gas_amount(), gas_meter, ZERO_STORAGE_REFUND);
             (prologue_session_change_set, fee_statement)
         };
 
@@ -725,7 +726,7 @@ impl AptosVM {
         }
 
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
-            txn_data,
+            txn_data.max_gas_amount(),
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
         );
@@ -2710,21 +2711,22 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         let balance = txn.txn.max_gas_amount;
+        info!("Gas balance {}", balance);
         let storage_gas = self.storage_gas_params(log_context)?;
-        /*let mut gas_meter = make_prod_gas_meter(
+        let mut gas_meter = make_prod_gas_meter(
             self.gas_feature_version(),
             self.gas_params(log_context)?.vm.clone(),
             storage_gas.clone(),
             false,
             balance.into(),
             &NoopBlockSynchronizationKillSwitch {},
-        );*/
-        let mut gas_meter = UnmeteredGasMeter;
+        );
 
         // no need of scheduled txn prologue for now.
         let args = vec![
             MoveValue::Signer(txn.txn.sender_handle),
             MoveValue::Bool(txn.txn.pass_signer),
+            txn.key.as_move_value(),
         ];
         let mut session = self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
         info!("Calling {}", &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_no_func_name);
@@ -2738,13 +2740,15 @@ impl AptosVM {
             traversal_context,
             code_storage,
         )?;
-        /*run_scheduled_txn_epilogue(
+        run_scheduled_txn_epilogue(
             &mut session,
             &txn,
             gas_meter.balance(),
-            Self::fee_statement_from_gas_meter(txn.max_gas_unit.into(), &gas_meter, 0),
-            context,
-        )?;*/
+            100, // todo fill this
+            Self::fee_statement_from_gas_meter(txn.txn.max_gas_amount.into(), &gas_meter, 0),
+            traversal_context,
+            code_storage,
+        )?;
         let output = get_system_transaction_output(
             session,
             code_storage,

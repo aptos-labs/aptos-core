@@ -1,4 +1,4 @@
-module aptos_framework::schedule_txns_usage {
+module 0xA550C18::scheduled_txns_usage {
     use std::signer;
     use std::option::Option;
     use aptos_std::debug;
@@ -11,6 +11,8 @@ module aptos_framework::schedule_txns_usage {
 
     #[persistent]
     fun step(state: State, _s: Option<signer>) {
+        debug::print(&string::utf8(b"Move: in the func step with value"));
+        debug::print(&state.value);
         if (state.value < 10) {
             state.value = state.value + 1;
         }
@@ -28,7 +30,7 @@ module aptos_framework::schedule_txns_usage {
         let txn1 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
             current_time_ms + 100000,
-            0,
+            10000,
             20,
             false,
             foo
@@ -36,7 +38,7 @@ module aptos_framework::schedule_txns_usage {
         let txn2 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
             current_time_ms + 200000,
-            0,
+            10000,
             20,
             false,
             foo
@@ -44,7 +46,7 @@ module aptos_framework::schedule_txns_usage {
         let txn3 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
             current_time_ms + 300000,
-            0,
+            10000,
             20,
             false,
             foo

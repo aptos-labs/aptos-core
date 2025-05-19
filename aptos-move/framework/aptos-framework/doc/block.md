@@ -49,6 +49,7 @@ This module defines a struct storing the metadata of the block and new block eve
 <b>use</b> <a href="randomness.md#0x1_randomness">0x1::randomness</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg">0x1::reconfiguration_with_dkg</a>;
+<b>use</b> <a href="scheduled_txns.md#0x1_scheduled_txns">0x1::scheduled_txns</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -610,7 +611,7 @@ Return epoch interval in seconds.
     <a href="stake.md#0x1_stake_update_performance_statistics">stake::update_performance_statistics</a>(proposer_index, failed_proposer_indices);
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
-    //<a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">scheduled_txns::remove_txns</a>();
+    <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">scheduled_txns::remove_txns</a>();
 
     block_metadata_ref.epoch_interval
 }

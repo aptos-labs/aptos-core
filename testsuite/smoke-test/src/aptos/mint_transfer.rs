@@ -11,6 +11,7 @@ use aptos_types::transaction::{EntryFunction, ExecutionStatus, TransactionPayloa
 use move_core_types::account_address::AccountAddress;
 use move_core_types::ident_str;
 use move_core_types::language_storage::ModuleId;
+use crate::aptos::move_test_helpers;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_mint_transfer() {
@@ -100,9 +101,15 @@ async fn test_mint_transfer() {
 #[tokio::test]
 async fn test_sched() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
-    let validator = swarm.validators().next().unwrap();
     let mut chain_info = swarm.aptos_public_info();
-    let transaction_factory = chain_info.transaction_factory();
+
+    let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let path = base_dir.join("src/aptos/package_scheduled_txns_usage/");
+
+    let transaction_factory = match move_test_helpers::publish_package(&mut chain_info, path).await {
+        Ok(tf) => { tf },
+        Err(e) => panic!("Failed to publish package: {:?}", e),
+    };
 
     let mut account1 = chain_info
         .create_and_fund_user_account(50_000_000_000)
@@ -110,19 +117,17 @@ async fn test_sched() {
         .unwrap();
 
     // Get current timestamp for scheduling
-    let mut current_time_ms = std::time::SystemTime::now()
+    let current_time_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64;
 
+    //let transaction_factory = chain_info.transaction_factory();
     let txn_builder = transaction_factory
         .payload(TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(
-                AccountAddress::new([
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 1,
-                ]),
-                ident_str!("schedule_txns_usage").to_owned(),
+                AccountAddress::from_hex_literal("0xA550C18").unwrap(),
+                ident_str!("scheduled_txns_usage").to_owned(),
             ),
             ident_str!("test_insert_transactions").to_owned(),
             vec![],
@@ -142,44 +147,10 @@ async fn test_sched() {
         response.inner()
     );
 
-    // poll the ledger
-    /*info!("wait_for_all_nodes_to_catchup..........");
-    swarm.wait_for_all_nodes_to_catchup(Duration::from_secs(30))
-        .await
-        .unwrap();
-    info!("done waiting..........");*/
-
     info!("Going again for submit_and_wait..........");
 
-    // Get current timestamp for scheduling
-    current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-    let txn_builder2 = transaction_factory
-        .payload(TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                AccountAddress::new([
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 1,
-                ]),
-                ident_str!("schedule_txns_usage").to_owned(),
-            ),
-            ident_str!("test_insert_transactions").to_owned(),
-            vec![],
-            vec![bcs::to_bytes(&current_time_ms).unwrap()],
-        )))
-        .max_gas_amount(200000)
-        .gas_unit_price(100)
-        .expiration_timestamp_secs(10000000000);
-
-    let mutate_txn2 = account1.sign_with_transaction_builder(txn_builder2);
-    let response2 = chain_info.client().submit_and_wait(&mutate_txn2).await.unwrap();
-    assert!(
-        response2.inner().success(),
-        "Transaction failed: {:?}",
-        response2.inner()
-    );
+    // sleep for 5 seconds
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     assert!(false);
 }
