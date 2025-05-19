@@ -137,6 +137,7 @@ enum StopAfter {
     /// Stop after the second bytecode generation.
     SecondBytecodeGen,
     /// Stop after second bytecode pipeline runs to end (None) or to given processor.
+    #[allow(dead_code)]
     SecondBytecodePipeline(Option<&'static str>),
     /// Run to the end, including file format generation and bytecode verification
     #[default]
@@ -399,23 +400,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 // has erroneous ability annotations.
                 .exp_off(Experiment::ABILITY_CHECK)
         },
-        // Copy propagation
-        TestConfig {
-            name: "copy-propagation",
-            runner: |p| run_test(p, get_config_by_name("copy-propagation")),
-            include: vec!["/copy-propagation/"],
-            stop_after: StopAfter::SecondBytecodePipeline(Some("DeadStoreElimination")),
-            dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: Some(vec![
-                INITIAL_BYTECODE_STAGE,
-                "AvailableCopiesAnalysisProcessor",
-                "CopyPropagation",
-                "DeadStoreElimination",
-            ]),
-            ..config()
-                .exp_off(Experiment::VARIABLE_COALESCING)
-                .exp(Experiment::COPY_PROPAGATION)
-        },
         // Variable coalescing tests
         TestConfig {
             name: "variable-coalescing",
@@ -593,7 +577,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "compiler-message-format-json",
             runner: |p| run_test(p, get_config_by_name("compiler-message-format-json")),
             include: vec!["/compiler-message-format-json/"],
-            stop_after: StopAfter::FirstAstPipeline,
+            stop_after: StopAfter::SecondAstPipeline,
             ..config().exp(Experiment::MESSAGE_FORMAT_JSON)
         },
     ];

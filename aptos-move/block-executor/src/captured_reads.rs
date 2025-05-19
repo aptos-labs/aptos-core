@@ -385,7 +385,7 @@ where
     pub(crate) fn get_group_read_values_with_delayed_fields<'a>(
         &'a self,
         skip: &'a HashSet<T::Key>,
-    ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
+    ) -> impl Iterator<Item = (&'a T::Key, &'a GroupRead<T>)> {
         self.group_reads.iter().filter(|(key, group_read)| {
             !skip.contains(key)
                 && group_read

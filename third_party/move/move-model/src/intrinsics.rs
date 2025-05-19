@@ -307,7 +307,7 @@ impl IntrinsicsAnnotation {
         qid: &QualifiedId<StructId>,
         intrinsic_name: &str,
     ) -> bool {
-        self.intrinsic_structs.get(qid).map_or(false, |id| {
+        self.intrinsic_structs.get(qid).is_some_and(|id| {
             let decl = self.decls.get(id).expect("intrinsic decl");
             let sym = symbol_pool.make(intrinsic_name);
             decl.intrinsic_type == sym
@@ -330,7 +330,7 @@ impl IntrinsicsAnnotation {
                     .move_fun_to_intrinsic
                     .get(qid)
             })
-            .map_or(false, |sym| sym == &symbol_pool.make(intrinsic_name))
+            .is_some_and(|sym| sym == &symbol_pool.make(intrinsic_name))
     }
 
     /// Test whether a spec function is an intrinsic of a specific name
@@ -349,6 +349,6 @@ impl IntrinsicsAnnotation {
                     .spec_fun_to_intrinsic
                     .get(qid)
             })
-            .map_or(false, |sym| sym == &symbol_pool.make(intrinsic_name))
+            .is_some_and(|sym| sym == &symbol_pool.make(intrinsic_name))
     }
 }

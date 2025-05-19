@@ -366,37 +366,37 @@ fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:58:9
    │
 58 │         (x, y) = (&mut 0, &mut 0);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:58:9
    │
 58 │         (x, y) = (&mut 0, &mut 0);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:66:24
    │
 66 │         let g = &mut ({x = x + 1; s}).f;
    │                        ^^^^^^^^^
 
-warning: Unused assignment/binding to `z`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_z`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `z` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_z`), or renaming to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:69:20
    │
 69 │         *({*f = 0; z = y; g}) = 2;
    │                    ^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:74:19
    │
 74 │         if (cond) x = copy s else x = other;
    │                   ^^^^^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/bytecode-generator/freeze_mut_ref.move:74:35
    │
 74 │         if (cond) x = copy s else x = other;

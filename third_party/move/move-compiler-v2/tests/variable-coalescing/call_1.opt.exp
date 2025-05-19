@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: Unused local variable `a`. Consider removing or prefixing with an underscore: `_a`
-  ┌─ tests/variable-coalescing/call_1.move:7:13
-  │
-7 │         let a = p;
-  │             ^
-
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
@@ -35,7 +27,7 @@ fun m::test($t0: u64): u64 {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `a` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_a`), or renaming to `_`
   ┌─ tests/variable-coalescing/call_1.move:7:17
   │
 7 │         let a = p;

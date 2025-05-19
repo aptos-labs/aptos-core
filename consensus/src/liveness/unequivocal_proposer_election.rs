@@ -44,7 +44,7 @@ impl UnequivocalProposerElection {
     // - if this is the first block proposer has submitted in this round
     // - if it is not old proposal
     pub fn is_valid_proposal(&self, block: &Block) -> bool {
-        block.author().map_or(false, |author| {
+        block.author().is_some_and(|author| {
             let valid_author = self.is_valid_proposer(author, block.round());
             if !valid_author {
                 warn!(

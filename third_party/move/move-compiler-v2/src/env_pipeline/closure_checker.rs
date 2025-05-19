@@ -8,6 +8,7 @@
 //!   definition of closure abilities, see
 //!   [AIP-112](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-112.md).
 //! - The closure does not capture references, as this is currently not allowed.
+//! - In a script, the closure cannot have a lambda lifted function.
 //! ```
 
 use crate::env_pipeline::lambda_lifter;
@@ -19,9 +20,10 @@ use move_model::{
     well_known,
 };
 
-/// Checks lambda expression abilities in all target module functions.
+/// Checks various properties of lambda expressions in all target module functions.
 pub fn check_closures(env: &GlobalEnv) {
     for module_env in env.get_primary_target_modules() {
+        let is_script_module = module_env.is_script_module();
         for fun_env in module_env.get_functions() {
             if let Some(def) = fun_env.get_def() {
                 def.visit_pre_order(&mut |e| {
@@ -35,6 +37,7 @@ pub fn check_closures(env: &GlobalEnv) {
                         let required_abilities =
                             env.type_abilities(&context_ty, fun_env.get_type_parameters_ref());
                         let fun_env = env.get_function(mid.qualified(*fid));
+                        let is_lambda_lifted = lambda_lifter::is_lambda_lifted_fun(&fun_env);
                         // The function itself has all abilities except `store`, which it only
                         // has if it is public. Notice that since required_abilities is derived
                         // from the function type of the closure, it cannot have `key` ability.
@@ -45,7 +48,6 @@ pub fn check_closures(env: &GlobalEnv) {
                                     == well_known::PERSISTENT_ATTRIBUTE
                             })
                         {
-                            let is_lambda_lifted = lambda_lifter::is_lambda_lifted_fun(&fun_env);
                             env.error_with_notes(
                                 &env.get_node_loc(*id),
                                 &format!(
@@ -114,6 +116,15 @@ pub fn check_closures(env: &GlobalEnv) {
                                     )],
                                 )
                             }
+                        }
+
+                        // (d) Scripts cannot have closures with lambda lifted functions.
+                        if is_script_module && is_lambda_lifted {
+                            env.error_with_notes(
+                                &env.get_node_loc(*id),
+                                "lambda lifting is not allowed in scripts",
+                                vec!["lambda cannot be reduced to partial application of an existing function".to_string()],
+                            );
                         }
                     }
 

@@ -500,7 +500,7 @@ struct WriteSetStateView<'a> {
     write_set: &'a WriteSet,
 }
 
-impl<'a> TStateView for WriteSetStateView<'a> {
+impl TStateView for WriteSetStateView<'_> {
     type Key = StateKey;
 
     fn get_state_value(

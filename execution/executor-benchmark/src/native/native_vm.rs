@@ -69,7 +69,7 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc, u128};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub struct NativeVMBlockExecutor;
 
@@ -355,7 +355,9 @@ impl NativeVMExecutorTask {
         };
 
         events.push((
-            FeeStatement::new(gas_units, gas_units, 0, 0, 0).create_event_v2(),
+            FeeStatement::new(gas_units, gas_units, 0, 0, 0)
+                .create_event_v2()
+                .expect("Creating FeeStatement should always succeed"),
             None,
         ));
 
@@ -656,7 +658,8 @@ impl NativeVMExecutorTask {
                                 store: sender_store_address,
                                 amount: transfer_amount,
                             }
-                            .create_event_v2(),
+                            .create_event_v2()
+                            .expect("Creating WithdrawFAEvent should always succeed"),
                             None,
                         ));
                     }
@@ -809,7 +812,12 @@ impl NativeVMExecutorTask {
                 store: recipient_store_address,
                 amount: transfer_amount,
             };
-            events.push((event.create_event_v2(), None));
+            events.push((
+                event
+                    .create_event_v2()
+                    .expect("Creating DepositFAEvent should always succeed"),
+                None,
+            ));
         }
         Ok(existed)
     }
@@ -838,7 +846,8 @@ impl NativeVMExecutorTask {
                             type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()
                                 .map_err(hide_error)?,
                         }
-                        .create_event_v2(),
+                        .create_event_v2()
+                        .expect("Creating CoinRegister should always succeed"),
                         None,
                     ));
                     (

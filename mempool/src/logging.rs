@@ -131,7 +131,7 @@ pub struct LogSchema<'a> {
     num_txns: Option<usize>,
 }
 
-impl<'a> LogSchema<'a> {
+impl LogSchema<'_> {
     pub fn new(name: LogEntry) -> Self {
         Self::new_event(name, None)
     }

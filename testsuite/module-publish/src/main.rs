@@ -17,25 +17,36 @@ struct Args {
 }
 
 // List of additional packages (beyond those in testsuite/module-publish/src/packages) to include
-fn additional_packages() -> Vec<(&'static str, &'static str)> {
+fn additional_packages() -> Vec<(&'static str, &'static str, bool)> {
     // Pairs of (package_name, package_path)
     vec![
-        ("simple", "src/packages/simple"),
-        ("framework_usecases", "src/packages/framework_usecases"),
+        ("simple", "src/packages/simple", false),
+        (
+            "framework_usecases",
+            "src/packages/framework_usecases",
+            false,
+        ),
         (
             "experimental_usecases",
             "src/packages/experimental_usecases",
+            true,
         ),
-        ("complex", "src/packages/complex"),
+        ("complex", "src/packages/complex", false),
         (
             "ambassador_token",
             "../../aptos-move/move-examples/token_objects/ambassador",
+            false,
         ),
         (
             "aggregator_examples",
             "../../aptos-move/move-examples/aggregator_examples",
+            false,
         ),
-        ("bcs_stream", "../../aptos-move/move-examples/bcs-stream"),
+        (
+            "bcs_stream",
+            "../../aptos-move/move-examples/bcs-stream",
+            false,
+        ),
     ]
 }
 
@@ -74,7 +85,7 @@ fn main() -> Result<()> {
     let base_path = base_dir.join("../../crates/transaction-workloads-lib/src/");
     let output_file = base_path.join("raw_module_data.rs");
 
-    create_prebuilt_packages_rs_file(base_dir, packages_to_build, output_file)
+    create_prebuilt_packages_rs_file(base_dir, packages_to_build, output_file, true)
 }
 
 #[test]

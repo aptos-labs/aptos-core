@@ -75,11 +75,35 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn has_nonce(&self) -> bool {
+        self.payload.replay_protection_nonce().is_some()
+    }
+
+    // Primarily used for running the tests with both payload v1 and v2 formats.
+    pub fn upgrade_payload(
+        mut self,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) -> Self {
+        self.payload = self
+            .payload
+            .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
+        if use_orderless_transactions {
+            self.sequence_number = self.sequence_number.map(|_| u64::MAX);
+        }
+        self
+    }
+
     pub fn build(self) -> RawTransaction {
+        let sequence_number = if self.has_nonce() {
+            u64::MAX
+        } else {
+            self.sequence_number
+                .expect("sequence number must have been set")
+        };
         RawTransaction::new(
             self.sender.expect("sender must have been set"),
-            self.sequence_number
-                .expect("sequence number must have been set"),
+            sequence_number,
             self.payload,
             self.max_gas_amount,
             self.gas_unit_price,
@@ -149,6 +173,7 @@ impl TransactionFactory {
     }
 
     pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
+        // TODO[Orderless]: Change this to use TransactionPayload::Payload once it's available
         self.payload(TransactionPayload::EntryFunction(func))
     }
 
@@ -286,6 +311,7 @@ impl TransactionFactory {
     //
 
     pub fn script(&self, script: Script) -> TransactionBuilder {
+        // TODO[Orderless]: Change this to use TransactionPayload::Payload once it's available
         self.payload(TransactionPayload::Script(script))
     }
 

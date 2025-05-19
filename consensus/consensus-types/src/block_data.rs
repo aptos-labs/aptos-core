@@ -244,8 +244,9 @@ impl BlockData {
         )
     }
 
+    #[allow(unexpected_cfgs)]
     pub fn new_genesis(timestamp_usecs: u64, quorum_cert: QuorumCert) -> Self {
-        assume!(quorum_cert.certified_block().epoch() < u64::max_value()); // unlikely to be false in this universe
+        assume!(quorum_cert.certified_block().epoch() < u64::MAX); // unlikely to be false in this universe
         Self {
             epoch: quorum_cert.certified_block().epoch() + 1,
             round: 0,
@@ -255,6 +256,7 @@ impl BlockData {
         }
     }
 
+    #[allow(unexpected_cfgs)]
     pub fn new_nil(
         round: Round,
         quorum_cert: QuorumCert,
@@ -262,7 +264,7 @@ impl BlockData {
     ) -> Self {
         // We want all the NIL blocks to agree on the timestamps even though they're generated
         // independently by different validators, hence we're using the timestamp of a parent + 1.
-        assume!(quorum_cert.certified_block().timestamp_usecs() < u64::max_value()); // unlikely to be false in this universe
+        assume!(quorum_cert.certified_block().timestamp_usecs() < u64::MAX); // unlikely to be false in this universe
         let timestamp_usecs = quorum_cert.certified_block().timestamp_usecs();
 
         Self {

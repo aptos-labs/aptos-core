@@ -719,7 +719,7 @@ pub enum TransactionExecutableRef<'a> {
     Empty,
 }
 
-impl<'a> TransactionExecutableRef<'a> {
+impl TransactionExecutableRef<'_> {
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Empty)
     }
@@ -1228,6 +1228,46 @@ impl SignedTransaction {
 
     pub fn replay_protector(&self) -> ReplayProtector {
         self.raw_txn.replay_protector()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IndexedTransactionSummary {
+    V1 {
+        sender: AccountAddress,
+        version: Version,
+        transaction_hash: HashValue,
+        replay_protector: ReplayProtector,
+    },
+}
+
+impl IndexedTransactionSummary {
+    pub fn version(&self) -> Version {
+        match self {
+            IndexedTransactionSummary::V1 { version, .. } => *version,
+        }
+    }
+
+    pub fn transaction_hash(&self) -> HashValue {
+        match self {
+            IndexedTransactionSummary::V1 {
+                transaction_hash, ..
+            } => *transaction_hash,
+        }
+    }
+
+    pub fn replay_protector(&self) -> ReplayProtector {
+        match self {
+            IndexedTransactionSummary::V1 {
+                replay_protector, ..
+            } => *replay_protector,
+        }
+    }
+
+    pub fn sender(&self) -> AccountAddress {
+        match self {
+            IndexedTransactionSummary::V1 { sender, .. } => *sender,
+        }
     }
 }
 

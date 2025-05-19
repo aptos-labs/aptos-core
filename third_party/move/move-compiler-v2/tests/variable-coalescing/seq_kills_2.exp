@@ -24,7 +24,7 @@ fun m::test($t0: u64): bool {
 
 
 Diagnostics:
-warning: Unused assignment/binding to `a`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `a` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_a`), or renaming to `_`
   ┌─ tests/variable-coalescing/seq_kills_2.move:7:9
   │
 7 │         a = p + 1; // kill b := a

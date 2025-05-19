@@ -16,12 +16,12 @@ use crate::{
             },
         },
         observer::{
-            active_state::ActiveObserverState,
+            block_data,
+            block_data::ObserverBlockData,
+            epoch_state::ObserverEpochState,
             execution_pool::ObservedOrderedBlock,
             fallback_manager::ObserverFallbackManager,
-            ordered_blocks::OrderedBlockStore,
-            payload_store::BlockPayloadStore,
-            pending_blocks::{PendingBlockStore, PendingBlockWithMetadata},
+            pending_blocks::PendingBlockWithMetadata,
             state_sync_manager::{StateSyncManager, StateSyncNotification},
             subscription_manager::SubscriptionManager,
         },
@@ -38,14 +38,11 @@ use aptos_config::{
     network_id::PeerNetworkId,
 };
 use aptos_consensus_types::{
-    pipeline,
-    pipelined_block::{PipelineFutures, PipelinedBlock},
-    vote_data::VoteData,
+    pipeline, pipelined_block::PipelinedBlock, vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
 use aptos_network::{
@@ -54,9 +51,7 @@ use aptos_network::{
 use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    block_info::{BlockInfo, Round},
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    block_info::Round, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
 };
 use futures::StreamExt;
@@ -74,20 +69,14 @@ const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
-    // The currently active observer state (e.g., epoch and root)
-    active_observer_state: ActiveObserverState,
-
-    // The block payload store (containing the block transaction payloads)
-    block_payload_store: Arc<Mutex<BlockPayloadStore>>,
-
-    // The ordered block store (containing ordered blocks that are ready for execution)
-    ordered_block_store: Arc<Mutex<OrderedBlockStore>>,
-
-    // The pending block store (containing pending blocks that are without payloads)
-    pending_block_store: Arc<Mutex<PendingBlockStore>>,
-
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
+
+    // The block data for the observer
+    observer_block_data: Arc<Mutex<ObserverBlockData>>,
+
+    // The current observer epoch state
+    observer_epoch_state: ObserverEpochState,
 
     // The observer fallback manager
     observer_fallback_manager: ObserverFallbackManager,
@@ -141,24 +130,23 @@ impl ConsensusObserver {
             time_service.clone(),
         );
 
-        // Create the active observer state
+        // Create the observer epoch state
         let reconfig_events =
             reconfig_events.expect("Reconfig events should exist for the consensus observer!");
-        let active_observer_state =
-            ActiveObserverState::new(node_config, db_reader, reconfig_events, consensus_publisher);
+        let observer_epoch_state =
+            ObserverEpochState::new(node_config, reconfig_events, consensus_publisher);
 
-        // Create the block and payload stores
-        let ordered_block_store = OrderedBlockStore::new(consensus_observer_config);
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
-        let pending_block_store = PendingBlockStore::new(consensus_observer_config);
+        // Create the observer block data
+        let observer_block_data = Arc::new(Mutex::new(ObserverBlockData::new(
+            consensus_observer_config,
+            db_reader,
+        )));
 
         // Create the consensus observer
         Self {
-            active_observer_state,
-            ordered_block_store: Arc::new(Mutex::new(ordered_block_store)),
-            block_payload_store: Arc::new(Mutex::new(block_payload_store)),
-            pending_block_store: Arc::new(Mutex::new(pending_block_store)),
             execution_client,
+            observer_block_data,
+            observer_epoch_state,
             observer_fallback_manager,
             state_sync_manager,
             subscription_manager,
@@ -169,12 +157,12 @@ impl ConsensusObserver {
     /// Returns true iff all payloads exist for the given blocks
     fn all_payloads_exist(&self, blocks: &[Arc<PipelinedBlock>]) -> bool {
         // If quorum store is disabled, all payloads exist (they're already in the blocks)
-        if !self.active_observer_state.is_quorum_store_enabled() {
+        if !self.observer_epoch_state.is_quorum_store_enabled() {
             return true;
         }
 
         // Otherwise, check if all the payloads exist in the payload store
-        self.block_payload_store.lock().all_payloads_exist(blocks)
+        self.observer_block_data.lock().all_payloads_exist(blocks)
     }
 
     /// Checks the progress of the consensus observer
@@ -194,7 +182,7 @@ impl ConsensusObserver {
             info!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Waiting for state sync to reach commit decision: {:?}!",
-                    self.active_observer_state.root().commit_info()
+                    self.observer_block_data.lock().root().commit_info()
                 ))
             );
             return;
@@ -229,17 +217,10 @@ impl ConsensusObserver {
     /// Clears the pending block state (this is useful for changing
     /// subscriptions, where we want to wipe all state and restart).
     async fn clear_pending_block_state(&self) {
-        // Clear the payload store
-        self.block_payload_store.lock().clear_all_payloads();
-
-        // Clear the pending blocks
-        self.pending_block_store.lock().clear_missing_blocks();
-
-        // Clear the ordered blocks
-        self.ordered_block_store.lock().clear_all_ordered_blocks();
+        // Clear the observer block data
+        let root = self.observer_block_data.lock().clear_block_data();
 
         // Reset the execution pipeline for the root
-        let root = self.active_observer_state.root();
         if let Err(error) = self.execution_client.reset(&root).await {
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -274,24 +255,29 @@ impl ConsensusObserver {
             ))
         );
 
+        // If the new pipeline is enabled, build the pipeline for the ordered blocks
         if self.pipeline_enabled() {
             let block = ordered_block.first_block();
-            let mut parent_fut = if let Some(futs) = self.get_parent_pipeline_futs(&block) {
+            let get_parent_pipeline_futs = self
+                .observer_block_data
+                .lock()
+                .get_parent_pipeline_futs(&block, self.pipeline_builder());
+
+            let mut parent_fut = if let Some(futs) = get_parent_pipeline_futs {
                 Some(futs)
             } else {
                 warn!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
-                                ordered_block.proof_block_info()
-                            ))
-                        );
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                        ordered_block.proof_block_info()
+                    ))
+                );
                 return;
             };
+
             for block in ordered_block.blocks() {
-                let commit_callback = self.active_observer_state.create_commit_callback(
-                    self.ordered_block_store.clone(),
-                    self.block_payload_store.clone(),
-                );
+                let commit_callback =
+                    block_data::create_commit_callback(self.observer_block_data.clone());
                 self.pipeline_builder().build(
                     block,
                     parent_fut.take().expect("future should be set"),
@@ -300,13 +286,10 @@ impl ConsensusObserver {
                 parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
             }
         }
+
         // Create the commit callback (to be called after the execution pipeline)
-        let commit_callback = self
-            .active_observer_state
-            .create_commit_callback_deprecated(
-                self.ordered_block_store.clone(),
-                self.block_payload_store.clone(),
-            );
+        let commit_callback =
+            block_data::create_commit_callback_deprecated(self.observer_block_data.clone());
 
         // Send the ordered block to the execution pipeline
         if let Err(error) = self
@@ -355,63 +338,21 @@ impl ConsensusObserver {
 
     /// Returns the current epoch state, and panics if it is not set
     fn get_epoch_state(&self) -> Arc<EpochState> {
-        self.active_observer_state.epoch_state()
+        self.observer_epoch_state.epoch_state()
     }
 
     /// Returns the window size for the execution pool
     fn get_execution_pool_window_size(&self) -> Option<u64> {
-        self.active_observer_state.execution_pool_window_size()
-    }
-
-    /// Returns the highest committed block epoch and round
-    fn get_highest_committed_epoch_round(&self) -> (u64, Round) {
-        if let Some(epoch_round) = self
-            .ordered_block_store
-            .lock()
-            .get_highest_committed_epoch_round()
-        {
-            epoch_round
-        } else {
-            // Return the root epoch and round
-            let root_block_info = self.active_observer_state.root().commit_info().clone();
-            (root_block_info.epoch(), root_block_info.round())
-        }
-    }
-
-    /// Returns the last ordered block
-    fn get_last_ordered_block(&self) -> BlockInfo {
-        if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
-            last_ordered_block.block_info()
-        } else {
-            // Return the root ledger info
-            self.active_observer_state.root().commit_info().clone()
-        }
-    }
-
-    /// Returns the parent block's pipeline futures, should only be called when pipeline is enabled
-    fn get_parent_pipeline_futs(&self, block: &PipelinedBlock) -> Option<PipelineFutures> {
-        if let Some(last_ordered_block) = self
-            .ordered_block_store
-            .lock()
-            .get_ordered_block(block.epoch(), block.quorum_cert().certified_block().round())
-        {
-            last_ordered_block.last_block().pipeline_futs()
-        } else {
-            Some(self.pipeline_builder().build_root(
-                StateComputeResult::new_dummy(),
-                self.active_observer_state.root().clone(),
-            ))
-        }
+        self.observer_epoch_state.execution_pool_window_size()
     }
 
     /// Orders any ready pending blocks for the given epoch and round
     async fn order_ready_pending_block(&mut self, block_epoch: u64, block_round: Round) {
-        // Get any ready ordered block
-        let pending_block_with_metadata = self.pending_block_store.lock().remove_ready_block(
-            block_epoch,
-            block_round,
-            self.block_payload_store.clone(),
-        );
+        // Remove any ready pending block
+        let pending_block_with_metadata = self
+            .observer_block_data
+            .lock()
+            .remove_ready_pending_block(block_epoch, block_round);
 
         // Process the ready ordered block (if it exists)
         if let Some(pending_block_with_metadata) = pending_block_with_metadata {
@@ -432,11 +373,11 @@ impl ConsensusObserver {
         let block_round = block_payload.round();
 
         // Determine if the payload is behind the last ordered block, or if it already exists
-        let last_ordered_block = self.get_last_ordered_block();
+        let last_ordered_block = self.observer_block_data.lock().get_last_ordered_block();
         let payload_out_of_date =
             (block_epoch, block_round) <= (last_ordered_block.epoch(), last_ordered_block.round());
         let payload_exists = self
-            .block_payload_store
+            .observer_block_data
             .lock()
             .existing_payload_entry(&block_payload);
 
@@ -493,7 +434,7 @@ impl ConsensusObserver {
         );
 
         // Update the payload store with the payload
-        self.block_payload_store
+        self.observer_block_data
             .lock()
             .insert_block_payload(block_payload, verified_payload);
 
@@ -518,7 +459,11 @@ impl ConsensusObserver {
         let commit_round = commit_decision.round();
 
         // If the commit message is behind our highest committed block, ignore it
-        if (commit_epoch, commit_round) <= self.get_highest_committed_epoch_round() {
+        let get_highest_committed_epoch_round = self
+            .observer_block_data
+            .lock()
+            .get_highest_committed_epoch_round();
+        if (commit_epoch, commit_round) <= get_highest_committed_epoch_round {
             // Update the metrics for the dropped commit decision
             update_metrics_for_dropped_commit_decision_message(peer_network_id, &commit_decision);
             return;
@@ -563,7 +508,7 @@ impl ConsensusObserver {
 
         // Otherwise, we failed to process the commit decision. If the commit
         // is for a future epoch or round, we need to state sync.
-        let last_block = self.get_last_ordered_block();
+        let last_block = self.observer_block_data.lock().get_last_ordered_block();
         let epoch_changed = commit_epoch > last_block.epoch();
         if epoch_changed || commit_round > last_block.round() {
             // If we're waiting for state sync to transition into a new epoch,
@@ -572,7 +517,7 @@ impl ConsensusObserver {
                 info!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Already waiting for state sync to reach new epoch: {:?}. Dropping commit decision: {:?}!",
-                        self.active_observer_state.root().commit_info(),
+                        self.observer_block_data.lock().root().commit_info(),
                         commit_decision.proof_block_info()
                     ))
                 );
@@ -580,15 +525,10 @@ impl ConsensusObserver {
             }
 
             // Otherwise, we should start the state sync process for the commit.
-            // Update the root and clear the pending blocks (up to the commit).
-            self.active_observer_state
-                .update_root(commit_decision.commit_proof().clone());
-            self.block_payload_store
+            // Update the block data (to the commit decision).
+            self.observer_block_data
                 .lock()
-                .remove_blocks_for_epoch_round(commit_epoch, commit_round);
-            self.ordered_block_store
-                .lock()
-                .remove_blocks_for_commit(commit_decision.commit_proof());
+                .update_blocks_for_state_sync_commit(&commit_decision);
 
             // Start state syncing to the commit decision
             self.state_sync_manager
@@ -602,7 +542,7 @@ impl ConsensusObserver {
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
         // Get the pending block for the commit decision
         let pending_block = self
-            .ordered_block_store
+            .observer_block_data
             .lock()
             .get_ordered_block(commit_decision.epoch(), commit_decision.round());
 
@@ -616,9 +556,9 @@ impl ConsensusObserver {
                         commit_decision.proof_block_info()
                     ))
                 );
-                self.ordered_block_store
+                self.observer_block_data
                     .lock()
-                    .update_commit_decision(commit_decision);
+                    .update_ordered_block_commit_decision(commit_decision);
 
                 // If state sync is not syncing to a commit, forward the commit decision to the execution pipeline
                 if !self.state_sync_manager.is_syncing_to_commit() {
@@ -701,7 +641,7 @@ impl ConsensusObserver {
         }
 
         // Update the metrics for the processed blocks
-        self.update_processed_blocks_metrics();
+        self.observer_block_data.lock().update_block_metrics();
     }
 
     /// Processes the ordered block
@@ -744,11 +684,11 @@ impl ConsensusObserver {
         let first_block_epoch_round = (first_block.epoch(), first_block.round());
 
         // Determine if the block is behind the last ordered block, or if it is already pending
-        let last_ordered_block = self.get_last_ordered_block();
+        let last_ordered_block = self.observer_block_data.lock().get_last_ordered_block();
         let block_out_of_date =
             first_block_epoch_round <= (last_ordered_block.epoch(), last_ordered_block.round());
         let block_pending = self
-            .pending_block_store
+            .observer_block_data
             .lock()
             .existing_pending_block(&ordered_block);
 
@@ -776,7 +716,7 @@ impl ConsensusObserver {
             self.process_ordered_block(pending_block_with_metadata)
                 .await;
         } else {
-            self.pending_block_store
+            self.observer_block_data
                 .lock()
                 .insert_pending_block(pending_block_with_metadata);
         }
@@ -822,7 +762,7 @@ impl ConsensusObserver {
 
         // Verify the block payloads against the ordered block
         if let Err(error) = self
-            .block_payload_store
+            .observer_block_data
             .lock()
             .verify_payloads_against_ordered_block(&ordered_block)
         {
@@ -841,7 +781,8 @@ impl ConsensusObserver {
 
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
-        if self.get_last_ordered_block().id() == ordered_block.first_block().parent_id() {
+        let last_ordered_block = self.observer_block_data.lock().get_last_ordered_block();
+        if last_ordered_block.id() == ordered_block.first_block().parent_id() {
             // Update the latency metrics for ordered block processing
             update_message_processing_latency_metrics(
                 message_received_time,
@@ -850,7 +791,7 @@ impl ConsensusObserver {
             );
 
             // Insert the ordered block into the pending blocks
-            self.ordered_block_store
+            self.observer_block_data
                 .lock()
                 .insert_ordered_block(observed_ordered_block.clone());
 
@@ -939,11 +880,11 @@ impl ConsensusObserver {
         let first_block_epoch_round = (first_block.epoch(), first_block.round());
 
         // Determine if the block is behind the last ordered block, or if it is already pending
-        let last_ordered_block = self.get_last_ordered_block();
+        let last_ordered_block = self.observer_block_data.lock().get_last_ordered_block();
         let block_out_of_date =
             first_block_epoch_round <= (last_ordered_block.epoch(), last_ordered_block.round());
         let block_pending = self
-            .pending_block_store
+            .observer_block_data
             .lock()
             .existing_pending_block(ordered_block);
 
@@ -1013,7 +954,8 @@ impl ConsensusObserver {
             .reset_syncing_progress(&latest_synced_ledger_info);
 
         // Update the root with the latest synced ledger info
-        self.active_observer_state
+        self.observer_block_data
+            .lock()
             .update_root(latest_synced_ledger_info);
 
         // If the epoch has changed, end the current epoch and start the latest one
@@ -1060,14 +1002,15 @@ impl ConsensusObserver {
 
         // Verify that the state sync notification is for the current epoch and round
         if !self
-            .active_observer_state
+            .observer_block_data
+            .lock()
             .check_root_epoch_and_round(epoch, round)
         {
             // Log the error, reset the state sync manager and return early
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Received invalid commit sync notification for epoch: {}, round: {}! Current root: {:?}",
-                    epoch, round, self.active_observer_state.root()
+                    epoch, round, self.observer_block_data.lock().root()
                 ))
             );
             self.state_sync_manager.clear_active_commit_sync();
@@ -1084,7 +1027,7 @@ impl ConsensusObserver {
             // Verify the block payloads for the new epoch
             let new_epoch_state = self.get_epoch_state();
             let verified_payload_rounds = self
-                .block_payload_store
+                .observer_block_data
                 .lock()
                 .verify_payload_signatures(&new_epoch_state);
 
@@ -1099,7 +1042,7 @@ impl ConsensusObserver {
         self.state_sync_manager.clear_active_commit_sync();
 
         // Process all the newly ordered blocks
-        let all_ordered_blocks = self.ordered_block_store.lock().get_all_ordered_blocks();
+        let all_ordered_blocks = self.observer_block_data.lock().get_all_ordered_blocks();
         for (_, (observed_ordered_block, commit_decision)) in all_ordered_blocks {
             // Finalize the ordered block
             let ordered_block = observed_ordered_block.consume_ordered_block();
@@ -1112,30 +1055,12 @@ impl ConsensusObserver {
         }
     }
 
-    /// Updates the metrics for the processed blocks
-    fn update_processed_blocks_metrics(&self) {
-        // Update the payload store metrics
-        self.block_payload_store
-            .lock()
-            .update_payload_store_metrics();
-
-        // Update the pending block metrics
-        self.pending_block_store
-            .lock()
-            .update_pending_blocks_metrics();
-
-        // Update the pending block metrics
-        self.ordered_block_store
-            .lock()
-            .update_ordered_blocks_metrics();
-    }
-
     /// Waits for a new epoch to start
     async fn wait_for_epoch_start(&mut self) {
-        // Wait for the active state epoch to update
-        let block_payloads = self.block_payload_store.lock().get_block_payloads();
+        // Wait for the epoch state to update
+        let block_payloads = self.observer_block_data.lock().get_block_payloads();
         let (payload_manager, consensus_config, execution_config, randomness_config) = self
-            .active_observer_state
+            .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
             .await;
 
@@ -1215,7 +1140,7 @@ impl ConsensusObserver {
 
     /// Returns whether the pipeline is enabled
     pub fn pipeline_enabled(&self) -> bool {
-        self.active_observer_state.pipeline_enabled()
+        self.observer_epoch_state.pipeline_enabled()
     }
 
     /// Returns the builder, should only be called if pipeline is enabled

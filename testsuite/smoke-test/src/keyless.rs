@@ -616,7 +616,7 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
     }
 }
 
-async fn sign_transaction_any_keyless_pk<'a>(
+async fn sign_transaction_any_keyless_pk(
     info: &mut AptosPublicInfo,
     mut sig: KeylessSignature,
     any_keyless_pk: AnyKeylessPublicKey,
@@ -723,7 +723,7 @@ async fn sign_transaction_any_keyless_pk<'a>(
     }
 }
 
-async fn sign_transaction<'a>(
+async fn sign_transaction(
     info: &mut AptosPublicInfo,
     sig: KeylessSignature,
     pk: KeylessPublicKey,
@@ -831,7 +831,7 @@ async fn setup_local_net_inner(
     (tw_sk, config, jwk, swarm, cli, root_idx)
 }
 
-pub(crate) async fn remove_training_wheels<'a>(
+pub(crate) async fn remove_training_wheels(
     cli: &mut CliTestFramework,
     info: &mut AptosPublicInfo,
     root_idx: usize,
@@ -1050,7 +1050,7 @@ script {{
     script
 }
 
-async fn rotate_vk_by_governance<'a>(
+async fn rotate_vk_by_governance(
     cli: &mut CliTestFramework,
     info: &mut AptosPublicInfo,
     vk: &Groth16VerificationKey,

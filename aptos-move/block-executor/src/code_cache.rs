@@ -30,15 +30,13 @@ use move_vm_types::code::{
 };
 use std::sync::Arc;
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment
-    for LatestView<'a, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment for LatestView<'_, T, S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.runtime_environment
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'_, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -62,7 +60,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for Late
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -183,7 +181,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'_, T, S> {
     fn fetch_state_value_metadata(
         &self,
         address: &AccountAddress,
@@ -200,7 +198,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for Lat
 
 #[delegate_to_methods]
 #[delegate(ScriptCache, target_ref = "as_script_cache")]
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
     /// Returns the script cache.
     fn as_script_cache(
         &self,

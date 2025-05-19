@@ -449,7 +449,6 @@ fn get_events_by_event_key(
     db: &AptosDB,
     ledger_info: &LedgerInfo,
     event_key: &EventKey,
-    // TODO[Orderless]: Need to update this to accommodate orderless transactions
     first_seq_num: u64,
     last_seq_num: u64,
     order: Order,
@@ -461,7 +460,7 @@ fn get_events_by_event_key(
         first_seq_num
     } else if is_latest {
         // Test the ability to get the latest.
-        u64::max_value()
+        u64::MAX
     } else {
         last_seq_num
     };
@@ -472,7 +471,7 @@ fn get_events_by_event_key(
             db.get_events_by_event_key(event_key, cursor, order, LIMIT, ledger_info.version())?;
 
         let num_events = events.len() as u64;
-        if cursor == u64::max_value() {
+        if cursor == u64::MAX {
             cursor = last_seq_num;
         }
         let expected_seq_nums: Vec<_> = if order == Order::Ascending {
@@ -610,6 +609,45 @@ fn group_events_by_event_key(
     event_key_to_events.into_iter().collect()
 }
 
+fn verify_account_txn_summaries(
+    db: &AptosDB,
+    expected_txns_by_account: HashMap<AccountAddress, Vec<Transaction>>,
+    ledger_info: &LedgerInfo,
+    first_version: Version,
+) {
+    let ledger_version = ledger_info.version();
+    for (address, expected_txns) in &expected_txns_by_account {
+        let actual_txn_summaries = db.get_account_transaction_summaries(
+            *address,
+            Some(first_version),
+            None,
+            expected_txns.len() as u64,
+            ledger_version,
+        );
+        for (expected_txn, actual_txn_summary) in
+            expected_txns.iter().zip(actual_txn_summaries.unwrap())
+        {
+            assert_eq!(actual_txn_summary.transaction_hash(), expected_txn.hash());
+            assert_eq!(
+                actual_txn_summary.replay_protector(),
+                expected_txn
+                    .try_as_signed_user_txn()
+                    .unwrap()
+                    .replay_protector()
+            );
+            assert_eq!(
+                actual_txn_summary.sender(),
+                expected_txn.try_as_signed_user_txn().unwrap().sender()
+            );
+            let fetched_txn = db
+                .get_transaction_by_version(actual_txn_summary.version(), ledger_version, false)
+                .unwrap();
+            assert_eq!(fetched_txn.transaction, *expected_txn);
+            assert_eq!(fetched_txn.version, actual_txn_summary.version());
+        }
+    }
+}
+
 fn verify_account_ordered_txns(
     db: &AptosDB,
     expected_ordered_txns_by_account: HashMap<
@@ -666,6 +704,22 @@ fn verify_account_ordered_txns(
         actual_ordered_txns_by_account,
         expected_ordered_txns_by_account
     );
+}
+
+fn group_txns_by_account(
+    txns_to_commit: &[TransactionToCommit],
+) -> HashMap<AccountAddress, Vec<Transaction>> {
+    let mut account_to_txns = HashMap::new();
+    for txn in txns_to_commit {
+        if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
+            let account = signed_txn.sender();
+            account_to_txns
+                .entry(account)
+                .or_insert_with(Vec::new)
+                .push(txn.transaction().clone());
+        }
+    }
+    account_to_txns
 }
 
 fn group_ordered_txns_by_account(
@@ -863,6 +917,12 @@ pub fn verify_committed_transactions(
     );
 
     // Fetch and verify batch transactions by account
+    verify_account_txn_summaries(
+        db,
+        group_txns_by_account(txns_to_commit),
+        ledger_info,
+        first_version,
+    );
     verify_account_ordered_txns(
         db,
         group_ordered_txns_by_account(txns_to_commit),

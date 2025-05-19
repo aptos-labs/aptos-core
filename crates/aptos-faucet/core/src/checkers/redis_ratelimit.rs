@@ -325,7 +325,7 @@ impl CheckerTrait for RedisRatelimitChecker {
             .await?;
         let (key, _) = self.get_key_and_secs_until_next_day(key_prefix, &key_value);
 
-        conn.decr(&key, 1).await.map_err(|e| {
+        let _: () = conn.decr(&key, 1).await.map_err(|e| {
             AptosTapError::new_with_error_code(
                 format!("Failed to decrement value for redis key {}: {}", key, e),
                 AptosTapErrorCode::StorageError,

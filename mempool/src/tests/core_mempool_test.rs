@@ -267,12 +267,12 @@ fn test_fail_for_same_gas_amount_and_not_same_expiration_time() {
         TestTransaction::new(0, ReplayProtector::Nonce(123), 1),
     ]);
     let txn = TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 0)
-        .make_signed_transaction_with_expiration_time(u64::max_value() - 1000);
+        .make_signed_transaction_with_expiration_time(u64::MAX - 1000);
     let ret = add_signed_txn(&mut mempool, txn);
     assert!(ret.is_err());
 
     let txn = TestTransaction::new(0, ReplayProtector::Nonce(123), 1)
-        .make_signed_transaction_with_expiration_time(u64::max_value() - 1000);
+        .make_signed_transaction_with_expiration_time(u64::MAX - 1000);
     let ret = add_signed_txn(&mut mempool, txn);
     assert!(ret.is_err());
 }

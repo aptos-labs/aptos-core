@@ -43,7 +43,7 @@ module aptos_std::ristretto255_bulletproofs {
     const E_DST_TOO_LONG: u64 = 6;
 
     /// The native functions have not been rolled out yet.
-    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 4;
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 7;
 
     //
     // Structs
@@ -376,7 +376,7 @@ module aptos_std::ristretto255_bulletproofs {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x030004, location = Self)]
+    #[expected_failure(abort_code = 0x030007, location = Self)]
     fun test_bulletproof_feature_disabled(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ ], vector[ features::get_bulletproofs_feature()]);
 
@@ -392,7 +392,7 @@ module aptos_std::ristretto255_bulletproofs {
     }
 
     #[test(fx = @std)]
-    #[expected_failure(abort_code = 0x030004, location = Self)]
+    #[expected_failure(abort_code = 0x030007, location = Self)]
     fun test_bulletproof_batch_feature_disabled(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ ], vector[ features::get_bulletproofs_batch_feature() ]);
 

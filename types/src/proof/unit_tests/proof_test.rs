@@ -116,7 +116,7 @@ fn test_accumulator_proof_max_siblings_rightmost() {
     let root_hash = siblings.iter().fold(element_hash, |hash, sibling_hash| {
         TestAccumulatorInternalNode::new(*sibling_hash, hash).hash()
     });
-    let leaf_index = (std::u64::MAX - 1) / 2;
+    let leaf_index = (u64::MAX - 1) / 2;
     let proof = TestAccumulatorProof::new(siblings);
 
     assert!(proof.verify(root_hash, element_hash, leaf_index).is_ok());
@@ -602,5 +602,5 @@ fn create_transaction_info(
 
 fn create_event() -> ContractEvent {
     let event_key = EventKey::new(0, AccountAddress::random());
-    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap()).unwrap()
 }
