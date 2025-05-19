@@ -92,6 +92,7 @@ module aptos_experimental::market {
     /// 1. Insufficient margin
     /// 2. Order is reduce_only but does not reduce
     const ORDER_STATUS_REJECTED: u8 = 3;
+    const ORDER_SIZE_REDUCED: u8 = 4;
 
     public fun order_status_open(): u8 {
         ORDER_STATUS_OPEN
@@ -842,7 +843,36 @@ module aptos_experimental::market {
     ) {
         let account = signer::address_of(user);
         self.order_book.decrease_order_size(account, order_id, size_delta);
-        // TODO(skedia) emit event for order size decrease
+        let maybe_order = self.order_book.get_order(account, order_id);
+        assert!(maybe_order.is_some(), EORDER_DOES_NOT_EXIST);
+        let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+        let (
+            order_id_type,
+            _unique_priority_idx,
+            price,
+            orig_size,
+            remaining_size,
+            is_buy,
+            _trigger_condition,
+            _metadata
+        ) = order.destroy_order();
+        let (user, order_id) = order_id_type.destroy_order_id_type();
+        event::emit(
+            OrderEvent {
+                parent: self.parent,
+                market: self.market,
+                order_id,
+                user,
+                orig_size,
+                remaining_size,
+                size_delta: remaining_size,
+                price,
+                is_buy,
+                is_taker: false,
+                status: ORDER_SIZE_REDUCED,
+                details: std::string::utf8(b"Order size reduced")
+            }
+        )
     }
 
     /// Remaining size of the order in the order book.

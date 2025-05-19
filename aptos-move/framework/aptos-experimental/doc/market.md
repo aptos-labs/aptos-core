@@ -486,6 +486,15 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
+<a id="0x7_market_ORDER_SIZE_REDUCED"></a>
+
+
+
+<pre><code><b>const</b> <a href="market.md#0x7_market_ORDER_SIZE_REDUCED">ORDER_SIZE_REDUCED</a>: u8 = 4;
+</code></pre>
+
+
+
 <a id="0x7_market_ORDER_STATUS_CANCELLED"></a>
 
 Order has been cancelled by the user or engine.
@@ -1835,7 +1844,36 @@ Cancels an order - this will cancel the order and emit an event for the order ca
 ) {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
     self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
-    // TODO(skedia) emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for order size decrease
+    <b>let</b> maybe_order = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
+    <b>assert</b>!(maybe_order.is_some(), <a href="market.md#0x7_market_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
+    <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+    <b>let</b> (
+        order_id_type,
+        _unique_priority_idx,
+        price,
+        orig_size,
+        remaining_size,
+        is_buy,
+        _trigger_condition,
+        _metadata
+    ) = order.destroy_order();
+    <b>let</b> (user, order_id) = order_id_type.destroy_order_id_type();
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
+            parent: self.parent,
+            <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
+            order_id,
+            user,
+            orig_size,
+            remaining_size,
+            size_delta: remaining_size,
+            price,
+            is_buy,
+            is_taker: <b>false</b>,
+            status: <a href="market.md#0x7_market_ORDER_SIZE_REDUCED">ORDER_SIZE_REDUCED</a>,
+            details: std::string::utf8(b"Order size reduced")
+        }
+    )
 }
 </code></pre>
 
