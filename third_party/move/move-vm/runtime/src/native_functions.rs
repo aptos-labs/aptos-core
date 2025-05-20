@@ -8,8 +8,9 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
+        loader::native::NativeLoader,
         module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+        ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
     ModuleStorage,
 };
@@ -23,7 +24,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::UnvisitableModuleTraversalContext,
+    gas::{UnmeteredGasMeter, UnvisitableModuleTraversalContext},
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     resolver::ResourceResolver,
@@ -159,8 +160,13 @@ impl<'b> NativeContext<'_, 'b> {
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
         Ok(if !self.data_store.contains_resource(&address, ty) {
+            let loader = NativeLoader::new(self.module_storage);
+            let layout_converter = LayoutConverter::new(&loader);
             let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-                // TODO(lazy-loading): Use a native loader here (later PRs).
+                &layout_converter,
+                // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
+                // be visited.
+                &mut UnmeteredGasMeter,
                 &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
                 self.module_storage,
                 self.resource_resolver,
@@ -181,20 +187,37 @@ impl<'b> NativeContext<'_, 'b> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
-    }
-
-    pub fn type_to_type_layout_with_identifier_mappings(
+    pub fn type_to_type_layout_with_delayed_fields(
         &self,
         ty: &Type,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        StorageLayoutConverter::new(self.module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)
+    ) -> PartialVMResult<LayoutWithDelayedFields> {
+        let loader = NativeLoader::new(self.module_storage);
+        LayoutConverter::new(&loader).type_to_type_layout_with_delayed_fields(
+            // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
+            // be visited.
+            &mut UnmeteredGasMeter,
+            &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
+            ty,
+        )
     }
 
-    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
+    /// Returns the annotated layout of a type. If type contains delayed fields, returns [None].
+    /// An error is returned when a layout cannot be constructed (e.g., some limits on number of
+    /// nodes are reached, or an internal invariant violation is raised).
+    pub fn type_to_fully_annotated_layout(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+        let loader = NativeLoader::new(self.module_storage);
+        let layout = LayoutConverter::new(&loader)
+            .type_to_annotated_type_layout_with_delayed_fields(
+                // Gas meter will be ignored here. Passing as a no-op. All modules are expected to
+                // be visited.
+                &mut UnmeteredGasMeter,
+                &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
+                ty,
+            )?;
+        Ok(layout.into_layout_when_has_no_delayed_fields())
     }
 
     pub fn module_storage(&self) -> &dyn ModuleStorage {

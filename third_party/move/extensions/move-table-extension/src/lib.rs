@@ -229,8 +229,15 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout = context.type_to_type_layout(value_ty)?;
+                // Delayed fields do not matter in non-Aptos context.
+                let key_layout = context
+                    .type_to_type_layout_with_delayed_fields(key_ty)?
+                    .unpack()
+                    .0;
+                let value_layout = context
+                    .type_to_type_layout_with_delayed_fields(value_ty)?
+                    .unpack()
+                    .0;
                 let table = Table {
                     handle,
                     key_layout,
