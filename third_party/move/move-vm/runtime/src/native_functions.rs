@@ -23,8 +23,12 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, resolver::ResourceResolver,
-    values::Value,
+    gas::UnvisitableModuleTraversalContext,
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    resolver::ResourceResolver,
+    value_serde::FunctionValueExtension,
+    values::{AbstractFunction, SerializedFunctionData, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -156,6 +160,8 @@ impl<'b> NativeContext<'_, 'b> {
         //   it in the data cache.
         Ok(if !self.data_store.contains_resource(&address, ty) {
             let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+                // TODO(lazy-loading): Use a native loader here (later PRs).
+                &mut UnvisitableModuleTraversalContext::new(self.traversal_context),
                 self.module_storage,
                 self.resource_resolver,
                 &address,
@@ -229,5 +235,13 @@ impl<'b> NativeContext<'_, 'b> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
+    }
+
+    pub fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        self.function_value_extension()
+            .get_serialization_data(fun, self.traversal_context())
     }
 }

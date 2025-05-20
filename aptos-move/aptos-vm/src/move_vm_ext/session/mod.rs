@@ -165,6 +165,7 @@ where
         self,
         configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
+        traversal_context: &TraversalContext,
     ) -> VMResult<VMChangeSet> {
         let function_extension = module_storage.as_function_value_extension();
 
@@ -178,14 +179,14 @@ where
                 // gas charging) in block storage.
                 ValueSerDeContext::new()
                     .with_delayed_fields_serde()
-                    .with_func_args_deserialization(&function_extension)
+                    .with_function_value_extension(&function_extension, traversal_context)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
                 ValueSerDeContext::new()
-                    .with_func_args_deserialization(&function_extension)
+                    .with_function_value_extension(&function_extension, traversal_context)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
             };
@@ -212,7 +213,7 @@ where
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
-            .into_change_set(&function_extension)
+            .into_change_set(&function_extension, traversal_context)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();

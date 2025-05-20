@@ -1245,7 +1245,9 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
-            let storage = TraversalStorage::new();
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             let result = session.execute_function_bypass_visibility(
                 module,
                 &fun_name,
@@ -1262,7 +1264,7 @@ impl FakeExecutor {
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 &module_storage,
             );
             if let Err(err) = result {
@@ -1275,7 +1277,12 @@ impl FakeExecutor {
                 .as_ref()
                 .unwrap()
                 .change_set_configs;
-            finish_session_assert_no_modules(session, &module_storage, change_set_configs)
+            finish_session_assert_no_modules(
+                session,
+                &module_storage,
+                &traversal_context,
+                change_set_configs,
+            )
         };
         self.state_store.apply_write_set(&write_set).unwrap();
 
@@ -1302,7 +1309,10 @@ impl FakeExecutor {
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             session
                 .execute_function_bypass_visibility(
                     &module_id,
@@ -1311,7 +1321,7 @@ impl FakeExecutor {
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
-                    &mut TraversalContext::new(&storage),
+                    &mut traversal_context,
                     &module_storage,
                 )
                 .unwrap_or_else(|e| {
@@ -1325,6 +1335,7 @@ impl FakeExecutor {
             finish_session_assert_no_modules(
                 session,
                 &module_storage,
+                &traversal_context,
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
             )
         };
@@ -1346,7 +1357,10 @@ impl FakeExecutor {
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
+
         let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -1355,13 +1369,14 @@ impl FakeExecutor {
                 args,
                 // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
+                &mut traversal_context,
                 &module_storage,
             )
             .map_err(|e| e.into_vm_status())?;
         Ok(finish_session_assert_no_modules(
             session,
             &module_storage,
+            &traversal_context,
             &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
         ))
     }
@@ -1408,10 +1423,11 @@ impl FakeExecutor {
 fn finish_session_assert_no_modules(
     session: SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
+    traversal_context: &TraversalContext,
     change_set_configs: &ChangeSetConfigs,
 ) -> (WriteSet, Vec<ContractEvent>) {
     let change_set = session
-        .finish(change_set_configs, module_storage)
+        .finish(change_set_configs, module_storage, traversal_context)
         .expect("Failed to finish the session");
 
     change_set

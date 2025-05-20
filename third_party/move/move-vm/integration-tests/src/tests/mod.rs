@@ -111,6 +111,7 @@ fn execute_script_impl(
 ) -> VMResult<ChangeSet> {
     let code_storage = storage.as_unsync_code_storage();
     let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
 
     let function = code_storage.load_script(script, ty_args)?;
     let mut data_cache = TransactionDataCache::empty();
@@ -120,13 +121,13 @@ fn execute_script_impl(
         args,
         &mut data_cache,
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
+        &mut traversal_context,
         &mut NativeContextExtensions::default(),
         &code_storage,
         storage,
     )?;
     let change_set = data_cache
-        .into_effects(&code_storage)
+        .into_effects(&code_storage, &traversal_context)
         .map_err(|err| err.finish(Location::Undefined))?;
     Ok(change_set)
 }

@@ -20,6 +20,7 @@ use aptos_vm_types::{
 };
 use derive_more::{Deref, DerefMut};
 use move_core_types::vm_status::VMStatus;
+use move_vm_runtime::module_traversal::TraversalContext;
 
 #[derive(Deref, DerefMut)]
 pub struct PrologueSession<'r> {
@@ -53,6 +54,7 @@ impl<'r> PrologueSession<'r> {
         resolver: &'r impl AptosMoveResolver,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl AptosModuleStorage,
+        traversal_context: &TraversalContext,
     ) -> Result<(SystemSessionChangeSet, UserSession<'r>), VMStatus> {
         let Self { session } = self;
 
@@ -68,6 +70,7 @@ impl<'r> PrologueSession<'r> {
             let change_set = session.finish_with_squashed_change_set(
                 change_set_configs,
                 module_storage,
+                traversal_context,
                 false,
             )?;
             let prologue_session_change_set =
