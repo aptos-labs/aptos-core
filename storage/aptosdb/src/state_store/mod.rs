@@ -536,6 +536,7 @@ impl StateStore {
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
         let state = StateWithSummary::new_at_version(
             latest_snapshot_version,
+            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
             usage,
         );
@@ -1099,10 +1100,14 @@ impl StateStore {
     }
 
     pub fn set_state_ignoring_summary(&self, ledger_state: LedgerState) {
+        let hot_smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
         let smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
-        let last_checkpoint_summary =
-            StateSummary::new_at_version(ledger_state.last_checkpoint().version(), smt.clone());
-        let summary = StateSummary::new_at_version(ledger_state.version(), smt.clone());
+        let last_checkpoint_summary = StateSummary::new_at_version(
+            ledger_state.last_checkpoint().version(),
+            hot_smt.clone(),
+            smt.clone(),
+        );
+        let summary = StateSummary::new_at_version(ledger_state.version(), hot_smt, smt);
 
         let last_checkpoint = StateWithSummary::new(
             ledger_state.last_checkpoint().clone(),
