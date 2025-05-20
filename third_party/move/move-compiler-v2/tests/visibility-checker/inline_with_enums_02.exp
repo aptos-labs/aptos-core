@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: Invalid operation: access of the field `0` on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/inline_with_enums_02.move:19:9
+   │
+12 │         x.0
+   │         --- accessed here
+   ·
+19 │     fun test(): u64 {
+   │         ^^^^
+20 │         m::use_me_not()
+   │         --------------- from a call inlined at this callsite

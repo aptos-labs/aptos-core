@@ -70,9 +70,6 @@ module aptos_experimental::market {
         TIME_IN_FORCE_IOC
     }
 
-    // TODO(skedia): Revisit this slippage tolerance for twap
-    const SLIPPAGE_TOLERANCE_FOR_TWAP: u64 = 300; // 3%
-
     struct Market<M: store + copy + drop> has store {
         /// Address of the parent object that created this market
         /// Purely for grouping events based on the source DEX, not used otherwise
@@ -95,6 +92,7 @@ module aptos_experimental::market {
     /// 1. Insufficient margin
     /// 2. Order is reduce_only but does not reduce
     const ORDER_STATUS_REJECTED: u8 = 3;
+    const ORDER_SIZE_REDUCED: u8 = 4;
 
     public fun order_status_open(): u8 {
         ORDER_STATUS_OPEN
@@ -839,6 +837,44 @@ module aptos_experimental::market {
         }
     }
 
+    /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
+    public fun decrease_order_size<M: store + copy + drop>(
+        self: &mut Market<M>, user: &signer, order_id: u64, size_delta: u64
+    ) {
+        let account = signer::address_of(user);
+        self.order_book.decrease_order_size(account, order_id, size_delta);
+        let maybe_order = self.order_book.get_order(account, order_id);
+        assert!(maybe_order.is_some(), EORDER_DOES_NOT_EXIST);
+        let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+        let (
+            order_id_type,
+            _unique_priority_idx,
+            price,
+            orig_size,
+            remaining_size,
+            is_buy,
+            _trigger_condition,
+            _metadata
+        ) = order.destroy_order();
+        let (user, order_id) = order_id_type.destroy_order_id_type();
+        event::emit(
+            OrderEvent {
+                parent: self.parent,
+                market: self.market,
+                order_id,
+                user,
+                orig_size,
+                remaining_size,
+                size_delta: remaining_size,
+                price,
+                is_buy,
+                is_taker: false,
+                status: ORDER_SIZE_REDUCED,
+                details: std::string::utf8(b"Order size reduced")
+            }
+        )
+    }
+
     /// Remaining size of the order in the order book.
     public fun get_remaining_size<M: store + copy + drop>(
         self: &Market<M>, user: address, order_id: u64
@@ -852,39 +888,6 @@ module aptos_experimental::market {
         self: &mut Market<M>, oracle_price: u64
     ): vector<Order<M>> {
         self.order_book.take_ready_price_based_orders(oracle_price)
-    }
-
-    /// Triggers all the orders that are ready to be executed based on the oracle price.
-    public fun trigger_price_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>,
-        oracle_price: u64,
-        callbacks: &MarketClearinghouseCallbacks<M>
-    ) {
-        let ready_orders = self.order_book.take_ready_price_based_orders(oracle_price);
-        let i = 0;
-        while (i < ready_orders.length()) {
-            let order = ready_orders[i];
-            let (order_id, _unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
-
-                order.destroy_order();
-            let (user_addr, order_id) = order_id.destroy_order_id_type();
-            self.place_order_with_order_id(
-                user_addr,
-                price,
-                orig_size,
-                orig_size,
-                is_buy,
-                TIME_IN_FORCE_GTC,
-                option::none(),
-                metadata,
-                order_id,
-                1000, // TODO(skedia): Add support for fill limit here.
-                false,
-                true,
-                callbacks
-            );
-            i += 1;
-        };
     }
 
     /// Returns all the pending order that are ready to be executed based on current time stamp. The caller is responsible to

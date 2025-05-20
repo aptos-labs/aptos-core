@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: Invalid operation: match on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/inline_with_enums_03.move:21:9
+   │
+12 │         match (x) {
+   │                - matched here
+   ·
+21 │     fun test(): u64 {
+   │         ^^^^
+22 │         m::use_me_not()
+   │         --------------- from a call inlined at this callsite

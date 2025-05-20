@@ -1258,6 +1258,15 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
         if idx < self.inlined_formal_params.len() {
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
+            if self.lambda_param_map.contains_key(&sym) {
+                // lambda parameter `sym` is used as a temp apart from a call
+                // which is currently not supported
+                let msg = format!("parameter `{}` with function type cannot be used as a local variable in an inline function",
+                   sym.display(self.env.symbol_pool()));
+                let call_details = vec![(loc.clone(), "being used here".to_string())];
+                self.env
+                    .diag_with_labels(Severity::Error, &param.2, &msg, call_details);
+            }
             let param_type = &param.1;
             let instantiated_param_type = param_type.instantiate(self.type_args);
             let new_node_id = self.env.new_node(loc, instantiated_param_type);
