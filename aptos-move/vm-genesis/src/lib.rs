@@ -65,7 +65,7 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::gas::{AlwaysVisitedModuleTraversalContext, UnmeteredGasMeter};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -1057,8 +1057,12 @@ fn code_to_writes_for_publishing(
     let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = genesis_state_view.as_move_resolver();
 
-    let module_storage_with_staged_modules =
-        StagingModuleStorage::create(&addr, &module_storage, code)?;
+    let module_storage_with_staged_modules = StagingModuleStorage::create(
+        &addr,
+        &module_storage,
+        code,
+        &AlwaysVisitedModuleTraversalContext,
+    )?;
     let verified_module_bundle =
         module_storage_with_staged_modules.release_verified_module_bundle();
 

@@ -24,7 +24,6 @@ use move_vm_types::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
     },
-    module_linker_error,
 };
 use std::{rc::Rc, sync::Arc};
 
@@ -59,9 +58,8 @@ where
 
             let size = self
                 .module_storage
-                .unmetered_get_module_size(addr, name)
-                .map_err(|err| err.to_partial())?
-                .ok_or_else(|| module_linker_error!(addr, name).to_partial())?;
+                .unmetered_get_existing_module_size(addr, name)
+                .map_err(|err| err.to_partial())?;
             gas_meter.charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
         }
         Ok(())
