@@ -64,9 +64,9 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `place_maker_order`](#0x7_market_place_maker_order)
 -  [Function `place_order_with_order_id`](#0x7_market_place_order_with_order_id)
 -  [Function `cancel_order`](#0x7_market_cancel_order)
+-  [Function `decrease_order_size`](#0x7_market_decrease_order_size)
 -  [Function `get_remaining_size`](#0x7_market_get_remaining_size)
 -  [Function `take_ready_price_based_orders`](#0x7_market_take_ready_price_based_orders)
--  [Function `trigger_price_based_orders`](#0x7_market_trigger_price_based_orders)
 -  [Function `take_ready_time_based_orders`](#0x7_market_take_ready_time_based_orders)
 
 
@@ -486,6 +486,15 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
+<a id="0x7_market_ORDER_SIZE_REDUCED"></a>
+
+
+
+<pre><code><b>const</b> <a href="market.md#0x7_market_ORDER_SIZE_REDUCED">ORDER_SIZE_REDUCED</a>: u8 = 4;
+</code></pre>
+
+
+
 <a id="0x7_market_ORDER_STATUS_CANCELLED"></a>
 
 Order has been cancelled by the user or engine.
@@ -525,15 +534,6 @@ orders are invalid orders. Rejection reasons:
 
 
 <pre><code><b>const</b> <a href="market.md#0x7_market_ORDER_STATUS_REJECTED">ORDER_STATUS_REJECTED</a>: u8 = 3;
-</code></pre>
-
-
-
-<a id="0x7_market_SLIPPAGE_TOLERANCE_FOR_TWAP"></a>
-
-
-
-<pre><code><b>const</b> <a href="market.md#0x7_market_SLIPPAGE_TOLERANCE_FOR_TWAP">SLIPPAGE_TOLERANCE_FOR_TWAP</a>: u64 = 300;
 </code></pre>
 
 
@@ -1823,6 +1823,64 @@ Cancels an order - this will cancel the order and emit an event for the order ca
 
 </details>
 
+<a id="0x7_market_decrease_order_size"></a>
+
+## Function `decrease_order_size`
+
+Cancels an order - this will cancel the order and emit an event for the order cancellation.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, order_id: u64, size_delta: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, order_id: u64, size_delta: u64
+) {
+    <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
+    <b>let</b> maybe_order = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
+    <b>assert</b>!(maybe_order.is_some(), <a href="market.md#0x7_market_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
+    <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();
+    <b>let</b> (
+        order_id_type,
+        _unique_priority_idx,
+        price,
+        orig_size,
+        remaining_size,
+        is_buy,
+        _trigger_condition,
+        _metadata
+    ) = order.destroy_order();
+    <b>let</b> (user, order_id) = order_id_type.destroy_order_id_type();
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
+            parent: self.parent,
+            <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
+            order_id,
+            user,
+            orig_size,
+            remaining_size,
+            size_delta: remaining_size,
+            price,
+            is_buy,
+            is_taker: <b>false</b>,
+            status: <a href="market.md#0x7_market_ORDER_SIZE_REDUCED">ORDER_SIZE_REDUCED</a>,
+            details: std::string::utf8(b"Order size reduced")
+        }
+    )
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_market_get_remaining_size"></a>
 
 ## Function `get_remaining_size`
@@ -1871,59 +1929,6 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;, oracle_price: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Order&lt;M&gt;&gt; {
     self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_take_ready_price_based_orders">take_ready_price_based_orders</a>(oracle_price)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_market_trigger_price_based_orders"></a>
-
-## Function `trigger_price_based_orders`
-
-Triggers all the orders that are ready to be executed based on the oracle price.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_trigger_price_based_orders">trigger_price_based_orders</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, oracle_price: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_trigger_price_based_orders">trigger_price_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;,
-    oracle_price: u64,
-    callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
-) {
-    <b>let</b> ready_orders = self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_take_ready_price_based_orders">take_ready_price_based_orders</a>(oracle_price);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; ready_orders.length()) {
-        <b>let</b> order = ready_orders[i];
-        <b>let</b> (order_id, _unique_priority_idx, price, orig_size, _, is_buy, _, metadata) =
-
-            order.destroy_order();
-        <b>let</b> (user_addr, order_id) = order_id.destroy_order_id_type();
-        self.<a href="market.md#0x7_market_place_order_with_order_id">place_order_with_order_id</a>(
-            user_addr,
-            price,
-            orig_size,
-            orig_size,
-            is_buy,
-            <a href="market.md#0x7_market_TIME_IN_FORCE_GTC">TIME_IN_FORCE_GTC</a>,
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-            metadata,
-            order_id,
-            1000, // TODO(skedia): Add support for fill limit here.
-            <b>false</b>,
-            <b>true</b>,
-            callbacks
-        );
-        i += 1;
-    };
 }
 </code></pre>
 
