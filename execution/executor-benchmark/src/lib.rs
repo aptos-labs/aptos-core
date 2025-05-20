@@ -289,7 +289,7 @@ where
     info!("Done creating workload");
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
-    let (num_pipeline_txns, staged_results) = pipeline.join();
+    let (num_pipeline_txns, staged_results, staged_events) = pipeline.join();
 
     info!("Executed workload {}", workload_name);
 
@@ -314,7 +314,7 @@ where
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
-
+    staged_events.print_end_table();
     (staged_results, overall_results)
 }
 
