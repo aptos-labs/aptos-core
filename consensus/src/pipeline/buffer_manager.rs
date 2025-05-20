@@ -69,6 +69,7 @@ pub const LOOP_INTERVAL_MS: u64 = 1500;
 pub struct ResetAck {}
 
 pub enum ResetSignal {
+    CriticalError,
     Stop,
     TargetRound(u64),
 }
@@ -547,7 +548,7 @@ impl BufferManager {
                 if commit_proof.ledger_info().ends_epoch() {
                     // the epoch ends, reset to avoid executing more blocks, execute after
                     // this persisting request will result in BlockNotFound
-                    self.reset().await;
+                    self.reset(false).await;
                 }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
                     let message =
@@ -583,19 +584,33 @@ impl BufferManager {
     /// Reset any request in buffer manager, this is important to avoid race condition with state sync.
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
-    async fn reset(&mut self) {
+    /// If critical error is true, the buffer manager has failed and state sync will eventually be triggered.
+    async fn reset(&mut self, critical_error: bool) {
         while let Some((_, block)) = self.pending_commit_blocks.pop_first() {
             // Those blocks don't have any dependencies, should be able to finish commit_ledger.
             // Abort them can cause error on epoch boundary.
             block.wait_for_commit_ledger().await;
         }
-        while let Some(item) = self.buffer.pop_front() {
-            for b in item.get_blocks() {
-                if let Some(futs) = b.abort_pipeline() {
-                    futs.wait_until_finishes().await;
+
+        // Clear the buffer
+        if critical_error {
+            while let Some(item) = self.buffer.pop_front_safe() {
+                for b in item.get_blocks() {
+                    if let Some(futs) = b.abort_pipeline() {
+                        futs.wait_until_finishes().await;
+                    }
+                }
+            }
+        } else {
+            while let Some(item) = self.buffer.pop_front() {
+                for b in item.get_blocks() {
+                    if let Some(futs) = b.abort_pipeline() {
+                        futs.wait_until_finishes().await;
+                    }
                 }
             }
         }
+
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
@@ -617,17 +632,23 @@ impl BufferManager {
             self.reset_flag.store(true, Ordering::SeqCst);
         }
 
-        match signal {
-            ResetSignal::Stop => self.stop = true,
+        let critical_error = match signal {
+            ResetSignal::CriticalError => true,
+            ResetSignal::Stop => {
+                self.stop = true;
+                false
+            },
             ResetSignal::TargetRound(round) => {
                 self.highest_committed_round = round;
                 self.latest_round = round;
 
                 let _ = self.drain_pending_commit_proof_till(round);
-            },
-        }
 
-        self.reset().await;
+                false
+            },
+        };
+
+        self.reset(critical_error).await;
         let _ = tx.send(ResetAck::default());
         if !self.new_pipeline_enabled {
             self.reset_flag.store(false, Ordering::SeqCst);
@@ -998,7 +1019,7 @@ impl BufferManager {
         let (reset_signal_tx, _reset_signal_rx) = oneshot::channel();
         let reset_request = ResetRequest {
             tx: reset_signal_tx,
-            signal: ResetSignal::Stop,
+            signal: ResetSignal::CriticalError,
         };
         self.process_reset_request(reset_request).await;
 
@@ -1057,7 +1078,7 @@ impl BufferManager {
                     monitor!("buffer_manager_process_execution_wait_response", {
                     let response_block_id = response.block_id;
                     if let Err(error) = self.process_execution_response(response).await {
-                        // We hit a critical error (the manager needs to be restarted)
+                        // We hit a critical error
                         self.handle_critical_error(error, "process_execution_response").await;
                         break;
                     }
@@ -1109,7 +1130,7 @@ impl BufferManager {
                             };
                         }
                         Err(error) => {
-                            // We hit a critical error (the manager needs to be restarted)
+                            // We hit a critical error
                             self.handle_critical_error(error, "process_commit_message").await;
                             break;
                         }

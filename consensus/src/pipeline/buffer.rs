@@ -4,6 +4,7 @@
 
 use crate::pipeline::hashable::Hashable;
 use aptos_crypto::HashValue;
+use aptos_logger::warn;
 use std::collections::HashMap;
 
 pub struct LinkedItem<T: Hashable> {
@@ -75,6 +76,34 @@ impl<T: Hashable> Buffer<T> {
                 self.tail = None;
             }
             elem.unwrap()
+        })
+    }
+
+    pub fn pop_front_safe(&mut self) -> Option<T> {
+        self.head.take().and_then(|head| {
+            // Get the item and remove it from the map
+            let mut item = match self.map.remove(&head) {
+                Some(item) => item,
+                None => {
+                    warn!("Failed to find buffer item with hash: {:?}", head);
+                    return None;
+                },
+            };
+
+            // Get the element and update the head
+            let elem = item.elem.take();
+            self.head = item.next;
+            if self.head.is_none() {
+                // empty
+                self.tail = None;
+            }
+
+            // If the element is None, log a warning
+            if elem.is_none() {
+                warn!("Buffer item with hash {:?} had no element", head);
+            }
+
+            elem
         })
     }
 
