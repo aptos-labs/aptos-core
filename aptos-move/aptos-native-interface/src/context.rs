@@ -7,7 +7,7 @@ use aptos_gas_algebra::{
 };
 use aptos_gas_schedule::{AbstractValueSizeGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::VMResult;
+use move_binary_format::errors::{Location, VMResult};
 use move_core_types::{
     gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
 };
@@ -145,16 +145,33 @@ impl SafeNativeContext<'_, '_, '_> {
         self.enable_incremental_gas_charging = enable;
     }
 
+    /// Loads a function definition corresponding to the given name. The module where the function
+    /// is defined must have been visited and metered (an error is returned otherwise).
     pub fn load_function(
         &mut self,
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.inner.module_storage().fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
+        // MODULE METERING SAFETY:
+        //   Metering is done when native returns LoadModule result, so this access will never load
+        //   anything and will access cached and metered modules. Currently, native implementations
+        //   check if the loading was metered or not before calling here, but this kept as an extra
+        //   redundancy check in case there is a mistake and gas is not charged somehow.
+        if self.features.is_lazy_loading_enabled() {
+            self.inner
+                .traversal_context()
+                .check_is_special_or_visited(module_id.address(), module_id.name())
+                .map_err(|err| err.finish(Location::Undefined))?;
+        }
+
+        let (_, function) = self
+            .inner
+            .module_storage()
+            .unmetered_get_function_definition(
+                module_id.address(),
+                module_id.name(),
+                function_name,
+            )?;
         Ok(function)
     }
 }
