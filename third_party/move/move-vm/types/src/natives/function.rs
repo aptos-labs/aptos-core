@@ -62,6 +62,12 @@ pub enum NativeResult {
     LoadModule {
         module_name: ModuleId,
     },
+    /// Instruct the VM to convert types into layouts (annotated, if flag is set and runtime
+    /// otherwise). These layouts can be used by natives later on.
+    LoadLayouts {
+        tys: Vec<Type>,
+        annotated: bool,
+    },
 }
 
 impl NativeResult {

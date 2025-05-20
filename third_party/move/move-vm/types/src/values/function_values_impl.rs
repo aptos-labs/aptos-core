@@ -20,6 +20,7 @@ use std::{
     cmp::Ordering,
     fmt,
     fmt::{Debug, Display, Formatter},
+    sync::Arc,
 };
 
 /// A trait describing a function which can be executed. If this is a generic
@@ -52,7 +53,7 @@ pub struct SerializedFunctionData {
     /// are stored so one can verify type consistency at
     /// resolution time. It also allows to serialize an unresolved
     /// closure, making unused closure data cheap in round trips.
-    pub captured_layouts: Vec<MoveTypeLayout>,
+    pub captured_layouts: Vec<Arc<MoveTypeLayout>>,
 }
 
 impl Closure {
@@ -127,10 +128,10 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveFunctionLayout
         seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
         for (layout, value) in data.captured_layouts.into_iter().zip(captured) {
-            seq.serialize_element(&layout)?;
+            seq.serialize_element(layout.as_ref())?;
             seq.serialize_element(&SerializationReadyValue {
                 ctx: self.ctx,
-                layout: &layout,
+                layout: layout.as_ref(),
                 value,
             })?
         }
@@ -178,7 +179,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
                 layout: &layout,
             })? {
                 Some(v) => {
-                    captured_layouts.push(layout);
+                    captured_layouts.push(Arc::new(layout));
                     captured.push(v.0)
                 },
                 None => return Err(A::Error::invalid_length(captured.len(), &self)),

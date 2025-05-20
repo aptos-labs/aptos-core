@@ -15,6 +15,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
+    native_layout_cache::NativeLayoutCache,
     reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_type_checks::{
         verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
@@ -100,6 +101,9 @@ pub(crate) struct InterpreterImpl<'ctx, T> {
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, T>,
     /// Converts runtime types ([Type]) to layouts for (de)serialization.
     layout_converter: &'ctx LayoutConverter<'ctx, T>,
+    /// Cache of layouts which are allowed to be used in native context. When native wants to use a
+    /// layout, it must pre-load it into this cache for future use.
+    native_layout_cache: NativeLayoutCache,
 }
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
@@ -172,6 +176,7 @@ where
             reentrancy_checker: ReentrancyChecker::default(),
             ty_depth_checker,
             layout_converter,
+            native_layout_cache: NativeLayoutCache::default(),
         };
 
         let function = Rc::new(function);
@@ -894,6 +899,7 @@ where
             extensions,
             gas_meter.balance_internal(),
             traversal_context,
+            &self.native_layout_cache,
         );
         let native_function = function.get_native()?;
 
@@ -1035,6 +1041,19 @@ where
                     vec![],
                 )
                 .map_err(|err| err.to_partial())
+            },
+            NativeResult::LoadLayouts { tys, annotated } => {
+                if self.vm_config.enable_lazy_loading {
+                    self.native_layout_cache.insert(
+                        self.layout_converter,
+                        gas_meter,
+                        traversal_context,
+                        tys,
+                        annotated,
+                    )?;
+                }
+                current_frame.pc += 1;
+                Ok(())
             },
             NativeResult::LoadModule { module_name } => {
                 let arena_id = traversal_context

@@ -80,7 +80,7 @@ pub fn randomly_check_layout_matches(
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
     resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+    events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
 
     // Changes separated out from the writes, for better concurrency,
     // materialized back into resources when transaction output is computed.
@@ -118,7 +118,7 @@ impl VMChangeSet {
 
     pub fn new(
         resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
@@ -144,7 +144,7 @@ impl VMChangeSet {
             (StateValueMetadata, u64, Arc<MoveTypeLayout>),
         >,
         group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
-        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: Vec<(ContractEvent, Option<Arc<MoveTypeLayout>>)>,
     ) -> PartialVMResult<Self> {
         Ok(Self::new(
             resource_write_set
@@ -358,7 +358,7 @@ impl VMChangeSet {
         &self.delayed_field_change_set
     }
 
-    pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
+    pub fn events(&self) -> &[(ContractEvent, Option<Arc<MoveTypeLayout>>)] {
         &self.events
     }
 

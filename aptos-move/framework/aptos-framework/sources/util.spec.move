@@ -9,8 +9,8 @@ spec aptos_framework::util {
     ///
     spec from_bytes<T>(bytes: vector<u8>): T {
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] result == spec_from_bytes<T>(bytes);
+        aborts_if false;
+        ensures result == spec_from_bytes<T>(bytes);
     }
 
     spec fun spec_from_bytes<T>(bytes: vector<u8>): T;
@@ -21,5 +21,16 @@ spec aptos_framework::util {
         // If length of address input bytes is not 32, the deserialization will fail. See indexer/src/utils.rs.
         /// [high-level-req-1]
         aborts_if [abstract] len(bytes) != 32;
+    }
+
+    spec native_load_layout<T>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec native_from_bytes<T>(bytes: vector<u8>): T {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_from_bytes<T>(bytes);
     }
 }

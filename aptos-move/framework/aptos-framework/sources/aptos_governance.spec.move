@@ -414,7 +414,7 @@ spec aptos_framework::aptos_governance {
         aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         let execution_key = utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if simple_map::spec_contains_key(proposal.metadata, execution_key) &&
-                  simple_map::spec_get(proposal.metadata, execution_key) != std::bcs::to_bytes(false);
+                  simple_map::spec_get(proposal.metadata, execution_key) != std::bcs::serialize(false);
         // Since there are two possibilities for voting_power, the result of the vote is not only related to should_pass,
         // but also to allow_validator_set_change which determines the voting_power
         aborts_if
@@ -425,7 +425,7 @@ spec aptos_framework::aptos_governance {
         aborts_if !string::spec_internal_check_utf8(voting::RESOLVABLE_TIME_METADATA_KEY);
         let key = utf8(voting::RESOLVABLE_TIME_METADATA_KEY);
         ensures simple_map::spec_contains_key(post_proposal.metadata, key);
-        ensures simple_map::spec_get(post_proposal.metadata, key) == std::bcs::to_bytes(timestamp::now_seconds());
+        ensures simple_map::spec_get(post_proposal.metadata, key) == std::bcs::serialize(timestamp::now_seconds());
 
         aborts_if used_voting_power + real_voting_power > MAX_U64;
 
