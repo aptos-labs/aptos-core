@@ -1,3 +1,3 @@
 module 0xcafe::m1 {
-    public entry fun run() {}
+    public entry fun noop() {}
 }
