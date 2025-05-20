@@ -1901,8 +1901,12 @@ impl ExpTranslator<'_, '_, '_> {
                 } else {
                     self.translate_exp(exp, &target_ty)
                 };
-                if self.subs.specialize(&target_ty).is_reference() {
+                let specialized_target_ty = self.subs.specialize(&target_ty);
+                if specialized_target_ty.is_reference() {
                     self.error(&loc, "cannot borrow from a reference")
+                }
+                if specialized_target_ty.is_tuple() {
+                    self.error(&loc, "cannot borrow a tuple")
                 }
                 let id = self.new_node_id_with_type_loc(&result_ty, &loc);
                 let target_exp =
