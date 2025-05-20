@@ -48,20 +48,27 @@ use aptos_logger::{debug, error, info, warn};
 use aptos_network::{
     application::interface::NetworkClient, protocols::wire::handshake::v1::ProtocolId,
 };
+use aptos_reliable_broadcast::DropGuard;
 use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
     block_info::Round, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
 };
-use futures::StreamExt;
-use futures_channel::oneshot;
+use futures::{
+    future::{AbortHandle, Abortable},
+    SinkExt, StreamExt,
+};
+use futures_channel::{
+    mpsc::{UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 use move_core_types::account_address::AccountAddress;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::mpsc::UnboundedSender, time::interval};
+use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
 // Whether to log messages at the info level (useful for debugging)
@@ -69,8 +76,11 @@ const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
-    // The execution client to the buffer manager
+    // The execution client, error forwarder, and notifier/listener pair
     execution_client: Arc<dyn TExecutionClient>,
+    execution_client_error_forwarder: Option<DropGuard>,
+    execution_client_error_notifier: UnboundedSender<String>,
+    execution_client_error_listener: UnboundedReceiver<String>,
 
     // The block data for the observer
     observer_block_data: Arc<Mutex<ObserverBlockData>>,
@@ -99,7 +109,7 @@ impl ConsensusObserver {
         >,
         db_reader: Arc<dyn DbReader>,
         execution_client: Arc<dyn TExecutionClient>,
-        state_sync_notification_sender: UnboundedSender<StateSyncNotification>,
+        state_sync_notification_sender: tokio::sync::mpsc::UnboundedSender<StateSyncNotification>,
         reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         time_service: TimeService,
@@ -136,6 +146,10 @@ impl ConsensusObserver {
         let observer_epoch_state =
             ObserverEpochState::new(node_config, reconfig_events, consensus_publisher);
 
+        // Create the execution client error channel
+        let (execution_client_error_notifier, execution_client_error_listener) =
+            futures_channel::mpsc::unbounded();
+
         // Create the observer block data
         let observer_block_data = Arc::new(Mutex::new(ObserverBlockData::new(
             consensus_observer_config,
@@ -145,6 +159,9 @@ impl ConsensusObserver {
         // Create the consensus observer
         Self {
             execution_client,
+            execution_client_error_forwarder: None,
+            execution_client_error_notifier,
+            execution_client_error_listener,
             observer_block_data,
             observer_epoch_state,
             observer_fallback_manager,
@@ -576,6 +593,21 @@ impl ConsensusObserver {
         }
 
         false // The commit decision was not processed
+    }
+
+    /// Processes an error notification from the execution client
+    async fn process_execution_client_error_notification(&mut self, error_notification: String) {
+        // Restart the execution client
+        self.start_execution_client().await;
+
+        // Log the error and enter fallback mode
+        warn!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Received execution client error notification: {:?}! Entering fallback mode!",
+                error_notification
+            ))
+        );
+        self.enter_fallback_mode().await;
     }
 
     /// Processes a network message received by the consensus observer
@@ -1059,21 +1091,31 @@ impl ConsensusObserver {
     async fn wait_for_epoch_start(&mut self) {
         // Wait for the epoch state to update
         let block_payloads = self.observer_block_data.lock().get_block_payloads();
-        let (payload_manager, consensus_config, execution_config, randomness_config) = self
-            .observer_epoch_state
+        self.observer_epoch_state
             .wait_for_epoch_start(block_payloads)
             .await;
 
-        // Fetch the new epoch state
-        let epoch_state = self.get_epoch_state();
+        // Start the execution client with the new epoch
+        self.start_execution_client().await;
+    }
 
-        // Start the new epoch
+    /// Starts the execution client. Internally, this will reset the client,
+    /// and spawn a task to forward error notifications to the observer.
+    async fn start_execution_client(&mut self) {
+        // Fetch the latest epoch state, on-chain configs and payload manager
+        let epoch_state = self.get_epoch_state();
+        let (consensus_config, execution_config, randomness_config) =
+            self.observer_epoch_state.on_chain_configs();
+        let payload_manager = self.observer_epoch_state.payload_manager();
+
+        // Start the execution client epoch
         let sk = Arc::new(bls12381::PrivateKey::genesis());
         let signer = Arc::new(ValidatorSigner::new(AccountAddress::ZERO, sk.clone()));
         let dummy_signer = Arc::new(DagCommitSigner::new(signer.clone()));
         let (_, rand_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
-        self.execution_client
+        let maybe_error_listener = self
+            .execution_client
             .start_epoch(
                 sk,
                 epoch_state.clone(),
@@ -1089,6 +1131,34 @@ impl ConsensusObserver {
                 self.pipeline_enabled(),
             )
             .await;
+
+        // Verify that the error listener exists
+        let mut error_listener =
+            maybe_error_listener.expect("The execution client failed to return an error listener!");
+
+        // Spawn an abortable task to forward error notifications to the observer
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let mut error_notifier = self.execution_client_error_notifier.clone();
+        tokio::spawn(Abortable::new(
+            async move {
+                // Forward each error notification from the execution client to the observer
+                while let Some(error_notification) = error_listener.next().await {
+                    if let Err(error) = error_notifier.send(error_notification).await {
+                        error!(
+                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                                "Failed to send execution client error notification! Error: {:?}",
+                                error
+                            ))
+                        );
+                        return; // Exit the task early
+                    }
+                }
+            },
+            abort_registration,
+        ));
+        self.execution_client_error_forwarder = Some(DropGuard::new(abort_handle));
+
+        // Update the pipeline builder
         if self.pipeline_enabled() {
             self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer))
         }
@@ -1118,6 +1188,9 @@ impl ConsensusObserver {
             .message("Starting the consensus observer loop!"));
         loop {
             tokio::select! {
+                Some(error_notification) = self.execution_client_error_listener.next() => {
+                    self.process_execution_client_error_notification(error_notification).await;
+                }
                 Some(network_message) = consensus_observer_message_receiver.next() => {
                     self.process_network_message(network_message).await;
                 }
