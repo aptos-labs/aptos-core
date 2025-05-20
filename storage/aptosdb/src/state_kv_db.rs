@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_options::gen_state_kv_shard_cfds,
+    db_options::{gen_hot_state_kv_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -45,6 +45,8 @@ pub const STATE_KV_METADATA_DB_NAME: &str = "state_kv_metadata_db";
 pub struct StateKvDb {
     state_kv_metadata_db: Arc<DB>,
     state_kv_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    #[allow(dead_code)] // TODO(HotState): can remove later.
+    hot_state_kv_db: Arc<DB>,
     enabled_sharding: bool,
 }
 
@@ -61,6 +63,7 @@ impl StateKvDb {
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
                 state_kv_db_shards: arr![Arc::clone(&ledger_db); 16],
+                hot_state_kv_db: Arc::clone(&ledger_db),
                 enabled_sharding: false,
             });
         }
@@ -105,9 +108,17 @@ impl StateKvDb {
             .try_into()
             .unwrap();
 
+        let hot_state_kv_db = Arc::new(Self::open_hot_state_db(
+            db_paths.state_kv_db_shard_root_path(0),
+            "hot_state_kv_db",
+            &state_kv_db_config,
+            readonly,
+        )?);
+
         let state_kv_db = Self {
             state_kv_metadata_db,
             state_kv_db_shards,
+            hot_state_kv_db,
             enabled_sharding: true,
         };
 
@@ -292,6 +303,31 @@ impl StateKvDb {
         })
     }
 
+    fn open_hot_state_db<P: AsRef<Path>>(
+        path: P,
+        name: &str,
+        state_kv_db_config: &RocksdbConfig,
+        readonly: bool,
+    ) -> Result<DB> {
+        let db_path = Self::hot_state_db_path(path);
+        let db = if readonly {
+            DB::open_cf_readonly(
+                &gen_rocksdb_options(state_kv_db_config, readonly),
+                db_path,
+                name,
+                gen_hot_state_kv_cfds(state_kv_db_config),
+            )?
+        } else {
+            DB::open_cf(
+                &gen_rocksdb_options(state_kv_db_config, readonly),
+                db_path,
+                name,
+                gen_hot_state_kv_cfds(state_kv_db_config),
+            )?
+        };
+        Ok(db)
+    }
+
     fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: u8) -> PathBuf {
         let shard_sub_path = format!("shard_{}", shard_id);
         db_root_path
@@ -305,6 +341,13 @@ impl StateKvDb {
             .as_ref()
             .join(STATE_KV_DB_FOLDER_NAME)
             .join("metadata")
+    }
+
+    fn hot_state_db_path<P: AsRef<Path>>(db_root_path: P) -> PathBuf {
+        db_root_path
+            .as_ref()
+            .join(STATE_KV_DB_FOLDER_NAME)
+            .join("hot_state")
     }
 
     pub(crate) fn get_state_value_with_version_by_version(
