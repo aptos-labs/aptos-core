@@ -11,6 +11,7 @@ use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
+use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
@@ -18,12 +19,13 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use derivative::Derivative;
+use move_core_types::language_storage::StructTag;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     marker::PhantomData,
     sync::{
         mpsc::{self, SyncSender},
-        Arc, Mutex,
+        Arc,
     },
     thread::JoinHandle,
     time::{Duration, Instant},
@@ -49,11 +51,25 @@ pub struct PipelineConfig {
     pub print_transactions: bool,
 }
 
+pub struct EventMeasurements {
+    staged_events: BTreeMap<(usize, StructTag), usize>,
+}
+
+impl EventMeasurements {
+    pub fn print_end_table(&self) {
+        println!("Events:");
+        for ((stage, tag), count) in &self.staged_events {
+            println!("stage{: <5}{: >12}     {}::{}::{}", stage, count, if tag.address.is_special() { tag.address.to_standard_string() } else { "custom".to_string()}, tag.module, tag.name);
+        }
+    }
+}
+
 pub struct Pipeline<V> {
     join_handles: Vec<JoinHandle<u64>>,
     phantom: PhantomData<V>,
     start_pipeline_tx: Option<SyncSender<()>>,
     staged_result: Arc<Mutex<Vec<OverallMeasurement>>>,
+    staged_events: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
 }
 
 impl<V> Pipeline<V>
@@ -130,12 +146,17 @@ where
         } else {
             CommitProcessing::SendToQueue(commit_sender)
         };
+
+        let staged_events = Arc::new(Mutex::new(BTreeMap::new()));
+        let staged_events_clone = staged_events.clone();
+
         let mut ledger_update_stage = LedgerUpdateStage::new(
             executor_2,
             commit_processing,
             config.allow_aborts,
             config.allow_discards,
             config.allow_retries,
+            staged_events_clone,
         );
 
         let print_transactions = config.print_transactions;
@@ -204,7 +225,7 @@ where
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     stage_executed += block_size;
-                    exe.execute_block(current_block_start_time, partition_time, block);
+                    exe.execute_block(current_block_start_time, partition_time, block, stage_index);
                     info!("Finished executing block");
 
                     // Empty blocks indicate the end of a stage.
@@ -219,7 +240,7 @@ where
                             );
 
                             stage_measurement.print_end();
-                            staged_result_clone.lock().unwrap().push(stage_measurement);
+                            staged_result_clone.lock().push(stage_measurement);
                         }
                         stage_index += 1;
                         stage_overall_measuring = OverallMeasuring::start();
@@ -236,7 +257,7 @@ where
                         stage_executed,
                     );
                     stage_measurement.print_end();
-                    staged_result_clone.lock().unwrap().push(stage_measurement);
+                    staged_result_clone.lock().push(stage_measurement);
                 }
 
                 if num_blocks.is_some() {
@@ -298,6 +319,7 @@ where
                 phantom: PhantomData,
                 start_pipeline_tx,
                 staged_result,
+                staged_events,
             },
             raw_block_sender,
         )
@@ -307,7 +329,7 @@ where
         self.start_pipeline_tx.as_ref().map(|tx| tx.send(()));
     }
 
-    pub fn join(self) -> (Option<u64>, Vec<OverallMeasurement>) {
+    pub fn join(self) -> (Option<u64>, Vec<OverallMeasurement>, EventMeasurements) {
         let mut counts = vec![];
         for handle in self.join_handles {
             let count = handle.join().unwrap();
@@ -319,8 +341,8 @@ where
             counts.into_iter().min(),
             Arc::try_unwrap(self.staged_result)
                 .unwrap()
-                .into_inner()
-                .unwrap(),
+                .into_inner(),
+            EventMeasurements { staged_events: Arc::try_unwrap(self.staged_events).unwrap().into_inner()},
         )
     }
 }
@@ -350,6 +372,7 @@ pub struct LedgerUpdateMessage {
     pub block_id: HashValue,
     pub parent_block_id: HashValue,
     pub num_input_txns: usize,
+    pub stage: usize,
 }
 
 /// Message from execution stage to commit stage.
