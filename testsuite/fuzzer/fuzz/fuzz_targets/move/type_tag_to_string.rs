@@ -13,34 +13,21 @@ struct FuzzData {
     b: TypeTag,
 }
 
-/// Validates that all identifiers in a TypeTag are valid Move identifiers
-fn contains_valid_identifiers(type_tag: &TypeTag) -> bool {
+/// Validates that all identifiers are valid Move identifiers and contains valid ability sets
+fn is_valid_type_tag(type_tag: &TypeTag) -> bool {
     match type_tag {
         TypeTag::Struct(struct_tag) => {
             Identifier::is_valid(&struct_tag.module.to_string())
                 && Identifier::is_valid(&struct_tag.name.to_string())
-                && struct_tag.type_args.iter().all(contains_valid_identifiers)
+                && struct_tag.type_args.iter().all(is_valid_type_tag)
         },
-        TypeTag::Vector(inner_type_tag) => contains_valid_identifiers(inner_type_tag),
-        TypeTag::Function(function_tag) => {
-            function_tag.args.iter().all(contains_valid_identifiers)
-                && function_tag.results.iter().all(contains_valid_identifiers)
-        },
-        _ => true, // Primitive types are always valid
-    }
-}
-
-/// Validates ability sets within the TypeTag
-fn validate_ability_set(type_tag: &TypeTag) -> bool {
-    match type_tag {
-        TypeTag::Struct(struct_tag) => struct_tag.type_args.iter().all(validate_ability_set),
-        TypeTag::Vector(inner_type_tag) => validate_ability_set(inner_type_tag),
+        TypeTag::Vector(inner_type_tag) => is_valid_type_tag(inner_type_tag),
         TypeTag::Function(function_tag) => {
             function_tag.abilities.into_u8() <= AbilitySet::ALL.into_u8()
-                && function_tag.args.iter().all(validate_ability_set)
-                && function_tag.results.iter().all(validate_ability_set)
+                && function_tag.args.iter().all(is_valid_type_tag)
+                && function_tag.results.iter().all(is_valid_type_tag)
         },
-        _ => true,
+        _ => true, // Primitive types are always valid
     }
 }
 
@@ -52,11 +39,7 @@ fn roundtrip_type_tag(type_tag: &TypeTag) -> Option<TypeTag> {
 
 fuzz_target!(|data: FuzzData| -> Corpus {
     // Validate input data
-    if !contains_valid_identifiers(&data.a)
-        || !contains_valid_identifiers(&data.b)
-        || !validate_ability_set(&data.a)
-        || !validate_ability_set(&data.b)
-    {
+    if !is_valid_type_tag(&data.a) || !is_valid_type_tag(&data.b) {
         return Corpus::Reject;
     }
 
@@ -87,6 +70,7 @@ fuzz_target!(|data: FuzzData| -> Corpus {
             bcs::to_bytes(&data.b).unwrap()
         );
         assert!(data.a.to_string() != data.b.to_string());
+        assert!(data.a.to_canonical_string() != data.b.to_canonical_string());
     }
 
     Corpus::Keep
