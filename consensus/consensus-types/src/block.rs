@@ -318,13 +318,13 @@ impl Block {
         block_data: OptBlockData,
         quorum_cert: QuorumCert,
         failed_authors: Vec<(Round, Author)>,
-    ) -> Result<Self> {
-        let block_data = BlockData::new_from_opt(block_data, quorum_cert, failed_authors)?;
-        Ok(Block {
+    ) -> Self {
+        let block_data = BlockData::new_from_opt(block_data, quorum_cert, failed_authors);
+        Block {
             id: block_data.hash(),
             block_data,
             signature: None,
-        })
+        }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
@@ -353,11 +353,9 @@ impl Block {
                 validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
-            BlockType::OptProposal { .. } => {
-                // Optimistic proposal is not signed by proposer
-                self.block_data()
-                    .grandparent_qc()
-                    .map_or(Ok(()), |qc| qc.verify(validator))?;
+            BlockType::OptProposal(p) => {
+                // Note: Optimistic proposal is not signed by proposer unlike normal proposal
+                p.grandparent_qc().verify(validator)?;
                 self.quorum_cert().verify(validator)
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
@@ -467,12 +465,12 @@ impl Block {
     }
 
     fn previous_bitvec(&self) -> BitVec {
-        if let BlockType::DAGBlock { parents_bitvec, .. } = self.block_data.block_type() {
-            parents_bitvec.clone()
-        } else if let BlockType::OptProposal { grandparent_qc, .. } = self.block_data.block_type() {
-            grandparent_qc.ledger_info().get_voters_bitvec().clone()
-        } else {
-            self.quorum_cert().ledger_info().get_voters_bitvec().clone()
+        match self.block_data.block_type() {
+            BlockType::DAGBlock { parents_bitvec, .. } => parents_bitvec.clone(),
+            BlockType::OptProposal(p) => {
+                p.grandparent_qc().ledger_info().get_voters_bitvec().clone()
+            },
+            _ => self.quorum_cert().ledger_info().get_voters_bitvec().clone(),
         }
     }
 
