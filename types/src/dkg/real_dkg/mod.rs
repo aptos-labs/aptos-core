@@ -294,6 +294,13 @@ impl DKGTrait for RealDKG {
         }
     }
 
+    fn verify_transcript_extra(trx: &Self::Transcript) -> anyhow::Result<()> {
+        if let Some(fast_trx) = &trx.fast {
+            ensure!(trx.main.get_dealt_public_key() == fast_trx.get_dealt_public_key());
+        }
+        Ok(())
+    }
+
     /// NOTE: this is used in VM.
     fn verify_transcript(
         params: &Self::PublicParams,

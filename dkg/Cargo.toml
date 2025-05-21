@@ -46,5 +46,8 @@ serde = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
 
+[dev-dependencies]
+aptos-types = { workspace = true, features = ["testing"] }
+
 [features]
 smoke-test = []

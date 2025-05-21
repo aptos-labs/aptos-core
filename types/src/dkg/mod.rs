@@ -202,6 +202,8 @@ pub trait DKGTrait: Debug {
     /// NOTE: used in VM.
     fn verify_transcript(params: &Self::PublicParams, trx: &Self::Transcript) -> Result<()>;
 
+    fn verify_transcript_extra(trx: &Self::Transcript) -> Result<()>;
+
     fn aggregate_transcripts(
         params: &Self::PublicParams,
         accumulator: &mut Self::Transcript,

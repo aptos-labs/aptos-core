@@ -51,6 +51,10 @@ impl DKGTrait for DummyDKG {
         }
     }
 
+    fn verify_transcript_extra(_trx: &Self::Transcript) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     fn verify_transcript(
         _params: &Self::PublicParams,
         transcript: &Self::Transcript,

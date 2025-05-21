@@ -6,10 +6,7 @@ use aptos_crypto::{bls12381::bls12381_keys, Uniform};
 use aptos_infallible::duration_since_epoch;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    dkg::{
-        dummy_dkg::{DummyDKG, DummyDKGTranscript},
-        DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata,
-    },
+    dkg::{real_dkg::RealDKG, DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{
@@ -17,10 +14,12 @@ use aptos_types::{
     },
 };
 use move_core_types::account_address::AccountAddress;
+use rand::thread_rng;
 use std::sync::Arc;
 
 #[test]
 fn test_transcript_aggregation_state() {
+    let mut rng = thread_rng();
     let num_validators = 5;
     let epoch = 999;
     let addrs: Vec<AccountAddress> = (0..num_validators)
@@ -43,21 +42,22 @@ fn test_transcript_aggregation_state() {
         .map(ValidatorConsensusInfoMoveStruct::from)
         .collect::<Vec<_>>();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
-    let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
+    let pub_params = RealDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,
         randomness_config: OnChainRandomnessConfig::default_enabled().into(),
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
     });
     let epoch_state = Arc::new(EpochState::new(epoch, verifier));
-    let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(
+    let trx_agg_state = Arc::new(TranscriptAggregationState::<RealDKG>::new(
         duration_since_epoch(),
         addrs[0],
-        pub_params,
+        pub_params.clone(),
         epoch_state,
     ));
 
-    let good_transcript = DummyDKGTranscript::default();
+    let good_transcript =
+        RealDKG::sample_secret_and_generate_transcript(&mut rng, &pub_params, 0, &private_keys[0]);
     let good_trx_bytes = bcs::to_bytes(&good_transcript).unwrap();
 
     // Node with incorrect epoch should be rejected.
@@ -99,6 +99,23 @@ fn test_transcript_aggregation_state() {
             author: addrs[2],
         },
         transcript_bytes: vec![],
+    });
+    assert!(result.is_err());
+
+    // Transcript where fast-path secret and main-path secret do not match should be rejected.
+    let validator_idx = 2;
+    let bad_trx_2 = RealDKG::generate_transcript_for_inconsistent_secrets(
+        &mut rng,
+        &pub_params,
+        validator_idx as u64,
+        &private_keys[validator_idx],
+    );
+    let result = trx_agg_state.add(addrs[2], DKGTranscript {
+        metadata: DKGTranscriptMetadata {
+            epoch: 999,
+            author: addrs[validator_idx],
+        },
+        transcript_bytes: bcs::to_bytes(&bad_trx_2).unwrap(),
     });
     assert!(result.is_err());
 
