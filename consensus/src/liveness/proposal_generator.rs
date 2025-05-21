@@ -718,7 +718,7 @@ impl ProposalGenerator {
             vec![]
         };
 
-        let block = OptBlockData::new_proposal(
+        let block = OptBlockData::new(
             validator_txns,
             payload,
             self.author,
