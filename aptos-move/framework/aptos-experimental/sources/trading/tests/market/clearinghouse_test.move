@@ -2,7 +2,6 @@
 module aptos_experimental::clearinghouse_test {
     use std::error;
     use std::option;
-    use std::option::Option;
     use std::signer;
     use aptos_std::table;
     use aptos_std::table::Table;
@@ -91,9 +90,11 @@ module aptos_experimental::clearinghouse_test {
         size: u64,
         _is_taker_long: bool
     ): SettleTradeResult {
-        new_settle_trade_result(size/2,
+        new_settle_trade_result(
+            size / 2,
             option::none(),
-            option::some(std::string::utf8(b"Max open interest violation")))
+            option::some(std::string::utf8(b"Max open interest violation"))
+        )
     }
 
     public(package) fun test_market_callbacks():
@@ -102,17 +103,21 @@ module aptos_experimental::clearinghouse_test {
             |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
+            |_account, _is_taker, _is_long, _price, _size, _order_metadata| {
+                validate_settlement_update()
+            }
         )
     }
 
     public(package) fun test_market_callbacks_with_taker_cancelled():
-    MarketClearinghouseCallbacks<TestOrderMetadata>{
+        MarketClearinghouseCallbacks<TestOrderMetadata> {
         new_market_clearinghouse_callbacks(
             |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
+            |_account, _is_taker, _is_long, _price, _size, _order_metadata| {
+                validate_settlement_update()
+            }
         )
     }
 }

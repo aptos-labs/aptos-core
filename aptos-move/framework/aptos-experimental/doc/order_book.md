@@ -585,9 +585,7 @@ it is added to the order book, if it exists, it's size is updated.
         <b>return</b> self.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(order_req);
     };
     <b>let</b> order_with_state = self.orders.remove(&order_id);
-    order_with_state.increase_remaining_size(
-        order_req.remaining_size
-    );
+    order_with_state.increase_remaining_size(order_req.remaining_size);
     self.orders.add(order_id, order_with_state);
     self.active_orders.increase_order_size(
         order_req.price,
