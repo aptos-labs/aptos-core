@@ -7,18 +7,23 @@ module aptos_experimental::market_tests {
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
         new_test_order_metadata,
-        get_position_size, test_market_callbacks_with_taker_cancelled
+        get_position_size,
+        test_market_callbacks_with_taker_cancelled
     };
     use aptos_experimental::market_test_utils::{
         place_maker_order_and_verify,
-        place_taker_order_and_verify_fill
+        place_taker_order_and_verify_fill,
+        place_taker_order,
+        verify_cancel_event,
+        verify_fills
     };
     use aptos_experimental::event_utils;
     use aptos_experimental::market::{
         good_till_cancelled,
         post_only,
         immediate_or_cancel,
-        new_market
+        new_market,
+        new_market_config
     };
 
     #[test(
@@ -31,7 +36,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -89,7 +94,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -133,7 +138,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
 
@@ -192,7 +197,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -255,7 +260,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -318,7 +323,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -375,7 +380,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -443,7 +448,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -514,7 +519,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer);
+        let market = new_market(admin, market_signer, new_market_config(false));
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -562,4 +567,180 @@ module aptos_experimental::market_tests {
         market.destroy_market()
     }
 
+    #[test(
+        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
+    )]
+    public fun test_self_matching_not_allowed(
+        admin: &signer,
+        market_signer: &signer,
+        maker1: &signer,
+        maker2: &signer
+    ) {
+        // Setup accounts
+        let market = new_market(admin, market_signer, new_market_config(false));
+        clearinghouse_test::initialize(admin);
+        let maker1_addr = signer::address_of(maker1);
+        let maker2_addr = signer::address_of(maker2);
+        let event_store = event_utils::new_event_store();
+        let maker1_order_id =
+            place_maker_order_and_verify(
+                &mut market,
+                maker1,
+                1001,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        let maker2_order_id =
+            place_maker_order_and_verify(
+                &mut market,
+                maker2,
+                1000,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        // Order not filled yet, so size is 0
+        assert!(get_position_size(maker1_addr) == 0);
+
+        // This should result in a self match order which should be cancelled and maker2 order should be filled
+        let taker_order_id =
+            place_taker_order(
+                &mut market,
+                maker1,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                &mut event_store,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        verify_cancel_event(
+            &mut market,
+            maker1,
+            false,
+            maker1_order_id,
+            1001,
+            2000000,
+            0,
+            2000000,
+            true,
+            &mut event_store
+        );
+
+        verify_fills(
+            &mut market,
+            maker1,
+            taker_order_id,
+            1000,
+            1000000,
+            false,
+            vector[1000000],
+            vector[1000],
+            maker2_addr,
+            vector[maker2_order_id],
+            vector[2000000],
+            &mut event_store,
+            false
+        );
+
+        assert!(get_position_size(maker1_addr) == 1000000);
+        assert!(get_position_size(maker2_addr) == 1000000);
+        market.destroy_market()
+    }
+
+    #[test(
+        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
+    )]
+    public fun test_self_matching_allowed(
+        admin: &signer,
+        market_signer: &signer,
+        maker1: &signer,
+        maker2: &signer
+    ) {
+        // Setup accounts
+        let market = new_market(admin, market_signer, new_market_config(true));
+        clearinghouse_test::initialize(admin);
+        let maker1_addr = signer::address_of(maker1);
+        let event_store = event_utils::new_event_store();
+        let maker1_order_id =
+            place_maker_order_and_verify(
+                &mut market,
+                maker1,
+                1001,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        let _ =
+            place_maker_order_and_verify(
+                &mut market,
+                maker2,
+                1000,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        // Order not filled yet, so size is 0
+        assert!(get_position_size(maker1_addr) == 0);
+
+        // This should result in a self match order which should be matched against self.
+        let taker_order_id =
+            place_taker_order(
+                &mut market,
+                maker1,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                &mut event_store,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        verify_fills(
+            &mut market,
+            maker1,
+            taker_order_id,
+            1001,
+            1000000,
+            false,
+            vector[1000000],
+            vector[1001],
+            maker1_addr,
+            vector[maker1_order_id],
+            vector[2000000],
+            &mut event_store,
+            false
+        );
+        market.destroy_market()
+    }
 }
