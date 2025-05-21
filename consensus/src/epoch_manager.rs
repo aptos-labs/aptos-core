@@ -945,6 +945,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
+
+        let (opt_proposal_loopback_tx, opt_proposal_loopback_rx) =
+            aptos_channels::new_unbounded(&counters::OP_COUNTERS.gauge("opt_proposal_queue"));
+
         self.round_manager_tx = Some(round_manager_tx.clone());
         self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
         let max_blocks_allowed = self
@@ -967,13 +971,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_jwk_consensus_config,
             fast_rand_config,
             failures_tracker,
+            opt_proposal_loopback_tx,
         );
 
         round_manager.init(last_vote).await;
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(round_manager_rx, buffered_proposal_rx, close_rx));
+        tokio::spawn(round_manager.start(
+            round_manager_rx,
+            buffered_proposal_rx,
+            opt_proposal_loopback_rx,
+            close_rx,
+        ));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
     }
