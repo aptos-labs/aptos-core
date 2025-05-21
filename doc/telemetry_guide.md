@@ -85,7 +85,7 @@ brew services start grafana
 3. Import Dashboard:
    - Click the "+" icon in the sidebar
    - Select "Import"
-   - Upload the provided `aptos-dashboard.json`
+   - Upload the provided [`aptos.json`](../grafana/dashboards/aptos.json)
    - Select your Prometheus data source
    - Click "Import"
 
