@@ -67,6 +67,11 @@ brew services start prometheus
 brew services start grafana
 ```
 
+3. Start the node:
+```bash
+cargo run -p movement -- node run-local-testnet
+```
+
 ### 3. Grafana Dashboard Setup
 
 1. Access Grafana UI:
