@@ -472,16 +472,6 @@ impl ProposalGenerator {
         Ok(Block::new_nil(round, quorum_cert, failed_authors))
     }
 
-    pub fn lock_last_round_generated(&self, round: Round) -> bool {
-        let mut last_round_generated = self.last_round_generated.lock();
-        if *last_round_generated < round {
-            *last_round_generated = round;
-            true
-        } else {
-            false
-        }
-    }
-
     /// The function generates a new proposal block: the returned future is fulfilled when the
     /// payload is delivered by the PayloadClient implementation.  At most one proposal can be
     /// generated per round (no proposal equivocation allowed).
@@ -514,7 +504,7 @@ impl ProposalGenerator {
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
-            self.generate_proposal_common(
+            self.generate_proposal_inner(
                 round,
                 hqc.certified_block().id(),
                 proposer_election.clone(),
@@ -556,7 +546,7 @@ impl ProposalGenerator {
         Ok(block)
     }
 
-    pub async fn generate_proposal_common(
+    pub async fn generate_proposal_inner(
         &self,
         round: Round,
         parent_id: HashValue,
@@ -564,6 +554,14 @@ impl ProposalGenerator {
         wait_callback: BoxFuture<'static, ()>,
         maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, u64)> {
+        {
+            let mut last_round_generated = self.last_round_generated.lock();
+            if *last_round_generated < round {
+                *last_round_generated = round;
+            } else {
+                bail!("Already proposed in the round {}", round);
+            }
+        }
         // One needs to hold the blocks with the references to the payloads while get_block is
         // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
         let mut pending_blocks = self
@@ -703,7 +701,7 @@ impl ProposalGenerator {
         let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             bail!("[OptProposal] HQC has reconfiguration!");
         } else {
-            self.generate_proposal_common(
+            self.generate_proposal_inner(
                 round,
                 parent_id,
                 proposer_election,

@@ -209,12 +209,6 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let block_created_ts = self.block_ordered_ts.clone();
 
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
-        if block.block().is_opt_block() {
-            observe_block(
-                block.block().timestamp_usecs(),
-                BlockStage::ORDERED_OPT_BLOCK,
-            );
-        }
 
         let blocks_to_send = OrderedBlocks {
             ordered_blocks: vec![block],
