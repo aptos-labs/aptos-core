@@ -1,0 +1,113 @@
+success
+
+PackageManifest {
+    package: PackageMetadata {
+        name: "some_package_name",
+        version: "0.1.2",
+        authors: [],
+        license: None,
+        upgrade_policy: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: None,
+    dependencies: {
+        "a": Dependency {
+            version: None,
+            location: Git {
+                url: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/a/b",
+                    query: None,
+                    fragment: None,
+                },
+                rev: None,
+                subdir: None,
+            },
+        },
+        "b": Dependency {
+            version: None,
+            location: Git {
+                url: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/a/b",
+                    query: None,
+                    fragment: None,
+                },
+                rev: None,
+                subdir: Some(
+                    "b",
+                ),
+            },
+        },
+        "c": Dependency {
+            version: None,
+            location: Git {
+                url: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/a/b",
+                    query: None,
+                    fragment: None,
+                },
+                rev: Some(
+                    "main",
+                ),
+                subdir: None,
+            },
+        },
+        "d": Dependency {
+            version: None,
+            location: Git {
+                url: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/a/b",
+                    query: None,
+                    fragment: None,
+                },
+                rev: Some(
+                    "main",
+                ),
+                subdir: Some(
+                    "b",
+                ),
+            },
+        },
+    },
+    dev_dependencies: {},
+}
