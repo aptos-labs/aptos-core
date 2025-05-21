@@ -76,7 +76,7 @@ brew services start grafana
      - Password: `admin`
 
 2. Add Prometheus Data Source:
-   - Go to Configuration (⚙️) > Data Sources
+   - Go to Connections (⚙️) > Data Sources
    - Click "Add data source"
    - Select "Prometheus"
    - Set URL to `http://localhost:9090`
