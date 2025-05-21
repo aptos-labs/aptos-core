@@ -2486,6 +2486,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-v2-file-store-backfiller"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.1",
+ "async-trait",
+ "clap 4.5.21",
+ "futures",
+ "jemallocator",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-scoped",
+ "tonic 0.12.3",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
