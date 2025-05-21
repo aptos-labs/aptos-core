@@ -69,9 +69,7 @@ impl OptProposalMsg {
             p.verify(validator, proof_cache, quorum_store_enabled)
         })?;
 
-        self.block_data()
-            .grandparent_qc()
-            .map_or(Ok(()), |qc| qc.verify(validator))?;
+        self.block_data().grandparent_qc().verify(validator)?;
 
         // Optimistic proposal shouldn't have a timeout certificate
         ensure!(
@@ -85,7 +83,7 @@ impl OptProposalMsg {
                 .highest_quorum_cert()
                 .certified_block()
                 .round()
-                == self.block_data().round().saturating_sub(2),
+                == self.round().saturating_sub(2),
             "Sync info doesn't have the grandparent QC"
         );
 

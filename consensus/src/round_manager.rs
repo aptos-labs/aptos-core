@@ -430,7 +430,10 @@ impl RoundManager {
         self.proposal_status_tracker
             .push(new_round_event.reason.clone());
 
-        // Process pending opt proposals
+        // Process pending opt proposal for the new round.
+        // The existence of pending optimistic proposal and being the current proposer are mutually
+        // exclusive. Note that the opt proposal is checked for valid proposer before inserting into
+        // the pending queue.
         if let Some(opt_proposal) = self.pending_opt_proposals.remove(&new_round) {
             self.opt_proposal_loopback_tx
                 .send(opt_proposal)
@@ -788,7 +791,7 @@ impl RoundManager {
             self.opt_proposal_loopback_tx
                 .send(proposal_msg.take_block_data())
                 .await
-                .expect("Send to loopback unbounded channel must succeed");
+                .expect("Sending to a self loopback unbounded channel cannot fail");
         } else {
             // Pre-check that proposal is from valid proposer before queuing it.
             // This check is done after syncing up to sync info to ensure proposer
@@ -811,10 +814,10 @@ impl RoundManager {
     /// 1. Ensure the highest quorum cert certifies the parent block of the opt block
     /// 2. Create a regular proposal by adding QC and failed_authors to the opt block
     /// 3. Process the proposal using exsiting logic
-    async fn process_opt_proposal(&mut self, proposal: OptBlockData) -> anyhow::Result<()> {
+    async fn process_opt_proposal(&mut self, opt_block_data: OptBlockData) -> anyhow::Result<()> {
         if self
             .block_store
-            .get_block_for_round(proposal.round())
+            .get_block_for_round(opt_block_data.round())
             .is_some()
         {
             // ignore the opt proposal if we have already received the proposal
@@ -822,24 +825,24 @@ impl RoundManager {
         }
         let hqc = self.block_store.highest_quorum_cert().as_ref().clone();
         ensure!(
-            hqc.certified_block().round() + 1 == proposal.round(),
+            hqc.certified_block().round() + 1 == opt_block_data.round(),
             "Opt proposal round {} is not the next round after the highest qc round {}",
-            proposal.round(),
+            opt_block_data.round(),
             hqc.certified_block().round()
         );
         ensure!(
-            hqc.certified_block().id() == proposal.parent_id(),
+            hqc.certified_block().id() == opt_block_data.parent_id(),
             "Opt proposal parent id {} is not the same as the highest qc certified block id {}",
-            proposal.parent_id(),
+            opt_block_data.parent_id(),
             hqc.certified_block().id()
         );
         let failed_authors = self.proposal_generator.compute_failed_authors(
-            proposal.round(),
+            opt_block_data.round(),
             hqc.certified_block().round(),
             false,
             self.proposer_election.clone(),
         );
-        let proposal = Block::new_from_opt(proposal, hqc, failed_authors)?;
+        let proposal = Block::new_from_opt(opt_block_data, hqc, failed_authors);
         observe_block(proposal.timestamp_usecs(), BlockStage::PROCESS_OPT_PROPOSAL);
         info!(
             self.new_log(LogEvent::ProcessOptProposal),
@@ -1097,7 +1100,7 @@ impl RoundManager {
                 BlockType::ProposalExt(_)
             ) || matches!(
                 proposal.block_data().block_type(),
-                BlockType::OptProposal { validator_txns, .. } if !validator_txns.is_empty()
+                BlockType::OptProposal(_)
             ))
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
@@ -1388,7 +1391,7 @@ impl RoundManager {
         Ok(())
     }
 
-    async fn start_next_opt_round(
+    fn start_next_opt_round(
         &self,
         parent_id: HashValue,
         parent_round: Round,
