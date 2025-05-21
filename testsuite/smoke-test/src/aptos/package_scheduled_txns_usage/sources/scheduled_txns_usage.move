@@ -29,7 +29,7 @@ module 0xA550C18::scheduled_txns_usage {
 
         let txn1 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
-            current_time_ms + 100000,
+            current_time_ms + 1000,
             10000,
             20,
             false,
@@ -37,7 +37,7 @@ module 0xA550C18::scheduled_txns_usage {
         );
         let txn2 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
-            current_time_ms + 200000,
+            current_time_ms + 2000,
             10000,
             20,
             false,
@@ -45,7 +45,7 @@ module 0xA550C18::scheduled_txns_usage {
         );
         let txn3 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
-            current_time_ms + 300000,
+            current_time_ms + 3000,
             10000,
             20,
             false,

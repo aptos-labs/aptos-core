@@ -50,7 +50,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-use aptos_types::transaction::scheduled_txn::ScheduledTransactionWithKey;
+use aptos_types::transaction::scheduled_txn::ScheduledTransactionInfoWithKey;
 use crate::scheduled_txns_handler::ScheduledTxnsHandler;
 
 /// Status to help synchornize the pipeline and sync_manager
@@ -538,10 +538,10 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> { ;
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
-        let scheduled_txns: Vec<ScheduledTransactionWithKey> = {
+        let scheduled_txns: Vec<ScheduledTransactionInfoWithKey> = {
             if let Ok(state_view) = executor.state_view(block.parent_id()) {
                 info!("[*****Pipeline] get_ready_txns()");
-                ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs())
+                ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs() / 1000)
             } else {
                 vec![]
             }

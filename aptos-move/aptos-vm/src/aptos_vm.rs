@@ -145,7 +145,7 @@ use std::{
     sync::Arc,
 };
 use aptos_crypto::hash::CryptoHash;
-use aptos_types::transaction::scheduled_txn::{SCHEDULED_TRANSACTIONS_MODULE_INFO, ScheduledTransactionWithKey};
+use aptos_types::transaction::scheduled_txn::{SCHEDULED_TRANSACTIONS_MODULE_INFO, ScheduledTransactionInfoWithKey};
 use crate::transaction_validation::run_scheduled_txn_epilogue;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
@@ -2705,12 +2705,12 @@ impl AptosVM {
     pub(crate) fn process_scheduled_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
-        txn: ScheduledTransactionWithKey,
+        txn: ScheduledTransactionInfoWithKey,
         traversal_context: &mut TraversalContext,
         code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        let balance = txn.txn.max_gas_amount;
+        let balance = txn.max_gas_amount;
         info!("Gas balance {}", balance);
         let storage_gas = self.storage_gas_params(log_context)?;
         let mut gas_meter = make_prod_gas_meter(
@@ -2724,28 +2724,33 @@ impl AptosVM {
 
         // no need of scheduled txn prologue for now.
         let args = vec![
-            MoveValue::Signer(txn.txn.sender_handle),
-            MoveValue::Bool(txn.txn.pass_signer),
+            MoveValue::Signer(txn.sender_handle),
             txn.key.as_move_value(),
         ];
         let mut session = self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
-        info!("Calling {}", &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_no_func_name);
+        info!("Calling {}", &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name);
         let result = session.execute_function_bypass_visibility(
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
-            //&SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
-            &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_no_func_name,
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
             vec![],
             serialize_values(&args),
             &mut gas_meter,
             traversal_context,
             code_storage,
-        )?;
+        );
+        match result {
+            Ok(_) => (),
+            Err(e) => {
+                info!("scheduled transaction execution failed: {:?}", e);
+                //return Err(e);
+            },
+        }
         run_scheduled_txn_epilogue(
             &mut session,
             &txn,
             gas_meter.balance(),
             100, // todo fill this
-            Self::fee_statement_from_gas_meter(txn.txn.max_gas_amount.into(), &gas_meter, 0),
+            Self::fee_statement_from_gas_meter(txn.max_gas_amount.into(), &gas_meter, 0),
             traversal_context,
             code_storage,
         )?;

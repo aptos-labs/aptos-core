@@ -88,7 +88,7 @@ use std::{
     ops::Deref,
     sync::{atomic::AtomicU64, Arc},
 };
-use crate::transaction::scheduled_txn::ScheduledTransactionWithKey;
+use crate::transaction::scheduled_txn::ScheduledTransactionInfoWithKey;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -2477,7 +2477,7 @@ pub enum Transaction {
     ValidatorTransaction(ValidatorTransaction),
 
     ///
-    ScheduledTransaction(ScheduledTransactionWithKey),
+    ScheduledTransaction(ScheduledTransactionInfoWithKey),
 
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.

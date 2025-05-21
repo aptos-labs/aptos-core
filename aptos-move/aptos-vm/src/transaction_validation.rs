@@ -36,7 +36,8 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
-use aptos_types::transaction::scheduled_txn::ScheduledTransactionWithKey;
+use aptos_logger::info;
+use aptos_types::transaction::scheduled_txn::ScheduledTransactionInfoWithKey;
 use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
@@ -690,21 +691,22 @@ pub(crate) fn run_failure_epilogue(
 
 pub(crate) fn run_scheduled_txn_epilogue(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    txn: &ScheduledTransactionWithKey,
+    txn: &ScheduledTransactionInfoWithKey,
     gas_remaining: Gas,
     gas_unit_price_charged: u64,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<()> {
+    info!("run_scheduled_txn_epilogue");
     let args = vec![
         MoveValue::Signer(AccountAddress::from_hex_literal("0xb").unwrap()),
-        MoveValue::Address(txn.txn.sender_handle),
+        MoveValue::Address(txn.sender_handle),
         txn.key.as_move_value(),
         MoveValue::U64(fee_statement.storage_fee_refund()),
         MoveValue::U64(gas_unit_price_charged),
-        MoveValue::U64(txn.txn.max_gas_amount),
-        MoveValue::U64(txn.txn.max_gas_amount * txn.txn.max_gas_unit_price),
+        MoveValue::U64(txn.max_gas_amount),
+        MoveValue::U64(txn.max_gas_amount * txn.max_gas_unit_price),
         MoveValue::U64(gas_remaining.into()),
     ];
     session

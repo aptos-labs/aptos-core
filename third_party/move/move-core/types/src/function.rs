@@ -357,6 +357,117 @@ mod serialization_tests {
             "deserialized value not equal to original one"
         );
     }
+
+    #[test]
+    fn struct_with_function_serialization_ok() {
+        // Create test struct using MoveStruct::Runtime since it's the simplest form
+        let test_struct = MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(42),
+            MoveValue::Closure(Box::new(MoveClosure {
+                module_id: ModuleId {
+                    address: AccountAddress::ONE,
+                    name: ident_str!("mod").to_owned(),
+                },
+                fun_id: ident_str!("func").to_owned(),
+                ty_args: vec![TypeTag::Bool],
+                mask: ClosureMask::new(0b11),
+                captured: vec![
+                    (MoveTypeLayout::U64, MoveValue::U64(100)),
+                    (MoveTypeLayout::Bool, MoveValue::Bool(true)),
+                ],
+            })),
+        ]));
+
+        // Define the layout for the struct
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+            MoveTypeLayout::U64,
+            MoveTypeLayout::Function(MoveFunctionLayout(vec![], vec![], AbilitySet::EMPTY)),
+        ]));
+
+        // Serialize
+        let blob = test_struct
+            .simple_serialize()
+            .expect("serialization must succeed");
+
+        // Deserialize and verify
+        let deserialized = MoveValue::simple_deserialize(&blob, &layout)
+            .expect("deserialization must succeed");
+
+        assert_eq!(
+            test_struct,
+            deserialized,
+            "deserialized value not equal to original one"
+        );
+
+        assert!(false);
+    }
+
+    #[test]
+    fn vector_of_structs_with_function_serialization_ok() {
+        // Create test vector of structs
+        let test_vec = MoveValue::Vector(vec![
+            MoveValue::Struct(MoveStruct::Runtime(vec![
+                MoveValue::U64(42),
+                MoveValue::Closure(Box::new(MoveClosure {
+                    module_id: ModuleId {
+                        address: AccountAddress::ONE,
+                        name: ident_str!("mod").to_owned(),
+                    },
+                    fun_id: ident_str!("func").to_owned(),
+                    ty_args: vec![],
+                    mask: ClosureMask::new(0),  // No captured values
+                    captured: vec![],
+                })),
+            ])),
+            MoveValue::Struct(MoveStruct::Runtime(vec![
+                MoveValue::U64(43),
+                MoveValue::Closure(Box::new(MoveClosure {
+                    module_id: ModuleId {
+                        address: AccountAddress::ONE,
+                        name: ident_str!("mod").to_owned(),
+                    },
+                    fun_id: ident_str!("func").to_owned(),
+                    ty_args: vec![],
+                    mask: ClosureMask::new(0b1),  // One captured value
+                    captured: vec![
+                        (MoveTypeLayout::U64, MoveValue::U64(100)),
+                    ],
+                })),
+            ])),
+        ]);
+
+        // Define the layout for Vector<MyStruct>
+        let layout = MoveTypeLayout::Vector(Box::new(
+            MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+                MoveTypeLayout::U64,
+                MoveTypeLayout::Function(MoveFunctionLayout(
+                    vec![
+                        MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+                            MoveTypeLayout::Bool,      // Option discriminant
+                            MoveTypeLayout::Signer     // Option inner value
+                        ]))
+                    ],
+                    vec![],
+                    AbilitySet::EMPTY
+                )),
+            ]))
+        ));
+
+        // Serialize
+        let blob = test_vec
+            .simple_serialize()
+            .expect("serialization must succeed");
+
+        // Deserialize and verify
+        let deserialized = MoveValue::simple_deserialize(&blob, &layout)
+            .expect("deserialization must succeed");
+
+        assert_eq!(
+            test_vec,
+            deserialized,
+            "deserialized value not equal to original one"
+        );
+    }
 }
 
 //===========================================================================================
