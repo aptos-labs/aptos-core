@@ -3590,7 +3590,10 @@ fn parse_module(
                 },
                 // Regular move constructs
                 Tok::Use => ModuleMember::Use(parse_use_decl(attributes, context)?),
-                Tok::Friend if context.tokens.lookahead()? != Tok::Fun => {
+                Tok::Friend
+                    if context.tokens.lookahead()? != Tok::Fun
+                        && context.tokens.lookahead()? != Tok::Inline =>
+                {
                     // Only interpret as module friend declaration if not directly
                     // followed by fun keyword. This is invalid syntax in v1, so
                     // we can re-interpret it for Move 2.
