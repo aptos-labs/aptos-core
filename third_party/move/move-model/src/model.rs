@@ -2044,6 +2044,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2109,6 +2110,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 
@@ -3130,17 +3132,9 @@ impl<'env> ModuleEnv<'env> {
         if self.is_script_module() {
             return deps;
         }
-        // Since we need to check all inline functions, BFS is used
-        let mut reachable_funcs = VecDeque::new();
-        let mut visited = BTreeSet::new();
         for fun_env in self.get_functions() {
-            reachable_funcs.push_back(fun_env.get_qualified_id());
-        }
-        while !reachable_funcs.is_empty() {
-            let qfid = reachable_funcs.pop_front().unwrap();
-            visited.insert(qfid);
-            let fun_env = self.env.get_function(qfid);
-            for used_fun in fun_env.get_used_functions().expect("call info available") {
+            // We need to traverse transitive inline functions because they will be expanded during inlining.
+            for used_fun in fun_env.get_used_functions_with_transitive_inline() {
                 let used_mod_id = used_fun.module_id;
                 if self.get_id() == used_mod_id {
                     // no need to friend self
@@ -3152,8 +3146,6 @@ impl<'env> ModuleEnv<'env> {
                     && self.can_call_package_fun_in(&used_mod_env)
                 {
                     deps.insert(used_mod_id);
-                } else if used_fun_env.is_inline() && !visited.contains(used_fun) {
-                    reachable_funcs.push_back(*used_fun);
                 }
             }
         }
@@ -4404,6 +4396,9 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the used functions.
     pub(crate) transitive_closure_of_used_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used functions including ones obtained by transitively traversing used inline functions.
+    pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 impl FunctionData {
@@ -4431,6 +4426,7 @@ impl FunctionData {
             used_funs: None,
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 }
@@ -5110,6 +5106,29 @@ impl<'env> FunctionEnv<'env> {
             }
         }
         *self.data.transitive_closure_of_used_funs.borrow_mut() = Some(set.clone());
+        set
+    }
+
+    /// Get used functions including ones obtained by transitively traversing used inline functions
+    pub fn get_used_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
+        if let Some(trans_used) = &*self.data.used_functions_with_transitive_inline.borrow() {
+            return trans_used.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) && f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
         set
     }
 
