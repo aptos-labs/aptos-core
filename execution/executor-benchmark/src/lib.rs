@@ -41,6 +41,7 @@ use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
+use transaction_generator::create_block_metadata_transaction;
 use std::{
     fs,
     path::Path,
@@ -437,8 +438,12 @@ fn add_accounts_impl<V>(
         executor,
         start_version,
         &pipeline_config,
-        Some(1 + num_new_accounts / block_size * 101 / 100),
+        Some(1 + 1 + num_new_accounts / block_size * 101 / 100),
     );
+
+    // issue single block with metadata transaction to trigger epoch change.
+    block_sender.send(vec![create_block_metadata_transaction()]).unwrap();
+    block_sender.send(vec![create_block_metadata_transaction()]).unwrap();
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),

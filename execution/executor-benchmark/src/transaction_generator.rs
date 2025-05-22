@@ -6,7 +6,8 @@ use crate::{
     account_generator::{AccountCache, AccountGenerator},
     metrics::{NUM_TXNS, TIMER},
 };
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 use aptos_logger::info;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -16,11 +17,7 @@ use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::{aptos_test_root_address, AccountResource},
-    chain_id::ChainId,
-    state_store::MoveResourceExt,
-    transaction::{EntryFunction, Transaction, TransactionPayload},
+    account_address::AccountAddress, account_config::{aptos_test_root_address, AccountResource}, block_metadata::BlockMetadata, chain_id::ChainId, state_store::MoveResourceExt, transaction::{authenticator::AuthenticationKey, EntryFunction, Transaction, TransactionPayload}
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -709,13 +706,16 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
+
+        // transactions.push(create_block_metadata_transaction());
+        let init_size = transactions.len();
         for i in 0..block_size {
             if let Some(txn) = transactions_by_index.get(&i) {
                 transactions.push(txn.clone());
             }
         }
 
-        if transactions.is_empty() {
+        if transactions.len() == init_size {
             let val = phase.fetch_add(1, Ordering::Relaxed);
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
             if val > last_generated_at + 2 {
@@ -825,6 +825,29 @@ impl TransactionGenerator {
     pub fn drop_sender(&mut self) {
         self.block_sender.take().unwrap();
     }
+}
+
+pub(crate) fn create_block_metadata_transaction() -> Transaction {
+    Transaction::BlockMetadata(BlockMetadata::new(
+        HashValue::random(),
+        0,
+        1,
+        validator_address(),
+        vec![],
+        vec![],
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64))
+}
+
+fn validator_address() -> AccountAddress {
+    let mut rng = StdRng::from_seed([0; 32]);
+    let _: [u8; 32] = rng.gen();
+    let seed: [u8; 32] = rng.gen();
+    let key = Ed25519PrivateKey::generate(&mut StdRng::from_seed(seed));
+    let account_address = AuthenticationKey::ed25519(&ConfigKey::new(key).public_key()).account_address();
+    account_address
 }
 
 /// With probability `1-h/n`, pick an integer in [0, h) uniformly at random;
