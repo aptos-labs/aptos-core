@@ -86,8 +86,19 @@ pub enum FeatureFlag {
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
-    GOVERNED_GAS_POOL = 73,
+    ALLOW_SERIALIZED_SCRIPT_ARGS = 72,
+    /// Enabled on mainnet, cannot be disabled.
+    _USE_COMPATIBILITY_CHECKER_V2 = 73,
+    ENABLE_ENUM_TYPES = 74,
+    FEDERATED_KEYLESS = 77,
+    TRANSACTION_SIMULATION_ENHANCEMENT = 78,
+    COLLECTION_OWNER = 79,
+    /// covers mem::swap and vector::move_range
+    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
+    NATIVE_MEMORY_OPERATIONS = 80,
+    ACCOUNT_ABSTRACTION = 85,
     DECOMMISSION_CORE_RESOURCES = 222,
+    GOVERNED_GAS_POOL = 223,
 }
 
 impl FeatureFlag {
@@ -97,7 +108,10 @@ impl FeatureFlag {
             FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
             FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            // Feature flag V6 is used to enable metadata v1 format and needs to stay on, even
+            // if we enable a higher version.
             FeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
             FeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::RESOURCE_GROUPS,
@@ -107,9 +121,12 @@ impl FeatureFlag {
             FeatureFlag::BLS12_381_STRUCTURES,
             FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
             FeatureFlag::STRUCT_CONSTRUCTORS,
+            // FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
+            FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
@@ -134,6 +151,7 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
@@ -153,6 +171,12 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
+            FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS,
+            FeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
             // FeatureFlag::GOVERNED_GAS_POOL, // governed gas pool should be voted in
         ]
     }
@@ -230,6 +254,10 @@ impl Features {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
     }
 
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
+    }
+
     pub fn is_module_event_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::MODULE_EVENT)
     }
@@ -279,6 +307,10 @@ impl Features {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
+    pub fn is_federated_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
+    }
+
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
@@ -293,6 +325,10 @@ impl Features {
 
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    pub fn is_native_memory_operations_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
