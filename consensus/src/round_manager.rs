@@ -508,7 +508,7 @@ impl RoundManager {
     async fn generate_and_send_opt_proposal(
         epoch_state: Arc<EpochState>,
         round: Round,
-        parent_id: HashValue,
+        parent: BlockInfo,
         grandparent_qc: QuorumCert,
         network: Arc<NetworkSender>,
         sync_info: SyncInfo,
@@ -518,7 +518,7 @@ impl RoundManager {
         let proposal_msg = Self::generate_opt_proposal(
             epoch_state.clone(),
             round,
-            parent_id,
+            parent,
             grandparent_qc,
             sync_info,
             network.clone(),
@@ -661,7 +661,7 @@ impl RoundManager {
     async fn generate_opt_proposal(
         epoch_state: Arc<EpochState>,
         round: Round,
-        parent_id: HashValue,
+        parent: BlockInfo,
         grandparent_qc: QuorumCert,
         sync_info: SyncInfo,
         network: Arc<NetworkSender>,
@@ -679,7 +679,7 @@ impl RoundManager {
             .generate_opt_proposal(
                 epoch_state.epoch,
                 round,
-                parent_id,
+                parent,
                 grandparent_qc,
                 proposer_election,
                 callback,
@@ -1350,7 +1350,6 @@ impl RoundManager {
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
         let parent_qc = proposal.quorum_cert().clone();
-        let proposal_id = proposal.id();
         let sync_info = self.block_store.sync_info();
 
         if proposal_round <= sync_info.highest_round() {
@@ -1387,13 +1386,17 @@ impl RoundManager {
             self.network.send_vote(vote_msg, vec![recipient]).await;
         }
 
-        self.start_next_opt_round(proposal_id, proposal_round, parent_qc);
+        self.start_next_opt_round(
+            vote.vote_data().proposed().clone(),
+            proposal_round,
+            parent_qc,
+        );
         Ok(())
     }
 
     fn start_next_opt_round(
         &self,
-        parent_id: HashValue,
+        parent: BlockInfo,
         parent_round: Round,
         grandparent_qc: QuorumCert,
     ) {
@@ -1422,7 +1425,7 @@ impl RoundManager {
                     Self::generate_and_send_opt_proposal(
                         epoch_state,
                         opt_proposal_round,
-                        parent_id,
+                        parent,
                         grandparent_qc,
                         network,
                         sync_info,
@@ -2066,7 +2069,7 @@ impl RoundManager {
                             }
                             VerifiedEvent::OptProposalMsg(proposal_msg) => {
                                 monitor!(
-                                    "process_proposal",
+                                    "process_opt_proposal",
                                     self.process_opt_proposal_msg(*proposal_msg).await
                                 )
                             }

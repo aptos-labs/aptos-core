@@ -44,9 +44,9 @@ impl OptProposalExt {
         }
     }
 
-    pub fn payload(&self) -> Option<&Payload> {
+    pub fn payload(&self) -> &Payload {
         match self {
-            OptProposalExt::V0 { payload, .. } => Some(payload),
+            OptProposalExt::V0 { payload, .. } => payload,
         }
     }
 
