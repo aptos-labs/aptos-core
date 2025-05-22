@@ -71,7 +71,7 @@ use std::{
 };
 
 /// [ReadResult] wraps the result of MVHashMap's data map, while [GroupReadResult]
-/// is for the groups' MVHHashMap. The client can interpret these types to
+/// is for the groups' MVHashMap. The client can interpret these types to
 /// further resolve the reads. TODO: Needs re-organization and clean-up.
 
 #[derive(Debug)]

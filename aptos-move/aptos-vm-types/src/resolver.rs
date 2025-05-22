@@ -211,33 +211,42 @@ where
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for resource at {:?}: {:?}",
-                state_key, e
-            ))
-        })
+        self.get_state_value(state_key)
+            .map_err(|e| map_storage_error(state_key, e))
     }
 
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| Ok(maybe_state_value.map(StateValue::into_metadata)),
+        )
     }
 
     fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| {
-                maybe_state_value.map_or(0, |state_value| state_value.size() as u64)
-            })
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| {
+                Ok(maybe_state_value.map_or(0, |state_value| state_value.size() as u64))
+            },
+        )
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.is_some())
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| Ok(maybe_state_value.is_some()),
+        )
     }
+}
+
+fn map_storage_error<E: std::fmt::Debug>(state_key: &StateKey, e: E) -> PartialVMError {
+    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+        "Unexpected storage error for resource at {:?}: {:?}",
+        state_key, e
+    ))
 }
 
 impl<S> StateStorageView for S
