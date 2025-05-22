@@ -3130,8 +3130,17 @@ impl<'env> ModuleEnv<'env> {
         if self.is_script_module() {
             return deps;
         }
+        // Since we need to check all inline functions, BFS is used
+        let mut reachable_funcs = VecDeque::new();
+        let mut visited = BTreeSet::new();
         for fun_env in self.get_functions() {
-            for used_fun in fun_env.get_used_functions().expect("used functions") {
+            reachable_funcs.push_back(fun_env.get_qualified_id());
+        }
+        while !reachable_funcs.is_empty() {
+            let qfid = reachable_funcs.pop_front().unwrap();
+            visited.insert(qfid);
+            let fun_env = self.env.get_function(qfid);
+            for used_fun in fun_env.get_used_functions().expect("call info available") {
                 let used_mod_id = used_fun.module_id;
                 if self.get_id() == used_mod_id {
                     // no need to friend self
@@ -3143,6 +3152,8 @@ impl<'env> ModuleEnv<'env> {
                     && self.can_call_package_fun_in(&used_mod_env)
                 {
                     deps.insert(used_mod_id);
+                } else if used_fun_env.is_inline() && !visited.contains(used_fun) {
+                    reachable_funcs.push_back(*used_fun);
                 }
             }
         }
