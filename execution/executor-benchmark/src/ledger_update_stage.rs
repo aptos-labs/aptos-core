@@ -8,7 +8,10 @@ use aptos_executor_types::BlockExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_vm::VMBlockExecutor;
 use move_core_types::language_storage::StructTag;
-use std::{collections::BTreeMap, sync::{mpsc, Arc}};
+use std::{
+    collections::BTreeMap,
+    sync::{mpsc, Arc},
+};
 
 pub enum CommitProcessing {
     SendToQueue(mpsc::SyncSender<CommitBlockMessage>),
