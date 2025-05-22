@@ -149,6 +149,12 @@ We pass the id around instead re-computing it
 
 </dd>
 <dt>
+<code>gas_unit_price_charged: u64</code>
+</dt>
+<dd>
+ To be determined during execution
+</dd>
+<dt>
 <code>key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a></code>
 </dt>
 <dd>
@@ -539,6 +545,16 @@ Scheduled time is in the past
 
 
 
+<a id="0x1_scheduled_txns_ELOW_GAS_UINIT_PRICE"></a>
+
+Gas unit price is too low
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ELOW_GAS_UINIT_PRICE">ELOW_GAS_UINIT_PRICE</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_scheduled_txns_EUNAVAILABLE"></a>
 
 Scheduling is stopped
@@ -869,6 +885,10 @@ Insert a scheduled transaction into the queue. Txn_id is returned to user, which
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"22222222222222222222"));
     <b>assert</b>!(txn_time &gt; block_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_TIME">EINVALID_TIME</a>));
 
+    <b>assert</b>!(
+        txn.max_gas_unit_price &gt; 100,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ELOW_GAS_UINIT_PRICE">ELOW_GAS_UINIT_PRICE</a>)
+    );
     // Insert the transaction into the schedule_map
     // Create schedule map key
     <b>let</b> key = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
@@ -1039,6 +1059,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
             sender_addr: txn.sender_addr,
             max_gas_amount: txn.max_gas_amount,
             max_gas_unit_price: txn.max_gas_unit_price,
+            gas_unit_price_charged: txn.max_gas_unit_price,
             key: *key,
         };
 
@@ -1178,6 +1199,7 @@ Remove the txns that are run
         };
         tbl_idx = tbl_idx + 1;
     };
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&remove_count);
 }
 </code></pre>
 

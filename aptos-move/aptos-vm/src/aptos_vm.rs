@@ -2749,7 +2749,6 @@ impl AptosVM {
             &mut session,
             &txn,
             gas_meter.balance(),
-            100, // todo fill this
             Self::fee_statement_from_gas_meter(txn.max_gas_amount.into(), &gas_meter, 0),
             traversal_context,
             code_storage,

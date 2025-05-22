@@ -34,6 +34,10 @@ module aptos_framework::scheduled_txns {
 
     /// Scheduling is stopped
     const EUNAVAILABLE: u64 = 3;
+
+    /// Gas unit price is too low
+    const ELOW_GAS_UINIT_PRICE: u64 = 4;
+
     const U64_MAX: u64 = 18446744073709551615;
 
     /// Conversion factor between our time granularity (100ms) and microseconds
@@ -88,6 +92,8 @@ module aptos_framework::scheduled_txns {
         sender_addr: address,
         max_gas_amount: u64,
         max_gas_unit_price: u64,
+        /// To be determined during execution
+        gas_unit_price_charged: u64,
         key: ScheduleMapKey
     }
 
@@ -303,6 +309,10 @@ module aptos_framework::scheduled_txns {
         debug::print(&string::utf8(b"22222222222222222222"));
         assert!(txn_time > block_time, error::invalid_argument(EINVALID_TIME));
 
+        assert!(
+            txn.max_gas_unit_price > 100,
+            error::invalid_argument(ELOW_GAS_UINIT_PRICE)
+        );
         // Insert the transaction into the schedule_map
         // Create schedule map key
         let key = ScheduleMapKey {
@@ -413,6 +423,7 @@ module aptos_framework::scheduled_txns {
                 sender_addr: txn.sender_addr,
                 max_gas_amount: txn.max_gas_amount,
                 max_gas_unit_price: txn.max_gas_unit_price,
+                gas_unit_price_charged: txn.max_gas_unit_price,
                 key: *key,
             };
 
@@ -512,6 +523,7 @@ module aptos_framework::scheduled_txns {
             };
             tbl_idx = tbl_idx + 1;
         };
+        debug::print(&remove_count);
     }
 
     /// Called by the executor when the scheduled transaction is run

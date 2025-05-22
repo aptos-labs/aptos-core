@@ -1,14 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt;
 use once_cell::sync::Lazy;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use move_core_types::function::MoveClosure;
 use move_core_types::identifier::Identifier;
 use move_core_types::language_storage::{CORE_CODE_ADDRESS, ModuleId};
 use move_core_types::value::{MoveStruct, MoveValue};
@@ -41,6 +39,8 @@ pub struct ScheduledTransactionInfoWithKey {
     pub max_gas_amount: u64,
     /// Charged @ lesser of {max_gas_unit_price, max_gas_unit_price other than this in the block executed}
     pub max_gas_unit_price: u64,
+    /// To be determined during execution
+    pub gas_unit_price_charged: u64,
     /// Key to the scheduled txn in the Schedule queue
     pub key: ScheduleMapKey
 }
