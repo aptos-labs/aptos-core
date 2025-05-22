@@ -4,9 +4,7 @@ module aptos_framework::transaction_validation {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use std::string;
     use std::vector;
-    use aptos_std::debug;
 
     use aptos_framework::account;
     use aptos_framework::aptos_account;
@@ -872,7 +870,6 @@ module aptos_framework::transaction_validation {
         scheduling_deposit: u64,
         gas_units_remaining: u64
     ) {
-        debug::print(&string::utf8(b"scheduled_txn_epilogue"));
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 

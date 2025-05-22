@@ -456,6 +456,8 @@ impl AptosVM {
         storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = Self::gas_used(max_gas_units, gas_meter);
+        info!("****max_gas_units {:?}; Gas used {}; execution_gas_used {}; io_gas_used {}; storage_fee_used {}; storage_fee_refund {}; scaling factor {}",
+               max_gas_units, gas_used, gas_meter.execution_gas_used(), gas_meter.io_gas_used(), gas_meter.storage_fee_used(), storage_fee_refund, gas_meter.gas_unit_scaling_factor());
         FeeStatement::new(
             gas_used,
             u64::from(gas_meter.execution_gas_used()),
@@ -1875,6 +1877,7 @@ impl AptosVM {
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount set");
+        info!("execute_user_transaction_impl: gas usage {:?}", gas_usage);
         TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
 
         let (vm_status, output) = result.unwrap_or_else(|err| {

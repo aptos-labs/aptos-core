@@ -1701,6 +1701,8 @@ If there is no fee_payer, fee_payer = sender
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"scheduled_txn_epilogue"));
     <b>assert</b>!(txn_max_gas_units &gt;= gas_units_remaining, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
     <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&gas_used);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&txn_gas_price);
 
     <b>assert</b>!(
         (txn_gas_price <b>as</b> u128) * (gas_used <b>as</b> u128) &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>,

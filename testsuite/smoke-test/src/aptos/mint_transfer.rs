@@ -1,17 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_forge::{Swarm, SwarmExt};
-use aptos_logger::info;
+use aptos_forge::Swarm;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_types::transaction::{EntryFunction, ExecutionStatus, TransactionPayload, TransactionStatus};
-use move_core_types::account_address::AccountAddress;
-use move_core_types::ident_str;
-use move_core_types::language_storage::ModuleId;
-use crate::aptos::move_test_helpers;
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_mint_transfer() {
@@ -96,61 +90,4 @@ async fn test_mint_transfer() {
         output.status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-}
-
-#[tokio::test]
-async fn test_sched() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-    let mut chain_info = swarm.aptos_public_info();
-
-    let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let path = base_dir.join("src/aptos/package_scheduled_txns_usage/");
-
-    let transaction_factory = match move_test_helpers::publish_package(&mut chain_info, path).await {
-        Ok(tf) => { tf },
-        Err(e) => panic!("Failed to publish package: {:?}", e),
-    };
-
-    let mut account1 = chain_info
-        .create_and_fund_user_account(50_000_000_000)
-        .await
-        .unwrap();
-
-    // Get current timestamp for scheduling
-    let current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
-    //let transaction_factory = chain_info.transaction_factory();
-    let txn_builder = transaction_factory
-        .payload(TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                AccountAddress::from_hex_literal("0xA550C18").unwrap(),
-                ident_str!("scheduled_txns_usage").to_owned(),
-            ),
-            ident_str!("test_insert_transactions").to_owned(),
-            vec![],
-            vec![bcs::to_bytes(&current_time_ms).unwrap()],
-        )))
-        .max_gas_amount(200000)
-        .gas_unit_price(100)
-        .expiration_timestamp_secs(10000000000);
-
-    let mutate_txn = account1.sign_with_transaction_builder(txn_builder);
-    info!("Gonna submit_and_wait..........");
-
-    let response = chain_info.client().submit_and_wait(&mutate_txn).await.unwrap();
-    assert!(
-        response.inner().success(),
-        "Transaction failed: {:?}",
-        response.inner()
-    );
-
-    info!("Going again for submit_and_wait..........");
-
-    // sleep for 5 seconds
-    tokio::time::sleep(Duration::from_secs(5)).await;
-
-    assert!(false);
 }

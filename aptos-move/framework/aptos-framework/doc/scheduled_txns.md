@@ -27,7 +27,6 @@
 -  [Function `finish_execution`](#0x1_scheduled_txns_finish_execution)
 -  [Function `remove_txns`](#0x1_scheduled_txns_remove_txns)
 -  [Function `execute_user_function_wrapper`](#0x1_scheduled_txns_execute_user_function_wrapper)
--  [Function `get_num_txns`](#0x1_scheduled_txns_get_num_txns)
 -  [Function `step`](#0x1_scheduled_txns_step)
 
 
@@ -496,21 +495,12 @@ Conversion factor between our time granularity (100ms) and microseconds
 
 
 
-<a id="0x1_scheduled_txns_AVG_FUNC_SIZE"></a>
-
-The maximum size of a function in bytes
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_FUNC_SIZE">AVG_FUNC_SIZE</a>: u16 = 1000;
-</code></pre>
-
-
-
 <a id="0x1_scheduled_txns_AVG_SCHED_TXN_SIZE"></a>
 
+The average size of a scheduled transaction to provide an estimate of leaf nodes of BigOrderedMap
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_SCHED_TXN_SIZE">AVG_SCHED_TXN_SIZE</a>: u16 = 1056;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_SCHED_TXN_SIZE">AVG_SCHED_TXN_SIZE</a>: u16 = 1024;
 </code></pre>
 
 
@@ -555,6 +545,16 @@ Gas unit price is too low
 
 
 
+<a id="0x1_scheduled_txns_ETXN_TOO_LARGE"></a>
+
+Txn size is too large; beyond 10KB
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ETXN_TOO_LARGE">ETXN_TOO_LARGE</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_scheduled_txns_EUNAVAILABLE"></a>
 
 Scheduling is stopped
@@ -585,12 +585,12 @@ The maximum number of scheduled transactions that can be run in a block
 
 
 
-<a id="0x1_scheduled_txns_MAX_FUNC_SIZE"></a>
+<a id="0x1_scheduled_txns_MAX_SCHED_TXN_SIZE"></a>
 
-The maximum size of a function in bytes
+Max size of a scheduled transaction
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_FUNC_SIZE">MAX_FUNC_SIZE</a>: u16 = 1024;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_SCHED_TXN_SIZE">MAX_SCHED_TXN_SIZE</a>: u64 = 10240;
 </code></pre>
 
 
@@ -876,9 +876,6 @@ Insert a scheduled transaction into the queue. Txn_id is returned to user, which
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>)
     );
 
-
-    <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-
     // Only schedule txns in the future
     <b>let</b> txn_time = txn.scheduled_time_ms / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>; // Round down <b>to</b> the nearest 100ms
     <b>let</b> block_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / <a href="scheduled_txns.md#0x1_scheduled_txns_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>;
@@ -889,6 +886,11 @@ Insert a scheduled transaction into the queue. Txn_id is returned to user, which
         txn.max_gas_unit_price &gt; 100,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ELOW_GAS_UINIT_PRICE">ELOW_GAS_UINIT_PRICE</a>)
     );
+
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(&txn) &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_SCHED_TXN_SIZE">MAX_SCHED_TXN_SIZE</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ETXN_TOO_LARGE">ETXN_TOO_LARGE</a>)
+    );
     // Insert the transaction into the schedule_map
     // Create schedule map key
     <b>let</b> key = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
@@ -896,6 +898,8 @@ Insert a scheduled transaction into the queue. Txn_id is returned to user, which
         gas_priority: <a href="scheduled_txns.md#0x1_scheduled_txns_U64_MAX">U64_MAX</a> - txn.max_gas_unit_price,
         txn_id
     };
+
+    <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
     queue.schedule_map.add(key, txn);
 
     // Collect deposit
@@ -1240,32 +1244,6 @@ Called by the executor when the scheduled transaction is run
     } <b>else</b> {
         f(std::option::none());
     };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_scheduled_txns_get_num_txns"></a>
-
-## Function `get_num_txns`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_num_txns">get_num_txns</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_num_txns">get_num_txns</a>(): u64 <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
-    <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-    <b>let</b> num_txns = queue.schedule_map.compute_length();
-    num_txns
 }
 </code></pre>
 

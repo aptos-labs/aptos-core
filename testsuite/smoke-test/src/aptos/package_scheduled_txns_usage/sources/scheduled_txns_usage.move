@@ -25,7 +25,7 @@ module 0xA550C18::scheduled_txns_usage {
         let foo1 = |s: Option<signer>| step(state1, s);
         let txn1 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
-            current_time_ms + 1000,
+            current_time_ms + 2000,
             10000,
             200,
             false,
@@ -47,7 +47,7 @@ module 0xA550C18::scheduled_txns_usage {
         let foo3 = |s: Option<signer>| step(state3, s);
         let txn3 = scheduled_txns::new_scheduled_transaction(
             signer::address_of(user),
-            current_time_ms + 3000,
+            current_time_ms + 2000,
             10000,
             200,
             false,
