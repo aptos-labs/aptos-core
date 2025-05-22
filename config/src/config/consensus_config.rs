@@ -369,8 +369,8 @@ impl Default for ConsensusConfig {
             optimistic_sig_verification: true,
             enable_round_timeout_msg: true,
             enable_pipeline: true,
-            enable_optimistic_proposal_rx: false,
-            enable_optimistic_proposal_tx: false,
+            enable_optimistic_proposal_rx: true,
+            enable_optimistic_proposal_tx: true,
         }
     }
 }
