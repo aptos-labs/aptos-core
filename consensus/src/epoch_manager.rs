@@ -1512,6 +1512,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
         }
         if let ConsensusMsg::OptProposalMsg(proposal) = &consensus_msg {
+            if !self.config.enable_optimistic_proposal_rx {
+                bail!(
+                    "Unexpected OptProposalMsg. Feature is disabled. Author: {}, Epoch: {}, Round: {}",
+                    proposal.block_data().author(),
+                    proposal.epoch(),
+                    proposal.round()
+                )
+            }
             observe_block(
                 proposal.timestamp_usecs(),
                 BlockStage::EPOCH_MANAGER_RECEIVED,
@@ -1741,13 +1749,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
             opt_proposal_event @ VerifiedEvent::OptProposalMsg(_) => {
                 if let VerifiedEvent::OptProposalMsg(p) = &opt_proposal_event {
-                    if let Some(payload) = p.block_data().payload() {
-                        payload_manager.prefetch_payload_data(
-                            payload,
-                            p.proposer(),
-                            p.timestamp_usecs(),
-                        );
-                    }
+                    payload_manager.prefetch_payload_data(
+                        p.block_data().payload(),
+                        p.proposer(),
+                        p.timestamp_usecs(),
+                    );
                 }
 
                 Self::forward_event_to(buffered_proposal_tx, peer_id, opt_proposal_event)
