@@ -50,12 +50,12 @@ module aptos_experimental::clearinghouse_test {
     }
 
     fun update_position(
-        position: &mut Position, size: u64, is_long: bool
+        position: &mut Position, size: u64, is_bid: bool
     ) {
-        if (position.is_long != is_long) {
+        if (position.is_long != is_bid) {
             if (size > position.size) {
                 position.size = size - position.size;
-                position.is_long = is_long;
+                position.is_long = is_bid;
             } else {
                 position.size -= size;
             }
@@ -100,24 +100,42 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+            |_market_address, taker, maker, _taker_order_id, _maker_order_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| {
+            |_market_address, _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
                 validate_settlement_update()
-            }
+            },
+            |_market_address, _account, _order_id, _is_bid, _price, _size, _order_metadata| {
+                // place_maker_order is not used in this test
+            },
+            |_market_address, _account, _order_id, _is_bid| {
+                // cleanup_order is not used in this test
+            },
+            |_market_address, _account, _order_id, _is_bid, _price, _size| {
+                // decrease order size is not used in this test
+            },
         )
     }
 
     public(package) fun test_market_callbacks_with_taker_cancelled():
         MarketClearinghouseCallbacks<TestOrderMetadata> {
         new_market_clearinghouse_callbacks(
-            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+            |_market_address, taker, maker, _taker_order_id, _maker_order_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| {
+            |_market_address, _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
                 validate_settlement_update()
-            }
+            },
+            |_market_address, _account, _order_id, _is_bid, _price, _size, _order_metadata| {
+                // place_maker_order is not used in this test
+            },
+            |_market_address, _account, _order_id, _is_bid| {
+                // cleanup_order is not used in this test
+            },
+            |_market_address, _account, _order_id, _is_bid, _price, _size| {
+                // decrease order size is not used in this test
+            },
         )
     }
 }
