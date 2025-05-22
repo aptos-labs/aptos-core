@@ -502,10 +502,12 @@ bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.11"
+blsttc = "8.0.2"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
+bulletproofs_bls12381 = { package = "bulletproofs", git = "ssh://git@github.com/Entropy-Foundation/bulletproofs", tag = "v0.1.0"}
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
 camino = { version = "1.1.6" }

@@ -32,7 +32,10 @@ ark-std = { workspace = true }
 bcs = { workspace = true }
 better_any = { workspace = true }
 blake2-rfc = { workspace = true }
+blst = { workspace = true }
+blsttc = { workspace = true }
 bulletproofs = { workspace = true }
+bulletproofs_bls12381 = { workspace = true }
 byteorder = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }

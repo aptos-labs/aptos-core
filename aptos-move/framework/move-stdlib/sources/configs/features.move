@@ -687,6 +687,19 @@ module std::features {
         is_enabled(SUPRA_ETH_TRIE)
     }
 
+    /// Whether the APIs related to the bls12381_bulletproofs feature are enabled.
+    ///
+    /// Lifetime: transient
+    const PRIVATE_POLL: u64 = 90;
+
+    public fun get_supra_private_poll_feature(): u64 {
+        PRIVATE_POLL
+    }
+
+    public fun supra_private_poll_enabled(): bool acquires Features {
+        is_enabled(PRIVATE_POLL)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

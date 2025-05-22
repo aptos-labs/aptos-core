@@ -984,7 +984,7 @@ dependencies = [
  "blake2",
  "blake2-rfc",
  "blst",
- "bulletproofs",
+ "bulletproofs 4.0.0",
  "byteorder",
  "bytes",
  "criterion",
@@ -992,7 +992,7 @@ dependencies = [
  "curve25519-dalek-ng",
  "digest 0.9.0",
  "ed25519-dalek 1.0.1",
- "ff",
+ "ff 0.13.0",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
@@ -1237,10 +1237,10 @@ dependencies = [
  "aptos-runtimes",
  "bcs 0.1.4",
  "blst",
- "blstrs",
+ "blstrs 0.7.1",
  "criterion",
- "ff",
- "group",
+ "ff 0.13.0",
+ "group 0.13.0",
  "hex",
  "merlin",
  "more-asserts",
@@ -1249,7 +1249,7 @@ dependencies = [
  "num-traits",
  "num_cpus",
  "once_cell",
- "pairing",
+ "pairing 0.23.0",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
@@ -1757,7 +1757,10 @@ dependencies = [
  "bcs 0.1.4",
  "better_any",
  "blake2-rfc",
- "bulletproofs",
+ "blst",
+ "blsttc",
+ "bulletproofs 4.0.0",
+ "bulletproofs 5.0.0",
  "byteorder",
  "claims",
  "clap 4.4.14",
@@ -2402,7 +2405,7 @@ dependencies = [
  "ark-serialize",
  "ark-std",
  "bcs 0.1.4",
- "blstrs",
+ "blstrs 0.7.1",
  "derivation-path",
  "ed25519-dalek 1.0.1",
  "hex",
@@ -5177,7 +5180,7 @@ checksum = "9ae286c2cb403324ab644c7cc68dceb25fe52ca9429908a726d7ed272c1edf7b"
 dependencies = [
  "bellpepper-core",
  "byteorder",
- "ff",
+ "ff 0.13.0",
 ]
 
 [[package]]
@@ -5188,7 +5191,7 @@ checksum = "1d8abb418570756396d722841b19edfec21d4e89e1cf8990610663040ecb1aea"
 dependencies = [
  "blake2s_simd",
  "byteorder",
- "ff",
+ "ff 0.13.0",
  "serde",
  "thiserror",
 ]
@@ -5439,18 +5442,55 @@ dependencies = [
 
 [[package]]
 name = "blstrs"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ff3694b352ece02eb664a09ffb948ee69b35afa2e6ac444a6b8cb9d515deebd"
+dependencies = [
+ "blst",
+ "byte-slice-cast",
+ "ff 0.12.1",
+ "group 0.12.1",
+ "pairing 0.22.0",
+ "rand_core 0.6.4",
+ "serde",
+ "subtle",
+]
+
+[[package]]
+name = "blstrs"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a8a8ed6fefbeef4a8c7b460e4110e12c5e22a5b7cf32621aae6ad650c4dcf29"
 dependencies = [
  "blst",
  "byte-slice-cast",
- "ff",
- "group",
- "pairing",
+ "ff 0.13.0",
+ "group 0.13.0",
+ "pairing 0.23.0",
  "rand_core 0.6.4",
  "serde",
  "subtle",
+]
+
+[[package]]
+name = "blsttc"
+version = "8.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1186a39763321a0b73d1a10aa4fc067c5d042308509e8f6cc31d2c2a7ac61ac2"
+dependencies = [
+ "blst",
+ "blstrs 0.6.2",
+ "ff 0.12.1",
+ "group 0.12.1",
+ "hex",
+ "hex_fmt",
+ "pairing 0.22.0",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
+ "thiserror",
+ "tiny-keccak",
+ "zeroize",
 ]
 
 [[package]]
@@ -5531,6 +5571,27 @@ dependencies = [
  "serde_derive",
  "sha3 0.9.1",
  "subtle-ng",
+ "thiserror",
+]
+
+[[package]]
+name = "bulletproofs"
+version = "5.0.0"
+source = "git+ssh://git@github.com/Entropy-Foundation/bulletproofs?tag=v0.1.0#15f9d568620a821e4252987b61c9992c1af06e9e"
+dependencies = [
+ "blsttc",
+ "byteorder",
+ "clear_on_drop",
+ "digest 0.10.7",
+ "group 0.13.0",
+ "merlin",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_derive",
+ "sha3 0.10.8",
+ "subtle",
  "thiserror",
 ]
 
@@ -7287,9 +7348,9 @@ dependencies = [
  "base64ct",
  "crypto-bigint 0.5.5",
  "digest 0.10.7",
- "ff",
+ "ff 0.13.0",
  "generic-array 0.14.7",
- "group",
+ "group 0.13.0",
  "pem-rfc7468 0.7.0",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
@@ -7693,6 +7754,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "209098dd6dfc4445aa6111f0e98653ac323eaa4dfd212c9ca3931bf9955c31bd"
 dependencies = [
  "simd-adler32",
+]
+
+[[package]]
+name = "ff"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
+dependencies = [
+ "bitvec 1.0.1",
+ "rand_core 0.6.4",
+ "subtle",
 ]
 
 [[package]]
@@ -8414,11 +8486,24 @@ dependencies = [
 
 [[package]]
 name = "group"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dfbfb3a6cfbd390d5c9564ab283a0349b9b9fcd46a706c1eb10e0db70bfbac7"
+dependencies = [
+ "ff 0.12.1",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "rand_xorshift",
+ "subtle",
+]
+
+[[package]]
+name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
 dependencies = [
- "ff",
+ "ff 0.13.0",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "rand_xorshift",
@@ -8654,6 +8739,12 @@ name = "hex-literal"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
+
+[[package]]
+name = "hex_fmt"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07f60793ff0a4d9cef0f18e63b5357e06209987153a64648c972c1e5aff336f"
 
 [[package]]
 name = "hidapi"
@@ -11185,9 +11276,9 @@ dependencies = [
  "bellpepper",
  "bellpepper-core",
  "blake2s_simd",
- "blstrs",
+ "blstrs 0.7.1",
  "byteorder",
- "ff",
+ "ff 0.13.0",
  "generic-array 0.14.7",
  "log",
  "pasta_curves",
@@ -11709,11 +11800,20 @@ dependencies = [
 
 [[package]]
 name = "pairing"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135590d8bdba2b31346f9cd1fb2a912329f5135e832a4f422942eb6ead8b6b3b"
+dependencies = [
+ "group 0.12.1",
+]
+
+[[package]]
+name = "pairing"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81fec4625e73cf41ef4bb6846cafa6d44736525f442ba45e407c4a000a13996f"
 dependencies = [
- "group",
+ "group 0.13.0",
 ]
 
 [[package]]
@@ -11890,8 +11990,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3e57598f73cc7e1b2ac63c79c517b31a0877cd7c402cdcaa311b5208de7a095"
 dependencies = [
  "blake2b_simd",
- "ff",
- "group",
+ "ff 0.13.0",
+ "group 0.13.0",
  "hex",
  "lazy_static",
  "rand 0.8.5",

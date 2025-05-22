@@ -89,7 +89,8 @@ pub enum FeatureFlag {
     // Keeping 16 bit reserved to have graceful updated from aptos-mainstream in case of new flags have been added
     // Ends up in 11th byte, 0th bit
     SUPRA_NATIVE_AUTOMATION = 88,
-    SUPRA_ETH_TRIE= 89,
+    SUPRA_ETH_TRIE = 89,
+    PRIVATE_POLL = 90,
 }
 
 impl FeatureFlag {
@@ -156,6 +157,7 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
+            FeatureFlag::PRIVATE_POLL,
         ]
     }
 }

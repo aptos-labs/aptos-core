@@ -133,6 +133,8 @@ return true.
 -  [Function `supra_native_automation_enabled`](#0x1_features_supra_native_automation_enabled)
 -  [Function `get_supra_eth_trie_feature`](#0x1_features_get_supra_eth_trie_feature)
 -  [Function `supra_eth_trie_enabled`](#0x1_features_supra_eth_trie_enabled)
+-  [Function `get_supra_private_poll_feature`](#0x1_features_get_supra_private_poll_feature)
+-  [Function `supra_private_poll_enabled`](#0x1_features_supra_private_poll_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -740,6 +742,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>: u64 = 61;
+</code></pre>
+
+
+
+<a id="0x1_features_PRIVATE_POLL"></a>
+
+Whether the APIs related to the bls12381_bulletproofs feature are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_PRIVATE_POLL">PRIVATE_POLL</a>: u64 = 90;
 </code></pre>
 
 
@@ -3351,6 +3365,54 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_eth_trie_enabled">supra_eth_trie_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SUPRA_ETH_TRIE">SUPRA_ETH_TRIE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_supra_private_poll_feature"></a>
+
+## Function `get_supra_private_poll_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_private_poll_feature">get_supra_private_poll_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_private_poll_feature">get_supra_private_poll_feature</a>(): u64 {
+    <a href="features.md#0x1_features_PRIVATE_POLL">PRIVATE_POLL</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_supra_private_poll_enabled"></a>
+
+## Function `supra_private_poll_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_private_poll_enabled">supra_private_poll_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_private_poll_enabled">supra_private_poll_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PRIVATE_POLL">PRIVATE_POLL</a>)
 }
 </code></pre>
 
