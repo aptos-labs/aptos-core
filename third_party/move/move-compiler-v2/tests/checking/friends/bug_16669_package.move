@@ -10,4 +10,11 @@ module 0xc0ffee::m {
     public(package) inline fun foo_2(): u64 {
         12
     }
+
+    package native fun foo_3(): u64;
+
+    package entry fun foo_4(): u64 {
+        12
+    }
+
 }
