@@ -24,19 +24,15 @@ impl StateUpdateRef<'_> {
                 }
             },
             BaseStateOp::Deletion(_) => StateSlot::HotVacant {
-                deletion_version: Some(self.version),
                 hot_since_version: self.version,
             },
             BaseStateOp::MakeHot { prev_slot } => match prev_slot {
                 StateSlot::ColdVacant => StateSlot::HotVacant {
-                    deletion_version: None,
                     hot_since_version: self.version,
                 },
                 StateSlot::HotVacant {
-                    deletion_version,
                     hot_since_version: _,
                 } => StateSlot::HotVacant {
-                    deletion_version,
                     hot_since_version: self.version,
                 },
                 StateSlot::ColdOccupied {
