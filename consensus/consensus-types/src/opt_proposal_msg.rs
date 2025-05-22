@@ -5,7 +5,7 @@
 use crate::{
     common::Author, opt_block_data::OptBlockData, proof_of_store::ProofCache, sync_info::SyncInfo,
 };
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +51,49 @@ impl OptProposalMsg {
         &self.sync_info
     }
 
+    /// Verifies that the ProposalMsg is well-formed.
+    pub fn verify_well_formed(&self) -> Result<()> {
+        self.block_data
+            .verify_well_formed()
+            .context("Fail to verify OptProposalMsg's data")?;
+        ensure!(
+            self.block_data.round() > 0,
+            "Proposal for {} has an incorrect round of 0",
+            self.block_data,
+        );
+        ensure!(
+            self.block_data.epoch() == self.sync_info.epoch(),
+            "ProposalMsg has different epoch number from SyncInfo"
+        );
+        // Ensure the sync info has the grandparent QC
+        ensure!(
+            self.block_data.grandparent_qc().certified_block().id()
+                == self.sync_info.highest_quorum_cert().certified_block().id(),
+            "Proposal HQC in SyncInfo certifies {}, but block grandparent id is {}",
+            self.sync_info.highest_quorum_cert().certified_block().id(),
+            self.block_data.grandparent_qc().certified_block().id(),
+        );
+        let grandparent_round = self
+            .block_data
+            .round()
+            .checked_sub(2)
+            .ok_or_else(|| anyhow::anyhow!("proposal round overflowed!"))?;
+
+        let highest_certified_round = self.block_data.grandparent_qc().certified_block().round();
+        ensure!(
+            grandparent_round == highest_certified_round,
+            "Proposal {} does not have a certified round {}",
+            self.block_data,
+            grandparent_round
+        );
+        // Optimistic proposal shouldn't have a timeout certificate
+        ensure!(
+            self.sync_info.highest_2chain_timeout_cert().is_none(),
+            "Optimistic proposal shouldn't have a timeout certificate"
+        );
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         sender: Author,
@@ -60,34 +103,18 @@ impl OptProposalMsg {
     ) -> Result<()> {
         ensure!(
             self.proposer() == sender,
-            "Proposal author {:?} doesn't match sender {:?}",
+            "OptProposal author {:?} doesn't match sender {:?}",
             self.proposer(),
             sender
         );
 
-        self.block_data().payload().map_or(Ok(()), |p| {
-            p.verify(validator, proof_cache, quorum_store_enabled)
-        })?;
+        self.block_data()
+            .payload()
+            .verify(validator, proof_cache, quorum_store_enabled)?;
 
         self.block_data().grandparent_qc().verify(validator)?;
 
-        // Optimistic proposal shouldn't have a timeout certificate
-        ensure!(
-            self.sync_info.highest_2chain_timeout_cert().is_none(),
-            "Optimistic proposal shouldn't have a timeout certificate"
-        );
-
-        // Ensure the sync info has the grandparent QC
-        ensure!(
-            self.sync_info
-                .highest_quorum_cert()
-                .certified_block()
-                .round()
-                == self.round().saturating_sub(2),
-            "Sync info doesn't have the grandparent QC"
-        );
-
         // Note that we postpone the verification of SyncInfo until it's being used.
-        self.block_data.verify()
+        self.block_data.verify_well_formed()
     }
 }

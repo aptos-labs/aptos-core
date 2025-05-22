@@ -35,7 +35,9 @@ use aptos_consensus_types::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
+use aptos_types::{
+    block_info::BlockInfo, on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction,
+};
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
 use itertools::Itertools;
@@ -682,7 +684,7 @@ impl ProposalGenerator {
         &self,
         epoch: u64,
         round: Round,
-        parent_id: HashValue,
+        parent: BlockInfo,
         grandparent_qc: QuorumCert,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         wait_callback: BoxFuture<'static, ()>,
@@ -703,7 +705,7 @@ impl ProposalGenerator {
         } else {
             self.generate_proposal_inner(
                 round,
-                parent_id,
+                parent.id(),
                 proposer_election,
                 wait_callback,
                 maybe_optqs_payload_pull_params,
@@ -726,7 +728,7 @@ impl ProposalGenerator {
             epoch,
             round,
             timestamp,
-            parent_id,
+            parent,
             grandparent_qc,
         );
 

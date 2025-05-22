@@ -162,7 +162,7 @@ impl BlockData {
                 Some(payload)
             },
             BlockType::ProposalExt(p) => p.payload(),
-            BlockType::OptProposal(p) => p.payload(),
+            BlockType::OptProposal(p) => Some(p.payload()),
             _ => None,
         }
     }
