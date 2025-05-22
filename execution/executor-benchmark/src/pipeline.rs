@@ -4,8 +4,9 @@
 use crate::{
     block_preparation::BlockPreparationStage,
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
+    measurements::{EventMeasurements, OverallMeasuring},
     metrics::NUM_TXNS,
-    OverallMeasurement, OverallMeasuring, TransactionCommitter, TransactionExecutor,
+    OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
@@ -49,19 +50,6 @@ pub struct PipelineConfig {
     pub num_sig_verify_threads: usize,
 
     pub print_transactions: bool,
-}
-
-pub struct EventMeasurements {
-    staged_events: BTreeMap<(usize, StructTag), usize>,
-}
-
-impl EventMeasurements {
-    pub fn print_end_table(&self) {
-        println!("Events:");
-        for ((stage, tag), count) in &self.staged_events {
-            println!("stage{: <5}{: >12}     {}::{}::{}", stage, count, if tag.address.is_special() { tag.address.to_standard_string() } else { "custom".to_string()}, tag.module, tag.name);
-        }
-    }
 }
 
 pub struct Pipeline<V> {
@@ -339,10 +327,10 @@ where
         }
         (
             counts.into_iter().min(),
-            Arc::try_unwrap(self.staged_result)
-                .unwrap()
-                .into_inner(),
-            EventMeasurements { staged_events: Arc::try_unwrap(self.staged_events).unwrap().into_inner()},
+            Arc::try_unwrap(self.staged_result).unwrap().into_inner(),
+            EventMeasurements {
+                staged_events: Arc::try_unwrap(self.staged_events).unwrap().into_inner(),
+            },
         )
     }
 }
