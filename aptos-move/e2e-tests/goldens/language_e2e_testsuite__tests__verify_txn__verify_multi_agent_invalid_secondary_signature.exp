@@ -1,11 +1,13 @@
 Ok(
     [
         TransactionOutput {
-            write_set: V0(
-                WriteSetV0(
-                    WriteSetMut {
-                        write_set: {},
-                    },
+            write_set: Value(
+                V0(
+                    WriteSetV0(
+                        WriteSetMut {
+                            write_set: {},
+                        },
+                    ),
                 ),
             ),
             events: [],

@@ -470,13 +470,15 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
         }
         if append_epilogue {
             state_by_version.append_version(vec![]);
+            let write_set = op_accu
+                .get_slots_to_make_hot()
+                .into_iter()
+                .map(|(k, slot)| (k, HotStateOp::make_hot(slot).into_base_op()))
+                .collect_vec();
+            let reads = write_set.iter().map(|(k, _op)| k.clone()).collect_vec();
             all_txns.push(Txn {
-                reads: vec![],
-                write_set: op_accu
-                    .get_slots_to_make_hot()
-                    .into_iter()
-                    .map(|(k, slot)| (k, HotStateOp::make_hot(slot).into_base_op()))
-                    .collect(),
+                reads,
+                write_set,
                 is_checkpoint: true,
             });
             next_version += 1;
@@ -561,7 +563,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
+    #![proptest_config(ProptestConfig::with_cases(100))]
 
     #[test]
     fn test_speculative_state_workflow(
