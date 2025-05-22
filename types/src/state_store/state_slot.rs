@@ -15,15 +15,10 @@ use StateSlot::*;
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
-#[derive(Clone, Debug, Derivative, Eq)]
-#[derivative(PartialEq)]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
-        /// None - unknown, from a DB read
-        /// Some - from a WriteOp::Deletion()
-        #[derivative(PartialEq = "ignore")]
-        deletion_version: Option<Version>,
         hot_since_version: Version,
     },
     ColdOccupied {
@@ -41,13 +36,16 @@ impl StateSlot {
     fn maybe_update_cold_state(&self, min_version: Version) -> Option<Option<&StateValue>> {
         match self {
             ColdVacant => Some(None),
-            HotVacant {
-                deletion_version,
-                hot_since_version: _,
-            } => deletion_version
-                .map(|ver| ver >= min_version)
-                .unwrap_or(false)
-                .then_some(None),
+            HotVacant { hot_since_version } => {
+                if *hot_since_version >= min_version {
+                    // TODO(HotState): revisit after the hot state is exclusive with the cold state
+                    // Can't tell if there was a deletion to the cold state here, not much harm to
+                    // issue a deletion anyway.
+                    Some(None)
+                } else {
+                    None
+                }
+            },
             ColdOccupied {
                 value_version,
                 value,
