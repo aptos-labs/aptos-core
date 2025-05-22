@@ -93,7 +93,8 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             return Ok(None);
         }
 
-        S::verify_transcript_extra(&transcript).context("extra verification failed")?;
+        S::verify_transcript_extra(&transcript, &self.epoch_state.verifier, false, Some(sender))
+            .context("extra verification failed")?;
 
         S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e| {
             anyhow!("[DKG] adding peer transcript failed with trx verification failure: {e}")

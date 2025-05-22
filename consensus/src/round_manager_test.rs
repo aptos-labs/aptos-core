@@ -2515,6 +2515,16 @@ fn no_vote_on_proposal_with_inconsistent_secret_dkg_result() {
 }
 
 #[test]
+fn no_vote_on_proposal_with_dup_dealers_in_dkg_transcript() {
+    test_dkg_result_handling(
+        &[10_000_000, 40_000_000, 10_000_000, 40_000_000],
+        1,
+        RealDKG::deal_twice_and_aggregate,
+        false,
+    );
+}
+
+#[test]
 fn vote_on_proposal_with_valid_dkg_result() {
     test_dkg_result_handling(
         &[10_000_000, 70_000_000, 10_000_000, 10_000_000],

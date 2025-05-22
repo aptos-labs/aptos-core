@@ -83,7 +83,7 @@ impl DKGTranscript {
     pub(crate) fn verify(&self, verifier: &ValidatorVerifier) -> Result<()> {
         let transcripts: Transcripts = bcs::from_bytes(&self.transcript_bytes)
             .context("Transcripts deserialization failed")?;
-        transcripts.verify(verifier)
+        RealDKG::verify_transcript_extra(&transcripts, verifier, true, None)
     }
 }
 
@@ -202,7 +202,12 @@ pub trait DKGTrait: Debug {
     /// NOTE: used in VM.
     fn verify_transcript(params: &Self::PublicParams, trx: &Self::Transcript) -> Result<()>;
 
-    fn verify_transcript_extra(trx: &Self::Transcript) -> Result<()>;
+    fn verify_transcript_extra(
+        trx: &Self::Transcript,
+        verifier: &ValidatorVerifier,
+        checks_voting_power: bool,
+        ensures_single_dealer: Option<AccountAddress>,
+    ) -> Result<()>;
 
     fn aggregate_transcripts(
         params: &Self::PublicParams,
