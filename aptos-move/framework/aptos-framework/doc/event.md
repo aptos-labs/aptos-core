@@ -81,7 +81,7 @@ A handle for an event such that:
 
 <a id="0x1_event_ECANNOT_CREATE_EVENT"></a>
 
-An event cannot be created. This error is returned by native implementations when.
+An event cannot be created. This error is returned by native implementations when
 - The type tag for event is too deeply nested.
 
 
