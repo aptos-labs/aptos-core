@@ -41,6 +41,8 @@ impl StateSlot {
                     // TODO(HotState): revisit after the hot state is exclusive with the cold state
                     // Can't tell if there was a deletion to the cold state here, not much harm to
                     // issue a deletion anyway.
+                    // TODO(HotState): query the base version before doing the JMT update to filter
+                    //                 out "empty deletes"
                     Some(None)
                 } else {
                     None
