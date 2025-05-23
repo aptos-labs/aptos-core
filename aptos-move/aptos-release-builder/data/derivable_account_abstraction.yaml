@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: "AIP-113 Derivable Account Abstraction"
+proposals:
+  - name: DERIVABLE_ACCOUNT_ABSTRACTION
+    metadata:
+      title: "Enable Derivable Account Abstraction"
+      description: "Enables AIP-113"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/15899"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-113.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - DERIVABLE_ACCOUNT_ABSTRACTION
+          disabled: [ ]
