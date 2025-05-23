@@ -4,7 +4,7 @@
 use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
@@ -16,7 +16,7 @@ use aptos_types::{
 };
 use claims::{assert_le, assert_none};
 use once_cell::sync::Lazy;
-use std::{env, time::Instant};
+use std::{collections::BTreeMap, env, time::Instant};
 
 pub static PRINT_CONFLICTS_INFO: Lazy<bool> =
     Lazy::new(|| env::var("PRINT_CONFLICTS_INFO").is_ok());
@@ -32,7 +32,7 @@ pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
     print_conflicts_info: bool,
-    hot_state_op_accumulator: BlockHotStateOpAccumulator<'s, T::Key, S>,
+    hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<'s, T::Key, S>>,
 }
 
 impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s, T, S> {
@@ -42,6 +42,9 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
+        let hot_state_op_accumulator = block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+            .then(|| BlockHotStateOpAccumulator::new(base_view));
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -54,7 +57,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             start_time: Instant::now(),
             // TODO: have a configuration for it.
             print_conflicts_info: *PRINT_CONFLICTS_INFO,
-            hot_state_op_accumulator: BlockHotStateOpAccumulator::new(base_view),
+            hot_state_op_accumulator,
         }
     }
 
@@ -85,8 +88,9 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            self.hot_state_op_accumulator
-                .add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+            if let Some(x) = &mut self.hot_state_op_accumulator {
+                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+            }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
@@ -287,7 +291,12 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
-        let slots_to_make_hot = self.hot_state_op_accumulator.get_slots_to_make_hot();
+        let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
+            x.get_slots_to_make_hot()
+        } else {
+            error!("BlockHotStateOpAccumulator is not set.");
+            BTreeMap::new()
+        };
 
         TBlockEndInfoExt::new(inner, slots_to_make_hot)
     }

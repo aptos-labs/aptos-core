@@ -7,9 +7,10 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        StateViewId, StateViewResult, TStateView,
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateViewId, StateViewResult, TStateView,
     },
+    transaction::Version,
     write_set::{TransactionWrite, WriteSet},
 };
 use bytes::Bytes;
@@ -20,7 +21,6 @@ use move_core_types::{
 use parking_lot::RwLock;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
-
 /***************************************************************************************************
  * Traits
  *
@@ -276,6 +276,13 @@ where
         }
     }
 
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        match self {
+            Self::Left(l) => l.get_state_slot(state_key),
+            Self::Right(r) => r.get_state_slot(state_key),
+        }
+    }
+
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         match self {
             Self::Left(l) => l.get_state_value(state_key),
@@ -301,6 +308,13 @@ where
         match self {
             Self::Left(l) => l.contains_state_value(state_key),
             Self::Right(r) => r.contains_state_value(state_key),
+        }
+    }
+
+    fn next_version(&self) -> Version {
+        match self {
+            Self::Left(l) => l.next_version(),
+            Self::Right(r) => r.next_version(),
         }
     }
 }
