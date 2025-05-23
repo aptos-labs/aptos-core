@@ -68,8 +68,8 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Function `finalize_epoch_change`](#0x1_automation_registry_finalize_epoch_change)
 -  [Function `finalize_epoch_change_for_feature_disabled_state`](#0x1_automation_registry_finalize_epoch_change_for_feature_disabled_state)
 -  [Function `update_state_for_new_epoch`](#0x1_automation_registry_update_state_for_new_epoch)
--  [Function `refund_cleanup_and_activate_tasks`](#0x1_automation_registry_refund_cleanup_and_activate_tasks)
--  [Function `cleanup_and_activate_tasks`](#0x1_automation_registry_cleanup_and_activate_tasks)
+-  [Function `refund_cleanup_tasks`](#0x1_automation_registry_refund_cleanup_tasks)
+-  [Function `cleanup_tasks`](#0x1_automation_registry_cleanup_tasks)
 -  [Function `safe_deposit_refund_all`](#0x1_automation_registry_safe_deposit_refund_all)
 -  [Function `safe_deposit_refund`](#0x1_automation_registry_safe_deposit_refund)
 -  [Function `safe_unlock_locked_deposit`](#0x1_automation_registry_safe_unlock_locked_deposit)
@@ -2836,7 +2836,7 @@ Cleans the stale tasks and calculates gas-committed for the new epoch.
     };
 
     <b>if</b> (refund_automation_fee_per_sec != 0) {
-        <a href="automation_registry.md#0x1_automation_registry_refund_cleanup_and_activate_tasks">refund_cleanup_and_activate_tasks</a>(
+        <a href="automation_registry.md#0x1_automation_registry_refund_cleanup_tasks">refund_cleanup_tasks</a>(
             <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>,
             refund_bookkeeping,
             current_time,
@@ -2844,7 +2844,7 @@ Cleans the stale tasks and calculates gas-committed for the new epoch.
             refund_automation_fee_per_sec,
             refund_interval)
     } <b>else</b> {
-        <a href="automation_registry.md#0x1_automation_registry_cleanup_and_activate_tasks">cleanup_and_activate_tasks</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>, refund_bookkeeping, current_time)
+        <a href="automation_registry.md#0x1_automation_registry_cleanup_tasks">cleanup_tasks</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>, refund_bookkeeping, current_time)
     }
 }
 </code></pre>
@@ -2853,16 +2853,16 @@ Cleans the stale tasks and calculates gas-committed for the new epoch.
 
 </details>
 
-<a id="0x1_automation_registry_refund_cleanup_and_activate_tasks"></a>
+<a id="0x1_automation_registry_refund_cleanup_tasks"></a>
 
-## Function `refund_cleanup_and_activate_tasks`
+## Function `refund_cleanup_tasks`
 
-Refunds active tasks of the previous epoch, cleans up expired and cancelled tasks and activates the pending tasks.
+Refunds active tasks of the previous epoch, cleans up expired and cancelled tasks.
 Also calculates and returns the total committed max gas for the new epoch along with the task indexes
 that have been removed from the registry.
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_refund_cleanup_and_activate_tasks">refund_cleanup_and_activate_tasks</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">automation_registry::AutomationRefundBookkeeping</a>, current_time: u64, arc: &<a href="automation_registry.md#0x1_automation_registry_AutomationRegistryConfig">automation_registry::AutomationRegistryConfig</a>, refund_automation_fee_per_sec: u256, refund_interval: u64): <a href="automation_registry.md#0x1_automation_registry_IntermediateStateOfEpochChange">automation_registry::IntermediateStateOfEpochChange</a>
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_refund_cleanup_tasks">refund_cleanup_tasks</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">automation_registry::AutomationRefundBookkeeping</a>, current_time: u64, arc: &<a href="automation_registry.md#0x1_automation_registry_AutomationRegistryConfig">automation_registry::AutomationRegistryConfig</a>, refund_automation_fee_per_sec: u256, refund_interval: u64): <a href="automation_registry.md#0x1_automation_registry_IntermediateStateOfEpochChange">automation_registry::IntermediateStateOfEpochChange</a>
 </code></pre>
 
 
@@ -2871,7 +2871,7 @@ that have been removed from the registry.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_refund_cleanup_and_activate_tasks">refund_cleanup_and_activate_tasks</a>(
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_refund_cleanup_tasks">refund_cleanup_tasks</a>(
     <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">AutomationRegistry</a>,
     refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">AutomationRefundBookkeeping</a>,
     current_time: u64,
@@ -2920,7 +2920,6 @@ that have been removed from the registry.
             <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> removed_tasks, task_index);
         } <b>else</b> {
-            task.state = <a href="automation_registry.md#0x1_automation_registry_ACTIVE">ACTIVE</a>;
             tcmg = tcmg + task.max_gas_amount;
         }
     });
@@ -2937,16 +2936,16 @@ that have been removed from the registry.
 
 </details>
 
-<a id="0x1_automation_registry_cleanup_and_activate_tasks"></a>
+<a id="0x1_automation_registry_cleanup_tasks"></a>
 
-## Function `cleanup_and_activate_tasks`
+## Function `cleanup_tasks`
 
-Cleans up expired and cancelled tasks and activates the pending tasks.
+Cleans up expired and cancelled.
 Also calculates and returns the total committed max gas for the new epoch along with the task indexes
 that have been removed from the registry.
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_cleanup_and_activate_tasks">cleanup_and_activate_tasks</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">automation_registry::AutomationRefundBookkeeping</a>, current_time: u64): <a href="automation_registry.md#0x1_automation_registry_IntermediateStateOfEpochChange">automation_registry::IntermediateStateOfEpochChange</a>
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_cleanup_tasks">cleanup_tasks</a>(<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">automation_registry::AutomationRefundBookkeeping</a>, current_time: u64): <a href="automation_registry.md#0x1_automation_registry_IntermediateStateOfEpochChange">automation_registry::IntermediateStateOfEpochChange</a>
 </code></pre>
 
 
@@ -2955,7 +2954,7 @@ that have been removed from the registry.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_cleanup_and_activate_tasks">cleanup_and_activate_tasks</a>(
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_cleanup_tasks">cleanup_tasks</a>(
     <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">AutomationRegistry</a>,
     refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">AutomationRefundBookkeeping</a>,
     current_time: u64
@@ -2983,7 +2982,6 @@ that have been removed from the registry.
             <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> removed_tasks, task_index);
         } <b>else</b> {
-            task.state = <a href="automation_registry.md#0x1_automation_registry_ACTIVE">ACTIVE</a>;
             tcmg = tcmg + task.max_gas_amount;
         }
     });
@@ -3280,7 +3278,7 @@ This is supposed to be called only after removing expired task and must not be c
 It returns calculated task fee for the interval the task will be active.
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_calculate_task_fee">calculate_task_fee</a>(arc: &<a href="automation_registry.md#0x1_automation_registry_AutomationRegistryConfig">automation_registry::AutomationRegistryConfig</a>, task: &<a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">automation_registry::AutomationTaskMetaData</a>, interval: u64, current_time: u64, automation_fee_per_sec: u256): u64
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_calculate_task_fee">calculate_task_fee</a>(arc: &<a href="automation_registry.md#0x1_automation_registry_AutomationRegistryConfig">automation_registry::AutomationRegistryConfig</a>, task: &<a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">automation_registry::AutomationTaskMetaData</a>, potential_fee_timeframe: u64, current_time: u64, automation_fee_per_sec: u256): u64
 </code></pre>
 
 
@@ -3292,17 +3290,29 @@ It returns calculated task fee for the interval the task will be active.
 <pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_calculate_task_fee">calculate_task_fee</a>(
     arc: &<a href="automation_registry.md#0x1_automation_registry_AutomationRegistryConfig">AutomationRegistryConfig</a>,
     task: &<a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">AutomationTaskMetaData</a>,
-    interval: u64,
+    potential_fee_timeframe: u64,
     current_time: u64,
     automation_fee_per_sec: u256
 ): u64 {
     <b>if</b> (automation_fee_per_sec == 0) { <b>return</b> 0 };
     <b>if</b> (task.expiry_time &lt;= current_time) { <b>return</b> 0 };
     // Subtraction is safe here, <b>as</b> we already excluded expired tasks
-    <b>let</b> remaining_time = task.expiry_time - current_time;
-    <b>let</b> min_interval = <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_min">math64::min</a>(remaining_time, interval);
+    <b>let</b> task_active_timeframe = task.expiry_time - current_time;
+    // If the task is a new task i.e. in Pending state, then it is charged always for
+    // the input potential_fee_timeframe(which is epoch-interval),
+    // For the new tasks which active-timeframe is less than epoch-interval
+    // it would mean it is their first and only epoch and we charge the fee for entire epoch.
+    // Note that although the new short tasks are charged for entire epoch, the refunding logic remains the same for
+    // them <b>as</b> for the long tasks.
+    // This way bad-actors will be discourged <b>to</b> submit small and short tasks <b>with</b> big occupancy by blocking other
+    // good-actors register tasks.
+    <b>let</b> actual_fee_timeframe = <b>if</b> (task.state == <a href="automation_registry.md#0x1_automation_registry_PENDING">PENDING</a>) {
+        potential_fee_timeframe
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_min">math64::min</a>(task_active_timeframe, potential_fee_timeframe)
+    };
     <a href="automation_registry.md#0x1_automation_registry_calculate_automation_fee_for_interval">calculate_automation_fee_for_interval</a>(
-        min_interval,
+        actual_fee_timeframe,
         task.max_gas_amount,
         automation_fee_per_sec,
         arc.registry_max_gas_cap)
@@ -3533,15 +3543,24 @@ Return estimated committed gas for the next epoch, locked automation fee amount 
 
     // Process each active task and calculate fee for the epoch for the tasks
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(task_ids, |task_index| {
-        <b>let</b> task_meta = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value_ref">enumerable_map::get_value_ref</a>(&<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
-        <b>let</b> task = <a href="automation_registry.md#0x1_automation_registry_AutomationTaskFeeMeta">AutomationTaskFeeMeta</a> {
-            task_index,
-            owner: task_meta.owner,
-            fee: <a href="automation_registry.md#0x1_automation_registry_calculate_task_fee">calculate_task_fee</a>(arc, task_meta, epoch_interval, current_time, automation_fee_per_sec),
-            expiry_time: task_meta.expiry_time,
-            automation_fee_cap: task_meta.automation_fee_cap_for_epoch,
-            max_gas_amount: task_meta.max_gas_amount,
-            locked_deposit_fee: task_meta.locked_fee_for_next_epoch,
+        <b>let</b> task = {
+            <b>let</b> task_meta = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value_mut">enumerable_map::get_value_mut</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.tasks, task_index);
+            <b>let</b> fee= <a href="automation_registry.md#0x1_automation_registry_calculate_task_fee">calculate_task_fee</a>(arc, task_meta, epoch_interval, current_time, automation_fee_per_sec);
+            // If the task reached this phase that means it is valid active task for the new epoch.
+            // During cleanup all expired tasks <b>has</b> been removed from the registry but the state of the tasks is not updated.
+            // As here we need <b>to</b> distinguish new tasks from already existing active tasks,
+            // <b>as</b> the fee calculation for them will be different based on their active duration in the epoch.
+            // For more details see calculate_task_fee function.
+            task_meta.state = <a href="automation_registry.md#0x1_automation_registry_ACTIVE">ACTIVE</a>;
+            <a href="automation_registry.md#0x1_automation_registry_AutomationTaskFeeMeta">AutomationTaskFeeMeta</a> {
+                task_index,
+                owner: task_meta.owner,
+                fee,
+                expiry_time: task_meta.expiry_time,
+                automation_fee_cap: task_meta.automation_fee_cap_for_epoch,
+                max_gas_amount: task_meta.max_gas_amount,
+                locked_deposit_fee: task_meta.locked_fee_for_next_epoch,
+            }
         };
         <a href="automation_registry.md#0x1_automation_registry_try_withdraw_task_automation_fee">try_withdraw_task_automation_fee</a>(
             <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>,

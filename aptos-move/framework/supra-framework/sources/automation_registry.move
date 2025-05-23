@@ -824,7 +824,7 @@ module supra_framework::automation_registry {
         };
 
         if (refund_automation_fee_per_sec != 0) {
-            refund_cleanup_and_activate_tasks(
+            refund_cleanup_tasks(
                 automation_registry,
                 refund_bookkeeping,
                 current_time,
@@ -832,14 +832,14 @@ module supra_framework::automation_registry {
                 refund_automation_fee_per_sec,
                 refund_interval)
         } else {
-            cleanup_and_activate_tasks(automation_registry, refund_bookkeeping, current_time)
+            cleanup_tasks(automation_registry, refund_bookkeeping, current_time)
         }
     }
 
-    /// Refunds active tasks of the previous epoch, cleans up expired and cancelled tasks and activates the pending tasks.
+    /// Refunds active tasks of the previous epoch, cleans up expired and cancelled tasks.
     /// Also calculates and returns the total committed max gas for the new epoch along with the task indexes
     /// that have been removed from the registry.
-    fun refund_cleanup_and_activate_tasks(
+    fun refund_cleanup_tasks(
         automation_registry: &mut AutomationRegistry,
         refund_bookkeeping: &mut AutomationRefundBookkeeping,
         current_time: u64,
@@ -888,7 +888,6 @@ module supra_framework::automation_registry {
                 enumerable_map::remove_value(&mut automation_registry.tasks, task_index);
                 vector::push_back(&mut removed_tasks, task_index);
             } else {
-                task.state = ACTIVE;
                 tcmg = tcmg + task.max_gas_amount;
             }
         });
@@ -900,10 +899,10 @@ module supra_framework::automation_registry {
         }
     }
 
-    /// Cleans up expired and cancelled tasks and activates the pending tasks.
+    /// Cleans up expired and cancelled.
     /// Also calculates and returns the total committed max gas for the new epoch along with the task indexes
     /// that have been removed from the registry.
-    fun cleanup_and_activate_tasks(
+    fun cleanup_tasks(
         automation_registry: &mut AutomationRegistry,
         refund_bookkeeping: &mut AutomationRefundBookkeeping,
         current_time: u64
@@ -931,7 +930,6 @@ module supra_framework::automation_registry {
                 enumerable_map::remove_value(&mut automation_registry.tasks, task_index);
                 vector::push_back(&mut removed_tasks, task_index);
             } else {
-                task.state = ACTIVE;
                 tcmg = tcmg + task.max_gas_amount;
             }
         });
@@ -1101,17 +1099,29 @@ module supra_framework::automation_registry {
     fun calculate_task_fee(
         arc: &AutomationRegistryConfig,
         task: &AutomationTaskMetaData,
-        interval: u64,
+        potential_fee_timeframe: u64,
         current_time: u64,
         automation_fee_per_sec: u256
     ): u64 {
         if (automation_fee_per_sec == 0) { return 0 };
         if (task.expiry_time <= current_time) { return 0 };
         // Subtraction is safe here, as we already excluded expired tasks
-        let remaining_time = task.expiry_time - current_time;
-        let min_interval = math64::min(remaining_time, interval);
+        let task_active_timeframe = task.expiry_time - current_time;
+        // If the task is a new task i.e. in Pending state, then it is charged always for
+        // the input potential_fee_timeframe(which is epoch-interval),
+        // For the new tasks which active-timeframe is less than epoch-interval
+        // it would mean it is their first and only epoch and we charge the fee for entire epoch.
+        // Note that although the new short tasks are charged for entire epoch, the refunding logic remains the same for
+        // them as for the long tasks.
+        // This way bad-actors will be discourged to submit small and short tasks with big occupancy by blocking other
+        // good-actors register tasks.
+        let actual_fee_timeframe = if (task.state == PENDING) {
+            potential_fee_timeframe
+        } else {
+            math64::min(task_active_timeframe, potential_fee_timeframe)
+        };
         calculate_automation_fee_for_interval(
-            min_interval,
+            actual_fee_timeframe,
             task.max_gas_amount,
             automation_fee_per_sec,
             arc.registry_max_gas_cap)
@@ -1242,15 +1252,24 @@ module supra_framework::automation_registry {
 
         // Process each active task and calculate fee for the epoch for the tasks
         vector::for_each(task_ids, |task_index| {
-            let task_meta = enumerable_map::get_value_ref(&automation_registry.tasks, task_index);
-            let task = AutomationTaskFeeMeta {
-                task_index,
-                owner: task_meta.owner,
-                fee: calculate_task_fee(arc, task_meta, epoch_interval, current_time, automation_fee_per_sec),
-                expiry_time: task_meta.expiry_time,
-                automation_fee_cap: task_meta.automation_fee_cap_for_epoch,
-                max_gas_amount: task_meta.max_gas_amount,
-                locked_deposit_fee: task_meta.locked_fee_for_next_epoch,
+            let task = {
+                let task_meta = enumerable_map::get_value_mut(&mut automation_registry.tasks, task_index);
+                let fee= calculate_task_fee(arc, task_meta, epoch_interval, current_time, automation_fee_per_sec);
+                // If the task reached this phase that means it is valid active task for the new epoch.
+                // During cleanup all expired tasks has been removed from the registry but the state of the tasks is not updated.
+                // As here we need to distinguish new tasks from already existing active tasks,
+                // as the fee calculation for them will be different based on their active duration in the epoch.
+                // For more details see calculate_task_fee function.
+                task_meta.state = ACTIVE;
+                AutomationTaskFeeMeta {
+                    task_index,
+                    owner: task_meta.owner,
+                    fee,
+                    expiry_time: task_meta.expiry_time,
+                    automation_fee_cap: task_meta.automation_fee_cap_for_epoch,
+                    max_gas_amount: task_meta.max_gas_amount,
+                    locked_deposit_fee: task_meta.locked_fee_for_next_epoch,
+                }
             };
             try_withdraw_task_automation_fee(
                 automation_registry,
@@ -2903,9 +2922,8 @@ module supra_framework::automation_registry {
             // tasks only will be charged for the next epoch.
             check_account_balance(user_address, expected_user_current_balance);
             check_account_balance(ar.registry_fee_address, expected_registry_current_balance);
-            check_task_state(ar, task3, exists, ACTIVE);
-            // reset the state
-            update_task_state(ar, task3, PENDING);
+            // Task state is still pending, tasks will be activated after their epoch-fee is calculated
+            check_task_state(ar, task3, exists, PENDING);
         };
 
         // Set some locked fee which is enough to pay refund if necessary
@@ -2926,10 +2944,10 @@ module supra_framework::automation_registry {
             check_account_balance(ar.registry_fee_address, expected_registry_current_balance);
             check_task_state(ar, task1, exists, ACTIVE);
             check_task_state(ar, task2, exists, ACTIVE);
-            check_task_state(ar, task3, exists, ACTIVE);
+            // Task state is still pending, tasks will be activated after their epoch-fee is calculated
+            check_task_state(ar, task3, exists, PENDING);
 
             // Refund is expected only for ACTIVE AND CANCELLED TASK BUT NOT FOR PENDING
-            update_task_state(ar, task3, PENDING);
             update_task_state(ar, task2, CANCELLED);
             let result = update_state_for_new_epoch(ar, refund_bookkeeping, arc, aei, EPOCH_INTERVAL_FOR_TEST_IN_SECS / 2);
             consume_intermediate_state(result);
@@ -2943,12 +2961,12 @@ module supra_framework::automation_registry {
             check_account_balance(ar.registry_fee_address, expected_registry_current_balance);
             check_task_state(ar, task1, exists, ACTIVE);
             check_task_state(ar, task2, !exists, CANCELLED);
-            check_task_state(ar, task3, exists, ACTIVE);
+            // Task state is still pending, tasks will be activated after their epoch-fee is calculated
+            check_task_state(ar, task3, exists, PENDING);
 
             // Now we have only task1 as Active and task 3 as pending.
             // If epoch duration surpasses tasks expiration time, then they are refunded on  locked deposit, and removed from registry.
             // even pending task.
-            update_task_state(ar, task3, PENDING);
             let result = update_state_for_new_epoch(
                 ar,
                 refund_bookkeeping,
@@ -3046,7 +3064,8 @@ module supra_framework::automation_registry {
 
         check_task_state(ar, task1, exists, ACTIVE);
         check_task_state(ar, task2, !exists, CANCELLED);
-        check_task_state(ar, task3, exists, ACTIVE);
+        // Task state is still pending, tasks will be activated after their epoch-fee is calculated
+        check_task_state(ar, task3, exists, PENDING);
 
         check_account_balance(user_address, expected_user_current_balance);
         // // Check registry balance
@@ -3226,6 +3245,86 @@ module supra_framework::automation_registry {
         let r2 = vector::borrow(&results, 1);
         assert!(r1.fee == 0, 5);
         assert!(r2.fee == 0, 6);
+    }
+
+    #[test(framework = @supra_framework, user = @0x1cafa)]
+    fun check_automation_task_fee_calculation_for_short_tasks(
+        framework: &signer,
+        user: &signer
+    ) acquires AutomationRegistry, AutomationEpochInfo, ActiveAutomationRegistryConfig, AutomationRefundBookkeeping {
+        initialize_registry_test(framework, user);
+        let t1_t2_max_gas = 44_000_000;
+        let expiry_time = EPOCH_INTERVAL_FOR_TEST_IN_SECS + EPOCH_INTERVAL_FOR_TEST_IN_SECS / 2;
+
+        // Old but short task, will be charged according to active time
+        let task1 = register_with_state(
+            framework,
+            user,
+            t1_t2_max_gas,
+            100_000_000,
+            expiry_time,
+            ACTIVE);
+
+        // New short task will be charged full epoch fee
+        let task2 = register_with_state(
+            framework,
+            user,
+            t1_t2_max_gas,
+            100_000_000,
+            expiry_time,
+            PENDING);
+
+        // 44/100 * 1000 = 440 - automation_epoch_fee_per_second, 7200 epoch duration
+        let expected_automation_fee_per_task = EPOCH_INTERVAL_FOR_TEST_IN_SECS * 440;
+        // 8% surpasses the threshold, ((1+(8/100))^exponent-1) * 100 = 58 congestion base fee, occupancy 44/100, 7200 epoch duration
+        let expected_congestion_fee_per_task = 58 * 44 * EPOCH_INTERVAL_FOR_TEST_IN_SECS / 100;
+        // Epoch cut short 2 times
+        let fwk_address = address_of(framework);
+
+        // if epoch length matches or greater the expected epoch interval then no refund is expected
+        // event if there is a locked fee.
+        let ar = borrow_global_mut<AutomationRegistry>(fwk_address);
+        let arc = &borrow_global<ActiveAutomationRegistryConfig>(fwk_address).main_config;
+        let tcmg = ((2 * t1_t2_max_gas) as u256);
+        // Take into account CANCELLED tasks as well
+        // Tasks are still valid
+        let results = calculate_tasks_automation_fees(
+            ar,
+            arc,
+            EPOCH_INTERVAL_FOR_TEST_IN_SECS,
+            EPOCH_INTERVAL_FOR_TEST_IN_SECS,
+            tcmg);
+        assert!(vector::length(&results) == 2, 2);
+
+        let expected_fee = expected_automation_fee_per_task + expected_congestion_fee_per_task;
+        let r1 = vector::borrow(&results, task1);
+        let r2 = vector::borrow(&results, task2);
+        assert!(r1.fee == expected_fee / 2, 3);
+        // As task to is short and new task it will be charged for full epoch
+        assert!(r2.fee == expected_fee, 4);
+
+        // Now lets assume task as activated and epoch has been kept short, refund for both tasks will be done in the
+        // same manner according to their expiration time.
+        update_task_state(ar, task2, ACTIVE);
+
+        let current_time = EPOCH_INTERVAL_FOR_TEST_IN_SECS + EPOCH_INTERVAL_FOR_TEST_IN_SECS / 4;
+        let refund_interval = 2 * EPOCH_INTERVAL_FOR_TEST_IN_SECS - current_time;
+        // Each task will be active still for EPOCH_INTERVAL_FOR_TEST_IN_SECS / 4 duration,
+        // as expiry time was EPOCH_INTERVAL_FOR_TEST_IN_SECS / 2;
+        let results = calculate_tasks_automation_fees(
+            ar,
+            arc,
+            refund_interval,
+            current_time,
+            tcmg);
+        assert!(vector::length(&results) == 2, 5);
+
+        let expected_fee = expected_automation_fee_per_task + expected_congestion_fee_per_task;
+        let r1 = vector::borrow(&results, task1);
+        let r2 = vector::borrow(&results, task2);
+        assert!(r1.fee == expected_fee / 4, 6);
+        // For this task full epoch fee was charged, but the refund is done according to expiry time
+        assert!(r2.fee == expected_fee / 4, 7);
     }
 
     #[test(framework = @supra_framework, user = @0x1cafa)]
@@ -3749,8 +3848,7 @@ module supra_framework::automation_registry {
         // Stop the same task 2 times, second time it will not abort it just skip the task_id if it's not found
         stop_tasks(user, vector[0]);
         assert!(!has_task_with_id(0), 1);
-
-        // stop_tasks(user, vector[0]);
+        stop_tasks(user, vector[0]);
     }
 
     #[test(framework = @supra_framework, user = @0x1cafe)]
@@ -4011,8 +4109,10 @@ module supra_framework::automation_registry {
         assert!(active_task_ids == vector[], 1);
     }
 
+    #[test_only]
+    // Kept only for performance analysis intentions
     // Register 500 tasks to measure registration time/used-gas
-    #[test(framework = @supra_framework, user = @0x1cafe)]
+    // #[test(framework = @supra_framework, user = @0x1cafe)]
     fun check_task_registration_performance(
         framework: &signer,
         user: &signer
@@ -4020,12 +4120,14 @@ module supra_framework::automation_registry {
         task_registration_performance(framework, user);
     }
 
+    #[test_only]
+    // Kept only for performance analysis intentions
     // Register 500 tasks with 1.5 EPOCH_INTERVAL duration/expiration time
     // And run 3 epochs to check gas-used when
     //  - full epoch passed
     //  - 1/3 of epoch passed to simulate refund, but tasks are still active
     //  - last epoch identifies all tasks are expired
-    #[test(framework = @supra_framework, user = @0x1cafe)]
+    // #[test(framework = @supra_framework, user = @0x1cafe)]
     fun check_task_activation_on_new_epoch_performance(
         framework: &signer,
         user: &signer
