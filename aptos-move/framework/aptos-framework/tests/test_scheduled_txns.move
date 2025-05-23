@@ -84,7 +84,7 @@ module aptos_framework::test_scheduled_txns {
 
         // Create test transactions
         let foo = |signer: Option<signer>| simpleFunc(5, signer);
-        let gas_price_txn1 = 20;
+        let gas_price_txn1 = 200;
         let txn1 =
             scheduled_txns::new_scheduled_transaction(
                 user_addr,
@@ -94,7 +94,7 @@ module aptos_framework::test_scheduled_txns {
                 false,
                 foo
             );
-        let gas_price_txn2 = 30;
+        let gas_price_txn2 = 300;
         let rescheduling_foo =
             |signer: Option<signer>| self_rescheduling_func(
                 signer,
@@ -187,7 +187,6 @@ module aptos_framework::test_scheduled_txns {
                 == 1,
             scheduled_txns::get_num_txns()
         );
-
         // Shutdown should cancel all transactions and refund all deposits
         scheduled_txns::shutdown_test(fx);
 

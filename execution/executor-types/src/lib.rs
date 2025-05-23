@@ -6,6 +6,7 @@
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
@@ -170,6 +171,7 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView>;
 }
 
 #[derive(Clone)]

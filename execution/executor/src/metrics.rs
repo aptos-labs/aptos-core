@@ -357,6 +357,7 @@ pub fn update_counters_for_processed_chunk<T>(
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
             Some(Transaction::BlockEpilogue(_)) => "block_epilogue",
             Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
+            Some(Transaction::ScheduledTransaction(_)) => "scheduled_transaction",
             None => "unknown",
         };
 

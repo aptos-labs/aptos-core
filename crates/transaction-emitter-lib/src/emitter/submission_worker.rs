@@ -8,7 +8,7 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{sample, sample::SampleRate};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -23,7 +23,6 @@ use core::{
 };
 use futures::future::join_all;
 use itertools::Itertools;
-use log::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
@@ -477,7 +476,6 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
-
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);

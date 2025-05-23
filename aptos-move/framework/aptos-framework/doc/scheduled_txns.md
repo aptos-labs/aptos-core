@@ -6,7 +6,7 @@
 
 
 -  [Struct `ScheduledTransaction`](#0x1_scheduled_txns_ScheduledTransaction)
--  [Struct `ScheduledTransactionWithKey`](#0x1_scheduled_txns_ScheduledTransactionWithKey)
+-  [Struct `ScheduledTransactionInfoWithKey`](#0x1_scheduled_txns_ScheduledTransactionInfoWithKey)
 -  [Struct `ScheduleMapKey`](#0x1_scheduled_txns_ScheduleMapKey)
 -  [Resource `ScheduleQueue`](#0x1_scheduled_txns_ScheduleQueue)
 -  [Resource `AuxiliaryData`](#0x1_scheduled_txns_AuxiliaryData)
@@ -26,6 +26,7 @@
 -  [Function `get_ready_transactions`](#0x1_scheduled_txns_get_ready_transactions)
 -  [Function `finish_execution`](#0x1_scheduled_txns_finish_execution)
 -  [Function `remove_txns`](#0x1_scheduled_txns_remove_txns)
+-  [Function `execute_user_function_wrapper`](#0x1_scheduled_txns_execute_user_function_wrapper)
 -  [Function `step`](#0x1_scheduled_txns_step)
 
 
@@ -75,10 +76,10 @@ ScheduledTransaction with permission signer handle, scheduled_time, gas params, 
  32 bytes
 </dd>
 <dt>
-<code>scheduled_time: u64</code>
+<code>scheduled_time_ms: u64</code>
 </dt>
 <dd>
- 100ms granularity
+ UTC timestamp in milliseconds
 </dd>
 <dt>
 <code>max_gas_amount: u64</code>
@@ -109,14 +110,14 @@ ScheduledTransaction with permission signer handle, scheduled_time, gas params, 
 
 </details>
 
-<a id="0x1_scheduled_txns_ScheduledTransactionWithKey"></a>
+<a id="0x1_scheduled_txns_ScheduledTransactionInfoWithKey"></a>
 
-## Struct `ScheduledTransactionWithKey`
+## Struct `ScheduledTransactionInfoWithKey`
 
 We pass the id around instead re-computing it
 
 
-<pre><code><b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionWithKey">ScheduledTransactionWithKey</a> <b>has</b> drop
+<pre><code><b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a> <b>has</b> drop
 </code></pre>
 
 
@@ -127,10 +128,28 @@ We pass the id around instead re-computing it
 
 <dl>
 <dt>
-<code>txn: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a></code>
+<code>sender_addr: <b>address</b></code>
 </dt>
 <dd>
 
+</dd>
+<dt>
+<code>max_gas_amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_gas_unit_price: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>gas_unit_price_charged: u64</code>
+</dt>
+<dd>
+ To be determined during execution
 </dd>
 <dt>
 <code>key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a></code>
@@ -169,7 +188,7 @@ Note: ScheduledTxn is still variable size though due to its closure.
 <code>time: u64</code>
 </dt>
 <dd>
-
+ UTC timestamp in the granularity of 100ms
 </dd>
 <dt>
 <code>gas_priority: u64</code>
@@ -474,21 +493,12 @@ Conversion factor between our time granularity (100ms) and microseconds
 
 
 
-<a id="0x1_scheduled_txns_AVG_FUNC_SIZE"></a>
-
-The maximum size of a function in bytes
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_FUNC_SIZE">AVG_FUNC_SIZE</a>: u16 = 1000;
-</code></pre>
-
-
-
 <a id="0x1_scheduled_txns_AVG_SCHED_TXN_SIZE"></a>
 
+The average size of a scheduled transaction to provide an estimate of leaf nodes of BigOrderedMap
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_SCHED_TXN_SIZE">AVG_SCHED_TXN_SIZE</a>: u16 = 1056;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_SCHED_TXN_SIZE">AVG_SCHED_TXN_SIZE</a>: u16 = 1024;
 </code></pre>
 
 
@@ -523,6 +533,26 @@ Scheduled time is in the past
 
 
 
+<a id="0x1_scheduled_txns_ELOW_GAS_UNIT_PRICE"></a>
+
+Gas unit price is too low
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ELOW_GAS_UNIT_PRICE">ELOW_GAS_UNIT_PRICE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_scheduled_txns_ETXN_TOO_LARGE"></a>
+
+Txn size is too large; beyond 10KB
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ETXN_TOO_LARGE">ETXN_TOO_LARGE</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_scheduled_txns_EUNAVAILABLE"></a>
 
 Scheduling is stopped
@@ -553,12 +583,12 @@ The maximum number of scheduled transactions that can be run in a block
 
 
 
-<a id="0x1_scheduled_txns_MAX_FUNC_SIZE"></a>
+<a id="0x1_scheduled_txns_MAX_SCHED_TXN_SIZE"></a>
 
-The maximum size of a function in bytes
+Max size of a scheduled transaction
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_FUNC_SIZE">MAX_FUNC_SIZE</a>: u16 = 1024;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_SCHED_TXN_SIZE">MAX_SCHED_TXN_SIZE</a>: u64 = 10240;
 </code></pre>
 
 
@@ -777,7 +807,7 @@ todo: Do we need a function to pause/unpause without issuing refund of deposit ?
 Constructor
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction">new_scheduled_transaction</a>(sender_addr: <b>address</b>, scheduled_time: u64, max_gas_amount: u64, max_gas_unit_price: u64, pass_signer: bool, f: |<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>&gt;| <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction">new_scheduled_transaction</a>(sender_addr: <b>address</b>, scheduled_time_ms: u64, max_gas_amount: u64, max_gas_unit_price: u64, pass_signer: bool, f: |<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>&gt;| <b>has</b> <b>copy</b> + drop + store): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>
 </code></pre>
 
 
@@ -788,7 +818,7 @@ Constructor
 
 <pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_new_scheduled_transaction">new_scheduled_transaction</a>(
     sender_addr: <b>address</b>,
-    scheduled_time: u64,
+    scheduled_time_ms: u64,
     max_gas_amount: u64,
     max_gas_unit_price: u64,
     pass_signer: bool,
@@ -796,7 +826,7 @@ Constructor
 ): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
     <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> {
         sender_addr,
-        scheduled_time,
+        scheduled_time_ms,
         max_gas_amount,
         max_gas_unit_price,
         pass_signer,
@@ -833,21 +863,29 @@ Insert a scheduled transaction into the queue. Txn_id is returned to user, which
     <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
     <b>assert</b>!(!aux_data.stop_scheduling, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EUNAVAILABLE">EUNAVAILABLE</a>));
 
-    // Generate unique transaction ID
-    <b>let</b> txn_id = sha3_256(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&txn));
-
     // we expect the sender <b>to</b> be a permissioned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender) == txn.sender_addr,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>)
     );
 
-    <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-
     // Only schedule txns in the future
-    <b>let</b> txn_time = txn.scheduled_time / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>; // Round down <b>to</b> the nearest 100ms
+    <b>let</b> txn_time = txn.scheduled_time_ms / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>; // Round down <b>to</b> the nearest 100ms
     <b>let</b> block_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / <a href="scheduled_txns.md#0x1_scheduled_txns_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>;
     <b>assert</b>!(txn_time &gt; block_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_TIME">EINVALID_TIME</a>));
+
+    <b>assert</b>!(
+        txn.max_gas_unit_price &gt;= 100,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ELOW_GAS_UNIT_PRICE">ELOW_GAS_UNIT_PRICE</a>)
+    );
+
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(&txn) &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_SCHED_TXN_SIZE">MAX_SCHED_TXN_SIZE</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_ETXN_TOO_LARGE">ETXN_TOO_LARGE</a>)
+    );
+
+    // Generate unique transaction ID
+    <b>let</b> txn_id = sha3_256(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&txn));
 
     // Insert the transaction into the schedule_map
     // Create schedule map key
@@ -856,6 +894,8 @@ Insert a scheduled transaction into the queue. Txn_id is returned to user, which
         gas_priority: <a href="scheduled_txns.md#0x1_scheduled_txns_U64_MAX">U64_MAX</a> - txn.max_gas_unit_price,
         txn_id
     };
+
+    <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
     queue.schedule_map.add(key, txn);
 
     // Collect deposit
@@ -979,7 +1019,7 @@ in the schedule_map.
 Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(<a href="timestamp.md#0x1_timestamp">timestamp</a>: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionWithKey">scheduled_txns::ScheduledTransactionWithKey</a>&gt;
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(timestamp_ms: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">scheduled_txns::ScheduledTransactionInfoWithKey</a>&gt;
 </code></pre>
 
 
@@ -989,17 +1029,18 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(
-    <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64
-): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionWithKey">ScheduledTransactionWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+    timestamp_ms: u64
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> {
+    <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>();
     // If scheduling is shutdown, we cannot schedule <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> more transactions
     <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
     <b>if</b> (aux_data.stop_scheduling) {
-        <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionWithKey">ScheduledTransactionWithKey</a>&gt;();
+        <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt;();
     };
 
     <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-    <b>let</b> block_time = <a href="timestamp.md#0x1_timestamp">timestamp</a> / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>;
-    <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionWithKey">ScheduledTransactionWithKey</a>&gt;();
+    <b>let</b> block_time = timestamp_ms / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>;
+    <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt;();
     <b>let</b> count = 0;
     <b>let</b> txns_to_expire = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a>&gt;();
 
@@ -1010,8 +1051,11 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
             <b>break</b>;
         };
         <b>let</b> txn = *iter.iter_borrow(&queue.schedule_map);
-        <b>let</b> scheduled_txn_with_id = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionWithKey">ScheduledTransactionWithKey</a> {
-            txn,
+        <b>let</b> scheduled_txn_info_with_key = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a> {
+            sender_addr: txn.sender_addr,
+            max_gas_amount: txn.max_gas_amount,
+            max_gas_unit_price: txn.max_gas_unit_price,
+            gas_unit_price_charged: txn.max_gas_unit_price,
             key: *key,
         };
 
@@ -1024,7 +1068,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
                 deposit_amt
             });
         } <b>else</b> {
-            <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a>.push_back(scheduled_txn_with_id);
+            <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a>.push_back(scheduled_txn_info_with_key);
         };
         // we do not want an unbounded size of ready or expirable txns; hence we increment either way
         count = count + 1;
@@ -1143,6 +1187,44 @@ Remove the txns that are run
             };
         };
         tbl_idx = tbl_idx + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_execute_user_function_wrapper"></a>
+
+## Function `execute_user_function_wrapper`
+
+Called by the executor when the scheduled transaction is run
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper">execute_user_function_wrapper</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_execute_user_function_wrapper">execute_user_function_wrapper</a>(
+    <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>,
+) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
+    <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
+    <b>assert</b>!(queue.schedule_map.contains(&txn_key), 0);
+
+    <b>let</b> txn = *queue.schedule_map.borrow(&txn_key);
+    <b>let</b> pass_signer = txn.pass_signer;
+    <b>let</b> f = txn.f;
+    <b>if</b> (pass_signer) {
+        f(some(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>));
+    } <b>else</b> {
+        f(std::option::none());
     };
 }
 </code></pre>

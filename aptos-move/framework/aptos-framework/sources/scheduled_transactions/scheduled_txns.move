@@ -2,7 +2,7 @@ module aptos_framework::scheduled_txns {
     use std::bcs;
     use std::error;
     use std::hash::sha3_256;
-    use std::option::Option;
+    use std::option::{Option, some};
     use std::signer;
     use std::vector;
     use aptos_std::from_bcs;
@@ -17,7 +17,6 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
-    #[test_only]
     use aptos_framework::transaction_fee;
 
     friend aptos_framework::block;
@@ -33,6 +32,14 @@ module aptos_framework::scheduled_txns {
 
     /// Scheduling is stopped
     const EUNAVAILABLE: u64 = 3;
+
+    /// Gas unit price is too low
+    const ELOW_GAS_UNIT_PRICE: u64 = 4;
+
+    // todo: should we also specify a minimum 'max_gas_amount' ?
+
+    /// Txn size is too large; beyond 10KB
+    const ETXN_TOO_LARGE: u64 = 5;
 
     const U64_MAX: u64 = 18446744073709551615;
 
@@ -58,21 +65,19 @@ module aptos_framework::scheduled_txns {
     /// SHA3-256 produces 32 bytes
     const TXN_ID_SIZE: u16 = 32;
 
-    // Todo: Confirm this.
-    /// The maximum size of a function in bytes
-    const MAX_FUNC_SIZE: u16 = 1024;
+    /// The average size of a scheduled transaction to provide an estimate of leaf nodes of BigOrderedMap
+    const AVG_SCHED_TXN_SIZE: u16 = 1024;
 
-    // Todo: Confirm this is a reasonable estimate
-    /// The maximum size of a function in bytes
-    const AVG_FUNC_SIZE: u16 = 1000;
-    const AVG_SCHED_TXN_SIZE: u16 = 56 + AVG_FUNC_SIZE; // strictly it is 112 + AVG_FUNC_SIZE
+    // todo: get rid of this, store it externally if the size > 10 KB
+    /// Max size of a scheduled transaction
+    const MAX_SCHED_TXN_SIZE: u64 = 10 * 1024;
 
     /// ScheduledTransaction with permission signer handle, scheduled_time, gas params, and function
     struct ScheduledTransaction has copy, drop, store {
         /// 32 bytes
         sender_addr: address,
-        /// 100ms granularity
-        scheduled_time: u64,
+        /// UTC timestamp in milliseconds
+        scheduled_time_ms: u64,
         /// Maximum gas to spend for this transaction
         max_gas_amount: u64,
         /// Charged @ lesser of {max_gas_unit_price, max_gas_unit_price other than this in the block executed}
@@ -84,8 +89,12 @@ module aptos_framework::scheduled_txns {
     }
 
     /// We pass the id around instead re-computing it
-    struct ScheduledTransactionWithKey has drop {
-        txn: ScheduledTransaction,
+    struct ScheduledTransactionInfoWithKey has drop {
+        sender_addr: address,
+        max_gas_amount: u64,
+        max_gas_unit_price: u64,
+        /// To be determined during execution
+        gas_unit_price_charged: u64,
         key: ScheduleMapKey
     }
 
@@ -96,6 +105,7 @@ module aptos_framework::scheduled_txns {
     /// "{time, gas_priority} --> List<(txn_id, ScheduledTxn)>".
     /// Note: ScheduledTxn is still variable size though due to its closure.
     struct ScheduleMapKey has copy, drop, store {
+        /// UTC timestamp in the granularity of 100ms
         time: u64,
         gas_priority: u64,
         /// SHA3-256
@@ -104,7 +114,6 @@ module aptos_framework::scheduled_txns {
 
     struct ScheduleQueue has key {
         /// key_size = 48 bytes; value_size = key_size + AVG_SCHED_TXN_SIZE
-        // todo: since key already has time and gas_priority, we don't have to store them in ScheduleTransaction
         schedule_map: BigOrderedMap<ScheduleMapKey, ScheduledTransaction>,
     }
 
@@ -256,7 +265,7 @@ module aptos_framework::scheduled_txns {
     /// Constructor
     public fun new_scheduled_transaction(
         sender_addr: address,
-        scheduled_time: u64,
+        scheduled_time_ms: u64,
         max_gas_amount: u64,
         max_gas_unit_price: u64,
         pass_signer: bool,
@@ -264,7 +273,7 @@ module aptos_framework::scheduled_txns {
     ): ScheduledTransaction {
         ScheduledTransaction {
             sender_addr,
-            scheduled_time,
+            scheduled_time_ms,
             max_gas_amount,
             max_gas_unit_price,
             pass_signer,
@@ -281,21 +290,29 @@ module aptos_framework::scheduled_txns {
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         assert!(!aux_data.stop_scheduling, error::unavailable(EUNAVAILABLE));
 
-        // Generate unique transaction ID
-        let txn_id = sha3_256(bcs::to_bytes(&txn));
-
         // we expect the sender to be a permissioned signer
         assert!(
             signer::address_of(sender) == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
 
-        let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
-
         // Only schedule txns in the future
-        let txn_time = txn.scheduled_time / MILLI_CONVERSION_FACTOR; // Round down to the nearest 100ms
+        let txn_time = txn.scheduled_time_ms / MILLI_CONVERSION_FACTOR; // Round down to the nearest 100ms
         let block_time = timestamp::now_microseconds() / MICRO_CONVERSION_FACTOR;
         assert!(txn_time > block_time, error::invalid_argument(EINVALID_TIME));
+
+        assert!(
+            txn.max_gas_unit_price >= 100,
+            error::invalid_argument(ELOW_GAS_UNIT_PRICE)
+        );
+
+        assert!(
+            bcs::serialized_size(&txn) < MAX_SCHED_TXN_SIZE,
+            error::invalid_argument(ETXN_TOO_LARGE)
+        );
+
+        // Generate unique transaction ID
+        let txn_id = sha3_256(bcs::to_bytes(&txn));
 
         // Insert the transaction into the schedule_map
         // Create schedule map key
@@ -304,6 +321,8 @@ module aptos_framework::scheduled_txns {
             gas_priority: U64_MAX - txn.max_gas_unit_price,
             txn_id
         };
+
+        let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
         queue.schedule_map.add(key, txn);
 
         // Collect deposit
@@ -377,17 +396,18 @@ module aptos_framework::scheduled_txns {
 
     /// Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
     fun get_ready_transactions(
-        timestamp: u64
-    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, AuxiliaryData {
+        timestamp_ms: u64
+    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+        remove_txns();
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         if (aux_data.stop_scheduling) {
-            return vector::empty<ScheduledTransactionWithKey>();
+            return vector::empty<ScheduledTransactionInfoWithKey>();
         };
 
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-        let block_time = timestamp / MILLI_CONVERSION_FACTOR;
-        let scheduled_txns = vector::empty<ScheduledTransactionWithKey>();
+        let block_time = timestamp_ms / MILLI_CONVERSION_FACTOR;
+        let scheduled_txns = vector::empty<ScheduledTransactionInfoWithKey>();
         let count = 0;
         let txns_to_expire = vector::empty<KeyAndTxnInfo>();
 
@@ -398,8 +418,11 @@ module aptos_framework::scheduled_txns {
                 break;
             };
             let txn = *iter.iter_borrow(&queue.schedule_map);
-            let scheduled_txn_with_id = ScheduledTransactionWithKey {
-                txn,
+            let scheduled_txn_info_with_key = ScheduledTransactionInfoWithKey {
+                sender_addr: txn.sender_addr,
+                max_gas_amount: txn.max_gas_amount,
+                max_gas_unit_price: txn.max_gas_unit_price,
+                gas_unit_price_charged: txn.max_gas_unit_price,
                 key: *key,
             };
 
@@ -412,7 +435,7 @@ module aptos_framework::scheduled_txns {
                     deposit_amt
                 });
             } else {
-                scheduled_txns.push_back(scheduled_txn_with_id);
+                scheduled_txns.push_back(scheduled_txn_info_with_key);
             };
             // we do not want an unbounded size of ready or expirable txns; hence we increment either way
             count = count + 1;
@@ -494,6 +517,24 @@ module aptos_framework::scheduled_txns {
         };
     }
 
+    /// Called by the executor when the scheduled transaction is run
+    fun execute_user_function_wrapper(
+        signer: signer,
+        txn_key: ScheduleMapKey,
+    ) acquires ScheduleQueue {
+        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
+        assert!(queue.schedule_map.contains(&txn_key), 0);
+
+        let txn = *queue.schedule_map.borrow(&txn_key);
+        let pass_signer = txn.pass_signer;
+        let f = txn.f;
+        if (pass_signer) {
+            f(some(signer));
+        } else {
+            f(std::option::none());
+        };
+    }
+
     ////////////////////////// TESTS //////////////////////////
     #[test_only]
     public fun get_num_txns(): u64 acquires ScheduleQueue {
@@ -505,7 +546,7 @@ module aptos_framework::scheduled_txns {
     #[test_only]
     public fun get_ready_transactions_test(
         timestamp: u64
-    ): vector<ScheduledTransactionWithKey> acquires ScheduleQueue, AuxiliaryData {
+    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
         get_ready_transactions(timestamp)
     }
 
@@ -547,7 +588,7 @@ module aptos_framework::scheduled_txns {
         timestamp::update_global_time_for_test(curr_mock_time_ms);
 
         // Fund user account
-        let coin = coin::mint<AptosCoin>(1000000, &mint);
+        let coin = coin::mint<AptosCoin>(100000000, &mint);
         coin::deposit(user_addr, coin);
 
         coin::destroy_burn_cap(burn);
@@ -584,7 +625,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time1,
             100,
-            20,
+            200,
             false,
             foo
         ); // time: 1s, gas: 20
@@ -592,7 +633,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time1,
             100,
-            30,
+            300,
             false,
             foo
         ); // time: 1s, gas: 30
@@ -600,7 +641,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time1,
             100,
-            10,
+            100,
             false,
             foo
         ); // time: 1s, gas: 10
@@ -610,7 +651,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time2,
             1000,
-            20,
+            200,
             false,
             foo
         ); // time: 2s, gas: 20
@@ -618,7 +659,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time2,
             100,
-            20,
+            200,
             false,
             foo
         );
@@ -626,7 +667,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time2,
             200,
-            20,
+            200,
             false,
             foo
         ); // time: 2s, gas: 20
@@ -635,7 +676,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time3,
             100,
-            20,
+            200,
             false,
             foo
         ); // time: 2s, gas: 20
@@ -643,7 +684,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             schedule_time3,
             200,
-            20,
+            200,
             false,
             foo
         ); // time: 2s, gas: 20
@@ -726,7 +767,7 @@ module aptos_framework::scheduled_txns {
         let past_time = curr_mock_time_micro_s / 1000 - 100;
         let state = State { count: 8 };
         let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, past_time, 100, 20, false, foo);
+        let txn = new_scheduled_transaction(user_addr, past_time, 100, 200, false, foo);
 
         // Create a signer from the handle to use for insert
         insert(&user, txn); // Should fail with EINVALID_TIME since time is in the past
@@ -746,7 +787,7 @@ module aptos_framework::scheduled_txns {
         let future_time = curr_mock_time + 1000;
         let state = State { count: 8 };
         let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, future_time, 100, 20, false, foo);
+        let txn = new_scheduled_transaction(user_addr, future_time, 100, 200, false, foo);
         insert(&other_user, txn); // Should fail with EINVALID_SIGNER
     }
 
@@ -764,7 +805,7 @@ module aptos_framework::scheduled_txns {
         let future_time = curr_mock_time + 1000;
         let state = State { count: 8 };
         let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, future_time, 100, 20, false, foo);
+        let txn = new_scheduled_transaction(user_addr, future_time, 100, 200, false, foo);
         let txn_id = insert(&user, txn);
 
         // Try to cancel the transaction with wrong user
@@ -794,7 +835,7 @@ module aptos_framework::scheduled_txns {
             user_addr,
             future_time,
             100,
-            20,
+            200,
             false,
             foo
         );
@@ -824,7 +865,7 @@ module aptos_framework::scheduled_txns {
                 user_addr,
                 curr_mock_time_micro_s / 1000 + 1000 + i, // Different times to ensure unique ordering
                 100,
-                20,
+                200,
                 false,
                 foo
             );

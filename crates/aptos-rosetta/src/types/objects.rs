@@ -930,6 +930,9 @@ impl Transaction {
             ),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
+            ScheduledTransaction(_) => {
+                unimplemented!()
+            },
             BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
         };
 

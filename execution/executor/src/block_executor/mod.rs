@@ -149,6 +149,11 @@ where
 
         *self.inner.write() = None;
     }
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.maybe_initialize().expect("Failed to initialize.");
+        self.inner.read().as_ref().unwrap().state_view(block_id)
+    }
 }
 
 struct BlockExecutorInner<V> {
@@ -177,6 +182,25 @@ where
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
+    }
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        let block = self
+            .block_tree
+            .get_blocks_opt(&[block_id])?
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(block_id))?;
+        let block_output = &block.output;
+        let state_view = {
+            let _timer = OTHER_TIMERS.timer_with(&["get_state_view"]);
+            CachedStateView::new(
+                StateViewId::BlockExecution { block_id },
+                Arc::clone(&self.db.reader),
+                block_output.result_state().latest().clone(),
+            )?
+        };
+        Ok(state_view)
     }
 
     fn execute_and_update_state(

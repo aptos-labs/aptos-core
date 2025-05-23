@@ -244,6 +244,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
                 Transaction::ValidatorTransaction((txn, info, events, timestamp).into())
             },
+            aptos_types::transaction::Transaction::ScheduledTransaction(_) => {
+                unimplemented!()
+            },
         })
     }
 
