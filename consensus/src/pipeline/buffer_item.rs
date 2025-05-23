@@ -22,6 +22,7 @@ use aptos_types::{
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
+use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, fmt::Debug};
 use tokio::time::Instant;
 
@@ -528,6 +529,14 @@ fn assert_eq_or_error<T: PartialEq + Debug>(
     error_message: &str,
 ) -> anyhow::Result<()> {
     if tolerate_assertion_failure {
+        // HACK!
+        // Generate a random number and fail the assertion with some chance.
+        // This is to simulate a failure in the assertion.
+        let random_number = create_random_u64();
+        if random_number % 1000 == 0 {
+            return Err(anyhow!("Random failure in assert_eq_or_error!"));
+        }
+
         if item_1 != item_2 {
             let error_message = format!(
                 "Equality check failed! Error: {}. Item 1: {:?}, Item 2: {:?}",
@@ -540,6 +549,12 @@ fn assert_eq_or_error<T: PartialEq + Debug>(
     }
 
     Ok(())
+}
+
+/// Returns a random u64
+fn create_random_u64() -> u64 {
+    let mut rng = OsRng;
+    rng.gen()
 }
 
 #[cfg(test)]
