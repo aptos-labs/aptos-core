@@ -341,7 +341,8 @@ pub struct FunctionHandle {
     /// does not depend on any global state.
     #[cfg_attr(
         any(test, feature = "fuzzing"),
-        proptest(filter = "|x| x.as_ref().map(|v| v.len() <= 64).unwrap_or(true)")
+        // Keep the number of specifiers in range for tests which create arbitrary data
+        proptest(filter = "|x| x.as_ref().map(|v| v.len() <= 32).unwrap_or(true)")
     )]
     pub access_specifiers: Option<Vec<AccessSpecifier>>,
     /// A list of attributes the referenced function definition had at compilation time.
@@ -893,7 +894,6 @@ pub enum AddressSpecifier {
         /// The index of a parameter of the current function. If `modifier` is not given, the
         /// parameter must have address type. Otherwise `modifier` must be a function which takes
         /// a value (or reference) of the parameter type and delivers an address.
-        #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "0u8..63"))]
         LocalIndex,
         /// If given, a function applied to the parameter. This is a well-known function which
         /// extracts an address from a value, e.g. `object::address_of`.

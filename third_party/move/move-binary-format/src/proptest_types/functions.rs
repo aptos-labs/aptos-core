@@ -4,15 +4,16 @@
 
 use crate::{
     file_format::{
-        AccessSpecifier, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex, FieldHandle,
-        FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinition,
-        FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
-        IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
+        AccessKind, AccessSpecifier, AddressIdentifierIndex, AddressSpecifier, Bytecode,
+        CodeOffset, CodeUnit, ConstantPoolIndex, FieldHandle, FieldHandleIndex, FieldInstantiation,
+        FieldInstantiationIndex, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
+        FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex, LocalIndex,
+        ModuleHandleIndex, ResourceSpecifier, Signature, SignatureIndex, SignatureToken,
         StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
-        StructDefinitionIndex, StructFieldInformation, StructHandle, StructVariantHandle,
-        StructVariantHandleIndex, StructVariantInstantiation, StructVariantInstantiationIndex,
-        TableIndex, VariantFieldHandle, VariantFieldHandleIndex, VariantFieldInstantiation,
-        VariantFieldInstantiationIndex, VariantIndex, Visibility,
+        StructDefinitionIndex, StructFieldInformation, StructHandle, StructHandleIndex,
+        StructVariantHandle, StructVariantHandleIndex, StructVariantInstantiation,
+        StructVariantInstantiationIndex, TableIndex, VariantFieldHandle, VariantFieldHandleIndex,
+        VariantFieldInstantiation, VariantFieldInstantiationIndex, VariantIndex, Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -168,7 +169,7 @@ pub struct FunctionHandleGen {
     parameters: SignatureGen,
     return_: SignatureGen,
     type_parameters: Vec<AbilitySetGen>,
-    access_specifiers: Option<Vec<AccessSpecifier>>,
+    access_specifiers: Option<Vec<AccessSpecifierGen>>,
 }
 
 impl FunctionHandleGen {
@@ -186,7 +187,7 @@ impl FunctionHandleGen {
             SignatureGen::strategy(param_count),
             SignatureGen::strategy(return_count),
             vec(AbilitySetGen::strategy(), type_parameter_count),
-            of(vec(any::<AccessSpecifier>(), access_specifiers_count)),
+            of(vec(AccessSpecifierGen::strategy(), access_specifiers_count)),
         )
             .prop_map(
                 |(module, name, parameters, return_, type_parameters, access_specifiers)| Self {
@@ -213,6 +214,7 @@ impl FunctionHandleGen {
         }
         state.function_handles.insert((mod_idx, iden_idx));
         let parameters = self.parameters.materialize(state.struct_handles);
+        let params_count = parameters.len();
         let params_idx = state.add_signature(parameters);
         let return_ = self.return_.materialize(state.struct_handles);
         let return_idx = state.add_signature(return_);
@@ -221,15 +223,172 @@ impl FunctionHandleGen {
             .into_iter()
             .map(|abilities| abilities.materialize())
             .collect();
+        let access_specifiers = self.access_specifiers.map(|accs| {
+            accs.into_iter()
+                .map(|acc| {
+                    acc.materialize(
+                        state.module_handles_len,
+                        1, // at least one address for current module
+                        state.struct_handles.len(),
+                        state.signatures.handles.len(),
+                        params_count,
+                        0, // functions currently untested
+                    )
+                })
+                .collect()
+        });
         Some(FunctionHandle {
             module: mod_idx,
             name: iden_idx,
             parameters: params_idx,
             return_: return_idx,
             type_parameters,
-            access_specifiers: self.access_specifiers,
+            access_specifiers,
             attributes: vec![],
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AddressSpecifierGen {
+    Any,
+    Literal(PropIndex),
+    Parameter(PropIndex, Option<PropIndex>),
+}
+
+impl AddressSpecifierGen {
+    pub fn strategy() -> impl Strategy<Value = Self> {
+        prop_oneof![
+            select(&[AddressSpecifierGen::Any]),
+            any::<PropIndex>().prop_map(AddressSpecifierGen::Literal),
+            any::<(PropIndex, Option<PropIndex>)>()
+                .prop_map(|(local, fun_opt)| AddressSpecifierGen::Parameter(local, fun_opt))
+        ]
+    }
+
+    pub fn materialize(
+        self,
+        addresses_len: usize,
+        params_len: usize,
+        fun_insts_len: usize,
+    ) -> AddressSpecifier {
+        use AddressSpecifierGen::*;
+        match self {
+            Literal(idx) if addresses_len > 0 => AddressSpecifier::Literal(AddressIdentifierIndex(
+                idx.index(addresses_len) as TableIndex,
+            )),
+            Parameter(local_idx, fun_idx_opt) if params_len > 0 => AddressSpecifier::Parameter(
+                local_idx.index(params_len) as LocalIndex,
+                fun_idx_opt.and_then(|idx| {
+                    if fun_insts_len > 0 {
+                        Some(FunctionInstantiationIndex(
+                            idx.index(fun_insts_len) as TableIndex
+                        ))
+                    } else {
+                        None
+                    }
+                }),
+            ),
+            _ => AddressSpecifier::Any,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ResourceSpecifierGen {
+    Any,
+    DeclaredAtAddress(PropIndex),
+    DeclaredInModule(PropIndex),
+    Resource(PropIndex),
+    ResourceInstantiation(PropIndex, PropIndex),
+}
+
+impl ResourceSpecifierGen {
+    pub fn strategy() -> impl Strategy<Value = Self> {
+        prop_oneof![
+            select(&[ResourceSpecifierGen::Any]),
+            any::<PropIndex>().prop_map(ResourceSpecifierGen::DeclaredAtAddress),
+            any::<PropIndex>().prop_map(ResourceSpecifierGen::DeclaredInModule),
+            any::<PropIndex>().prop_map(ResourceSpecifierGen::Resource),
+            any::<(PropIndex, PropIndex)>()
+                .prop_map(|(s, i)| ResourceSpecifierGen::ResourceInstantiation(s, i))
+        ]
+    }
+
+    pub fn materialize(
+        self,
+        modules_len: usize,
+        addresses_len: usize,
+        structs_len: usize,
+        signs_len: usize,
+    ) -> ResourceSpecifier {
+        use ResourceSpecifierGen::*;
+        match self {
+            DeclaredAtAddress(idx) if addresses_len > 0 => ResourceSpecifier::DeclaredAtAddress(
+                AddressIdentifierIndex(idx.index(addresses_len) as TableIndex),
+            ),
+            DeclaredInModule(idx) if modules_len > 0 => ResourceSpecifier::DeclaredInModule(
+                ModuleHandleIndex(idx.index(modules_len) as TableIndex),
+            ),
+            Resource(idx) if structs_len > 0 => {
+                ResourceSpecifier::Resource(StructHandleIndex(idx.index(structs_len) as TableIndex))
+            },
+            ResourceInstantiation(idx, sign) if structs_len > 0 && signs_len > 0 => {
+                ResourceSpecifier::ResourceInstantiation(
+                    StructHandleIndex(idx.index(structs_len) as TableIndex),
+                    SignatureIndex(sign.index(signs_len) as TableIndex),
+                )
+            },
+            _ => ResourceSpecifier::Any,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AccessSpecifierGen {
+    kind: AccessKind,
+    negated: bool,
+    resource: ResourceSpecifierGen,
+    address: AddressSpecifierGen,
+}
+
+impl AccessSpecifierGen {
+    pub fn strategy() -> impl Strategy<Value = Self> {
+        (
+            any::<AccessKind>(),
+            any::<bool>(),
+            ResourceSpecifierGen::strategy(),
+            AddressSpecifierGen::strategy(),
+        )
+            .prop_map(|(kind, negated, resource, address)| AccessSpecifierGen {
+                kind,
+                negated,
+                resource,
+                address,
+            })
+    }
+
+    pub fn materialize(
+        self,
+        modules_len: usize,
+        addresses_len: usize,
+        structs_len: usize,
+        signs_len: usize,
+        params_len: usize,
+        fun_insts_len: usize,
+    ) -> AccessSpecifier {
+        let resource =
+            self.resource
+                .materialize(modules_len, addresses_len, structs_len, signs_len);
+        let address = self
+            .address
+            .materialize(addresses_len, params_len, fun_insts_len);
+        AccessSpecifier {
+            kind: self.kind,
+            negated: self.negated,
+            resource,
+            address,
+        }
     }
 }
 

@@ -7,20 +7,23 @@ use move_binary_format::{
     file_format as FF,
     file_format::TableIndex,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{account_address::AccountAddress, ident_str, vm_status::StatusCode};
 use move_vm_types::loaded_data::{
     runtime_access_specifier::{
         AccessSpecifier, AccessSpecifierClause, AddressSpecifier, AddressSpecifierFunction,
         ResourceSpecifier,
     },
     runtime_types::{StructIdentifier, Type},
+    struct_name_indexing::StructNameIndexMap,
 };
 
 /// Loads an access specifier from the file format into the runtime representation.
 pub fn load_access_specifier(
     module: BinaryIndexedView,
+    param_tys: &[Type],
     signature_table: &[Vec<Type>],
     struct_names: &[StructIdentifier],
+    struct_name_index_map: &StructNameIndexMap,
     specifier: &Option<Vec<FF::AccessSpecifier>>,
 ) -> PartialVMResult<AccessSpecifier> {
     if let Some(specs) = specifier {
@@ -29,7 +32,8 @@ pub fn load_access_specifier(
         for spec in specs {
             let resource =
                 load_resource_specifier(module, signature_table, struct_names, &spec.resource)?;
-            let address = load_address_specifier(module, &spec.address)?;
+            let address =
+                load_address_specifier(module, param_tys, struct_name_index_map, &spec.address)?;
             let clause = AccessSpecifierClause {
                 kind: spec.kind,
                 resource,
@@ -77,6 +81,8 @@ fn load_resource_specifier(
 
 fn load_address_specifier(
     module: BinaryIndexedView,
+    param_tys: &[Type],
+    struct_name_index_map: &StructNameIndexMap,
     spec: &FF::AddressSpecifier,
 ) -> PartialVMResult<AddressSpecifier> {
     use FF::AddressSpecifier::*;
@@ -106,6 +112,49 @@ fn load_address_specifier(
             } else {
                 AddressSpecifierFunction::Identity
             };
+            let param_ty = param_tys.get(*param as usize).ok_or_else(|| {
+                PartialVMError::new(StatusCode::ACCESS_CONTROL_INVARIANT_VIOLATION).with_message(
+                    format!(
+                        "address specifier parameter index out of range: {}>={}",
+                        *param,
+                        param_tys.len()
+                    ),
+                )
+            })?;
+            let param_ty_error = |msg: &str| {
+                Err(
+                    PartialVMError::new(StatusCode::ACCESS_CONTROL_INVARIANT_VIOLATION)
+                        .with_message(format!(
+                        "address specifier parameter expected to have type `{}`, but found `{}`",
+                        msg, param_ty
+                    )),
+                )
+            };
+            match fun {
+                AddressSpecifierFunction::Identity => {
+                    if param_ty != &Type::Address {
+                        return param_ty_error("address");
+                    }
+                },
+                AddressSpecifierFunction::SignerAddress => {
+                    if !matches!(param_ty, Type::Reference(ty) if ty.as_ref() != &Type::Signer) {
+                        return param_ty_error("&signer");
+                    }
+                },
+                AddressSpecifierFunction::ObjectAddress => {
+                    let ok = if let Type::StructInstantiation { idx, .. } = param_ty {
+                        let name = struct_name_index_map.idx_to_struct_name(*idx)?;
+                        name.module.address == AccountAddress::ONE
+                            && name.module.name.as_ref() == ident_str!("object")
+                            && name.name.as_ref() == ident_str!("Object")
+                    } else {
+                        false
+                    };
+                    if !ok {
+                        return param_ty_error("0x1::object::Object");
+                    }
+                },
+            }
             Ok(AddressSpecifier::Eval(fun, *param))
         },
     }

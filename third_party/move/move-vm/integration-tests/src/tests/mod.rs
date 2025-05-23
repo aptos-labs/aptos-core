@@ -18,6 +18,7 @@ use move_vm_runtime::{
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
 
+mod access_specifier_tests;
 mod bad_entry_point_tests;
 mod bad_storage_tests;
 mod binary_format_version;
