@@ -6,7 +6,9 @@ use crate::{
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
-        buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
+        buffer_manager::{
+            create_channel, BufferManager, CriticalErrorNotification, OrderedBlocks, ResetRequest,
+        },
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
         persisting_phase::{PersistingPhase, PersistingRequest},
@@ -51,7 +53,7 @@ pub fn prepare_phases_and_buffer_manager(
     PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
-    BufferManager,
+    (BufferManager, UnboundedReceiver<CriticalErrorNotification>),
 ) {
     let reset_flag = Arc::new(AtomicBool::new(false));
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
@@ -109,36 +111,39 @@ pub fn prepare_phases_and_buffer_manager(
         reset_flag.clone(),
     );
 
+    // Create the buffer manager
+    let buffer_manager_and_error_listener = BufferManager::new(
+        author,
+        execution_schedule_phase_request_tx,
+        execution_schedule_phase_response_rx,
+        execution_wait_phase_request_tx,
+        execution_wait_phase_response_rx,
+        signing_phase_request_tx,
+        signing_phase_response_rx,
+        commit_msg_tx,
+        commit_msg_rx,
+        persisting_phase_request_tx,
+        persisting_phase_response_rx,
+        block_rx,
+        sync_rx,
+        epoch_state,
+        ongoing_tasks,
+        reset_flag.clone(),
+        bounded_executor,
+        order_vote_enabled,
+        back_pressure_enabled,
+        highest_committed_round,
+        consensus_observer_config,
+        consensus_publisher,
+        max_pending_rounds_in_commit_vote_cache,
+        new_pipeline_enabled,
+    );
+
     (
         execution_schedule_phase,
         execution_wait_phase,
         signing_phase,
         persisting_phase,
-        BufferManager::new(
-            author,
-            execution_schedule_phase_request_tx,
-            execution_schedule_phase_response_rx,
-            execution_wait_phase_request_tx,
-            execution_wait_phase_response_rx,
-            signing_phase_request_tx,
-            signing_phase_response_rx,
-            commit_msg_tx,
-            commit_msg_rx,
-            persisting_phase_request_tx,
-            persisting_phase_response_rx,
-            block_rx,
-            sync_rx,
-            epoch_state,
-            ongoing_tasks,
-            reset_flag.clone(),
-            bounded_executor,
-            order_vote_enabled,
-            back_pressure_enabled,
-            highest_committed_round,
-            consensus_observer_config,
-            consensus_publisher,
-            max_pending_rounds_in_commit_vote_cache,
-            new_pipeline_enabled,
-        ),
+        buffer_manager_and_error_listener,
     )
 }

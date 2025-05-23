@@ -10,7 +10,9 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_manager::TPayloadManager,
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
+        buffer_manager::{
+            CriticalErrorNotification, OrderedBlocks, ResetAck, ResetRequest, ResetSignal,
+        },
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         errors::Error,
         pipeline_builder::PipelineBuilder,
@@ -72,7 +74,7 @@ pub trait TExecutionClient: Send + Sync {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
-    );
+    ) -> Option<futures_channel::mpsc::UnboundedReceiver<CriticalErrorNotification>>;
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
@@ -211,7 +213,7 @@ impl ExecutionProxyClient {
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         new_pipeline_enabled: bool,
-    ) {
+    ) -> futures_channel::mpsc::UnboundedReceiver<CriticalErrorNotification> {
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -279,7 +281,7 @@ impl ExecutionProxyClient {
             execution_wait_phase,
             signing_phase,
             persisting_phase,
-            buffer_manager,
+            (buffer_manager, error_listener),
         ) = prepare_phases_and_buffer_manager(
             self.author,
             self.execution_proxy.clone(),
@@ -306,6 +308,8 @@ impl ExecutionProxyClient {
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start());
+
+        error_listener
     }
 }
 
@@ -325,8 +329,8 @@ impl TExecutionClient for ExecutionProxyClient {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
-    ) {
-        let maybe_rand_msg_tx = self.spawn_decoupled_execution(
+    ) -> Option<futures_channel::mpsc::UnboundedReceiver<CriticalErrorNotification>> {
+        let error_listener = self.spawn_decoupled_execution(
             maybe_consensus_key,
             commit_signer_provider,
             epoch_state.clone(),
@@ -359,7 +363,7 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_consensus_config.order_vote_enabled(),
         );
 
-        maybe_rand_msg_tx
+        Some(error_listener)
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
@@ -549,7 +553,8 @@ impl TExecutionClient for DummyExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
         _new_pipeline_enabled: bool,
-    ) {
+    ) -> Option<futures_channel::mpsc::UnboundedReceiver<CriticalErrorNotification>> {
+        None
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {

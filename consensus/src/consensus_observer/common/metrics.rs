@@ -25,6 +25,7 @@ pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 
 // Useful state sync metric labels
+pub const STATE_SYNCING_FOR_CRITICAL_FALLBACK: &str = "sync_for_critical_fallback";
 pub const STATE_SYNCING_FOR_FALLBACK: &str = "sync_for_fallback";
 pub const STATE_SYNCING_TO_COMMIT: &str = "sync_to_commit";
 
