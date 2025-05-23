@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
 use aptos_logger::error;
+use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
     state_store::{state_slot::StateSlot, TStateView},
     transaction::Version,
@@ -67,12 +69,15 @@ where
         Key: 'a,
     {
         for key in writes {
-            self.to_make_hot.remove(key);
+            if self.to_make_hot.remove(key).is_some() {
+                COUNTER.inc_with(&["promotion_removed_by_write"]);
+            }
             self.writes.get_or_insert_owned(key);
         }
 
         for key in read_only {
             if self.to_make_hot.len() >= self.max_promotions_per_block {
+                COUNTER.inc_with(&["max_promotions_per_block_hit"]);
                 continue;
             }
             if self.to_make_hot.contains_key(key) {
@@ -85,15 +90,33 @@ where
                 .base_view
                 .get_state_slot(key)
                 .expect("base_view.get_slot() failed.");
-            let make_hot = match slot.hot_since_version_opt() {
-                None => true,
-                Some(hot_since_version) => {
-                    if hot_since_version >= self.first_version {
-                        error!("Unexpected: hot_since_version > block first version");
-                        false
+            let make_hot = match slot {
+                StateSlot::ColdVacant => {
+                    COUNTER.inc_with(&["vacant_new"]);
+                    true
+                },
+                StateSlot::HotVacant { hot_since_version } => {
+                    if self.should_refresh(hot_since_version) {
+                        COUNTER.inc_with(&["vacant_refresh"]);
+                        true
                     } else {
-                        hot_since_version + self.refresh_interval_versions as Version
-                            >= self.first_version
+                        COUNTER.inc_with(&["vacant_still_hot"]);
+                        false
+                    }
+                },
+                StateSlot::ColdOccupied { .. } => {
+                    COUNTER.inc_with(&["occupied_new"]);
+                    true
+                },
+                StateSlot::HotOccupied {
+                    hot_since_version, ..
+                } => {
+                    if self.should_refresh(hot_since_version) {
+                        COUNTER.inc_with(&["occupied_refresh"]);
+                        true
+                    } else {
+                        COUNTER.inc_with(&["occupied_still_hot"]);
+                        false
                     }
                 },
             };
@@ -105,5 +128,12 @@ where
 
     pub fn get_slots_to_make_hot(&self) -> BTreeMap<Key, StateSlot> {
         self.to_make_hot.clone()
+    }
+
+    pub fn should_refresh(&self, hot_since_version: Version) -> bool {
+        if hot_since_version >= self.first_version {
+            error!("Unexpected: hot_since_version > block first version");
+        }
+        hot_since_version + self.refresh_interval_versions as Version >= self.first_version
     }
 }
