@@ -16,9 +16,7 @@ mod tests {
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{
-            ClosureMask, MoveClosure, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-        },
+        function::{ClosureMask, MoveClosure, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
         identifier::Identifier,
         language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
         u256,
@@ -209,11 +207,7 @@ mod tests {
 
     fn make_fun_layout() -> MoveTypeLayout {
         // Currently, content of layout doesn't influence parsing, so can set anything here
-        MoveTypeLayout::Function(MoveFunctionLayout(
-            vec![],
-            vec![],
-            AbilitySet::PUBLIC_FUNCTIONS,
-        ))
+        MoveTypeLayout::Function
     }
 
     fn make_type_args() -> Vec<TypeTag> {
@@ -253,7 +247,6 @@ mod tests {
 
     #[test]
     fn closure_round_trip_move_value_good() {
-        let fun_layout = make_fun_layout();
         let ty_args = make_type_args();
         let good_values = vec![
             make_move_closure("f", ty_args, ClosureMask::new(0b101), vec![
@@ -268,14 +261,17 @@ mod tests {
         ];
         for value in good_values {
             let blob = value.simple_serialize().expect("serialization succeeds");
-            let de_value = assert_ok!(MoveValue::simple_deserialize(&blob, &fun_layout));
+            let de_value = assert_ok!(MoveValue::simple_deserialize(
+                &blob,
+                &MoveTypeLayout::Function
+            ));
             assert_eq!(value, de_value, "round trip serialization succeeds")
         }
     }
 
     #[test]
     fn closure_round_trip_move_value_bad_size() {
-        let fun_layout = make_fun_layout();
+        let fun_layout = MoveTypeLayout::Function;
         let bad_captures_more = make_move_closure("f", vec![], ClosureMask::new(0b1), vec![
             (MoveTypeLayout::Bool, MoveValue::Bool(true)),
             (MoveTypeLayout::U64, MoveValue::U64(22)),
@@ -312,7 +308,6 @@ mod tests {
 
     #[test]
     fn closure_round_trip_move_value_bad_layout() {
-        let fun_layout = make_fun_layout();
         let bad_layout = make_move_closure("f", vec![], ClosureMask::new(0b11), vec![
             (
                 MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
@@ -326,7 +321,7 @@ mod tests {
         let blob = bad_layout
             .simple_serialize()
             .expect("serialization succeeds");
-        MoveValue::simple_deserialize(&blob, &fun_layout)
+        MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
             .inspect_err(|e| {
                 assert!(
                     e.to_string().contains("remaining input"),

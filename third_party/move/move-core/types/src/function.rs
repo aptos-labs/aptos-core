@@ -4,7 +4,7 @@
 use crate::{
     ability::AbilitySet,
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
@@ -253,10 +253,9 @@ pub struct MoveClosure {
     pub captured: Vec<(MoveTypeLayout, MoveValue)>,
 }
 
-#[allow(unused)] // Currently, we do not use the expected function layout
-pub(crate) struct ClosureVisitor<'a>(pub(crate) &'a MoveFunctionLayout);
+pub(crate) struct ClosureVisitor;
 
-impl<'d> serde::de::Visitor<'d> for ClosureVisitor<'_> {
+impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
     type Value = MoveClosure;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -377,55 +376,14 @@ mod serialization_tests {
         eprintln!("{:?}", blob);
         assert_eq!(
             value,
-            MoveValue::simple_deserialize(
-                &blob,
-                // The type layout is currently ignored by the serializer, so pass in some
-                // arbitrary one
-                &MoveTypeLayout::Function(MoveFunctionLayout(vec![], vec![], AbilitySet::EMPTY))
-            )
-            .expect("deserialization must succeed"),
+            MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
+                .expect("deserialization must succeed"),
             "deserialized value not equal to original one"
         );
     }
 }
 
 //===========================================================================================
-
-impl fmt::Display for MoveFunctionLayout {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        let fmt_list = |l: &[MoveTypeLayout]| {
-            l.iter()
-                .map(|t| t.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        let MoveFunctionLayout(args, results, abilities) = self;
-        write!(
-            f,
-            "|{}|{}{}",
-            fmt_list(args),
-            fmt_list(results),
-            abilities.display_postfix()
-        )
-    }
-}
-
-impl TryInto<FunctionTag> for &MoveFunctionLayout {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<FunctionTag, Self::Error> {
-        let into_list = |ts: &[MoveTypeLayout]| {
-            ts.iter()
-                .map(|t| t.try_into())
-                .collect::<Result<Vec<TypeTag>, _>>()
-        };
-        Ok(FunctionTag {
-            args: into_list(&self.0)?,
-            results: into_list(&self.1)?,
-            abilities: self.2,
-        })
-    }
-}
 
 impl fmt::Display for MoveClosure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
