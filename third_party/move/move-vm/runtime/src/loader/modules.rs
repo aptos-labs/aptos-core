@@ -5,6 +5,7 @@
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
+        single_signature_loader::load_single_signatures_for_module,
         type_loader::intern_type,
     },
     native_functions::NativeFunctions,
@@ -14,7 +15,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
+        CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
         FunctionDefinitionIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
         StructFieldInformation, StructVariantHandleIndex, StructVariantInstantiationIndex,
         TableIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
@@ -166,266 +167,213 @@ impl Module {
         let mut variant_field_instantiation_infos = vec![];
         let mut function_map = HashMap::new();
         let mut struct_map = HashMap::new();
-        let mut single_signature_token_map = BTreeMap::new();
         let mut signature_table = vec![];
 
-        let mut create = || {
-            let mut struct_idxs = vec![];
-            let mut struct_names = vec![];
-            // validate the correctness of struct handle references.
-            for struct_handle in module.struct_handles() {
-                let struct_name = module.identifier_at(struct_handle.name);
-                let module_handle = module.module_handle_at(struct_handle.module);
-                let module_id = module.module_id_for_handle(module_handle);
+        let mut struct_idxs = vec![];
+        let mut struct_names = vec![];
 
-                let struct_name = StructIdentifier {
-                    module: module_id,
-                    name: struct_name.to_owned(),
-                };
-                struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
-                struct_names.push(struct_name)
-            }
+        // validate the correctness of struct handle references.
+        for struct_handle in module.struct_handles() {
+            let struct_name = module.identifier_at(struct_handle.name);
+            let module_handle = module.module_handle_at(struct_handle.module);
+            let module_id = module.module_id_for_handle(module_handle);
 
-            // Build signature table
-            for signatures in module.signatures() {
-                signature_table.push(
-                    signatures
-                        .0
-                        .iter()
-                        .map(|sig| {
-                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs)
-                        })
-                        .collect::<PartialVMResult<Vec<_>>>()?,
-                )
-            }
-
-            for (idx, struct_def) in module.struct_defs().iter().enumerate() {
-                let definition_struct_type =
-                    Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
-                structs.push(StructDef {
-                    field_count: definition_struct_type.field_count(None),
-                    definition_struct_type,
-                });
-                let name =
-                    module.identifier_at(module.struct_handle_at(struct_def.struct_handle).name);
-                struct_map.insert(name.to_owned(), idx);
-            }
-
-            for struct_inst in module.struct_instantiations() {
-                let def = struct_inst.def.0 as usize;
-                let struct_def = &structs[def];
-                struct_instantiations.push(StructInstantiation {
-                    field_count: struct_def.definition_struct_type.field_count(None),
-                    instantiation: signature_table[struct_inst.type_parameters.0 as usize].clone(),
-                    definition_struct_type: struct_def.definition_struct_type.clone(),
-                });
-            }
-
-            for struct_variant in module.struct_variant_handles() {
-                let definition_struct_type = structs[struct_variant.struct_index.0 as usize]
-                    .definition_struct_type
-                    .clone();
-                let variant = struct_variant.variant;
-                struct_variant_infos.push(StructVariantInfo {
-                    field_count: definition_struct_type.field_count(Some(variant)),
-                    variant,
-                    definition_struct_type,
-                    instantiation: vec![],
-                })
-            }
-
-            for struct_variant_inst in module.struct_variant_instantiations() {
-                let variant = &struct_variant_infos[struct_variant_inst.handle.0 as usize];
-                struct_variant_instantiation_infos.push(StructVariantInfo {
-                    field_count: variant.field_count,
-                    variant: variant.variant,
-                    definition_struct_type: variant.definition_struct_type.clone(),
-                    instantiation: signature_table[struct_variant_inst.type_parameters.0 as usize]
-                        .clone(),
-                })
-            }
-
-            for (idx, func) in module.function_defs().iter().enumerate() {
-                let findex = FunctionDefinitionIndex(idx as TableIndex);
-                let function = Function::new(
-                    natives,
-                    findex,
-                    &module,
-                    signature_table.as_slice(),
-                    &struct_names,
-                )?;
-
-                function_map.insert(function.name.to_owned(), idx);
-                function_defs.push(Arc::new(function));
-
-                if let Some(code_unit) = &func.code {
-                    for bc in &code_unit.code {
-                        match bc {
-                            Bytecode::CallClosure(si)
-                            | Bytecode::VecPack(si, _)
-                            | Bytecode::VecLen(si)
-                            | Bytecode::VecImmBorrow(si)
-                            | Bytecode::VecMutBorrow(si)
-                            | Bytecode::VecPushBack(si)
-                            | Bytecode::VecPopBack(si)
-                            | Bytecode::VecUnpack(si, _)
-                            | Bytecode::VecSwap(si) => {
-                                if !single_signature_token_map.contains_key(si) {
-                                    let ty = match module.signature_at(*si).0.first() {
-                                        None => {
-                                            return Err(PartialVMError::new(
-                                                StatusCode::VERIFIER_INVARIANT_VIOLATION,
-                                            )
-                                            .with_message(
-                                                "the type argument for vector-related bytecode \
-                                                expects one and only one signature token"
-                                                    .to_owned(),
-                                            ));
-                                        },
-                                        Some(sig_token) => sig_token,
-                                    };
-                                    single_signature_token_map.insert(
-                                        *si,
-                                        intern_type(
-                                            BinaryIndexedView::Module(&module),
-                                            ty,
-                                            &struct_idxs,
-                                        )?,
-                                    );
-                                }
-                            },
-                            _ => {},
-                        }
-                    }
-                }
-            }
-
-            for func_handle in module.function_handles() {
-                let func_name = module.identifier_at(func_handle.name);
-                let module_handle = module.module_handle_at(func_handle.module);
-                let module_id = module.module_id_for_handle(module_handle);
-                let func_handle = if module_id == id {
-                    FunctionHandle::Local(
-                        function_defs[*function_map.get(func_name).ok_or_else(|| {
-                            PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
-                                "Cannot find function in publishing module".to_string(),
-                            )
-                        })?]
-                        .clone(),
-                    )
-                } else {
-                    FunctionHandle::Remote {
-                        module: module_id,
-                        name: func_name.to_owned(),
-                    }
-                };
-                function_refs.push(func_handle);
-            }
-
-            for func_inst in module.function_instantiations() {
-                let handle = function_refs[func_inst.handle.0 as usize].clone();
-                function_instantiations.push(FunctionInstantiation {
-                    handle,
-                    instantiation: signature_table[func_inst.type_parameters.0 as usize].clone(),
-                });
-            }
-
-            for field_handle in module.field_handles() {
-                let def_idx = field_handle.owner;
-                let definition_struct_type =
-                    structs[def_idx.0 as usize].definition_struct_type.clone();
-                let offset = field_handle.field as usize;
-                let ty = definition_struct_type.field_at(None, offset)?.1.clone();
-                field_handles.push(FieldHandle {
-                    offset,
-                    field_ty: ty,
-                    definition_struct_type,
-                });
-            }
-
-            for field_inst in module.field_instantiations() {
-                let fh_idx = field_inst.handle;
-                let offset = field_handles[fh_idx.0 as usize].offset;
-                let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
-                let uninstantiated_ty = owner_struct_def
-                    .definition_struct_type
-                    .field_at(None, offset)?
-                    .1
-                    .clone();
-                field_instantiations.push(FieldInstantiation {
-                    offset,
-                    uninstantiated_field_ty: uninstantiated_ty,
-                    instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
-                    definition_struct_type: owner_struct_def.definition_struct_type.clone(),
-                });
-            }
-
-            for variant_handle in module.variant_field_handles() {
-                let def_idx = variant_handle.struct_index;
-                let definition_struct_type =
-                    structs[def_idx.0 as usize].definition_struct_type.clone();
-                let offset = variant_handle.field as usize;
-                let variants = variant_handle.variants.clone();
-                let ty = definition_struct_type
-                    .field_at(Some(variants[0]), offset)?
-                    .1
-                    .clone();
-                variant_field_infos.push(VariantFieldInfo {
-                    offset,
-                    variants,
-                    definition_struct_type,
-                    uninstantiated_field_ty: ty,
-                    instantiation: vec![],
-                });
-            }
-
-            for variant_inst in module.variant_field_instantiations() {
-                let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
-                let definition_struct_type = variant_info.definition_struct_type.clone();
-                let variants = variant_info.variants.clone();
-                let offset = variant_info.offset;
-                let instantiation =
-                    signature_table[variant_inst.type_parameters.0 as usize].clone();
-                // We can select one representative variant for finding the field type, all
-                // must have the same type as the verifier ensured.
-                let uninstantiated_ty = definition_struct_type
-                    .field_at(Some(variants[0]), offset)?
-                    .1
-                    .clone();
-                variant_field_instantiation_infos.push(VariantFieldInfo {
-                    offset,
-                    uninstantiated_field_ty: uninstantiated_ty,
-                    variants,
-                    definition_struct_type,
-                    instantiation,
-                });
-            }
-
-            Ok(())
-        };
-
-        match create() {
-            Ok(_) => Ok(Self {
-                id,
-                size,
-                module,
-                structs,
-                struct_instantiations,
-                struct_variant_infos,
-                struct_variant_instantiation_infos,
-                function_refs,
-                function_defs,
-                function_instantiations,
-                field_handles,
-                field_instantiations,
-                variant_field_infos,
-                variant_field_instantiation_infos,
-                function_map,
-                struct_map,
-                single_signature_token_map,
-            }),
-            Err(err) => Err(err),
+            let struct_name = StructIdentifier {
+                module: module_id,
+                name: struct_name.to_owned(),
+            };
+            struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
+            struct_names.push(struct_name)
         }
+
+        // Build signature table
+        for signatures in module.signatures() {
+            signature_table.push(
+                signatures
+                    .0
+                    .iter()
+                    .map(|sig| intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs))
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            )
+        }
+
+        for (idx, struct_def) in module.struct_defs().iter().enumerate() {
+            let definition_struct_type =
+                Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
+            structs.push(StructDef {
+                field_count: definition_struct_type.field_count(None),
+                definition_struct_type,
+            });
+            let name = module.identifier_at(module.struct_handle_at(struct_def.struct_handle).name);
+            struct_map.insert(name.to_owned(), idx);
+        }
+
+        for struct_inst in module.struct_instantiations() {
+            let def = struct_inst.def.0 as usize;
+            let struct_def = &structs[def];
+            struct_instantiations.push(StructInstantiation {
+                field_count: struct_def.definition_struct_type.field_count(None),
+                instantiation: signature_table[struct_inst.type_parameters.0 as usize].clone(),
+                definition_struct_type: struct_def.definition_struct_type.clone(),
+            });
+        }
+
+        for struct_variant in module.struct_variant_handles() {
+            let definition_struct_type = structs[struct_variant.struct_index.0 as usize]
+                .definition_struct_type
+                .clone();
+            let variant = struct_variant.variant;
+            struct_variant_infos.push(StructVariantInfo {
+                field_count: definition_struct_type.field_count(Some(variant)),
+                variant,
+                definition_struct_type,
+                instantiation: vec![],
+            })
+        }
+
+        for struct_variant_inst in module.struct_variant_instantiations() {
+            let variant = &struct_variant_infos[struct_variant_inst.handle.0 as usize];
+            struct_variant_instantiation_infos.push(StructVariantInfo {
+                field_count: variant.field_count,
+                variant: variant.variant,
+                definition_struct_type: variant.definition_struct_type.clone(),
+                instantiation: signature_table[struct_variant_inst.type_parameters.0 as usize]
+                    .clone(),
+            })
+        }
+
+        for (idx, _) in module.function_defs().iter().enumerate() {
+            let findex = FunctionDefinitionIndex(idx as TableIndex);
+            let function = Function::new(
+                natives,
+                findex,
+                &module,
+                signature_table.as_slice(),
+                &struct_names,
+            )?;
+
+            function_map.insert(function.name.to_owned(), idx);
+            function_defs.push(Arc::new(function));
+        }
+
+        let single_signature_token_map = load_single_signatures_for_module(&module, &struct_idxs)?;
+
+        for func_handle in module.function_handles() {
+            let func_name = module.identifier_at(func_handle.name);
+            let module_handle = module.module_handle_at(func_handle.module);
+            let module_id = module.module_id_for_handle(module_handle);
+            let func_handle = if module_id == id {
+                FunctionHandle::Local(
+                    function_defs[*function_map.get(func_name).ok_or_else(|| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                            .with_message("Cannot find function in publishing module".to_string())
+                    })?]
+                    .clone(),
+                )
+            } else {
+                FunctionHandle::Remote {
+                    module: module_id,
+                    name: func_name.to_owned(),
+                }
+            };
+            function_refs.push(func_handle);
+        }
+
+        for func_inst in module.function_instantiations() {
+            let handle = function_refs[func_inst.handle.0 as usize].clone();
+            function_instantiations.push(FunctionInstantiation {
+                handle,
+                instantiation: signature_table[func_inst.type_parameters.0 as usize].clone(),
+            });
+        }
+
+        for field_handle in module.field_handles() {
+            let def_idx = field_handle.owner;
+            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
+            let offset = field_handle.field as usize;
+            let ty = definition_struct_type.field_at(None, offset)?.1.clone();
+            field_handles.push(FieldHandle {
+                offset,
+                field_ty: ty,
+                definition_struct_type,
+            });
+        }
+
+        for field_inst in module.field_instantiations() {
+            let fh_idx = field_inst.handle;
+            let offset = field_handles[fh_idx.0 as usize].offset;
+            let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
+            let uninstantiated_ty = owner_struct_def
+                .definition_struct_type
+                .field_at(None, offset)?
+                .1
+                .clone();
+            field_instantiations.push(FieldInstantiation {
+                offset,
+                uninstantiated_field_ty: uninstantiated_ty,
+                instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
+                definition_struct_type: owner_struct_def.definition_struct_type.clone(),
+            });
+        }
+
+        for variant_handle in module.variant_field_handles() {
+            let def_idx = variant_handle.struct_index;
+            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
+            let offset = variant_handle.field as usize;
+            let variants = variant_handle.variants.clone();
+            let ty = definition_struct_type
+                .field_at(Some(variants[0]), offset)?
+                .1
+                .clone();
+            variant_field_infos.push(VariantFieldInfo {
+                offset,
+                variants,
+                definition_struct_type,
+                uninstantiated_field_ty: ty,
+                instantiation: vec![],
+            });
+        }
+
+        for variant_inst in module.variant_field_instantiations() {
+            let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
+            let definition_struct_type = variant_info.definition_struct_type.clone();
+            let variants = variant_info.variants.clone();
+            let offset = variant_info.offset;
+            let instantiation = signature_table[variant_inst.type_parameters.0 as usize].clone();
+            // We can select one representative variant for finding the field type, all
+            // must have the same type as the verifier ensured.
+            let uninstantiated_ty = definition_struct_type
+                .field_at(Some(variants[0]), offset)?
+                .1
+                .clone();
+            variant_field_instantiation_infos.push(VariantFieldInfo {
+                offset,
+                uninstantiated_field_ty: uninstantiated_ty,
+                variants,
+                definition_struct_type,
+                instantiation,
+            });
+        }
+
+        Ok(Self {
+            id,
+            size,
+            module,
+            structs,
+            struct_instantiations,
+            struct_variant_infos,
+            struct_variant_instantiation_infos,
+            function_refs,
+            function_defs,
+            function_instantiations,
+            field_handles,
+            field_instantiations,
+            variant_field_infos,
+            variant_field_instantiation_infos,
+            function_map,
+            struct_map,
+            single_signature_token_map,
+        })
     }
 
     fn make_struct_type(
