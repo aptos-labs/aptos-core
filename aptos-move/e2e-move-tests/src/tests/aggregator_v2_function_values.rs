@@ -113,6 +113,29 @@ fn test_function_value_captures_aggregator_is_not_storable() {
 }
 
 #[test]
+fn test_function_value_uses_aggregator_is_storable() {
+    let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis().set_parallel());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    initialize(&mut h);
+
+    let status = h.run_entry_function(
+        &acc,
+        MemberId::from_str("0x1::function_store::try_initialize_should_succeed").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&100_u64).unwrap()],
+    );
+    assert_success!(status);
+
+    let status = h.run_entry_function(
+        &acc,
+        MemberId::from_str("0x1::function_store::run_stored_add").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&200_u64).unwrap()],
+    );
+    assert_success!(status);
+}
+
+#[test]
 fn test_function_value_captures_aggregator() {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis().set_parallel());
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());

@@ -8,7 +8,6 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
-    function::MoveFunctionLayout,
     identifier::Identifier,
     language_storage::{FunctionTag, StructTag, TypeTag},
     value::{MoveStructLayout, MoveTypeLayout},
@@ -367,14 +366,8 @@ impl FatType {
                     .map(|tys| Self::from_layout_slice(tys, limit))
                     .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
             ),
-            Function(MoveFunctionLayout(args, results, abilities)) => {
-                FatType::Function(Box::new(FatFunctionType {
-                    args: Self::from_layout_slice(args, limit)?,
-                    results: Self::from_layout_slice(results, limit)?,
-                    abilities: *abilities,
-                }))
-            },
-            Native(..) | Struct(_) => {
+            // TODO(#15664): get rid of fat type to support captured functions.
+            Native(..) | Struct(_) | Function => {
                 return Err(PartialVMError::new_invariant_violation(format!(
                     "cannot derive fat type for {:?}",
                     layout
@@ -458,18 +451,6 @@ impl TryInto<MoveStructLayout> for &FatStructType {
     }
 }
 
-impl TryInto<MoveFunctionLayout> for &FatFunctionType {
-    type Error = PartialVMError;
-
-    fn try_into(self) -> Result<MoveFunctionLayout, Self::Error> {
-        Ok(MoveFunctionLayout(
-            into_types(self.args.iter())?,
-            into_types(self.results.iter())?,
-            self.abilities,
-        ))
-    }
-}
-
 fn into_types<'a>(
     types: impl Iterator<Item = &'a FatType>,
 ) -> PartialVMResult<Vec<MoveTypeLayout>> {
@@ -498,7 +479,7 @@ impl TryInto<MoveTypeLayout> for &FatType {
             FatType::Bool => MoveTypeLayout::Bool,
             FatType::Vector(v) => MoveTypeLayout::Vector(Box::new(v.as_ref().try_into()?)),
             FatType::Struct(s) => MoveTypeLayout::Struct(s.as_ref().try_into()?),
-            FatType::Function(f) => MoveTypeLayout::Function(f.as_ref().try_into()?),
+            FatType::Function(_) => MoveTypeLayout::Function,
             FatType::Runtime(tys) => {
                 MoveTypeLayout::Struct(MoveStructLayout::Runtime(slice_into(tys)?))
             },
