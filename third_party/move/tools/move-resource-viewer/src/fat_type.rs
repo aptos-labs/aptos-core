@@ -13,79 +13,47 @@ use move_core_types::{
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct WrappedAbilitySet(pub AbilitySet);
-
-impl Serialize for WrappedAbilitySet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.into_u8().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for WrappedAbilitySet {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let byte = u8::deserialize(deserializer)?;
-        Ok(WrappedAbilitySet(AbilitySet::from_u8(byte).ok_or_else(
-            || serde::de::Error::custom(format!("Invalid ability set: {:X}", byte)),
-        )?))
-    }
-}
-
 /// VM representation of a struct type in Move.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct FatStructType {
     pub address: AccountAddress,
     pub module: Identifier,
     pub name: Identifier,
-    pub abilities: WrappedAbilitySet,
+    pub abilities: AbilitySet,
     pub ty_args: Vec<FatType>,
     pub layout: FatStructLayout,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) enum FatStructLayout {
     Singleton(Vec<FatType>),
     Variants(Vec<Vec<FatType>>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct FatFunctionType {
     pub args: Vec<FatType>,
     pub results: Vec<FatType>,
     pub abilities: AbilitySet,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) enum FatType {
     Bool,
     U8,
+    U16,
+    U32,
     U64,
     U128,
+    U256,
     Address,
     Signer,
     Vector(Box<FatType>),
     Struct(Box<FatStructType>),
-    Reference(Box<FatType>),
-    MutableReference(Box<FatType>),
     TyParam(usize),
-    // NOTE: Added in bytecode version v6, do not reorder!
-    U16,
-    U32,
-    U256,
-    // NOTE: Added in bytecode version v8, do not reorder!
     Function(Box<FatFunctionType>),
-    // `Runtime` and `RuntimeVariants` are used for typing
-    // captured structures in closures, for which we only know
-    // the raw layout (no struct name, no field names).
     Runtime(Vec<FatType>),
     RuntimeVariants(Vec<Vec<FatType>>),
 }
@@ -244,8 +212,6 @@ impl FatType {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.clone_with_limit(limit)?)),
-            Reference(ty) => Reference(Box::new(ty.clone_with_limit(limit)?)),
-            MutableReference(ty) => MutableReference(Box::new(ty.clone_with_limit(limit)?)),
             Struct(struct_ty) => Struct(Box::new(struct_ty.clone_with_limit(limit)?)),
             Function(fun_ty) => Function(Box::new(fun_ty.clone_with_limit(limit)?)),
             Runtime(tys) => Runtime(Self::clone_with_limit_slice(tys, limit)?),
@@ -289,8 +255,6 @@ impl FatType {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.subst(ty_args, limit)?)),
-            Reference(ty) => Reference(Box::new(ty.subst(ty_args, limit)?)),
-            MutableReference(ty) => MutableReference(Box::new(ty.subst(ty_args, limit)?)),
 
             Struct(struct_ty) => Struct(Box::new(struct_ty.subst(ty_args, limit)?)),
 
@@ -331,7 +295,7 @@ impl FatType {
             Struct(struct_ty) => TypeTag::Struct(Box::new(struct_ty.struct_tag(limit)?)),
             Function(fun_ty) => TypeTag::Function(Box::new(fun_ty.fun_tag(limit)?)),
 
-            Reference(_) | MutableReference(_) | TyParam(_) | RuntimeVariants(_) | Runtime(..) => {
+            TyParam(_) | RuntimeVariants(_) | Runtime(..) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("cannot derive type tag for {:?}", self)),
@@ -384,54 +348,6 @@ impl FatType {
             .iter()
             .map(|l| Self::from_runtime_layout(l, limit))
             .collect()
-    }
-}
-
-impl From<&TypeTag> for FatType {
-    fn from(tag: &TypeTag) -> FatType {
-        use FatType::*;
-        match tag {
-            TypeTag::Bool => Bool,
-            TypeTag::U8 => U8,
-            TypeTag::U16 => U16,
-            TypeTag::U32 => U32,
-            TypeTag::U64 => U64,
-            TypeTag::U128 => U128,
-            TypeTag::Address => Address,
-            TypeTag::Signer => Signer,
-            TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
-            TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
-            TypeTag::Function(inner) => Function(Box::new(inner.as_ref().into())),
-            TypeTag::U256 => U256,
-        }
-    }
-}
-
-impl From<&StructTag> for FatStructType {
-    fn from(struct_tag: &StructTag) -> FatStructType {
-        FatStructType {
-            address: struct_tag.address,
-            module: struct_tag.module.clone(),
-            name: struct_tag.name.clone(),
-            abilities: WrappedAbilitySet(AbilitySet::EMPTY), // We can't get abilities from a struct tag
-            ty_args: struct_tag
-                .type_args
-                .iter()
-                .map(|inner| inner.into())
-                .collect(),
-            layout: FatStructLayout::Singleton(vec![]), // We can't get field types from struct tag
-        }
-    }
-}
-
-impl From<&FunctionTag> for FatFunctionType {
-    fn from(fun_tag: &FunctionTag) -> FatFunctionType {
-        let into_slice = |tys: &[TypeTag]| tys.iter().map(|ty| ty.into()).collect::<Vec<FatType>>();
-        FatFunctionType {
-            args: into_slice(&fun_tag.args),
-            results: into_slice(&fun_tag.results),
-            abilities: fun_tag.abilities,
-        }
     }
 }
 
@@ -491,7 +407,7 @@ impl TryInto<MoveTypeLayout> for &FatType {
                 ))
             },
             FatType::Signer => MoveTypeLayout::Signer,
-            FatType::Reference(_) | FatType::MutableReference(_) | FatType::TyParam(_) => {
+            FatType::TyParam(_) => {
                 return Err(PartialVMError::new(StatusCode::ABORT_TYPE_MISMATCH_ERROR))
             },
         })

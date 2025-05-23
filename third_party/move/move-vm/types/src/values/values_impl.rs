@@ -4128,9 +4128,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
                 )?;
                 Ok(Struct::pack(fields))
             },
-            MoveStructLayout::WithFields(_)
-            | MoveStructLayout::WithTypes { .. }
-            | MoveStructLayout::WithVariants(_) => {
+            MoveStructLayout::Decorated { .. } | MoveStructLayout::DecoratedVariants { .. } => {
                 Err(D::Error::custom("cannot deserialize from decorated type"))
             },
         }

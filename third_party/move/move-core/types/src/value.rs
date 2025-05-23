@@ -171,20 +171,20 @@ pub struct MoveVariantLayout {
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 pub enum MoveStructLayout {
-    /// The representation used by the MoveVM for plain structs
+    /// The representation used by the MoveVM for plain structs.
     Runtime(Vec<MoveTypeLayout>),
     /// The representation used by the MoveVM for plain struct variants.
     RuntimeVariants(Vec<Vec<MoveTypeLayout>>),
-    /// A decorated representation with human-readable field names that can be used by clients
-    WithFields(Vec<MoveFieldLayout>),
-    /// An even more decorated representation which carries the tag of struct this layout belongs
-    /// to. This allows specialized rendering for framework types like strings.
-    WithTypes {
-        type_: StructTag,
+    /// A decorated representation with human-readable field names that can be used by clients.
+    Decorated {
+        struct_tag: StructTag,
         fields: Vec<MoveFieldLayout>,
     },
     /// A decorated representation of struct variants, containing variant and field names.
-    WithVariants(Vec<MoveVariantLayout>),
+    DecoratedVariants {
+        struct_tag: StructTag,
+        variants: Vec<MoveVariantLayout>,
+    },
 }
 
 /// Used to distinguish between aggregators ans snapshots.
@@ -393,17 +393,9 @@ impl MoveStruct {
 
     pub fn decorate(self, layout: &MoveStructLayout) -> Self {
         match (self, layout) {
-            (MoveStruct::Runtime(vals), MoveStructLayout::WithFields(layouts)) => {
-                MoveStruct::WithFields(
-                    vals.into_iter()
-                        .zip(layouts)
-                        .map(|(v, l)| (l.name.clone(), v.decorate(&l.layout)))
-                        .collect(),
-                )
-            },
-            (MoveStruct::Runtime(vals), MoveStructLayout::WithTypes { type_, fields }) => {
+            (MoveStruct::Runtime(vals), MoveStructLayout::Decorated { struct_tag, fields }) => {
                 MoveStruct::WithTypes {
-                    _type_: type_.clone(),
+                    _type_: struct_tag.clone(),
                     _fields: vals
                         .into_iter()
                         .zip(fields)
@@ -411,9 +403,10 @@ impl MoveStruct {
                         .collect(),
                 }
             },
-            (MoveStruct::RuntimeVariant(tag, vals), MoveStructLayout::WithVariants(variants))
-                if (tag as usize) < variants.len() =>
-            {
+            (
+                MoveStruct::RuntimeVariant(tag, vals),
+                MoveStructLayout::DecoratedVariants { variants, .. },
+            ) if (tag as usize) < variants.len() => {
                 let MoveVariantLayout { name, fields } = &variants[tag as usize];
                 MoveStruct::WithVariantFields(
                     name.clone(),
@@ -424,9 +417,9 @@ impl MoveStruct {
                         .collect(),
                 )
             },
-            (MoveStruct::WithFields(vals), MoveStructLayout::WithTypes { type_, fields }) => {
+            (MoveStruct::WithFields(vals), MoveStructLayout::Decorated { struct_tag, fields }) => {
                 MoveStruct::WithTypes {
-                    _type_: type_.clone(),
+                    _type_: struct_tag.clone(),
                     _fields: vals
                         .into_iter()
                         .zip(fields)
@@ -498,16 +491,15 @@ impl MoveStructLayout {
         Self::RuntimeVariants(types)
     }
 
-    pub fn with_fields(types: Vec<MoveFieldLayout>) -> Self {
-        Self::WithFields(types)
+    pub fn decorated(struct_tag: StructTag, fields: Vec<MoveFieldLayout>) -> Self {
+        Self::Decorated { struct_tag, fields }
     }
 
-    pub fn with_types(type_: StructTag, fields: Vec<MoveFieldLayout>) -> Self {
-        Self::WithTypes { type_, fields }
-    }
-
-    pub fn with_variants(variants: Vec<MoveVariantLayout>) -> Self {
-        Self::WithVariants(variants)
+    pub fn decorated_variants(struct_tag: StructTag, variants: Vec<MoveVariantLayout>) -> Self {
+        Self::DecoratedVariants {
+            struct_tag,
+            variants,
+        }
     }
 
     /// Determines whether the layout is serialization compatible with the other layout
@@ -545,7 +537,7 @@ impl MoveStructLayout {
                     &[]
                 },
             },
-            Self::WithFields(_) | Self::WithTypes { .. } | Self::WithVariants(_) => {
+            Self::Decorated { .. } | Self::DecoratedVariants { .. } => {
                 // It's not possible to implement this without changing the return type, and some
                 // performance-critical VM serialization code uses the Runtime case of this.
                 // panicking is the best move
@@ -566,10 +558,8 @@ impl MoveStructLayout {
                     },
                 }
             },
-            Self::WithFields(fields) | Self::WithTypes { fields, .. } => {
-                fields.into_iter().map(|f| f.layout).collect()
-            },
-            Self::WithVariants(mut variants) => match variant {
+            Self::Decorated { fields, .. } => fields.into_iter().map(|f| f.layout).collect(),
+            Self::DecoratedVariants { mut variants, .. } => match variant {
                 Some(idx) if idx < variants.len() => variants
                     .remove(idx)
                     .fields
@@ -769,31 +759,26 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                 )?;
                 Ok(MoveStruct::RuntimeVariant(tag, fields))
             },
-            MoveStructLayout::WithFields(layout) => {
-                let fields = deserializer
-                    .deserialize_tuple(layout.len(), DecoratedStructFieldVisitor(layout))?;
-                Ok(MoveStruct::WithFields(fields))
-            },
-            MoveStructLayout::WithTypes {
-                type_,
+            MoveStructLayout::Decorated {
+                struct_tag,
                 fields: layout,
             } => {
                 let fields = deserializer
                     .deserialize_tuple(layout.len(), DecoratedStructFieldVisitor(layout))?;
                 Ok(MoveStruct::WithTypes {
-                    _type_: type_.clone(),
+                    _type_: struct_tag.clone(),
                     _fields: fields,
                 })
             },
-            MoveStructLayout::WithVariants(decorated_variants) => {
+            MoveStructLayout::DecoratedVariants { variants, .. } => {
                 // Downgrade the decorated variants to simple layouts to deserialize the fields.
-                let variant_names = variant_name_placeholder(decorated_variants.len())
+                let variant_names = variant_name_placeholder(variants.len())
                     .map_err(|e| D::Error::custom(format!("{}", e)))?;
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
                     StructVariantVisitor(
-                        &decorated_variants
+                        &variants
                             .iter()
                             .map(|v| v.fields.iter().map(|f| f.layout.clone()).collect())
                             .collect::<Vec<_>>(),
@@ -967,19 +952,17 @@ impl fmt::Display for MoveStructLayout {
                     write!(f, "}}")?;
                 }
             },
-            Self::WithFields(layouts) => {
-                for layout in layouts {
-                    write!(f, "{}, ", layout)?
-                }
-            },
-            Self::WithTypes { type_, fields } => {
-                write!(f, "Type: {}", type_)?;
+            Self::Decorated { struct_tag, fields } => {
+                write!(f, "Type: {}", struct_tag)?;
                 write!(f, "Fields:")?;
                 for field in fields {
                     write!(f, "{}, ", field)?
                 }
             },
-            Self::WithVariants(variants) => {
+            Self::DecoratedVariants {
+                struct_tag: _,
+                variants,
+            } => {
                 for v in variants {
                     write!(f, "{}{{", v.name)?;
                     for layout in &v.fields {
@@ -1029,10 +1012,12 @@ impl TryInto<StructTag> for &MoveStructLayout {
     fn try_into(self) -> Result<StructTag, Self::Error> {
         use MoveStructLayout::*;
         match self {
-            Runtime(..) | RuntimeVariants(..) | WithFields(..) | WithVariants(..) => bail!(
+            Runtime(..) | RuntimeVariants(..) => bail!(
                 "Invalid MoveTypeLayout -> StructTag conversion--needed MoveLayoutType::WithTypes"
             ),
-            WithTypes { type_, .. } => Ok(type_.clone()),
+            Decorated { struct_tag, .. } | DecoratedVariants { struct_tag, .. } => {
+                Ok(struct_tag.clone())
+            },
         }
     }
 }

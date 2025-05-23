@@ -235,11 +235,13 @@ fn native_format_impl(
             )?;
             out.push(']');
         },
-        MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, fields, .. }) => {
+        MoveTypeLayout::Struct(MoveStructLayout::Decorated {
+            struct_tag, fields, ..
+        }) => {
             let strct = val.value_as::<Struct>()?;
-            if type_.name.as_str() == "String"
-                && type_.module.as_str() == "string"
-                && type_.address == AccountAddress::ONE
+            if struct_tag.name.as_str() == "String"
+                && struct_tag.module.as_str() == "string"
+                && struct_tag.address == AccountAddress::ONE
             {
                 let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
                 if context.should_charge_gas {
@@ -254,9 +256,9 @@ fn native_format_impl(
                 )
                 .unwrap();
                 return Ok(());
-            } else if type_.name.as_str() == "Option"
-                && type_.module.as_str() == "option"
-                && type_.address == AccountAddress::ONE
+            } else if struct_tag.name.as_str() == "Option"
+                && struct_tag.module.as_str() == "option"
+                && struct_tag.address == AccountAddress::ONE
             {
                 let mut v = strct
                     .unpack()?
@@ -279,23 +281,10 @@ fn native_format_impl(
                 return Ok(());
             }
             if context.type_tag {
-                write!(out, "{} {{", TypeTag::from(type_.clone())).unwrap();
+                write!(out, "{} {{", TypeTag::from(struct_tag.clone())).unwrap();
             } else {
-                write!(out, "{} {{", type_.name.as_str()).unwrap();
+                write!(out, "{} {{", struct_tag.name.as_str()).unwrap();
             };
-            format_vector(
-                context,
-                fields.iter(),
-                strct.unpack()?.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
-            out.push('}');
-        },
-        MoveTypeLayout::Struct(MoveStructLayout::WithFields(fields)) => {
-            let strct = val.value_as::<Struct>()?;
-            out.push('{');
             format_vector(
                 context,
                 fields.iter(),
@@ -338,7 +327,7 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Struct(MoveStructLayout::WithVariants(variants)) => {
+        MoveTypeLayout::Struct(MoveStructLayout::DecoratedVariants { variants, .. }) => {
             let struct_value = val.value_as::<Struct>()?;
             let (tag, elems) = struct_value.unpack_with_tag()?;
             if (tag as usize) >= variants.len() {

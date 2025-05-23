@@ -2,9 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fat_type::{
-    FatFunctionType, FatStructLayout, FatStructType, FatType, WrappedAbilitySet,
-};
+use crate::fat_type::{FatFunctionType, FatStructLayout, FatStructType, FatType};
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
@@ -78,7 +76,7 @@ pub enum AnnotatedMoveValue {
     U128(u128),
     Bool(bool),
     Address(AccountAddress),
-    Vector(TypeTag, Vec<AnnotatedMoveValue>),
+    Vector(Vec<AnnotatedMoveValue>),
     Bytes(Vec<u8>),
     Struct(AnnotatedMoveStruct),
     // NOTE: Added in bytecode version v6, do not reorder!
@@ -97,17 +95,6 @@ pub struct MoveValueAnnotator<V> {
 impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     pub fn new(module_viewer: V) -> Self {
         Self { module_viewer }
-    }
-
-    pub fn get_type_layout_runtime(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_runtime(type_tag, &self.module_viewer)
-    }
-
-    pub fn get_type_layout_with_fields(
-        &self,
-        type_tag: &TypeTag,
-    ) -> anyhow::Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_with_fields(type_tag, &self.module_viewer)
     }
 
     pub fn get_type_layout_with_types(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
@@ -133,11 +120,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
         let mut limit = Limiter::default();
         let compiled_script = CompiledScript::deserialize(script_bytes)
-            .map_err(|err| anyhow!("Failed to deserialzie script: {:?}", err))?;
+            .map_err(|err| anyhow!("Failed to deserialize script: {:?}", err))?;
         let param_tys = compiled_script
             .signature_at(compiled_script.parameters)
             .0
             .iter()
+            .filter(|tok| !tok.is_signer_or_signer_ref())
             .map(|tok| {
                 self.resolve_signature(BinaryIndexedView::Script(&compiled_script), tok, &mut limit)
             })
@@ -172,7 +160,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 | FatType::Function(_)
                 | FatType::Runtime(_)
                 | FatType::RuntimeVariants(_) => false,
-                FatType::Reference(inner) => !matches!(&**inner, FatType::Signer),
                 FatType::Bool
                 | FatType::U8
                 | FatType::U64
@@ -180,7 +167,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 | FatType::Address
                 | FatType::Vector(_)
                 | FatType::Struct(_)
-                | FatType::MutableReference(_)
                 | FatType::TyParam(_)
                 | FatType::U16
                 | FatType::U32
@@ -194,8 +180,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             args.len(),
         );
 
-        // Make an approximation at the fat types for the type arguments
-        let ty_args: Vec<FatType> = ty_args.iter().map(|inner| inner.into()).collect();
+        let ty_args = ty_args
+            .iter()
+            .map(|ty| self.resolve_type_impl(ty, limit))
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         types
             .iter()
@@ -224,6 +212,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     .parameters()
                     .0
                     .iter()
+                    .filter(|tok| !tok.is_signer_or_signer_ref())
                     .map(|signature| {
                         self.resolve_signature(BinaryIndexedView::Module(m), signature, limit)
                     })
@@ -346,7 +335,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 address,
                 module: module_name,
                 name,
-                abilities: WrappedAbilitySet(abilities),
+                abilities,
                 ty_args,
                 layout: FatStructLayout::Singleton(make_fields(fields, limit)?),
             }),
@@ -354,7 +343,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 address,
                 module: module_name,
                 name,
-                abilities: WrappedAbilitySet(abilities),
+                abilities,
                 ty_args,
                 layout: FatStructLayout::Variants(
                     variants
@@ -410,10 +399,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 ))
             },
             SignatureToken::TypeParameter(idx) => FatType::TyParam(*idx as usize),
-            SignatureToken::MutableReference(_) => return Err(anyhow!("Unexpected Reference")),
-            SignatureToken::Reference(inner) => match **inner {
-                SignatureToken::Signer => FatType::Reference(Box::new(FatType::Signer)),
-                _ => return Err(anyhow!("Unexpected Reference")),
+            SignatureToken::MutableReference(_) | SignatureToken::Reference(_) => {
+                return Err(anyhow!("Unexpected Reference"))
             },
         })
     }
@@ -509,7 +496,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
 
         match &ty.layout {
             FatStructLayout::Singleton(field_tys) => Ok(AnnotatedMoveStruct {
-                abilities: ty.abilities.0,
+                abilities: ty.abilities,
                 ty_tag: struct_tag,
                 variant_info: None,
                 value: annotate_values(field_values, field_tys, limit)?,
@@ -518,7 +505,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 Some(tag) if (tag as usize) < variants.len() => {
                     let field_tys = &variants[tag as usize];
                     Ok(AnnotatedMoveStruct {
-                        abilities: ty.abilities.0,
+                        abilities: ty.abilities,
                         ty_tag: struct_tag,
                         variant_info,
                         value: annotate_values(field_values, field_tys, limit)?,
@@ -654,7 +641,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                         .collect::<anyhow::Result<_>>()?,
                 ),
                 _ => AnnotatedMoveValue::Vector(
-                    ty.type_tag(limit).unwrap(),
                     a.iter()
                         .map(|v| self.annotate_value(v, ty.as_ref(), limit))
                         .collect::<anyhow::Result<_>>()?,
@@ -733,7 +719,7 @@ fn pretty_print_value(
         AnnotatedMoveValue::U128(v) => write!(f, "{}u128", v),
         AnnotatedMoveValue::U256(v) => write!(f, "{}u256", v),
         AnnotatedMoveValue::Address(a) => write!(f, "{}", a.short_str_lossless()),
-        AnnotatedMoveValue::Vector(_, v) => {
+        AnnotatedMoveValue::Vector(v) => {
             writeln!(f, "[")?;
             for value in v.iter() {
                 write_indent(f, indent + 4)?;
@@ -953,10 +939,10 @@ impl serde::Serialize for AnnotatedMoveValue {
             },
             Bool(b) => serializer.serialize_bool(*b),
             Address(a) => a.short_str_lossless().serialize(serializer),
-            Vector(t, vals) => {
-                assert_ne!(t, &TypeTag::U8);
+            Vector(vals) => {
                 let mut vec = serializer.serialize_seq(Some(vals.len()))?;
                 for v in vals {
+                    assert!(!matches!(v, U8(_)));
                     vec.serialize_element(v)?;
                 }
                 vec.end()

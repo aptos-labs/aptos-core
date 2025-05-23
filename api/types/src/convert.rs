@@ -967,8 +967,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
         let (struct_tag, field_layouts) =
-            if let MoveStructLayout::WithTypes { type_, fields } = layout {
-                (type_, fields)
+            if let MoveStructLayout::Decorated { struct_tag, fields } = layout {
+                (struct_tag, fields)
             } else {
                 bail!(
                     "Expecting `MoveStructLayout::WithTypes`, getting {:?}",

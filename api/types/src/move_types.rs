@@ -377,7 +377,7 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             AnnotatedMoveValue::U256(v) => MoveValue::U256(U256(v)),
             AnnotatedMoveValue::Bool(v) => MoveValue::Bool(v),
             AnnotatedMoveValue::Address(v) => MoveValue::Address(v.into()),
-            AnnotatedMoveValue::Vector(_, vals) => MoveValue::Vector(
+            AnnotatedMoveValue::Vector(vals) => MoveValue::Vector(
                 vals.into_iter()
                     .map(MoveValue::try_from)
                     .collect::<anyhow::Result<_>>()?,
@@ -1391,21 +1391,16 @@ mod tests {
             (identifier("field_u128"), U128(7)),
             (identifier("field_bool"), Bool(true)),
             (identifier("field_address"), Address(address("0xdd"))),
-            (
-                identifier("field_vector"),
-                Vector(TypeTag::U128, vec![U128(128)]),
-            ),
+            (identifier("field_vector"), Vector(vec![U128(128)])),
             (identifier("field_bytes"), Bytes(vec![9, 9])),
             (
                 identifier("field_struct"),
                 Struct(annotated_move_struct("Nested", vec![(
                     identifier("nested_vector"),
-                    Vector(TypeTag::Struct(Box::new(type_struct("Host"))), vec![
-                        Struct(annotated_move_struct("String", vec![
-                            (identifier("address1"), Address(address("0x0"))),
-                            (identifier("address2"), Address(address("0x123"))),
-                        ])),
-                    ]),
+                    Vector(vec![Struct(annotated_move_struct("String", vec![
+                        (identifier("address1"), Address(address("0x0"))),
+                        (identifier("address2"), Address(address("0x123"))),
+                    ]))]),
                 )])),
             ),
         ]))

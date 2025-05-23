@@ -1131,6 +1131,30 @@ impl SignatureToken {
         matches!(self, Signer)
     }
 
+    /// Returns true if the signature token is a signer or signer reference.
+    pub fn is_signer_or_signer_ref(&self) -> bool {
+        use SignatureToken::*;
+
+        match self {
+            Signer => true,
+            Reference(inner_tok) => inner_tok.is_signer(),
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Vector(_)
+            | Function(..)
+            | Struct(_)
+            | StructInstantiation(_, _)
+            | MutableReference(_)
+            | TypeParameter(_) => false,
+        }
+    }
+
     /// Returns true if the `SignatureToken` can represent a constant (as in representable in
     /// the constants table).
     pub fn is_valid_for_constant(&self) -> bool {

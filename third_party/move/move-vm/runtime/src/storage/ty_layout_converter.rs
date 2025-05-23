@@ -329,7 +329,7 @@ pub(crate) trait LayoutConverterBase {
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_layout =
-            MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
+            MoveTypeLayout::Struct(MoveStructLayout::decorated(struct_tag, field_layouts));
 
         Ok(struct_layout)
     }

@@ -224,7 +224,7 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
 
     fn parse_move_value(&mut self, move_value: &AnnotatedMoveValue) -> Result<()> {
         match move_value {
-            AnnotatedMoveValue::Vector(_type_tag, items) => {
+            AnnotatedMoveValue::Vector(items) => {
                 for item in items {
                     self.parse_move_value(item)?;
                 }
