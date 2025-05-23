@@ -40,11 +40,8 @@ pub trait TStateView {
 
     /// Returns the version after this view.
     fn next_version(&self) -> Version {
-        // TODO(HotState):
-        // Hack: This is currently only used by the HotStateOpAccumulator to decide if to refresh
-        //       an already hot item.
-        //       hot state promotions and evictions are not currently serialized, authenticated or
-        //       charged, so it's okay for this to always return 0 if not implemented.
+        // TODO(HotState): Revisit
+        // This is currently only used by the HotStateOpAccumulator to decide if to refresh an already hot item.
         unimplemented!()
     }
 
@@ -57,9 +54,7 @@ pub trait TStateView {
 
     /// Gets the state slot for a given state key.
     fn get_state_slot(&self, _state_key: &Self::Key) -> StateViewResult<StateSlot> {
-        // TODO(HotState):
-        // Hack: hot state promotions and evictions are not currently serialized, authenticated or
-        //       charged, so it's okay for most type of state views to fake it.
+        // TODO(HotState): implement for more views if accessed.
         unimplemented!()
     }
 

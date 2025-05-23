@@ -322,4 +322,8 @@ impl TStateView for CachedDbStateView {
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         self.db_state_view.get_usage()
     }
+
+    fn next_version(&self) -> Version {
+        self.db_state_view.next_version()
+    }
 }
