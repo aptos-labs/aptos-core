@@ -277,6 +277,10 @@ impl TStateView for CachedStateView {
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         Ok(self.speculative.current.usage())
     }
+
+    fn next_version(&self) -> Version {
+        self.speculative.next_version()
+    }
 }
 
 pub struct CachedDbStateView {

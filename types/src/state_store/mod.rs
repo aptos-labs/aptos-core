@@ -45,7 +45,7 @@ pub trait TStateView {
         //       an already hot item.
         //       hot state promotions and evictions are not currently serialized, authenticated or
         //       charged, so it's okay for this to always return 0 if not implemented.
-        0
+        unimplemented!()
     }
 
     /// Returns the version of the view.
@@ -56,13 +56,11 @@ pub trait TStateView {
     }
 
     /// Gets the state slot for a given state key.
-    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+    fn get_state_slot(&self, _state_key: &Self::Key) -> StateViewResult<StateSlot> {
         // TODO(HotState):
         // Hack: hot state promotions and evictions are not currently serialized, authenticated or
         //       charged, so it's okay for most type of state views to fake it.
-        Ok(StateSlot::from_db_get(
-            self.get_state_value(state_key)?.map(|val| (0, val)),
-        ))
+        unimplemented!()
     }
 
     /// Gets the state value for a given state key.
@@ -120,6 +118,10 @@ where
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         self.deref().get_usage()
+    }
+
+    fn next_version(&self) -> Version {
+        self.deref().next_version()
     }
 
     fn get_state_slot(&self, state_key: &K) -> StateViewResult<StateSlot> {

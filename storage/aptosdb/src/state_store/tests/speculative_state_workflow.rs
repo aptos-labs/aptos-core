@@ -20,6 +20,7 @@ use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
         state_key::StateKey,
+        state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
         StateViewId, StateViewResult, TStateView,
@@ -149,6 +150,7 @@ struct VersionState {
     usage: StateStorageUsage,
     state: HashMap<StateKey, (Version, StateValue)>,
     summary: NaiveSmt,
+    next_version: Version,
 }
 
 impl VersionState {
@@ -157,6 +159,7 @@ impl VersionState {
             usage: StateStorageUsage::zero(),
             state: HashMap::new(),
             summary: NaiveSmt::default(),
+            next_version: 0,
         }
     }
 
@@ -165,6 +168,8 @@ impl VersionState {
         version: Version,
         kvs: impl IntoIterator<Item = (&'a StateKey, Option<&'a StateValue>)>,
     ) -> Self {
+        assert_eq!(version, self.next_version);
+
         let mut state = self.state.clone();
         let mut smt_updates = vec![];
 
@@ -191,6 +196,7 @@ impl VersionState {
             state,
             summary,
             usage,
+            next_version: version + 1,
         }
     }
 }
@@ -198,18 +204,21 @@ impl VersionState {
 impl TStateView for VersionState {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        Ok(self.state.get(state_key).map(|(_ver, val)| val.clone()))
+    fn get_state_slot(&self, key: &Self::Key) -> StateViewResult<StateSlot> {
+        Ok(StateSlot::from_db_get(self.state.get(key).cloned()))
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         Ok(self.usage)
     }
+
+    fn next_version(&self) -> Version {
+        self.next_version
+    }
 }
 
 struct StateByVersion {
     state_by_next_version: Vec<Arc<VersionState>>,
-    updates_by_next_version: Vec<Vec<(StateKey, Option<StateValue>)>>,
 }
 
 impl StateByVersion {
@@ -218,14 +227,9 @@ impl StateByVersion {
         &self.state_by_next_version[next_version as usize]
     }
 
-    pub fn get_updates(&self, version: Version) -> &[(StateKey, Option<StateValue>)] {
-        &self.updates_by_next_version[version as usize + 1]
-    }
-
     fn new_empty() -> Self {
         Self {
             state_by_next_version: vec![Arc::new(VersionState::new_empty())],
-            updates_by_next_version: vec![vec![]],
         }
     }
 
@@ -240,11 +244,6 @@ impl StateByVersion {
                 .unwrap()
                 .update(self.next_version(), kvs.clone()),
         ));
-        self.updates_by_next_version.push(
-            kvs.into_iter()
-                .map(|(k, v)| (k.clone(), v.cloned()))
-                .collect(),
-        );
     }
 
     fn next_version(&self) -> Version {
@@ -274,28 +273,88 @@ impl StateByVersion {
         self.assert_state_summary(ledger_state_summary.latest());
     }
 
-    pub fn assert_jmt_updates(&self, last_snapshot: &State, snapshot: &State) {
-        let _jmt_updates = snapshot
+    pub fn assert_jmt_updates(
+        &self,
+        last_snapshot: &StateWithSummary,
+        snapshot: &StateWithSummary,
+    ) {
+        let base_state = self.get_state(last_snapshot.version()).clone();
+        let result_state = self.get_state(snapshot.version()).clone();
+        assert_eq!(
+            result_state.summary.get_root_hash(),
+            snapshot.summary().root_hash()
+        );
+
+        let jmt_updates = snapshot
             .make_delta(last_snapshot)
             .shards
             .iter()
             .flat_map(|shard| shard.iter())
-            .flat_map(|(key, slot)| slot.maybe_update_jmt(key, last_snapshot.next_version()))
-            .collect::<HashMap<_, _>>();
+            .filter_map(|(key, slot)| slot.maybe_update_jmt(key, last_snapshot.next_version()))
+            .map(|(key_hash, value_opt)| (key_hash, value_opt.map(|(val_hash, _key)| val_hash)))
+            .collect_vec();
 
-        let _expected_jmt_updates =
-            (last_snapshot.next_version()..snapshot.next_version()).fold(
-                HashMap::new(),
-                |mut updates, version| {
-                    updates.extend(self.get_updates(version).iter().map(|(k, v_opt)| {
-                        (k.hash(), v_opt.as_ref().map(|v| (v.hash(), k.clone())))
-                    }));
-                    updates
-                },
+        let base_kv_hashes: HashSet<_> = base_state.summary.leaves.iter().collect();
+        let result_kv_hashes: HashSet<_> = result_state.summary.leaves.iter().collect();
+        let base_keys: HashSet<_> = base_kv_hashes.iter().map(|(k, _v)| k).collect();
+        let result_keys: HashSet<_> = result_kv_hashes.iter().map(|(k, _v)| k).collect();
+
+        let updated_keys: HashSet<_> = jmt_updates
+            .iter()
+            .filter_map(|(key, value_opt)| {
+                value_opt.and_then(|val| (!base_kv_hashes.contains(&(*key, val))).then_some(key))
+            })
+            .collect();
+        let deleted_keys: HashSet<_> = jmt_updates
+            .iter()
+            .filter_map(|(key, value_opt)| value_opt.is_none().then_some(key))
+            .filter(|k| base_keys.contains(*k))
+            .collect();
+
+        let expected_updated_keys: HashSet<_> = result_kv_hashes
+            .difference(&base_kv_hashes)
+            .map(|(k, _v)| k)
+            .collect();
+        let expected_deleted_keys: HashSet<_> =
+            base_keys.difference(&result_keys).cloned().collect();
+
+        if updated_keys != expected_updated_keys {
+            let excess = updated_keys
+                .difference(&expected_updated_keys)
+                .collect_vec();
+            let missing = expected_updated_keys
+                .difference(&updated_keys)
+                .collect_vec();
+            eprintln!(
+                "bad updated keys: excess: {:?}, missing: {:?}",
+                excess, missing
             );
+        } else {
+            // eprintln!("updated keys good");
+        }
 
-        // FIXME(aldenhu): update
-        // assert_eq!(jmt_updates, expected_jmt_updates, "JMT updates mismatch.");
+        if deleted_keys != expected_deleted_keys {
+            let excess = deleted_keys
+                .difference(&expected_deleted_keys)
+                .collect_vec();
+            let missing = expected_deleted_keys
+                .difference(&deleted_keys)
+                .collect_vec();
+            eprintln!(
+                "bad deleted keys: excess: {:?}, missing: {:?}",
+                excess, missing
+            );
+        } else {
+            // eprintln!("deleted keys good")
+        }
+
+        let new_summary = self
+            .get_state(last_snapshot.version())
+            .summary
+            .clone()
+            .update(&jmt_updates);
+
+        assert_eq!(new_summary.get_root_hash(), snapshot.summary().root_hash());
     }
 }
 
@@ -433,10 +492,10 @@ fn send_to_state_buffer(
 }
 
 fn commit_state_buffer(
-    from_db_commit: Receiver<StateWithSummary>,
+    from_buffered_state_commit: Receiver<StateWithSummary>,
     persisted_state: PersistedState,
 ) {
-    while let Ok(snapshot) = from_db_commit.recv() {
+    while let Ok(snapshot) = from_buffered_state_commit.recv() {
         persisted_state.set(snapshot);
     }
 }
@@ -469,7 +528,10 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
             next_version += 1;
         }
         if append_epilogue {
+            // TODO(HotState): revisit
+            // all ops are hotness only, no effect on the global state
             state_by_version.append_version(vec![]);
+
             let write_set = op_accu
                 .get_slots_to_make_hot()
                 .into_iter()
@@ -501,7 +563,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
 
     let (to_summary_update, from_state_update) = channel();
     let (to_db_commit, from_summary_update) = channel();
-    let (to_buffered_state_commit, from_db_commit) = channel();
+    let (to_buffered_state_commit, from_buffered_state_commit) = channel();
 
     let mut threads = vec![];
 
@@ -553,7 +615,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
     {
         let persisted_state = persisted_state.clone();
         threads.push(spawn(move || {
-            commit_state_buffer(from_db_commit, persisted_state);
+            commit_state_buffer(from_buffered_state_commit, persisted_state);
         }));
     }
 
