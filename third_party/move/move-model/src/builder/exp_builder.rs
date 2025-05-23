@@ -3683,6 +3683,10 @@ impl ExpTranslator<'_, '_, '_> {
         }
 
         if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
+            if entry.kind == FunctionKind::Inline {
+                self.error(loc, "inline function cannot be used as a function value");
+                return self.new_error_exp();
+            }
             let module_id = entry.module_id;
             let fun_id = entry.fun_id;
             let result_type = entry.result_type.clone();
