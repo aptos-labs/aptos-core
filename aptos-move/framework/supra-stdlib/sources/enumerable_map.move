@@ -35,9 +35,10 @@ module supra_std::enumerable_map {
     }
 
     /// To create an empty enum map
-    public fun new_map<K: copy + drop, V: store+drop+copy>(): EnumerableMap<K, V> {
+    public fun new_map<K: copy + drop, V: store + drop + copy>(): EnumerableMap<K, V> {
         return EnumerableMap<K, V> { list: vector::empty<K>(), map: table::new<K, Tuple<V>>() }
     }
+
 
     /// Add Single Key in the Enumerable Map
     public fun add_value<K: copy+drop, V: store+drop+copy>(map: &mut EnumerableMap<K, V>, key: K, value: V) {

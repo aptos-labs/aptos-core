@@ -198,7 +198,7 @@ To create an empty enum map
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="enumerable_map.md#0x1_enumerable_map_new_map">new_map</a>&lt;K: <b>copy</b> + drop, V: store+drop+<b>copy</b>&gt;(): <a href="enumerable_map.md#0x1_enumerable_map_EnumerableMap">EnumerableMap</a>&lt;K, V&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="enumerable_map.md#0x1_enumerable_map_new_map">new_map</a>&lt;K: <b>copy</b> + drop, V: store + drop + <b>copy</b>&gt;(): <a href="enumerable_map.md#0x1_enumerable_map_EnumerableMap">EnumerableMap</a>&lt;K, V&gt; {
     <b>return</b> <a href="enumerable_map.md#0x1_enumerable_map_EnumerableMap">EnumerableMap</a>&lt;K, V&gt; { list: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;K&gt;(), map: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>&lt;K, <a href="enumerable_map.md#0x1_enumerable_map_Tuple">Tuple</a>&lt;V&gt;&gt;() }
 }
 </code></pre>

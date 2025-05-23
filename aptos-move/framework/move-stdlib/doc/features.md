@@ -133,6 +133,8 @@ return true.
 -  [Function `supra_native_automation_enabled`](#0x1_features_supra_native_automation_enabled)
 -  [Function `get_supra_eth_trie_feature`](#0x1_features_get_supra_eth_trie_feature)
 -  [Function `supra_eth_trie_enabled`](#0x1_features_supra_eth_trie_enabled)
+-  [Function `get_supra_automation_payload_gas_check_feature`](#0x1_features_get_supra_automation_payload_gas_check_feature)
+-  [Function `supra_automation_payload_gas_check_enabled`](#0x1_features_supra_automation_payload_gas_check_enabled)
 -  [Function `get_supra_private_poll_feature`](#0x1_features_get_supra_private_poll_feature)
 -  [Function `supra_private_poll_enabled`](#0x1_features_supra_private_poll_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -753,7 +755,7 @@ Whether the APIs related to the bls12381_bulletproofs feature are enabled.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_PRIVATE_POLL">PRIVATE_POLL</a>: u64 = 90;
+<pre><code><b>const</b> <a href="features.md#0x1_features_PRIVATE_POLL">PRIVATE_POLL</a>: u64 = 91;
 </code></pre>
 
 
@@ -868,6 +870,19 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a>: u64 = 15;
+</code></pre>
+
+
+
+<a id="0x1_features_SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK"></a>
+
+Whether gas check of automation-task during registration is enabled. Once enabled, the inner payload along with
+task gas parameters in scope of automation registration transaction will pass gas check.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK">SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK</a>: u64 = 90;
 </code></pre>
 
 
@@ -3365,6 +3380,54 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_eth_trie_enabled">supra_eth_trie_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SUPRA_ETH_TRIE">SUPRA_ETH_TRIE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_supra_automation_payload_gas_check_feature"></a>
+
+## Function `get_supra_automation_payload_gas_check_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_automation_payload_gas_check_feature">get_supra_automation_payload_gas_check_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_automation_payload_gas_check_feature">get_supra_automation_payload_gas_check_feature</a>(): u64 {
+    <a href="features.md#0x1_features_SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK">SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_supra_automation_payload_gas_check_enabled"></a>
+
+## Function `supra_automation_payload_gas_check_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_automation_payload_gas_check_enabled">supra_automation_payload_gas_check_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_automation_payload_gas_check_enabled">supra_automation_payload_gas_check_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK">SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK</a>)
 }
 </code></pre>
 

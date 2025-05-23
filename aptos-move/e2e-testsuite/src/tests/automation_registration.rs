@@ -56,8 +56,13 @@ impl AutomationRegistrationTestContext {
     }
 
     pub(crate) fn set_supra_native_automation(&mut self, enable: bool) {
+        self.set_feature_flag(FeatureFlag::SUPRA_NATIVE_AUTOMATION, enable);
+    }
+
+
+    pub(crate) fn set_feature_flag(&mut self, flag: FeatureFlag, enable: bool) {
         let acc = AccountAddress::ONE;
-        let flag_value = [FeatureFlag::SUPRA_NATIVE_AUTOMATION]
+        let flag_value = [flag]
             .into_iter()
             .map(|f| f as u64)
             .collect::<Vec<_>>();
@@ -73,6 +78,8 @@ impl AutomationRegistrationTestContext {
                 bcs::to_bytes(&disabled).unwrap(),
             ]);
     }
+
+
 
     pub(crate) fn new_account_data(&mut self, amount: u64, seq_num: u64) -> AccountData {
         let new_account_data = self.create_raw_account_data(amount, seq_num);
@@ -311,7 +318,7 @@ fn check_invalid_gas_params_of_automation_task() {
     let automation_txn = test_context.create_automation_txn(
         0,
         inner_entry_function.clone(),
-        3600,
+        14400,
         2,
         100,
         automation_fee_cap,
@@ -321,15 +328,15 @@ fn check_invalid_gas_params_of_automation_task() {
     let output = test_context.execute_transaction(automation_txn.clone());
     AutomationRegistrationTestContext::check_discarded_output(
         output,
-        StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+        StatusCode::AUTOMATION_TASK_MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
     );
     let validation_output = test_context.validate_transaction(automation_txn);
-    assert_eq!(validation_output.status(), Some(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS));
+    assert_eq!(validation_output.status(), Some(StatusCode::AUTOMATION_TASK_MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS));
 
     let automation_txn = test_context.create_automation_txn(
         0,
         inner_entry_function.clone(),
-        3600,
+        14400,
         aptos_global_constants::MAX_GAS_AMOUNT + 1,
         100,
         automation_fee_cap,
@@ -339,15 +346,15 @@ fn check_invalid_gas_params_of_automation_task() {
     let output = test_context.execute_transaction(automation_txn.clone());
     AutomationRegistrationTestContext::check_discarded_output(
         output,
-        StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+        StatusCode::AUTOMATION_TASK_MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
     );
     let validation_output = test_context.validate_transaction(automation_txn);
-    assert_eq!(validation_output.status(), Some(StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND));
+    assert_eq!(validation_output.status(), Some(StatusCode::AUTOMATION_TASK_MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND));
 
     let automation_txn = test_context.create_automation_txn(
         0,
         inner_entry_function.clone(),
-        3600,
+        14400,
         100,
         10_000_000_001,
         automation_fee_cap,
@@ -357,8 +364,17 @@ fn check_invalid_gas_params_of_automation_task() {
     let output = test_context.execute_transaction(automation_txn.clone());
     AutomationRegistrationTestContext::check_discarded_output(
         output,
-        StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+        StatusCode::AUTOMATION_TASK_GAS_PRICE_CAP_ABOVE_MAX_BOUND,
     );
+    let validation_output = test_context.validate_transaction(automation_txn.clone());
+    assert_eq!(validation_output.status(), Some(StatusCode::AUTOMATION_TASK_GAS_PRICE_CAP_ABOVE_MAX_BOUND));
+
+    // Check the gas check of inner payload is skipped if feature flag is not enabled
+    test_context.set_feature_flag(FeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK, false);
+
+    let output = test_context.execute_transaction(automation_txn.clone());
+    let status = output.status().status().unwrap();
+    assert!(matches!(status, ExecutionStatus::Success), "{status:?}");
     let validation_output = test_context.validate_transaction(automation_txn);
-    assert_eq!(validation_output.status(), Some(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND));
+    assert!(validation_output.status().is_none());
 }

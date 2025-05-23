@@ -1,3 +1,4 @@
+// Copyright (c) 2025 Supra.
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,9 +11,9 @@ use aptos_gas_schedule::{
 };
 use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_types::on_chain_config::{
-    ConfigStorage, Features, GasSchedule, GasScheduleV2, OnChainConfig,
-};
+use aptos_types::on_chain_config::{ConfigStorage, FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig};
+use aptos_types::transaction::{RawTransaction, TransactionPayload};
+use aptos_types::transaction::automation::RegistrationParams;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
 use aptos_vm_types::storage::{
     io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
@@ -149,6 +150,73 @@ pub(crate) fn check_gas(
         is_account_init_for_sponsored_transaction: crate::aptos_vm::is_account_init_for_sponsored_transaction(txn_metadata, features, resolver)?,
     };
     check_gas_for_parameters(gas_params, gas_feature_version, features, txn_gas_metadata, is_approved_gov_script, log_context)
+}
+
+/// Checks gas parameters and maps the gas related error status code to Automation invariants.
+/// Checks automation task gas by mocking automated raw transaction with inner payload/entry function,
+/// task's max-gas-amount and task's gas-price-cap.
+/// If the gas check fails at this stage, then an automated transaction based on the registered
+/// task will also fail. This early check, before registration, saves us storing invalid tasks in the registry.
+pub(crate) fn check_automation_task_gas(
+    gas_params: &AptosGasParameters,
+    gas_feature_version: u64,
+    features: &Features,
+    registration_params: &RegistrationParams,
+    log_context: &AdapterLogSchema,
+) -> Result<(), VMStatus> {
+    if !features.is_enabled(FeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK) {
+        return Ok(())
+    }
+    let size_in_bytes = RawTransaction::estimate_size_in_bytes(
+        TransactionPayload::EntryFunction(registration_params.automated_function().clone()),
+    );
+    let gas_check_invariants = TransactionGasCheckInvariants {
+        gas_unit_price: registration_params.gas_price_cap().into(),
+        max_gas_amount: registration_params.max_gas_amount().into(),
+        transaction_size: (size_in_bytes as u64).into(),
+        script_size: NumBytes::zero().into(),
+        is_keyless: false,
+        is_account_init_for_sponsored_transaction: false,
+    };
+    let results = check_gas_for_parameters(
+        gas_params,
+        gas_feature_version,
+        features,
+        gas_check_invariants,
+        false,
+        log_context,
+    );
+    match results {
+        Ok(_) => Ok(()),
+        Err(VMStatus::Error {
+            status_code, sub_status, message
+        } )=> {
+            let mapped_status = match status_code {
+                StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE => {
+                    StatusCode::AUTOMATION_PAYLOAD_EXCEEDED_MAX_TRANSACTION_SIZE
+                }
+                StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND => {
+                    StatusCode::AUTOMATION_TASK_MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND
+                }
+                StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS => {
+                    StatusCode::AUTOMATION_TASK_MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
+                }
+                StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND => {
+                    StatusCode::AUTOMATION_TASK_GAS_PRICE_CAP_BELOW_MIN_BOUND
+                }
+                StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND => {
+                    StatusCode::AUTOMATION_TASK_GAS_PRICE_CAP_ABOVE_MAX_BOUND
+                }
+                _ => status_code
+            };
+            Err(VMStatus::Error {
+                status_code: mapped_status,
+                sub_status,
+                message,
+            })
+        }
+        Err(v) =>  Err(v),
+    }
 }
 
 pub(crate) fn check_gas_for_parameters(

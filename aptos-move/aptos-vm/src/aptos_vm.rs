@@ -40,7 +40,6 @@ use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::transaction::automation::RegistrationParams;
-use aptos_types::transaction::RawTransaction;
 use aptos_types::{
     account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
@@ -153,8 +152,8 @@ macro_rules! unwrap_or_discard {
     };
 }
 
-use crate::gas::{check_gas_for_parameters, TransactionGasCheckInvariants};
 pub(crate) use unwrap_or_discard;
+use crate::gas::check_automation_task_gas;
 
 pub(crate) fn get_system_transaction_output(
     session: SessionExt,
@@ -995,36 +994,6 @@ impl AptosVM {
             traversal_context,
         )?;
         Ok(())
-    }
-
-    /// Checks automation task gas by mocking automated raw transaction with inner payload/entry function,
-    /// task's max-gas-amount and task's gas-price-cap.
-    /// If the gas check fails at this stage, then an automated transaction based on the registered
-    /// task will also fail. This early check, before registration, saves us storing invalid tasks in the registry.
-    fn check_automation_task_gas(
-        &self,
-        registration_params: &RegistrationParams,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let size_in_bytes = RawTransaction::estimate_size_in_bytes(
-            TransactionPayload::EntryFunction(registration_params.automated_function().clone()),
-        );
-        let gas_check_invariants = TransactionGasCheckInvariants {
-            gas_unit_price: registration_params.gas_price_cap().into(),
-            max_gas_amount: registration_params.max_gas_amount().into(),
-            transaction_size: (size_in_bytes as u64).into(),
-            script_size: NumBytes::zero().into(),
-            is_keyless: false,
-            is_account_init_for_sponsored_transaction: false,
-        };
-        check_gas_for_parameters(
-            get_or_vm_startup_failure(&self.gas_params, log_context)?,
-            self.gas_feature_version,
-            self.features(),
-            gas_check_invariants,
-            false,
-            log_context,
-        )
     }
 
     /// Checks inner payload/entry function of automation registration transaction to be valid.
@@ -2487,7 +2456,13 @@ impl AptosVM {
                     log_context,
                     traversal_context,
                 )?;
-                self.check_automation_task_gas(task_registration_params, log_context)
+                check_automation_task_gas(
+                    get_or_vm_startup_failure(&self.gas_params, log_context)?,
+                    self.gas_feature_version,
+                    self.features(),
+                    task_registration_params,
+                    log_context,
+                )
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 // Still run script prologue for multisig transaction to ensure the same tx

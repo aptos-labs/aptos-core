@@ -595,6 +595,20 @@ pub enum StatusCode {
     RESERVED_VALIDATION_ERROR_9 = 44,
     // Failed to identify active automated task by provided index/sequence-number
     NO_ACTIVE_AUTOMATED_TASK = 45,
+    // Length of program field of automation payload in raw transaction exceeded max length
+    AUTOMATION_PAYLOAD_EXCEEDED_MAX_TRANSACTION_SIZE = 46,
+    // Max gas units submitted with for automation-task exceeds max gas units bound
+    // in VM
+    AUTOMATION_TASK_MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND = 47,
+    // Max gas units submitted for the automation-task not enough to cover the
+    // intrinsic cost of the transaction.
+    AUTOMATION_TASK_MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS = 48,
+    // Gas unit price capacity submitted for the automation-task is below minimum gas price
+    // set in the VM.
+    AUTOMATION_TASK_GAS_PRICE_CAP_BELOW_MIN_BOUND = 49,
+    // Gas unit price capacity submitted for the automation-task is above the maximum
+    // gas price set in the VM.
+    AUTOMATION_TASK_GAS_PRICE_CAP_ABOVE_MAX_BOUND = 50,
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
