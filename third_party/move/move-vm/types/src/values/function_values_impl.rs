@@ -5,7 +5,7 @@ use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, V
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    function::{ClosureMask, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+    function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
@@ -108,7 +108,7 @@ impl VMValueCast<Closure> for Value {
     }
 }
 
-impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveFunctionLayout, Closure> {
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let Closure(fun, captured) = self.value;
         let fun_ext = self
@@ -136,11 +136,9 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveFunctionLayout
     }
 }
 
-pub(crate) struct ClosureVisitor<'c, 'l>(
-    pub(crate) DeserializationSeed<'c, &'l MoveFunctionLayout>,
-);
+pub(crate) struct ClosureVisitor<'c>(pub(crate) DeserializationSeed<'c, ()>);
 
-impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
+impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
     type Value = Closure;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

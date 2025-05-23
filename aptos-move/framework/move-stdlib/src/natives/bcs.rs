@@ -199,7 +199,7 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         MoveTypeLayout::Struct(
             MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
         )
-        | MoveTypeLayout::Function(..) => Ok(None),
+        | MoveTypeLayout::Function => Ok(None),
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let mut total = Some(0);
             for field in fields {
