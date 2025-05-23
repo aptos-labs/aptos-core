@@ -1,6 +1,7 @@
 module aptos_framework::genesis {
     use std::error;
     use std::fixed_point32;
+    use std::signer;
     use std::vector;
 
     use aptos_std::simple_map;
@@ -132,7 +133,6 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         nonce_validation::initialize(&aptos_framework_account);
-        scheduled_txns::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -148,6 +148,8 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+
+        scheduled_txns::initialize(aptos_framework);
     }
 
     /// Only called for testnets and e2e tests.
@@ -171,6 +173,7 @@ module aptos_framework::genesis {
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         aptos_account::register_apt(&core_resources); // registers APT store
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
+        scheduled_txns::initialize(aptos_framework);
     }
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {

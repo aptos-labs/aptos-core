@@ -364,7 +364,6 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="nonce_validation.md#0x1_nonce_validation_initialize">nonce_validation::initialize</a>(&aptos_framework_account);
-    <a href="scheduled_txns.md#0x1_scheduled_txns_initialize">scheduled_txns::initialize</a>(&aptos_framework_account);
 }
 </code></pre>
 
@@ -400,6 +399,8 @@ Genesis step 2: Initialize Aptos coin.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+
+    <a href="scheduled_txns.md#0x1_scheduled_txns_initialize">scheduled_txns::initialize</a>(aptos_framework);
 }
 </code></pre>
 
@@ -443,6 +444,7 @@ Only called for testnets and e2e tests.
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
     <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&core_resources); // registers APT store
     <a href="aptos_coin.md#0x1_aptos_coin_configure_accounts_for_test">aptos_coin::configure_accounts_for_test</a>(aptos_framework, &core_resources, mint_cap);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_initialize">scheduled_txns::initialize</a>(aptos_framework);
 }
 </code></pre>
 

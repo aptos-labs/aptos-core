@@ -15,6 +15,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
 };
 use aptos_infallible::Mutex;
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
@@ -154,6 +155,10 @@ impl BlockExecutorTrait for DummyBlockExecutor {
     }
 
     fn finish(&self) {}
+
+    fn state_view(&self, _block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        todo!()
+    }
 }
 
 #[tokio::test]
