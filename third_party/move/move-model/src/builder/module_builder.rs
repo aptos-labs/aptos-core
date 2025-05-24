@@ -3638,6 +3638,7 @@ impl ModuleBuilder<'_, '_> {
                 used_funs,
                 using_funs: RefCell::default(),
                 transitive_closure_of_used_funs: RefCell::default(),
+                used_functions_with_transitive_inline: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }
