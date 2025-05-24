@@ -7,7 +7,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{Features, TimedFeaturesBuilder},
+    on_chain_config::{CurrentTimeMicroseconds, Features, TimedFeaturesBuilder},
     transaction::user_transaction_context::UserTransactionContext,
 };
 use aptos_vm_environment::{
@@ -95,6 +95,7 @@ impl GenesisMoveVm {
             self.chain_id,
             &self.features,
             &self.vm_config,
+            None, // current_time_override
             None,
             resolver,
         )
@@ -123,6 +124,7 @@ impl MoveVmExt {
 
     pub fn new_session<'r, R: AptosMoveResolver>(
         &self,
+        current_time_override: Option<CurrentTimeMicroseconds>,
         resolver: &'r R,
         session_id: SessionId,
         maybe_user_transaction_context: Option<UserTransactionContext>,
@@ -132,6 +134,7 @@ impl MoveVmExt {
             self.env.chain_id(),
             self.env.features(),
             self.env.vm_config(),
+            current_time_override,
             maybe_user_transaction_context,
             resolver,
         )
