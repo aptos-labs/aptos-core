@@ -240,7 +240,10 @@ impl NumberOperationAnalysis<'_> {
                             CONFLICT_ERROR_MSG,
                         );
                     }
-                    global_state.update_node_oper(*id, true_oper.merge(&false_oper), true);
+                    let merged = true_oper.merge(&false_oper);
+                    global_state.update_node_oper(true_exp.node_id(), merged, true);
+                    global_state.update_node_oper(false_exp.node_id(), merged, true);
+                    global_state.update_node_oper(*id, merged, true);
                 },
                 ExpData::Call(id, oper, args) => {
                     let mut arg_oper = vec![];
