@@ -65,10 +65,27 @@ pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
+#[derive(Debug)]
+
+pub struct CriticalErrorNotification {
+    error: String,
+}
+
+impl CriticalErrorNotification {
+    pub fn new(error: String) -> Self {
+        Self { error }
+    }
+
+    pub fn error(&self) -> &str {
+        &self.error
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ResetAck {}
 
 pub enum ResetSignal {
+    CriticalError,
     Stop,
     TargetRound(u64),
 }
@@ -178,6 +195,10 @@ pub struct BufferManager {
     // but we need to keep the pending blocks for reset.
     pending_commit_blocks: BTreeMap<Round, Arc<PipelinedBlock>>,
     new_pipeline_enabled: bool,
+
+    // A channel to notify any listeners that the buffer manager has
+    // hit a critical error. This is currently only used by fullnodes.
+    critical_error_notifier: UnboundedSender<CriticalErrorNotification>,
 }
 
 impl BufferManager {
@@ -210,7 +231,7 @@ impl BufferManager {
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         max_pending_rounds_in_commit_vote_cache: u64,
         new_pipeline_enabled: bool,
-    ) -> Self {
+    ) -> (Self, UnboundedReceiver<CriticalErrorNotification>) {
         let buffer = Buffer::<BufferItem>::new();
 
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)
@@ -218,7 +239,9 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
 
         let (tx, rx) = unbounded();
-        Self {
+        let (critical_error_notifier, critical_error_listener) = unbounded();
+
+        let buffer_manager = Self {
             author,
 
             buffer,
@@ -276,12 +299,21 @@ impl BufferManager {
             pending_commit_votes: BTreeMap::new(),
             pending_commit_blocks: BTreeMap::new(),
             new_pipeline_enabled,
-        }
+            critical_error_notifier,
+        };
+
+        (buffer_manager, critical_error_listener)
+    }
+
+    /// Returns true iff consensus observer is enabled. If so, this must be
+    /// a fullnode (as consensus observer is not supported on validators).
+    fn is_consensus_observer_enabled(&self) -> bool {
+        self.consensus_observer_config.observer_enabled
     }
 
     fn do_reliable_broadcast(&self, message: CommitMessage) -> Option<DropGuard> {
         // If consensus observer is enabled, we don't need to broadcast
-        if self.consensus_observer_config.observer_enabled {
+        if self.is_consensus_observer_enabled() {
             return None;
         }
 
@@ -530,7 +562,7 @@ impl BufferManager {
                 if commit_proof.ledger_info().ends_epoch() {
                     // the epoch ends, reset to avoid executing more blocks, execute after
                     // this persisting request will result in BlockNotFound
-                    self.reset().await;
+                    self.reset(false).await;
                 }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
                     let message =
@@ -563,16 +595,28 @@ impl BufferManager {
         unreachable!("Aggregated item not found in the list");
     }
 
+    /// Pops the front of the buffer and returns the item. Note:
+    /// if critical_error is true, the buffer manager has failed and
+    /// a safe pop is needed.
+    fn pop_buffer_front(&mut self, critical_error: bool) -> Option<BufferItem> {
+        if critical_error {
+            self.buffer.pop_front_safe()
+        } else {
+            self.buffer.pop_front()
+        }
+    }
+
     /// Reset any request in buffer manager, this is important to avoid race condition with state sync.
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
-    async fn reset(&mut self) {
+    /// If critical_error is true, the buffer manager has failed and state sync will be needed!
+    async fn reset(&mut self, critical_error: bool) {
         while let Some((_, block)) = self.pending_commit_blocks.pop_first() {
             // Those blocks don't have any dependencies, should be able to finish commit_ledger.
             // Abort them can cause error on epoch boundary.
             block.wait_for_commit_ledger().await;
         }
-        while let Some(item) = self.buffer.pop_front() {
+        while let Some(item) = self.pop_buffer_front(critical_error) {
             for b in item.get_blocks() {
                 if let Some(futs) = b.abort_pipeline() {
                     futs.wait_until_finishes().await;
@@ -608,9 +652,12 @@ impl BufferManager {
 
                 let _ = self.drain_pending_commit_proof_till(round);
             },
+            _ => {},
         }
 
-        self.reset().await;
+        let critical_error = matches!(signal, ResetSignal::CriticalError);
+        self.reset(critical_error).await;
+
         let _ = tx.send(ResetAck::default());
         if !self.new_pipeline_enabled {
             self.reset_flag.store(false, Ordering::SeqCst);
@@ -651,12 +698,15 @@ impl BufferManager {
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
     #[allow(clippy::unwrap_used)]
-    async fn process_execution_response(&mut self, response: ExecutionResponse) {
+    async fn process_execution_response(
+        &mut self,
+        response: ExecutionResponse,
+    ) -> anyhow::Result<()> {
         let ExecutionResponse { block_id, inner } = response;
         // find the corresponding item, may not exist if a reset or aggregated happened
         let current_cursor = self.buffer.find_elem_by_key(self.execution_root, block_id);
         if current_cursor.is_none() {
-            return;
+            return Ok(());
         }
 
         let executed_blocks = match inner {
@@ -668,7 +718,7 @@ impl BufferManager {
                     block_id,
                     self.new_pipeline_enabled,
                 );
-                return;
+                return Ok(());
             },
         };
         info!(
@@ -683,7 +733,7 @@ impl BufferManager {
                 expected_block_id = current_item.block_id(),
                 "Received result for unexpected block id. Ignoring."
             );
-            return;
+            return Ok(());
         }
 
         // Handle reconfiguration timestamp reconciliation.
@@ -709,12 +759,16 @@ impl BufferManager {
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
             self.order_vote_enabled,
-        );
+            self.is_consensus_observer_enabled(),
+        )?;
         if let Some(commit_proof) = self.drain_pending_commit_proof_till(round) {
             if !new_item.is_aggregated()
                 && commit_proof.ledger_info().commit_info().id() == block_id
             {
-                new_item = new_item.try_advance_to_aggregated_with_ledger_info(commit_proof)
+                new_item = new_item.try_advance_to_aggregated_with_ledger_info(
+                    commit_proof,
+                    self.is_consensus_observer_enabled(),
+                )?;
             }
         }
 
@@ -723,6 +777,8 @@ impl BufferManager {
         if aggregated {
             self.advance_head(block_id).await;
         }
+
+        Ok(())
     }
 
     fn generate_commit_message(commit_vote: CommitVote) -> CommitMessage {
@@ -779,7 +835,10 @@ impl BufferManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
+    fn process_commit_message(
+        &mut self,
+        commit_msg: IncomingCommitRequest,
+    ) -> anyhow::Result<Option<HashValue>> {
         let IncomingCommitRequest {
             req,
             protocol,
@@ -819,9 +878,9 @@ impl BufferManager {
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
-                        return Some(target_block_id);
+                        return Ok(Some(target_block_id));
                     } else {
-                        return None;
+                        return Ok(None);
                     }
                 } else if self.try_add_pending_commit_vote(vote) {
                     reply_ack(protocol, response_sender);
@@ -842,13 +901,14 @@ impl BufferManager {
                     let item = self.buffer.take(&cursor);
                     let new_item = item.try_advance_to_aggregated_with_ledger_info(
                         commit_proof.ledger_info().clone(),
-                    );
+                        self.is_consensus_observer_enabled(),
+                    )?;
                     let aggregated = new_item.is_aggregated();
                     self.buffer.set(&cursor, new_item);
 
                     reply_ack(protocol, response_sender);
                     if aggregated {
-                        return Some(target_block_id);
+                        return Ok(Some(target_block_id));
                     }
                 } else if self.try_add_pending_commit_proof(commit_proof.into_inner()) {
                     reply_ack(protocol, response_sender);
@@ -864,7 +924,8 @@ impl BufferManager {
                 error!("Unexpected NACK message");
             },
         }
-        None
+
+        Ok(None)
     }
 
     /// this function retries all the items until the signing root
@@ -955,6 +1016,32 @@ impl BufferManager {
         self.back_pressure_enabled && self.highest_committed_round + MAX_BACKLOG < self.latest_round
     }
 
+    async fn handle_critical_error(&mut self, error: anyhow::Error, error_context: &str) {
+        // Log the error message
+        let error_message = format!(
+            "Critical error encountered! Stopping the buffer manager. Error context: {}! Error: {}",
+            error_context, error
+        );
+        error!("{}", error_message);
+
+        // Reset the buffer manager
+        let (reset_signal_tx, _reset_signal_rx) = oneshot::channel();
+        let reset_request = ResetRequest {
+            tx: reset_signal_tx,
+            signal: ResetSignal::CriticalError,
+        };
+        self.process_reset_request(reset_request).await;
+
+        // Send the critical error notification to the listener
+        let error_notification = CriticalErrorNotification::new(error_message);
+        if let Err(error) = self.critical_error_notifier.send(error_notification).await {
+            error!(
+                error = ?error,
+                "Failed to send critical error notification to listener!"
+            );
+        }
+    }
+
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
@@ -1000,7 +1087,11 @@ impl BufferManager {
                 Some(response) = self.execution_wait_phase_rx.next() => {
                     monitor!("buffer_manager_process_execution_wait_response", {
                     let response_block_id = response.block_id;
-                    self.process_execution_response(response).await;
+                    if let Err(error) = self.process_execution_response(response).await {
+                        // We hit a critical error (something has gone wrong)
+                        self.handle_critical_error(error, "process_execution_response").await;
+                        break;
+                    }
                     if let Some(block_id) = self.advance_execution_root() {
                         // if the response is for the current execution root, retry the schedule phase
                         if response_block_id == block_id {
@@ -1036,13 +1127,22 @@ impl BufferManager {
                 },
                 Some(rpc_request) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
-                        self.advance_head(aggregated_block_id).await;
-                        if self.execution_root.is_none() {
-                            self.advance_execution_root();
+                    match self.process_commit_message(rpc_request) {
+                        Ok(maybe_aggregated_block_id) => {
+                            if let Some(aggregated_block_id) = maybe_aggregated_block_id {
+                                self.advance_head(aggregated_block_id).await;
+                                if self.execution_root.is_none() {
+                                    self.advance_execution_root();
+                                }
+                                if self.signing_root.is_none() {
+                                    self.advance_signing_root().await;
+                                }
+                            };
                         }
-                        if self.signing_root.is_none() {
-                            self.advance_signing_root().await;
+                        Err(error) => {
+                            // We hit a critical error (something has gone wrong)
+                            self.handle_critical_error(error, "process_commit_message").await;
+                            break;
                         }
                     });
                 }
