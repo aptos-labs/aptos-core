@@ -3,7 +3,7 @@ module 0x42::M {
 
     struct R has key { f: u64 }
 
-    public inline fun my_borrow(): &R {
+    inline fun my_borrow(): &R {
         borrow_global<R>(@0x42)
     }
 
