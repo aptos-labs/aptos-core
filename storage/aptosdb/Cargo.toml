@@ -58,6 +58,7 @@ status-line = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+aptos-block-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true, features = ["fuzzing"] }
 aptos-proptest-helpers = { workspace = true }

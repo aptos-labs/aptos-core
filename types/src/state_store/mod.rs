@@ -4,8 +4,8 @@
 use crate::{
     account_address::AccountAddress,
     state_store::{
-        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
+        errors::StateViewError, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::Version,
 };
@@ -18,6 +18,7 @@ use std::ops::Deref;
 
 pub mod errors;
 pub mod state_key;
+pub mod state_slot;
 pub mod state_storage_usage;
 pub mod state_value;
 pub mod table;
@@ -34,17 +35,41 @@ pub trait TStateView {
         StateViewId::Miscellaneous
     }
 
+    /// Gets state storage usage info at epoch ending.
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
+
+    /// Returns the version after this view.
+    fn next_version(&self) -> Version {
+        // TODO(HotState): Revisit
+        // This is currently only used by the HotStateOpAccumulator to decide if to refresh an already hot item.
+        unimplemented!()
+    }
+
+    /// Returns the version of the view.
+    ///
+    /// The empty "pre-genesis" state view has version None.
+    fn version(&self) -> Option<Version> {
+        self.next_version().checked_sub(1)
+    }
+
+    /// Gets the state slot for a given state key.
+    fn get_state_slot(&self, _state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        // TODO(HotState): implement for more views if accessed.
+        unimplemented!()
+    }
+
+    /// Gets the state value for a given state key.
+    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
+        // if not implemented, delegate to get_state_slot.
+        self.get_state_slot(state_key)
+            .map(StateSlot::into_state_value_opt)
+    }
+
     /// Gets the state value bytes for a given state key.
     fn get_state_value_bytes(&self, state_key: &Self::Key) -> StateViewResult<Option<Bytes>> {
         let val_opt = self.get_state_value(state_key)?;
         Ok(val_opt.map(|val| val.bytes().clone()))
     }
-
-    /// Gets the state value for a given state key.
-    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>>;
-
-    /// Gets state storage usage info at epoch ending.
-    fn get_usage(&self) -> StateViewResult<StateStorageUsage>;
 
     /// Checks if a state keyed by the given state key exists.
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
@@ -86,12 +111,20 @@ where
         self.deref().id()
     }
 
-    fn get_state_value(&self, state_key: &K) -> StateViewResult<Option<StateValue>> {
-        self.deref().get_state_value(state_key)
-    }
-
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         self.deref().get_usage()
+    }
+
+    fn next_version(&self) -> Version {
+        self.deref().next_version()
+    }
+
+    fn get_state_slot(&self, state_key: &K) -> StateViewResult<StateSlot> {
+        self.deref().get_state_slot(state_key)
+    }
+
+    fn get_state_value(&self, state_key: &K) -> StateViewResult<Option<StateValue>> {
+        self.deref().get_state_value(state_key)
     }
 }
 
@@ -118,14 +151,11 @@ impl<K> MockStateView<K> {
 impl<K: Clone + Eq + Hash> TStateView for MockStateView<K> {
     type Key = K;
 
-    fn get_state_value(
-        &self,
-        state_key: &Self::Key,
-    ) -> StateViewResult<Option<StateValue>, StateViewError> {
+    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         Ok(self.data.get(state_key).cloned())
     }
 
-    fn get_usage(&self) -> std::result::Result<StateStorageUsage, StateViewError> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!("Irrelevant for tests");
     }
 }

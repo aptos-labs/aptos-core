@@ -111,7 +111,7 @@ impl CrossShardCommitSender {
         let output = txn_output.committed_output();
         let write_set = output.write_set();
 
-        for (state_key, write_op) in write_set.iter() {
+        for (state_key, write_op) in write_set.expect_write_op_iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
                 for (dependent_shard_id, round_id) in dependent_shard_ids.iter() {
                     trace!("Sending remote update for success for shard id {:?} and txn_idx: {:?}, state_key: {:?}, dependent shard id: {:?}", self.shard_id, txn_idx, state_key, dependent_shard_id);

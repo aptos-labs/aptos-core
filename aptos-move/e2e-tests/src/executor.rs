@@ -1452,14 +1452,14 @@ pub fn assert_outputs_equal(
 
         let keys = txn_output_1
             .write_set()
-            .iter()
-            .chain(txn_output_2.write_set().iter())
+            .write_op_iter()
+            .chain(txn_output_2.write_set().write_op_iter())
             .map(|(k, _)| k)
             .collect::<BTreeSet<_>>();
         let mut differences = vec![];
         for key in keys {
-            let write1 = txn_output_1.write_set().get(key);
-            let write2 = txn_output_2.write_set().get(key);
+            let write1 = txn_output_1.write_set().get_write_op(key);
+            let write2 = txn_output_2.write_set().get_write_op(key);
 
             if write1 != write2 {
                 differences.push(format!(

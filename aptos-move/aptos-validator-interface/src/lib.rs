@@ -173,4 +173,8 @@ impl TStateView for DebuggerStateView {
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!()
     }
+
+    fn next_version(&self) -> Version {
+        self.version + 1
+    }
 }
