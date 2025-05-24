@@ -5,7 +5,10 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    boogie_helpers::{boogie_bv_type, boogie_module_name, boogie_type, boogie_type_suffix_bv},
+    boogie_helpers::{
+        boogie_bv_type, boogie_module_name, boogie_num_type_base, boogie_type,
+        boogie_type_suffix_bv,
+    },
     bytecode_translator::has_native_equality,
     options::{BoogieOptions, VectorTheory},
 };
@@ -205,8 +208,27 @@ pub fn add_prelude(
     all_types.append(&mut bv_all_types);
     context.insert("uninterpreted_instances", &all_types);
 
+    // obtain bv number types appearing in the program, which is currently used to generate cast functions for bv types
+    let number_types = mono_info
+        .all_types
+        .iter()
+        .filter(|ty| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num)))
+        .map(|ty| {
+            boogie_num_type_base(ty)
+                .parse::<usize>()
+                .expect("parse error")
+        })
+        .collect_vec();
+    let bv_in_all_types = bv_instances
+        .iter()
+        .filter(|bv_info| number_types.contains(&bv_info.base))
+        .map(|bv_info| bv_info.base)
+        .collect_vec();
+
     context.insert("sh_instances", &sh_instances);
     context.insert("bv_instances", &bv_instances);
+    context.insert("bv_in_all_types", &bv_in_all_types);
+
     let mut vec_instances = mono_info
         .vec_inst
         .iter()
