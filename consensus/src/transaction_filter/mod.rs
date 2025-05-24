@@ -17,15 +17,20 @@ impl TransactionFilter {
     pub fn filter(
         &self,
         block_id: HashValue,
-        timestamp: u64,
+        block_epoch: u64,
+        block_timestamp: u64,
         txns: Vec<SignedTransaction>,
     ) -> Vec<SignedTransaction> {
         // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
         if self.filter.is_empty() {
             return txns;
         }
+
         txns.into_iter()
-            .filter(|txn| self.filter.allows(block_id, timestamp, txn))
+            .filter(|txn| {
+                self.filter
+                    .allows(block_id, block_epoch, block_timestamp, txn)
+            })
             .collect()
     }
 }
@@ -72,6 +77,12 @@ mod test {
         )
     }
 
+    fn get_block_id_and_transactions() -> (HashValue, Vec<SignedTransaction>) {
+        let block_id = HashValue::random();
+        let transactions = get_transactions();
+        (block_id, transactions)
+    }
+
     fn get_transactions() -> Vec<SignedTransaction> {
         vec![
             create_signed_transaction(str::parse("0x1::test::add").unwrap()),
@@ -112,134 +123,246 @@ mod test {
     }
 
     #[test]
-    fn test_no_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let no_filter = TransactionFilter::new(Filter::empty());
-        let filtered_txns = no_filter.filter(block_id, 0, txns.clone());
+    fn test_empty_filter() {
+        // Create an empty filter
+        let empty_filter = TransactionFilter::new(Filter::empty());
+
+        // Verify that the empty filter allows all transactions
+        let (block_id, txns) = get_block_id_and_transactions();
+        let filtered_txns = empty_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
-    fn test_all_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let all_filter = TransactionFilter::new(Filter::empty().add_deny_all());
-        let filtered_txns = all_filter.filter(block_id, 0, txns.clone());
+    fn test_any_filter() {
+        // Create a filter that denies all transactions
+        let any_filter = TransactionFilter::new(Filter::empty().add_any_filter(false));
+
+        // Verify that the filter denies all transactions
+        let (block_id, txns) = get_block_id_and_transactions();
+        let filtered_txns = any_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, vec![]);
+
+        // Create a filter that allows all transactions
+        let any_filter = TransactionFilter::new(Filter::empty().add_any_filter(true));
+
+        // Verify that the filter allows all transactions
+        let filtered_txns = any_filter.filter(block_id, 0, 0, txns.clone());
+        assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_block_id_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let block_id_filter = TransactionFilter::new(Filter::empty().add_deny_block_id(block_id));
+        // Create a filter that denies transactions with a specific block ID
+        let (block_id, txns) = get_block_id_and_transactions();
+        let block_id_filter =
+            TransactionFilter::new(Filter::empty().add_block_id_filter(false, block_id));
 
-        let filtered_txns = block_id_filter.filter(block_id, 0, txns.clone());
+        // Verify that the filter denies transactions with the specified block ID
+        let filtered_txns = block_id_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, vec![]);
+
+        // Create a filter that only allows transactions with a specific block ID
+        let block_id_filter =
+            TransactionFilter::new(Filter::empty().add_block_id_filter(true, block_id));
+
+        // Verify that the filter allows transactions with the specified block ID
+        let filtered_txns = block_id_filter.filter(block_id, 0, 0, txns.clone());
+        assert_eq!(filtered_txns, txns);
+
+        // Verify that the filter denies transactions with a different block ID
         let block_id = HashValue::random();
-        let filtered_txns = block_id_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = block_id_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns);
     }
 
     #[test]
-    fn test_block_timestamp_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        // Allows all transactions with block timestamp greater than 1000
+    fn test_deny_block_timestamp_filter_greater_than() {
+        // Create a filter that only allows transactions with block timestamp greater than 1000
         let block_timestamp_filter = TransactionFilter::new(
             Filter::empty()
-                .add_allow_block_timestamp_greater_than(1000)
-                .add_deny_all(),
+                .add_block_timestamp_greater_than_filter(true, 1000)
+                .add_any_filter(false),
         );
 
-        let filtered_txns = block_timestamp_filter.filter(block_id, 0, txns.clone());
+        // Verify that the filter denies transactions with block timestamp less than or equal to 1000
+        let (block_id, txns) = get_block_id_and_transactions();
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, vec![]);
-        let filtered_txns = block_timestamp_filter.filter(block_id, 1001, txns.clone());
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 1000, txns.clone());
+        assert_eq!(filtered_txns, vec![]);
+
+        // Verify that the filter allows transactions with block timestamp greater than 1000
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 1001, txns.clone());
         assert_eq!(filtered_txns, txns);
+    }
+
+    #[test]
+    fn test_block_timestamp_filter_less_than() {
+        // Create a filter that only allows transactions with block timestamp less than 1000
+        let block_timestamp_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_block_timestamp_less_than_filter(true, 1000)
+                .add_any_filter(false),
+        );
+
+        // Verify that the filter allows transactions with block timestamp less than 1000
+        let (block_id, txns) = get_block_id_and_transactions();
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 0, txns.clone());
+        assert_eq!(filtered_txns, txns);
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 999, txns.clone());
+        assert_eq!(filtered_txns, txns);
+
+        // Verify that the filter denies transactions with block timestamp greater than or equal to 1000
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 1000, txns.clone());
+        assert_eq!(filtered_txns, vec![]);
+    }
+
+    #[test]
+    fn test_epoch_filter_greater_than() {
+        // Create a filter that only allows transactions with block epoch greater than 1000
+        let block_epoch_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_epoch_greater_than_filter(true, 1000)
+                .add_any_filter(false),
+        );
+
+        // Verify that the filter denies transactions with block epoch less than or equal to 1000
+        let (block_id, txns) = get_block_id_and_transactions();
+        let filtered_txns = block_epoch_filter.filter(block_id, 0, 0, txns.clone());
+        assert_eq!(filtered_txns, vec![]);
+        let filtered_txns = block_epoch_filter.filter(block_id, 1000, 0, txns.clone());
+        assert_eq!(filtered_txns, vec![]);
+
+        // Verify that the filter allows transactions with block epoch greater than 1000
+        let filtered_txns = block_epoch_filter.filter(block_id, 1001, 0, txns.clone());
+        assert_eq!(filtered_txns, txns);
+    }
+
+    #[test]
+    fn test_epoch_filter_less_than() {
+        // Create a filter that only allows transactions with block epoch less than 1000
+        let block_epoch_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_epoch_less_than_filter(true, 1000)
+                .add_any_filter(false),
+        );
+
+        // Verify that the filter allows transactions with block epoch less than 1000
+        let (block_id, txns) = get_block_id_and_transactions();
+        let filtered_txns = block_epoch_filter.filter(block_id, 0, 0, txns.clone());
+        assert_eq!(filtered_txns, txns);
+        let filtered_txns = block_epoch_filter.filter(block_id, 999, 0, txns.clone());
+        assert_eq!(filtered_txns, txns);
+
+        // Verify that the filter denies transactions with block epoch greater than or equal to 1000
+        let filtered_txns = block_epoch_filter.filter(block_id, 1000, 0, txns.clone());
+        assert_eq!(filtered_txns, vec![]);
     }
 
     #[test]
     fn test_transaction_hash_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
+        // Create a filter that denies transactions with a specific transaction hash (txn 0)
+        let (block_id, txns) = get_block_id_and_transactions();
         let transaction_hash_filter = TransactionFilter::new(
-            Filter::empty().add_deny_transaction_id(txns[0].committed_hash()),
+            Filter::empty().add_transaction_id_filter(false, txns[0].committed_hash()),
         );
-        let filtered_txns = transaction_hash_filter.filter(block_id, 0, txns.clone());
+
+        // Verify that the filter denies the transaction with the specified hash
+        let filtered_txns = transaction_hash_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[1..].to_vec());
     }
 
     #[test]
     fn test_sender_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let block_list_sender_filter = TransactionFilter::new(
+        // Create a filter that denies transactions from specific senders (txn 0 and txn 1)
+        let (block_id, txns) = get_block_id_and_transactions();
+        let sender_filter = TransactionFilter::new(
             Filter::empty()
-                .add_deny_sender(txns[0].sender())
-                .add_deny_sender(txns[1].sender()),
+                .add_sender_filter(false, txns[0].sender())
+                .add_sender_filter(false, txns[1].sender())
+                .add_any_filter(true),
         );
-        let filtered_txns = block_list_sender_filter.filter(block_id, 0, txns.clone());
+
+        // Verify that the filter denies transactions from the specified senders
+        let filtered_txns = sender_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[2..].to_vec());
     }
 
     #[test]
     fn test_entry_function_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let allow_list_entry_function_filter = TransactionFilter::new(
+        // Create a filter that allows specific entry functions (txn 0 and txn 1)
+        let (block_id, txns) = get_block_id_and_transactions();
+        let entry_function_filter = TransactionFilter::new(
             Filter::empty()
-                .add_allow_entry_function(
+                .add_entry_function_filter(
+                    true,
                     get_module_address(&txns[0]),
                     get_module_name(&txns[0]),
                     get_function_name(&txns[0]),
                 )
-                .add_allow_entry_function(
+                .add_entry_function_filter(
+                    true,
                     get_module_address(&txns[1]),
                     get_module_name(&txns[1]),
                     get_function_name(&txns[1]),
                 )
-                .add_deny_all(),
+                .add_any_filter(false),
         );
-        let filtered_txns = allow_list_entry_function_filter.filter(block_id, 0, txns.clone());
+
+        // Verify that the filter allows transactions with the specified entry functions
+        let filtered_txns = entry_function_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[0..2].to_vec());
 
+        // Create a filter that denies specific entry functions (txn 0 and txn 1)
         let deny_list_entry_function_filter = TransactionFilter::new(
             Filter::empty()
-                .add_deny_entry_function(
+                .add_entry_function_filter(
+                    false,
                     get_module_address(&txns[0]),
                     get_module_name(&txns[0]),
                     get_function_name(&txns[0]),
                 )
-                .add_deny_entry_function(
+                .add_entry_function_filter(
+                    false,
                     get_module_address(&txns[1]),
                     get_module_name(&txns[1]),
                     get_function_name(&txns[1]),
                 ),
         );
-        let filtered_txns = deny_list_entry_function_filter.filter(block_id, 0, txns.clone());
+
+        // Verify that the filter denies transactions with the specified entry functions
+        let filtered_txns = deny_list_entry_function_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[2..].to_vec());
     }
 
     #[test]
     fn test_allow_list_module_address_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
+        // Create a filter that allows transactions from specific module addresses (txn 0 and txn 1)
+        let (block_id, txns) = get_block_id_and_transactions();
+        let module_address_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_module_address_filter(true, get_module_address(&txns[0]))
+                .add_module_address_filter(true, get_module_address(&txns[1]))
+                .add_any_filter(false),
+        );
+
+        // Verify that the filter allows transactions from the specified module addresses
+        let filtered_txns = module_address_filter.filter(block_id, 0, 0, txns.clone());
+        assert_eq!(filtered_txns, txns[0..2].to_vec());
+
+        // Create a filter that denies transactions from specific module addresses (txn 0 to txn 3)
         let allow_list_module_address_filter = TransactionFilter::new(
             Filter::empty()
-                .add_allow_module_address(get_module_address(&txns[0]))
-                .add_allow_module_address(get_module_address(&txns[1]))
-                .add_deny_all(),
+                .add_module_address_filter(false, get_module_address(&txns[0]))
+                .add_module_address_filter(false, get_module_address(&txns[1]))
+                .add_module_address_filter(false, get_module_address(&txns[2]))
+                .add_module_address_filter(false, get_module_address(&txns[3]))
+                .add_any_filter(true),
         );
-        let filtered_txns = allow_list_module_address_filter.filter(block_id, 0, txns.clone());
-        assert_eq!(filtered_txns, txns[0..4].to_vec());
 
-        let block_list_module_address_filter = TransactionFilter::new(
-            Filter::empty()
-                .add_deny_module_address(get_module_address(&txns[0]))
-                .add_deny_module_address(get_module_address(&txns[1])),
-        );
-        let filtered_txns = block_list_module_address_filter.filter(block_id, 0, txns.clone());
+        // Verify that the filter denies transactions from the specified module addresses
+        let filtered_txns = allow_list_module_address_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[4..].to_vec());
     }
 
@@ -263,11 +386,11 @@ mod test {
                         - "0000000000000000000000000000000000000000000000000000000000000001"
                         - test
                         - new
-                - Deny: All
+                - Deny: Any
               "#).unwrap();
 
         let allow_list_filter = TransactionFilter::new(filter);
-        let filtered_txns = allow_list_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = allow_list_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[0..4].to_vec());
     }
 
@@ -294,7 +417,7 @@ mod test {
               "#).unwrap();
 
         let allow_list_filter = TransactionFilter::new(filter);
-        let filtered_txns = allow_list_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = allow_list_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[4..].to_vec());
     }
 }
