@@ -2,12 +2,11 @@ processed 2 tasks
 
 task 0 'publish'. lines 1-11:
 Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
-Error message: none
-  ┌─ TEMPFILE:8:9
+ error: cannot pass `&mut || has copy + drop` to a function which expects argument of type `&mut || has drop`
+  ┌─ TEMPFILE:8:11
   │
 8 │         f(&mut x);
-  │         ^^^^^^^^^
+  │           ^^^^^^
 
 
 
