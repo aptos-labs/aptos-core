@@ -98,8 +98,13 @@ impl ModuleWriteSet {
         module_storage: &'a impl ModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.writes.iter_mut().map(move |(key, write)| {
+            // MODULE METERING SAFETY:
+            //   If there is a write to the module at key K, it means the module at K has been read,
+            //   and therefore it must have been loaded and metered. If module at K previously did
+            //   not exist, the publishing logic must have charged for it (and there will be no
+            //   module to load here anyway).
             let prev_size = module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .unmetered_get_module_size(write.module_address(), write.module_name())
                 .map_err(|e| e.to_partial())?
                 .unwrap_or(0) as u64;
             Ok(WriteOpInfo {
