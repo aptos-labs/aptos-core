@@ -53,9 +53,13 @@ impl FileStoreReader {
 
     /// Returns the file path for the given version. Requires the version to be the first version
     /// in the file.
-    pub fn get_path_for_version(&self, version: u64) -> PathBuf {
+    pub fn get_path_for_version(&self, version: u64, suffix: Option<u64>) -> PathBuf {
         let mut buf = self.get_folder_name(version);
-        buf.push(format!("{}", version));
+        if let Some(suffix) = suffix {
+            buf.push(format!("{version}_{suffix}"));
+        } else {
+            buf.push(format!("{version}"));
+        }
         buf
     }
 
@@ -116,7 +120,7 @@ impl FileStoreReader {
                 }
             }
             let transactions = self
-                .get_transaction_file_at_version(current_version, retries)
+                .get_transaction_file_at_version(current_version, batch_metadata.suffix, retries)
                 .await;
             if let Ok(mut transactions) = transactions {
                 let timestamp = transactions.last().unwrap().timestamp.unwrap();
@@ -209,11 +213,12 @@ impl FileStoreReader {
     async fn get_transaction_file_at_version(
         &self,
         version: u64,
+        suffix: Option<u64>,
         retries: u8,
     ) -> Result<Vec<Transaction>> {
         let mut retries = retries;
         let bytes = loop {
-            let path = self.get_path_for_version(version);
+            let path = self.get_path_for_version(version, suffix);
             match self.reader.get_raw_file(path.clone()).await {
                 Ok(bytes) => break bytes.unwrap_or_else(|| panic!("File should exist: {path:?}.")),
                 Err(err) => {
