@@ -52,4 +52,6 @@ order-book-no-matches	1	VM	1	0.7	1.2	1604.0
 order-book-balanced-matches25-pct	1	VM	1	0.7	1.2	984.0
 order-book-balanced-matches80-pct	1	VM	1	0.7	1.2	482.0
 order-book-balanced-size-skewed80-pct	1	VM	1	0.7	1.2	1008.0
-
+collection-insert-none-smart-table	1	VM	1	0.7	1.2	2689.0
+collection-insert-none-b-tree-map	1	VM	1	0.7	1.2	4240.0
+collection-insert-max-b-tree-map	1	VM	1	0.7	1.2	1134.0

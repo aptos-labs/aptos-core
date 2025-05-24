@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_workloads::{LoopType, PreBuiltPackagesImpl},
+    move_workloads::{LoopType, PreBuiltPackagesImpl, StateMapType},
     token_workflow::TokenWorkflowKind,
     EntryPoints, OrderBookState,
 };
@@ -93,6 +93,9 @@ pub enum TransactionTypeArg {
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct,
+    CollectionInsertNoneSmartTable,
+    CollectionInsertNoneBTreeMap,
+    CollectionInsertMaxBTreeMap,
 }
 
 impl TransactionTypeArg {
@@ -404,6 +407,27 @@ impl TransactionTypeArg {
                     buy_frequency: 0.01,
                     max_sell_size: 50,
                     max_buy_size: 950,
+                })
+            },
+            TransactionTypeArg::CollectionInsertNoneSmartTable => {
+                call_custom_module(EntryPoints::CollectionInsert {
+                    map_type: StateMapType::SmartTable,
+                    key_size: None,
+                    value_size: None,
+                })
+            },
+            TransactionTypeArg::CollectionInsertNoneBTreeMap => {
+                call_custom_module(EntryPoints::CollectionInsert {
+                    map_type: StateMapType::BigOrderedMap,
+                    key_size: None,
+                    value_size: None,
+                })
+            },
+            TransactionTypeArg::CollectionInsertMaxBTreeMap => {
+                call_custom_module(EntryPoints::CollectionInsert {
+                    map_type: StateMapType::BigOrderedMap,
+                    key_size: Some(5000),
+                    value_size: Some(5000),
                 })
             },
         }
