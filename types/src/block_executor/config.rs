@@ -65,31 +65,37 @@ pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
     enable_per_block_gas_limit: bool,
     per_block_gas_limit: Option<u64>,
+    blockchain_generated_info_version: u32,
 }
 
 impl BlockExecutorConfigFromOnchain {
-    pub fn new(block_gas_limit_type: BlockGasLimitType, enable_per_block_gas_limit: bool) -> Self {
+    pub fn new(block_gas_limit_type: BlockGasLimitType, enable_per_block_gas_limit: bool, blockchain_generated_info_version: u32) -> Self {
         Self {
             block_gas_limit_type,
             enable_per_block_gas_limit,
             per_block_gas_limit: None,
+            blockchain_generated_info_version,
         }
     }
 
-    pub fn new_no_block_limit() -> Self {
+    pub fn new_no_block_limit(blockchain_generated_info_version: u32) -> Self {
         Self {
             block_gas_limit_type: BlockGasLimitType::NoLimit,
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
+            // TODO[MI Counter]: Increment this version to 1.
+            blockchain_generated_info_version,
         }
     }
 
-    pub fn new_maybe_block_limit(maybe_block_gas_limit: Option<u64>) -> Self {
+    pub fn new_maybe_block_limit(maybe_block_gas_limit: Option<u64>, blockchain_generated_info_version: u32) -> Self {
         Self {
             block_gas_limit_type: maybe_block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
+            // TODO[MI Counter]: Increment this version to 1.
+            blockchain_generated_info_version,
         }
     }
 
@@ -110,6 +116,8 @@ impl BlockExecutorConfigFromOnchain {
                 },
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
+            // TODO[MI Counter]: Increment this version to 1.
+            blockchain_generated_info_version: 0,
         }
     }
 
@@ -118,6 +126,7 @@ impl BlockExecutorConfigFromOnchain {
             block_gas_limit_type: self.block_gas_limit_type,
             enable_per_block_gas_limit: self.enable_per_block_gas_limit,
             per_block_gas_limit: block_gas_limit_override,
+            blockchain_generated_info_version: self.blockchain_generated_info_version,
         }
     }
 
@@ -127,6 +136,10 @@ impl BlockExecutorConfigFromOnchain {
         } else {
             None
         }
+    }
+
+    pub fn blockchain_generated_info_version(&self) -> u32 {
+        self.blockchain_generated_info_version
     }
 }
 

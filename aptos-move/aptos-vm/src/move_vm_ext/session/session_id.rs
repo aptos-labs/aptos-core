@@ -188,4 +188,43 @@ impl SessionId {
             | Self::BlockMetaExt { id: _ } => vec![],
         }
     }
+
+    // This is used in `monotonically_increasing_number` native function. Every call to the native function
+    // will output a monotonically increasing number.
+    // monotonically_increasing_number (128 bits) = timestamp (64 bits) || transaction_index_inside_block (32 bits) || session_counter_inside_transaction (16 bits) || local_counter_inside_session (16 bits)
+    // This function is used to obtain `session_counter_inside_transaction`.
+    // The sessions here are organized in the increasing order in which they are created. Eg: Prologue < Txn < RunOnAbort < Epilogue.
+    // When introducing new session types, please check the order in which the sessions are created during a transaction execution and assign a number here accordingly.
+    pub(crate) fn session_counter(&self) -> u16 {
+        match self {
+            Self::Genesis { .. } => 0,
+
+            // This session is only used in simulation. Output is not committed.
+            // It's okay to use any number here.
+            Self::Void => 10,
+
+            // BlockMetadata and BlockMetaData transactions have no sub-sessions.
+            // It's okay to use any number here.
+            Self::BlockMeta { .. } => 20,
+            Self::BlockMetaExt { .. } => 30,
+
+            // Validator transactions have no sub-sessions.
+            // It's okay to use any number here.
+            Self::ValidatorTxn { .. } => 40,
+
+            // We should maintaint the order: Prologue < Txn < RunOnAbort < Epilogue
+            Self::Prologue { .. } => 50,
+            Self::OrderlessTxnProlouge { .. } => 60,
+
+            Self::Txn { .. } => 70,
+            Self::OrderlessTxn { .. } => 80,
+
+            // RunOnAbort runs before epilogue, so it should be after epilogue
+            Self::RunOnAbort { .. } => 110,
+            Self::OrderlessRunOnAbort { .. } => 120,
+
+            Self::Epilogue { .. } => 90,
+            Self::OrderlessTxnEpilogue { .. } => 100,
+        }
+    }
 }

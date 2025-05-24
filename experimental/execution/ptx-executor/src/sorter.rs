@@ -91,7 +91,7 @@ impl Worker {
     }
 
     fn add_analyzed_transaction(&mut self, txn: AnalyzedTransaction) {
-        let txn_idx = self.num_txns;
+        let txn_idx = self.num_txns as TxnIdx;
         self.num_txns += 1;
 
         // TODO(ptx): Reorder Non-P-Transactions. (Now we assume all are P-Txns.)

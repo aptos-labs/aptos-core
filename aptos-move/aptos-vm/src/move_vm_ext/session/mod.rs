@@ -87,6 +87,7 @@ where
             .to_vec()
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
+        let session_counter = session_id.session_counter();
 
         extensions.add(NativeTableContext::new(txn_hash, resolver));
         extensions.add(NativeRistrettoPointContext::new());
@@ -103,6 +104,7 @@ where
             session_id.into_script_hash(),
             chain_id.id(),
             maybe_user_transaction_context,
+            session_counter,
         ));
         extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));
