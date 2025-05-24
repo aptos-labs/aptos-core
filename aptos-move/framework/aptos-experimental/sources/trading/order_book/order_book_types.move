@@ -51,7 +51,7 @@ module aptos_experimental::order_book_types {
         price: u64,
         orig_size: u64,
         remaining_size: u64,
-        is_buy: bool,
+        is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
         metadata: M
     }
@@ -130,7 +130,7 @@ module aptos_experimental::order_book_types {
             price,
             orig_size,
             remaining_size: size,
-            is_buy,
+            is_bid: is_buy,
             trigger_condition,
             metadata
         }
@@ -278,7 +278,7 @@ module aptos_experimental::order_book_types {
             self.price,
             self.orig_size,
             self.remaining_size,
-            self.is_buy,
+            self.is_bid,
             self.trigger_condition,
             self.metadata
         )
@@ -304,7 +304,7 @@ module aptos_experimental::order_book_types {
         self.price
     }
 
-    public fun is_buy<M: store + copy + drop>(self: &Order<M>): bool {
-        self.is_buy
+    public fun is_bid<M: store + copy + drop>(self: &Order<M>): bool {
+        self.is_bid
     }
 }

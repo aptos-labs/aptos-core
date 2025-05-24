@@ -286,7 +286,7 @@ module aptos_experimental::order_book {
                 order.get_price(),
                 order_with_state.get_unique_priority_idx_from_state(),
                 size_delta,
-                order.is_buy()
+                order.is_bid()
             );
         };
         self.orders.add(order_id, order_with_state);
