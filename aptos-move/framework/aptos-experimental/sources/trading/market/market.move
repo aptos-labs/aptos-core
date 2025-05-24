@@ -34,7 +34,7 @@ module aptos_experimental::market {
     use std::string::String;
     use aptos_framework::event;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
-    use aptos_experimental::order_book_types::{TriggerCondition, UniqueIdxType, Order};
+    use aptos_experimental::order_book_types::{TriggerCondition, Order};
     use aptos_experimental::market_types::MarketClearinghouseCallbacks;
 
     // Error codes
@@ -394,7 +394,6 @@ module aptos_experimental::market {
 
         if (
             !callbacks.validate_order_placement(
-                self.market,
                 user_addr,
                 order_id,
                 false, // is_taker
@@ -429,7 +428,6 @@ module aptos_experimental::market {
             };
         };
         callbacks.place_maker_order(
-            self.market,
             user_addr,
             order_id,
             is_bid,
@@ -506,7 +504,6 @@ module aptos_experimental::market {
             self.order_book.cancel_order(maker_address, order_id);
         };
         callbacks.cleanup_order(
-            self.market,
             maker_address,
             order_id,
             maker_order.is_bid()
@@ -544,7 +541,6 @@ module aptos_experimental::market {
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
         if (
             !callbacks.validate_order_placement(
-                self.market,
                 user_addr,
                 order_id,
                 true, // is_taker
@@ -660,7 +656,6 @@ module aptos_experimental::market {
             };
             let settle_result =
                 callbacks.settle_trade(
-                    self.market,
                     user_addr,
                     maker_address,
                     order_id,
@@ -774,7 +769,6 @@ module aptos_experimental::market {
 
             if (remaining_size == 0) {
                 callbacks.cleanup_order(
-                    self.market,
                     user_addr,
                     order_id,
                     is_bid,
@@ -903,7 +897,6 @@ module aptos_experimental::market {
                 _metadata
             ) = order.destroy_order();
             callbacks.cleanup_order(
-                self.market,
                 account,
                 order_id,
                 is_bid
@@ -953,7 +946,6 @@ module aptos_experimental::market {
         ) = order.destroy_order();
         let (user, order_id) = order_id_type.destroy_order_id_type();
         callbacks.decrease_order_size(
-            self.market,
             user,
             order_id,
             is_bid,

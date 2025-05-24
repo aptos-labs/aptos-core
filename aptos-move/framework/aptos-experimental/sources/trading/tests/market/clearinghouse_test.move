@@ -100,19 +100,19 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |_market_address, taker, maker, _taker_order_id, _maker_order_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+            |taker, maker, _taker_order_id, _maker_order_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
             },
-            |_market_address, _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
+            | _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
                 validate_settlement_update()
             },
-            |_market_address, _account, _order_id, _is_bid, _price, _size, _order_metadata| {
+            |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
                 // place_maker_order is not used in this test
             },
-            |_market_address, _account, _order_id, _is_bid| {
+            | _account, _order_id, _is_bid| {
                 // cleanup_order is not used in this test
             },
-            |_market_address, _account, _order_id, _is_bid, _price, _size| {
+            | _account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
             },
         )
@@ -121,19 +121,19 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks_with_taker_cancelled():
         MarketClearinghouseCallbacks<TestOrderMetadata> {
         new_market_clearinghouse_callbacks(
-            |_market_address, taker, maker, _taker_order_id, _maker_order_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+            |taker, maker, _taker_order_id, _maker_order_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
-            |_market_address, _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
+            | _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
                 validate_settlement_update()
             },
-            |_market_address, _account, _order_id, _is_bid, _price, _size, _order_metadata| {
+            |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
                 // place_maker_order is not used in this test
             },
-            |_market_address, _account, _order_id, _is_bid| {
+            | _account, _order_id, _is_bid| {
                 // cleanup_order is not used in this test
             },
-            |_market_address, _account, _order_id, _is_bid, _price, _size| {
+            | _account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
             },
         )

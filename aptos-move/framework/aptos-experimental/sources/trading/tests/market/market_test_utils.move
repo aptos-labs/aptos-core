@@ -3,7 +3,6 @@ module aptos_experimental::market_test_utils {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use aptos_std::debug::print;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore};
     use aptos_experimental::market_types::MarketClearinghouseCallbacks;
 
@@ -197,8 +196,6 @@ module aptos_experimental::market_test_utils {
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         assert!(events.length() == 1);
         let order_cancel_event = events[0];
-        print(&order_id);
-        print(&order_cancel_event);
         order_cancel_event.verify_order_event(
             order_id,
             market.get_market(),
