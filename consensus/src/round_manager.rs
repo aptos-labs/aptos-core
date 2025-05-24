@@ -40,6 +40,8 @@ use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
     common::{Author, Round},
+    opt_block_data::OptBlockData,
+    opt_proposal_msg::OptProposalMsg,
     order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     pipelined_block::PipelinedBlock,
@@ -73,10 +75,17 @@ use aptos_types::{
     PeerId,
 };
 use fail::fail_point;
-use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, StreamExt};
+use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, SinkExt, StreamExt};
 use lru::LruCache;
 use serde::Serialize;
-use std::{mem::Discriminant, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    mem::Discriminant,
+    ops::Add,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -92,6 +101,7 @@ pub enum UnverifiedEvent {
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
+    OptProposalMsg(Box<OptProposalMsg>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -118,6 +128,15 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::ProposalMsg(p)
+            },
+            UnverifiedEvent::OptProposalMsg(p) => {
+                if !self_message {
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["opt_proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::OptProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
@@ -186,6 +205,7 @@ impl UnverifiedEvent {
     pub fn epoch(&self) -> anyhow::Result<u64> {
         match self {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedEvent::OptProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
@@ -201,6 +221,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
     fn from(value: ConsensusMsg) -> Self {
         match value {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
+            ConsensusMsg::OptProposalMsg(m) => UnverifiedEvent::OptProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
             ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
@@ -229,6 +250,7 @@ pub enum VerifiedEvent {
     LocalTimeout(Round),
     // Shutdown the NetworkListener
     Shutdown(TokioOneshot::Sender<()>),
+    OptProposalMsg(Box<OptProposalMsg>),
 }
 
 #[cfg(test)]
@@ -270,6 +292,8 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+    pending_opt_proposals: BTreeMap<Round, OptBlockData>,
+    opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
 }
 
 impl RoundManager {
@@ -290,6 +314,7 @@ impl RoundManager {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+        opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -321,6 +346,8 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
+            pending_opt_proposals: BTreeMap::new(),
+            opt_proposal_loopback_tx,
         }
     }
 
@@ -403,6 +430,17 @@ impl RoundManager {
         self.proposal_status_tracker
             .push(new_round_event.reason.clone());
 
+        // Process pending opt proposal for the new round.
+        // The existence of pending optimistic proposal and being the current proposer are mutually
+        // exclusive. Note that the opt proposal is checked for valid proposer before inserting into
+        // the pending queue.
+        if let Some(opt_proposal) = self.pending_opt_proposals.remove(&new_round) {
+            self.opt_proposal_loopback_tx
+                .send(opt_proposal)
+                .await
+                .expect("Sending to a self loopback unbounded channel cannot fail");
+        } else
+        // If the current proposer is the leading, try to propose a regular block if not opt proposed already
         if is_current_proposer {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
@@ -463,6 +501,32 @@ impl RoundManager {
             }
         };
         network.broadcast_proposal(proposal_msg).await;
+        counters::PROPOSALS_COUNT.inc();
+        Ok(())
+    }
+
+    async fn generate_and_send_opt_proposal(
+        epoch_state: Arc<EpochState>,
+        round: Round,
+        parent: BlockInfo,
+        grandparent_qc: QuorumCert,
+        network: Arc<NetworkSender>,
+        sync_info: SyncInfo,
+        proposal_generator: Arc<ProposalGenerator>,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+    ) -> anyhow::Result<()> {
+        let proposal_msg = Self::generate_opt_proposal(
+            epoch_state.clone(),
+            round,
+            parent,
+            grandparent_qc,
+            sync_info,
+            network.clone(),
+            proposal_generator,
+            proposer_election,
+        )
+        .await?;
+        network.broadcast_opt_proposal(proposal_msg).await;
         counters::PROPOSALS_COUNT.inc();
         Ok(())
     }
@@ -594,6 +658,42 @@ impl RoundManager {
         Ok(ProposalMsg::new(signed_proposal, sync_info))
     }
 
+    async fn generate_opt_proposal(
+        epoch_state: Arc<EpochState>,
+        round: Round,
+        parent: BlockInfo,
+        grandparent_qc: QuorumCert,
+        sync_info: SyncInfo,
+        network: Arc<NetworkSender>,
+        proposal_generator: Arc<ProposalGenerator>,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+    ) -> anyhow::Result<OptProposalMsg> {
+        // Proposal generator will ensure that at most one proposal is generated per round
+        let callback_sync_info = sync_info.clone();
+        let callback = async move {
+            network.broadcast_sync_info(callback_sync_info).await;
+        }
+        .boxed();
+
+        let proposal = proposal_generator
+            .generate_opt_proposal(
+                epoch_state.epoch,
+                round,
+                parent,
+                grandparent_qc,
+                proposer_election,
+                callback,
+            )
+            .await?;
+        observe_block(proposal.timestamp_usecs(), BlockStage::OPT_PROPOSED);
+        info!(Self::new_log_with_round_epoch(
+            LogEvent::OptPropose,
+            round,
+            epoch_state.epoch
+        ),);
+        Ok(OptProposalMsg::new(proposal, sync_info))
+    }
+
     /// Process the proposal message:
     /// 1. ensure after processing sync info, we're at the same round as the proposal
     /// 2. execute and decide whether to vote for the proposal
@@ -648,6 +748,111 @@ impl RoundManager {
         }
 
         self.process_verified_proposal(proposal).await
+    }
+
+    /// Process the optimistic proposal message:
+    /// If entered the round of opt proposal, process the opt proposal directly.
+    /// Otherwise, buffer the opt proposal and process it later when parent QC is available.
+    pub async fn process_opt_proposal_msg(
+        &mut self,
+        proposal_msg: OptProposalMsg,
+    ) -> anyhow::Result<()> {
+        ensure!(self.local_config.enable_optimistic_proposal_rx,
+            "Opt proposal is disabled, but received opt proposal msg of epoch {} round {} from peer {}", 
+            proposal_msg.block_data().epoch(), proposal_msg.round(), proposal_msg.proposer()
+        );
+
+        fail_point!("consensus::process_opt_proposal_msg", |_| {
+            Err(anyhow::anyhow!(
+                "Injected error in process_opt_proposal_msg"
+            ))
+        });
+
+        observe_block(
+            proposal_msg.block_data().timestamp_usecs(),
+            BlockStage::ROUND_MANAGER_RECEIVED,
+        );
+        observe_block(
+            proposal_msg.block_data().timestamp_usecs(),
+            BlockStage::ROUND_MANAGER_RECEIVED_OPT_PROPOSAL,
+        );
+        info!(
+            self.new_log(LogEvent::ReceiveOptProposal),
+            block_author = proposal_msg.proposer(),
+            block_epoch = proposal_msg.block_data().epoch(),
+            block_round = proposal_msg.round(),
+            block_parent_hash = proposal_msg.block_data().parent_id(),
+        );
+
+        self.sync_up(proposal_msg.sync_info(), proposal_msg.proposer())
+            .await?;
+
+        if self.round_state.current_round() == proposal_msg.round() {
+            self.opt_proposal_loopback_tx
+                .send(proposal_msg.take_block_data())
+                .await
+                .expect("Sending to a self loopback unbounded channel cannot fail");
+        } else {
+            // Pre-check that proposal is from valid proposer before queuing it.
+            // This check is done after syncing up to sync info to ensure proposer
+            // election provider is up to date.
+            ensure!(
+                self.proposer_election
+                    .is_valid_proposer(proposal_msg.proposer(), proposal_msg.round()),
+                "[OptProposal] Not a valid proposer for round {}: {}",
+                proposal_msg.round(),
+                proposal_msg.proposer()
+            );
+            self.pending_opt_proposals
+                .insert(proposal_msg.round(), proposal_msg.take_block_data());
+        }
+
+        Ok(())
+    }
+
+    /// Process the optimistic proposal:
+    /// 1. Ensure the highest quorum cert certifies the parent block of the opt block
+    /// 2. Create a regular proposal by adding QC and failed_authors to the opt block
+    /// 3. Process the proposal using exsiting logic
+    async fn process_opt_proposal(&mut self, opt_block_data: OptBlockData) -> anyhow::Result<()> {
+        if self
+            .block_store
+            .get_block_for_round(opt_block_data.round())
+            .is_some()
+        {
+            // ignore the opt proposal if we have already received the proposal
+            return Ok(());
+        }
+        let hqc = self.block_store.highest_quorum_cert().as_ref().clone();
+        ensure!(
+            hqc.certified_block().round() + 1 == opt_block_data.round(),
+            "Opt proposal round {} is not the next round after the highest qc round {}",
+            opt_block_data.round(),
+            hqc.certified_block().round()
+        );
+        ensure!(
+            hqc.certified_block().id() == opt_block_data.parent_id(),
+            "Opt proposal parent id {} is not the same as the highest qc certified block id {}",
+            opt_block_data.parent_id(),
+            hqc.certified_block().id()
+        );
+        let failed_authors = self.proposal_generator.compute_failed_authors(
+            opt_block_data.round(),
+            hqc.certified_block().round(),
+            false,
+            self.proposer_election.clone(),
+        );
+        let proposal = Block::new_from_opt(opt_block_data, hqc, failed_authors);
+        observe_block(proposal.timestamp_usecs(), BlockStage::PROCESS_OPT_PROPOSAL);
+        info!(
+            self.new_log(LogEvent::ProcessOptProposal),
+            block_author = proposal.author(),
+            block_epoch = proposal.epoch(),
+            block_round = proposal.round(),
+            block_hash = proposal.id(),
+            block_parent_hash = proposal.quorum_cert().certified_block().id(),
+        );
+        self.process_proposal(proposal).await
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
@@ -890,13 +1095,16 @@ impl RoundManager {
             .expect("Proposal should be verified having an author");
 
         if !self.vtxn_config.enabled()
-            && matches!(
+            && (matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)
-            )
+            ) || matches!(
+                proposal.block_data().block_type(),
+                BlockType::OptProposal(_)
+            ))
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
-            bail!("ProposalExt unexpected while the feature is disabled.");
+            bail!("validator txns unexpected while the feature is disabled.");
         }
 
         if let Some(vtxns) = proposal.validator_txns() {
@@ -998,6 +1206,9 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
+        if proposal.is_opt_block() {
+            observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED_OPT_BLOCK);
+        }
 
         // Since processing proposal is delayed due to backpressure or payload availability, we add
         // the block to the block store so that we don't need to fetch it from remote once we
@@ -1005,7 +1216,7 @@ impl RoundManager {
         // guaranteed to add the block to the block store if we don't get out of the backpressure
         // before the timeout, so this is needed to ensure that the proposed block is added to
         // the block store irrespective. Also, it is possible that delayed processing of proposal
-        // tries to add the same block again, which is okay as `execute_and_insert_block` call
+        // tries to add the same block again, which is okay as `insert_block` call
         // is idempotent.
         self.block_store
             .insert_block(proposal.clone())
@@ -1135,6 +1346,7 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
+        let parent_qc = proposal.quorum_cert().clone();
         let sync_info = self.block_store.sync_info();
 
         if proposal_round <= sync_info.highest_round() {
@@ -1170,7 +1382,62 @@ impl RoundManager {
             );
             self.network.send_vote(vote_msg, vec![recipient]).await;
         }
+
+        self.start_next_opt_round(
+            vote.vote_data().proposed().clone(),
+            proposal_round,
+            parent_qc,
+        );
         Ok(())
+    }
+
+    fn start_next_opt_round(
+        &self,
+        parent: BlockInfo,
+        parent_round: Round,
+        grandparent_qc: QuorumCert,
+    ) {
+        let opt_proposal_round = parent_round + 1;
+        // Optimistic Proposal:
+        // When receiving round r block, send optimistic proposal for round r+1 if:
+        // 0. opt proposal is enabled
+        // 1. it is the leader of the next round r+1
+        // 2. voted for round r block
+        // 3. the round r block contains QC of round r-1
+        // 4. does not propose in round r+1
+        if self.local_config.enable_optimistic_proposal_tx
+            && self
+                .proposer_election
+                .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
+            && grandparent_qc.certified_block().round() == parent_round - 1
+        {
+            let epoch_state = self.epoch_state.clone();
+            let network = self.network.clone();
+            let sync_info = self.block_store.sync_info();
+            let proposal_generator = self.proposal_generator.clone();
+            let proposer_election = self.proposer_election.clone();
+            tokio::spawn(async move {
+                if let Err(e) = monitor!(
+                    "generate_and_send_opt_proposal",
+                    Self::generate_and_send_opt_proposal(
+                        epoch_state,
+                        opt_proposal_round,
+                        parent,
+                        grandparent_qc,
+                        network,
+                        sync_info,
+                        proposal_generator,
+                        proposer_election,
+                    )
+                    .await
+                ) {
+                    warn!(
+                        "[OptProposal] Error generating and sending opt proposal: {}",
+                        e
+                    );
+                }
+            });
+        }
     }
 
     /// The function generates a VoteMsg for a given proposed_block:
@@ -1208,6 +1475,13 @@ impl RoundManager {
         ))?;
         if !block_arc.block().is_nil_block() {
             observe_block(block_arc.block().timestamp_usecs(), BlockStage::VOTED);
+        }
+
+        if block_arc.block().is_opt_block() {
+            observe_block(
+                block_arc.block().timestamp_usecs(),
+                BlockStage::VOTED_OPT_BLOCK,
+            );
         }
 
         self.storage
@@ -1335,6 +1609,12 @@ impl RoundManager {
                 observe_block(
                     proposed_block.block().timestamp_usecs(),
                     BlockStage::ORDER_VOTED,
+                );
+            }
+            if proposed_block.block().is_opt_block() {
+                observe_block(
+                    proposed_block.block().timestamp_usecs(),
+                    BlockStage::ORDER_VOTED_OPT_BLOCK,
                 );
             }
             let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
@@ -1725,6 +2005,7 @@ impl RoundManager {
             (Author, VerifiedEvent),
         >,
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
+        mut opt_proposal_loopback_rx: aptos_channels::UnboundedReceiver<OptBlockData>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state.epoch, "RoundManager started");
@@ -1738,6 +2019,18 @@ impl RoundManager {
                     }
                     break;
                 }
+                opt_proposal = opt_proposal_loopback_rx.select_next_some() => {
+                    self.pending_opt_proposals = self.pending_opt_proposals.split_off(&opt_proposal.round().add(1));
+                    let result = monitor!("process_opt_proposal_loopback", self.process_opt_proposal(opt_proposal).await);
+                    let round_state = self.round_state();
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                        }
+                    }
+                }
                 proposal = buffered_proposal_rx.select_next_some() => {
                     let mut proposals = vec![proposal];
                     while let Some(Some(proposal)) = buffered_proposal_rx.next().now_or_never() {
@@ -1747,6 +2040,7 @@ impl RoundManager {
                         match event {
                             VerifiedEvent::ProposalMsg(p) => p.proposal().round(),
                             VerifiedEvent::VerifiedProposalMsg(p) => p.round(),
+                            VerifiedEvent::OptProposalMsg(p) => p.round(),
                             unexpected_event => unreachable!("Unexpected event {:?}", unexpected_event),
                         }
                     };
@@ -1768,6 +2062,12 @@ impl RoundManager {
                                 monitor!(
                                     "process_verified_proposal",
                                     self.process_delayed_proposal_msg(*proposal_msg).await
+                                )
+                            }
+                            VerifiedEvent::OptProposalMsg(proposal_msg) => {
+                                monitor!(
+                                    "process_opt_proposal",
+                                    self.process_opt_proposal_msg(*proposal_msg).await
                                 )
                             }
                             unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),

@@ -4,13 +4,18 @@
 
 use crate::{
     common::{Author, Payload, Round},
-    proposal_ext::ProposalExt,
+    opt_block_data::OptBlockData,
+    proposal_ext::{OptProposalExt, ProposalExt},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
+use anyhow::{bail, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::hash::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto::{
+    hash::{CryptoHash, CryptoHasher},
+    HashValue,
+};
+use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -51,7 +56,6 @@ pub enum BlockType {
 
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
-    #[serde(skip_deserializing)]
     DAGBlock {
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -61,9 +65,12 @@ pub enum BlockType {
         parent_block_id: HashValue,
         parents_bitvec: BitVec,
     },
+
+    /// Optimistic proposal.
+    OptProposal(OptProposalExt),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
 /// Each block must know the id of its parent and keep the QuorurmCertificate to that parent.
 pub struct BlockData {
@@ -96,6 +103,28 @@ pub struct BlockData {
     block_type: BlockType,
 }
 
+impl CryptoHash for BlockData {
+    type Hasher = BlockDataHasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        if self.is_opt_block() {
+            state.update(&self.epoch.to_be_bytes());
+            state.update(&self.round.to_be_bytes());
+            state.update(&self.timestamp_usecs.to_be_bytes());
+            state.update(
+                &bcs::to_bytes(self.quorum_cert().vote_data())
+                    .expect("Unable to serialize quorum cert vote data"),
+            );
+            state
+                .update(&bcs::to_bytes(self.block_type()).expect("Unable to serialize block type"));
+        } else {
+            bcs::serialize_into(&mut state, &self).expect("Failed to serialize BlockData");
+        }
+        state.finish()
+    }
+}
+
 impl BlockData {
     pub fn author(&self) -> Option<Author> {
         match &self.block_type {
@@ -103,6 +132,7 @@ impl BlockData {
                 Some(*author)
             },
             BlockType::ProposalExt(p) => Some(*p.author()),
+            BlockType::OptProposal(p) => Some(*p.author()),
             _ => None,
         }
     }
@@ -132,13 +162,15 @@ impl BlockData {
                 Some(payload)
             },
             BlockType::ProposalExt(p) => p.payload(),
+            BlockType::OptProposal(p) => Some(p.payload()),
             _ => None,
         }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match &self.block_type {
-            BlockType::ProposalExt(proposal_ext) => proposal_ext.validator_txns(),
+            BlockType::ProposalExt(p) => p.validator_txns(),
+            BlockType::OptProposal(p) => p.validator_txns(),
             BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
             BlockType::DAGBlock { validator_txns, .. } => Some(validator_txns),
         }
@@ -176,6 +208,10 @@ impl BlockData {
         matches!(self.block_type, BlockType::NilBlock { .. })
     }
 
+    pub fn is_opt_block(&self) -> bool {
+        matches!(self.block_type, BlockType::OptProposal { .. })
+    }
+
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
@@ -184,6 +220,7 @@ impl BlockData {
             | BlockType::NilBlock { failed_authors, .. }
             | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
             BlockType::ProposalExt(p) => Some(p.failed_authors()),
+            BlockType::OptProposal(p) => Some(p.failed_authors()),
             BlockType::Genesis => None,
         }
     }
@@ -352,6 +389,30 @@ impl BlockData {
                 author,
                 failed_authors,
             }),
+        }
+    }
+
+    // Converting OptBlockData to BlockData
+    // by adding QC and failed_authors
+    pub fn new_from_opt(
+        opt_block_data: OptBlockData,
+        quorum_cert: QuorumCert,
+        new_failed_authors: Vec<(Round, Author)>,
+    ) -> Self {
+        let OptBlockData {
+            epoch,
+            round,
+            timestamp_usecs,
+            mut proposal,
+            ..
+        } = opt_block_data;
+        proposal.set_failed_authors(new_failed_authors);
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::OptProposal(proposal),
         }
     }
 
