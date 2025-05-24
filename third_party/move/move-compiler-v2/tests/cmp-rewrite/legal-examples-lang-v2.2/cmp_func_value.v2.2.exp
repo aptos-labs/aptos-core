@@ -1,0 +1,216 @@
+// -- Model dump before first bytecode pipeline
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq1());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq1());
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq2());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq2());
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq3());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq3());
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq4());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq4());
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun __lambda__1__eq1(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq1(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+    private fun __lambda__1__eq2(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq2(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+    private fun __lambda__1__eq3(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq3(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+    private fun __lambda__1__eq4(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq4(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+} // end 0x1::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x1::test {
+    struct Work has copy, drop {
+        0: |u64|u64 has copy + drop,
+    }
+    fun eq1(): Work {
+        let work1 = Work(|arg0| __lambda__1__eq1(arg0));
+        let work2 = Work(|arg0| __lambda__2__eq1(arg0));
+        if (&work1 == &work2) work1 else work2
+    }
+    fun eq2(): Work {
+        let work1 = Work(|arg0| __lambda__1__eq2(arg0));
+        let work2 = Work(|arg0| __lambda__2__eq2(arg0));
+        if (&work1 == &work2) work1 else work2
+    }
+    fun eq3(): Work {
+        let work1 = Work(|arg0| __lambda__1__eq3(arg0));
+        let work2 = Work(|arg0| __lambda__2__eq3(arg0));
+        if (work1(2) == work2(1)) work1 else work2
+    }
+    fun eq4(): Work {
+        let work1 = Work(|arg0| __lambda__1__eq4(arg0));
+        let work2 = Work(|arg0| __lambda__2__eq4(arg0));
+        if (&work1(2) == &work2(1)) work1 else work2
+    }
+    fun __lambda__1__eq1(x: u64): u64 {
+        x + 1
+    }
+    fun __lambda__2__eq1(x: u64): u64 {
+        x + 2
+    }
+    fun __lambda__1__eq2(x: u64): u64 {
+        x + 1
+    }
+    fun __lambda__2__eq2(x: u64): u64 {
+        x + 2
+    }
+    fun __lambda__1__eq3(x: u64): u64 {
+        x + 1
+    }
+    fun __lambda__2__eq3(x: u64): u64 {
+        x + 2
+    }
+    fun __lambda__1__eq4(x: u64): u64 {
+        x + 1
+    }
+    fun __lambda__2__eq4(x: u64): u64 {
+        x + 2
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x1::test {
+    struct Work {
+        0: |u64|u64 has copy + drop,
+    }
+    private fun eq1(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq1());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq1());
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq2(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq2());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq2());
+            if Eq<Work>(Borrow(Immutable)(work1), Borrow(Immutable)(work2)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq3(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq3());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq3());
+            if Eq<u64>((work1)(2), (work2)(1)) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun eq4(): Work {
+        {
+          let work1: Work = pack test::Work(closure#0test::__lambda__1__eq4());
+          {
+            let work2: Work = pack test::Work(closure#0test::__lambda__2__eq4());
+            if Eq<u64>(Borrow(Immutable)((work1)(2)), Borrow(Immutable)((work2)(1))) {
+              work1
+            } else {
+              work2
+            }
+          }
+        }
+    }
+    private fun __lambda__1__eq1(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq1(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+    private fun __lambda__1__eq2(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq2(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+    private fun __lambda__1__eq3(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq3(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+    private fun __lambda__1__eq4(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    private fun __lambda__2__eq4(x: u64): u64 {
+        Add<u64>(x, 2)
+    }
+} // end 0x1::test

@@ -43,60 +43,59 @@ B1:
 	12: CopyLoc[6](i: u64)
 	13: CopyLoc[5](len: u64)
 	14: Lt
-	15: BrFalse(35)
+	15: BrFalse(34)
 B2:
 	16: CopyLoc[2](v: &vector<T>)
 	17: CopyLoc[6](i: u64)
 	18: VecImmBorrow(2)
 	19: ImmBorrowField[1](T.issuer: vector<u8>)
-	20: ReadRef
-	21: CopyLoc[1](issuer: vector<u8>)
-	22: Eq
-	23: BrFalse(30)
+	20: ImmBorrowLoc[1](issuer: vector<u8>)
+	21: Eq
+	22: BrFalse(29)
 B3:
-	24: LdTrue
-	25: StLoc[3](find: bool)
-	26: MoveLoc[6](i: u64)
-	27: StLoc[4](found_index: u64)
-	28: Branch(37)
+	23: LdTrue
+	24: StLoc[3](find: bool)
+	25: MoveLoc[6](i: u64)
+	26: StLoc[4](found_index: u64)
+	27: Branch(36)
 B4:
-	29: Branch(30)
+	28: Branch(29)
 B5:
-	30: MoveLoc[6](i: u64)
-	31: LdU64(1)
-	32: Add
-	33: StLoc[6](i: u64)
-	34: Branch(36)
+	29: MoveLoc[6](i: u64)
+	30: LdU64(1)
+	31: Add
+	32: StLoc[6](i: u64)
+	33: Branch(35)
 B6:
-	35: Branch(37)
+	34: Branch(36)
 B7:
-	36: Branch(12)
+	35: Branch(12)
 B8:
-	37: Nop
-	38: MoveLoc[2](v: &vector<T>)
-	39: Pop
-	40: MoveLoc[3](find: bool)
-	41: MoveLoc[4](found_index: u64)
-	42: StLoc[7](index: u64)
-	43: StLoc[8](found: bool)
-	44: MoveLoc[8](found: bool)
-	45: BrFalse(53)
+	36: Nop
+	37: MoveLoc[2](v: &vector<T>)
+	38: Pop
+	39: MoveLoc[3](find: bool)
+	40: MoveLoc[4](found_index: u64)
+	41: StLoc[7](index: u64)
+	42: StLoc[8](found: bool)
+	43: MoveLoc[8](found: bool)
+	44: BrFalse(52)
 B9:
-	46: MoveLoc[0](s: &mut S)
-	47: MutBorrowField[0](S.entries: vector<T>)
-	48: MoveLoc[7](index: u64)
-	49: Call vector::remove<T>(&mut vector<T>, u64): T
-	50: Call option::some<T>(T): Option<T>
-	51: StLoc[9](ret: Option<T>)
-	52: Branch(57)
+	45: MoveLoc[0](s: &mut S)
+	46: MutBorrowField[0](S.entries: vector<T>)
+	47: MoveLoc[7](index: u64)
+	48: Call vector::remove<T>(&mut vector<T>, u64): T
+	49: Call option::some<T>(T): Option<T>
+	50: StLoc[9](ret: Option<T>)
+	51: Branch(56)
 B10:
-	53: MoveLoc[0](s: &mut S)
-	54: Pop
-	55: Call option::none<T>(): Option<T>
-	56: StLoc[9](ret: Option<T>)
+	52: MoveLoc[0](s: &mut S)
+	53: Pop
+	54: Call option::none<T>(): Option<T>
+	55: StLoc[9](ret: Option<T>)
 B11:
-	57: MoveLoc[9](ret: Option<T>)
-	58: Ret
+	56: MoveLoc[9](ret: Option<T>)
+	57: Ret
 }
 }
 ============ bytecode verification succeeded ========

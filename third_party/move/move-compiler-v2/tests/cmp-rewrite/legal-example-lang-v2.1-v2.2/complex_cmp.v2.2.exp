@@ -1,0 +1,106 @@
+// -- Model dump before first bytecode pipeline
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcfff::m {
+    struct Test has copy, drop {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 has copy, drop {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T: copy + drop>(x: T, y: T): bool {
+        foo<T>(x, y) == foo<T>(y, x)
+    }
+    public fun eq2<T: copy + drop>(x: T, y: T, z: bool): bool {
+        &(&x == &y) == &z
+    }
+    public fun eq3<T: copy + drop>(x: T, y: T, z: bool): bool {
+        x == y == z
+    }
+    public fun eq4<T: copy + drop>(x: T, y: T, z: bool): bool {
+        &x == &y == z
+    }
+    public fun eq5(x: Test1, y: Test1): bool {
+        &x.a == &y.a
+    }
+    public fun eq6(x: Test1, y: Test1): bool {
+        &x.a == &y.a
+    }
+    fun foo<T: copy + drop>(x: T, y: T): T {
+        if (x == y) x else y
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m

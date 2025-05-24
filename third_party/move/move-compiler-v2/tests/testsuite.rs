@@ -580,6 +580,24 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::SecondAstPipeline,
             ..config().exp(Experiment::MESSAGE_FORMAT_JSON)
         },
+        TestConfig {
+            name: "cmp-rewrite-lang-v2.1",
+            runner: |p| run_test(p, get_config_by_name("cmp-rewrite-lang-v2.1")),
+            include: vec!["/cmp-rewrite/"],
+            exp_suffix: Some("v2.1.exp"),
+            stop_after: StopAfter::SecondAstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_1)
+        },
+        TestConfig {
+            name: "cmp-rewrite-lang-v2.2",
+            runner: |p| run_test(p, get_config_by_name("cmp-rewrite-lang-v2.2")),
+            include: vec!["/cmp-rewrite/"],
+            exp_suffix: Some("v2.2.exp"),
+            stop_after: StopAfter::SecondAstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_2)
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });

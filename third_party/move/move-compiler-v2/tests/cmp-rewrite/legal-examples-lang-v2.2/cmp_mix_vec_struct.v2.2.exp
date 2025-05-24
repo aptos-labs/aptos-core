@@ -1,0 +1,569 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Test1 {
+        a: u64,
+        b: u64,
+    }
+    struct Test2 {
+        a: vector<u64>,
+    }
+    struct Test3 {
+        a: vector<Test1>,
+    }
+    public fun test1() {
+        {
+          let x: Test1 = pack m::Test1(1, 2);
+          {
+            let y: Test1 = pack m::Test1(1, 2);
+            if Eq<Test1>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(select m::Test1.b<Test1>(x), select m::Test1.b<Test1>(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(Borrow(Immutable)(select m::Test1.b<Test1>(x)), Borrow(Immutable)(select m::Test1.b<Test1>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test2() {
+        {
+          let x: Test2 = pack m::Test2(Vector<u64>(1, 2, 3));
+          {
+            let y: Test2 = pack m::Test2(Vector<u64>(1, 2, 3));
+            if Eq<Test2>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test2>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<u64>>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), Borrow(Immutable)(select m::Test2.a<Test2>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<u64>>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), Borrow(Immutable)(select m::Test2.a<Test2>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(Deref(vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), 0)), Deref(vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(y)), 0))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), 0), vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(y)), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test3() {
+        {
+          let x: Test3 = pack m::Test3(Vector<Test1>(pack m::Test1(1, 2)));
+          {
+            let y: Test3 = pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2)));
+            if Neq<Test3>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<Test3>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), Borrow(Immutable)(select m::Test3.a<Test3>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), Borrow(Immutable)(select m::Test3.a<Test3>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), 0))), Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(y)), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), 0), vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(y)), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test4() {
+        {
+          let x: vector<Test1> = Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2), pack m::Test1(1, 2));
+          {
+            let y: vector<Test1> = Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2), pack m::Test1(1, 2));
+            if Eq<vector<Test1>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<Test1>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(vector::borrow<Test1>(Borrow(Immutable)(x), 0), vector::borrow<Test1>(Borrow(Immutable)(y), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(x), 1))), Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(y), 1)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(vector::borrow<Test1>(Borrow(Immutable)(x), 1), vector::borrow<Test1>(Borrow(Immutable)(y), 1)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test5() {
+        {
+          let x: vector<Test2> = Vector<Test2>(pack m::Test2(Vector<u64>(1, 2, 3)), pack m::Test2(Vector<u64>(1, 2, 3)));
+          {
+            let y: vector<Test2> = Vector<Test2>(pack m::Test2(Vector<u64>(1, 2, 3)), pack m::Test2(Vector<u64>(2, 2, 2)), pack m::Test2(Vector<u64>(1, 2, 3)));
+            if Neq<vector<Test2>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test2>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test2>(Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test2>(vector::borrow<Test2>(Borrow(Immutable)(x), 0), vector::borrow<Test2>(Borrow(Immutable)(y), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<Test2>(Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(x), 1))), Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(y), 1)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<Test2>(vector::borrow<Test2>(Borrow(Immutable)(x), 1), vector::borrow<Test2>(Borrow(Immutable)(y), 1)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test6() {
+        {
+          let x: vector<Test3> = Vector<Test3>(pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2))));
+          {
+            let y: vector<Test3> = Vector<Test3>(pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2))), pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2))));
+            if Neq<vector<Test3>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test3>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test3>(Borrow(Immutable)(Deref(vector::borrow<Test3>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(Deref(vector::borrow<Test3>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test3>(vector::borrow<Test3>(Borrow(Immutable)(x), 0), vector::borrow<Test3>(Borrow(Immutable)(y), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Test1 has copy, drop {
+        a: u64,
+        b: u64,
+    }
+    struct Test2 has copy, drop {
+        a: vector<u64>,
+    }
+    struct Test3 has copy, drop {
+        a: vector<Test1>,
+    }
+    public fun test1() {
+        let x = Test1{a: 1,b: 2};
+        let y = Test1{a: 1,b: 2};
+        if (&x == &y) () else abort 0;
+        if (&x == &y) () else abort 0;
+        if (x.a == y.a) () else abort 0;
+        if (&x.a == &y.a) () else abort 0;
+        if (x.b == y.b) () else abort 0;
+        if (&x.b == &y.b) () else abort 0;
+    }
+    public fun test2() {
+        let x = Test2{a: vector[1, 2, 3]};
+        let y = Test2{a: vector[1, 2, 3]};
+        if (&x == &y) () else abort 0;
+        if (&x == &y) () else abort 0;
+        if (&x.a == &y.a) () else abort 0;
+        if (&x.a == &y.a) () else abort 0;
+        if (*0x1::vector::borrow<u64>(&x.a, 0) == *0x1::vector::borrow<u64>(&y.a, 0)) () else abort 0;
+        if (0x1::vector::borrow<u64>(&x.a, 0) == 0x1::vector::borrow<u64>(&y.a, 0)) () else abort 0;
+    }
+    public fun test3() {
+        let x = Test3{a: vector[Test1{a: 1,b: 2}]};
+        let y = Test3{a: vector[Test1{a: 1,b: 2}, Test1{a: 1,b: 2}]};
+        if (&x != &y) () else abort 0;
+        if (&x != &y) () else abort 0;
+        if (&x.a != &y.a) () else abort 0;
+        if (&x.a != &y.a) () else abort 0;
+        if (&*0x1::vector::borrow<Test1>(&x.a, 0) == &*0x1::vector::borrow<Test1>(&y.a, 0)) () else abort 0;
+        if (0x1::vector::borrow<Test1>(&x.a, 0) == 0x1::vector::borrow<Test1>(&y.a, 0)) () else abort 0;
+    }
+    public fun test4() {
+        let x = vector[Test1{a: 1,b: 2}, Test1{a: 1,b: 2}, Test1{a: 1,b: 2}];
+        let y = vector[Test1{a: 1,b: 2}, Test1{a: 1,b: 2}, Test1{a: 1,b: 2}];
+        if (&x == &y) () else abort 0;
+        if (&x == &y) () else abort 0;
+        if (&*0x1::vector::borrow<Test1>(&x, 0) == &*0x1::vector::borrow<Test1>(&y, 0)) () else abort 0;
+        if (0x1::vector::borrow<Test1>(&x, 0) == 0x1::vector::borrow<Test1>(&y, 0)) () else abort 0;
+        if (&*0x1::vector::borrow<Test1>(&x, 1) == &*0x1::vector::borrow<Test1>(&y, 1)) () else abort 0;
+        if (0x1::vector::borrow<Test1>(&x, 1) == 0x1::vector::borrow<Test1>(&y, 1)) () else abort 0;
+    }
+    public fun test5() {
+        let x = vector[Test2{a: vector[1, 2, 3]}, Test2{a: vector[1, 2, 3]}];
+        let y = vector[Test2{a: vector[1, 2, 3]}, Test2{a: vector[2, 2, 2]}, Test2{a: vector[1, 2, 3]}];
+        if (&x != &y) () else abort 0;
+        if (&x != &y) () else abort 0;
+        if (&*0x1::vector::borrow<Test2>(&x, 0) == &*0x1::vector::borrow<Test2>(&y, 0)) () else abort 0;
+        if (0x1::vector::borrow<Test2>(&x, 0) == 0x1::vector::borrow<Test2>(&y, 0)) () else abort 0;
+        if (&*0x1::vector::borrow<Test2>(&x, 1) != &*0x1::vector::borrow<Test2>(&y, 1)) () else abort 0;
+        if (0x1::vector::borrow<Test2>(&x, 1) != 0x1::vector::borrow<Test2>(&y, 1)) () else abort 0;
+    }
+    public fun test6() {
+        let x = vector[Test3{a: vector[Test1{a: 1,b: 2}, Test1{a: 1,b: 2}]}];
+        let y = vector[Test3{a: vector[Test1{a: 1,b: 2}, Test1{a: 1,b: 2}]}, Test3{a: vector[Test1{a: 1,b: 2}, Test1{a: 1,b: 2}]}];
+        if (&x != &y) () else abort 0;
+        if (&x != &y) () else abort 0;
+        if (&*0x1::vector::borrow<Test3>(&x, 0) == &*0x1::vector::borrow<Test3>(&y, 0)) () else abort 0;
+        if (0x1::vector::borrow<Test3>(&x, 0) == 0x1::vector::borrow<Test3>(&y, 0)) () else abort 0;
+        if (&0x1::vector::borrow<Test3>(&x, 0).a == &0x1::vector::borrow<Test3>(&y, 0).a) () else abort 0;
+        if (&0x1::vector::borrow<Test3>(&x, 0).a == &0x1::vector::borrow<Test3>(&y, 0).a) () else abort 0;
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct Test1 {
+        a: u64,
+        b: u64,
+    }
+    struct Test2 {
+        a: vector<u64>,
+    }
+    struct Test3 {
+        a: vector<Test1>,
+    }
+    public fun test1() {
+        {
+          let x: Test1 = pack m::Test1(1, 2);
+          {
+            let y: Test1 = pack m::Test1(1, 2);
+            if Eq<Test1>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(select m::Test1.b<Test1>(x), select m::Test1.b<Test1>(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(Borrow(Immutable)(select m::Test1.b<Test1>(x)), Borrow(Immutable)(select m::Test1.b<Test1>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test2() {
+        {
+          let x: Test2 = pack m::Test2([Number(1), Number(2), Number(3)]);
+          {
+            let y: Test2 = pack m::Test2([Number(1), Number(2), Number(3)]);
+            if Eq<Test2>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test2>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<u64>>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), Borrow(Immutable)(select m::Test2.a<Test2>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<u64>>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), Borrow(Immutable)(select m::Test2.a<Test2>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(Deref(vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), 0)), Deref(vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(y)), 0))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<u64>(vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(x)), 0), vector::borrow<u64>(Borrow(Immutable)(select m::Test2.a<Test2>(y)), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test3() {
+        {
+          let x: Test3 = pack m::Test3(Vector<Test1>(pack m::Test1(1, 2)));
+          {
+            let y: Test3 = pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2)));
+            if Neq<Test3>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<Test3>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), Borrow(Immutable)(select m::Test3.a<Test3>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), Borrow(Immutable)(select m::Test3.a<Test3>(y))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), 0))), Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(y)), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(x)), 0), vector::borrow<Test1>(Borrow(Immutable)(select m::Test3.a<Test3>(y)), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test4() {
+        {
+          let x: vector<Test1> = Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2), pack m::Test1(1, 2));
+          {
+            let y: vector<Test1> = Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2), pack m::Test1(1, 2));
+            if Eq<vector<Test1>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<Test1>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(vector::borrow<Test1>(Borrow(Immutable)(x), 0), vector::borrow<Test1>(Borrow(Immutable)(y), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(x), 1))), Borrow(Immutable)(Deref(vector::borrow<Test1>(Borrow(Immutable)(y), 1)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test1>(vector::borrow<Test1>(Borrow(Immutable)(x), 1), vector::borrow<Test1>(Borrow(Immutable)(y), 1)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test5() {
+        {
+          let x: vector<Test2> = Vector<Test2>(pack m::Test2([Number(1), Number(2), Number(3)]), pack m::Test2([Number(1), Number(2), Number(3)]));
+          {
+            let y: vector<Test2> = Vector<Test2>(pack m::Test2([Number(1), Number(2), Number(3)]), pack m::Test2([Number(2), Number(2), Number(2)]), pack m::Test2([Number(1), Number(2), Number(3)]));
+            if Neq<vector<Test2>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test2>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test2>(Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test2>(vector::borrow<Test2>(Borrow(Immutable)(x), 0), vector::borrow<Test2>(Borrow(Immutable)(y), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<Test2>(Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(x), 1))), Borrow(Immutable)(Deref(vector::borrow<Test2>(Borrow(Immutable)(y), 1)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<Test2>(vector::borrow<Test2>(Borrow(Immutable)(x), 1), vector::borrow<Test2>(Borrow(Immutable)(y), 1)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    public fun test6() {
+        {
+          let x: vector<Test3> = Vector<Test3>(pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2))));
+          {
+            let y: vector<Test3> = Vector<Test3>(pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2))), pack m::Test3(Vector<Test1>(pack m::Test1(1, 2), pack m::Test1(1, 2))));
+            if Neq<vector<Test3>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Neq<vector<Test3>>(Borrow(Immutable)(x), Borrow(Immutable)(y)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test3>(Borrow(Immutable)(Deref(vector::borrow<Test3>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(Deref(vector::borrow<Test3>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<Test3>(vector::borrow<Test3>(Borrow(Immutable)(x), 0), vector::borrow<Test3>(Borrow(Immutable)(y), 0)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            if Eq<vector<Test1>>(Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(x), 0))), Borrow(Immutable)(select m::Test3.a<Test3>(vector::borrow<Test3>(Borrow(Immutable)(y), 0)))) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::m
