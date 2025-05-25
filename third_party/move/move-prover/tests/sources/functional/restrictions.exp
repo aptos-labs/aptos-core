@@ -23,13 +23,13 @@ error: [boogie translator] `|x|e` (lambda) currently only supported as argument 
 21 │             let f = |x| x + 1;
    │                     ^^^^^^^^^
 
-error: [boogie translator] `|x|e` (lambda) currently only supported as argument for `all` or `any`
+error: bug: operation closure#0M::__lambda__1__use_them is not supported in the current context
    ┌─ tests/sources/functional/restrictions.move:50:20
    │
 50 │         ensures f3(|x|x) == f3(|x|x);
    │                    ^^^^
 
-error: [boogie translator] `|x|e` (lambda) currently only supported as argument for `all` or `any`
+error: bug: operation closure#0M::__lambda__2__use_them is not supported in the current context
    ┌─ tests/sources/functional/restrictions.move:50:32
    │
 50 │         ensures f3(|x|x) == f3(|x|x);

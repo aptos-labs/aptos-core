@@ -287,6 +287,11 @@ impl Condition {
     pub fn all_exps(&self) -> impl Iterator<Item = &Exp> {
         std::iter::once(&self.exp).chain(self.additional_exps.iter())
     }
+
+    /// Return all expressions in the condition, the primary one and the additional ones.
+    pub fn all_exps_mut(&mut self) -> impl Iterator<Item = &mut Exp> {
+        std::iter::once(&mut self.exp).chain(self.additional_exps.iter_mut())
+    }
 }
 
 // =================================================================================================
