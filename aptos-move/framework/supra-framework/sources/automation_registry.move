@@ -566,6 +566,7 @@ module supra_framework::automation_registry {
     /// Estimates automation fee the next epoch for specified task occupancy for the configured epoch-interval
     /// referencing the current automation registry fee parameters, specified total/committed occupancy and registry
     /// maximum allowed occupancy for the next epoch.
+    /// Note it is expected that committed_occupancy does not include currnet task's occupancy.
     fun estimate_automation_fee_with_committed_occupancy_internal(
         task_occupancy: u64,
         committed_occupancy: u64,
@@ -1504,7 +1505,7 @@ module supra_framework::automation_registry {
         // Check the automation fee capacity
         let estimated_automation_fee_for_epoch = estimate_automation_fee_with_committed_occupancy_internal(
             max_gas_amount,
-            committed_gas,
+            automation_registry.gas_committed_for_next_epoch,
             automation_epoch_info,
             automation_registry_config);
         assert!(automation_fee_cap_for_epoch >= estimated_automation_fee_for_epoch,
@@ -2287,17 +2288,47 @@ module supra_framework::automation_registry {
         user: &signer
     ) acquires AutomationRegistry, AutomationEpochInfo, ActiveAutomationRegistryConfig, AutomationRefundBookkeeping {
         initialize_registry_test(framework, user);
+        let max_gas_amount = 10;
+        let estimated_fee = estimate_automation_fee(max_gas_amount);
         register(user,
             PAYLOAD,
             86400,
-            10,
+            max_gas_amount,
             20,
-            1000,
+            estimated_fee,
             PARENT_HASH,
             AUX_DATA
         );
         assert!(1 == get_next_task_index(), 1);
-        assert!(10 == get_gas_committed_for_next_epoch(), 1)
+        assert!(max_gas_amount == get_gas_committed_for_next_epoch(), 2);
+
+        let registry_fee_address = get_registry_fee_address();
+        let user_address = address_of(user);
+        let registration_charges = FLAT_REGISTRATION_FEE_TEST + estimated_fee;
+        let expected_current_balance = ACCOUNT_BALANCE - registration_charges;
+        let expected_registry_balance = REGISTRY_DEFAULT_BALANCE + registration_charges;
+        check_account_balance(user_address, expected_current_balance);
+        check_account_balance(registry_fee_address, expected_registry_balance);
+
+        let max_gas_amount_causing_of = (AUTOMATION_MAX_GAS_TEST * (CONGESTION_THRESHOLD_TEST as u64)) / 100;
+        let estimated_fee = estimate_automation_fee(max_gas_amount_causing_of);
+        register(user,
+            PAYLOAD,
+            86400,
+            max_gas_amount_causing_of,
+            20,
+            estimated_fee,
+            PARENT_HASH,
+            AUX_DATA
+        );
+        assert!(2 == get_next_task_index(), 3);
+        assert!(max_gas_amount_causing_of + max_gas_amount == get_gas_committed_for_next_epoch(), 4);
+
+        let registration_charges = FLAT_REGISTRATION_FEE_TEST + estimated_fee;
+        let expected_current_balance = expected_current_balance - registration_charges;
+        let expected_registry_balance = expected_registry_balance + registration_charges;
+        check_account_balance(user_address, expected_current_balance);
+        check_account_balance(registry_fee_address, expected_registry_balance);
     }
 
     #[test(framework = @supra_framework, user = @0x1cafe)]

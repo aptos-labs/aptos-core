@@ -2407,6 +2407,7 @@ Returns the current status of the registration in the automation registry.
 Estimates automation fee the next epoch for specified task occupancy for the configured epoch-interval
 referencing the current automation registry fee parameters, specified total/committed occupancy and registry
 maximum allowed occupancy for the next epoch.
+Note it is expected that committed_occupancy does not include currnet task's occupancy.
 
 
 <pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_estimate_automation_fee_with_committed_occupancy_internal">estimate_automation_fee_with_committed_occupancy_internal</a>(task_occupancy: u64, committed_occupancy: u64, epoch_info: &<a href="automation_registry.md#0x1_automation_registry_AutomationEpochInfo">automation_registry::AutomationEpochInfo</a>, active_config: &<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfig">automation_registry::ActiveAutomationRegistryConfig</a>): u64
@@ -3955,7 +3956,7 @@ Registers a new automation task entry.
     // Check the automation fee capacity
     <b>let</b> estimated_automation_fee_for_epoch = <a href="automation_registry.md#0x1_automation_registry_estimate_automation_fee_with_committed_occupancy_internal">estimate_automation_fee_with_committed_occupancy_internal</a>(
         max_gas_amount,
-        committed_gas,
+        <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.gas_committed_for_next_epoch,
         automation_epoch_info,
         automation_registry_config);
     <b>assert</b>!(automation_fee_cap_for_epoch &gt;= estimated_automation_fee_for_epoch,
