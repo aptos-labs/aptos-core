@@ -64,10 +64,12 @@ impl BlockPreparer {
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
         let block_id = block.id();
+        let block_epoch = block.epoch();
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         let result = tokio::task::spawn_blocking(move || {
-            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
+            let filtered_txns =
+                txn_filter.filter(block_id, block_epoch, block_timestamp_usecs, txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = {
                 let _timer = TXN_SHUFFLE_SECONDS.start_timer();
