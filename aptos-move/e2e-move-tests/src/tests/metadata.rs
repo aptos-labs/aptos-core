@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
+use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::BuildOptions;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -117,7 +117,7 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions::default())
         .expect("building package must succeed");
     let origin_code = package.extract_code();
     let mut compiled_module = CompiledModule::deserialize(&origin_code[0]).unwrap();
@@ -175,7 +175,7 @@ fn test_compilation_metadata_with_changes(
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions {
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions {
         compiler_version: Some(compiler_version),
         ..BuildOptions::default()
     })
@@ -222,7 +222,7 @@ fn test_compilation_metadata_internal(
     } else {
         CompilerVersion::latest_stable()
     };
-    let package = build_package(path.path().to_path_buf(), BuildOptions {
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions {
         compiler_version: Some(compiler_version),
         ..BuildOptions::default()
     })
@@ -278,7 +278,7 @@ fn test_compilation_metadata_script_internal(
     } else {
         CompilerVersion::latest_stable()
     };
-    let package = build_package(path.path().to_path_buf(), BuildOptions {
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions {
         compiler_version: Some(compiler_version),
         ..BuildOptions::default()
     })

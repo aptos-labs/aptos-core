@@ -301,6 +301,40 @@ module aptos_experimental::active_order_book {
         }
     }
 
+    /// Increase the size of the order in the orderbook without altering its position in the price-time priority.
+    public fun increase_order_size(
+        self: &mut ActiveOrderBook,
+        price: u64,
+        unique_priority_idx: UniqueIdxType,
+        size_delta: u64,
+        is_buy: bool
+    ) {
+        let tie_breaker = get_tie_breaker(unique_priority_idx, is_buy);
+        let key = ActiveBidKey { price, tie_breaker };
+        if (is_buy) {
+            self.buys.borrow_mut(&key).size += size_delta;
+        } else {
+            self.sells.borrow_mut(&key).size += size_delta;
+        };
+    }
+
+    /// Decrease the size of the order in the order book without altering its position in the price-time priority.
+    public fun decrease_order_size(
+        self: &mut ActiveOrderBook,
+        price: u64,
+        unique_priority_idx: UniqueIdxType,
+        size_delta: u64,
+        is_buy: bool
+    ) {
+        let tie_breaker = get_tie_breaker(unique_priority_idx, is_buy);
+        let key = ActiveBidKey { price, tie_breaker };
+        if (is_buy) {
+            self.buys.borrow_mut(&key).size -= size_delta;
+        } else {
+            self.sells.borrow_mut(&key).size -= size_delta;
+        };
+    }
+
     public fun place_maker_order(
         self: &mut ActiveOrderBook,
         order_id: OrderIdType,

@@ -6,18 +6,17 @@ use crate::{
     state_store::{
         state::State,
         state_delta::StateDelta,
+        state_slot::StateSlot,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
             db_state_view::DbStateView,
             hot_state_view::{EmptyHotState, HotStateView},
         },
-        versioned_state_value::{DbStateUpdate, MemorizedStateRead},
         NUM_STATE_SHARDS,
     },
     DbReader,
 };
 use anyhow::Result;
-use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::{
     state_store::{
@@ -38,8 +37,8 @@ use std::{
     sync::Arc,
 };
 
-pub type StateCacheShard = DashMap<StateKey, MemorizedStateRead>;
-pub type HotStateShardRefreshes = DashMap<StateKey, DbStateUpdate>;
+pub type StateCacheShard = DashMap<StateKey, StateSlot>;
+pub type HotStateShardRefreshes = DashMap<StateKey, StateSlot>;
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -54,7 +53,6 @@ pub struct ShardedStateCache {
     next_version: Version,
     pub shards: [StateCacheShard; NUM_STATE_SHARDS],
     pub hot_state_refreshes: [HotStateShardRefreshes; NUM_STATE_SHARDS],
-    access_time_secs: u32,
 }
 
 impl ShardedStateCache {
@@ -63,7 +61,6 @@ impl ShardedStateCache {
             next_version: version.map_or(0, |v| v + 1),
             shards: Default::default(),
             hot_state_refreshes: arr![DashMap::with_capacity(32); 16],
-            access_time_secs: duration_since_epoch().as_secs() as u32,
         }
     }
 
@@ -71,7 +68,7 @@ impl ShardedStateCache {
         &self.shards[shard_id as usize]
     }
 
-    pub fn get_cloned(&self, state_key: &StateKey) -> Option<MemorizedStateRead> {
+    pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateSlot> {
         self.shard(state_key.get_shard_id())
             .get(state_key)
             .map(|r| r.clone())
@@ -84,27 +81,27 @@ impl ShardedStateCache {
     pub fn try_insert(
         &self,
         state_key: &StateKey,
-        value: MemorizedStateRead,
-        access_time_refresh_interval_secs: u32,
-    ) -> Option<StateValue> {
+        slot: StateSlot,
+        refresh_interval_versions: usize,
+    ) -> StateSlot {
         let shard_id = state_key.get_shard_id();
 
         let try_get_hot_state_refresh = match self.shard(shard_id).entry(state_key.clone()) {
             Entry::Occupied(_) => false,
             Entry::Vacant(entry) => {
-                entry.insert(value.clone());
+                entry.insert(slot.clone());
                 true
             },
         };
         if try_get_hot_state_refresh {
-            if let Some(refresh) =
-                value.to_hot_state_refresh(self.access_time_secs, access_time_refresh_interval_secs)
+            if let Some(hot_slot) =
+                slot.maybe_make_hot_or_refresh(self.next_version, refresh_interval_versions)
             {
-                self.hot_state_refreshes[shard_id as usize].insert(state_key.clone(), refresh);
+                self.hot_state_refreshes[shard_id as usize].insert(state_key.clone(), hot_slot);
             }
         }
 
-        value.to_state_value_opt()
+        slot
     }
 }
 
@@ -128,8 +125,9 @@ pub struct CachedStateView {
     /// State values (with update versions) read across the lifetime of the state view.
     memorized: ShardedStateCache,
 
+    // TODO(HotState): move refresh logic to the VM
     /// Hot state access time updates no more frequent than the set interval.
-    access_time_refresh_interval_secs: u32,
+    hot_item_refresh_interval_versions: usize,
 }
 
 impl Debug for CachedStateView {
@@ -139,7 +137,7 @@ impl Debug for CachedStateView {
 }
 
 impl CachedStateView {
-    const ACCESS_TIME_REFRESH_INTERVAL_SECS: u32 = 600;
+    const HOT_ITEM_REFRESH_INTERVAL_VERSIONS: usize = 1_000_000;
 
     /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
     /// speculative state represented by `speculative_state`. The persistent state view is the
@@ -168,7 +166,7 @@ impl CachedStateView {
             hot_state,
             persisted_state,
             state,
-            Self::ACCESS_TIME_REFRESH_INTERVAL_SECS,
+            Self::HOT_ITEM_REFRESH_INTERVAL_VERSIONS,
         )
     }
 
@@ -178,7 +176,7 @@ impl CachedStateView {
         hot_state: Arc<dyn HotStateView>,
         persisted_state: State,
         state: State,
-        access_time_refresh_interval_secs: u32,
+        hot_item_refresh_interval_versions: usize,
     ) -> Self {
         let version = state.version();
 
@@ -188,7 +186,7 @@ impl CachedStateView {
             hot: hot_state,
             cold: reader,
             memorized: ShardedStateCache::new_empty(version),
-            access_time_refresh_interval_secs,
+            hot_item_refresh_interval_versions,
         }
     }
 
@@ -196,14 +194,13 @@ impl CachedStateView {
         struct DummyDbReader;
         impl DbReader for DummyDbReader {}
 
-        Self {
-            id: StateViewId::Miscellaneous,
-            speculative: state.make_delta(state),
-            hot: Arc::new(EmptyHotState),
-            cold: Arc::new(DummyDbReader),
-            memorized: ShardedStateCache::new_empty(None),
-            access_time_refresh_interval_secs: Self::ACCESS_TIME_REFRESH_INTERVAL_SECS,
-        }
+        Self::new_impl(
+            StateViewId::Miscellaneous,
+            Arc::new(DummyDbReader),
+            Arc::new(EmptyHotState),
+            state.clone(),
+            state.clone(),
+        )
     }
 
     pub fn prime_cache(&self, updates: &StateUpdateRefs) -> Result<()> {
@@ -250,23 +247,23 @@ impl CachedStateView {
         self.speculative.base_version()
     }
 
-    fn get_unmemorized(&self, state_key: &StateKey) -> Result<MemorizedStateRead> {
+    fn get_unmemorized(&self, state_key: &StateKey) -> Result<StateSlot> {
         COUNTER.inc_with(&["sv_unmemorized"]);
 
-        let ret = if let Some(update) = self.speculative.get_state_update(state_key) {
+        let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
-            MemorizedStateRead::from_speculative_state(update)
-        } else if let Some(update) = self.hot.get_state_update(state_key)? {
+            slot
+        } else if let Some(slot) = self.hot.get_state_slot(state_key)? {
             COUNTER.inc_with(&["sv_hit_hot"]);
-            MemorizedStateRead::from_hot_state_hit(update)
+            slot
         } else if let Some(base_version) = self.base_version() {
             COUNTER.inc_with(&["sv_cold"]);
-            MemorizedStateRead::from_db_get(
+            StateSlot::from_db_get(
                 self.cold
                     .get_state_value_with_version_by_version(state_key, base_version)?,
             )
         } else {
-            MemorizedStateRead::NonExistent
+            StateSlot::ColdVacant
         };
 
         Ok(ret)
@@ -301,18 +298,17 @@ impl TStateView for CachedStateView {
         COUNTER.inc_with(&["sv_total_get"]);
 
         // First check if requested key is already memorized.
-        if let Some(value_with_version_opt) = self.memorized.get_cloned(state_key) {
+        if let Some(slot) = self.memorized.get_cloned(state_key) {
             COUNTER.inc_with(&["sv_memorized"]);
-            return Ok(value_with_version_opt.into_state_value_opt());
+            return Ok(slot.into_state_value_opt());
         }
 
         // TODO(aldenhu): reduce duplicated gets
-        let value_with_version_opt = self.get_unmemorized(state_key)?;
-        Ok(self.memorized.try_insert(
-            state_key,
-            value_with_version_opt,
-            self.access_time_refresh_interval_secs,
-        ))
+        let slot = self.get_unmemorized(state_key)?;
+        Ok(self
+            .memorized
+            .try_insert(state_key, slot, self.hot_item_refresh_interval_versions)
+            .into_state_value_opt())
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

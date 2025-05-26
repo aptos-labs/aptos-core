@@ -269,7 +269,7 @@ impl EventV2Translator for CoinDepositTranslator {
             sequence_number,
             DEPOSIT_EVENT_TYPE.clone(),
             bcs::to_bytes(&deposit_event)?,
-        ))
+        )?)
     }
 }
 
@@ -307,7 +307,7 @@ impl EventV2Translator for CoinWithdrawTranslator {
             sequence_number,
             WITHDRAW_EVENT_TYPE.clone(),
             bcs::to_bytes(&withdraw_event)?,
-        ))
+        )?)
     }
 }
 
@@ -346,7 +346,7 @@ impl EventV2Translator for CoinRegisterTranslator {
             sequence_number,
             COIN_REGISTER_EVENT_TYPE.clone(),
             bcs::to_bytes(&coin_register_event)?,
-        ))
+        )?)
     }
 }
 
@@ -385,7 +385,7 @@ impl EventV2Translator for KeyRotationTranslator {
             sequence_number,
             KEY_ROTATION_EVENT_TYPE.clone(),
             bcs::to_bytes(&key_rotation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -423,7 +423,7 @@ impl EventV2Translator for TransferTranslator {
             sequence_number,
             TRANSFER_EVENT_TYPE.clone(),
             bcs::to_bytes(&transfer_event)?,
-        ))
+        )?)
     }
 }
 
@@ -464,7 +464,7 @@ impl EventV2Translator for TokenMutationTranslator {
             sequence_number,
             TOKEN_MUTATION_EVENT_TYPE.clone(),
             bcs::to_bytes(&token_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -502,7 +502,7 @@ impl EventV2Translator for CollectionMutationTranslator {
             sequence_number,
             COLLECTION_MUTATION_EVENT_TYPE.clone(),
             bcs::to_bytes(&collection_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -551,7 +551,7 @@ impl EventV2Translator for MintTranslator {
             sequence_number,
             MINT_EVENT_TYPE.clone(),
             bcs::to_bytes(&mint_event)?,
-        ))
+        )?)
     }
 }
 
@@ -600,7 +600,7 @@ impl EventV2Translator for BurnTranslator {
             sequence_number,
             BURN_EVENT_TYPE.clone(),
             bcs::to_bytes(&burn_event)?,
-        ))
+        )?)
     }
 }
 
@@ -634,7 +634,7 @@ impl EventV2Translator for TokenDepositTranslator {
             sequence_number,
             TOKEN_DEPOSIT_EVENT_TYPE.clone(),
             bcs::to_bytes(&deposit_event)?,
-        ))
+        )?)
     }
 }
 
@@ -668,7 +668,7 @@ impl EventV2Translator for TokenWithdrawTranslator {
             sequence_number,
             TOKEN_WITHDRAW_EVENT_TYPE.clone(),
             bcs::to_bytes(&withdraw_event)?,
-        ))
+        )?)
     }
 }
 
@@ -702,7 +702,7 @@ impl EventV2Translator for BurnTokenTranslator {
             sequence_number,
             BURN_TOKEN_EVENT_TYPE.clone(),
             bcs::to_bytes(&burn_event)?,
-        ))
+        )?)
     }
 }
 
@@ -745,7 +745,7 @@ impl EventV2Translator for MutatePropertyMapTranslator {
             sequence_number,
             MUTATE_TOKEN_PROPERTY_MAP_EVENT_TYPE.clone(),
             bcs::to_bytes(&mutate_event)?,
-        ))
+        )?)
     }
 }
 
@@ -780,7 +780,7 @@ impl EventV2Translator for MintTokenTranslator {
             sequence_number,
             MINT_TOKEN_EVENT_TYPE.clone(),
             bcs::to_bytes(&mint_event)?,
-        ))
+        )?)
     }
 }
 
@@ -822,7 +822,7 @@ impl EventV2Translator for CreateCollectionTranslator {
             sequence_number,
             CREATE_COLLECTION_EVENT_TYPE.clone(),
             bcs::to_bytes(&create_event)?,
-        ))
+        )?)
     }
 }
 
@@ -871,7 +871,7 @@ impl EventV2Translator for TokenDataCreationTranslator {
             sequence_number,
             CREATE_TOKEN_DATA_EVENT_TYPE.clone(),
             bcs::to_bytes(&create_event)?,
-        ))
+        )?)
     }
 }
 
@@ -909,7 +909,7 @@ impl EventV2Translator for OfferTranslator {
             sequence_number,
             TOKEN_OFFER_EVENT_TYPE.clone(),
             bcs::to_bytes(&offer_event)?,
-        ))
+        )?)
     }
 }
 
@@ -947,7 +947,7 @@ impl EventV2Translator for CancelOfferTranslator {
             sequence_number,
             TOKEN_CANCEL_OFFER_EVENT_TYPE.clone(),
             bcs::to_bytes(&cancel_offer_event)?,
-        ))
+        )?)
     }
 }
 
@@ -985,7 +985,7 @@ impl EventV2Translator for ClaimTranslator {
             sequence_number,
             TOKEN_CLAIM_EVENT_TYPE.clone(),
             bcs::to_bytes(&claim_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1031,7 +1031,7 @@ impl EventV2Translator for CollectionDescriptionMutateTranslator {
             sequence_number,
             COLLECTION_DESCRIPTION_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&collection_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1072,7 +1072,7 @@ impl EventV2Translator for CollectionUriMutateTranslator {
             sequence_number,
             COLLECTION_URI_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&collection_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1113,7 +1113,7 @@ impl EventV2Translator for CollectionMaximumMutateTranslator {
             sequence_number,
             COLLECTION_MAXIMUM_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&collection_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1153,7 +1153,7 @@ impl EventV2Translator for UriMutationTranslator {
             sequence_number,
             URI_MUTATION_EVENT_TYPE.clone(),
             bcs::to_bytes(&uri_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1196,7 +1196,7 @@ impl EventV2Translator for DefaultPropertyMutateTranslator {
             sequence_number,
             DEFAULT_PROPERTY_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&default_property_mutate_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1238,7 +1238,7 @@ impl EventV2Translator for DescriptionMutateTranslator {
             sequence_number,
             DESCRIPTION_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&description_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1282,7 +1282,7 @@ impl EventV2Translator for RoyaltyMutateTranslator {
             sequence_number,
             ROYALTY_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&royalty_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1322,7 +1322,7 @@ impl EventV2Translator for MaximumMutateTranslator {
             sequence_number,
             MAXIMUM_MUTATE_EVENT_TYPE.clone(),
             bcs::to_bytes(&maximum_mutation_event)?,
-        ))
+        )?)
     }
 }
 
@@ -1356,6 +1356,6 @@ impl EventV2Translator for OptInTransferTranslator {
             sequence_number,
             OPT_IN_TRANSFER_EVENT_TYPE.clone(),
             bcs::to_bytes(&opt_in_transfer_event)?,
-        ))
+        )?)
     }
 }

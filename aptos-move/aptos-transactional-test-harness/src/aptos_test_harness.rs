@@ -31,8 +31,9 @@ use aptos_types::{
     },
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
-use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+use aptos_vm_environment::{environment::AptosEnvironment, prod_configs::set_paranoid_type_checks};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use clap::Parser;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -56,7 +57,8 @@ use move_transactional_test_runner::{
     tasks::{InitCommand, SyntaxChoice, TaskInput},
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use move_vm_runtime::move_vm::SerializedReturnValues;
+use move_vm_runtime::{move_vm::SerializedReturnValues, AsFunctionValueExtension};
+use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1025,6 +1027,14 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             },
         }
     }
+
+    fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+        let environment = AptosEnvironment::new(&self.storage);
+        let code_storage = self.storage.as_aptos_code_storage(&environment);
+        ValueSerDeContext::new()
+            .with_func_args_deserialization(&code_storage.as_function_value_extension())
+            .deserialize(bytes, layout)
+    }
 }
 
 /**
@@ -1079,10 +1089,13 @@ fn precompiled_v2_framework_with_experimental() -> &'static PrecompiledFilesModu
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
-        language_version: LanguageVersion::default(),
-        experiments: vec![("attach-compiled-module".to_owned(), true)],
-    })
+    run_aptos_test_with_config(
+        path,
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![(
+            "attach-compiled-module".to_owned(),
+            true,
+        )]),
+    )
 }
 
 pub fn run_aptos_test_with_config(

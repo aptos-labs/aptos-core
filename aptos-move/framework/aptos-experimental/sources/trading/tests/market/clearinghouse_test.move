@@ -2,7 +2,6 @@
 module aptos_experimental::clearinghouse_test {
     use std::error;
     use std::option;
-    use std::option::Option;
     use std::signer;
     use aptos_std::table;
     use aptos_std::table::Table;
@@ -36,12 +35,6 @@ module aptos_experimental::clearinghouse_test {
             error::invalid_argument(EINVALID_ADDRESS)
         );
         move_to(admin, GlobalState { user_positions: table::new() });
-    }
-
-    public(package) fun max_settlement_size<M: store + copy + drop>(
-        orig_size: u64
-    ): Option<u64> {
-        return option::some(orig_size)
     }
 
     public(package) fun validate_settlement_update(): bool {
@@ -91,15 +84,39 @@ module aptos_experimental::clearinghouse_test {
         new_settle_trade_result(size, option::none(), option::none())
     }
 
+    public(package) fun settle_trade_with_taker_cancelled(
+        _taker: address,
+        _maker: address,
+        size: u64,
+        _is_taker_long: bool
+    ): SettleTradeResult {
+        new_settle_trade_result(
+            size / 2,
+            option::none(),
+            option::some(std::string::utf8(b"Max open interest violation"))
+        )
+    }
+
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
             |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
-            |_user_addr, _is_buy, orig_size, _metadata| {
-                max_settlement_size<TestOrderMetadata>(orig_size)
+            |_account, _is_taker, _is_long, _price, _size, _order_metadata| {
+                validate_settlement_update()
+            }
+        )
+    }
+
+    public(package) fun test_market_callbacks_with_taker_cancelled():
+        MarketClearinghouseCallbacks<TestOrderMetadata> {
+        new_market_clearinghouse_callbacks(
+            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+                settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
+            },
+            |_account, _is_taker, _is_long, _price, _size, _order_metadata| {
+                validate_settlement_update()
             }
         )
     }

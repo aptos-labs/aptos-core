@@ -28,6 +28,7 @@ aptos-vm-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+cfg-if = { workspace = true }
 claims = { workspace = true }
 concurrent-queue = { workspace = true }
 criterion = { workspace = true, optional = true }

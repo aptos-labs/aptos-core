@@ -262,9 +262,9 @@ async fn test_release_validate_tool_multi_step() {
         framework_git_rev: None,
     };
 
-    network_config.mint_to_validator().await.unwrap();
+    network_config.mint_to_validator(None).await.unwrap();
 
-    aptos_release_builder::validate::validate_config(config, network_config)
+    aptos_release_builder::validate::validate_config(config, network_config, None)
         .await
         .unwrap();
 

@@ -205,6 +205,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "annotate-snippets"
+version = "0.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "710e8eae58854cdc1790fcb56cca04d712a17be849eeb81da2a724bf4bae2bc4"
+dependencies = [
+ "anstyle",
+ "unicode-width 0.2.0",
+]
+
+[[package]]
 name = "ansi-escapes"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -709,6 +719,7 @@ dependencies = [
  "arc-swap",
  "bcs 0.1.4",
  "bytes",
+ "cfg-if",
  "claims",
  "concurrent-queue",
  "criterion",
@@ -896,6 +907,8 @@ dependencies = [
  "serde_json",
  "serde_merge",
  "serde_yaml 0.8.26",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
  "tempfile",
  "thiserror",
  "url",
@@ -979,7 +992,8 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "sha3 0.9.1",
- "strum_macros 0.24.3",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1398,21 +1412,18 @@ dependencies = [
 
 [[package]]
 name = "aptos-dynamic-transaction-composer"
-version = "0.1.1"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "aptos-types",
  "bcs 0.1.4",
  "e2e-move-tests",
  "getrandom 0.2.11",
- "hex",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "reqwest 0.11.23",
  "serde",
  "serde_bytes",
- "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -1511,6 +1522,7 @@ dependencies = [
  "aptos-experimental-ptx-executor",
  "aptos-experimental-runtimes",
  "aptos-genesis",
+ "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
@@ -2477,13 +2489,13 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=bfb07a2b6985743fbc275d6fc621a80453f6742d#bfb07a2b6985743fbc275d6fc621a80453f6742d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "aptos-indexer-transaction-stream",
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917)",
- "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "async-trait",
  "autometrics",
  "axum 0.7.5",
@@ -2562,12 +2574,12 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=bfb07a2b6985743fbc275d6fc621a80453f6742d#bfb07a2b6985743fbc275d6fc621a80453f6742d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=bfb07a2b6985743fbc275d6fc621a80453f6742d)",
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917)",
- "aptos-transaction-filter 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
+ "aptos-transaction-filter 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "chrono",
  "futures-util",
  "once_cell",
@@ -2894,8 +2906,8 @@ dependencies = [
  "prometheus",
  "serde",
  "serde_json",
- "strum 0.24.1",
- "strum_macros 0.24.3",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.18",
@@ -3080,7 +3092,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=bfb07a2b6985743fbc275d6fc621a80453f6742d#bfb07a2b6985743fbc275d6fc621a80453f6742d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
 dependencies = [
  "chrono",
 ]
@@ -3568,7 +3580,7 @@ dependencies = [
 [[package]]
 name = "aptos-profiler"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917#4bb4cd9799c05099f60c3a2c3813b12cc96ea917"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686#2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -3600,7 +3612,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.1"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917#4bb4cd9799c05099f60c3a2c3813b12cc96ea917"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686#2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686"
 dependencies = [
  "pbjson",
  "prost 0.13.4",
@@ -3682,8 +3694,8 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "sha3 0.9.1",
- "strum 0.24.1",
- "strum_macros 0.24.3",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
  "tokio",
  "url",
  "walkdir",
@@ -4084,7 +4096,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-experimental-layered-map",
- "aptos-infallible",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -4203,10 +4214,10 @@ dependencies = [
 [[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917#4bb4cd9799c05099f60c3a2c3813b12cc96ea917"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686#2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917)",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "async-mutex",
  "http 0.2.11",
  "hyper 0.14.28",
@@ -4461,10 +4472,10 @@ dependencies = [
 [[package]]
 name = "aptos-transaction-filter"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917#4bb4cd9799c05099f60c3a2c3813b12cc96ea917"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686#2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686"
 dependencies = [
  "anyhow",
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=4bb4cd9799c05099f60c3a2c3813b12cc96ea917)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "derivative",
  "derive_builder",
  "memchr",
@@ -4548,6 +4559,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-genesis",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.5.21",
  "codespan-reporting",
@@ -4562,6 +4574,7 @@ dependencies = [
  "move-symbol-pool",
  "move-transactional-test-runner",
  "move-vm-runtime",
+ "move-vm-types",
  "once_cell",
  "serde_json",
  "tempfile",
@@ -4626,7 +4639,6 @@ dependencies = [
  "quick_cache",
  "rand 0.7.3",
  "rayon",
- "ref-cast",
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
@@ -4636,8 +4648,8 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml 0.8.26",
- "strum 0.24.1",
- "strum_macros 0.24.3",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
  "thiserror",
  "tokio",
  "tracing",
@@ -4748,6 +4760,7 @@ dependencies = [
  "rand_core 0.5.1",
  "rayon",
  "serde",
+ "test-case",
 ]
 
 [[package]]
@@ -6569,7 +6582,7 @@ dependencies = [
  "bitflags 1.3.2",
  "strsim 0.8.0",
  "textwrap 0.11.0",
- "unicode-width",
+ "unicode-width 0.1.11",
  "vec_map",
 ]
 
@@ -6723,7 +6736,7 @@ checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -6845,7 +6858,7 @@ dependencies = [
  "encode_unicode 0.3.6",
  "lazy_static",
  "libc",
- "unicode-width",
+ "unicode-width 0.1.11",
  "windows-sys 0.45.0",
 ]
 
@@ -10485,7 +10498,7 @@ dependencies = [
  "instant",
  "number_prefix 0.4.0",
  "portable-atomic",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -10547,7 +10560,7 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=bfb07a2b6985743fbc275d6fc621a80453f6742d#bfb07a2b6985743fbc275d6fc621a80453f6742d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
 dependencies = [
  "delegate",
  "derive_builder",
@@ -12246,6 +12259,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-package-manifest"
+version = "0.1.0"
+dependencies = [
+ "annotate-snippets",
+ "anyhow",
+ "datatest-stable",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+ "serde",
+ "toml 0.7.8",
+ "url",
+]
+
+[[package]]
 name = "move-prover"
 version = "0.1.0"
 dependencies = [
@@ -12555,15 +12583,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-vm-paranoid-tests"
-version = "0.1.0"
-dependencies = [
- "datatest-stable",
- "fail",
- "move-transactional-test-runner",
-]
-
-[[package]]
 name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
@@ -12615,7 +12634,14 @@ name = "move-vm-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "fail",
+ "libtest-mimic",
+ "move-bytecode-verifier",
+ "move-model",
  "move-transactional-test-runner",
+ "move-vm-runtime",
+ "once_cell",
+ "walkdir",
 ]
 
 [[package]]
@@ -13008,13 +13034,13 @@ checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 
 [[package]]
 name = "num-derive"
-version = "0.3.3"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
+checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -13074,9 +13100,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.17"
+version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39e3200413f237f41ab11ad6d161bc7239c84dcb631773ccd7de3dfe4b5c267c"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
  "libm",
@@ -13379,7 +13405,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2ad9b889f1b12e0b9ee24db044b5129150d5eada288edc800f789928dc8c0e3"
 dependencies = [
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -14428,7 +14454,7 @@ dependencies = [
  "is-terminal",
  "lazy_static",
  "term",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -14546,7 +14572,7 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors-v2.git?rev=1449895f6e69425e2873b85c14182ac448732109#1449895f6e69425e2873b85c14182ac448732109"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors-v2.git?rev=8628f1534efa28ada547bbcd34afec1af55697d4#8628f1534efa28ada547bbcd34afec1af55697d4"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
@@ -15970,7 +15996,7 @@ dependencies = [
 [[package]]
 name = "sample"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=bfb07a2b6985743fbc275d6fc621a80453f6742d#bfb07a2b6985743fbc275d6fc621a80453f6742d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
 dependencies = [
  "tracing",
 ]
@@ -17065,6 +17091,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "strum"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f64def088c51c9510a8579e3c5d67c65349dcf755e5479ad3d010aa6454e2c32"
+
+[[package]]
 name = "strum_macros"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -17095,6 +17127,19 @@ name = "strum_macros"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c77a8c5abcaf0f9ce05d62342b7d298c346515365c36b673df4ebe3ced01fde8"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -17398,7 +17443,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -17408,7 +17453,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd05616119e612a8041ef58f2b578906cc2531a6069047ae092cfb86a325d835"
 dependencies = [
  "smawk",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -17419,7 +17464,7 @@ checksum = "b7b3e525a49ec206798b40326a44121291b530c963cfb01018f63e135bac543d"
 dependencies = [
  "smawk",
  "unicode-linebreak",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -18216,7 +18261,7 @@ dependencies = [
  "cassowary",
  "crossterm 0.25.0",
  "unicode-segmentation",
- "unicode-width",
+ "unicode-width 0.1.11",
 ]
 
 [[package]]
@@ -18449,6 +18494,12 @@ name = "unicode-width"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
+
+[[package]]
+name = "unicode-width"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unicode-xid"

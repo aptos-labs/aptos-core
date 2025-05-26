@@ -46,6 +46,7 @@ module aptos_experimental::order_book {
     const EORDER_NOT_FOUND: u64 = 4;
     const EINVALID_INACTIVE_ORDER_STATE: u64 = 5;
     const EINVALID_ADD_SIZE_TO_ORDER: u64 = 6;
+    const E_NOT_ACTIVE_ORDER: u64 = 7;
 
     struct OrderRequest<M: store + copy + drop> has copy, drop {
         account: address,
@@ -112,10 +113,7 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, account: address, account_order_id: u64
     ): Option<Order<M>> {
         let order_id = new_order_id_type(account, account_order_id);
-        // TODO(skedia) change the semantic to abort in case of order not found
-        if (!self.orders.contains(&order_id)) {
-            return option::none();
-        };
+        assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
         let (order, is_active) = order_with_state.destroy_order_from_state();
         if (is_active) {
@@ -196,6 +194,28 @@ module aptos_experimental::order_book {
         );
     }
 
+    /// Reinserts a maker order to the order book. This is used when the order is removed from the order book
+    /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
+    /// it is added to the order book, if it exists, it's size is updated.
+    public fun reinsert_maker_order<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_req: OrderRequest<M>
+    ) {
+        assert!(order_req.trigger_condition.is_none(), E_NOT_ACTIVE_ORDER);
+        let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
+        if (!self.orders.contains(&order_id)) {
+            return self.place_maker_order(order_req);
+        };
+        let order_with_state = self.orders.remove(&order_id);
+        order_with_state.increase_remaining_size(order_req.remaining_size);
+        self.orders.add(order_id, order_with_state);
+        self.active_orders.increase_order_size(
+            order_req.price,
+            order_req.unique_priority_idx.destroy_some(),
+            order_req.remaining_size,
+            order_req.is_buy
+        );
+    }
+
     fun place_pending_maker_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ) {
@@ -247,6 +267,29 @@ module aptos_experimental::order_book {
         let (order, is_active) = order_with_state.destroy_order_from_state();
         assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
         new_single_order_match(order, matched_size)
+    }
+
+    /// Decrease the size of the order by the given size delta. The API aborts if the order is not found in the order book or
+    /// if the size delta is greater than or equal to the remaining size of the order. Please note that the API will abort and
+    /// not cancel the order if the size delta is equal to the remaining size of the order, to avoid unintended
+    /// cancellation of the order. Please use the `cancel_order` API to cancel the order.
+    public fun decrease_order_size<M: store + copy + drop>(
+        self: &mut OrderBook<M>, account: address, account_order_id: u64, size_delta: u64
+    ) {
+        let order_id = new_order_id_type(account, account_order_id);
+        assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
+        let order_with_state = self.orders.remove(&order_id);
+        order_with_state.decrease_remaining_size(size_delta);
+        if (order_with_state.is_active_order()) {
+            let order = order_with_state.get_order_from_state();
+            self.active_orders.decrease_order_size(
+                order.get_price(),
+                order_with_state.get_unique_priority_idx_from_state(),
+                size_delta,
+                order.is_buy()
+            );
+        };
+        self.orders.add(order_id, order_with_state);
     }
 
     public fun is_active_order<M: store + copy + drop>(
@@ -1118,6 +1161,177 @@ module aptos_experimental::order_book {
         assert!(orig_size == 1000);
         assert!(size == 300); // 1000 - 400 - 300 = 300 remaining
         assert!(is_buy == true);
+        order_book.destroy_order_book();
+    }
+
+    #[test]
+    fun test_maker_order_reinsert_already_exists() {
+        let order_book = new_order_book<TestMetadata>();
+
+        // Place a GTC sell order
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: false,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+        order_book.place_maker_order(order_req);
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 1000);
+
+        // Taker order
+        let order_req = OrderRequest {
+            account: @0xBB,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 100,
+            remaining_size: 100,
+            is_buy: true,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+
+        let match_results = order_book.place_order_and_get_matches(order_req);
+        assert!(total_matched_size(&match_results) == 100);
+
+        let (matched_order, _) = match_results[0].destroy_single_order_match();
+        let (
+            _order_id,
+            unique_idx,
+            price,
+            orig_size,
+            _remaining_size,
+            is_buy,
+            _trigger_condition,
+            metadata
+        ) = matched_order.destroy_order();
+        // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::some(unique_idx),
+            price,
+            orig_size,
+            remaining_size: 50,
+            is_buy,
+            trigger_condition: option::none(),
+            metadata
+        };
+        order_book.reinsert_maker_order(order_req);
+        // Verify order was reinserted with updated size
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 950);
+        order_book.destroy_order_book();
+    }
+
+    #[test]
+    fun test_maker_order_reinsert_not_exists() {
+        let order_book = new_order_book<TestMetadata>();
+
+        // Place a GTC sell order
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: false,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+        order_book.place_maker_order(order_req);
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 1000);
+
+        // Taker order
+        let order_req = OrderRequest {
+            account: @0xBB,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: true,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+
+        let match_results = order_book.place_order_and_get_matches(order_req);
+        assert!(total_matched_size(&match_results) == 1000);
+
+        let (matched_order, _) = match_results[0].destroy_single_order_match();
+        let (
+            _order_id,
+            unique_idx,
+            price,
+            orig_size,
+            _remaining_size,
+            is_buy,
+            _trigger_condition,
+            metadata
+        ) = matched_order.destroy_order();
+        // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::some(unique_idx),
+            price,
+            orig_size,
+            remaining_size: 500,
+            is_buy,
+            trigger_condition: option::none(),
+            metadata
+        };
+        order_book.reinsert_maker_order(order_req);
+        // Verify order was reinserted with updated size
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 500);
+        order_book.destroy_order_book();
+    }
+
+    #[test]
+    fun test_decrease_order_size() {
+        let order_book = new_order_book<TestMetadata>();
+
+        // Place an active order
+        let order_req = OrderRequest {
+            account: @0xAA,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: false,
+            trigger_condition: option::none(),
+            metadata: TestMetadata {}
+        };
+        order_book.place_maker_order(order_req);
+        assert!(order_book.get_remaining_size(@0xAA, 1) ==  1000);
+
+        order_book.decrease_order_size(@0xAA, 1, 700);
+        // Verify order was decreased with updated size
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 300);
+
+        let order_req = OrderRequest {
+            account: @0xBB,
+            account_order_id: 1,
+            unique_priority_idx: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_buy: false,
+            trigger_condition: option::some(tp_trigger_condition(90)),
+            metadata: TestMetadata {}
+        };
+        order_book.place_maker_order(order_req);
+        assert!(order_book.get_remaining_size(@0xBB, 1) == 1000);
+        order_book.decrease_order_size(@0xBB, 1, 600);
+        // Verify order was decreased with updated size
+        assert!(order_book.get_remaining_size(@0xBB, 1) == 400);
+
         order_book.destroy_order_book();
     }
 }

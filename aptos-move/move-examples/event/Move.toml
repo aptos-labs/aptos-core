@@ -1,5 +1,5 @@
 [package]
-name = "Event example"
+name = "Event-example"
 version = "0.0.1"
 
 [addresses]

@@ -26,7 +26,9 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_framework::chunked_publish::CHUNK_SIZE_IN_BYTES;
+use aptos_framework::chunked_publish::{
+    default_large_packages_module_address, CHUNK_SIZE_IN_BYTES,
+};
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -1176,7 +1178,7 @@ impl FromStr for OptimizationLevel {
             "" | "default" => Ok(Self::Default),
             "extra" => Ok(Self::Extra),
             _ => bail!(
-                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `extra`)",
                 s
             ),
         }
@@ -2514,16 +2516,12 @@ impl LargePackagesModuleOption {
             Ok(address)
         } else {
             let chain_id = ChainId::new(client.get_ledger_information().await?.inner().chain_id);
-            if chain_id.is_mainnet() || chain_id.is_testnet() {
-                Ok(AccountAddress::from_str_strict(
-                    "0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7",
-                )
-                .map_err(|err| {
+            Ok(
+                AccountAddress::from_str_strict(default_large_packages_module_address(&chain_id))
+                    .map_err(|err| {
                     CliError::UnableToParse("Default Large Package Module Address", err.to_string())
-                })?)
-            } else {
-                Ok(AccountAddress::SEVEN)
-            }
+                })?,
+            )
         }
     }
 }

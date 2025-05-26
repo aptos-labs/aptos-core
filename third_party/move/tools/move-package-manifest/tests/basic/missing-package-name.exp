@@ -1,0 +1,6 @@
+error: failed to parse manifest
+  |
+1 | / [package]
+2 | | version = "0.1.2"
+  | |_________________^ missing field `name`
+  |

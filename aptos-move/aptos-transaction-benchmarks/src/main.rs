@@ -203,7 +203,7 @@ fn main() {
             .unwrap()
             .as_millis() as i64,
     );
-    aptos_node_resource_metrics::register_node_metrics_collector();
+    aptos_node_resource_metrics::register_node_metrics_collector(None);
     let _mp = MetricsPusher::start_for_local_run("block-stm-benchmark");
     let args = Args::parse();
 

@@ -138,6 +138,8 @@ pub enum FeatureFlag {
     JWK_CONSENSUS_PER_KEY_MODE = 92,
     TRANSACTION_PAYLOAD_V2 = 93,
     ORDERLESS_TRANSACTIONS = 94,
+    // TODO(lazy-loading): Add link to AIP and its number + brief description.
+    ENABLE_LAZY_LOADING = 95,
 }
 
 impl FeatureFlag {
@@ -231,6 +233,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
             FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            FeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
             FeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::ORDERLESS_TRANSACTIONS,
         ]
@@ -387,6 +390,10 @@ impl Features {
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
+    }
+
+    pub fn is_lazy_loading_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LAZY_LOADING)
     }
 
     pub fn is_default_account_resource_enabled(&self) -> bool {

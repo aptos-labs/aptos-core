@@ -7,10 +7,16 @@ use aptos_gas_algebra::{
 };
 use aptos_gas_schedule::{AbstractValueSizeGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::NativeContext;
+use move_binary_format::errors::VMResult;
+use move_core_types::{
+    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
+};
+use move_vm_runtime::{native_functions::NativeContext, Function};
 use move_vm_types::values::Value;
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 /// A proxy between the VM and the native functions, allowing the latter to query VM configurations
 /// or access certain VM functionalities.
@@ -137,5 +143,18 @@ impl SafeNativeContext<'_, '_, '_> {
     ///   This should only be used for backward compatibility reasons.
     pub fn set_incremental_gas_charging(&mut self, enable: bool) {
         self.enable_incremental_gas_charging = enable;
+    }
+
+    pub fn load_function(
+        &mut self,
+        module_id: &ModuleId,
+        function_name: &Identifier,
+    ) -> VMResult<Arc<Function>> {
+        let (_, function) = self.inner.module_storage().fetch_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
+        Ok(function)
     }
 }

@@ -11493,7 +11493,7 @@ components:
         shortened by stripping leading 0s, and adding a 0x.
 
         For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
-      example: '0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
+      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     AptosError:
       type: object
       description: |-
@@ -12218,7 +12218,7 @@ components:
         two hex digits per byte.
 
         Unlike the `Address` type, HexEncodedBytes will not trim any zeros.
-      example: '0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
+      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     IdentifierWrapper:
       type: string
     IndexResponse:
