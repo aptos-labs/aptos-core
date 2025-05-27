@@ -17,7 +17,8 @@ impl TransactionFilter {
     pub fn filter(
         &self,
         block_id: HashValue,
-        timestamp: u64,
+        block_epoch: u64,
+        block_timestamp: u64,
         txns: Vec<SignedTransaction>,
     ) -> Vec<SignedTransaction> {
         // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
@@ -25,7 +26,10 @@ impl TransactionFilter {
             return txns;
         }
         txns.into_iter()
-            .filter(|txn| self.filter.allows(block_id, timestamp, txn))
+            .filter(|txn| {
+                self.filter
+                    .allows(block_id, block_epoch, block_timestamp, txn)
+            })
             .collect()
     }
 }
@@ -116,7 +120,7 @@ mod test {
         let txns = get_transactions();
         let block_id = HashValue::random();
         let no_filter = TransactionFilter::new(Filter::empty());
-        let filtered_txns = no_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = no_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns);
     }
 
@@ -125,7 +129,7 @@ mod test {
         let txns = get_transactions();
         let block_id = HashValue::random();
         let all_filter = TransactionFilter::new(Filter::empty().add_deny_all());
-        let filtered_txns = all_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = all_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, vec![]);
     }
 
@@ -135,10 +139,10 @@ mod test {
         let block_id = HashValue::random();
         let block_id_filter = TransactionFilter::new(Filter::empty().add_deny_block_id(block_id));
 
-        let filtered_txns = block_id_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = block_id_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, vec![]);
         let block_id = HashValue::random();
-        let filtered_txns = block_id_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = block_id_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns);
     }
 
@@ -153,9 +157,9 @@ mod test {
                 .add_deny_all(),
         );
 
-        let filtered_txns = block_timestamp_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, vec![]);
-        let filtered_txns = block_timestamp_filter.filter(block_id, 1001, txns.clone());
+        let filtered_txns = block_timestamp_filter.filter(block_id, 0, 1001, txns.clone());
         assert_eq!(filtered_txns, txns);
     }
 
@@ -166,7 +170,7 @@ mod test {
         let transaction_hash_filter = TransactionFilter::new(
             Filter::empty().add_deny_transaction_id(txns[0].committed_hash()),
         );
-        let filtered_txns = transaction_hash_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = transaction_hash_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[1..].to_vec());
     }
 
@@ -179,7 +183,7 @@ mod test {
                 .add_deny_sender(txns[0].sender())
                 .add_deny_sender(txns[1].sender()),
         );
-        let filtered_txns = block_list_sender_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = block_list_sender_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[2..].to_vec());
     }
 
@@ -201,7 +205,7 @@ mod test {
                 )
                 .add_deny_all(),
         );
-        let filtered_txns = allow_list_entry_function_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = allow_list_entry_function_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[0..2].to_vec());
 
         let deny_list_entry_function_filter = TransactionFilter::new(
@@ -217,7 +221,7 @@ mod test {
                     get_function_name(&txns[1]),
                 ),
         );
-        let filtered_txns = deny_list_entry_function_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = deny_list_entry_function_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[2..].to_vec());
     }
 
@@ -231,7 +235,7 @@ mod test {
                 .add_allow_module_address(get_module_address(&txns[1]))
                 .add_deny_all(),
         );
-        let filtered_txns = allow_list_module_address_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = allow_list_module_address_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[0..4].to_vec());
 
         let block_list_module_address_filter = TransactionFilter::new(
@@ -239,7 +243,7 @@ mod test {
                 .add_deny_module_address(get_module_address(&txns[0]))
                 .add_deny_module_address(get_module_address(&txns[1])),
         );
-        let filtered_txns = block_list_module_address_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = block_list_module_address_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[4..].to_vec());
     }
 
@@ -267,7 +271,7 @@ mod test {
               "#).unwrap();
 
         let allow_list_filter = TransactionFilter::new(filter);
-        let filtered_txns = allow_list_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = allow_list_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[0..4].to_vec());
     }
 
@@ -294,7 +298,7 @@ mod test {
               "#).unwrap();
 
         let allow_list_filter = TransactionFilter::new(filter);
-        let filtered_txns = allow_list_filter.filter(block_id, 0, txns.clone());
+        let filtered_txns = allow_list_filter.filter(block_id, 0, 0, txns.clone());
         assert_eq!(filtered_txns, txns[4..].to_vec());
     }
 }
