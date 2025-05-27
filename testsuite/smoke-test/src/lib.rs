@@ -5,6 +5,8 @@
 extern crate core;
 
 #[cfg(test)]
+mod sui_derivable_account;
+#[cfg(test)]
 mod account_abstraction;
 #[cfg(test)]
 mod aptos;
