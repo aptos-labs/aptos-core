@@ -5,6 +5,7 @@ module aptos_framework::common_account_abstractions_utils {
 
     friend aptos_framework::ethereum_derivable_account;
     friend aptos_framework::solana_derivable_account;
+    friend aptos_framework::sui_derivable_account;
 
     public(friend) fun network_name(): vector<u8> {
         let chain_id = chain_id::get();

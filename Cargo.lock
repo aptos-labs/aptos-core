@@ -16838,6 +16838,7 @@ dependencies = [
  "aptos-vm",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "blake2-rfc",
  "diesel",
  "digest 0.9.0",
  "ethers",

@@ -311,6 +311,7 @@ fn test_db_indexer_data() {
         ident_str!("ristretto255_elgamal"),
         ident_str!("reconfiguration_state"),
         ident_str!("ristretto255_pedersen"),
+        ident_str!("sui_derivable_account"),
         ident_str!("object_code_deployment"),
         ident_str!("primary_fungible_store"),
         ident_str!("transaction_validation"),
