@@ -1,0 +1,22 @@
+success
+
+PackageManifest {
+    package: PackageMetadata {
+        name: "some_package_name",
+        version: "0.1.2",
+        authors: [],
+        license: None,
+        upgrade_policy: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: Some(
+        BuildOptions {
+            language_version: Some(
+                V2_0,
+            ),
+        },
+    ),
+    dependencies: {},
+    dev_dependencies: {},
+}

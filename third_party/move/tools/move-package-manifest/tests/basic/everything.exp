@@ -1,0 +1,86 @@
+success
+
+PackageManifest {
+    package: PackageMetadata {
+        name: "some_package_name",
+        version: "0.1.2",
+        authors: [
+            "alice",
+            "bob",
+            "carol",
+        ],
+        license: Some(
+            "MIT",
+        ),
+        upgrade_policy: Some(
+            Compatible,
+        ),
+    },
+    addresses: {
+        "alice": Unspecified,
+        "bob": Numerical(
+            0000000000000000000000000000000000000000000000000000000000001234,
+        ),
+    },
+    dev_addresses: {
+        "alice": 0000000000000000000000000000000000000000000000000000000000005678,
+    },
+    build: Some(
+        BuildOptions {
+            language_version: Some(
+                V2_3,
+            ),
+        },
+    ),
+    dependencies: {
+        "bar": Dependency {
+            version: Some(
+                "0.1.2",
+            ),
+            location: Aptos {
+                node_url: "mainnet",
+                package_addr: "0x1",
+            },
+        },
+        "baz": Dependency {
+            version: None,
+            location: Local {
+                path: "../baz",
+            },
+        },
+        "foo": Dependency {
+            version: None,
+            location: Git {
+                url: Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "github.com",
+                        ),
+                    ),
+                    port: None,
+                    path: "/some-org/some-project",
+                    query: None,
+                    fragment: None,
+                },
+                rev: Some(
+                    "main",
+                ),
+                subdir: Some(
+                    "foo",
+                ),
+            },
+        },
+    },
+    dev_dependencies: {
+        "dd": Dependency {
+            version: None,
+            location: Local {
+                path: "../dd",
+            },
+        },
+    },
+}

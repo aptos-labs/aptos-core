@@ -50,6 +50,7 @@ where
         current_block_start_time: Instant,
         partition_time: Duration,
         executable_block: ExecutableBlock,
+        stage: usize,
     ) {
         let execution_start_time = Instant::now();
         if self.maybe_first_block_start_time.is_none() {
@@ -79,6 +80,7 @@ where
             block_id,
             parent_block_id: self.parent_block_id,
             num_input_txns,
+            stage,
         };
         self.ledger_update_sender.send(msg).unwrap();
         self.parent_block_id = block_id;

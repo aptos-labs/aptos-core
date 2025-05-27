@@ -1,0 +1,10 @@
+error: failed to parse manifest
+  |
+1 | [package]
+2 | name = "some_package_name"
+3 | version = "0.1.2"
+4 |
+5 | [build]
+6 | language_version = "a.b"
+  |                    ^^^^^ unrecognized language version "a.b" (supported versions: "1", "2", "2.0-2.3")
+  |

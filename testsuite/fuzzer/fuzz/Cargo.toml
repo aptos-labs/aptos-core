@@ -95,3 +95,9 @@ name = "move_bytecode_verifier_compiled_modules"
 path = "fuzz_targets/move/bytecode_verifier_compiled_modules.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "type_tag_to_string"
+path = "fuzz_targets/move/type_tag_to_string.rs"
+test = false
+doc = false

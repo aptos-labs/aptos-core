@@ -4,6 +4,7 @@ module 0x8675309::M {
 
     fun t0(b: bool, u: u64, s: S, r: R): R {
         (&b : &bool);
+        (&(b) : &bool);
         (&mut b : &mut bool);
         (&u : &u64);
         (&mut u : &mut u64);
