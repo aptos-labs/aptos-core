@@ -1,0 +1,190 @@
+
+Diagnostics:
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t1`. Consider replacing with the simpler form.
+  ┌─ tests/model_ast_lints/redundant_boolean_expression.move:5:13
+  │
+5 │         if ((a) && b || (b)) ();
+  │             ^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t0`. Consider replacing with the simpler form.
+  ┌─ tests/model_ast_lints/redundant_boolean_expression.move:8:13
+  │
+8 │         if ((a) || (b && a)) ();
+  │             ^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t0`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:11:13
+   │
+11 │         if ((a) || (b && a)) ();
+   │             ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t0`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:16:13
+   │
+16 │         if ((a) && (a)) ();
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t0`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:19:13
+   │
+19 │         if ((a) || (a)) ();
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the expression `bexpr && true` is logically equivalent to `bexpr`. Consider simplifying.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:24:13
+   │
+24 │         if ((a) && (true)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t0`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:24:13
+   │
+24 │         if ((a) && (true)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:27:13
+   │
+27 │         if ((true) && (a)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `$t0`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:27:13
+   │
+27 │         if ((true) && (a)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] The right-hand side of `&&` evaluates to `false`. Recall that the expression `bexpr && false` is logically equivalent to `false`. Consider simplifying.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:32:13
+   │
+32 │         if ((a) && (false)) ();
+   │             ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `false`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:32:13
+   │
+32 │         if ((a) && (false)) ();
+   │             ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] The left-hand side of `&&` evaluates to `false`. Recall that the expression `false && bexpr` is logically equivalent to `false`. Consider simplifying.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:35:13
+   │
+35 │         if ((false) && (a)) ();
+   │             ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `false`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:35:13
+   │
+35 │         if ((false) && (a)) ();
+   │             ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] The right-hand side of `||` evaluates to `true`. Recall that the expression `bexpr || true` is logically equivalent to `true`. Consider simplifying.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:38:13
+   │
+38 │         if ((a) || (true)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `true`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:38:13
+   │
+38 │         if ((a) || (true)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] The left-hand side of `||` evaluates to `true`. Recall that the expression `true || bexpr` is logically equivalent to `true`. Consider simplifying.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:41:13
+   │
+41 │         if ((true) || (a)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `true`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:41:13
+   │
+41 │         if ((true) || (a)) ();
+   │             ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `false`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:46:13
+   │
+46 │         if ((a) && (!a)) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `false`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:49:13
+   │
+49 │         if ((!a) && (a)) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `true`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:52:13
+   │
+52 │         if ((a) || (!a)) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
+
+warning: [lint] This boolean expression can be simplified. The expression `?` is equivalent to just `true`. Consider replacing with the simpler form.
+   ┌─ tests/model_ast_lints/redundant_boolean_expression.move:55:13
+   │
+55 │         if ((!a) || (a)) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(redundant_boolean_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#redundant_boolean_expression.
