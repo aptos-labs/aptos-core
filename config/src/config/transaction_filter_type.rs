@@ -18,15 +18,23 @@ pub enum Matcher {
     Sender(AccountAddress),
     ModuleAddress(AccountAddress),
     EntryFunction(AccountAddress, String, String),
+    BlockEpochGreaterThan(u64),
+    BlockEpochLessThan(u64),
 }
 
 impl Matcher {
-    fn matches(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {
+    fn matches(
+        &self,
+        block_id: HashValue,
+        block_epoch: u64,
+        block_timestamp: u64,
+        txn: &SignedTransaction,
+    ) -> bool {
         match self {
             Matcher::All => true,
             Matcher::BlockId(id) => block_id == *id,
-            Matcher::BlockTimeStampGreaterThan(ts) => timestamp > *ts,
-            Matcher::BlockTimeStampLessThan(ts) => timestamp < *ts,
+            Matcher::BlockTimeStampGreaterThan(timestamp) => block_timestamp > *timestamp,
+            Matcher::BlockTimeStampLessThan(timestamp) => block_timestamp < *timestamp,
             Matcher::TransactionId(id) => txn.committed_hash() == *id,
             Matcher::Sender(sender) => txn.sender() == *sender,
             Matcher::ModuleAddress(address) => match txn.payload().executable_ref() {
@@ -49,6 +57,8 @@ impl Matcher {
                     _ => false,
                 }
             },
+            Matcher::BlockEpochGreaterThan(epoch) => block_epoch > *epoch,
+            Matcher::BlockEpochLessThan(epoch) => block_epoch < *epoch,
         }
     }
 }
@@ -75,17 +85,23 @@ enum EvalResult {
 }
 
 impl Rule {
-    fn eval(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> EvalResult {
+    fn eval(
+        &self,
+        block_id: HashValue,
+        block_epoch: u64,
+        block_timestamp: u64,
+        txn: &SignedTransaction,
+    ) -> EvalResult {
         match self {
             Rule::Allow(matcher) => {
-                if matcher.matches(block_id, timestamp, txn) {
+                if matcher.matches(block_id, block_epoch, block_timestamp, txn) {
                     EvalResult::Allow
                 } else {
                     EvalResult::NoMatch
                 }
             },
             Rule::Deny(matcher) => {
-                if matcher.matches(block_id, timestamp, txn) {
+                if matcher.matches(block_id, block_epoch, block_timestamp, txn) {
                     EvalResult::Deny
                 } else {
                     EvalResult::NoMatch
@@ -207,11 +223,17 @@ impl Filter {
         &self.rules
     }
 
-    pub fn allows(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {
+    pub fn allows(
+        &self,
+        block_id: HashValue,
+        block_epoch: u64,
+        block_timestamp: u64,
+        txn: &SignedTransaction,
+    ) -> bool {
         for rule in &self.rules {
             // Rules are evaluated in the order and the first rule that matches is used. If no rule
             // matches, the transaction is allowed.
-            match rule.eval(block_id, timestamp, txn) {
+            match rule.eval(block_id, block_epoch, block_timestamp, txn) {
                 EvalResult::Allow => return true,
                 EvalResult::Deny => return false,
                 EvalResult::NoMatch => continue,
