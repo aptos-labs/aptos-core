@@ -2617,18 +2617,22 @@ impl ViewFunctionOutput {
     }
 
     pub fn new_ok(values: Vec<Vec<u8>>, gas_used: u64) -> Self {
-        Self { values: Ok(values), gas_used }
+        Self {
+            values: Ok(values),
+            gas_used,
+        }
     }
 
     pub fn new_err(status: VMStatus, gas_used: u64, charge_invariant_violation: bool) -> Self {
-        let txn_status = TransactionStatus::from_vm_status(
-            status.clone(),
-            charge_invariant_violation
-        );
+        let txn_status =
+            TransactionStatus::from_vm_status(status.clone(), charge_invariant_violation);
         let execution_status = match txn_status {
             TransactionStatus::Keep(status) => status,
             _ => ExecutionStatus::MiscellaneousError(Some(status.status_code())),
         };
-        Self { values: Err(execution_status), gas_used }
+        Self {
+            values: Err(execution_status),
+            gas_used,
+        }
     }
 }
