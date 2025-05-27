@@ -1,0 +1,83 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public inline fun outer(): u64 {
+        Add<u64>(m::package_inner(), m::package_inner())
+    }
+    public inline fun outer_2(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(m::package_inner(), m::package_inner())
+        }, {
+          let (): ();
+          Add<u64>(m::package_inner(), m::package_inner())
+        })
+    }
+    friend fun package_inner(): u64 {
+        12
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>(m::package_inner(), m::package_inner())
+        }, 24) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(m::package_inner(), m::package_inner())
+          }, {
+            let (): ();
+            Add<u64>(m::package_inner(), m::package_inner())
+          })
+        }, 48) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    public inline fun outer(): u64 {
+        package_inner() + package_inner()
+    }
+    public inline fun outer_2(): u64 {
+        {
+            let ();
+            package_inner() + package_inner()
+        } + {
+            let ();
+            package_inner() + package_inner()
+        }
+    }
+    friend fun package_inner(): u64 {
+        12
+    }
+}
+module 0xc0ffee::n {
+    fun test() {
+        if ({
+            let ();
+            0xc0ffee::m::package_inner() + 0xc0ffee::m::package_inner()
+        } == 24) () else abort 14566554180833181696;
+        if ({
+            let ();
+            {
+                let ();
+                0xc0ffee::m::package_inner() + 0xc0ffee::m::package_inner()
+            } + {
+                let ();
+                0xc0ffee::m::package_inner() + 0xc0ffee::m::package_inner()
+            }
+        } == 48) () else abort 14566554180833181696;
+    }
+}
