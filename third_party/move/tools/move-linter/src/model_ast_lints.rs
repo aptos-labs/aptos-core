@@ -14,6 +14,7 @@ mod needless_deref_ref;
 mod needless_ref_deref;
 mod needless_ref_in_field_access;
 mod nonminimal_bool;
+mod redundant_boolean_expressions;
 mod self_assignment;
 mod simpler_numeric_expression;
 mod unnecessary_boolean_identity_comparison;
@@ -35,6 +36,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<known_to_abort::KnownToAbort>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
+        Box::<redundant_boolean_expressions::RedundantBooleanExpression>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
