@@ -25,6 +25,7 @@ impl TransactionFilter {
         if self.filter.is_empty() {
             return txns;
         }
+
         txns.into_iter()
             .filter(|txn| {
                 self.filter

@@ -10,16 +10,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Matcher {
-    All,
-    BlockId(HashValue),
-    BlockTimeStampGreaterThan(u64),
-    BlockTimeStampLessThan(u64),
-    TransactionId(HashValue),
-    Sender(AccountAddress),
-    ModuleAddress(AccountAddress),
-    EntryFunction(AccountAddress, String, String),
-    BlockEpochGreaterThan(u64),
-    BlockEpochLessThan(u64),
+    All,                                           // Matches any transactions
+    BlockId(HashValue), // Matches transactions in a specific block (identified by block ID)
+    BlockTimeStampGreaterThan(u64), // Matches transactions in blocks with timestamps greater than the specified value
+    BlockTimeStampLessThan(u64), // Matches transactions in blocks with timestamps less than the specified value
+    TransactionId(HashValue),    // Matches a specific transaction by its ID
+    Sender(AccountAddress),      // Matches transactions sent by a specific account address
+    ModuleAddress(AccountAddress), // Matches transactions that call a module at a specific address
+    EntryFunction(AccountAddress, String, String), // Matches transactions that call a specific entry function in a module
+    BlockEpochGreaterThan(u64), // Matches transactions in blocks with epochs greater than the specified value
+    BlockEpochLessThan(u64), // Matches transactions in blocks with epochs less than the specified value
+    MatchesAllOf(Vec<Matcher>), // Matches transactions that satisfy all the provided conditions (i.e., logical AND)
 }
 
 impl Matcher {
@@ -59,6 +60,9 @@ impl Matcher {
             },
             Matcher::BlockEpochGreaterThan(epoch) => block_epoch > *epoch,
             Matcher::BlockEpochLessThan(epoch) => block_epoch < *epoch,
+            Matcher::MatchesAllOf(matchers) => matchers
+                .iter()
+                .all(|matcher| matcher.matches(block_id, block_epoch, block_timestamp, txn)),
         }
     }
 }
@@ -111,30 +115,40 @@ impl Rule {
     }
 }
 
-/// A filter that can be used to allow or deny transactions from being executed. It contains a set
-/// of rules that are evaluated one by one in the order of declaration.
-/// If a rule matches, the transaction is either allowed or
-/// denied depending on the rule. If no rule matches, the transaction is allowed.
-/// For example a rules might look like this:
+/// A filter that can be used to allow or deny transactions from being executed. It contains a
+/// set of rules that are evaluated one by one in the order of declaration. If a rule matches,
+/// the transaction is either allowed or denied depending on the rule. If no rule matches,
+/// the transaction is allowed.
+///
+/// For example, a filter might look like this:
 ///             rules:
 ///                 - Allow:
 ///                     Sender: f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a
 ///                 - Allow:
+///                     MatchesAllOf:
+///                         - Sender: 0xcd3357a925307983f7fbf1a433e87e49eda93fbb94d0d31974e68b5d60e09f3a
+///                         - BlockEpochGreaterThan: 10
+///                 - Allow:
 ///                     ModuleAddress: "0000000000000000000000000000000000000000000000000000000000000001"
 ///                 - Allow:
 ///                     EntryFunction:
-///                         - "0000000000000000000000000000000000000000000000000000000000000001"
+///                         - "0000000000000000000000000000000000000000000000000000000000000002"
 ///                         - test
 ///                         - check
 ///                 - Allow:
 ///                     EntryFunction:
-///                         - "0000000000000000000000000000000000000000000000000000000000000001"
+///                         - "0000000000000000000000000000000000000000000000000000000000000002"
 ///                         - test
 ///                         - new
 ///                 - Deny: All
-/// This filter allows transactions from the sender with address f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a or
-/// from the module with address 0000000000000000000000000000000000000000000000000000000000000001 or entry functions
-/// test::check and test::new from the module 0000000000000000000000000000000000000000000000000000000000000001. All other transactions are denied.
+/// This filter allows transactions with the following properties:
+/// - Sender with address f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a.
+/// - Sender with address cd3357a925307983f7fbf1a433e87e49eda93fbb94d0d31974e68b5d60e09f3a, and
+///   block epoch greater than 10.
+/// - Transactions for the module with address 0000000000000000000000000000000000000000000000000000000000000001.
+/// - Transactions that call the entry function test::check or test::new from the module with
+///   address 0000000000000000000000000000000000000000000000000000000000000002.
+/// All other transactions are denied.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Filter {
     rules: Vec<Rule>,
