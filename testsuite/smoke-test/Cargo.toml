@@ -65,6 +65,7 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 walkdir = { workspace = true }
+blake2-rfc = { workspace = true }
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }
