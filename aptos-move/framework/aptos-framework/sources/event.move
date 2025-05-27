@@ -9,7 +9,7 @@ module aptos_framework::event {
     friend aptos_framework::account;
     friend aptos_framework::object;
 
-    /// An event cannot be created. This error is returned by native implementations when.
+    /// An event cannot be created. This error is returned by native implementations when
     ///   - The type tag for event is too deeply nested.
     const ECANNOT_CREATE_EVENT: u64 = 1;
 
