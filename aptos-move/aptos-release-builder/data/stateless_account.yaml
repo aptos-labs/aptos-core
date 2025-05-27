@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: "AIP-115 Stateless Account Update"
+proposals:
+  - name: stateless_account
+    metadata:
+      title: "Enable Stateless Account"
+      description: "Enables AIP-115"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/15891"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-115.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - default_account_resource
+          disabled: [ ]
