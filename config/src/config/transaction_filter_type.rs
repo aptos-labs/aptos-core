@@ -4,7 +4,12 @@
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{SignedTransaction, TransactionExecutableRef},
+    transaction::{
+        authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
+        EntryFunction, MultisigTransactionPayload, Script, SignedTransaction, TransactionArgument,
+        TransactionExecutableRef, TransactionExtraConfig, TransactionPayload,
+        TransactionPayloadInner,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +26,7 @@ pub enum Matcher {
     BlockEpochGreaterThan(u64), // Matches transactions in blocks with epochs greater than the specified value
     BlockEpochLessThan(u64), // Matches transactions in blocks with epochs less than the specified value
     MatchesAllOf(Vec<Matcher>), // Matches transactions that satisfy all the provided conditions (i.e., logical AND)
+    AccountAddress(AccountAddress), // Matches transactions that involve a specific account address
 }
 
 impl Matcher {
@@ -37,33 +43,252 @@ impl Matcher {
             Matcher::BlockTimeStampGreaterThan(timestamp) => block_timestamp > *timestamp,
             Matcher::BlockTimeStampLessThan(timestamp) => block_timestamp < *timestamp,
             Matcher::TransactionId(id) => txn.committed_hash() == *id,
-            Matcher::Sender(sender) => txn.sender() == *sender,
-            Matcher::ModuleAddress(address) => match txn.payload().executable_ref() {
-                Ok(TransactionExecutableRef::EntryFunction(entry_function))
-                    if !txn.payload().is_multisig() =>
-                {
-                    *entry_function.module().address() == *address
-                },
-                _ => false,
-            },
+            Matcher::Sender(sender) => matches_sender_address(txn, sender),
+            Matcher::ModuleAddress(address) => matches_entry_function_module_address(txn, address),
             Matcher::EntryFunction(address, module_name, function) => {
-                match txn.payload().executable_ref() {
-                    Ok(TransactionExecutableRef::EntryFunction(entry_function))
-                        if !txn.payload().is_multisig() =>
-                    {
-                        *entry_function.module().address() == *address
-                            && entry_function.module().name().to_string() == *module_name
-                            && entry_function.function().to_string() == *function
-                    },
-                    _ => false,
-                }
+                matches_entry_function(txn, address, module_name, function)
             },
             Matcher::BlockEpochGreaterThan(epoch) => block_epoch > *epoch,
             Matcher::BlockEpochLessThan(epoch) => block_epoch < *epoch,
             Matcher::MatchesAllOf(matchers) => matchers
                 .iter()
                 .all(|matcher| matcher.matches(block_id, block_epoch, block_timestamp, txn)),
+            Matcher::AccountAddress(address) => {
+                matches_sender_address(txn, address)
+                    || matches_entry_function_module_address(txn, address)
+                    || matches_multisig_address(txn, address)
+                    || matches_script_argument_address(txn, address)
+                    || matches_transaction_authenticator_address(txn, address)
+            },
         }
+    }
+}
+
+/// Returns true iff the entry function's module address, name, and function name
+/// match the given account address, module name, and function name.
+fn compare_entry_function(
+    entry_function: &EntryFunction,
+    address: &AccountAddress,
+    module_name: &String,
+    function_name: &String,
+) -> bool {
+    entry_function.module().address() == address
+        && entry_function.module().name().to_string() == *module_name
+        && entry_function.function().to_string() == *function_name
+}
+
+/// Returns true iff the entry function's module address matches the given account address
+fn compare_entry_function_module_address(
+    entry_function: &EntryFunction,
+    address: &AccountAddress,
+) -> bool {
+    entry_function.module().address() == address
+}
+
+/// Returns true iff the script's arguments contain the given account address
+fn compare_script_argument_address(script: &Script, address: &AccountAddress) -> bool {
+    script.args().iter().any(|transaction_argument| {
+        if let TransactionArgument::Address(argument_address) = transaction_argument {
+            argument_address == address
+        } else {
+            false
+        }
+    })
+}
+
+/// Returns true iff the account authenticator contains the given account address
+fn matches_account_authenticator_address(
+    account_authenticator: &AccountAuthenticator,
+    address: &AccountAddress,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match account_authenticator {
+        AccountAuthenticator::Ed25519 { .. }
+        | AccountAuthenticator::MultiEd25519 { .. }
+        | AccountAuthenticator::NoAccountAuthenticator => false,
+        AccountAuthenticator::SingleKey { authenticator } => {
+            matches_any_public_key_address(authenticator.public_key(), address)
+        },
+        AccountAuthenticator::MultiKey { authenticator } => authenticator
+            .public_keys()
+            .public_keys()
+            .iter()
+            .any(|any_public_key| matches_any_public_key_address(any_public_key, address)),
+        AccountAuthenticator::Abstraction { function_info, .. } => {
+            function_info.module_address == *address
+        },
+    }
+}
+
+/// Returns true iff the public key contains the given account address
+fn matches_any_public_key_address(any_public_key: &AnyPublicKey, address: &AccountAddress) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match any_public_key {
+        AnyPublicKey::Ed25519 { .. }
+        | AnyPublicKey::Secp256k1Ecdsa { .. }
+        | AnyPublicKey::Secp256r1Ecdsa { .. }
+        | AnyPublicKey::Keyless { .. } => false,
+        AnyPublicKey::FederatedKeyless { public_key } => {
+            // Check if the public key's JWK address matches the given address
+            public_key.jwk_addr == *address
+        },
+    }
+}
+
+/// Returns true iff the transaction's entry function matches the given account address, module name, and function name
+fn matches_entry_function(
+    signed_transaction: &SignedTransaction,
+    address: &AccountAddress,
+    module_name: &String,
+    function: &String,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match signed_transaction.payload() {
+        TransactionPayload::Script(_) | TransactionPayload::ModuleBundle(_) => false,
+        TransactionPayload::Multisig(multisig) => multisig
+            .transaction_payload
+            .as_ref()
+            .map(|payload| match payload {
+                MultisigTransactionPayload::EntryFunction(entry_function) => {
+                    compare_entry_function(entry_function, address, module_name, function)
+                },
+            })
+            .unwrap_or(false),
+        TransactionPayload::EntryFunction(entry_function) => {
+            compare_entry_function(entry_function, address, module_name, function)
+        },
+        TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
+            match executable.as_ref() {
+                TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                TransactionExecutableRef::EntryFunction(entry_function) => {
+                    compare_entry_function(entry_function, address, module_name, function)
+                },
+            }
+        },
+    }
+}
+
+/// Returns true iff the transaction's module address matches the given account address
+fn matches_entry_function_module_address(
+    signed_transaction: &SignedTransaction,
+    module_address: &AccountAddress,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match signed_transaction.payload() {
+        TransactionPayload::Script(_) | TransactionPayload::ModuleBundle(_) => false,
+        TransactionPayload::Multisig(multisig) => multisig
+            .transaction_payload
+            .as_ref()
+            .map(|payload| match payload {
+                MultisigTransactionPayload::EntryFunction(entry_function) => {
+                    compare_entry_function_module_address(entry_function, module_address)
+                },
+            })
+            .unwrap_or(false),
+        TransactionPayload::EntryFunction(entry_function) => {
+            compare_entry_function_module_address(entry_function, module_address)
+        },
+        TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
+            match executable.as_ref() {
+                TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                TransactionExecutableRef::EntryFunction(entry_function) => {
+                    compare_entry_function_module_address(entry_function, module_address)
+                },
+            }
+        },
+    }
+}
+
+/// Returns true iff the transaction's multisig address matches the given account address
+fn matches_multisig_address(
+    signed_transaction: &SignedTransaction,
+    address: &AccountAddress,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match signed_transaction.payload() {
+        TransactionPayload::EntryFunction(_)
+        | TransactionPayload::Script(_)
+        | TransactionPayload::ModuleBundle(_) => false,
+        TransactionPayload::Multisig(multisig) => multisig.multisig_address == *address,
+        TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
+            match extra_config {
+                TransactionExtraConfig::V1 {
+                    multisig_address, ..
+                } => multisig_address
+                    .map(|multisig_address| multisig_address == *address)
+                    .unwrap_or(false),
+            }
+        },
+    }
+}
+
+/// Returns true iff a script argument matches the given account address
+fn matches_script_argument_address(
+    signed_transaction: &SignedTransaction,
+    address: &AccountAddress,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match signed_transaction.payload() {
+        TransactionPayload::EntryFunction(_)
+        | TransactionPayload::Multisig(_)
+        | TransactionPayload::ModuleBundle(_) => false,
+        TransactionPayload::Script(script) => compare_script_argument_address(script, address),
+        TransactionPayload::Payload(TransactionPayloadInner::V1 { executable, .. }) => {
+            match executable.as_ref() {
+                TransactionExecutableRef::EntryFunction(_) | TransactionExecutableRef::Empty => {
+                    false
+                },
+                TransactionExecutableRef::Script(script) => {
+                    compare_script_argument_address(script, address)
+                },
+            }
+        },
+    }
+}
+
+/// Returns true iff the transaction's sender matches the given account address
+fn matches_sender_address(signed_transaction: &SignedTransaction, sender: &AccountAddress) -> bool {
+    signed_transaction.sender() == *sender
+}
+
+/// Returns true iff the transaction's authenticator contains the given account address
+fn matches_transaction_authenticator_address(
+    signed_transaction: &SignedTransaction,
+    address: &AccountAddress,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match signed_transaction.authenticator_ref() {
+        TransactionAuthenticator::Ed25519 { .. }
+        | TransactionAuthenticator::MultiEd25519 { .. } => false,
+        TransactionAuthenticator::MultiAgent {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        } => {
+            matches_account_authenticator_address(sender, address)
+                || secondary_signer_addresses.contains(address)
+                || secondary_signers
+                    .iter()
+                    .any(|signer| matches_account_authenticator_address(signer, address))
+        },
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address,
+            fee_payer_signer,
+        } => {
+            matches_account_authenticator_address(sender, address)
+                || secondary_signer_addresses.contains(address)
+                || secondary_signers
+                    .iter()
+                    .any(|signer| matches_account_authenticator_address(signer, address))
+                || fee_payer_address == address
+                || matches_account_authenticator_address(fee_payer_signer, address)
+        },
+        TransactionAuthenticator::SingleSender { sender } => {
+            matches_account_authenticator_address(sender, address)
+        },
     }
 }
 
