@@ -44,7 +44,9 @@ pub(crate) fn validate_view_function(
     if !is_view {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .with_message("function not marked as view function".to_string()).finish(Location::Module(module_id)).into_vm_status(),
+                .with_message("function not marked as view function".to_string())
+                .finish(Location::Module(module_id))
+                .into_vm_status(),
         );
     }
 
@@ -52,7 +54,9 @@ pub(crate) fn validate_view_function(
     if func.return_tys().is_empty() {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .with_message("view function must return values".to_string()).finish(Location::Module(module_id)).into_vm_status(),
+                .with_message("view function must return values".to_string())
+                .finish(Location::Module(module_id))
+                .into_vm_status(),
         );
     }
 

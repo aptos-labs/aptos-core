@@ -2311,11 +2311,25 @@ impl AptosVM {
 
         let vm_gas_params = match vm.gas_params(&log_context) {
             Ok(gas_params) => gas_params.vm.clone(),
-            Err(err) => return ViewFunctionOutput::new_err(err, 0, vm.features().is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)),
+            Err(err) => {
+                return ViewFunctionOutput::new_err(
+                    err,
+                    0,
+                    vm.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                )
+            },
         };
         let storage_gas_params = match vm.storage_gas_params(&log_context) {
             Ok(gas_params) => gas_params.clone(),
-            Err(err) => return ViewFunctionOutput::new_err(err, 0, vm.features().is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)),
+            Err(err) => {
+                return ViewFunctionOutput::new_err(
+                    err,
+                    0,
+                    vm.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                )
+            },
         };
 
         let mut gas_meter = make_prod_gas_meter(
@@ -2347,13 +2361,15 @@ impl AptosVM {
             Err(e) => {
                 let txn_status = TransactionStatus::from_vm_status(
                     e.clone(),
-                    vm.features().is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)
+                    vm.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
                 );
                 let execution_status = match txn_status {
                     TransactionStatus::Keep(status) => status,
                     _ => ExecutionStatus::MiscellaneousError(Some(e.status_code())),
                 };
-                let status_with_abort_info = vm.inject_abort_info_if_available(&module_storage, execution_status);
+                let status_with_abort_info =
+                    vm.inject_abort_info_if_available(&module_storage, execution_status);
                 ViewFunctionOutput::new(Err(status_with_abort_info), gas_used)
             },
         }
@@ -2402,9 +2418,7 @@ impl AptosVM {
                 &mut traversal_context,
                 module_storage,
             )
-            .map_err(|err| {
-                err.clone().into_vm_status()
-            })?;
+            .map_err(|err| err.clone().into_vm_status())?;
 
         Ok(result
             .return_values
