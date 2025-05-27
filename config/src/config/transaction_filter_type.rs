@@ -163,74 +163,74 @@ impl Filter {
         self.rules.is_empty()
     }
 
-    pub fn add_deny_all(mut self) -> Self {
-        self.rules.push(Rule::Deny(Matcher::All));
+    fn add_match_rule(mut self, allow: bool, matcher: Matcher) -> Self {
+        if allow {
+            self.rules.push(Rule::Allow(matcher));
+        } else {
+            self.rules.push(Rule::Deny(matcher));
+        }
         self
     }
 
-    pub fn add_deny_block_id(mut self, block_id: HashValue) -> Self {
-        self.rules.push(Rule::Deny(Matcher::BlockId(block_id)));
-        self
+    pub fn add_all_filter(self, allow: bool) -> Self {
+        let matcher = Matcher::All;
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_allow_block_timestamp_greater_than(mut self, timestamp: u64) -> Self {
-        self.rules
-            .push(Rule::Allow(Matcher::BlockTimeStampGreaterThan(timestamp)));
-        self
+    pub fn add_block_id_filter(self, allow: bool, block_id: HashValue) -> Self {
+        let matcher = Matcher::BlockId(block_id);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_deny_transaction_id(mut self, txn_id: HashValue) -> Self {
-        self.rules.push(Rule::Deny(Matcher::TransactionId(txn_id)));
-        self
+    pub fn add_block_timestamp_greater_than_filter(self, allow: bool, timestamp: u64) -> Self {
+        let matcher = Matcher::BlockTimeStampGreaterThan(timestamp);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_allow_sender(mut self, sender: AccountAddress) -> Self {
-        self.rules.push(Rule::Allow(Matcher::Sender(sender)));
-        self
+    pub fn add_block_timestamp_less_than_filter(self, allow: bool, timestamp: u64) -> Self {
+        let matcher = Matcher::BlockTimeStampLessThan(timestamp);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_deny_sender(mut self, sender: AccountAddress) -> Self {
-        self.rules.push(Rule::Deny(Matcher::Sender(sender)));
-        self
+    pub fn add_transaction_id_filter(self, allow: bool, txn_id: HashValue) -> Self {
+        let matcher = Matcher::TransactionId(txn_id);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_allow_module_address(mut self, address: AccountAddress) -> Self {
-        self.rules
-            .push(Rule::Allow(Matcher::ModuleAddress(address)));
-        self
+    pub fn add_sender_filter(self, allow: bool, sender: AccountAddress) -> Self {
+        let matcher = Matcher::Sender(sender);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_deny_module_address(mut self, address: AccountAddress) -> Self {
-        self.rules.push(Rule::Deny(Matcher::ModuleAddress(address)));
-        self
+    pub fn add_module_address_filter(self, allow: bool, address: AccountAddress) -> Self {
+        let matcher = Matcher::ModuleAddress(address);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_deny_entry_function(
-        mut self,
+    pub fn add_entry_function_filter(
+        self,
+        allow: bool,
         address: AccountAddress,
         module_name: String,
         function: String,
     ) -> Self {
-        self.rules.push(Rule::Deny(Matcher::EntryFunction(
-            address,
-            module_name,
-            function,
-        )));
-        self
+        let matcher = Matcher::EntryFunction(address, module_name, function);
+        self.add_match_rule(allow, matcher)
     }
 
-    pub fn add_allow_entry_function(
-        mut self,
-        address: AccountAddress,
-        module_name: String,
-        function: String,
-    ) -> Self {
-        self.rules.push(Rule::Allow(Matcher::EntryFunction(
-            address,
-            module_name,
-            function,
-        )));
-        self
+    pub fn add_block_epoch_greater_than_filter(self, allow: bool, epoch: u64) -> Self {
+        let matcher = Matcher::BlockEpochGreaterThan(epoch);
+        self.add_match_rule(allow, matcher)
+    }
+
+    pub fn add_block_epoch_less_than_filter(self, allow: bool, epoch: u64) -> Self {
+        let matcher = Matcher::BlockEpochLessThan(epoch);
+        self.add_match_rule(allow, matcher)
+    }
+
+    pub fn add_matches_all_of_filter(self, allow: bool, matchers: Vec<Matcher>) -> Self {
+        let matcher = Matcher::MatchesAllOf(matchers);
+        self.add_match_rule(allow, matcher)
     }
 
     pub fn rules(&self) -> &[Rule] {
