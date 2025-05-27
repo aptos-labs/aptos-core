@@ -62,5 +62,5 @@ fn detect_for_loop(then: &Exp, env: &GlobalEnv) -> bool {
     let LocalVar(_, name) = cond.as_ref() else {
         return false;
     };
-    return name.display(env.symbol_pool()).to_string() == FOR_LOOP_UPDATE_ITER_FLAG;
+    name.display(env.symbol_pool()).to_string() == FOR_LOOP_UPDATE_ITER_FLAG
 }

@@ -14,7 +14,7 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{gas::GasMeter, module_linker_error};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub fn check_script_dependencies_and_check_gas(
     code_storage: &impl CodeStorage,
@@ -80,7 +80,7 @@ pub fn check_type_tag_dependencies_and_charge_gas(
 /// `ModuleId`, a.k.a. heap allocations, as much as possible, which is critical for
 /// performance.
 pub fn check_dependencies_and_charge_gas<'a, I>(
-    module_storage: &dyn ModuleStorage,
+    module_storage: &impl ModuleStorage,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext<'a>,
     ids: I,
@@ -95,7 +95,7 @@ where
     //
     // TODO: Determine the reserved capacity based on the max number of dependencies allowed.
     let mut stack = Vec::with_capacity(512);
-    push_next_ids_to_visit(&mut stack, &mut traversal_context.visited, ids);
+    traversal_context.push_next_ids_to_visit(&mut stack, ids);
 
     while let Some((addr, name)) = stack.pop() {
         let size = module_storage
@@ -119,31 +119,8 @@ where
         let imm_deps_and_friends = compiled_module
             .immediate_dependencies_iter()
             .chain(compiled_module.immediate_friends_iter());
-        push_next_ids_to_visit(
-            &mut stack,
-            &mut traversal_context.visited,
-            imm_deps_and_friends,
-        );
+        traversal_context.push_next_ids_to_visit(&mut stack, imm_deps_and_friends);
     }
 
     Ok(())
-}
-
-/// Given a list of addresses and module names, pushes them onto stack unless they have been
-/// already visited or if the address is special.
-#[inline]
-pub(crate) fn push_next_ids_to_visit<'a, I>(
-    stack: &mut Vec<(&'a AccountAddress, &'a IdentStr)>,
-    visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
-    ids: I,
-) where
-    I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-    I::IntoIter: DoubleEndedIterator,
-{
-    for (addr, name) in ids.into_iter().rev() {
-        // TODO: Allow the check of special addresses to be customized.
-        if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
-            stack.push((addr, name));
-        }
-    }
 }

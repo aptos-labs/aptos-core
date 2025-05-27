@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x815::m {
     enum E {
         None,
@@ -14,7 +14,7 @@ module 0x815::m {
     }
 } // end 0x815::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x815::m {
     enum E {
         None,
@@ -28,7 +28,34 @@ module 0x815::m {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::t($t0: 0x815::m::E): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := unpack_variant 0x815::m::E::Some($t0)
+  1: $t1 := infer($t2)
+  2: return $t1
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x815::m {
+    enum E {
+        None,
+        Some {
+            0: u64,
+        }
+    }
+    private fun t(self: E): u64 {
+        {
+          let m::E::Some{ 0: x } = self;
+          x
+        }
+    }
+} // end 0x815::m
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::t($t0: 0x815::m::E): u64 {

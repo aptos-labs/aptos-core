@@ -414,7 +414,7 @@ mod test {
         );
 
         let derived_width = assert_ok!(calculate_width_for_integer_embedded_string(
-            "prefixsuffix".as_bytes().len(),
+            "prefixsuffix".len(),
             id_from_fake_idx(0, 8)
         )) as u32;
 
@@ -500,7 +500,7 @@ mod test {
         );
 
         let derived_width = assert_ok!(calculate_width_for_integer_embedded_string(
-            "prefixsuffix".as_bytes().len(),
+            "prefixsuffix".len(),
             id_from_fake_idx(0, 8)
         )) as u32;
 

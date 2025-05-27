@@ -892,6 +892,37 @@ impl GlobalEnv {
         target_modules
     }
 
+    /// Find all target modules and their transitive closures and return in a vector
+    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv> {
+        let mut target_and_transitive_modules: BTreeSet<ModuleId> = BTreeSet::new();
+        let mut todo_modules: BTreeSet<ModuleId> = BTreeSet::new();
+        for module_env in self.get_modules() {
+            if module_env.is_target() {
+                todo_modules.insert(module_env.get_id());
+            }
+        }
+        while let Some(module_id) = todo_modules.pop_first() {
+            if !target_and_transitive_modules.contains(&module_id) {
+                target_and_transitive_modules.insert(module_id);
+            }
+            let module_env = self.get_module(module_id);
+            for func_env in module_env.get_functions() {
+                let used_functions = func_env
+                    .get_used_functions()
+                    .expect("used functions available");
+                for used_function in used_functions {
+                    if !target_and_transitive_modules.contains(&used_function.module_id) {
+                        todo_modules.insert(used_function.module_id);
+                    }
+                }
+            }
+        }
+        target_and_transitive_modules
+            .iter()
+            .map(|id| self.get_module(*id))
+            .collect_vec()
+    }
+
     /// Find all primary target modules and return in a vector
     pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
@@ -1665,7 +1696,7 @@ impl GlobalEnv {
             };
 
             // While releasing any mutation, compute the used/called functions if needed.
-            let fun_data = &self.module_data[module_id.0 as usize]
+            let fun_data = &self.module_data[module_id.to_usize()]
                 .function_data
                 .get(&fun_id)
                 .unwrap();
@@ -1982,6 +2013,7 @@ impl GlobalEnv {
         params: Vec<Parameter>,
         result_type: Type,
         def: Exp,
+        spec_opt: Option<Spec>,
     ) {
         let used_funs = def.used_funs();
         let called_funs = def.called_funs();
@@ -2004,7 +2036,7 @@ impl GlobalEnv {
             result_type,
             access_specifiers: None,
             acquired_structs: None,
-            spec: RefCell::new(Default::default()),
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
             calling_funs: RefCell::new(None),
@@ -2020,6 +2052,64 @@ impl GlobalEnv {
             .function_data
             .insert(FunId::new(name), data)
             .is_none())
+    }
+
+    /// Adds a new function definition from data
+    pub fn add_function_def_from_data(&mut self, module_id: ModuleId, data: FunctionData) -> FunId {
+        let new_id = FunId::new(data.name);
+        assert!(self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .expect("module defined")
+            .function_data
+            .insert(FunId::new(data.name), data)
+            .is_none());
+        new_id
+    }
+
+    /// Constructs function data
+    pub fn construct_function_data(
+        &self,
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        has_package_visibility: bool,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+        spec_opt: Option<Spec>,
+    ) -> FunctionData {
+        let used_funs = def.used_funs();
+        let called_funs = def.called_funs();
+        FunctionData {
+            name,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
+            def_idx: None,
+            handle_idx: None,
+            visibility,
+            has_package_visibility,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params,
+            params,
+            result_type,
+            access_specifiers: None,
+            acquired_structs: None,
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
+            def: Some(def),
+            called_funs: Some(called_funs),
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+            used_funs: Some(used_funs),
+            using_funs: RefCell::new(None),
+            transitive_closure_of_used_funs: RefCell::new(None),
+        }
     }
 
     /// Returns a reference to the declaration of a spec fun.
@@ -2076,6 +2166,7 @@ impl GlobalEnv {
                 .unwrap()
                 .spec
                 .borrow(),
+            SpecFunction(mid, fid) => self.get_spec_fun(mid.qualified(*fid)).spec.borrow(),
             FunctionCode(..) | Schema(_, _, _) | Inline => {
                 // Schemas are expanded, inline spec blocks are part of the AST,
                 // and function code is nested inside of a function spec block
@@ -2102,6 +2193,7 @@ impl GlobalEnv {
                 .unwrap()
                 .spec
                 .borrow_mut(),
+            SpecFunction(mid, fid) => self.get_spec_fun(mid.qualified(*fid)).spec.borrow_mut(),
             FunctionCode(..) | Schema(_, _, _) | Inline => {
                 // Schemas are expanded, inline spec blocks are part of the AST,
                 // and function code is nested inside of a function spec block
@@ -3952,7 +4044,7 @@ pub struct FieldEnv<'env> {
     data: &'env FieldData,
 }
 
-impl<'env> FieldEnv<'env> {
+impl FieldEnv<'_> {
     /// Gets the name of this field.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4057,7 +4149,7 @@ pub struct NamedConstantEnv<'env> {
     data: &'env NamedConstantData,
 }
 
-impl<'env> NamedConstantEnv<'env> {
+impl NamedConstantEnv<'_> {
     /// Returns the name of this constant
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4426,7 +4518,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.loc.id_loc.clone()
     }
 
-    /// Returns the location of the function identifier.
+    /// Returns the location of the function's return type.
     pub fn get_result_type_loc(&self) -> Loc {
         self.data.loc.result_type_loc.clone()
     }
@@ -4872,12 +4964,12 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns associated specification.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.data.spec.borrow()
     }
 
     /// Returns associated mutable reference to specification.
-    pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
+    pub fn get_mut_spec(&'env self) -> RefMut<'env, Spec> {
         self.data.spec.borrow_mut()
     }
 
@@ -5202,7 +5294,7 @@ impl Loc {
     }
 }
 
-impl<'env> fmt::Display for LocDisplay<'env> {
+impl fmt::Display for LocDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
             match &self.mode {
@@ -5269,7 +5361,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5278,7 +5370,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedInstId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedInstId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5298,13 +5390,13 @@ where
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+impl fmt::Display for EnvDisplay<'_, Symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Parameter> {
+impl fmt::Display for EnvDisplay<'_, Parameter> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let p = self.val;
         write!(

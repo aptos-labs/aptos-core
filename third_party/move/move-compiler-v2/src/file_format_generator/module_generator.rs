@@ -8,7 +8,7 @@ use crate::{
         MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
         MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
     },
-    Experiment, Options,
+    Options,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -127,8 +127,7 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_2)
-            && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_3);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
@@ -992,7 +991,7 @@ impl ModuleGenerator {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Emits an error at the location.
     pub fn error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
         self.env.diag(Severity::Error, loc.as_ref(), msg.as_ref())
@@ -1064,7 +1063,7 @@ impl<'env> ModuleContext<'env> {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Acquires analysis. This is temporary until we have the full reference analysis.
     fn generate_acquires_map(&self, module: &ModuleEnv) -> BTreeMap<FunId, BTreeSet<StructId>> {
         // Compute map with direct usage of resources

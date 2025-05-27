@@ -5,7 +5,7 @@ use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, 
 use aptos_framework::{
     chunked_publish::{
         chunk_package_and_create_payloads, PublishType, CHUNK_SIZE_IN_BYTES,
-        LARGE_PACKAGES_MODULE_ADDRESS,
+        LARGE_PACKAGES_DEV_MODULE_ADDRESS,
     },
     natives::{
         code::{PackageMetadata, PackageRegistry, UpgradePolicy},
@@ -21,8 +21,14 @@ use aptos_types::{
 use move_core_types::{
     account_address::AccountAddress, parser::parse_struct_tag, vm_status::StatusCode,
 };
+use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, option::Option, path::Path, str::FromStr};
+use std::{
+    collections::BTreeMap,
+    option::Option,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 /// Number of transactions needed for staging code chunks before publishing to accounts or objects
 /// This is used to derive object address for testing object code deployment feature
@@ -44,9 +50,6 @@ impl LargePackageTestContext {
     /// Create a new test context with initialized accounts and published `large_packages.move` module.
     fn new() -> Self {
         let mut harness = MoveHarness::new();
-        let admin_account = harness.new_account_at(
-            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
-        );
         let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
         let sequence_number = harness.sequence_number(account.address());
         let object_address = create_object_code_deployment_address(
@@ -54,25 +57,23 @@ impl LargePackageTestContext {
             sequence_number + NUMBER_OF_TRANSACTIONS_FOR_STAGING + 1,
         );
 
-        // publish `large_packages.move` module
-        let build_option = Self::get_named_addresses_build_options(vec![(
-            String::from("large_packages"),
-            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
-        )]);
-
-        let txn = harness.create_publish_package(
-            &admin_account,
-            &common::test_dir_path("../../../move-examples/large_packages"),
-            Some(build_option),
-            |_| {},
-        );
-        assert_success!(harness.run(txn));
-
         LargePackageTestContext {
             harness,
             account,
             object_address,
         }
+    }
+
+    /// Get the local framework path based on this source file's location.
+    /// Note: If this source file is moved to a different location, this function
+    /// may need to be updated.
+    fn get_local_framework_path() -> String {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .map(|p| p.join("framework"))
+            .expect("framework path")
+            .to_string_lossy()
+            .to_string()
     }
 
     fn get_named_addresses_build_options(
@@ -84,6 +85,7 @@ impl LargePackageTestContext {
             map.insert(k, v);
         }
         build_options.named_addresses = map;
+        build_options.override_std = Some(StdVersion::Local(Self::get_local_framework_path()));
 
         build_options
     }
@@ -144,7 +146,7 @@ impl LargePackageTestContext {
             package_code,
             publish_type,
             Some(self.object_address),
-            AccountAddress::from_str(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            AccountAddress::from_str(LARGE_PACKAGES_DEV_MODULE_ADDRESS).unwrap(),
             CHUNK_SIZE_IN_BYTES,
         )
     }

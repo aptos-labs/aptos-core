@@ -48,6 +48,14 @@ pub static CACHE_SIZE_LIMIT_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static LATENCY_MS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_indexer_grpc_v2_live_data_service_latency_ms",
+        "The latency of live data service (comparing with txn timestamp)."
+    )
+    .unwrap()
+});
+
 pub static COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_indexer_grpc_v2_data_service_counter",

@@ -6,6 +6,7 @@
 
 
 -  [Struct `KeyRotation`](#0x1_account_KeyRotation)
+-  [Struct `KeyRotationToPublicKey`](#0x1_account_KeyRotationToPublicKey)
 -  [Resource `Account`](#0x1_account_Account)
 -  [Struct `KeyRotationEvent`](#0x1_account_KeyRotationEvent)
 -  [Struct `CoinRegisterEvent`](#0x1_account_CoinRegisterEvent)
@@ -39,6 +40,11 @@
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
 -  [Function `rotate_authentication_key_call`](#0x1_account_rotate_authentication_key_call)
+-  [Function `rotate_authentication_key_from_public_key`](#0x1_account_rotate_authentication_key_from_public_key)
+-  [Function `upsert_ed25519_backup_key_on_keyless_account`](#0x1_account_upsert_ed25519_backup_key_on_keyless_account)
+    -  [Arguments](#@Arguments_1)
+    -  [Aborts](#@Aborts_2)
+    -  [Events](#@Events_3)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
 -  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
@@ -65,45 +71,46 @@
 -  [Function `create_signer_with_capability`](#0x1_account_create_signer_with_capability)
 -  [Function `get_signer_capability_address`](#0x1_account_get_signer_capability_address)
 -  [Function `verify_signed_message`](#0x1_account_verify_signed_message)
--  [Specification](#@Specification_1)
+-  [Specification](#@Specification_4)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
-    -  [Function `initialize`](#@Specification_1_initialize)
-    -  [Function `create_account_if_does_not_exist`](#@Specification_1_create_account_if_does_not_exist)
-    -  [Function `create_account`](#@Specification_1_create_account)
-    -  [Function `create_account_unchecked`](#@Specification_1_create_account_unchecked)
-    -  [Function `exists_at`](#@Specification_1_exists_at)
-    -  [Function `get_guid_next_creation_num`](#@Specification_1_get_guid_next_creation_num)
-    -  [Function `get_sequence_number`](#@Specification_1_get_sequence_number)
-    -  [Function `originating_address`](#@Specification_1_originating_address)
-    -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
-    -  [Function `get_authentication_key`](#@Specification_1_get_authentication_key)
-    -  [Function `rotate_authentication_key_internal`](#@Specification_1_rotate_authentication_key_internal)
-    -  [Function `rotate_authentication_key_call`](#@Specification_1_rotate_authentication_key_call)
-    -  [Function `rotate_authentication_key`](#@Specification_1_rotate_authentication_key)
-    -  [Function `rotate_authentication_key_with_rotation_capability`](#@Specification_1_rotate_authentication_key_with_rotation_capability)
-    -  [Function `offer_rotation_capability`](#@Specification_1_offer_rotation_capability)
-    -  [Function `set_originating_address`](#@Specification_1_set_originating_address)
-    -  [Function `is_rotation_capability_offered`](#@Specification_1_is_rotation_capability_offered)
-    -  [Function `get_rotation_capability_offer_for`](#@Specification_1_get_rotation_capability_offer_for)
-    -  [Function `revoke_rotation_capability`](#@Specification_1_revoke_rotation_capability)
-    -  [Function `revoke_any_rotation_capability`](#@Specification_1_revoke_any_rotation_capability)
-    -  [Function `offer_signer_capability`](#@Specification_1_offer_signer_capability)
-    -  [Function `is_signer_capability_offered`](#@Specification_1_is_signer_capability_offered)
-    -  [Function `get_signer_capability_offer_for`](#@Specification_1_get_signer_capability_offer_for)
-    -  [Function `revoke_signer_capability`](#@Specification_1_revoke_signer_capability)
-    -  [Function `revoke_any_signer_capability`](#@Specification_1_revoke_any_signer_capability)
-    -  [Function `create_authorized_signer`](#@Specification_1_create_authorized_signer)
-    -  [Function `assert_valid_rotation_proof_signature_and_get_auth_key`](#@Specification_1_assert_valid_rotation_proof_signature_and_get_auth_key)
-    -  [Function `update_auth_key_and_originating_address_table`](#@Specification_1_update_auth_key_and_originating_address_table)
-    -  [Function `create_resource_address`](#@Specification_1_create_resource_address)
-    -  [Function `create_resource_account`](#@Specification_1_create_resource_account)
-    -  [Function `create_framework_reserved_account`](#@Specification_1_create_framework_reserved_account)
-    -  [Function `create_guid`](#@Specification_1_create_guid)
-    -  [Function `new_event_handle`](#@Specification_1_new_event_handle)
-    -  [Function `register_coin`](#@Specification_1_register_coin)
-    -  [Function `create_signer_with_capability`](#@Specification_1_create_signer_with_capability)
-    -  [Function `verify_signed_message`](#@Specification_1_verify_signed_message)
+    -  [Function `initialize`](#@Specification_4_initialize)
+    -  [Function `create_account_if_does_not_exist`](#@Specification_4_create_account_if_does_not_exist)
+    -  [Function `create_account`](#@Specification_4_create_account)
+    -  [Function `create_account_unchecked`](#@Specification_4_create_account_unchecked)
+    -  [Function `exists_at`](#@Specification_4_exists_at)
+    -  [Function `get_guid_next_creation_num`](#@Specification_4_get_guid_next_creation_num)
+    -  [Function `get_sequence_number`](#@Specification_4_get_sequence_number)
+    -  [Function `originating_address`](#@Specification_4_originating_address)
+    -  [Function `increment_sequence_number`](#@Specification_4_increment_sequence_number)
+    -  [Function `get_authentication_key`](#@Specification_4_get_authentication_key)
+    -  [Function `rotate_authentication_key_internal`](#@Specification_4_rotate_authentication_key_internal)
+    -  [Function `rotate_authentication_key_call`](#@Specification_4_rotate_authentication_key_call)
+    -  [Function `rotate_authentication_key_from_public_key`](#@Specification_4_rotate_authentication_key_from_public_key)
+    -  [Function `rotate_authentication_key`](#@Specification_4_rotate_authentication_key)
+    -  [Function `rotate_authentication_key_with_rotation_capability`](#@Specification_4_rotate_authentication_key_with_rotation_capability)
+    -  [Function `offer_rotation_capability`](#@Specification_4_offer_rotation_capability)
+    -  [Function `set_originating_address`](#@Specification_4_set_originating_address)
+    -  [Function `is_rotation_capability_offered`](#@Specification_4_is_rotation_capability_offered)
+    -  [Function `get_rotation_capability_offer_for`](#@Specification_4_get_rotation_capability_offer_for)
+    -  [Function `revoke_rotation_capability`](#@Specification_4_revoke_rotation_capability)
+    -  [Function `revoke_any_rotation_capability`](#@Specification_4_revoke_any_rotation_capability)
+    -  [Function `offer_signer_capability`](#@Specification_4_offer_signer_capability)
+    -  [Function `is_signer_capability_offered`](#@Specification_4_is_signer_capability_offered)
+    -  [Function `get_signer_capability_offer_for`](#@Specification_4_get_signer_capability_offer_for)
+    -  [Function `revoke_signer_capability`](#@Specification_4_revoke_signer_capability)
+    -  [Function `revoke_any_signer_capability`](#@Specification_4_revoke_any_signer_capability)
+    -  [Function `create_authorized_signer`](#@Specification_4_create_authorized_signer)
+    -  [Function `assert_valid_rotation_proof_signature_and_get_auth_key`](#@Specification_4_assert_valid_rotation_proof_signature_and_get_auth_key)
+    -  [Function `update_auth_key_and_originating_address_table`](#@Specification_4_update_auth_key_and_originating_address_table)
+    -  [Function `create_resource_address`](#@Specification_4_create_resource_address)
+    -  [Function `create_resource_account`](#@Specification_4_create_resource_account)
+    -  [Function `create_framework_reserved_account`](#@Specification_4_create_framework_reserved_account)
+    -  [Function `create_guid`](#@Specification_4_create_guid)
+    -  [Function `new_event_handle`](#@Specification_4_new_event_handle)
+    -  [Function `register_coin`](#@Specification_4_register_coin)
+    -  [Function `create_signer_with_capability`](#@Specification_4_create_signer_with_capability)
+    -  [Function `verify_signed_message`](#@Specification_4_verify_signed_message)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -117,9 +124,11 @@
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519">0x1::multi_ed25519</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key">0x1::multi_key</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key">0x1::single_key</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
@@ -159,6 +168,64 @@
 </dd>
 <dt>
 <code>new_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_account_KeyRotationToPublicKey"></a>
+
+## Struct `KeyRotationToPublicKey`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>verified_public_key_bit_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>public_key_scheme: u8</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -856,6 +923,26 @@ The current authentication key and the new authentication key are the same
 
 
 
+<a id="0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY"></a>
+
+The provided public key is not a single Keyless public key
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>: u64 = 25;
+</code></pre>
+
+
+
+<a id="0x1_account_ENOT_THE_ORIGINAL_PUBLIC_KEY"></a>
+
+The provided public key is not the original public key for the account
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENOT_THE_ORIGINAL_PUBLIC_KEY">ENOT_THE_ORIGINAL_PUBLIC_KEY</a>: u64 = 26;
+</code></pre>
+
+
+
 <a id="0x1_account_ENO_ACCOUNT_PERMISSION"></a>
 
 Current permissioned signer cannot perform the privilaged operations.
@@ -955,6 +1042,16 @@ Sequence number exceeds the maximum value for a u64
 
 
 
+<a id="0x1_account_EUNRECOGNIZED_SCHEME"></a>
+
+Specified scheme is not recognized. Should be ED25519_SCHEME(0), MULTI_ED25519_SCHEME(1), SINGLE_KEY_SCHEME(2), or MULTI_KEY_SCHEME(3).
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EUNRECOGNIZED_SCHEME">EUNRECOGNIZED_SCHEME</a>: u64 = 24;
+</code></pre>
+
+
+
 <a id="0x1_account_EWRONG_CURRENT_PUBLIC_KEY"></a>
 
 Specified current public key is not correct
@@ -981,6 +1078,26 @@ Scheme identifier for MultiEd25519 signatures used to derive authentication keys
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>: u8 = 1;
+</code></pre>
+
+
+
+<a id="0x1_account_MULTI_KEY_SCHEME"></a>
+
+Scheme identifier for multi key public keys used to derive authentication keys for multi key public keys.
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>: u8 = 3;
+</code></pre>
+
+
+
+<a id="0x1_account_SINGLE_KEY_SCHEME"></a>
+
+Scheme identifier for single key public keys used to derive authentication keys for single key public keys.
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_SINGLE_KEY_SCHEME">SINGLE_KEY_SCHEME</a>: u8 = 2;
 </code></pre>
 
 
@@ -1578,6 +1695,170 @@ If you'd like to followup with updating the <code><a href="account.md#0x1_accoun
 
 </details>
 
+<a id="0x1_account_rotate_authentication_key_from_public_key"></a>
+
+## Function `rotate_authentication_key_from_public_key`
+
+Private entry function for key rotation that allows the signer to update their authentication key from a given public key.
+This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
+
+Note: This function does not update the <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table.
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_from_public_key">rotate_authentication_key_from_public_key</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, scheme: u8, new_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_from_public_key">rotate_authentication_key_from_public_key</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, scheme: u8, new_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> account_resource = &<a href="account.md#0x1_account_Account">Account</a>[addr];
+    <b>let</b> old_auth_key = account_resource.authentication_key;
+    <b>let</b> new_auth_key;
+    <b>if</b> (scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
+        <b>let</b> from_pk = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(new_public_key_bytes);
+        new_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_unvalidated_public_key_to_authentication_key">ed25519::unvalidated_public_key_to_authentication_key</a>(&from_pk);
+    } <b>else</b> <b>if</b> (scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>) {
+        <b>let</b> from_pk = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_new_unvalidated_public_key_from_bytes">multi_ed25519::new_unvalidated_public_key_from_bytes</a>(new_public_key_bytes);
+        new_auth_key = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_to_authentication_key">multi_ed25519::unvalidated_public_key_to_authentication_key</a>(&from_pk);
+    } <b>else</b> <b>if</b> (scheme == <a href="account.md#0x1_account_SINGLE_KEY_SCHEME">SINGLE_KEY_SCHEME</a>) {
+        new_auth_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_public_key_from_bytes">single_key::new_public_key_from_bytes</a>(new_public_key_bytes).to_authentication_key();
+    } <b>else</b> <b>if</b> (scheme == <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>) {
+        new_auth_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_new_public_key_from_bytes">multi_key::new_public_key_from_bytes</a>(new_public_key_bytes).to_authentication_key();
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EUNRECOGNIZED_SCHEME">EUNRECOGNIZED_SCHEME</a>)
+    };
+    <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
+        <a href="account.md#0x1_account">account</a>: addr,
+        // Set verified_public_key_bit_map <b>to</b> [0x00, 0x00, 0x00, 0x00] <b>as</b> the <b>public</b> key(s) are not verified
+        verified_public_key_bit_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x00, 0x00, 0x00, 0x00],
+        public_key_scheme: scheme,
+        public_key: new_public_key_bytes,
+        old_auth_key,
+        new_auth_key,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_upsert_ed25519_backup_key_on_keyless_account"></a>
+
+## Function `upsert_ed25519_backup_key_on_keyless_account`
+
+Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
+
+Note: This function emits a <code>KeyRotationToMultiPublicKey</code> event marking both keys as verified since the keyless public key
+is the original public key of the account and the new backup key has been validated via verifying the challenge signed by the new backup key.
+
+
+<a id="@Arguments_1"></a>
+
+### Arguments
+
+* <code><a href="account.md#0x1_account">account</a></code> - The signer representing the keyless account
+* <code>keyless_public_key</code> - The original keyless public key of the account (wrapped in an AnyPublicKey)
+* <code>backup_public_key</code> - The ED25519 public key to add as a backup
+* <code>backup_key_proof</code> - A signature from the backup key proving ownership
+
+
+<a id="@Aborts_2"></a>
+
+### Aborts
+
+* If the any of inputs deserialize incorrectly
+* If the provided public key is not a keyless public key
+* If the keyless public key is not the original public key of the account
+* If the backup key proof signature is invalid
+
+
+<a id="@Events_3"></a>
+
+### Events
+
+* Emits a <code>KeyRotationToMultiPublicKey</code> event with the new multi-key configuration
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account">upsert_ed25519_backup_key_on_keyless_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account">upsert_ed25519_backup_key_on_keyless_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    // Check that the provided <b>public</b> key is a <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> <b>public</b> key
+    <b>let</b> keyless_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_public_key_from_bytes">single_key::new_public_key_from_bytes</a>(keyless_public_key);
+    <b>assert</b>!(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_is_keyless_or_federated_keyless_public_key">single_key::is_keyless_or_federated_keyless_public_key</a>(&keyless_single_key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
+
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> account_resource = &<b>mut</b> <a href="account.md#0x1_account_Account">Account</a>[addr];
+    <b>let</b> old_auth_key = account_resource.authentication_key;
+
+    // Check that the provided <b>public</b> key is original <b>public</b> key of the <a href="account.md#0x1_account">account</a> by comparing
+    // its authentication key <b>to</b> the <a href="account.md#0x1_account">account</a> <b>address</b>.
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr) == keyless_single_key.to_authentication_key(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENOT_THE_ORIGINAL_PUBLIC_KEY">ENOT_THE_ORIGINAL_PUBLIC_KEY</a>)
+    );
+
+    <b>let</b> curr_auth_key_as_address = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(old_auth_key);
+    <b>let</b> challenge = <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a> {
+        sequence_number: account_resource.sequence_number,
+        originator: addr,
+        current_auth_key: curr_auth_key_as_address,
+        new_public_key: backup_public_key,
+    };
+
+    // Assert the challenges signed by the provided backup key is valid
+    <a href="account.md#0x1_account_assert_valid_rotation_proof_signature_and_get_auth_key">assert_valid_rotation_proof_signature_and_get_auth_key</a>(
+        <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>,
+        backup_public_key,
+        backup_key_proof,
+        &challenge
+    );
+
+    // Get the backup key <b>as</b> a single key
+    <b>let</b> backup_key_ed25519 = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(backup_public_key);
+    <b>let</b> backup_key_as_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_from_ed25519_public_key_unvalidated">single_key::from_ed25519_public_key_unvalidated</a>(backup_key_ed25519);
+
+    <b>let</b> new_public_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_new_multi_key_from_single_keys">multi_key::new_multi_key_from_single_keys</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[keyless_single_key, backup_key_as_single_key], 1);
+    <b>let</b> new_auth_key = new_public_key.to_authentication_key();
+
+    // Rotate the authentication key <b>to</b> the new multi key <b>public</b> key
+    <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
+        <a href="account.md#0x1_account">account</a>: addr,
+        // This marks that both the <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> <b>public</b> key and the new backup key are verified
+        // The <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> <b>public</b> key is the original <b>public</b> key of the <a href="account.md#0x1_account">account</a> and the new backup key
+        // <b>has</b> been validated via verifying the challenge signed by the new backup key.
+        // Represents the bitmap 0b11000000000000000000000000000000
+        verified_public_key_bit_map: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0xC0, 0x00, 0x00, 0x00],
+        public_key_scheme: <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>,
+        public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&new_public_key),
+        old_auth_key,
+        new_auth_key,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_account_rotate_authentication_key"></a>
 
 ## Function `rotate_authentication_key`
@@ -1634,7 +1915,7 @@ to rotate his address to Alice's address in the first place.
     <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = &<b>mut</b> <a href="account.md#0x1_account_Account">Account</a>[addr];
-
+    <b>let</b> old_auth_key = account_resource.authentication_key;
     // Verify the given `from_public_key_bytes` matches this <a href="account.md#0x1_account">account</a>'s current authentication key.
     <b>if</b> (from_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
         <b>let</b> from_pk = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(from_public_key_bytes);
@@ -1679,6 +1960,25 @@ to rotate his address to Alice's address in the first place.
 
     // Update the `<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>` <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.
     <a href="account.md#0x1_account_update_auth_key_and_originating_address_table">update_auth_key_and_originating_address_table</a>(addr, account_resource, new_auth_key);
+
+    <b>let</b> verified_public_key_bit_map;
+    <b>if</b> (to_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
+        // Set verified_public_key_bit_map <b>to</b> [0x80, 0x00, 0x00, 0x00] <b>as</b> the <b>public</b> key is verified and there is only one <b>public</b> key.
+        verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x80, 0x00, 0x00, 0x00];
+    } <b>else</b> {
+        // The new key is a multi-<a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">ed25519</a> key, so set the verified_public_key_bit_map <b>to</b> the signature bitmap.
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
+        verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
+    };
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
+        <a href="account.md#0x1_account">account</a>: addr,
+        verified_public_key_bit_map,
+        public_key_scheme: to_scheme,
+        public_key: to_public_key_bytes,
+        old_auth_key,
+        new_auth_key,
+    });
 }
 </code></pre>
 
@@ -1714,6 +2014,7 @@ to rotate his address to Alice's address in the first place.
     // Check that there <b>exists</b> a rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate.
     <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
     <b>let</b> offerer_account_resource = &<a href="account.md#0x1_account_Account">Account</a>[rotation_cap_offerer_address];
+    <b>let</b> old_auth_key = offerer_account_resource.authentication_key;
     <b>assert</b>!(
         offerer_account_resource.rotation_capability_offer.for.contains(&delegate_address),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>)
@@ -1742,6 +2043,25 @@ to rotate his address to Alice's address in the first place.
         offerer_account_resource,
         new_auth_key
     );
+
+    <b>let</b> verified_public_key_bit_map;
+    <b>if</b> (new_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
+        // Set verified_public_key_bit_map <b>to</b> [0x80, 0x00, 0x00, 0x00] <b>as</b> the <b>public</b> key is verified and there is only one <b>public</b> key.
+        verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[0x80, 0x00, 0x00, 0x00];
+    } <b>else</b> {
+        // The new key is a multi-<a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">ed25519</a> key, so set the verified_public_key_bit_map <b>to</b> the signature bitmap.
+        <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cap_update_table);
+        verified_public_key_bit_map = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&cap_update_table, len - 4, len);
+    };
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_KeyRotationToPublicKey">KeyRotationToPublicKey</a> {
+        <a href="account.md#0x1_account">account</a>: rotation_cap_offerer_address,
+        verified_public_key_bit_map,
+        public_key_scheme: new_scheme,
+        public_key: new_public_key_bytes,
+        old_auth_key,
+        new_auth_key,
+    });
 }
 </code></pre>
 
@@ -2753,7 +3073,7 @@ Capability based functions for efficient use.
 
 </details>
 
-<a id="@Specification_1"></a>
+<a id="@Specification_4"></a>
 
 ## Specification
 
@@ -2880,18 +3200,7 @@ Capability based functions for efficient use.
 
 
 
-
-<a id="0x1_account_spec_get_authentication_key"></a>
-
-
-<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-   <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
-}
-</code></pre>
-
-
-
-<a id="@Specification_1_initialize"></a>
+<a id="@Specification_4_initialize"></a>
 
 ### Function `initialize`
 
@@ -2912,7 +3221,7 @@ OriginatingAddress does not exist under <code>@aptos_framework</code> before the
 
 
 
-<a id="@Specification_1_create_account_if_does_not_exist"></a>
+<a id="@Specification_4_create_account_if_does_not_exist"></a>
 
 ### Function `create_account_if_does_not_exist`
 
@@ -2937,7 +3246,7 @@ Ensure that the account exists at the end of the call.
 
 
 
-<a id="@Specification_1_create_account"></a>
+<a id="@Specification_4_create_account"></a>
 
 ### Function `create_account`
 
@@ -2960,7 +3269,7 @@ Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<a id="@Specification_1_create_account_unchecked"></a>
+<a id="@Specification_4_create_account_unchecked"></a>
 
 ### Function `create_account_unchecked`
 
@@ -2982,7 +3291,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a id="@Specification_1_exists_at"></a>
+<a id="@Specification_4_exists_at"></a>
 
 ### Function `exists_at`
 
@@ -3030,7 +3339,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a id="@Specification_1_get_guid_next_creation_num"></a>
+<a id="@Specification_4_get_guid_next_creation_num"></a>
 
 ### Function `get_guid_next_creation_num`
 
@@ -3048,7 +3357,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a id="@Specification_1_get_sequence_number"></a>
+<a id="@Specification_4_get_sequence_number"></a>
 
 ### Function `get_sequence_number`
 
@@ -3066,7 +3375,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a id="@Specification_1_originating_address"></a>
+<a id="@Specification_4_originating_address"></a>
 
 ### Function `originating_address`
 
@@ -3083,7 +3392,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<a id="@Specification_1_increment_sequence_number"></a>
+<a id="@Specification_4_increment_sequence_number"></a>
 
 ### Function `increment_sequence_number`
 
@@ -3107,7 +3416,7 @@ The sequence_number of the Account is up to MAX_U64.
 
 
 
-<a id="@Specification_1_get_authentication_key"></a>
+<a id="@Specification_4_get_authentication_key"></a>
 
 ### Function `get_authentication_key`
 
@@ -3126,7 +3435,18 @@ The sequence_number of the Account is up to MAX_U64.
 
 
 
-<a id="@Specification_1_rotate_authentication_key_internal"></a>
+
+<a id="0x1_account_spec_get_authentication_key"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+   <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
+}
+</code></pre>
+
+
+
+<a id="@Specification_4_rotate_authentication_key_internal"></a>
 
 ### Function `rotate_authentication_key_internal`
 
@@ -3150,7 +3470,7 @@ The length of new_auth_key is 32.
 
 
 
-<a id="@Specification_1_rotate_authentication_key_call"></a>
+<a id="@Specification_4_rotate_authentication_key_call"></a>
 
 ### Function `rotate_authentication_key_call`
 
@@ -3172,6 +3492,22 @@ The length of new_auth_key is 32.
 
 
 
+<a id="@Specification_4_rotate_authentication_key_from_public_key"></a>
+
+### Function `rotate_authentication_key_from_public_key`
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_from_public_key">rotate_authentication_key_from_public_key</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, scheme: u8, new_public_key_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a> && scheme != <a href="account.md#0x1_account_SINGLE_KEY_SCHEME">SINGLE_KEY_SCHEME</a> && scheme != <a href="account.md#0x1_account_MULTI_KEY_SCHEME">MULTI_KEY_SCHEME</a>;
+</code></pre>
+
+
+
 
 <a id="0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
 
@@ -3181,7 +3517,7 @@ The length of new_auth_key is 32.
 
 
 
-<a id="@Specification_1_rotate_authentication_key"></a>
+<a id="@Specification_4_rotate_authentication_key"></a>
 
 ### Function `rotate_authentication_key`
 
@@ -3250,7 +3586,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_rotate_authentication_key_with_rotation_capability"></a>
+<a id="@Specification_4_rotate_authentication_key_with_rotation_capability"></a>
 
 ### Function `rotate_authentication_key_with_rotation_capability`
 
@@ -3301,7 +3637,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_offer_rotation_capability"></a>
+<a id="@Specification_4_offer_rotation_capability"></a>
 
 ### Function `offer_rotation_capability`
 
@@ -3355,7 +3691,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_set_originating_address"></a>
+<a id="@Specification_4_set_originating_address"></a>
 
 ### Function `set_originating_address`
 
@@ -3371,7 +3707,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_is_rotation_capability_offered"></a>
+<a id="@Specification_4_is_rotation_capability_offered"></a>
 
 ### Function `is_rotation_capability_offered`
 
@@ -3388,7 +3724,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_get_rotation_capability_offer_for"></a>
+<a id="@Specification_4_get_rotation_capability_offer_for"></a>
 
 ### Function `get_rotation_capability_offer_for`
 
@@ -3407,7 +3743,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_revoke_rotation_capability"></a>
+<a id="@Specification_4_revoke_rotation_capability"></a>
 
 ### Function `revoke_rotation_capability`
 
@@ -3431,7 +3767,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_revoke_any_rotation_capability"></a>
+<a id="@Specification_4_revoke_any_rotation_capability"></a>
 
 ### Function `revoke_any_rotation_capability`
 
@@ -3454,7 +3790,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<a id="@Specification_1_offer_signer_capability"></a>
+<a id="@Specification_4_offer_signer_capability"></a>
 
 ### Function `offer_signer_capability`
 
@@ -3508,7 +3844,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<a id="@Specification_1_is_signer_capability_offered"></a>
+<a id="@Specification_4_is_signer_capability_offered"></a>
 
 ### Function `is_signer_capability_offered`
 
@@ -3525,7 +3861,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<a id="@Specification_1_get_signer_capability_offer_for"></a>
+<a id="@Specification_4_get_signer_capability_offer_for"></a>
 
 ### Function `get_signer_capability_offer_for`
 
@@ -3544,7 +3880,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<a id="@Specification_1_revoke_signer_capability"></a>
+<a id="@Specification_4_revoke_signer_capability"></a>
 
 ### Function `revoke_signer_capability`
 
@@ -3568,7 +3904,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_revoke_any_signer_capability"></a>
+<a id="@Specification_4_revoke_any_signer_capability"></a>
 
 ### Function `revoke_any_signer_capability`
 
@@ -3588,7 +3924,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_create_authorized_signer"></a>
+<a id="@Specification_4_create_authorized_signer"></a>
 
 ### Function `create_authorized_signer`
 
@@ -3630,7 +3966,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
+<a id="@Specification_4_assert_valid_rotation_proof_signature_and_get_auth_key"></a>
 
 ### Function `assert_valid_rotation_proof_signature_and_get_auth_key`
 
@@ -3677,7 +4013,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_update_auth_key_and_originating_address_table"></a>
+<a id="@Specification_4_update_auth_key_and_originating_address_table"></a>
 
 ### Function `update_auth_key_and_originating_address_table`
 
@@ -3718,7 +4054,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_create_resource_address"></a>
+<a id="@Specification_4_create_resource_address"></a>
 
 ### Function `create_resource_address`
 
@@ -3749,7 +4085,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_create_resource_account"></a>
+<a id="@Specification_4_create_resource_account"></a>
 
 ### Function `create_resource_account`
 
@@ -3773,7 +4109,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<a id="@Specification_1_create_framework_reserved_account"></a>
+<a id="@Specification_4_create_framework_reserved_account"></a>
 
 ### Function `create_framework_reserved_account`
 
@@ -3815,7 +4151,7 @@ The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7
 
 
 
-<a id="@Specification_1_create_guid"></a>
+<a id="@Specification_4_create_guid"></a>
 
 ### Function `create_guid`
 
@@ -3839,7 +4175,7 @@ The guid_creation_num of the account resource is up to MAX_U64.
 
 
 
-<a id="@Specification_1_new_event_handle"></a>
+<a id="@Specification_4_new_event_handle"></a>
 
 ### Function `new_event_handle`
 
@@ -3873,7 +4209,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a id="@Specification_1_register_coin"></a>
+<a id="@Specification_4_register_coin"></a>
 
 ### Function `register_coin`
 
@@ -3891,7 +4227,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a id="@Specification_1_create_signer_with_capability"></a>
+<a id="@Specification_4_create_signer_with_capability"></a>
 
 ### Function `create_signer_with_capability`
 
@@ -3920,7 +4256,7 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<a id="@Specification_1_verify_signed_message"></a>
+<a id="@Specification_4_verify_signed_message"></a>
 
 ### Function `verify_signed_message`
 

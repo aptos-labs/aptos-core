@@ -38,7 +38,7 @@ module aptos_framework::randomness_config_seqnum {
     public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfigSeqNum {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfigSeqNum>()) {
-            let new_config = config_buffer::extract<RandomnessConfigSeqNum>();
+            let new_config = config_buffer::extract_v2<RandomnessConfigSeqNum>();
             if (exists<RandomnessConfigSeqNum>(@aptos_framework)) {
                 *borrow_global_mut<RandomnessConfigSeqNum>(@aptos_framework) = new_config;
             } else {

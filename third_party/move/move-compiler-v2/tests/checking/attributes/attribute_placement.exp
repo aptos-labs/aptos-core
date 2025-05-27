@@ -84,7 +84,7 @@ warning: unknown attribute
 44 │     #[attr]
    │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::N {
     public fun bar() {
         Tuple()
@@ -107,7 +107,7 @@ module <SELF>_0 {
     }
 } // end <SELF>_0
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::N {
     friend 0x42::M;
     public fun bar() {

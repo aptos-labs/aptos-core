@@ -228,7 +228,6 @@ The semantics of deposit will be governed by the function specified in DispatchF
             <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
         );
-        <b>let</b> start_balance = <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(store);
         <b>let</b> func = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&func_opt);
         <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);
         <b>let</b> fa = <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_withdraw">dispatchable_withdraw</a>(
@@ -237,8 +236,6 @@ The semantics of deposit will be governed by the function specified in DispatchF
             <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>(store),
             func,
         );
-        <b>let</b> end_balance = <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(store);
-        <b>assert</b>!(amount &lt;= start_balance - end_balance, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_EAMOUNT_MISMATCH">EAMOUNT_MISMATCH</a>));
         fa
     } <b>else</b> {
         <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw">fungible_asset::unchecked_withdraw</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)

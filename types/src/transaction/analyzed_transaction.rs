@@ -7,8 +7,8 @@ use crate::{
     on_chain_config::{CurrentTimeMicroseconds, Features, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-        TransactionPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, EntryFunction, Transaction,
+        TransactionExecutableRef,
     },
     AptosCoinType, CoinType,
 };
@@ -243,42 +243,38 @@ trait AnalyzedTransactionProvider {
 
 impl AnalyzedTransactionProvider for Transaction {
     fn get_read_write_hints(&self) -> (Vec<StorageLocation>, Vec<StorageLocation>) {
+        let process_entry_function = |func: &EntryFunction,
+                                      sender_address: AccountAddress|
+         -> (Vec<StorageLocation>, Vec<StorageLocation>) {
+            match (
+                *func.module().address(),
+                func.module().name().as_str(),
+                func.function().as_str(),
+            ) {
+                (AccountAddress::ONE, "coin", "transfer") => {
+                    let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
+                    rw_set_for_coin_transfer(sender_address, receiver_address, true)
+                },
+                (AccountAddress::ONE, "aptos_account", "transfer") => {
+                    let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
+                    rw_set_for_coin_transfer(sender_address, receiver_address, false)
+                },
+                (AccountAddress::ONE, "aptos_account", "create_account") => {
+                    let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
+                    rw_set_for_create_account(sender_address, receiver_address)
+                },
+                _ => todo!(
+                    "Only coin transfer and create account transactions are supported for now"
+                ),
+            }
+        };
         match self {
-            Transaction::UserTransaction(signed_txn) => match signed_txn.payload() {
-                TransactionPayload::EntryFunction(func) => {
-                    match (
-                        *func.module().address(),
-                        func.module().name().as_str(),
-                        func.function().as_str(),
-                    ) {
-                        (AccountAddress::ONE, "coin", "transfer") => {
-                            let sender_address = signed_txn.sender();
-                            let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            rw_set_for_coin_transfer(
-                                sender_address,
-                                receiver_address,
-                                true,
-                            )
-                        },
-                        (AccountAddress::ONE, "aptos_account", "transfer") => {
-                            let sender_address = signed_txn.sender();
-                            let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            rw_set_for_coin_transfer(
-                                sender_address,
-                                receiver_address,
-                                false,
-                            )
-                        },
-                        (AccountAddress::ONE, "aptos_account", "create_account") => {
-                            let sender_address = signed_txn.sender();
-                            let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
-                            rw_set_for_create_account(
-                                sender_address,
-                                receiver_address,
-                            )
-                        },
-                        _ => todo!("Only coin transfer and create account transactions are supported for now")
-                    }
+            Transaction::UserTransaction(signed_txn) => match signed_txn.payload().executable_ref()
+            {
+                Ok(TransactionExecutableRef::EntryFunction(func))
+                    if !signed_txn.payload().is_multisig() =>
+                {
+                    process_entry_function(func, signed_txn.sender())
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
             },

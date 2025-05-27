@@ -24,6 +24,7 @@ pub mod module_traversal;
 mod debug;
 
 mod access_control;
+mod frame;
 mod frame_type_cache;
 mod reentrancy_checker;
 mod runtime_type_checks;
@@ -45,5 +46,4 @@ pub use storage::{
     },
     module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
-    ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
 };

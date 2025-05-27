@@ -25,13 +25,6 @@ pub mod remembering_unique_map;
 pub mod unique_map;
 pub mod unique_set;
 
-//**************************************************************************************************
-// Numbers
-//**************************************************************************************************
-
-//**************************************************************************************************
-// Address
-//**************************************************************************************************
 pub use move_command_line_common::{
     address::NumericalAddress,
     parser::{
@@ -39,6 +32,10 @@ pub use move_command_line_common::{
         parse_u64, parse_u8, NumberFormat,
     },
 };
+
+//**************************************************************************************************
+// Address
+//**************************************************************************************************
 
 pub fn parse_named_address(s: &str) -> anyhow::Result<(String, NumericalAddress)> {
     let before_after = s.split('=').collect::<Vec<_>>();
@@ -567,6 +564,8 @@ pub enum LanguageVersion {
     V2_1,
     #[value(name = "2.2")]
     V2_2,
+    #[value(name = "2.3")]
+    V2_3,
 }
 
 impl LanguageVersion {
@@ -577,6 +576,7 @@ impl LanguageVersion {
             V2_0 => 1,
             V2 | V2_1 => 2,
             V2_2 => 3,
+            V2_3 => 4,
         }
     }
 }
@@ -609,6 +609,7 @@ impl std::fmt::Display for LanguageVersion {
             LanguageVersion::V2_0 => "2.0",
             LanguageVersion::V2_1 => "2.1",
             LanguageVersion::V2_2 => "2.2",
+            LanguageVersion::V2_3 => "2.3",
         })
     }
 }

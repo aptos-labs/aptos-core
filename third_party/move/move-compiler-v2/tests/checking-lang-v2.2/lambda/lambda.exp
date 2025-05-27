@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: function takes arguments of type `&T` but `(&T, u64)` was expected
+error: expected function type has argument of type `(&T, u64)` but `&T` was provided
    ┌─ tests/checking-lang-v2.2/lambda/lambda.move:40:13
    │
 40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: function takes arguments of type `&T` but `u64` was expected
+error: expected function type has argument of type `u64` but `&T` was provided
    ┌─ tests/checking-lang-v2.2/lambda/lambda.move:48:13
    │
 48 │             action(i); // expected to have wrong argument type
@@ -32,7 +32,7 @@ error: reference type `&integer` is not allowed as a type argument (type was inf
    │
    = required by instantiating type parameter `T` of function `+`
 
-error: function returns value of type `u64` but `()` was expected
+error: expected function type returns value of type `()` but `u64` was provided
    ┌─ tests/checking-lang-v2.2/lambda/lambda.move:73:21
    │
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda

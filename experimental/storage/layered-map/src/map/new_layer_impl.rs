@@ -202,7 +202,7 @@ enum PendingBuild<'a, K, V> {
     BelowPeakFeet,
 }
 
-impl<'a, K, V> PendingBuild<'a, K, V> {
+impl<K, V> PendingBuild<'_, K, V> {
     fn seal_with_node(&mut self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
         match self {
             PendingBuild::AbovePeakFeet => unreachable!("Trying to put node above peak feet."),
@@ -276,7 +276,7 @@ struct SubTreeBuilder<'a, K, V> {
     items: &'a [Item<'a, K, V>],
 }
 
-impl<'a, K, V> SubTreeBuilder<'a, K, V>
+impl<K, V> SubTreeBuilder<'_, K, V>
 where
     K: ArcAsyncDrop + Key,
     V: ArcAsyncDrop + Value,

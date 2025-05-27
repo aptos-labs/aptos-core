@@ -1,4 +1,23 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: if ($t0) goto 1 else goto 5
+  1: label L0
+  2: $t2 := 0
+  3: abort($t2)
+  4: goto 8
+  5: label L1
+  6: $t1 := 1
+  7: return $t1
+  8: label L2
+  9: $t1 := 42
+ 10: return $t1
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::test($t0: bool): u64 {

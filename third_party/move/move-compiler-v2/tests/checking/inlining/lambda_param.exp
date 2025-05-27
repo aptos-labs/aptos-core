@@ -1,10 +1,43 @@
 
 Diagnostics:
+error: parameter `f` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking/inlining/lambda_param.move:6:37
+   │
+ 6 │     public inline fun inline_apply2(f: |u64|u64, b: u64) : u64 {
+   │                                     ^
+ 7 │     inline_apply(f, b)
+   │                  - being used here
+   ·
+19 │     let a = inline_apply2(|x| x, 3);
+   │             ----------------------- from a call inlined at this callsite
+
+error: parameter `f` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking/inlining/lambda_param.move:6:37
+   │
+ 6 │     public inline fun inline_apply2(f: |u64|u64, b: u64) : u64 {
+   │                                     ^
+ 7 │     inline_apply(f, b)
+   │                  - being used here
+   ·
+24 │     let a = inline_apply2(|x| x, 3);
+   │             ----------------------- from a call inlined at this callsite
+
 error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
   ┌─ tests/checking/inlining/lambda_param.move:7:15
   │
 7 │     inline_apply(f, b)
   │                  ^
+
+error: parameter `f` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking/inlining/lambda_param.move:10:37
+   │
+10 │     public inline fun inline_apply3(f: |u64|u64, b: u64) : u64 {
+   │                                     ^
+11 │     inline_apply4(f, b)
+   │                   - being used here
+   ·
+28 │     let b = inline_apply3(|x| x, 3);
+   │             ----------------------- from a call inlined at this callsite
 
 error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
    ┌─ tests/checking/inlining/lambda_param.move:11:16

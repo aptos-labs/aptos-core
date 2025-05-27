@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: lambda lifting is not allowed in scripts
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16609.move:3:30
+  │
+3 │         let f: || has drop = || {};
+  │                              ^^^^^
+  │
+  = lambda cannot be reduced to partial application of an existing function

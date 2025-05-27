@@ -8,7 +8,14 @@ license = "Apache-2.0"
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
+fail = { workspace = true, features = ['failpoints'] }
+libtest-mimic = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-model = { workspace = true }
 move-transactional-test-runner = { workspace = true }
+move-vm-runtime = { workspace = true }
+once_cell = { workspace = true }
+walkdir = { workspace = true }
 
 [[test]]
 name = "tests"

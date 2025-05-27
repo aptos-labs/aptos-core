@@ -1,0 +1,119 @@
+
+Diagnostics:
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_tuple_invalid.move:4:9
+  │
+4 │         &();
+  │         ^^^
+
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_tuple_invalid.move:5:9
+  │
+5 │         &(1, 2);
+  │         ^^^^^^^
+
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_tuple_invalid.move:6:17
+  │
+6 │         let x = &();
+  │                 ^^^
+
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_tuple_invalid.move:7:17
+  │
+7 │         let y = &(1, 2);
+  │                 ^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:11:10
+   │
+11 │         *&();
+   │          ^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:12:10
+   │
+12 │         *&(1, 2);
+   │          ^^^^^^^
+
+error: tuple type `()` is not allowed as a local variable type
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:13:13
+   │
+13 │         let x = *&();
+   │             ^
+   │
+   = required by declaration of local `x`
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:13:18
+   │
+13 │         let x = *&();
+   │                  ^^^
+
+error: tuple type `(integer, integer)` is not allowed as a local variable type
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:14:13
+   │
+14 │         let y = *&(1, 2);
+   │             ^
+   │
+   = required by declaration of local `y`
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:14:18
+   │
+14 │         let y = *&(1, 2);
+   │                  ^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:26:9
+   │
+26 │         &return_tuple();
+   │         ^^^^^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:27:9
+   │
+27 │         &return_unit();
+   │         ^^^^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:34:9
+   │
+34 │         &in_unit();
+   │         ^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:35:9
+   │
+35 │         &in_tuple();
+   │         ^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:39:9
+   │
+39 │         &(if (true) (1, 2) else (2, 1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:40:9
+   │
+40 │         &(if (false) ());
+   │         ^^^^^^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:44:9
+   │
+44 │         &(assert!(true, 0));
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:45:9
+   │
+45 │         &mut spec {};
+   │         ^^^^^^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:49:16
+   │
+49 │         return &(1, 2)
+   │                ^^^^^^^

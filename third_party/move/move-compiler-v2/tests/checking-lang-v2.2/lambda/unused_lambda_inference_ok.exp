@@ -1,8 +1,8 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     public fun f() {
         {
-          let _x: |u64|u64 = closure#0M::__lambda__1__f();
+          let _x: |u64|u64 has drop = closure#0M::__lambda__1__f();
           Tuple()
         }
     }
@@ -11,7 +11,7 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     public fun f() {
         let _x = |arg0| __lambda__1__f(arg0);

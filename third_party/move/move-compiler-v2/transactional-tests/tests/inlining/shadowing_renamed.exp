@@ -1,7 +1,7 @@
 processed 2 tasks
 
 task 0 'publish'. lines 1-19:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
   ┌─ TEMPFILE:8:17
   │
 8 │         let x = 1;

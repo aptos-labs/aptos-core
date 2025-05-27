@@ -1,20 +1,13 @@
-
-Diagnostics:
-warning: If condition is always true, so else branch code eliminated as dead code
-  ┌─ tests/simplifier-elimination/if_assigns_no_else.move:4:9
-  │
-4 │     if (true) x = 42;
-  │     ----^^^^--------
-  │     │   │
-  │     │   condition is always true
-  │     else branch eliminated
-
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         {
           let x: u64;
-          x: u64 = 42;
+          if true {
+            x: u64 = 42
+          } else {
+            Tuple()
+          };
           if Eq<u64>(x, 42) {
             Tuple()
           } else {
@@ -25,14 +18,19 @@ module <SELF>_0 {
     }
 } // end <SELF>_0
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 script {
     fun main() {
         let x;
-        x = 42;
+        if (true) x = 42;
         if (x == 42) () else abort 42;
     }
 }
 
 
-============ bytecode verification succeeded ========
+Diagnostics:
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/if_assigns_no_else.move:5:13
+  │
+5 │     assert!(x == 42, 42);
+  │             ^

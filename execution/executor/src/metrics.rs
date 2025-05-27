@@ -12,7 +12,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::AccountAuthenticator, signature_verified_transaction::TransactionProvider,
-        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
+        ExecutionStatus, Transaction, TransactionExecutableRef, TransactionOutput,
+        TransactionStatus,
     },
 };
 use aptos_vm::AptosVM;
@@ -324,6 +325,8 @@ pub fn update_counters_for_processed_chunk<T>(
                         "discard_sequence_number_too_new"
                     } else if *discard_status_code == StatusCode::TRANSACTION_EXPIRED {
                         "discard_transaction_expired"
+                    } else if *discard_status_code == StatusCode::NONCE_ALREADY_USED {
+                        "discard_nonce_already_used"
                     } else {
                         // Only log if it is an interesting discard
                         sample!(
@@ -331,7 +334,7 @@ pub fn update_counters_for_processed_chunk<T>(
                             warn!(
                                 "[sampled] Txn being discarded is {:?} with status code {:?}",
                                 txn, discard_status_code
-                            )
+                            );
                         );
                         "discard"
                     },
@@ -430,57 +433,60 @@ pub fn update_counters_for_processed_chunk<T>(
                     .observe(signature_count as f64);
             }
 
-            match user_txn.payload() {
-                aptos_types::transaction::TransactionPayload::Script(_script) => {
-                    PROCESSED_USER_TXNS_BY_PAYLOAD
-                        .with_label_values(&[process_type, "script", state])
-                        .inc();
-                },
-                aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
-                    PROCESSED_USER_TXNS_BY_PAYLOAD
-                        .with_label_values(&[process_type, "function", state])
-                        .inc();
+            let payload_type = if user_txn.payload().is_multisig() {
+                "multisig"
+            } else {
+                match user_txn.payload().executable_ref() {
+                    Ok(TransactionExecutableRef::Script(_)) => "script",
+                    Ok(TransactionExecutableRef::EntryFunction(_)) => "function",
+                    Ok(TransactionExecutableRef::Empty) => "empty",
+                    Err(_) => "deprecated_payload",
+                }
+            };
+            if user_txn.payload().replay_protection_nonce().is_some() {
+                PROCESSED_USER_TXNS_BY_PAYLOAD
+                    .with_label_values(&[
+                        process_type,
+                        &(payload_type.to_string() + "_orderless"),
+                        state,
+                    ])
+                    .inc();
+            } else {
+                PROCESSED_USER_TXNS_BY_PAYLOAD
+                    .with_label_values(&[process_type, payload_type, state])
+                    .inc();
+            }
 
-                    let is_core = function.module().address() == &CORE_CODE_ADDRESS;
-                    PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_MODULE
+            if let Ok(TransactionExecutableRef::EntryFunction(function)) =
+                user_txn.payload().executable_ref()
+            {
+                let is_core = function.module().address() == &CORE_CODE_ADDRESS;
+                PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_MODULE
+                    .with_label_values(&[
+                        detailed_counters_label,
+                        process_type,
+                        if is_core { "core" } else { "user" },
+                        if detailed_counters {
+                            function.module().name().as_str()
+                        } else if is_core {
+                            "core_module"
+                        } else {
+                            "user_module"
+                        },
+                        state,
+                    ])
+                    .inc();
+                if is_core && detailed_counters {
+                    PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_CORE_METHOD
                         .with_label_values(&[
-                            detailed_counters_label,
                             process_type,
-                            if is_core { "core" } else { "user" },
-                            if detailed_counters {
-                                function.module().name().as_str()
-                            } else if is_core {
-                                "core_module"
-                            } else {
-                                "user_module"
-                            },
+                            function.module().name().as_str(),
+                            function.function().as_str(),
                             state,
                         ])
                         .inc();
-                    if is_core && detailed_counters {
-                        PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_CORE_METHOD
-                            .with_label_values(&[
-                                process_type,
-                                function.module().name().as_str(),
-                                function.function().as_str(),
-                                state,
-                            ])
-                            .inc();
-                    }
-                },
-                aptos_types::transaction::TransactionPayload::Multisig(_) => {
-                    PROCESSED_USER_TXNS_BY_PAYLOAD
-                        .with_label_values(&[process_type, "multisig", state])
-                        .inc();
-                },
-
-                // Deprecated.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {
-                    PROCESSED_USER_TXNS_BY_PAYLOAD
-                        .with_label_values(&[process_type, "deprecated_module_bundle", state])
-                        .inc();
-                },
-            }
+                }
+            };
         }
 
         for event in output.events() {

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::Resolver, LoadedFunction};
+use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
@@ -110,14 +110,13 @@ impl FrameTypeCache {
     pub(crate) fn get_field_type_and_struct_type(
         &mut self,
         idx: FieldInstantiationIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
         let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
-                let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
+                let struct_type = frame.field_instantiation_to_struct(idx)?;
                 let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
-                let field_ty = resolver.get_generic_field_ty(idx, ty_args)?;
+                let field_ty = frame.get_generic_field_ty(idx)?;
                 let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
                 Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
@@ -127,23 +126,18 @@ impl FrameTypeCache {
     pub(crate) fn get_variant_field_type_and_struct_type(
         &mut self,
         idx: VariantFieldInstantiationIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
         let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             Self::get_or(&mut self.variant_field_instantiation, idx, |idx| {
-                let info = resolver.variant_field_instantiation_info_at(idx);
-                let struct_type = resolver.create_struct_instantiation_ty(
+                let info = frame.variant_field_instantiation_info_at(idx);
+                let struct_type = frame.create_struct_instantiation_ty(
                     &info.definition_struct_type,
                     &info.instantiation,
-                    ty_args,
                 )?;
                 let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
-                let field_ty = resolver.instantiate_ty(
-                    &info.uninstantiated_field_ty,
-                    ty_args,
-                    &info.instantiation,
-                )?;
+                let field_ty =
+                    frame.instantiate_ty(&info.uninstantiated_field_ty, &info.instantiation)?;
                 let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
                 Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
@@ -154,11 +148,10 @@ impl FrameTypeCache {
     pub(crate) fn get_struct_type(
         &mut self,
         idx: StructDefInstantiationIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.struct_def_instantiation_type, idx, |idx| {
-            let ty = resolver.get_generic_struct_ty(idx, ty_args)?;
+            let ty = frame.get_generic_struct_ty(idx)?;
             let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
             Ok((ty, ty_count))
         })?;
@@ -169,16 +162,14 @@ impl FrameTypeCache {
     pub(crate) fn get_struct_variant_type(
         &mut self,
         idx: StructVariantInstantiationIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) =
             Self::get_or(&mut self.struct_variant_instantiation_type, idx, |idx| {
-                let info = resolver.get_struct_variant_instantiation_at(idx);
-                let ty = resolver.create_struct_instantiation_ty(
+                let info = frame.get_struct_variant_instantiation_at(idx);
+                let ty = frame.create_struct_instantiation_ty(
                     &info.definition_struct_type,
                     &info.instantiation,
-                    ty_args,
                 )?;
                 let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
                 Ok((ty, ty_count))
@@ -190,15 +181,14 @@ impl FrameTypeCache {
     pub(crate) fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<&[(Type, NumTypeNodes)]> {
         Ok(Self::get_or(
             &mut self.struct_field_type_instantiation,
             idx,
             |idx| {
-                Ok(resolver
-                    .instantiate_generic_struct_fields(idx, ty_args)?
+                Ok(frame
+                    .instantiate_generic_struct_fields(idx)?
                     .into_iter()
                     .map(|ty| {
                         let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
@@ -213,15 +203,14 @@ impl FrameTypeCache {
     pub(crate) fn get_struct_variant_fields_types(
         &mut self,
         idx: StructVariantInstantiationIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<&[(Type, NumTypeNodes)]> {
         Ok(Self::get_or(
             &mut self.struct_variant_field_type_instantiation,
             idx,
             |idx| {
-                Ok(resolver
-                    .instantiate_generic_struct_variant_fields(idx, ty_args)?
+                Ok(frame
+                    .instantiate_generic_struct_variant_fields(idx)?
                     .into_iter()
                     .map(|ty| {
                         let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
@@ -236,11 +225,10 @@ impl FrameTypeCache {
     pub(crate) fn get_signature_index_type(
         &mut self,
         idx: SignatureIndex,
-        resolver: &Resolver,
-        ty_args: &[Type],
+        frame: &Frame,
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.single_sig_token_type, idx, |idx| {
-            let ty = resolver.instantiate_single_type(idx, ty_args)?;
+            let ty = frame.instantiate_single_type(idx)?;
             let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
             Ok((ty, ty_count))
         })?;
