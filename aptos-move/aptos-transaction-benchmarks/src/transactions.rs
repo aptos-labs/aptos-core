@@ -56,7 +56,12 @@ where
     }
 
     /// Runs the bencher.
-    pub fn bench<M: Measurement>(&self, b: &mut Bencher<M>) {
+    pub fn bench<M: Measurement>(
+        &self,
+        b: &mut Bencher<M>,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         b.iter_batched(
             || {
                 TransactionBenchState::with_size(
@@ -68,14 +73,19 @@ where
                     AccountPickStyle::Unlimited,
                 )
             },
-            |state| state.execute_sequential(),
+            |state| state.execute_sequential(use_txn_payload_v2_format, use_orderless_transactions),
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
     }
 
     /// Runs the bencher.
-    pub fn bench_parallel<M: Measurement>(&self, b: &mut Bencher<M>) {
+    pub fn bench_parallel<M: Measurement>(
+        &self,
+        b: &mut Bencher<M>,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) {
         b.iter_batched(
             || {
                 TransactionBenchState::with_size(
@@ -87,13 +97,14 @@ where
                     AccountPickStyle::Unlimited,
                 )
             },
-            |state| state.execute_parallel(),
+            |state| state.execute_parallel(use_txn_payload_v2_format, use_orderless_transactions),
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
     }
 
     /// Runs the bencher.
+    #[allow(clippy::too_many_arguments)]
     pub fn blockstm_benchmark(
         &self,
         num_accounts: usize,
@@ -108,6 +119,8 @@ where
         no_conflict_txn: bool,
         maybe_block_gas_limit: Option<u64>,
         generate_then_execute: bool,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (Vec<usize>, Vec<usize>) {
         let mut par_tps = Vec::new();
         let mut seq_tps = Vec::new();
@@ -134,6 +147,8 @@ where
                 remote_executor_addresses,
                 account_pick_style,
                 total_runs,
+                use_txn_payload_v2_format,
+                use_orderless_transactions,
             ))
         } else {
             Box::new(TransactionBenchmarkRunner::new(
@@ -153,6 +168,8 @@ where
                     run_seq,
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
                 );
             } else {
                 let tps = runner.run_benchmark(
@@ -160,6 +177,8 @@ where
                     run_seq,
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
                 );
                 par_tps.push(tps.0);
                 seq_tps.push(tps.1);

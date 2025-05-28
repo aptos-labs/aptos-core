@@ -29,6 +29,7 @@ use aptos_types::{
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use move_core_types::move_resource::MoveStructType;
 use proptest::prelude::*;
+use rand::Rng;
 
 // TTL is 86400s. Initial time was set to 0.
 const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
@@ -268,7 +269,7 @@ pub struct TransactionBuilder {
     pub max_gas_amount: Option<u64>,
     pub gas_unit_price: Option<u64>,
     pub chain_id: Option<ChainId>,
-    pub ttl: Option<u64>,
+    pub current_time: Option<u64>,
 }
 
 impl TransactionBuilder {
@@ -282,7 +283,7 @@ impl TransactionBuilder {
             max_gas_amount: None,
             gas_unit_price: None,
             chain_id: None,
-            ttl: None,
+            current_time: None,
         }
     }
 
@@ -331,8 +332,28 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn ttl(mut self, ttl: u64) -> Self {
-        self.ttl = Some(ttl);
+    pub fn current_time(mut self, current_time: u64) -> Self {
+        self.current_time = Some(current_time);
+        self
+    }
+
+    // Primarily used for running the tests with both payload v1 and v2 formats.
+    pub fn upgrade_payload(
+        mut self,
+        rng: &mut impl Rng,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
+    ) -> Self {
+        if let Some(program) = self.program {
+            self.program = Some(program.upgrade_payload(
+                rng,
+                use_txn_payload_v2_format,
+                use_orderless_transactions,
+            ));
+        }
+        if use_orderless_transactions {
+            self.sequence_number = Some(u64::MAX);
+        }
         self
     }
 
@@ -343,7 +364,8 @@ impl TransactionBuilder {
             self.program.clone().expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(500_000),
             self.gas_unit_price.unwrap_or(0),
-            self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
+            self.current_time
+                .map_or(DEFAULT_EXPIRATION_TIME, |t| t + 60),
             self.chain_id.unwrap_or_else(ChainId::test), //ChainId::test(),
         )
     }
@@ -526,7 +548,7 @@ impl FungibleStore {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountData {
     account: Account,
-    sequence_number: u64,
+    sequence_number: Option<u64>,
     coin_register_events: EventHandle,
     key_rotation_events: EventHandle,
     coin_store: Option<CoinStore>,
@@ -541,18 +563,22 @@ impl AccountData {
     /// Creates a new `AccountData` with a new account.
     ///
     /// This constructor is non-deterministic and should not be used against golden file.
-    pub fn new(balance: u64, sequence_number: u64) -> Self {
+    pub fn new(balance: u64, sequence_number: Option<u64>) -> Self {
         Self::with_account(Account::new(), balance, sequence_number, true, false)
     }
 
     pub fn increment_sequence_number(&mut self) {
-        self.sequence_number += 1;
+        self.sequence_number = self.sequence_number.map(|n| n + 1);
+    }
+
+    pub fn increment_seq_num_or_assign_default(&mut self) {
+        *self.sequence_number.get_or_insert(0) += 1;
     }
 
     /// Creates a new `AccountData` with a new account.
     ///
     /// Most tests will want to use this constructor.
-    pub fn new_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: u64) -> Self {
+    pub fn new_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: Option<u64>) -> Self {
         Self::with_account(
             Account::new_from_seed(seed),
             balance,
@@ -566,7 +592,7 @@ impl AccountData {
     pub fn with_account(
         account: Account,
         balance: u64,
-        sequence_number: u64,
+        sequence_number: Option<u64>,
         use_fa_apt: bool,
         use_concurrent_balance: bool,
     ) -> Self {
@@ -587,7 +613,7 @@ impl AccountData {
         privkey: Ed25519PrivateKey,
         pubkey: Ed25519PublicKey,
         balance: u64,
-        sequence_number: u64,
+        sequence_number: Option<u64>,
     ) -> Self {
         let account = Account::with_keypair(privkey, pubkey);
         Self::with_account(account, balance, sequence_number, false, false)
@@ -597,7 +623,7 @@ impl AccountData {
     pub fn with_account_and_event_counts(
         account: Account,
         balance: u64,
-        sequence_number: u64,
+        sequence_number: Option<u64>,
         sent_events_count: u64,
         received_events_count: u64,
     ) -> Self {
@@ -620,7 +646,7 @@ impl AccountData {
     pub fn with_account_and_fungible_store(
         account: Account,
         fungible_balance: u64,
-        sequence_number: u64,
+        sequence_number: Option<u64>,
         use_concurrent_balance: bool,
     ) -> Self {
         let addr = *account.address();
@@ -647,8 +673,9 @@ impl AccountData {
 
     /// Creates and returns the top-level resources to be published under the account
     pub fn to_bytes(&self) -> Vec<u8> {
+        // TODO[Orderless]: Make sure AccountResource is not used anywhere for stateless accounts (when sequence_number = None).
         let account = AccountResource::new(
-            self.sequence_number,
+            self.sequence_number.unwrap_or(0),
             self.account.auth_key(),
             self.coin_register_events.clone(),
             self.key_rotation_events.clone(),
@@ -673,10 +700,14 @@ impl AccountData {
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let mut write_set = vec![(
-            StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
-            WriteOp::legacy_modification(self.to_bytes().into()),
-        )];
+        let mut write_set = vec![];
+        // Not creating an AccountResource when sequence_number is None.
+        if self.sequence_number.is_some() {
+            write_set.push((
+                StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
+                WriteOp::legacy_modification(self.to_bytes().into()),
+            ));
+        }
 
         if let Some(coin_store) = &self.coin_store {
             write_set.push((
@@ -729,7 +760,7 @@ impl AccountData {
     }
 
     /// Returns the initial sequence number.
-    pub fn sequence_number(&self) -> u64 {
+    pub fn sequence_number(&self) -> Option<u64> {
         self.sequence_number
     }
 
@@ -753,15 +784,23 @@ impl AccountData {
         // XXX should we also test edge cases around large sequence numbers?
         let sequence_strategy = 0u64..(1 << 32);
 
-        (any::<Account>(), balance_strategy, sequence_strategy).prop_map(
-            |(account, balance, sequence_number)| {
+        (
+            any::<Account>(),
+            balance_strategy,
+            sequence_strategy,
+            any::<bool>(),
+        )
+            .prop_map(|(account, balance, sequence_number, stateless_account)| {
                 AccountData::with_account_and_fungible_store(
                     account,
                     balance,
-                    sequence_number,
+                    if stateless_account {
+                        None
+                    } else {
+                        Some(sequence_number)
+                    },
                     false,
                 )
-            },
-        )
+            })
     }
 }
