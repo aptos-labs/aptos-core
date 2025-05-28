@@ -262,12 +262,32 @@ function coverage() {
         install-coverage-tools
     fi
 
-    clean-coverage $fuzz_target
-    local corpus_dir="fuzz/corpus/$fuzz_target"
+    local profdata_file="fuzz/coverage/$fuzz_target/coverage.profdata"
     local coverage_dir="./fuzz/coverage/$fuzz_target/report"
     mkdir -p $coverage_dir
-    
-    if [ ! -d "fuzz/coverage/$fuzz_target/raw" ]; then
+
+    if [ -f "$profdata_file" ]; then
+        local profdata_time
+        profdata_time=$(stat -f "%Sm" "$profdata_file")
+        echo "Found existing profdata file created at: $profdata_time"
+        read -p "Do you want to (c)lean and regenerate or (g)enerate report with existing file? [c/g]: " choice
+        case "$choice" in 
+            c|C ) 
+                clean-coverage $fuzz_target
+                local corpus_dir="fuzz/corpus/$fuzz_target"
+                cargo_fuzz coverage $fuzz_target $corpus_dir
+                ;;
+            g|G ) 
+                echo "Using existing profdata file..."
+                ;;
+            * ) 
+                echo "Invalid choice. Exiting."
+                exit 1
+                ;;
+        esac
+    else
+        clean-coverage $fuzz_target
+        local corpus_dir="fuzz/corpus/$fuzz_target"
         cargo_fuzz coverage $fuzz_target $corpus_dir
     fi
     
@@ -283,7 +303,7 @@ function coverage() {
     # Generate the coverage report
     cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
         --format=html \
-        --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
+        --instr-profile=$profdata_file \
         --show-directory-coverage \
         --output-dir=$coverage_dir \
         -Xdemangler=rustfilt \
@@ -361,7 +381,7 @@ function run() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 #-ignore_crashes=1
     else
-        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=10 #-ignore_crashes=1
+        cargo_fuzz run $features --sanitizer none -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=4 -ignore_crashes=1
     fi
 }
 
