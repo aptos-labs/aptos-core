@@ -464,13 +464,13 @@ impl FakeExecutor {
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
-    pub fn create_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
+    pub fn create_raw_account_data(&mut self, balance: u64, seq_num: Option<u64>) -> AccountData {
         AccountData::new_from_seed(&mut self.rng, balance, seq_num)
     }
 
     /// Creates a number of [`Account`] instances all with the same balance and sequence number,
     /// and publishes them to this executor's data store.
-    pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: u64) -> Vec<Account> {
+    pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: Option<u64>) -> Vec<Account> {
         let mut accounts: Vec<Account> = Vec::with_capacity(size);
         for _i in 0..size {
             let account_data = AccountData::new_from_seed(&mut self.rng, balance, seq_num);
@@ -492,14 +492,14 @@ impl FakeExecutor {
         let acc = Account::new_genesis_account(addr);
 
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(acc, 1_000_000_000_000_000, 0)
+        self.store_and_fund_account(acc, 1_000_000_000_000_000, Some(0))
     }
 
     pub fn store_and_fund_account(
         &mut self,
         account: Account,
         balance: u64,
-        seq_num: u64,
+        seq_num: Option<u64>,
     ) -> AccountData {
         let features = Features::fetch_config(&self.state_store).unwrap_or_default();
         let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
