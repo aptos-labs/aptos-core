@@ -12,7 +12,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation, Value},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 
 #[derive(Default)]
@@ -23,7 +23,7 @@ impl ExpChecker for UnnecessaryBooleanIdentityComparison {
         "unnecessary_boolean_identity_comparison".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::{Call, Value as ExpValue};
         use Operation::*;
         use Value::Bool;
@@ -45,6 +45,7 @@ impl ExpChecker for UnnecessaryBooleanIdentityComparison {
                         },
                         if *b { "true" } else { "false" }
                     );
+                    let env = function.env();
                     self.report(env, &env.get_node_loc(e.node_id()), &msg);
                 },
                 _ => {},
