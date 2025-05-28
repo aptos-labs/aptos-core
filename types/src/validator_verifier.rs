@@ -137,7 +137,7 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 #[derivative(PartialEq, Eq)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
-    validator_infos: Vec<ValidatorConsensusInfo>,
+    pub validator_infos: Vec<ValidatorConsensusInfo>,
     /// The minimum voting power required to achieve a quorum
     #[serde(skip)]
     quorum_voting_power: u128,
