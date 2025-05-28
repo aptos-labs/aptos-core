@@ -1,0 +1,15 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Test1 {
+        a: u64,
+        b: u64,
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Test1 has copy, drop {
+        a: u64,
+        b: u64,
+    }
+}
