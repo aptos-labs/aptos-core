@@ -10,7 +10,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 
 #[derive(Default)]
@@ -21,7 +21,7 @@ impl ExpChecker for NeedlessRefInFieldAccess {
         "needless_ref_in_field_access".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::Call;
         use Operation::{Borrow, Select, SelectVariants};
         let Call(_, select @ (Select(..) | SelectVariants(..)), args) = expr else {
@@ -43,6 +43,7 @@ impl ExpChecker for NeedlessRefInFieldAccess {
             ),
             _ => unreachable!("select is limited to the two variants above"),
         };
+        let env = function.env();
         let field_name = env
             .get_module(*module_id)
             .into_struct(*struct_id)
