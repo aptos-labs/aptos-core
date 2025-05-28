@@ -193,6 +193,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::SKIP_INLINING_INLINE_FUNS.to_string(),
+            description: "Whether to skip inlining the (standalone) inline functions".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::AST_SIMPLIFY.to_string(),
             description: "Whether to run the ast simplifier".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -298,6 +303,7 @@ impl Experiment {
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
     pub const SKIP_BAILOUT_ON_EXTENDED_CHECKS: &'static str = "skip-bailout-on-extended-checks";
+    pub const SKIP_INLINING_INLINE_FUNS: &'static str = "skip-inlining-inline-funs";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
