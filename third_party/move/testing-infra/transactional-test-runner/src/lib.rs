@@ -6,4 +6,6 @@
 
 pub mod framework;
 pub mod tasks;
+#[cfg(feature = "fuzzing")]
+pub mod transactional_ops;
 pub mod vm_test_harness;
