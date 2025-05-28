@@ -31,7 +31,7 @@ pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 #[test]
 fn verify_signature() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 10);
+    let sender = executor.create_raw_account_data(900_000, Some(10));
     executor.add_account_data(&sender);
     // Generate a new key pair to try and sign things with.
     let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -56,8 +56,8 @@ fn verify_multi_agent_invalid_sender_signature() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
 
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
+    let sender = executor.create_raw_account_data(1_000_010, Some(10));
+    let secondary_signer = executor.create_raw_account_data(100_100, Some(100));
 
     executor.add_account_data(&sender);
     executor.add_account_data(&secondary_signer);
@@ -86,8 +86,8 @@ fn verify_multi_agent_invalid_sender_signature() {
 fn verify_multi_agent_invalid_secondary_signature() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
+    let sender = executor.create_raw_account_data(1_000_010, Some(10));
+    let secondary_signer = executor.create_raw_account_data(100_100, Some(100));
 
     executor.add_account_data(&sender);
     executor.add_account_data(&secondary_signer);
@@ -116,9 +116,9 @@ fn verify_multi_agent_invalid_secondary_signature() {
 fn verify_multi_agent_duplicate_secondary_signer() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-    let third_signer = executor.create_raw_account_data(100_100, 100);
+    let sender = executor.create_raw_account_data(1_000_010, Some(10));
+    let secondary_signer = executor.create_raw_account_data(100_100, Some(100));
+    let third_signer = executor.create_raw_account_data(100_100, Some(100));
 
     executor.add_account_data(&sender);
     executor.add_account_data(&secondary_signer);
@@ -157,7 +157,7 @@ fn verify_multi_agent_duplicate_secondary_signer() {
 #[test]
 fn verify_reserved_sender() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 10);
+    let sender = executor.create_raw_account_data(900_000, Some(10));
     executor.add_account_data(&sender);
     // Generate a new key pair to try and sign things with.
     let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -181,8 +181,8 @@ fn verify_reserved_sender() {
 fn verify_simple_payment() {
     let mut executor = FakeExecutor::from_head_genesis();
     // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
-    let sender = executor.create_raw_account_data(900_000, 10);
-    let receiver = executor.create_raw_account_data(100_000, 10);
+    let sender = executor.create_raw_account_data(900_000, Some(10));
+    let receiver = executor.create_raw_account_data(100_000, Some(10));
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
@@ -267,7 +267,7 @@ fn verify_simple_payment() {
     );
 
     // Create a new transaction from a bogus account that doesn't exist
-    let bogus_account = executor.create_raw_account_data(100_000, 10);
+    let bogus_account = executor.create_raw_account_data(100_000, Some(10));
     let txn = bogus_account
         .account()
         .transaction()
@@ -401,7 +401,7 @@ pub fn test_arbitrary_script_execution() {
     executor.set_golden_file(current_function_name!());
 
     // create an empty transaction
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // If CustomScripts is on, result should be Keep(DeserializationError). If it's off, the
@@ -430,7 +430,7 @@ pub fn test_arbitrary_script_execution() {
 #[test]
 fn verify_expiration_time() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 0);
+    let sender = executor.create_raw_account_data(900_000, Some(0));
     executor.add_account_data(&sender);
     let private_key = &sender.account().privkey;
     let txn = transaction_test_helpers::get_test_signed_transaction(
@@ -471,7 +471,7 @@ fn verify_expiration_time() {
 #[test]
 fn verify_chain_id() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 0);
+    let sender = executor.create_raw_account_data(900_000, Some(0));
     executor.add_account_data(&sender);
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let txn = transaction_test_helpers::get_test_txn_with_chain_id(
@@ -492,7 +492,7 @@ fn verify_chain_id() {
 #[test]
 fn verify_max_sequence_number() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, u64::MAX);
+    let sender = executor.create_raw_account_data(900_000, Some(u64::MAX));
     executor.add_account_data(&sender);
     let private_key = &sender.account().privkey;
     let txn = transaction_test_helpers::get_test_signed_transaction(
@@ -585,7 +585,7 @@ fn test_script_dependency_fails_verification() {
     executor.add_module(&module.self_id(), bytes);
 
     // Create a module that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     let code = "
@@ -632,7 +632,7 @@ fn test_type_tag_dependency_fails_verification() {
     executor.add_module(&module.self_id(), bytes);
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     let code = "
@@ -689,7 +689,7 @@ fn test_script_transitive_dependency_fails_verification() {
     executor.add_module(&good_module.self_id(), good_module_bytes);
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     let code = "
@@ -740,7 +740,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     executor.add_module(&good_module.self_id(), good_module_bytes);
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     let code = "
