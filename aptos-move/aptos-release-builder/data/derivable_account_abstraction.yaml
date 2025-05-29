@@ -12,5 +12,5 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - DERIVABLE_ACCOUNT_ABSTRACTION
+            - derivable_account_abstraction
           disabled: [ ]
