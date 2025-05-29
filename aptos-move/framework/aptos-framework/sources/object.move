@@ -644,6 +644,7 @@ module aptos_framework::object {
         borrow_global<ObjectCore>(object.inner).allow_ungated_transfer
     }
 
+    #[view]
     /// Return the current owner.
     public fun owner<T: key>(object: Object<T>): address acquires ObjectCore {
         assert!(
@@ -653,11 +654,13 @@ module aptos_framework::object {
         borrow_global<ObjectCore>(object.inner).owner
     }
 
+    #[view]    
     /// Return true if the provided address is the current owner.
     public fun is_owner<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
         owner(object) == owner
     }
 
+    #[view]
     /// Return true if the provided address has indirect or direct ownership of the provided object.
     public fun owns<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
         let current_address = object_address(&object);
@@ -687,6 +690,7 @@ module aptos_framework::object {
         true
     }
 
+    #[view]
     /// Returns the root owner of an object. As objects support nested ownership, it can be useful
     /// to determine the identity of the starting point of ownership.
     public fun root_owner<T: key>(object: Object<T>): address acquires ObjectCore {
