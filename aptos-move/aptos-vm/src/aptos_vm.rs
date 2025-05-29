@@ -2606,6 +2606,9 @@ impl AptosVM {
             },
             Transaction::BlockEpilogue(_) => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                // TODO(HotState): generate an output according to the block end info in the
+                //   transaction. (maybe resort to the move resolver, but for simplicity I would
+                //   just include the full slot in both the transaction and the output).
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output)
             },
