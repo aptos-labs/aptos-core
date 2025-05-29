@@ -11,6 +11,31 @@
 ///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 ///  the position size of the user and does not do any validation.
 ///
+/// - place_maker_order(account, order_id, is_bid, price, size, metadata) -> Called by the market before placing the
+/// maker order in the order book. The clearinghouse can use this to track pending orders in the order book and perform
+/// any other book keeping operations.
+///
+/// - cleanup_order(account, order_id, is_bid, remaining_size) -> Called by the market when an order is cancelled or fully filled
+/// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
+/// that passes the validate_order_placement check,
+/// the market guarantees that the cleanup_order API will be called once and only once with the remaining size of the order.
+///
+/// - decrease_order_size(account, order_id, is_bid, price, size) -> Called by the market when a maker order is decreased
+/// in size by the user. Please note that this API will only be called after place_maker_order is called and the order is
+/// already in the order book. Size in this case is the remaining size of the order after the decrease.
+///
+/// Following are some valid sequence of API calls that the market makes to the clearinghouse:
+/// 1. validate_order_placement(10)
+/// 2. settle_trade(2)
+/// 3. settle_trade(3)
+/// 4. place_maker_order(5)
+/// 5. decrease_order_size(2)
+/// 6. decrease_order_size(1)
+/// 7. cleanup_order(2)
+/// or
+/// 1. validate_order_placement(10)
+/// 2. cleanup_order(10)
+///
 /// Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
 /// is a unique id for the order that can be used to later get the status of the order or cancel the order.
 ///
@@ -34,7 +59,7 @@ module aptos_experimental::market {
     use std::string::String;
     use aptos_framework::event;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
-    use aptos_experimental::order_book_types::{TriggerCondition, UniqueIdxType, Order};
+    use aptos_experimental::order_book_types::{TriggerCondition, Order};
     use aptos_experimental::market_types::MarketClearinghouseCallbacks;
 
     // Error codes
@@ -272,7 +297,7 @@ module aptos_experimental::market {
         user: &signer,
         price: u64,
         orig_size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
@@ -286,7 +311,7 @@ module aptos_experimental::market {
             price,
             orig_size,
             orig_size,
-            is_buy,
+            is_bid,
             time_in_force,
             trigger_condition,
             metadata,
@@ -311,7 +336,7 @@ module aptos_experimental::market {
         user_addr: address,
         price: u64,
         orig_size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
@@ -325,7 +350,7 @@ module aptos_experimental::market {
             price,
             orig_size,
             orig_size,
-            is_buy,
+            is_bid,
             time_in_force,
             trigger_condition,
             metadata,
@@ -343,7 +368,7 @@ module aptos_experimental::market {
         price: u64,
         orig_size: u64,
         remaining_size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
@@ -362,7 +387,7 @@ module aptos_experimental::market {
                     remaining_size: orig_size,
                     size_delta: orig_size,
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: false,
                     status: ORDER_STATUS_OPEN,
                     details: std::string::utf8(b"")
@@ -378,7 +403,7 @@ module aptos_experimental::market {
                     remaining_size: orig_size,
                     size_delta: orig_size,
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: false,
                     status: ORDER_STATUS_CANCELLED,
                     details: std::string::utf8(b"IOC_VIOLATION")
@@ -394,8 +419,13 @@ module aptos_experimental::market {
 
         if (
             !callbacks.validate_order_placement(
-                user_addr, false, // is_taker
-                is_buy, price, orig_size, metadata
+                user_addr,
+                order_id,
+                false, // is_taker
+                is_bid,
+                price,
+                orig_size,
+                metadata
             )) {
             event::emit(
                 OrderEvent {
@@ -407,7 +437,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta: 0, // 0 because order was never placed
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: false,
                     status: ORDER_STATUS_REJECTED,
                     details: std::string::utf8(b"Position Update violation")
@@ -422,6 +452,14 @@ module aptos_experimental::market {
                 num_fills: 0
             };
         };
+        callbacks.place_maker_order(
+            user_addr,
+            order_id,
+            is_bid,
+            price,
+            orig_size,
+            metadata
+        );
         self.order_book.place_maker_order(
             new_order_request(
                 user_addr,
@@ -430,7 +468,7 @@ module aptos_experimental::market {
                 price,
                 orig_size,
                 remaining_size,
-                is_buy,
+                is_bid,
                 trigger_condition,
                 metadata
             )
@@ -446,7 +484,7 @@ module aptos_experimental::market {
                 remaining_size,
                 size_delta: orig_size,
                 price,
-                is_buy,
+                is_buy: is_bid,
                 is_taker: false,
                 status: ORDER_STATUS_OPEN,
                 details: std::string::utf8(b"")
@@ -466,7 +504,8 @@ module aptos_experimental::market {
         order_id: u64,
         maker_address: address,
         maker_cancellation_reason: String,
-        unsettled_size: u64
+        unsettled_size: u64,
+        callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
         event::emit(
@@ -479,7 +518,7 @@ module aptos_experimental::market {
                 remaining_size: 0,
                 size_delta: maker_cancel_size,
                 price: maker_order.get_price(),
-                is_buy: maker_order.is_buy(),
+                is_buy: maker_order.is_bid(),
                 is_taker: false,
                 status: ORDER_STATUS_CANCELLED,
                 details: maker_cancellation_reason
@@ -488,7 +527,13 @@ module aptos_experimental::market {
         // If the maker is invalid cancel the maker order and continue to the next maker order
         if (maker_order.get_remaining_size() != 0) {
             self.order_book.cancel_order(maker_address, order_id);
-        }
+        };
+        callbacks.cleanup_order(
+            maker_address,
+            order_id,
+            maker_order.is_bid(),
+            maker_cancel_size
+        );
     }
 
     /// Similar to `place_order` API but allows few extra parameters as follows
@@ -503,7 +548,7 @@ module aptos_experimental::market {
         price: u64,
         orig_size: u64,
         remaining_size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
@@ -522,8 +567,13 @@ module aptos_experimental::market {
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
         if (
             !callbacks.validate_order_placement(
-                user_addr, true, // is_taker
-                is_buy, price, remaining_size, metadata
+                user_addr,
+                order_id,
+                true, // is_taker
+                is_bid,
+                price,
+                remaining_size,
+                metadata
             )) {
             event::emit(
                 OrderEvent {
@@ -535,7 +585,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta: 0, // 0 because order was never placed
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: false,
                     status: ORDER_STATUS_REJECTED,
                     details: std::string::utf8(b"Position Update violation")
@@ -552,14 +602,14 @@ module aptos_experimental::market {
         };
 
         let is_taker_order =
-            self.order_book.is_taker_order(price, is_buy, trigger_condition);
+            self.order_book.is_taker_order(price, is_bid, trigger_condition);
         if (!is_taker_order) {
             return self.place_maker_order(
                 user_addr,
                 price,
                 orig_size,
                 remaining_size,
-                is_buy,
+                is_bid,
                 time_in_force,
                 trigger_condition,
                 metadata,
@@ -581,7 +631,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta: orig_size,
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: true,
                     status: ORDER_STATUS_OPEN,
                     details: std::string::utf8(b"")
@@ -599,7 +649,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta: remaining_size,
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: true,
                     status: ORDER_STATUS_CANCELLED,
                     details: std::string::utf8(b"Post only violation")
@@ -615,7 +665,7 @@ module aptos_experimental::market {
         let num_fills = 0;
         loop {
             let result =
-                self.order_book.get_single_match_for_taker(price, remaining_size, is_buy);
+                self.order_book.get_single_match_for_taker(price, remaining_size, is_bid);
             let (maker_order, maker_matched_size) = result.destroy_single_order_match();
             let (maker_address, maker_order_id) =
                 maker_order.get_order_id().destroy_order_id_type();
@@ -625,7 +675,8 @@ module aptos_experimental::market {
                     maker_order_id,
                     maker_address,
                     std::string::utf8(b"Disallowed self trading"),
-                    maker_matched_size
+                    maker_matched_size,
+                    callbacks
                 );
                 continue;
             };
@@ -633,7 +684,9 @@ module aptos_experimental::market {
                 callbacks.settle_trade(
                     user_addr,
                     maker_address,
-                    is_buy,
+                    order_id,
+                    maker_order_id,
+                    is_bid,
                     maker_order.get_price(), // Order is always matched at the price of the maker
                     maker_matched_size,
                     metadata,
@@ -657,7 +710,7 @@ module aptos_experimental::market {
                         remaining_size,
                         size_delta: settled_size,
                         price: maker_order.get_price(),
-                        is_buy,
+                        is_buy: is_bid,
                         is_taker: true,
                         status: ORDER_STATUS_FILLED,
                         details: std::string::utf8(b"")
@@ -675,7 +728,7 @@ module aptos_experimental::market {
                             + unsettled_maker_size,
                         size_delta: settled_size,
                         price: maker_order.get_price(),
-                        is_buy: !is_buy,
+                        is_buy: !is_bid,
                         is_taker: false,
                         status: ORDER_STATUS_FILLED,
                         details: std::string::utf8(b"")
@@ -690,12 +743,19 @@ module aptos_experimental::market {
                     maker_order_id,
                     maker_address,
                     maker_cancellation_reason.destroy_some(),
-                    unsettled_maker_size
+                    unsettled_maker_size,
+                    callbacks
                 );
             };
 
             let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
             if (taker_cancellation_reason.is_some()) {
+                callbacks.cleanup_order(
+                    user_addr,
+                    order_id,
+                    is_bid,
+                    remaining_size
+                );
                 event::emit(
                     OrderEvent {
                         parent: self.parent,
@@ -706,7 +766,7 @@ module aptos_experimental::market {
                         remaining_size,
                         size_delta: remaining_size,
                         price,
-                        is_buy,
+                        is_buy: is_bid,
                         is_taker: true,
                         status: ORDER_STATUS_CANCELLED,
                         details: taker_cancellation_reason.destroy_some()
@@ -723,7 +783,7 @@ module aptos_experimental::market {
                             maker_order.get_price(),
                             maker_order.get_orig_size(),
                             unsettled_maker_size,
-                            !is_buy,
+                            !is_bid,
                             option::none(),
                             maker_order.get_metadata_from_order()
                         )
@@ -740,12 +800,18 @@ module aptos_experimental::market {
             };
 
             if (remaining_size == 0) {
+                callbacks.cleanup_order(
+                    user_addr,
+                    order_id,
+                    is_bid,
+                    0 // 0 because the order is fully filled
+                );
                 break;
             };
 
             // Check if the next iteration will still match
             let is_taker_order =
-                self.order_book.is_taker_order(price, is_buy, option::none());
+                self.order_book.is_taker_order(price, is_bid, option::none());
             if (!is_taker_order) {
                 if (time_in_force == TIME_IN_FORCE_IOC) {
                     event::emit(
@@ -758,7 +824,7 @@ module aptos_experimental::market {
                             remaining_size,
                             size_delta: remaining_size,
                             price,
-                            is_buy,
+                            is_buy: is_bid,
                             // NOTE: Keep consistent with all the logs we've
                             // emitted for this taker order
                             is_taker: true,
@@ -783,7 +849,7 @@ module aptos_experimental::market {
                         remaining_size,
                         size_delta: orig_size,
                         price,
-                        is_buy,
+                        is_buy: is_bid,
                         is_taker: false,
                         status: ORDER_STATUS_OPEN,
                         details: std::string::utf8(b"")
@@ -797,7 +863,7 @@ module aptos_experimental::market {
                         price,
                         orig_size,
                         remaining_size,
-                        is_buy,
+                        is_bid,
                         trigger_condition,
                         metadata
                     )
@@ -817,7 +883,7 @@ module aptos_experimental::market {
                             remaining_size,
                             size_delta: remaining_size,
                             price,
-                            is_buy,
+                            is_buy: is_bid,
                             is_taker: true,
                             status: ORDER_STATUS_CANCELLED,
                             details: std::string::utf8(b"Fill limit reached")
@@ -844,7 +910,10 @@ module aptos_experimental::market {
 
     /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
     public fun cancel_order<M: store + copy + drop>(
-        self: &mut Market<M>, user: &signer, order_id: u64
+        self: &mut Market<M>,
+        user: &signer,
+        order_id: u64,
+        callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
         let maybe_order = self.order_book.cancel_order(account, order_id);
@@ -856,10 +925,16 @@ module aptos_experimental::market {
                 price,
                 orig_size,
                 remaining_size,
-                is_buy,
+                is_bid,
                 _trigger_condition,
                 _metadata
             ) = order.destroy_order();
+            callbacks.cleanup_order(
+                account,
+                order_id,
+                is_bid,
+                remaining_size
+            );
             let (user, order_id) = order_id_type.destroy_order_id_type();
             event::emit(
                 OrderEvent {
@@ -871,7 +946,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta: remaining_size,
                     price,
-                    is_buy,
+                    is_buy: is_bid,
                     is_taker: false,
                     status: ORDER_STATUS_CANCELLED,
                     details: std::string::utf8(b"Order cancelled")
@@ -882,7 +957,11 @@ module aptos_experimental::market {
 
     /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
     public fun decrease_order_size<M: store + copy + drop>(
-        self: &mut Market<M>, user: &signer, order_id: u64, size_delta: u64
+        self: &mut Market<M>,
+        user: &signer,
+        order_id: u64,
+        size_delta: u64,
+        callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
         self.order_book.decrease_order_size(account, order_id, size_delta);
@@ -895,11 +974,18 @@ module aptos_experimental::market {
             price,
             orig_size,
             remaining_size,
-            is_buy,
+            is_bid,
             _trigger_condition,
             _metadata
         ) = order.destroy_order();
         let (user, order_id) = order_id_type.destroy_order_id_type();
+        callbacks.decrease_order_size(
+            user,
+            order_id,
+            is_bid,
+            price,
+            remaining_size
+        );
         event::emit(
             OrderEvent {
                 parent: self.parent,
@@ -908,9 +994,9 @@ module aptos_experimental::market {
                 user,
                 orig_size,
                 remaining_size,
-                size_delta: remaining_size,
+                size_delta,
                 price,
-                is_buy,
+                is_buy: is_bid,
                 is_taker: false,
                 status: ORDER_SIZE_REDUCED,
                 details: std::string::utf8(b"Order size reduced")
