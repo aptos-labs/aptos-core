@@ -11,6 +11,17 @@
 ///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 ///  the position size of the user and does not do any validation.
 ///
+/// - place_maker_order(account, order_id, is_bid, price, size, metadata) -> Called by the market before placing the
+/// maker order in the order book. The clearinghouse can use this to track pending orders in the order book and perform
+/// any other book keeping operations.
+///
+/// - cleanup_order(account, order_id, is_bid, remaining_size) -> Called by the market when an order is cancelled or fully filled
+/// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list.
+///
+/// - decrease_order_size(account, order_id, is_bid, price, size) -> Called by the market when a maker order is decreased
+/// in size by the user. Please note that this API will only be called after place_maker_order is called and the order is
+/// already in the order book. Size in this case is the remaining size of the order after the decrease.
+///
 /// Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
 /// is a unique id for the order that can be used to later get the status of the order or cancel the order.
 ///
@@ -506,7 +517,8 @@ module aptos_experimental::market {
         callbacks.cleanup_order(
             maker_address,
             order_id,
-            maker_order.is_bid()
+            maker_order.is_bid(),
+            maker_cancel_size
         );
     }
 
@@ -724,6 +736,12 @@ module aptos_experimental::market {
 
             let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
             if (taker_cancellation_reason.is_some()) {
+                callbacks.cleanup_order(
+                    user_addr,
+                    order_id,
+                    is_bid,
+                    remaining_size
+                );
                 event::emit(
                     OrderEvent {
                         parent: self.parent,
@@ -772,6 +790,7 @@ module aptos_experimental::market {
                     user_addr,
                     order_id,
                     is_bid,
+                    0 // 0 because the order is fully filled
                 );
                 break;
             };
@@ -899,7 +918,8 @@ module aptos_experimental::market {
             callbacks.cleanup_order(
                 account,
                 order_id,
-                is_bid
+                is_bid,
+                remaining_size
             );
             let (user, order_id) = order_id_type.destroy_order_id_type();
             event::emit(

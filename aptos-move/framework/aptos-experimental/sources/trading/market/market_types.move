@@ -16,8 +16,11 @@ module aptos_experimental::market_types {
         settle_trade_f:  |address, address, u64, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: account, is_taker, is_long, price, size
         validate_order_placement_f: |address, u64, bool, bool, u64, u64, M| bool has drop + copy,
+        // place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
         place_maker_order_f: |address, u64, bool, u64, u64, M| has drop + copy,
-        cleanup_order_f: |address, u64, bool| has drop + copy,
+        // cleanup_order_f arguments: account, order_id, is_bid, remaining_size
+        cleanup_order_f: |address, u64, bool, u64| has drop + copy,
+        // decrease_order_size_f arguments: account, order_id, is_bid, price, size
         decrease_order_size_f: |address, u64, bool, u64, u64| has drop + copy,
     }
 
@@ -39,7 +42,7 @@ module aptos_experimental::market_types {
         // validate_settlement_update_f arguments: accoun, is_taker, is_long, price, size
         validate_order_placement_f: |address, u64, bool, bool, u64, u64, M| bool has drop + copy,
         place_maker_order_f: |address, u64, bool, u64, u64, M| has drop + copy,
-        cleanup_order_f: |address, u64, bool| has drop + copy,
+        cleanup_order_f: |address, u64, bool, u64| has drop + copy,
         decrease_order_size_f: |address, u64, bool, u64, u64| has drop + copy,
     ): MarketClearinghouseCallbacks<M> {
         MarketClearinghouseCallbacks {
@@ -104,8 +107,9 @@ module aptos_experimental::market_types {
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: u64,
-        is_bid: bool) {
-        (self.cleanup_order_f)(account, order_id, is_bid)
+        is_bid: bool,
+        remaining_size: u64) {
+        (self.cleanup_order_f)(account, order_id, is_bid, remaining_size)
     }
 
     public fun decrease_order_size<M: store + copy + drop>(
