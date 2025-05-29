@@ -47,7 +47,7 @@ pub struct StateKvDb {
     state_kv_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
     // TODO(HotState): no separate metadata db for hot state for now.
     #[allow(dead_code)] // TODO(HotState): can remove later.
-    hot_state_kv_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    hot_state_kv_db_shards: Option<[Arc<DB>; NUM_STATE_SHARDS]>,
     enabled_sharding: bool,
 }
 
@@ -64,7 +64,7 @@ impl StateKvDb {
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
                 state_kv_db_shards: arr![Arc::clone(&ledger_db); 16],
-                hot_state_kv_db_shards: arr![Arc::clone(&ledger_db); 16],
+                hot_state_kv_db_shards: None,
                 enabled_sharding: false,
             });
         }
@@ -111,25 +111,35 @@ impl StateKvDb {
             .try_into()
             .unwrap();
 
-        let hot_state_kv_db_shards = (0..NUM_STATE_SHARDS)
-            .into_par_iter()
-            .map(|shard_id| {
-                let shard_root_path = db_paths.hot_state_kv_db_shard_root_path(shard_id as u8);
-                let db = Self::open_shard(
-                    shard_root_path,
-                    shard_id as u8,
-                    &state_kv_db_config,
-                    readonly,
-                    /* is_hot = */ true,
-                )
-                .unwrap_or_else(|e| {
-                    panic!("Failed to open hot state kv db shard {shard_id}: {e:?}.")
-                });
-                Arc::new(db)
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+        info!("db_paths: {:?} readonly: {}", db_paths, readonly);
+        let hot_state_kv_db_shards = if readonly {
+            // TODO(HotState): do not open it in readonly mode yet, until we have this DB
+            // everywhere.
+            None
+        } else {
+            Some(
+                (0..NUM_STATE_SHARDS)
+                    .into_par_iter()
+                    .map(|shard_id| {
+                        let shard_root_path =
+                            db_paths.hot_state_kv_db_shard_root_path(shard_id as u8);
+                        let db = Self::open_shard(
+                            shard_root_path,
+                            shard_id as u8,
+                            &state_kv_db_config,
+                            readonly,
+                            /* is_hot = */ true,
+                        )
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to open hot state kv db shard {shard_id}: {e:?}.")
+                        });
+                        Arc::new(db)
+                    })
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .unwrap(),
+            )
+        };
 
         let state_kv_db = Self {
             state_kv_metadata_db,
