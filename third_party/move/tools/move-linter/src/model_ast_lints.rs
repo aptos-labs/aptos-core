@@ -35,7 +35,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
-        Box::<redundant_boolean_expressions::RedundantBooleanExpression>::default(),
+        Box::<redundant_boolean_expressions::SimplifiableBooleanExpression>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),

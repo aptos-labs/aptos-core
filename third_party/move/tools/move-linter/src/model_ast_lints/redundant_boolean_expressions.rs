@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module implements an expression linter that checks for redundant boolean expressions
+//! This module implements an expression linter that checks for boolean expressions
 //! that can be simplified using boolean algebra laws.
 //!
 //! Currently detects:
@@ -36,12 +36,12 @@ fn get_text_from_expr(env: &GlobalEnv, exp_data: &ExpData) -> Option<String> {
     None
 }
 
-struct RedundantPattern {
+struct SimplifiablePattern {
     original_expr: String,
     simplified_expr: String,
 }
 
-impl RedundantPattern {
+impl SimplifiablePattern {
     fn new(env: &GlobalEnv, original: &ExpData, simplified: &ExpData) -> Self {
         Self {
             original_expr: get_text_from_expr(env, original).unwrap_or_default(),
@@ -65,9 +65,9 @@ impl RedundantPattern {
 }
 
 #[derive(Default)]
-pub struct RedundantBooleanExpression;
+pub struct SimplifiableBooleanExpression;
 
-impl RedundantBooleanExpression {
+impl SimplifiableBooleanExpression {
     /// Check if two expressions are structurally equal
     fn is_expression_equal(&self, expr1: &ExpData, expr2: &ExpData) -> bool {
         match (expr1, expr2) {
@@ -85,7 +85,7 @@ impl RedundantBooleanExpression {
         expr: &ExpData,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<RedundantPattern> {
+    ) -> Option<SimplifiablePattern> {
         let check_pattern = |left: &ExpData, right: &ExpData| {
             if let ExpData::Call(_, And, and_args) = left {
                 if and_args.len() == 2 {
@@ -98,10 +98,10 @@ impl RedundantBooleanExpression {
 
         if check_pattern(left, right) {
             // Pattern 1: (a && b) || a  →  a
-            Some(RedundantPattern::new(env, expr, right))
+            Some(SimplifiablePattern::new(env, expr, right))
         } else if check_pattern(right, left) {
             // Pattern 2: a || (a && b)  →  a
-            Some(RedundantPattern::new(env, expr, left))
+            Some(SimplifiablePattern::new(env, expr, left))
         } else {
             None
         }
@@ -114,9 +114,9 @@ impl RedundantBooleanExpression {
         expr: &ExpData,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<RedundantPattern> {
+    ) -> Option<SimplifiablePattern> {
         if self.is_expression_equal(left, right) {
-            return Some(RedundantPattern::new(env, expr, left));
+            return Some(SimplifiablePattern::new(env, expr, left));
         }
         None
     }
@@ -129,7 +129,7 @@ impl RedundantBooleanExpression {
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<RedundantPattern> {
+    ) -> Option<SimplifiablePattern> {
         let is_negation_pair = |expr1: &ExpData, expr2: &ExpData| -> bool {
             matches!(expr2, ExpData::Call(_, Not, not_args)
                 if not_args.len() == 1 && self.is_expression_equal(expr1, not_args[0].as_ref()))
@@ -138,7 +138,7 @@ impl RedundantBooleanExpression {
         if is_negation_pair(left, right) || is_negation_pair(right, left) {
             let result_value = matches!(op, Or);
             let result_expr = ExpData::Value(env.new_node_id(), Value::Bool(result_value));
-            Some(RedundantPattern::new(env, expr, &result_expr))
+            Some(SimplifiablePattern::new(env, expr, &result_expr))
         } else {
             None
         }
@@ -152,12 +152,12 @@ impl RedundantBooleanExpression {
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<RedundantPattern> {
+    ) -> Option<SimplifiablePattern> {
         let try_distribute = |outer_op: Operation,
                               inner_op: Operation,
                               left_args: &[Exp],
                               right_args: &[Exp]|
-         -> Option<RedundantPattern> {
+         -> Option<SimplifiablePattern> {
             if left_args.len() != 2 || right_args.len() != 2 {
                 return None;
             }
@@ -189,7 +189,7 @@ impl RedundantBooleanExpression {
                                 common_text, outer_op_str, left_text, inner_op_str, right_text
                             );
 
-                            return Some(RedundantPattern::new_with_text(
+                            return Some(SimplifiablePattern::new_with_text(
                                 env,
                                 expr,
                                 simplified_text,
@@ -213,9 +213,9 @@ impl RedundantBooleanExpression {
     }
 }
 
-impl ExpChecker for RedundantBooleanExpression {
+impl ExpChecker for SimplifiableBooleanExpression {
     fn get_name(&self) -> String {
-        "redundant_boolean_expression".to_string()
+        "simplifiable_boolean_expression".to_string()
     }
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
