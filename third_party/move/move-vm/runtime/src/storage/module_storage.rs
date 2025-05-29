@@ -588,18 +588,32 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                     .runtime_environment()
                     .vm_config()
                     .ty_builder;
-                let instantiate = |ty: &Type| -> PartialVMResult<Type> {
-                    if fun.ty_args.is_empty() {
-                        Ok(ty.clone())
-                    } else {
-                        ty_builder.create_ty_with_subst(ty, &fun.ty_args)
-                    }
-                };
+
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()
-                    .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
+                    .map(|ty| {
+                        let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
+                            ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
+                        } else {
+                            let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                            ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
+                        };
+
+                        // Do not allow delayed fields to be serialized.
+                        if contains_delayed_fields {
+                            let err = PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                                .with_message(
+                                "Function values that capture delayed fields cannot be serialized"
+                                    .to_string(),
+                            );
+                            return Err(err);
+                        }
+
+                        Ok(layout)
+                    })
                     .collect::<PartialVMResult<Vec<_>>>()?;
+
                 Ok(SerializedFunctionData {
                     format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun

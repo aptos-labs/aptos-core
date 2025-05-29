@@ -1,0 +1,24 @@
+[package]
+name = "some_package_name"
+version = "0.1.2"
+authors = ["alice", "bob", "carol"]
+license = "MIT"
+upgrade_policy = "compatible"
+
+[addresses]
+alice = "_"
+bob = "0x1234"
+
+[dev-addresses]
+alice = "0x5678"
+
+[build]
+language_version = "2.3"
+
+[dependencies]
+foo = { git = "https://github.com/some-org/some-project", rev = "main", subdir = "foo" }
+bar = { aptos = "mainnet", address = "0x1", version = "0.1.2" }
+baz = { local = "../baz" }
+
+[dev-dependencies]
+dd = { local = "../dd" }

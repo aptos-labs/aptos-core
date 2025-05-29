@@ -17,7 +17,7 @@ use crate::{
     },
     util::is_vtxn_expected,
 };
-use anyhow::{bail, ensure};
+use anyhow::{bail, ensure, Context};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
@@ -120,11 +120,14 @@ impl NodeBroadcastHandler {
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         for vtxn in node.validator_txns() {
+            let vtxn_type_name = vtxn.type_name();
             ensure!(
                 is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                 "unexpected validator transaction: {:?}",
-                vtxn.type_name()
+                vtxn_type_name
             );
+            vtxn.verify(self.epoch_state.verifier.as_ref())
+                .context(format!("{} verification failed", vtxn_type_name))?;
         }
         let vtxn_total_bytes = node
             .validator_txns()

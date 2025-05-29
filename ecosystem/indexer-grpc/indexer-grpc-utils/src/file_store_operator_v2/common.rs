@@ -27,6 +27,7 @@ pub struct FileMetadata {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct BatchMetadata {
     pub files: Vec<FileMetadata>,
+    pub suffix: Option<u64>,
 }
 
 #[async_trait::async_trait]

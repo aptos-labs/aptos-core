@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: public inline function `foo` cannot be called from all locations it is accessible
+  ┌─ tests/checking/visibility-checker/ok_until_inlining.move:2:23
+  │
+2 │     public inline fun foo() {
+  │                       ^^^ if called from a location where `m::priv` is not accessible
+3 │         priv();
+  │         ------ inline expansion calls private function that may not be accessible in all locations that `m::foo` can be called
+
 error: function `0xc0ffee::m::priv` cannot be called from function `0xc0ffee::n::test` because it is private to module `0xc0ffee::m`
    ┌─ tests/checking/visibility-checker/ok_until_inlining.move:6:9
    │

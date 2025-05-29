@@ -154,8 +154,11 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
 
     let mut error_writer = Buffer::no_color();
     options.language_version = Some(LanguageVersion::latest());
-    let function_value_experiments =
-        vec![Experiment::KEEP_INLINE_FUNS, Experiment::LIFT_INLINE_FUNS];
+    let function_value_experiments = vec![
+        Experiment::KEEP_INLINE_FUNS,
+        Experiment::LIFT_INLINE_FUNS,
+        Experiment::SKIP_INLINING_INLINE_FUNS,
+    ];
     let result = run_move_prover_v2(
         &mut error_writer,
         options,

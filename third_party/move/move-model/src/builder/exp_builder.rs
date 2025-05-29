@@ -3683,6 +3683,10 @@ impl ExpTranslator<'_, '_, '_> {
         }
 
         if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
+            if entry.kind == FunctionKind::Inline {
+                self.error(loc, "inline function cannot be used as a function value");
+                return self.new_error_exp();
+            }
             let module_id = entry.module_id;
             let fun_id = entry.fun_id;
             let result_type = entry.result_type.clone();
@@ -4257,13 +4261,17 @@ impl ExpTranslator<'_, '_, '_> {
         for ty in tys {
             let ty_loc = self.to_loc(&ty.loc);
             if let EA::Type_::Apply(maccess, generics) = &ty.value {
+                // If no type params were given, pass `None` to `translate_constructor_name` to trigger inference;
+                // an empty vec means "explicitly no type params".
+                // If any were given, pass them through to avoid inferring.
+                let generics = (!generics.is_empty()).then_some(generics.clone());
                 if let Some((inferred_struct_id, variant)) = self.translate_constructor_name(
                     &exp_ty,
                     WideningOrder::LeftToRight,
                     context,
                     &ty_loc,
                     maccess,
-                    &Some(generics.clone()),
+                    &generics,
                 ) {
                     if let Some(variant) = variant {
                         // Any time in the loop is the same if type unification succeeds, so

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
+  ┌─ tests/checking-lang-v1/unused_inline_fun.move:7:17
+  │
+7 │         another(f)
+  │                 ^

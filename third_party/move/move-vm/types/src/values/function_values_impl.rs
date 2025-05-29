@@ -167,9 +167,11 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
         let mask = read_required_value::<_, ClosureMask>(&mut seq)?;
-        let mut captured_layouts = vec![];
-        let mut captured = vec![];
-        for _ in 0..mask.captured_count() {
+
+        let num_captured_values = mask.captured_count() as usize;
+        let mut captured_layouts = Vec::with_capacity(num_captured_values);
+        let mut captured = Vec::with_capacity(num_captured_values);
+        for _ in 0..num_captured_values {
             let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
             match seq.next_element_seed(DeserializationSeed {
                 ctx: self.0.ctx,

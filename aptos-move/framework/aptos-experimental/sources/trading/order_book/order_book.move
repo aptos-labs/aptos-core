@@ -206,9 +206,7 @@ module aptos_experimental::order_book {
             return self.place_maker_order(order_req);
         };
         let order_with_state = self.orders.remove(&order_id);
-        order_with_state.increase_remaining_size(
-            order_req.remaining_size
-        );
+        order_with_state.increase_remaining_size(order_req.remaining_size);
         self.orders.add(order_id, order_with_state);
         self.active_orders.increase_order_size(
             order_req.price,
@@ -1183,7 +1181,7 @@ module aptos_experimental::order_book {
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
-        assert!(order_book.get_remaining_size(@0xAA, 1) ==  1000);
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 1000);
 
         // Taker order
         let order_req = OrderRequest {
@@ -1202,7 +1200,16 @@ module aptos_experimental::order_book {
         assert!(total_matched_size(&match_results) == 100);
 
         let (matched_order, _) = match_results[0].destroy_single_order_match();
-        let (_order_id, unique_idx, price, orig_size, _remaining_size, is_buy, _trigger_condition, metadata  ) = matched_order.destroy_order();
+        let (
+            _order_id,
+            unique_idx,
+            price,
+            orig_size,
+            _remaining_size,
+            is_buy,
+            _trigger_condition,
+            metadata
+        ) = matched_order.destroy_order();
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
         let order_req = OrderRequest {
             account: @0xAA,
@@ -1217,7 +1224,7 @@ module aptos_experimental::order_book {
         };
         order_book.reinsert_maker_order(order_req);
         // Verify order was reinserted with updated size
-        assert!(order_book.get_remaining_size(@0xAA, 1) ==  950);
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 950);
         order_book.destroy_order_book();
     }
 
@@ -1238,7 +1245,7 @@ module aptos_experimental::order_book {
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
-        assert!(order_book.get_remaining_size(@0xAA, 1) ==  1000);
+        assert!(order_book.get_remaining_size(@0xAA, 1) == 1000);
 
         // Taker order
         let order_req = OrderRequest {
@@ -1257,7 +1264,16 @@ module aptos_experimental::order_book {
         assert!(total_matched_size(&match_results) == 1000);
 
         let (matched_order, _) = match_results[0].destroy_single_order_match();
-        let (_order_id, unique_idx, price, orig_size, _remaining_size, is_buy, _trigger_condition, metadata  ) = matched_order.destroy_order();
+        let (
+            _order_id,
+            unique_idx,
+            price,
+            orig_size,
+            _remaining_size,
+            is_buy,
+            _trigger_condition,
+            metadata
+        ) = matched_order.destroy_order();
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
         let order_req = OrderRequest {
             account: @0xAA,
@@ -1275,7 +1291,6 @@ module aptos_experimental::order_book {
         assert!(order_book.get_remaining_size(@0xAA, 1) == 500);
         order_book.destroy_order_book();
     }
-
 
     #[test]
     fun test_decrease_order_size() {
@@ -1319,5 +1334,4 @@ module aptos_experimental::order_book {
 
         order_book.destroy_order_book();
     }
-
 }

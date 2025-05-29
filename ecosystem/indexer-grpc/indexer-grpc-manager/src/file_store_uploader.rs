@@ -129,8 +129,7 @@ impl FileStoreUploader {
             NUM_TXNS_PER_FOLDER,
             version,
             batch_metadata,
-        )
-        .await;
+        );
 
         recover_tx.send(()).expect("Receiver should exist.");
 
@@ -197,7 +196,7 @@ impl FileStoreUploader {
                 .start_timer();
             FileEntry::from_transactions(transactions, StorageFormat::Lz4CompressedProto)
         };
-        let path = self.reader.get_path_for_version(first_version);
+        let path = self.reader.get_path_for_version(first_version, None);
 
         info!("Dumping transactions [{first_version}, {last_version}] to file {path:?}.");
 

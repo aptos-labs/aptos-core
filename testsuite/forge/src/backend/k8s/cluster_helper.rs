@@ -405,8 +405,8 @@ pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
 
 pub fn generate_new_era() -> String {
     let mut rng = rand::thread_rng();
-    let r: u8 = rng.gen();
-    format!("forge{}", r)
+    let r: u32 = rng.gen();
+    format!("forge{:08x}", r)
 }
 
 fn get_node_default_helm_path() -> String {

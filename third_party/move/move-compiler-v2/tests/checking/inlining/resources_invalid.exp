@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: access of the field `addr` on type `objects::ReaderRef` can only be done within the defining module `0x42::objects`, but `objects::reader` could be called (and expanded) outside the module
+  ┌─ tests/checking/inlining/resources_invalid.move:7:23
+  │
+7 │     public inline fun reader<T: key>(ref: &ReaderRef<T>): &T {
+  │                       ^^^^^^
+8 │         borrow_global<T>(ref.addr)
+  │                          -------- accessed here
+
 error: Invalid operation: access of the field `addr` on type `objects::ReaderRef` can only be done within the defining module `0x42::objects`
    ┌─ tests/checking/inlining/resources_invalid.move:17:16
    │

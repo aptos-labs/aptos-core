@@ -17,5 +17,7 @@ pub(crate) use modules::{StructVariantInfo, VariantFieldInfo};
 mod script;
 pub use script::Script;
 
+mod single_signature_loader;
+
 mod type_loader;
 use type_loader::intern_type;

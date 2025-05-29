@@ -1,0 +1,138 @@
+
+Diagnostics:
+warning: unpack of `m::W` can only be done within the defining module `0xc0ffee::m`, but `m::destroy1` could be called (and expanded) outside the module
+  ┌─ tests/visibility-checker/inline_with_warning_07.move:4:23
+  │
+4 │     public inline fun destroy1(w: W) {
+  │                       ^^^^^^^^
+5 │         let W(_) = w;
+  │             ---- unpacked here
+
+warning: unpack of `m::W` can only be done within the defining module `0xc0ffee::m`, but `m::destroy2` could be called (and expanded) outside the module
+  ┌─ tests/visibility-checker/inline_with_warning_07.move:8:24
+  │
+8 │     package inline fun destroy2(w: W) {
+  │                        ^^^^^^^^
+9 │         let W(_) = w;
+  │             ---- unpacked here
+
+warning: access of the field `0` on type `m::W` can only be done within the defining module `0xc0ffee::m`, but `m::get_field` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/inline_with_warning_07.move:12:23
+   │
+12 │     public inline fun get_field(w: W): u64 {
+   │                       ^^^^^^^^^
+13 │         w.0
+   │         --- accessed here
+
+warning: match on enum type `n::E` can only be done within the defining module `0xc0ffee::n`, but `n::fetch` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/inline_with_warning_07.move:23:31
+   │
+23 │     public(friend) inline fun fetch(e: E): u64 {
+   │                               ^^^^^
+24 │         match (e) {
+   │                - matched here
+
+warning: storage operation on type `o::R` can only be done within the defining module `0xc0ffee::o`, but `o::my_borrow` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/inline_with_warning_07.move:38:23
+   │
+38 │     public inline fun my_borrow(): &R {
+   │                       ^^^^^^^^^
+39 │         borrow_global<R>(@0xc0ffee)
+   │         --------------------------- called here
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct W {
+        0: u64,
+    }
+    public inline fun destroy1(w: W) {
+        {
+          let m::W{ 0: _ } = w;
+          Tuple()
+        }
+    }
+    friend inline fun destroy2(w: W) {
+        {
+          let m::W{ 0: _ } = w;
+          Tuple()
+        }
+    }
+    public inline fun get_field(w: W): u64 {
+        select m::W.0<W>(w)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    enum E {
+        A {
+            0: u64,
+        }
+        B {
+            0: u64,
+        }
+    }
+    friend inline fun fetch(e: E): u64 {
+        match (e) {
+          n::E::A{ 0: x } => {
+            x
+          }
+          n::E::B{ 0: x } => {
+            x
+          }
+        }
+
+    }
+    private inline fun no_warn(): E {
+        pack n::E::A(0)
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::o {
+    struct R {
+        f: u64,
+    }
+    public inline fun my_borrow(): &R {
+        BorrowGlobal(Immutable)<R>(0xc0ffee)
+    }
+} // end 0xc0ffee::o
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct W {
+        0: u64,
+    }
+    public inline fun destroy1(w: W) {
+        let W(_) = w;
+    }
+    friend inline fun destroy2(w: W) {
+        let W(_) = w;
+    }
+    public inline fun get_field(w: W): u64 {
+        w.0
+    }
+}
+module 0xc0ffee::n {
+    enum E {
+        A {
+            0: u64,
+        }
+        B {
+            0: u64,
+        }
+    }
+    friend inline fun fetch(e: E): u64 {
+        match (e) {
+            E::A(x) => x,
+            E::B(x) => x,
+        }
+    }
+    inline fun no_warn(): E {
+        E::A(0)
+    }
+}
+module 0xc0ffee::o {
+    struct R has key {
+        f: u64,
+    }
+    public inline fun my_borrow(): &R {
+        borrow_global<R>(0xc0ffee)
+    }
+}
