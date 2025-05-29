@@ -624,7 +624,7 @@ Exceeds maximum nesting for an object transfer.
 
 
 
-<a id="0x1_object_ENOT_OBJECT_OWNER"></a>
+<a id="0x1_object_ENOT_"></a>
 
 The caller does not have ownership permissions
 
