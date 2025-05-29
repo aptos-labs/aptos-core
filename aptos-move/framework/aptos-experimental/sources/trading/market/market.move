@@ -16,11 +16,25 @@
 /// any other book keeping operations.
 ///
 /// - cleanup_order(account, order_id, is_bid, remaining_size) -> Called by the market when an order is cancelled or fully filled
-/// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list.
+/// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
+/// that passes the validate_order_placement check,
+/// the market guarantees that the cleanup_order API will be called once and only once with the remaining size of the order.
 ///
 /// - decrease_order_size(account, order_id, is_bid, price, size) -> Called by the market when a maker order is decreased
 /// in size by the user. Please note that this API will only be called after place_maker_order is called and the order is
 /// already in the order book. Size in this case is the remaining size of the order after the decrease.
+///
+/// Following are some valid sequence of API calls that the market makes to the clearinghouse:
+/// 1. validate_order_placement(10)
+/// 2. settle_trade(2)
+/// 3. settle_trade(3)
+/// 4. place_maker_order(5)
+/// 5. decrease_order_size(2)
+/// 6. decrease_order_size(1)
+/// 7. cleanup_order(2)
+/// or
+/// 1. validate_order_placement(10)
+/// 2. cleanup_order(10)
 ///
 /// Upon placement of an order, the market generates an order id and emits an event with the order details - the order id
 /// is a unique id for the order that can be used to later get the status of the order or cancel the order.
