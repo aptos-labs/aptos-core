@@ -175,7 +175,7 @@ impl AptosDB {
             rocksdb_configs,
             readonly,
             ledger_db.metadata_db_arc(),
-        )?;
+        ).expect("Failed to open state kv db");
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs,

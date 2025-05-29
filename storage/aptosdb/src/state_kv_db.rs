@@ -77,6 +77,7 @@ impl StateKvDb {
         state_kv_db_config: RocksdbConfig,
         readonly: bool,
     ) -> Result<Self> {
+        info!("open sharded. db_paths: {:?}. readonly: {}", db_paths, readonly);
         let state_kv_metadata_db_path =
             Self::metadata_db_path(db_paths.state_kv_db_metadata_root_path());
 
