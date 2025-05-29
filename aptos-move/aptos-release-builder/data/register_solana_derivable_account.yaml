@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+name: "AIP-121 - x-chain DAA authentication using Sign-in-With-Solana"
+proposals:
+  - name: register_solana_derivable_account
+    metadata:
+      title: "Register Solana Derivable Account authentication function"
+      description: "Enables AIP-121"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-121.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_121_registration.move
