@@ -48,36 +48,12 @@ impl AbstractResourceWriteOp {
                 write_op,
                 materialized_size,
                 ..
-            }) => {
-                use WriteOp::*;
-                match write_op {
-                    Creation { .. } => WriteOpSize::Creation {
-                        write_len: materialized_size.expect("Creation must have size"),
-                    },
-                    Modification { .. } => WriteOpSize::Modification {
-                        write_len: materialized_size.expect("Modification must have size"),
-                    },
-                    Deletion { .. } => WriteOpSize::Deletion,
-                }
-            },
+            }) => write_op.project_write_op_size(|| *materialized_size),
             WriteResourceGroup(GroupWrite {
                 metadata_op: write_op,
                 maybe_group_op_size,
                 ..
-            }) => {
-                use WriteOp::*;
-                match write_op {
-                    Creation { .. } => WriteOpSize::Creation {
-                        write_len: maybe_group_op_size.expect("Creation must have size").get(),
-                    },
-                    Modification { .. } => WriteOpSize::Modification {
-                        write_len: maybe_group_op_size
-                            .expect("Modification must have size")
-                            .get(),
-                    },
-                    Deletion { .. } => WriteOpSize::Deletion,
-                }
-            },
+            }) => write_op.project_write_op_size(|| maybe_group_op_size.map(|x| x.get())),
             InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {
                 materialized_size, ..
             })

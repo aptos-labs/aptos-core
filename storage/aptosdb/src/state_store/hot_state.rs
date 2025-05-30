@@ -7,10 +7,10 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_slot::StateSlot, state_view::hot_state_view::HotStateView,
+    state::State, state_view::hot_state_view::HotStateView,
 };
 use aptos_types::{
-    state_store::{state_key::StateKey, StateViewResult},
+    state_store::{state_key::StateKey, state_slot::StateSlot, StateViewResult},
     transaction::Version,
 };
 use dashmap::DashMap;

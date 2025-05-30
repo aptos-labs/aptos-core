@@ -1200,6 +1200,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-accumulator",
+ "aptos-block-executor",
  "aptos-config",
  "aptos-crypto",
  "aptos-db-indexer",
@@ -4633,6 +4634,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "derivative",
+ "derive_more 0.99.17",
  "fixed",
  "fxhash",
  "hashbrown 0.14.3",
@@ -4660,6 +4662,7 @@ dependencies = [
  "quick_cache",
  "rand 0.7.3",
  "rayon",
+ "ref-cast",
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
