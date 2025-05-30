@@ -36,6 +36,7 @@ struct itself, while the operations are implemented as native functions. No trav
     -  [Function `new`](#@Specification_0_new)
     -  [Function `add`](#@Specification_0_add)
     -  [Function `borrow`](#@Specification_0_borrow)
+    -  [Function `borrow_with_default`](#@Specification_0_borrow_with_default)
     -  [Function `borrow_mut`](#@Specification_0_borrow_mut)
     -  [Function `borrow_mut_with_default`](#@Specification_0_borrow_mut_with_default)
     -  [Function `upsert`](#@Specification_0_upsert)
@@ -591,6 +592,7 @@ and can be used only in modules that know by themselves that table is empty.
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
     map_borrow_mut_with_default = borrow_mut_with_default,
+    map_borrow_with_default = borrow_with_default,
     map_spec_get = spec_get,
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
@@ -637,6 +639,22 @@ and can be used only in modules that know by themselves that table is empty.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow">borrow</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K): &V
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_0_borrow_with_default"></a>
+
+### Function `borrow_with_default`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;, key: K, default: &V): &V
 </code></pre>
 
 
