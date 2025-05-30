@@ -7,6 +7,7 @@ use crate::{
 };
 use std::marker::PhantomData;
 
+#[derive(PartialEq)]
 pub enum ScanDirection {
     Forward,
     Backward,
@@ -125,7 +126,7 @@ where
     }
 }
 
-impl<'a, S> Iterator for SchemaIterator<'a, S>
+impl<S> Iterator for SchemaIterator<'_, S>
 where
     S: Schema,
 {

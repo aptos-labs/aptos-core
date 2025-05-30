@@ -1,4 +1,136 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
+     var $t5: 0xc0ffee::m::Wrap
+     var $t6: &0xc0ffee::m::S
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: &u64
+  0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
+  1: $t7 := infer($t0)
+  2: $t8 := infer($t1)
+  3: $t9 := infer($t2)
+  4: $t11 := borrow_field<0xc0ffee::m::S>.x($t6)
+  5: $t10 := read_ref($t11)
+  6: $t12 := infer($t4)
+  7: $t14 := borrow_field<0xc0ffee::m::S>.y($t6)
+  8: $t13 := read_ref($t14)
+  9: $t5 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10, $t12, $t13)
+ 10: return $t5
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
+     var $t5: 0xc0ffee::m::Wrap
+     var $t6: &0xc0ffee::m::S
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: &u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t3, $t4
+     # refs: []
+     #
+  0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2, $t4, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  1: $t7 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t4, $t6, $t7
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  2: $t8 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2, $t4, $t6, $t7, $t8
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  3: $t9 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t4, $t6, $t7, $t8, $t9
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  4: $t11 := borrow_field<0xc0ffee::m::S>.x($t6)
+     # abort state: {returns}
+     # live vars: $t4, $t6, $t7, $t8, $t9, $t11
+     # refs: [$t6 => #6, $t11 => #11]
+     # #6
+     #   => #11 via [field `x`] at line 22
+     # #11
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  5: $t10 := read_ref($t11)
+     # abort state: {returns}
+     # live vars: $t4, $t6, $t7, $t8, $t9, $t10
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  6: $t12 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t6, $t7, $t8, $t9, $t10, $t12
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #6 via [struct `m::S`] at line 17
+     #
+  7: $t14 := borrow_field<0xc0ffee::m::S>.y($t6)
+     # abort state: {returns}
+     # live vars: $t7, $t8, $t9, $t10, $t12, $t14
+     # refs: [$t14 => #14]
+     # #14
+     #   <no edges>
+     # #root
+     #   -> #14 via [struct `m::S`] at line 24
+     #
+  8: $t13 := read_ref($t14)
+     # abort state: {returns}
+     # live vars: $t7, $t8, $t9, $t10, $t12, $t13
+     # refs: []
+     #
+  9: $t5 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10, $t12, $t13)
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+ 10: return $t5
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {

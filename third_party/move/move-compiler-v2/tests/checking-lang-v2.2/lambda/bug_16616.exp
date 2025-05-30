@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: lambda lifting is not allowed in scripts
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16616.move:3:9
+  │
+3 │ ╭         (
+4 │ │             | x: |u8| has drop | { 1u16 } // Lambda
+5 │ │         )(
+  │ ╰─────────^
+  │
+  = lambda cannot be reduced to partial application of an existing function
+
+error: lambda lifting is not allowed in scripts
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16616.move:6:13
+  │
+6 │             | y: u8 | { 1u8 & y; } // Argument
+  │             ^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = lambda cannot be reduced to partial application of an existing function

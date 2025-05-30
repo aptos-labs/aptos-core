@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     struct S {
         x: u64,
@@ -21,12 +21,12 @@ module 0x42::m {
         m::receiver_ref_mut(Borrow(Mutable)(s), 1);
         {
           let (self: &mut S, y: u64): (&mut S, u64) = Tuple(Borrow(Mutable)(s), 1);
-          Add<u64>(select m::S.x<&mut S>(self), 1)
+          Add<u64>(select m::S.x<&mut S>(self), y)
         }
     }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     struct S {
         x: u64,
@@ -48,6 +48,6 @@ module 0x42::m {
         receiver_ref(&s, 1);
         receiver_ref_mut(&mut s, 1);
         let (self,y) = (&mut s, 1);
-        self.x + 1
+        self.x + y
     }
 }

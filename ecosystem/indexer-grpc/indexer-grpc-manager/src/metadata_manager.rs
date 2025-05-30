@@ -212,7 +212,7 @@ impl MetadataManager {
 
                 for kv in &self.live_data_services {
                     let (address, live_data_service) = kv.pair();
-                    let unreachable = live_data_service.recent_states.back().map_or(false, |s| {
+                    let unreachable = live_data_service.recent_states.back().is_some_and(|s| {
                         Self::is_stale_timestamp(
                             s.timestamp.unwrap_or_default(),
                             Duration::from_secs(60),
@@ -247,7 +247,7 @@ impl MetadataManager {
                         historical_data_service
                             .recent_states
                             .back()
-                            .map_or(false, |s| {
+                            .is_some_and(|s| {
                                 Self::is_stale_timestamp(
                                     s.timestamp.unwrap_or_default(),
                                     Duration::from_secs(60),
@@ -342,9 +342,10 @@ impl MetadataManager {
             .fullnodes
             .iter()
             .filter(|fullnode| {
-                fullnode.recent_states.back().map_or(false, |s| {
-                    s.known_latest_version >= request.starting_version
-                })
+                fullnode
+                    .recent_states
+                    .back()
+                    .is_some_and(|s| s.known_latest_version >= request.starting_version)
             })
             .choose(&mut rng)
             .map(|kv| (kv.key().clone(), kv.value().client.clone()))

@@ -16,16 +16,9 @@ use move_vm_types::loaded_data::{
 };
 use std::sync::Arc;
 
-/// Maximal nodes which are allowed when converting to layout. This includes the types of
-/// fields for struct types.
-const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
-
-/// Maximal depth of a value in terms of type depth.
-const VALUE_DEPTH_MAX: u64 = 128;
-
 /// A trait allowing to convert runtime types into other types used throughout the stack.
 #[allow(private_bounds)]
-pub trait LayoutConverter: LayoutConverterBase {
+pub(crate) trait LayoutConverter: LayoutConverterBase {
     /// Converts a runtime type to a type layout.
     fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
@@ -74,19 +67,19 @@ pub(crate) trait LayoutConverterBase {
     // Layout
 
     fn check_type_layout_bounds(&self, node_count: u64, depth: u64) -> PartialVMResult<()> {
-        if node_count > MAX_TYPE_TO_LAYOUT_NODES {
+        if node_count > self.vm_config().layout_max_size {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
                     "Number of type nodes when constructing type layout exceeded the maximum of {}",
-                    MAX_TYPE_TO_LAYOUT_NODES
+                    self.vm_config().layout_max_size
                 )),
             );
         }
-        if depth > VALUE_DEPTH_MAX {
+        if depth > self.vm_config().layout_max_depth {
             return Err(
                 PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
                     "Depth of a layout exceeded the maximum of {} during construction",
-                    VALUE_DEPTH_MAX
+                    self.vm_config().layout_max_depth
                 )),
             );
         }
@@ -298,22 +291,7 @@ pub(crate) trait LayoutConverterBase {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        if *count > MAX_TYPE_TO_LAYOUT_NODES {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Number of type nodes when constructing type layout exceeded the maximum of {}",
-                    MAX_TYPE_TO_LAYOUT_NODES
-                )),
-            );
-        }
-        if depth > VALUE_DEPTH_MAX {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
-                    "Depth of a layout exceeded the maximum of {} during construction",
-                    VALUE_DEPTH_MAX
-                )),
-            );
-        }
+        self.check_type_layout_bounds(*count, depth)?;
         Ok(match ty {
             Type::Bool => MoveTypeLayout::Bool,
             Type::U8 => MoveTypeLayout::U8,
@@ -399,28 +377,23 @@ pub(crate) trait LayoutConverterBase {
 // --------------------------------------------------------------------------------------------
 // Layout converter based on ModuleStorage
 
-pub struct StorageLayoutConverter<'a> {
+pub(crate) struct StorageLayoutConverter<'a> {
     storage: &'a dyn ModuleStorage,
 }
 
 impl<'a> StorageLayoutConverter<'a> {
-    pub fn new(storage: &'a dyn ModuleStorage) -> Self {
+    pub(crate) fn new(storage: &'a dyn ModuleStorage) -> Self {
         Self { storage }
     }
 }
 
-impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
+impl LayoutConverterBase for StorageLayoutConverter<'_> {
     fn vm_config(&self) -> &VMConfig {
         self.storage.runtime_environment().vm_config()
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self.struct_name_index_map().idx_to_struct_name_ref(idx)?;
-        self.storage.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
+        self.storage.fetch_struct_ty_by_idx(&idx)
     }
 
     fn struct_name_index_map(&self) -> &StructNameIndexMap {
@@ -437,4 +410,4 @@ impl<'a> LayoutConverterBase for StorageLayoutConverter<'a> {
     }
 }
 
-impl<'a> LayoutConverter for StorageLayoutConverter<'a> {}
+impl LayoutConverter for StorageLayoutConverter<'_> {}

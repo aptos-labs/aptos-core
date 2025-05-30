@@ -10,6 +10,7 @@
 ///
 /// NOTE: on-chain config `0x1::state::ValidatorSet` implemented its own buffer.
 module aptos_framework::config_buffer {
+    use std::error;
     use std::string::String;
     use aptos_std::any;
     use aptos_std::any::Any;
@@ -31,6 +32,9 @@ module aptos_framework::config_buffer {
 
     /// Config buffer operations failed with permission denied.
     const ESTD_SIGNER_NEEDED: u64 = 1;
+
+    /// Function is deprecated.
+    const EDEPRECATED: u64 = 2;
 
     struct PendingConfigs has key {
         configs: SimpleMap<String, Any>,
@@ -65,11 +69,17 @@ module aptos_framework::config_buffer {
         simple_map::upsert(&mut configs.configs, key, value);
     }
 
+    #[deprecated]
+    /// Use `extract_v2` instead.
+    public fun extract<T: store>(): T {
+        abort(error::unavailable(EDEPRECATED))
+    }
+
     /// Take the buffered config `T` out (buffer cleared). Abort if the buffer is empty.
     /// Should only be used at the end of a reconfiguration.
     ///
     /// Typically used in `X::on_new_epoch()` where X is an on-chaon config.
-    public fun extract<T: store>(): T acquires PendingConfigs {
+    public(friend) fun extract_v2<T: store>(): T acquires PendingConfigs {
         let configs = borrow_global_mut<PendingConfigs>(@aptos_framework);
         let key = type_info::type_name<T>();
         let (_, value_packed) = simple_map::remove(&mut configs.configs, &key);
@@ -94,7 +104,7 @@ module aptos_framework::config_buffer {
         // Update and extract should work.
         upsert(DummyConfig { data: 999 });
         assert!(does_exist<DummyConfig>(), 1);
-        let config = extract<DummyConfig>();
+        let config = extract_v2<DummyConfig>();
         assert!(config == DummyConfig { data: 999 }, 1);
         assert!(!does_exist<DummyConfig>(), 1);
     }

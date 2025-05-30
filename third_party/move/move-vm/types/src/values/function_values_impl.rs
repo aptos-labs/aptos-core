@@ -93,12 +93,8 @@ impl Display for Closure {
         let Self(fun, captured) = self;
         let captured = fun
             .closure_mask()
-            .merge_placeholder_strings(
-                captured.len(),
-                captured.iter().map(|v| v.to_string()).collect(),
-            )
-            .unwrap_or_else(|| vec!["*invalid*".to_string()]);
-        write!(f, "{}({})", fun.to_stable_string(), captured.join(","))
+            .format_arguments(captured.iter().map(|v| v.to_string()).collect());
+        write!(f, "{}({})", fun.to_stable_string(), captured.join(", "))
     }
 }
 
@@ -112,9 +108,7 @@ impl VMValueCast<Closure> for Value {
     }
 }
 
-impl<'c, 'l, 'v> serde::Serialize
-    for SerializationReadyValue<'c, 'l, 'v, MoveFunctionLayout, Closure>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveFunctionLayout, Closure> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let Closure(fun, captured) = self.value;
         let fun_ext = self
@@ -173,9 +167,11 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
         let mask = read_required_value::<_, ClosureMask>(&mut seq)?;
-        let mut captured_layouts = vec![];
-        let mut captured = vec![];
-        for _ in 0..mask.captured_count() {
+
+        let num_captured_values = mask.captured_count() as usize;
+        let mut captured_layouts = Vec::with_capacity(num_captured_values);
+        let mut captured = Vec::with_capacity(num_captured_values);
+        for _ in 0..num_captured_values {
             let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
             match seq.next_element_seed(DeserializationSeed {
                 ctx: self.0.ctx,

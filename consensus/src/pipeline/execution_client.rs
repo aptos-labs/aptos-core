@@ -33,6 +33,7 @@ use aptos_config::config::{ConsensusConfig, ConsensusObserverConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_executor_types::ExecutorResult;
@@ -80,7 +81,7 @@ pub trait TExecutionClient: Send + Sync {
     async fn finalize_order(
         &self,
         blocks: &[Arc<PipelinedBlock>],
-        ordered_proof: LedgerInfoWithSignatures,
+        ordered_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;
 
@@ -355,6 +356,7 @@ impl TExecutionClient for ExecutionProxyClient {
             block_executor_onchain_config,
             transaction_deduper,
             randomness_enabled,
+            onchain_consensus_config.order_vote_enabled(),
         );
 
         maybe_rand_msg_tx
@@ -367,7 +369,7 @@ impl TExecutionClient for ExecutionProxyClient {
     async fn finalize_order(
         &self,
         blocks: &[Arc<PipelinedBlock>],
-        ordered_proof: LedgerInfoWithSignatures,
+        ordered_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
@@ -381,6 +383,11 @@ impl TExecutionClient for ExecutionProxyClient {
 
         for block in blocks {
             block.set_insertion_time();
+            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                tx.order_proof_tx
+                    .take()
+                    .map(|tx| tx.send(ordered_proof.clone()));
+            }
         }
 
         if execute_tx
@@ -389,7 +396,7 @@ impl TExecutionClient for ExecutionProxyClient {
                     .iter()
                     .map(|b| (**b).clone())
                     .collect::<Vec<PipelinedBlock>>(),
-                ordered_proof,
+                ordered_proof: ordered_proof.ledger_info().clone(),
                 callback,
             })
             .await
@@ -552,7 +559,7 @@ impl TExecutionClient for DummyExecutionClient {
     async fn finalize_order(
         &self,
         _: &[Arc<PipelinedBlock>],
-        _: LedgerInfoWithSignatures,
+        _: WrappedLedgerInfo,
         _: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         Ok(())

@@ -138,7 +138,7 @@ impl ExpectedMoveError {
     }
 }
 
-impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
+impl fmt::Display for ExpectedMoveErrorDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use move_binary_format::errors::Location;
         let Self {

@@ -109,7 +109,7 @@ spec aptos_framework::aptos_account {
     /// Check if the AptosCoin under the address existed.
     spec assert_account_is_registered_for_apt(addr: address) {
         pragma aborts_if_is_partial;
-        aborts_if !account::spec_exists_at(addr);
+        // aborts_if !account::spec_exists_at(addr);
         // TODO(fa_migration)
         //aborts_if !coin::spec_is_account_registered<AptosCoin>(addr);
     }

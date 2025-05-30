@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         dummy_field: bool,
@@ -8,27 +8,31 @@ module 0x8675309::M {
     }
     private fun t() {
         {
-          let s: S = pack M::S(false);
-          Copy(0);
-          Copy(s);
-          s;
-          0;
-          Tuple()
+          let u: u64 = 0;
+          {
+            let s: S = pack M::S(false);
+            Copy(u);
+            Copy(s);
+            s;
+            u;
+            Tuple()
+          }
         }
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
     }
     struct S has copy, drop {
     }
     fun t() {
+        let u = 0;
         let s = S{};
-        copy 0;
+        copy u;
         copy s;
         s;
-        0;
+        u;
     }
 }

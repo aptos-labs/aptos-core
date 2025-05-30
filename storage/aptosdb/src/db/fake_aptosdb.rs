@@ -31,6 +31,7 @@ use aptos_types::{
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
+    indexer::indexer_db_reader::IndexedTransactionSummary,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, position::Position, AccumulatorConsistencyProof,
@@ -739,7 +740,7 @@ impl DbReader for FakeAptosDB {
         self.inner.get_state_snapshot_before(next_version)
     }
 
-    fn get_account_transaction(
+    fn get_account_ordered_transaction(
         &self,
         address: aptos_types::PeerId,
         seq_num: u64,
@@ -747,19 +748,41 @@ impl DbReader for FakeAptosDB {
         ledger_version: Version,
     ) -> Result<Option<TransactionWithProof>> {
         self.inner
-            .get_account_transaction(address, seq_num, include_events, ledger_version)
+            .get_account_ordered_transaction(address, seq_num, include_events, ledger_version)
     }
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: aptos_types::PeerId,
         seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<aptos_types::transaction::AccountTransactionsWithProof> {
-        self.inner
-            .get_account_transactions(address, seq_num, limit, include_events, ledger_version)
+    ) -> Result<aptos_types::transaction::AccountOrderedTransactionsWithProof> {
+        self.inner.get_account_ordered_transactions(
+            address,
+            seq_num,
+            limit,
+            include_events,
+            ledger_version,
+        )
+    }
+
+    fn get_account_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<IndexedTransactionSummary>> {
+        self.inner.get_account_transaction_summaries(
+            address,
+            start_version,
+            end_version,
+            limit,
+            ledger_version,
+        )
     }
 
     fn get_state_proof_with_ledger_info(

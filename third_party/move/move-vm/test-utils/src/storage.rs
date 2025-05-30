@@ -265,6 +265,13 @@ impl InMemoryStorage {
         }
     }
 
+    pub fn max_binary_format_version(&self) -> u32 {
+        self.runtime_environment
+            .vm_config()
+            .deserializer_config
+            .max_binary_format_version
+    }
+
     /// Adds serialized module bytes to this storage.
     pub fn add_module_bytes(
         &mut self,

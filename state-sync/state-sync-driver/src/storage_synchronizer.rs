@@ -455,6 +455,7 @@ impl<
 }
 
 /// A simple container that holds the handles to the spawned storage synchronizer threads
+#[allow(dead_code)]
 pub struct StorageSynchronizerHandles {
     pub executor: JoinHandle<()>,
     pub ledger_updater: JoinHandle<()>,

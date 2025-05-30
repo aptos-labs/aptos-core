@@ -4,11 +4,14 @@
 use crate::{
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    LayoutConverter, LoadedFunction, StorageLayoutConverter, WithRuntimeEnvironment,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    LoadedFunction, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;
+#[cfg(fuzzing)]
+use move_binary_format::access::ModuleAccess;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
@@ -125,6 +128,16 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
+    /// Returns the module without verification, or [None] otherwise. The existing module can be
+    /// either in a cached state (it is then returned) or newly constructed. The error is returned
+    /// if the storage fails to fetch the deserialized module.
+    #[cfg(fuzzing)]
+    fn fetch_module_skip_verification(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>>;
+
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
     fn fetch_struct_ty(
@@ -136,18 +149,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         let module = self
             .fetch_existing_verified_module(address, module_name)
             .map_err(|err| err.to_partial())?;
-        Ok(module
-            .struct_map
-            .get(struct_name)
-            .and_then(|idx| module.structs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Struct {}::{}::{} does not exist",
-                    address, module_name, struct_name
-                ))
-            })?
-            .definition_struct_type
-            .clone())
+        module
+            .get_struct(struct_name)
+            .map_err(|err| err.to_partial())
     }
 
     fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
@@ -194,19 +198,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         let module = self.fetch_existing_verified_module(address, module_name)?;
-        let function = module
-            .function_map
-            .get(function_name)
-            .and_then(|idx| module.function_defs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!(
-                        "Function {}::{}::{} does not exist",
-                        address, module_name, function_name
-                    ))
-                    .finish(Location::Undefined)
-            })?
-            .clone();
+        let function = module.get_function(function_name)?;
         Ok((module, function))
     }
 
@@ -345,6 +337,37 @@ where
             self,
         )?))
     }
+
+    #[cfg(fuzzing)]
+    fn fetch_module_skip_verification(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>> {
+        let id = ModuleId::new(*address, module_name.to_owned());
+
+        // Look up the module in cache, if it is not there, we need to load it
+        let (module, version) = match self.get_module_or_build_with(&id, self)? {
+            Some(module_and_version) => module_and_version,
+            None => return Ok(None),
+        };
+
+        // If module is already verified, return it
+        if module.code().is_verified() {
+            return Ok(Some(module.code().verified().clone()));
+        }
+
+        // Otherwise, load the module and its dependencies without verification
+        let mut visited = HashSet::new();
+        visited.insert(id.clone());
+        Ok(Some(visit_dependencies_and_skip_verification(
+            id,
+            module,
+            version,
+            &mut visited,
+            self,
+        )?))
+    }
 }
 
 /// Visits the dependencies of the given module. If dependencies form a cycle (which should not be
@@ -444,6 +467,88 @@ where
     Ok(module.code().verified().clone())
 }
 
+/// Visits the dependencies of the given module and loads them without verification. If dependencies form a cycle,
+/// an error is returned.
+#[cfg(fuzzing)]
+fn visit_dependencies_and_skip_verification<T, E, V>(
+    module_id: ModuleId,
+    module: Arc<ModuleCode<CompiledModule, Module, E>>,
+    version: V,
+    visited: &mut HashSet<ModuleId>,
+    module_cache_with_context: &T,
+) -> VMResult<Arc<Module>>
+where
+    T: WithRuntimeEnvironment
+        + ModuleCache<
+            Key = ModuleId,
+            Deserialized = CompiledModule,
+            Verified = Module,
+            Extension = E,
+            Version = V,
+        > + ModuleCodeBuilder<
+            Key = ModuleId,
+            Deserialized = CompiledModule,
+            Verified = Module,
+            Extension = E,
+        >,
+    E: WithBytes + WithSize + WithHash,
+    V: Clone + Default + Ord,
+{
+    let runtime_environment = module_cache_with_context.runtime_environment();
+
+    // Step 2: Traverse and collect all immediate dependencies
+    let mut loaded_dependencies = vec![];
+    for (addr, name) in module.code().deserialized().immediate_dependencies_iter() {
+        let dependency_id = ModuleId::new(*addr, name.to_owned());
+
+        let (dependency, dependency_version) = module_cache_with_context
+            .get_module_or_build_with(&dependency_id, module_cache_with_context)?
+            .ok_or_else(|| module_linker_error!(addr, name))?;
+
+        // If dependency is already loaded, use it
+        if dependency.code().is_verified() {
+            loaded_dependencies.push(dependency.code().verified().clone());
+            continue;
+        }
+
+        if visited.insert(dependency_id.clone()) {
+            // Dependency is not loaded, and we have not visited it yet
+            let loaded_dependency = visit_dependencies_and_skip_verification(
+                dependency_id.clone(),
+                dependency,
+                dependency_version,
+                visited,
+                module_cache_with_context,
+            )?;
+            loaded_dependencies.push(loaded_dependency);
+        } else {
+            // We must have found a cycle otherwise
+            return Err(module_cyclic_dependency_error!(
+                dependency_id.address(),
+                dependency_id.name()
+            ));
+        }
+    }
+
+    // Create a new Module without verification
+    let code = Module::new(
+        runtime_environment.natives(),
+        module.extension().size_in_bytes(),
+        module.code().deserialized().clone(),
+        runtime_environment.struct_name_index_map(),
+    )
+    .map_err(|e| e.finish(Location::Undefined))?;
+
+    let verified_module = module_cache_with_context.insert_verified_module(
+        module_id,
+        code,
+        module.extension().clone(),
+        version,
+    )?;
+
+    Ok(verified_module.code().verified().clone())
+}
+
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
@@ -462,37 +567,7 @@ impl<T: ModuleStorage> AsFunctionValueExtension for T {
     }
 }
 
-impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
-    fn get_function_arg_tys(
-        &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        substitution_ty_arg_tags: Vec<TypeTag>,
-    ) -> PartialVMResult<Vec<Type>> {
-        let substitution_ty_args = substitution_ty_arg_tags
-            .into_iter()
-            .map(|tag| self.module_storage.fetch_ty(&tag))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-
-        let (_, function) = self
-            .module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            .map_err(|err| err.to_partial())?;
-
-        let ty_builder = &self
-            .module_storage
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        function
-            .param_tys()
-            .iter()
-            .map(|ty_to_substitute| {
-                ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-    }
-
+impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
     fn create_from_serialization_data(
         &self,
         data: SerializedFunctionData,
@@ -513,18 +588,32 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                     .runtime_environment()
                     .vm_config()
                     .ty_builder;
-                let instantiate = |ty: &Type| -> PartialVMResult<Type> {
-                    if fun.ty_args.is_empty() {
-                        Ok(ty.clone())
-                    } else {
-                        ty_builder.create_ty_with_subst(ty, &fun.ty_args)
-                    }
-                };
+
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()
-                    .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
+                    .map(|ty| {
+                        let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
+                            ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
+                        } else {
+                            let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                            ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
+                        };
+
+                        // Do not allow delayed fields to be serialized.
+                        if contains_delayed_fields {
+                            let err = PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                                .with_message(
+                                "Function values that capture delayed fields cannot be serialized"
+                                    .to_string(),
+                            );
+                            return Err(err);
+                        }
+
+                        Ok(layout)
+                    })
                     .collect::<PartialVMResult<Vec<_>>>()?;
+
                 Ok(SerializedFunctionData {
                     format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
                     module_id: fun

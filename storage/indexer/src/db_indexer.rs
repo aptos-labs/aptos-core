@@ -11,12 +11,12 @@ use aptos_db_indexer_schemas::{
     schema::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
         event_sequence_number::EventSequenceNumberSchema,
-        indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
-        transaction_by_account::TransactionByAccountSchema,
-        translated_v1_event::TranslatedV1EventSchema,
+        indexer_metadata::InternalIndexerMetadataSchema,
+        ordered_transaction_by_account::OrderedTransactionByAccountSchema,
+        state_keys::StateKeysSchema, translated_v1_event::TranslatedV1EventSchema,
     },
     utils::{
-        error_if_too_many_requested, get_first_seq_num_and_limit, AccountTransactionVersionIter,
+        error_if_too_many_requested, get_first_seq_num_and_limit, AccountOrderedTransactionsIter,
         MAX_REQUEST_LIMIT,
     },
 };
@@ -35,7 +35,7 @@ use aptos_types::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
     },
-    transaction::{AccountTransactionsWithProof, Transaction, Version},
+    transaction::{AccountOrderedTransactionsWithProof, ReplayProtector, Transaction, Version},
     write_set::{TransactionWrite, WriteSet},
 };
 use std::{
@@ -170,16 +170,16 @@ impl InternalIndexerDB {
         bail!("ledger version too new")
     }
 
-    pub fn get_account_transaction_version_iter(
+    pub fn get_account_ordered_transactions_iter(
         &self,
         address: AccountAddress,
         min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
-    ) -> Result<AccountTransactionVersionIter> {
-        let mut iter = self.db.iter::<TransactionByAccountSchema>()?;
+    ) -> Result<AccountOrderedTransactionsIter> {
+        let mut iter = self.db.iter::<OrderedTransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
-        Ok(AccountTransactionVersionIter::new(
+        Ok(AccountOrderedTransactionsIter::new(
             iter,
             address,
             min_seq_num
@@ -195,7 +195,7 @@ impl InternalIndexerDB {
         event_key: &EventKey,
     ) -> Result<Option<u64>> {
         let mut iter = self.db.iter::<EventByVersionSchema>()?;
-        iter.seek_for_prev(&(*event_key, ledger_version, u64::max_value()))?;
+        iter.seek_for_prev(&(*event_key, ledger_version, u64::MAX))?;
 
         Ok(iter.next().transpose()?.and_then(
             |((key, _version, seq), _idx)| if &key == event_key { Some(seq) } else { None },
@@ -417,12 +417,15 @@ impl DBIndexer {
         let mut event_keys: HashSet<EventKey> = HashSet::new();
         db_iter.try_for_each(|res| {
             let (txn, events, writeset) = res?;
-            if let Some(txn) = txn.try_as_signed_user_txn() {
+            if let Some(signed_txn) = txn.try_as_signed_user_txn() {
                 if self.indexer_db.transaction_enabled() {
-                    batch.put::<TransactionByAccountSchema>(
-                        &(txn.sender(), txn.sequence_number()),
-                        &version,
-                    )?;
+                    if let ReplayProtector::SequenceNumber(seq_num) = signed_txn.replay_protector()
+                    {
+                        batch.put::<OrderedTransactionByAccountSchema>(
+                            &(signed_txn.sender(), seq_num),
+                            &version,
+                        )?;
+                    }
                 }
             }
 
@@ -582,21 +585,21 @@ impl DBIndexer {
         }
     }
 
-    pub fn get_account_transactions(
+    pub fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof> {
+    ) -> Result<AccountOrderedTransactionsWithProof> {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
         let txns_with_proofs = self
             .indexer_db
-            .get_account_transaction_version_iter(address, start_seq_num, limit, ledger_version)?
+            .get_account_ordered_transactions_iter(address, start_seq_num, limit, ledger_version)?
             .map(|result| {
                 let (_seq_num, txn_version) = result?;
                 self.main_db_reader.get_transaction_by_version(
@@ -607,7 +610,7 @@ impl DBIndexer {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+        Ok(AccountOrderedTransactionsWithProof::new(txns_with_proofs))
     }
 
     pub fn get_prefixed_state_value_iterator(
@@ -651,7 +654,7 @@ impl DBIndexer {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-        let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
+        let get_latest = order == Order::Descending && start_seq_num == u64::MAX;
 
         let cursor = if get_latest {
             // Caller wants the latest, figure out the latest seq_num.

@@ -49,7 +49,7 @@ use aptos_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
-    transaction::SignedTransaction,
+    transaction::{ReplayProtector, SignedTransaction},
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
@@ -62,6 +62,7 @@ use tokio_stream::StreamExt;
 ///
 /// TODO: Add ability to mock StateSync updates to remove transactions
 /// TODO: Add ability to reject transactions via Consensus
+#[allow(dead_code)]
 pub struct MempoolNode {
     /// The [`CoreMempool`] storage of the node
     pub mempool: Arc<Mutex<CoreMempool>>,
@@ -164,7 +165,7 @@ impl MempoolNode {
         for txn in sign_transactions(txns) {
             self.mempool
                 .lock()
-                .commit_transaction(&txn.sender(), txn.sequence_number());
+                .commit_transaction(&txn.sender(), txn.replay_protector());
         }
     }
 
@@ -232,7 +233,13 @@ impl MempoolNode {
         &self,
         txns: &[TestTransaction],
         condition: Condition,
-    ) -> Result<(), (Vec<(AccountAddress, u64)>, Vec<(AccountAddress, u64)>)> {
+    ) -> Result<
+        (),
+        (
+            Vec<(AccountAddress, ReplayProtector)>,
+            Vec<(AccountAddress, ReplayProtector)>,
+        ),
+    > {
         let block = self
             .mempool
             .lock()
@@ -240,11 +247,11 @@ impl MempoolNode {
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()
-                .map(|txn| (txn.sender(), txn.sequence_number()))
+                .map(|txn| (txn.sender(), txn.replay_protector()))
                 .collect();
             let expected: Vec<_> = txns
                 .iter()
-                .map(|txn| (txn.address, txn.sequence_number))
+                .map(|txn| (txn.address, txn.replay_protector))
                 .collect();
             Err((actual, expected))
         } else {
@@ -392,11 +399,11 @@ impl MempoolNode {
                 if !block_only_contains_transactions(&transactions, expected_txns) {
                     let txns: Vec<_> = transactions
                         .iter()
-                        .map(|txn| (txn.sender(), txn.sequence_number()))
+                        .map(|txn| (txn.sender(), txn.replay_protector()))
                         .collect();
                     let expected_txns: Vec<_> = expected_txns
                         .iter()
-                        .map(|txn| (txn.address, txn.sequence_number))
+                        .map(|txn| (txn.address, txn.replay_protector))
                         .collect();
 
                     panic!(
@@ -415,11 +422,11 @@ impl MempoolNode {
                 if !block_only_contains_transactions(&transactions, expected_txns) {
                     let txns: Vec<_> = transactions
                         .iter()
-                        .map(|txn| (txn.sender(), txn.sequence_number()))
+                        .map(|txn| (txn.sender(), txn.replay_protector()))
                         .collect();
                     let expected_txns: Vec<_> = expected_txns
                         .iter()
-                        .map(|txn| (txn.address, txn.sequence_number))
+                        .map(|txn| (txn.address, txn.replay_protector))
                         .collect();
 
                     panic!(
@@ -683,9 +690,8 @@ fn mpsc_channel<T>() -> (
 pub fn test_transaction(seq_num: u64) -> TestTransaction {
     TestTransaction {
         address: TestTransaction::get_address(1),
-        sequence_number: seq_num,
+        replay_protector: ReplayProtector::SequenceNumber(seq_num),
         gas_price: 1,
-        account_seqno: 0,
         script: None,
     }
 }
@@ -722,7 +728,7 @@ pub fn block_contains_any_transaction(
 /// Tells us if a [`SignedTransaction`] block contains the [`TestTransaction`]
 fn block_contains_transaction(block: &[SignedTransaction], txn: &TestTransaction) -> bool {
     block.iter().any(|signed_txn| {
-        signed_txn.sequence_number() == txn.sequence_number
+        signed_txn.replay_protector() == txn.replay_protector
             && signed_txn.sender() == txn.address
             && signed_txn.gas_unit_price() == txn.gas_price
     })

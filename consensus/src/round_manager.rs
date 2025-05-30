@@ -901,11 +901,14 @@ impl RoundManager {
 
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
+                let vtxn_type_name = vtxn.type_name();
                 ensure!(
                     is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                     "unexpected validator txn: {:?}",
-                    vtxn.topic()
+                    vtxn_type_name
                 );
+                vtxn.verify(self.epoch_state.verifier.as_ref())
+                    .context(format!("{} verify failed", vtxn_type_name))?;
             }
         }
 
@@ -980,7 +983,7 @@ impl RoundManager {
             self.proposer_election.clone(),
         );
         ensure!(
-            proposal.block_data().failed_authors().map_or(false, |failed_authors| *failed_authors == expected_failed_authors),
+            proposal.block_data().failed_authors().is_some_and(|failed_authors| *failed_authors == expected_failed_authors),
             "[RoundManager] Proposal for block {} has invalid failed_authors list {:?}, expected {:?}",
             proposal.round(),
             proposal.block_data().failed_authors(),

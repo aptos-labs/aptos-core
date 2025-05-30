@@ -11,26 +11,29 @@ use aptos_crypto::{
     ValidCryptoMaterialStringExt,
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_transaction_simulation::{
     InMemoryStateStore, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
 };
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
+        ObjectGroupResource,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    state_store::{state_key::StateKey, table::TableHandle, TStateView},
+    state_store::{state_key::StateKey, table::TableHandle, MoveResourceExt, TStateView},
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
         EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
         Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
-    AptosCoinType,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
-use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+use aptos_vm_environment::{environment::AptosEnvironment, prod_configs::set_paranoid_type_checks};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use clap::Parser;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -54,7 +57,8 @@ use move_transactional_test_runner::{
     tasks::{InitCommand, SyntaxChoice, TaskInput},
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use move_vm_runtime::move_vm::SerializedReturnValues;
+use move_vm_runtime::{move_vm::SerializedReturnValues, AsFunctionValueExtension};
+use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -290,39 +294,81 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
     )
 }
 
-static APTOS_FRAMEWORK_FILES: Lazy<Vec<String>> = Lazy::new(|| {
-    aptos_cached_packages::head_release_bundle()
-        .files()
-        .unwrap()
-});
-
-static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
+fn compile_framework_sources(
+    all_source_files: Vec<String>,
+    language_version: Option<LanguageVersion>,
+) -> PrecompiledFilesModules {
     let named_address_mapping_strings: Vec<String> = aptos_framework::named_addresses()
         .iter()
         .map(|(string, num_addr)| format!("{}={}", string, num_addr))
         .collect();
 
     let options = move_compiler_v2::Options {
-        sources: aptos_cached_packages::head_release_bundle()
-            .files()
-            .unwrap(),
+        sources: all_source_files.clone(),
         dependencies: vec![],
-        named_address_mapping: named_address_mapping_strings,
+        named_address_mapping: named_address_mapping_strings.clone(),
         known_attributes: aptos_framework::extended_checks::get_all_attribute_names().clone(),
-        language_version: None,
+        language_version,
         ..move_compiler_v2::Options::default()
     };
 
-    let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options)
-        .expect("stdlib compilation succeeds");
-    PrecompiledFilesModules::new(APTOS_FRAMEWORK_FILES.clone(), modules)
+    let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options.clone())
+        .expect("framework compilation succeeds");
+
+    PrecompiledFilesModules::new(all_source_files, modules)
+}
+
+// aptos-experimental can be using latest language features, while others cannot.
+// So we need to compile it twice, once without aptos-experimental, and once with.
+
+static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
+    compile_framework_sources(
+        aptos_cached_packages::head_release_bundle()
+            .files()
+            .unwrap()
+            .iter()
+            .filter(|f| !f.contains("aptos-move/framework/aptos-experimental/sources"))
+            .cloned()
+            .collect::<Vec<_>>(),
+        None,
+    )
 });
+
+static PRECOMPILED_APTOS_FRAMEWORK_V2_WITH_EXPERIMENTAL: Lazy<PrecompiledFilesModules> =
+    Lazy::new(|| {
+        let named_address_mapping_strings: Vec<String> = aptos_framework::named_addresses()
+            .iter()
+            .map(|(string, num_addr)| format!("{}={}", string, num_addr))
+            .collect();
+
+        // aptos-experimental can be using latest language features, while others cannot.
+        // So we need to compile it twice, once without aptos-experimental, and once with.
+        // (in the second pass, we need to provide both, in case aptos-experimental depends on other modules)
+
+        let all_sources = aptos_cached_packages::head_release_bundle()
+            .files()
+            .unwrap();
+
+        let options = move_compiler_v2::Options {
+            sources: all_sources.clone(),
+            dependencies: vec![],
+            named_address_mapping: named_address_mapping_strings.clone(),
+            known_attributes: aptos_framework::extended_checks::get_all_attribute_names().clone(),
+            language_version: Some(LanguageVersion::latest()),
+            ..move_compiler_v2::Options::default()
+        };
+
+        let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options.clone())
+            .expect("framework compilation succeeds");
+
+        PrecompiledFilesModules::new(all_sources, modules)
+    });
 
 /**
  * Test Adapter Implementation
  */
 
-impl<'a> AptosTestAdapter<'a> {
+impl AptosTestAdapter<'_> {
     /// Look up the named private key in the mapping.
     fn resolve_named_private_key(&self, s: &IdentStr) -> Ed25519PrivateKey {
         if let Some(private_key) = self.private_key_mapping.get(s.as_str()) {
@@ -401,42 +447,13 @@ impl<'a> AptosTestAdapter<'a> {
 
     /// Obtain the AptosCoin amount under address `signer_addr`
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let aptos_coin_tag = CoinStoreResource::<AptosCoinType>::struct_tag();
-
-        let balance_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag)?)
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                    "Failed to fetch balance resource under address {}.",
-                    signer_addr
-                )
-            })?;
-
-        let annotated = AptosValueAnnotator::new(&self.storage)
-            .view_resource(&aptos_coin_tag, &balance_blob)?;
-
-        // Filter the Coin resource and return the resouce value
-        for (key, val) in annotated.value {
-            if key != Identifier::new("coin").unwrap() {
-                continue;
-            }
-
-            if let AnnotatedMoveValue::Struct(s) = val {
-                for (key, val) in s.value {
-                    if key != Identifier::new("value").unwrap() {
-                        continue;
-                    }
-
-                    if let AnnotatedMoveValue::U64(v) = val {
-                        return Ok(v);
-                    }
-                }
-            }
-        }
-
-        bail!("Failed to fetch balance under address {}.", signer_addr)
+        Ok(FungibleStoreResource::fetch_move_resource_from_group(
+            &self.storage,
+            &primary_apt_store(*signer_addr),
+            &ObjectGroupResource::struct_tag(),
+        )?
+        .unwrap()
+        .balance())
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched
@@ -1010,6 +1027,14 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             },
         }
     }
+
+    fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+        let environment = AptosEnvironment::new(&self.storage);
+        let code_storage = self.storage.as_aptos_code_storage(&environment);
+        ValueSerDeContext::new()
+            .with_func_args_deserialization(&code_storage.as_function_value_extension())
+            .deserialize(bytes, layout)
+    }
 }
 
 /**
@@ -1018,7 +1043,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
 struct PrettyEvent<'a>(&'a ContractEvent);
 
-impl<'a> fmt::Display for PrettyEvent<'a> {
+impl fmt::Display for PrettyEvent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{{")?;
         match self.0 {
@@ -1036,7 +1061,7 @@ impl<'a> fmt::Display for PrettyEvent<'a> {
 
 struct PrettyEvents<'a>(&'a [ContractEvent]);
 
-impl<'a> fmt::Display for PrettyEvents<'a> {
+impl fmt::Display for PrettyEvents<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Events:")?;
         for event in self.0.iter() {
@@ -1055,15 +1080,22 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
     }
 }
 
-fn precompiled_v2_stdlib() -> &'static PrecompiledFilesModules {
+fn precompiled_v2_framework() -> &'static PrecompiledFilesModules {
     &PRECOMPILED_APTOS_FRAMEWORK_V2
 }
 
+fn precompiled_v2_framework_with_experimental() -> &'static PrecompiledFilesModules {
+    &PRECOMPILED_APTOS_FRAMEWORK_V2_WITH_EXPERIMENTAL
+}
+
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
-        language_version: LanguageVersion::default(),
-        experiments: vec![("attach-compiled-module".to_owned(), true)],
-    })
+    run_aptos_test_with_config(
+        path,
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![(
+            "attach-compiled-module".to_owned(),
+            true,
+        )]),
+    )
 }
 
 pub fn run_aptos_test_with_config(
@@ -1071,7 +1103,18 @@ pub fn run_aptos_test_with_config(
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let suffix = Some(EXP_EXT.to_owned());
-    let v2_lib = precompiled_v2_stdlib();
+    let v2_lib = match &config {
+        // only latest language version can use experimental framework
+        TestRunConfig::CompilerV2 {
+            language_version, ..
+        } => {
+            if language_version == &LanguageVersion::latest() {
+                precompiled_v2_framework_with_experimental()
+            } else {
+                precompiled_v2_framework()
+            }
+        },
+    };
     set_paranoid_type_checks(true);
     run_test_impl::<AptosTestAdapter>(config, path, v2_lib, &suffix)
 }

@@ -20,11 +20,12 @@ use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource},
     chain_id::ChainId,
     state_store::MoveResourceExt,
-    transaction::Transaction,
+    transaction::{EntryFunction, Transaction, TransactionPayload},
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
+use move_core_types::{ident_str, language_storage::ModuleId};
 #[cfg(test)]
 use rand::SeedableRng;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
@@ -320,8 +321,7 @@ impl TransactionGenerator {
         let last_non_empty_phase = Arc::new(AtomicUsize::new(0));
         let transaction_generators = Mutex::new(transaction_generators);
         assert!(self.block_sender.is_some());
-        let num_senders_per_block =
-            (block_size + transactions_per_sender - 1) / transactions_per_sender;
+        let num_senders_per_block = block_size.div_ceil(transactions_per_sender);
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for i in 0..num_blocks {
@@ -448,10 +448,20 @@ impl TransactionGenerator {
                 Arc::new(AtomicUsize::new(0)),
                 |(sender_idx, new_account), account_cache| {
                     let sender = &account_cache.accounts[sender_idx];
-                    let payload = aptos_stdlib::aptos_account_transfer(
-                        new_account.authentication_key().account_address(),
-                        init_account_balance,
-                    );
+                    // Use special function to both transfer, and create account resource.
+                    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+                        ModuleId::new(
+                            AccountAddress::SEVEN,
+                            ident_str!("benchmark_utils").to_owned(),
+                        ),
+                        ident_str!("transfer_and_create_account").to_owned(),
+                        vec![],
+                        vec![
+                            bcs::to_bytes(&new_account.authentication_key().account_address())
+                                .unwrap(),
+                            bcs::to_bytes(&init_account_balance).unwrap(),
+                        ],
+                    ));
                     let txn = sender
                         .sign_with_transaction_builder(self.transaction_factory.payload(payload));
                     Some(Transaction::UserTransaction(txn))

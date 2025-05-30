@@ -626,7 +626,21 @@ fn initialize_account_abstraction(
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::Address(AccountAddress::ONE),
-            "daa_siws".to_string().as_move_value(),
+            "solana_derivable_account".to_string().as_move_value(),
+            "authenticate".to_string().as_move_value(),
+        ]),
+    );
+
+    exec_function(
+        session,
+        module_storage,
+        ACCOUNT_ABSTRACTION_MODULE_NAME,
+        "register_derivable_authentication_function",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Address(AccountAddress::ONE),
+            "ethereum_derivable_account".to_string().as_move_value(),
             "authenticate".to_string().as_move_value(),
         ]),
     );
@@ -1169,11 +1183,7 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
-        let stake_amount = if let Some(amount) = initial_stake {
-            amount
-        } else {
-            1
-        };
+        let stake_amount = initial_stake.unwrap_or(1);
         let data = Validator {
             owner_address,
             consensus_pubkey,

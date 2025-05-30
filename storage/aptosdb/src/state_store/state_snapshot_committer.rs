@@ -124,8 +124,8 @@ impl StateSnapshotCommitter {
 
                                         updates
                                             .iter()
-                                            .filter_map(|(k, db_update)| {
-                                                db_update.to_jmt_update_opt(k, min_version)
+                                            .filter_map(|(key, slot)| {
+                                                slot.maybe_update_jmt(key, min_version)
                                             })
                                             .collect_vec()
                                     };

@@ -10,7 +10,7 @@ use aptos_consensus_types::{
     utils::PayloadTxnsSize,
 };
 use aptos_crypto::HashValue;
-use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
+use aptos_types::{aggregate_signature::AggregateSignature, transaction::ReplayProtector, PeerId};
 use maplit::hashset;
 use std::{collections::HashSet, time::Duration};
 
@@ -155,10 +155,30 @@ async fn test_proof_calculate_remaining_txns_and_proofs() {
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
     let txns = vec![
-        TxnSummaryWithExpiration::new(PeerId::ONE, 0, now_in_secs + 1, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 1, now_in_secs + 1, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 2, now_in_secs + 1, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 3, now_in_secs + 1, HashValue::zero()),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(0),
+            now_in_secs + 1,
+            HashValue::zero(),
+        ),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(1),
+            now_in_secs + 1,
+            HashValue::zero(),
+        ),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(2),
+            now_in_secs + 1,
+            HashValue::zero(),
+        ),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(3),
+            now_in_secs + 1,
+            HashValue::zero(),
+        ),
     ];
 
     let author_0_batches = vec![
@@ -413,10 +433,30 @@ async fn test_proof_pull_proofs_with_duplicates() {
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
     let txns = vec![
-        TxnSummaryWithExpiration::new(PeerId::ONE, 0, now_in_secs + 2, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 1, now_in_secs + 1, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 2, now_in_secs + 3, HashValue::zero()),
-        TxnSummaryWithExpiration::new(PeerId::ONE, 3, now_in_secs + 4, HashValue::zero()),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(0),
+            now_in_secs + 2,
+            HashValue::zero(),
+        ),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(1),
+            now_in_secs + 1,
+            HashValue::zero(),
+        ),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(2),
+            now_in_secs + 3,
+            HashValue::zero(),
+        ),
+        TxnSummaryWithExpiration::new(
+            PeerId::ONE,
+            ReplayProtector::SequenceNumber(3),
+            now_in_secs + 4,
+            HashValue::zero(),
+        ),
     ];
 
     let author_0 = PeerId::random();

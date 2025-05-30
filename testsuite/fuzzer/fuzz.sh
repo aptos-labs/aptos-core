@@ -4,10 +4,11 @@ export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 # Nightly version control
 # Pin nightly-2024-02-12 because of https://github.com/google/oss-fuzz/issues/11626
-NIGHTLY_VERSION="nightly-2024-04-06"
+NIGHTLY_VERSION="nightly-2024-09-05"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
-CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")
+# "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip"
+CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip")
 
 # This save time excluding some features needed only for specific targets
 # Downside: fuzzers which require  specific features need to recompile all dependencies
@@ -99,6 +100,9 @@ function usage() {
         "run")
             echo "Usage: $0 run <fuzz_target> [testcase]"
             ;;
+        "samply")
+            echo "Usage: $0 samply <fuzz_target> <testcase>"
+            ;;
         "test")
             echo "Usage: $0 test"
             ;;
@@ -106,7 +110,7 @@ function usage() {
             echo "Usage: $0 tmin <fuzz_target> <crashing_input>"
             ;;
         *)
-            echo "Usage: $0 <add|block-builder|block-builder-recursive|build|build-oss-fuzz|clean-coverage|cmin|coverage|debug|flamegraph|list|monitor-coverage|run|test|tmin>"
+            echo "Usage: $0 <add|block-builder|block-builder-recursive|build|build-oss-fuzz|clean-coverage|cmin|coverage|debug|flamegraph|list|monitor-coverage|run|samply|test|tmin>"
             echo "    add                   adds a new fuzz target"
             echo "    block-builder         runs rust tool to help build fuzzers"
             echo "    block-builder-recursive runs block-builder on all Move.toml files in directory"
@@ -120,6 +124,7 @@ function usage() {
             echo "    list                 lists existing fuzz targets"
             echo "    monitor-coverage     monitors coverage for a fuzz target"
             echo "    run                  runs a fuzz target"
+            echo "    samply               runs a fuzz target with a testcase to sample it"
             echo "    test                 tests all fuzz targets"
             echo "    tmin                 minimizes a crashing input for a target"
             ;;
@@ -197,7 +202,6 @@ function build-oss-fuzz() {
         git -C "$wd/../.." apply "$patch"
     done
 
-
     # Workaround for build failures on oss-fuzz
     # Owner: @zi0Black
     # Issue: Some dependencies requires to compile C/C++ code and it result in build failure on oss-fuzz using provided flags.
@@ -212,12 +216,12 @@ function build-oss-fuzz() {
     clang --version
 
     # Limit the number of parallel jobs to avoid OOM
-    # export CARGO_BUILD_JOBS = 3
+    export CARGO_BUILD_JOBS=4
 
     # Build the fuzz targets
     # Doing one target at the time should prevent OOM, but use all thread while bulding dependecies
     for fuzz_target in $(list); do
-        if ! build $fuzz_target ./target ; then
+        if ! build $fuzz_target ./target ""; then
             env
             error "Build failed. Exiting."
         fi
@@ -229,6 +233,10 @@ function build-oss-fuzz() {
     for corpus_zip in "${CORPUS_ZIPS[@]}"; do
         wget --content-disposition -P "$oss_fuzz_out" "$corpus_zip"
     done
+
+    # Hack to reuse the same seed corpus for both fuzz targets
+    cp "$oss_fuzz_out/move_aptosvm_publish_and_run_seed_corpus.zip" "$oss_fuzz_out/move_aptosvm_publish_seed_corpus.zip"
+    cp "$oss_fuzz_out/move_aptosvm_publish_and_run_seed_corpus.zip" "$oss_fuzz_out/move_bytecode_verifier_compiled_modules_seed_corpus.zip"
 }
 
 function cmin() {
@@ -310,7 +318,7 @@ function debug() {
     fi
     info "Debugging $fuzz_target with $testcase"
     # find the binary
-    binary=$(find ./target -name $fuzz_target -type f -perm /111)
+    binary=$(find ./target/*/release/ -name $fuzz_target -type f -perm /111)
     if [ -z "$binary" ]; then
         error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
     fi
@@ -354,7 +362,7 @@ function run() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 #-ignore_crashes=1
     else
-        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
+        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=10 #-ignore_crashes=1
     fi
 }
 
@@ -467,6 +475,30 @@ function tmin() {
     cargo_fuzz tmin $features --sanitizer address -O $fuzz_target "$input_case"
 }
 
+function samply() {
+    if [ -z "$2" ]; then
+        usage samply
+    fi
+    # check if samply is installed
+    if ! command -v samply &> /dev/null; then
+        info "samply is not installed. Installing..."
+        cargo install --locked samply
+    fi
+    fuzz_target=$1
+    testcase=$2
+    if [ ! -e "$testcase" ]; then
+        error "$testcase does not exist"
+    fi
+    # find the binary
+    binary=$(find ./target/*/release/ -name $fuzz_target -type f -perm /111)
+    if [ -z "$binary" ]; then
+        info "Building $fuzz_target"
+        build "$fuzz_target"
+    fi
+    info "Sampling $fuzz_target with $testcase"
+    command samply record "$binary" "$testcase"
+}
+
 case "$1" in
   "add")
     shift
@@ -515,6 +547,10 @@ case "$1" in
   "run")
     shift
     run  "$@"
+    ;;
+  "samply")
+    shift
+    samply "$@"
     ;;
   "test")
     shift

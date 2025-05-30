@@ -1,0 +1,158 @@
+
+Diagnostics:
+warning: friend inline function `foo` cannot be called from all locations it is accessible
+   ┌─ tests/visibility-checker/inline_with_warning_03.move:12:31
+   │
+ 9 │         secret() + secret()
+   │         -------- inline expansion calls private function that may not be accessible in all locations that `m::foo` can be called
+   ·
+12 │     public(friend) inline fun foo(): u64 {
+   │                               ^^^ if called from a location where `m::secret` is not accessible, such as in a friend module of `0xc0ffee::m`
+13 │         blah() + blah()
+   │         ------ from a call inlined at this callsite
+
+warning: friend inline function `foo` cannot be called from all locations it is accessible
+   ┌─ tests/visibility-checker/inline_with_warning_03.move:32:31
+   │
+29 │         secret() + secret()
+   │         -------- inline expansion calls private function that may not be accessible in all locations that `o::foo` can be called
+   ·
+32 │     public(friend) inline fun foo(): u64 {
+   │                               ^^^ if called from a location where `o::secret` is not accessible, such as in a (future) friend module of `0xc0ffee::o`
+33 │         blah() + blah()
+   │         ------ from a call inlined at this callsite
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private inline fun blah(): u64 {
+        Add<u64>(m::secret(), m::secret())
+    }
+    friend inline fun foo(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(m::secret(), m::secret())
+        }, {
+          let (): ();
+          Add<u64>(m::secret(), m::secret())
+        })
+    }
+    private fun secret(): u64 {
+        42
+    }
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(m::secret(), m::secret())
+          }, {
+            let (): ();
+            Add<u64>(m::secret(), m::secret())
+          })
+        }, 168) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+} // end 0xc0ffee::n
+module 0xc0ffee::o {
+    private inline fun blah(): u64 {
+        Add<u64>(o::secret(), o::secret())
+    }
+    friend inline fun foo(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(o::secret(), o::secret())
+        }, {
+          let (): ();
+          Add<u64>(o::secret(), o::secret())
+        })
+    }
+    private fun secret(): u64 {
+        42
+    }
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(o::secret(), o::secret())
+          }, {
+            let (): ();
+            Add<u64>(o::secret(), o::secret())
+          })
+        }, 168) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::o
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    inline fun blah(): u64 {
+        secret() + secret()
+    }
+    friend inline fun foo(): u64 {
+        {
+            let ();
+            secret() + secret()
+        } + {
+            let ();
+            secret() + secret()
+        }
+    }
+    fun secret(): u64 {
+        42
+    }
+    fun test() {
+        if ({
+            let ();
+            {
+                let ();
+                secret() + secret()
+            } + {
+                let ();
+                secret() + secret()
+            }
+        } == 168) () else abort 14566554180833181696;
+    }
+}
+module 0xc0ffee::n {
+}
+module 0xc0ffee::o {
+    inline fun blah(): u64 {
+        secret() + secret()
+    }
+    friend inline fun foo(): u64 {
+        {
+            let ();
+            secret() + secret()
+        } + {
+            let ();
+            secret() + secret()
+        }
+    }
+    fun secret(): u64 {
+        42
+    }
+    fun test() {
+        if ({
+            let ();
+            {
+                let ();
+                secret() + secret()
+            } + {
+                let ();
+                secret() + secret()
+            }
+        } == 168) () else abort 14566554180833181696;
+    }
+}

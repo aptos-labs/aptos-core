@@ -1,0 +1,163 @@
+
+Diagnostics:
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:10:5
+   │
+10 │     x = x;
+   │     ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:16:5
+   │
+16 │     x1 = x1;
+   │     ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:17:5
+   │
+17 │     x1.f = x1.f;
+   │     ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:19:5
+   │
+19 │     y.x1.f = y.x1.f;
+   │     ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:24:9
+   │
+24 │     let x = x;
+   │         ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:26:9
+   │
+26 │     let x1 = x1;
+   │         ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:34:5
+   │
+34 │     y2 = y2;
+   │     ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:35:5
+   │
+35 │     *y2 = *y2;
+   │     ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:36:5
+   │
+36 │     (*y2).x2 = (*y2).x2;
+   │     ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:37:5
+   │
+37 │     y2.x2 = y2.x2;
+   │     ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:44:5
+   │
+44 │     (*y2).x2 = (*y2).x2;
+   │     ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:45:5
+   │
+45 │     (*y2).x2 = y2.x2;
+   │     ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:46:5
+   │
+46 │     y2.x2 = (*y2).x2;
+   │     ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:51:5
+   │
+51 │     pair.0 = pair.0;
+   │     ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:52:5
+   │
+52 │     pair = pair;
+   │     ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:59:5
+   │
+59 │     v1 = v1;
+   │     ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:70:5
+   │
+70 │     e = e;
+   │     ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.
+
+warning: [lint] This is an unnecessary self assignment. Consider removing it.
+   ┌─ tests/model_ast_lints/self_assignment.move:71:5
+   │
+71 │     e.x = e.x;
+   │     ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(self_assignment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#self_assignment.

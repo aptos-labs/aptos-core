@@ -8,7 +8,7 @@ error: reference type `&mut u64` is not allowed as a type argument
   │
   = required by instantiating vector type parameter
 
-error: expected `&mut` but `&` was provided
+error: expected `&mut u64` but found a value of type `&u64` (mutability mismatch)
   ┌─ tests/checking/typing/vector_mismatched_args_non_base_type.move:7:26
   │
 7 │         vector<&mut u64>[&0];
