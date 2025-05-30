@@ -54,8 +54,12 @@ pub enum BlockType {
     /// Proposal with extensions (e.g. system transactions).
     ProposalExt(ProposalExt),
 
+    /// Optimistic proposal.
+    OptProposal(OptProposalExt),
+
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
+    #[serde(skip_deserializing)]
     DAGBlock {
         author: Author,
         failed_authors: Vec<(Round, Author)>,
@@ -65,9 +69,6 @@ pub enum BlockType {
         parent_block_id: HashValue,
         parents_bitvec: BitVec,
     },
-
-    /// Optimistic proposal.
-    OptProposal(OptProposalExt),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
@@ -107,19 +108,28 @@ impl CryptoHash for BlockData {
     type Hasher = BlockDataHasher;
 
     fn hash(&self) -> HashValue {
+        #[derive(Serialize)]
+        struct OptBlockDataForHash<'a> {
+            epoch: u64,
+            round: Round,
+            timestamp_usecs: u64,
+            quorum_cert_vote_data: &'a VoteData,
+            block_type: &'a BlockType,
+        }
+
         let mut state = Self::Hasher::default();
         if self.is_opt_block() {
-            state.update(&self.epoch.to_be_bytes());
-            state.update(&self.round.to_be_bytes());
-            state.update(&self.timestamp_usecs.to_be_bytes());
-            state.update(
-                &bcs::to_bytes(self.quorum_cert().vote_data())
-                    .expect("Unable to serialize quorum cert vote data"),
-            );
-            state
-                .update(&bcs::to_bytes(self.block_type()).expect("Unable to serialize block type"));
+            let opt_block_data_for_hash = OptBlockDataForHash {
+                epoch: self.epoch,
+                round: self.round,
+                timestamp_usecs: self.timestamp_usecs,
+                quorum_cert_vote_data: self.quorum_cert.vote_data(),
+                block_type: &self.block_type,
+            };
+            bcs::serialize_into(&mut state, &opt_block_data_for_hash)
+                .expect("OptBlockDataForHash must be serializable");
         } else {
-            bcs::serialize_into(&mut state, &self).expect("Failed to serialize BlockData");
+            bcs::serialize_into(&mut state, &self).expect("BlockData must be serializable");
         }
         state.finish()
     }
@@ -392,8 +402,8 @@ impl BlockData {
         }
     }
 
-    // Converting OptBlockData to BlockData
-    // by adding QC and failed_authors
+    /// Returns an instance of BlockData by converting the OptBlockData to BlockData
+    /// and adding QC and failed_authors
     pub fn new_from_opt(
         opt_block_data: OptBlockData,
         quorum_cert: QuorumCert,

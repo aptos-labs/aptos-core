@@ -76,20 +76,18 @@ impl OptBlockData {
         self.round
     }
 
-    #[allow(unexpected_cfgs)]
     pub fn verify_well_formed(&self) -> anyhow::Result<()> {
         let parent = self.parent();
         let grandparent_qc = self.grandparent_qc().certified_block();
-        // TODO(ibalajiarun): probably should check for consecutive round numbers.
         ensure!(
-            grandparent_qc.round() < parent.round(),
-            "Block's parent's round {} must be greater than grandparent's round {}",
+            grandparent_qc.round() + 1 == parent.round(),
+            "Block's parent's round {} must be one more than grandparent's round {}",
             parent.round(),
             grandparent_qc.round(),
         );
         ensure!(
-            parent.round() < self.round(),
-            "Block's round {} must be greater than parent's round {}",
+            parent.round() + 1 == self.round(),
+            "Block's round {} must be one more than parent's round {}",
             self.round(),
             parent.round(),
         );
