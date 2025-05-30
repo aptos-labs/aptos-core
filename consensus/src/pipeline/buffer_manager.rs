@@ -714,7 +714,7 @@ impl BufferManager {
             if !new_item.is_aggregated()
                 && commit_proof.ledger_info().commit_info().id() == block_id
             {
-                new_item = new_item.try_advance_to_aggregated_with_ledger_info(commit_proof)
+                new_item = new_item.try_advance_to_aggregated_with_ledger_info(commit_proof, None)
             }
         }
 
@@ -779,7 +779,11 @@ impl BufferManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
+    fn process_commit_message(
+        &mut self,
+        commit_msg_sender_address: AccountAddress,
+        commit_msg: IncomingCommitRequest,
+    ) -> Option<HashValue> {
         let IncomingCommitRequest {
             req,
             protocol,
@@ -842,6 +846,7 @@ impl BufferManager {
                     let item = self.buffer.take(&cursor);
                     let new_item = item.try_advance_to_aggregated_with_ledger_info(
                         commit_proof.ledger_info().clone(),
+                        Some(commit_msg_sender_address),
                     );
                     let aggregated = new_item.is_aggregated();
                     self.buffer.set(&cursor, new_item);
@@ -963,14 +968,17 @@ impl BufferManager {
         let epoch_state = self.epoch_state.clone();
         let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
-            while let Some((sender, commit_msg)) = commit_msg_rx.next().await {
+            while let Some((commit_msg_sender_address, commit_msg)) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
                     .spawn(async move {
-                        match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
+                        match commit_msg
+                            .req
+                            .verify(commit_msg_sender_address, &epoch_state_clone.verifier)
+                        {
                             Ok(_) => {
-                                let _ = tx.unbounded_send(commit_msg);
+                                let _ = tx.unbounded_send((commit_msg_sender_address, commit_msg));
                             },
                             Err(e) => warn!("Invalid commit message: {}", e),
                         }
@@ -1034,9 +1042,9 @@ impl BufferManager {
                     self.highest_committed_round = round;
                     self.pending_commit_blocks = self.pending_commit_blocks.split_off(&(round + 1));
                 },
-                Some(rpc_request) = verified_commit_msg_rx.next() => {
+                Some((commit_msg_sender_address, commit_msg)) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
+                    if let Some(aggregated_block_id) = self.process_commit_message(commit_msg_sender_address, commit_msg) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root();
