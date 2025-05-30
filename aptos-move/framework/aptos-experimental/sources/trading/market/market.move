@@ -374,10 +374,27 @@ module aptos_experimental::market {
         metadata: M,
         order_id: u64,
         num_fills: u64,
+        emit_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         // Validate that the order is valid from position management perspective
         if (time_in_force == TIME_IN_FORCE_IOC) {
+            return self.cancel_order_internal(
+                user_addr,
+                price,
+                order_id,
+                orig_size,
+                remaining_size,
+                is_bid,
+                false, // is_taker
+                OrderCancellationReason::IOCViolation,
+                std::string::utf8(b"IOC Violation"),
+                num_fills,
+                callbacks
+            );
+        };
+
+        if (emit_order_open) {
             event::emit(
                 OrderEvent {
                     parent: self.parent,
@@ -385,27 +402,15 @@ module aptos_experimental::market {
                     order_id,
                     user: user_addr,
                     orig_size,
-                    remaining_size: 0,
-                    size_delta: remaining_size,
+                    remaining_size,
+                    size_delta: orig_size,
                     price,
                     is_buy: is_bid,
                     is_taker: false,
-                    status: ORDER_STATUS_CANCELLED,
-                    details: std::string::utf8(b"IOC_VIOLATION")
+                    status: ORDER_STATUS_OPEN,
+                    details: std::string::utf8(b"")
                 }
             );
-            callbacks.cleanup_order(
-                user_addr,
-                order_id,
-                is_bid,
-                remaining_size,
-            );
-            return OrderMatchResult {
-                order_id,
-                remaining_size,
-                cancel_reason: option::some(OrderCancellationReason::IOCViolation),
-                num_fills
-            };
         };
 
         callbacks.place_maker_order(
@@ -475,7 +480,7 @@ module aptos_experimental::market {
         );
     }
 
-    fun cancel_taker_order_internal<M: store + copy + drop>(
+    fun cancel_order_internal<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
         price: u64,
@@ -483,6 +488,7 @@ module aptos_experimental::market {
         orig_size: u64,
         size_delta: u64,
         is_bid: bool,
+        is_taker: bool,
         cancel_reason: OrderCancellationReason,
         cancel_details: String,
         num_fills: u64,
@@ -499,7 +505,7 @@ module aptos_experimental::market {
                 size_delta,
                 price,
                 is_buy: is_bid,
-                is_taker: true,
+                is_taker,
                 status: ORDER_STATUS_CANCELLED,
                 details: cancel_details
             }
@@ -552,13 +558,14 @@ module aptos_experimental::market {
                 remaining_size,
                 metadata
             )) {
-            return self.cancel_taker_order_internal(
+            return self.cancel_order_internal(
                 user_addr,
                 price,
                 order_id,
                 orig_size,
                 0, // 0 because order was never placed
                 is_bid,
+                true, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
                 std::string::utf8(b"Position Update violation"),
                 0,
@@ -598,6 +605,7 @@ module aptos_experimental::market {
                 metadata,
                 order_id,
                 0, // num_fills
+                false,
                 callbacks
             );
         };
@@ -605,13 +613,14 @@ module aptos_experimental::market {
         // NOTE: We should always use is_taker: true for this order past this
         // point so that indexer can consistently track the order's status
         if (time_in_force == TIME_IN_FORCE_POST_ONLY) {
-            return self.cancel_taker_order_internal(
+            return self.cancel_order_internal(
                 user_addr,
                 price,
                 order_id,
                 orig_size,
                 remaining_size,
                 is_bid,
+                true, // is_taker
                 OrderCancellationReason::PostOnlyViolation,
                 std::string::utf8(b"Post Only violation"),
                 0,
@@ -706,13 +715,14 @@ module aptos_experimental::market {
 
             let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
             if (taker_cancellation_reason.is_some()) {
-                let result = self.cancel_taker_order_internal(
+                let result = self.cancel_order_internal(
                     user_addr,
                     price,
                     order_id,
                     orig_size,
                     remaining_size,
                     is_bid,
+                    true, // is_taker
                     OrderCancellationReason::ClearinghouseSettleViolation,
                     taker_cancellation_reason.destroy_some(),
                     num_fills,
@@ -753,73 +763,62 @@ module aptos_experimental::market {
                 self.order_book.is_taker_order(price, is_bid, option::none());
             if (!is_taker_order) {
                 if (time_in_force == TIME_IN_FORCE_IOC) {
-                    return self.cancel_taker_order_internal(
+                    return self.cancel_order_internal(
                         user_addr,
                         price,
                         order_id,
                         orig_size,
                         remaining_size,
                         is_bid,
+                        true, // is_taker
                         OrderCancellationReason::IOCViolation,
                         std::string::utf8(b"IOC_VIOLATION"),
                         num_fills,
                         callbacks
                     );
-                };
-                event::emit(
-                    OrderEvent {
-                        parent: self.parent,
-                        market: self.market,
-                        order_id,
-                        user: user_addr,
-                        orig_size,
-                        remaining_size,
-                        size_delta: orig_size,
-                        price,
-                        is_buy: is_bid,
-                        is_taker: false,
-                        status: ORDER_STATUS_OPEN,
-                        details: std::string::utf8(b"")
-                    }
-                );
-                self.order_book.place_maker_order(
-                    new_order_request(
+                } else {
+                    // If the order is not a taker order, then we can place it as a maker order
+                    return self.place_maker_order_internal(
                         user_addr,
-                        order_id,
-                        option::none(),
                         price,
                         orig_size,
                         remaining_size,
                         is_bid,
+                        time_in_force,
                         trigger_condition,
-                        metadata
-                    )
-                );
-                break;
+                        metadata,
+                        order_id,
+                        num_fills,
+                        true, // emit_order_open
+                        callbacks
+                    );
+                };
             };
 
             if (num_fills >= max_fill_limit) {
                 if (cancel_on_fill_limit) {
-                    return self.cancel_taker_order_internal(
+                    return self.cancel_order_internal(
                         user_addr,
                         price,
                         order_id,
                         orig_size,
                         remaining_size,
                         is_bid,
+                        true, // is_taker
                         OrderCancellationReason::MaxFillLimitViolation,
                         std::string::utf8(b"Max fill limit reached"),
                         num_fills,
                         callbacks
                     );
-                };
-                return OrderMatchResult {
-                    order_id,
-                    remaining_size,
-                    cancel_reason: option::some(
-                        OrderCancellationReason::MaxFillLimitViolation
-                    ),
-                    num_fills
+                } else {
+                    return OrderMatchResult {
+                        order_id,
+                        remaining_size,
+                        cancel_reason: option::some(
+                            OrderCancellationReason::MaxFillLimitViolation
+                        ),
+                        num_fills
+                    }
                 };
             };
         };
