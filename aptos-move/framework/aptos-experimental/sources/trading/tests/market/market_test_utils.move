@@ -3,6 +3,7 @@ module aptos_experimental::market_test_utils {
     use std::option;
     use std::option::Option;
     use std::signer;
+    use aptos_std::debug::print;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore};
     use aptos_experimental::market_types::MarketClearinghouseCallbacks;
 
@@ -41,6 +42,7 @@ module aptos_experimental::market_test_utils {
             callbacks
         );
         let events = latest_emitted_events<OrderEvent>(event_store, option::none());
+        print(&events.length());
         if (!is_cancelled) {
             assert!(events.length() == 1);
         } else {
@@ -67,7 +69,7 @@ module aptos_experimental::market_test_utils {
                 market.get_market(),
                 user_addr,
                 size,
-                size,
+                0, // Remaining size is always 0 when the order is cancelled
                 size,
                 price,
                 is_buy,
@@ -287,8 +289,8 @@ module aptos_experimental::market_test_utils {
                 market.get_market(),
                 taker_addr,
                 size,
-                size - total_fill_size,
-                total_fill_size,
+                0, // Remaining size is always 0 when the order is cancelled
+                size - taker_total_fill,
                 taker_price,
                 is_buy,
                 true,

@@ -37,7 +37,7 @@ module aptos_experimental::clearinghouse_test {
         move_to(admin, GlobalState { user_positions: table::new() });
     }
 
-    public(package) fun validate_settlement_update(): bool {
+    public(package) fun validate_order_placement(): bool {
         return true
     }
 
@@ -104,7 +104,7 @@ module aptos_experimental::clearinghouse_test {
                 settle_trade(taker, maker, size, is_taker_long)
             },
             | _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
-                validate_settlement_update()
+                validate_order_placement()
             },
             |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
                 // place_maker_order is not used in this test
@@ -125,7 +125,7 @@ module aptos_experimental::clearinghouse_test {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
             | _account, _order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
-                validate_settlement_update()
+                validate_order_placement()
             },
             |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
                 // place_maker_order is not used in this test
