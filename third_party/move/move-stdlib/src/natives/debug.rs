@@ -179,14 +179,15 @@ mod testing {
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
-        match annotated_type_layout {
-            MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
-            _ => Err(
+        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) = annotated_type_layout {
+            Ok(annotated_struct_layout)
+        } else {
+            Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
                     "Could not convert Type to fully-annotated MoveTypeLayout via NativeContext"
                         .to_string(),
                 ),
-            ),
+            )
         }
     }
 
@@ -258,14 +259,27 @@ mod testing {
         single_line: bool,
         include_int_types: bool,
     ) -> PartialVMResult<()> {
-        // get type layout in VM format
-        let ty_layout = context.type_to_type_layout(&ty)?;
+        // Get type layout in VM format. We do not expect to see any delayed fields here.
+        let ty_layout = context
+            .type_to_type_layout_with_delayed_fields(&ty)?
+            .into_layout_when_has_no_delayed_fields()
+            .ok_or_else(|| {
+                PartialVMError::new_invariant_violation("Delayed fields should not be printed")
+            })?;
 
         match &ty_layout {
             MoveTypeLayout::Vector(_) => {
-                // get the inner type T of a vector<T>
+                // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
+                // in the debug context.
                 let inner_ty = get_vector_inner_type(&ty)?;
-                let inner_tyl = context.type_to_type_layout(inner_ty)?;
+                let inner_tyl = context
+                    .type_to_type_layout_with_delayed_fields(inner_ty)?
+                    .into_layout_when_has_no_delayed_fields()
+                    .ok_or_else(|| {
+                        PartialVMError::new_invariant_violation(
+                            "Delayed fields should not be printed",
+                        )
+                    })?;
 
                 match inner_tyl {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because
