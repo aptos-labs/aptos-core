@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
+use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
@@ -27,6 +27,7 @@ pub enum Matcher {
     BlockEpochLessThan(u64), // Matches transactions in blocks with epochs less than the specified value
     MatchesAllOf(Vec<Matcher>), // Matches transactions that satisfy all the provided conditions (i.e., logical AND)
     AccountAddress(AccountAddress), // Matches transactions that involve a specific account address
+    PublicKey(AnyPublicKey),    // Matches transactions that involve a specific public key
 }
 
 impl Matcher {
@@ -60,7 +61,22 @@ impl Matcher {
                     || matches_script_argument_address(txn, address)
                     || matches_transaction_authenticator_address(txn, address)
             },
+            Matcher::PublicKey(public_key) => {
+                matches_transaction_authenticator_public_key(txn, public_key)
+            },
         }
+    }
+}
+
+/// Returns true iff the Ed25519 public key matches the given AnyPublicKey
+fn compare_ed25519_public_key(
+    ed25519_public_key: &Ed25519PublicKey,
+    any_public_key: &AnyPublicKey,
+) -> bool {
+    if let AnyPublicKey::Ed25519 { public_key } = any_public_key {
+        ed25519_public_key == public_key
+    } else {
+        false
     }
 }
 
@@ -117,6 +133,35 @@ fn matches_account_authenticator_address(
         AccountAuthenticator::Abstraction { function_info, .. } => {
             function_info.module_address == *address
         },
+    }
+}
+
+/// Returns true iff the account authenticator contains the given public key
+fn matches_account_authenticator_public_key(
+    account_authenticator: &AccountAuthenticator,
+    any_public_key: &AnyPublicKey,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match account_authenticator {
+        AccountAuthenticator::NoAccountAuthenticator | AccountAuthenticator::Abstraction { .. } => {
+            false
+        },
+        AccountAuthenticator::Ed25519 { public_key, .. } => {
+            compare_ed25519_public_key(public_key, any_public_key)
+        },
+        AccountAuthenticator::MultiEd25519 { public_key, .. } => {
+            public_key.public_keys().iter().any(|ed25519_public_key| {
+                compare_ed25519_public_key(ed25519_public_key, any_public_key)
+            })
+        },
+        AccountAuthenticator::SingleKey { authenticator } => {
+            authenticator.public_key() == any_public_key
+        },
+        AccountAuthenticator::MultiKey { authenticator } => authenticator
+            .public_keys()
+            .public_keys()
+            .iter()
+            .any(|key| key == any_public_key),
     }
 }
 
@@ -288,6 +333,49 @@ fn matches_transaction_authenticator_address(
         },
         TransactionAuthenticator::SingleSender { sender } => {
             matches_account_authenticator_address(sender, address)
+        },
+    }
+}
+
+/// Returns true iff the transaction's authenticator contains the given public key
+fn matches_transaction_authenticator_public_key(
+    signed_transaction: &SignedTransaction,
+    any_public_key: &AnyPublicKey,
+) -> bool {
+    // Match all variants explicitly to ensure future enum changes are caught during compilation
+    match signed_transaction.authenticator_ref() {
+        TransactionAuthenticator::Ed25519 { public_key, .. } => {
+            compare_ed25519_public_key(public_key, any_public_key)
+        },
+        TransactionAuthenticator::MultiEd25519 { public_key, .. } => {
+            public_key.public_keys().iter().any(|ed25519_public_key| {
+                compare_ed25519_public_key(ed25519_public_key, any_public_key)
+            })
+        },
+        TransactionAuthenticator::MultiAgent {
+            sender,
+            secondary_signers,
+            ..
+        } => {
+            matches_account_authenticator_public_key(sender, any_public_key)
+                || secondary_signers
+                    .iter()
+                    .any(|signer| matches_account_authenticator_public_key(signer, any_public_key))
+        },
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signers,
+            fee_payer_signer,
+            ..
+        } => {
+            matches_account_authenticator_public_key(sender, any_public_key)
+                || secondary_signers
+                    .iter()
+                    .any(|signer| matches_account_authenticator_public_key(signer, any_public_key))
+                || matches_account_authenticator_public_key(fee_payer_signer, any_public_key)
+        },
+        TransactionAuthenticator::SingleSender { sender } => {
+            matches_account_authenticator_public_key(sender, any_public_key)
         },
     }
 }
