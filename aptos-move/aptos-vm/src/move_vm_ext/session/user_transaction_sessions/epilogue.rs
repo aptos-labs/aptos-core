@@ -26,6 +26,7 @@ use aptos_vm_types::{
 };
 use derive_more::{Deref, DerefMut};
 use move_core_types::vm_status::VMStatus;
+use move_vm_runtime::module_traversal::TraversalContext;
 
 #[derive(Deref, DerefMut)]
 pub struct EpilogueSession<'r> {
@@ -105,6 +106,7 @@ impl<'r> EpilogueSession<'r> {
         execution_status: ExecutionStatus,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl AptosModuleStorage,
+        traversal_context: &TraversalContext,
     ) -> Result<VMOutput, VMStatus> {
         let Self {
             session,
@@ -112,8 +114,12 @@ impl<'r> EpilogueSession<'r> {
             module_write_set,
         } = self;
 
-        let change_set =
-            session.finish_with_squashed_change_set(change_set_configs, module_storage, true)?;
+        let change_set = session.finish_with_squashed_change_set(
+            change_set_configs,
+            module_storage,
+            traversal_context,
+            true,
+        )?;
         let epilogue_session_change_set =
             UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)?;
 

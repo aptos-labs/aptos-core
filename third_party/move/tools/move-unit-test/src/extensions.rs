@@ -13,7 +13,7 @@ use move_table_extension::NativeTableContext;
 use move_vm_runtime::native_extensions::NativeContextExtensions;
 #[cfg(feature = "table-extension")]
 use move_vm_test_utils::BlankStorage;
-use move_vm_types::value_serde::FunctionValueExtension;
+use move_vm_types::{gas::NoOpTraversalContext, value_serde::FunctionValueExtension};
 use once_cell::sync::Lazy;
 use std::{fmt::Write, sync::Mutex};
 
@@ -76,7 +76,7 @@ fn print_table_extension<W: Write>(
 ) {
     let cs = native_extensions
         .remove::<NativeTableContext>()
-        .into_change_set(function_value_extension);
+        .into_change_set(function_value_extension, &NoOpTraversalContext);
     if let Ok(cs) = cs {
         if !cs.new_tables.is_empty() {
             writeln!(
