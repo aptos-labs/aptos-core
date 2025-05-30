@@ -66,6 +66,12 @@ module aptos_experimental::active_order_book {
         }
     }
 
+    public fun destroy_active_order_book(self: ActiveOrderBook) {
+        let ActiveOrderBook::V1 { sells, buys } = self;
+        sells.destroy(|_v| {});
+        buys.destroy(|_v| {});
+    }
+
     /// Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
     /// aborts if there are no buys
     public fun best_bid_price(self: &ActiveOrderBook): Option<u64> {
@@ -355,12 +361,7 @@ module aptos_experimental::active_order_book {
         };
     }
 
-    #[test_only]
-    public(friend) fun destroy_active_order_book(self: ActiveOrderBook) {
-        let ActiveOrderBook::V1 { sells, buys } = self;
-        sells.destroy(|_v| {});
-        buys.destroy(|_v| {});
-    }
+
 
     #[test_only]
     struct TestOrder has copy, drop {

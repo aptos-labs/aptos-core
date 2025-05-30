@@ -37,6 +37,19 @@ module aptos_experimental::pending_order_book_index {
         }
     }
 
+    public(friend) fun destroy_pending_order_book_index(
+        self: PendingOrderBookIndex
+    ) {
+        let PendingOrderBookIndex::V1 {
+            price_move_up_index,
+            price_move_down_index,
+            time_based_index
+        } = self;
+        price_move_up_index.destroy(|_v| {});
+        price_move_down_index.destroy(|_v| {});
+        time_based_index.destroy(|_v| {});
+    }
+
     public(friend) fun cancel_pending_order(
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
@@ -161,17 +174,5 @@ module aptos_experimental::pending_order_book_index {
         &self.time_based_index
     }
 
-    #[test_only]
-    public(friend) fun destroy_pending_order_book_index(
-        self: PendingOrderBookIndex
-    ) {
-        let PendingOrderBookIndex::V1 {
-            price_move_up_index,
-            price_move_down_index,
-            time_based_index
-        } = self;
-        price_move_up_index.destroy(|_v| {});
-        price_move_down_index.destroy(|_v| {});
-        time_based_index.destroy(|_v| {});
-    }
+
 }

@@ -237,6 +237,18 @@ module aptos_experimental::market {
         }
     }
 
+    public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
+        let Market {
+            parent: _parent,
+            market: _market,
+            last_order_id: _last_order_id,
+            config,
+            order_book
+        } = self;
+        let MarketConfig { allow_self_trade: _ } = config;
+        order_book.destroy_order_book()
+    }
+
     public fun get_market<M: store + copy + drop>(self: &Market<M>): address {
         self.market
     }
@@ -748,6 +760,14 @@ module aptos_experimental::market {
                 return result;
             };
 
+            if (maker_order.get_remaining_size() == 0) {
+                callbacks.cleanup_order(
+                    maker_address,
+                    maker_order_id,
+                    !is_bid, // is_bid is inverted for maker orders
+                    0 // 0 because the order is fully filled
+                );
+            };
             if (remaining_size == 0) {
                 callbacks.cleanup_order(
                     user_addr,
@@ -993,16 +1013,5 @@ module aptos_experimental::market {
         assert!(self.status == status);
     }
 
-    #[test_only]
-    public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
-        let Market {
-            parent: _parent,
-            market: _market,
-            last_order_id: _last_order_id,
-            config,
-            order_book
-        } = self;
-        let MarketConfig { allow_self_trade: _ } = config;
-        order_book.destroy_order_book()
-    }
+
 }

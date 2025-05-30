@@ -4,6 +4,7 @@ module aptos_experimental::market_test_utils {
     use std::option::Option;
     use std::signer;
     use aptos_std::debug::print;
+    use aptos_experimental::clearinghouse_test;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore};
     use aptos_experimental::market_types::MarketClearinghouseCallbacks;
 
@@ -61,6 +62,13 @@ module aptos_experimental::market_test_utils {
             is_taker,
             order_status_open()
         );
+        if (!is_cancelled) {
+            // Maker order is opened
+            assert!(clearinghouse_test::is_maker_order_called(order_id));
+        } else {
+            // Maker order is cancelled
+            assert!(!clearinghouse_test::is_maker_order_called(order_id));
+        };
         if (is_cancelled) {
             let order_cancel_event = events[1];
             order_cancel_event.verify_order_event(
@@ -142,6 +150,7 @@ module aptos_experimental::market_test_utils {
         maker_addr: address,
         maker_order_ids: vector<u64>,
         maker_orig_sizes: vector<u64>,
+        maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
         is_cancelled: bool,
         max_fills: Option<u64>,
@@ -174,6 +183,7 @@ module aptos_experimental::market_test_utils {
             maker_addr,
             maker_order_ids,
             maker_orig_sizes,
+            maker_remaining_sizes,
             event_store,
             is_cancelled
         );
@@ -223,6 +233,7 @@ module aptos_experimental::market_test_utils {
         maker_addr: address,
         maker_order_ids: vector<u64>,
         maker_orig_sizes: vector<u64>,
+        maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
         is_cancelled: bool
     ) {
@@ -248,6 +259,7 @@ module aptos_experimental::market_test_utils {
             let fill_size = fill_sizes[fill_index];
             let fill_price = fill_prices[fill_index];
             let maker_orig_size = maker_orig_sizes[fill_index];
+            let maker_remaining_size = maker_remaining_sizes[fill_index];
             taker_total_fill += fill_size;
             let maker_order_id = maker_order_ids[fill_index];
             // Taker order is filled
@@ -271,7 +283,7 @@ module aptos_experimental::market_test_utils {
                 market.get_market(),
                 maker_addr,
                 maker_orig_size,
-                maker_orig_size - fill_size,
+                maker_remaining_size - fill_size,
                 fill_size,
                 fill_price,
                 !is_buy,

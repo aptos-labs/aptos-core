@@ -106,6 +106,13 @@ module aptos_experimental::order_book {
         }
     }
 
+    public fun destroy_order_book<M: store + copy + drop>(self: OrderBook<M>) {
+        let OrderBook::V1 { orders, active_orders, pending_orders } = self;
+        orders.destroy(|_v| {});
+        active_orders.destroy_active_order_book();
+        pending_orders.destroy_pending_order_book_index();
+    }
+
     /// Cancels an order from the order book. If the order is active, it is removed from the active order book else
     /// it is removed from the pending order book. The API doesn't abort if the order is not found in the order book -
     /// this is a TODO for now.
@@ -370,13 +377,7 @@ module aptos_experimental::order_book {
 
     // ============================= test_only APIs ====================================
 
-    #[test_only]
-    public fun destroy_order_book<M: store + copy + drop>(self: OrderBook<M>) {
-        let OrderBook::V1 { orders, active_orders, pending_orders } = self;
-        orders.destroy(|_v| {});
-        active_orders.destroy_active_order_book();
-        pending_orders.destroy_pending_order_book_index();
-    }
+
 
     #[test_only]
     public fun get_unique_priority_idx<M: store + copy + drop>(
