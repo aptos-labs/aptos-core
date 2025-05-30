@@ -42,7 +42,6 @@ module aptos_experimental::market_test_utils {
             callbacks
         );
         let events = latest_emitted_events<OrderEvent>(event_store, option::none());
-        print(&events.length());
         if (!is_cancelled) {
             assert!(events.length() == 1);
         } else {
