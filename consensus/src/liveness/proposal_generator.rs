@@ -548,7 +548,7 @@ impl ProposalGenerator {
         Ok(block)
     }
 
-    pub async fn generate_proposal_inner(
+    async fn generate_proposal_inner(
         &self,
         round: Round,
         parent_id: HashValue,

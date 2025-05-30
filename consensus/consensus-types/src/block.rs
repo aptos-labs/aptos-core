@@ -464,6 +464,8 @@ impl Block {
             .collect()
     }
 
+    /// Returns the voters, as BitVec, of the parent block for a normal proposal or
+    /// the grandparent block for an optimistic proposal.
     fn previous_bitvec(&self) -> BitVec {
         match self.block_data.block_type() {
             BlockType::DAGBlock { parents_bitvec, .. } => parents_bitvec.clone(),

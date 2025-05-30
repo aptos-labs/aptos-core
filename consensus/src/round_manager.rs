@@ -521,7 +521,6 @@ impl RoundManager {
             parent,
             grandparent_qc,
             sync_info,
-            network.clone(),
             proposal_generator,
             proposer_election,
         )
@@ -664,16 +663,11 @@ impl RoundManager {
         parent: BlockInfo,
         grandparent_qc: QuorumCert,
         sync_info: SyncInfo,
-        network: Arc<NetworkSender>,
         proposal_generator: Arc<ProposalGenerator>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) -> anyhow::Result<OptProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
-        let callback_sync_info = sync_info.clone();
-        let callback = async move {
-            network.broadcast_sync_info(callback_sync_info).await;
-        }
-        .boxed();
+        let callback = async move {}.boxed();
 
         let proposal = proposal_generator
             .generate_opt_proposal(
@@ -1386,21 +1380,17 @@ impl RoundManager {
             self.network.send_vote(vote_msg, vec![recipient]).await;
         }
 
-        self.start_next_opt_round(
-            vote.vote_data().proposed().clone(),
-            proposal_round,
-            parent_qc,
-        );
+        if let Err(e) = self.start_next_opt_round(vote, parent_qc) {
+            debug!("Cannot start next opt round: {}", e);
+        };
         Ok(())
     }
 
     fn start_next_opt_round(
         &self,
-        parent: BlockInfo,
-        parent_round: Round,
+        parent_vote: Vote,
         grandparent_qc: QuorumCert,
-    ) {
-        let opt_proposal_round = parent_round + 1;
+    ) -> anyhow::Result<()> {
         // Optimistic Proposal:
         // When receiving round r block, send optimistic proposal for round r+1 if:
         // 0. opt proposal is enabled
@@ -1408,11 +1398,26 @@ impl RoundManager {
         // 2. voted for round r block
         // 3. the round r block contains QC of round r-1
         // 4. does not propose in round r+1
-        if self.local_config.enable_optimistic_proposal_tx
-            && self
-                .proposer_election
-                .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
-            && grandparent_qc.certified_block().round() == parent_round - 1
+        if !self.local_config.enable_optimistic_proposal_tx {
+            return Ok(());
+        };
+
+        let parent = parent_vote.vote_data().proposed().clone();
+        let opt_proposal_round = parent.round() + 1;
+        let expected_grandparent_round = parent
+            .round()
+            .checked_sub(1)
+            .ok_or_else(|| anyhow::anyhow!("Invalid parent round {}", parent.round()))?;
+        ensure!(
+            grandparent_qc.certified_block().round() == expected_grandparent_round,
+            "Cannot start Optimistic Round. Grandparent QC is not for round minus one: {} < {}",
+            grandparent_qc.certified_block().round(),
+            parent.round()
+        );
+
+        if self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
         {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
@@ -1441,6 +1446,7 @@ impl RoundManager {
                 }
             });
         }
+        Ok(())
     }
 
     /// The function generates a VoteMsg for a given proposed_block:
