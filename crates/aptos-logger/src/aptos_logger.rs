@@ -213,20 +213,20 @@ impl LogEntry {
 
         let peer_id: Option<&str>;
         let chain_id: Option<u8>;
-        let full_git_hash: Option<&str>;
+        let git_hash: Option<String>;
 
         #[cfg(node_identity)]
         {
             peer_id = aptos_node_identity::peer_id_as_str();
             chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
-            full_git_hash = aptos_node_identity::git_hash();
+            git_hash = aptos_node_identity::git_hash();
         }
 
         #[cfg(not(node_identity))]
         {
             peer_id = None;
             chain_id = None;
-            full_git_hash = None;
+            git_hash = None;
         }
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
@@ -246,14 +246,6 @@ impl LogEntry {
             schema.visit(&mut JsonVisitor(&mut data));
         }
 
-        let short_git_hash = full_git_hash.map(|full_git_hash| {
-            if full_git_hash.len() >= 7 {
-                full_git_hash[..7].to_string()
-            } else {
-                full_git_hash.to_string()
-            }
-        });
-
         Self {
             metadata,
             thread_name,
@@ -265,7 +257,7 @@ impl LogEntry {
             message,
             peer_id,
             chain_id,
-            git_hash: short_git_hash,
+            git_hash,
         }
     }
 

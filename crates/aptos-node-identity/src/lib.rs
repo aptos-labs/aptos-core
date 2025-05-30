@@ -48,10 +48,15 @@ pub fn set_chain_id(chain_id: ChainId) -> Result<()> {
 /// Sets the [GitHash] in the global [AptosNodeIdentity], returning an error
 /// if [init] was not called already.
 pub fn set_git_hash(git_hash: String) -> Result<()> {
+    let short_git_hash = if git_hash.len() >= 7 {
+        git_hash[..7].to_string()
+    } else {
+        git_hash.to_string()
+    };
     match APTOS_NODE_IDENTITY.get() {
         Some(identity) => identity
             .git_hash
-            .set(git_hash)
+            .set(short_git_hash)
             .map_err(|_| format_err!("git_hash was already set.")),
         None => Err(format_err!("APTOS_NODE_IDENTITY has not been set yet")),
     }
