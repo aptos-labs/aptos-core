@@ -17,6 +17,7 @@ use aptos_types::{
 use itertools::{izip, Itertools};
 use rayon::prelude::*;
 use std::sync::Arc;
+use aptos_logger::info;
 
 pub struct DoLedgerUpdate;
 
@@ -40,6 +41,8 @@ impl DoLedgerUpdate {
             event_hashes,
             writeset_hashes,
         );
+
+        info!("first_version: {:?}, transaction_infos: {:?}", execution_output.first_version(), transaction_infos);
 
         // Calculate root hash
         let transaction_info_hashes = transaction_infos.iter().map(CryptoHash::hash).collect_vec();

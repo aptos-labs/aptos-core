@@ -139,6 +139,10 @@ impl ExecutionOutput {
     pub fn expect_last_version(&self) -> Version {
         self.first_version + self.num_transactions_to_commit() as Version - 1
     }
+
+    pub fn first_version(&self) -> Version {
+        self.first_version
+}
 }
 
 #[derive(Debug)]
