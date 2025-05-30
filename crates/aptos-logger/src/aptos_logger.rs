@@ -121,7 +121,7 @@ pub struct LogEntry {
     message: Option<String>,
     peer_id: Option<&'static str>,
     chain_id: Option<u8>,
-    git_hash: Option<String>,
+    git_hash: Option<&'static str>,
 }
 
 // implement custom serializer for LogEntry since we want to promote the `metadata.level` field into a top-level `level` field
@@ -213,7 +213,7 @@ impl LogEntry {
 
         let peer_id: Option<&str>;
         let chain_id: Option<u8>;
-        let git_hash: Option<String>;
+        let git_hash: Option<&str>;
 
         #[cfg(node_identity)]
         {
@@ -302,7 +302,7 @@ impl LogEntry {
     }
 
     pub fn git_hash(&self) -> Option<&str> {
-        self.git_hash.as_deref()
+        self.git_hash
     }
 }
 
@@ -979,7 +979,7 @@ mod tests {
         let original_timestamp = entry.timestamp;
         entry.timestamp = String::from("2022-07-24T23:42:29.540278Z");
         entry.hostname = Some("test-host");
-        entry.git_hash = Some("1234567".to_string());
+        entry.git_hash = Some("1234567");
         line_num += 1;
         let thread_name = thread::current().name().map(|s| s.to_string()).unwrap();
 
