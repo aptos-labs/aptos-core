@@ -136,7 +136,12 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)>;
 
     /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
+    fn get_events(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Event,
+        Option<Arc<MoveTypeLayout>>,
+    )>;
 
     fn resource_group_write_set(
         &self,

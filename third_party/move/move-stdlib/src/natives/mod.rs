@@ -7,6 +7,7 @@ pub mod debug;
 pub mod event;
 pub mod hash;
 mod helpers;
+pub mod layouts;
 pub mod signer;
 pub mod string;
 pub mod type_name;

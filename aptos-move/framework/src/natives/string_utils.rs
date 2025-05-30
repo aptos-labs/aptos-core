@@ -3,6 +3,7 @@
 
 use aptos_gas_algebra::NumBytes;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_move_stdlib::natives::layouts::native_load_annotated_layouts;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
@@ -366,7 +367,7 @@ fn native_format_impl(
             out.push_str(&fun.to_stable_string());
             format_vector(
                 context,
-                data.captured_layouts.iter(),
+                data.captured_layouts.iter().map(|l| l.as_ref()),
                 args.collect(),
                 depth,
                 !context.single_line,
@@ -569,6 +570,22 @@ pub fn make_all(
     let natives = [
         ("native_format", native_format as RawSafeNative),
         ("native_format_list", native_format_list),
+        (
+            "native_load_annotated_layout1",
+            native_load_annotated_layouts,
+        ),
+        (
+            "native_load_annotated_layout2",
+            native_load_annotated_layouts,
+        ),
+        (
+            "native_load_annotated_layout3",
+            native_load_annotated_layouts,
+        ),
+        (
+            "native_load_annotated_layout4",
+            native_load_annotated_layouts,
+        ),
     ];
 
     builder.make_named_natives(natives)

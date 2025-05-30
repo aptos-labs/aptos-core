@@ -81,7 +81,7 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-          "execution_gas_units": "4",
+          "execution_gas_units": "5",
           "io_gas_units": "6",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",

@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
+use crate::natives::{helpers::make_module_natives, layouts::make_native_load_layouts};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGasPerAbstractMemoryUnit;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -59,10 +59,13 @@ pub struct GasParameters {
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
-        "write_to_event_store",
-        make_native_write_to_event_store(gas_params.write_to_event_store),
-    )];
+    let natives = [
+        (
+            "write_to_event_store",
+            make_native_write_to_event_store(gas_params.write_to_event_store),
+        ),
+        ("native_load_layout", make_native_load_layouts()),
+    ];
 
     make_module_natives(natives)
 }

@@ -45,6 +45,7 @@ module std::event {
 
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit_event<T: drop + store>(handle_ref: &mut EventHandle<T>, msg: T) {
+        native_load_layout<T>();
         write_to_event_store<T>(bcs::to_bytes(&handle_ref.guid.guid), handle_ref.counter, msg);
         handle_ref.counter = handle_ref.counter + 1;
     }
@@ -56,6 +57,8 @@ module std::event {
 
     /// Log `msg` as the `count`th event associated with the event stream identified by `guid`
     native fun write_to_event_store<T: drop + store>(guid: vector<u8>, count: u64, msg: T);
+
+    native fun native_load_layout<T>();
 
     /// Destroy a unique handle.
     public fun destroy_handle<T: drop + store>(handle: EventHandle<T>) {
@@ -85,5 +88,9 @@ module std::event {
             // representation does not have the `counter` field.
             h1 == h2
         }
+    }
+
+    spec native_load_layout<T>() {
+        aborts_if true;
     }
 }

@@ -257,7 +257,7 @@ pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = 
 
 // For each delayed field in the event, replace delayed field identifier with value.
 pub(crate) fn map_id_to_values_events<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
-    events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
+    events: Box<dyn Iterator<Item = (T::Event, Option<Arc<MoveTypeLayout>>)>>,
     latest_view: &LatestView<T, S>,
 ) -> Result<Vec<T::Event>, PanicError> {
     events

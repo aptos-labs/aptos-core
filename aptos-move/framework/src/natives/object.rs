@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_move_stdlib::natives::layouts::native_load_layouts;
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
     SafeNativeResult,
@@ -116,6 +117,7 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
         ("exists_at", native_exists_at as RawSafeNative),
+        ("native_load_layout", native_load_layouts),
         (
             "create_user_derived_object_address_impl",
             native_create_user_derived_object_address_impl,
