@@ -72,7 +72,7 @@ module aptos_framework::scheduled_txns {
     /// Max size of a scheduled transaction
     const MAX_SCHED_TXN_SIZE: u64 = 10 * 1024;
 
-    /// ScheduledTransaction with permission signer handle, scheduled_time, gas params, and function
+    /// ScheduledTransaction with scheduled_time, gas params, and function
     struct ScheduledTransaction has copy, drop, store {
         /// 32 bytes
         sender_addr: address,
@@ -88,7 +88,7 @@ module aptos_framework::scheduled_txns {
         f: |Option<signer>| has copy + store + drop,
     }
 
-    /// We pass the id around instead re-computing it
+    /// We pass around only needed info
     struct ScheduledTransactionInfoWithKey has drop {
         sender_addr: address,
         max_gas_amount: u64,
@@ -281,7 +281,7 @@ module aptos_framework::scheduled_txns {
         }
     }
 
-    /// Insert a scheduled transaction into the queue. Txn_id is returned to user, which can be used to cancel the txn.
+    /// Insert a scheduled transaction into the queue. ScheduleMapKey is returned to user, which can be used to cancel the txn.
     public fun insert(
         sender: &signer,
         txn: ScheduledTransaction

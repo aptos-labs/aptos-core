@@ -2418,7 +2418,7 @@ impl AptosVM {
 
         Ok(result.return_values.into_iter().map(|v| v.0).collect())
     }
-    
+
     pub fn execute_view_function(
         state_view: &impl StateView,
         module_id: ModuleId,

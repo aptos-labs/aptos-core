@@ -56,7 +56,7 @@
 
 ## Struct `ScheduledTransaction`
 
-ScheduledTransaction with permission signer handle, scheduled_time, gas params, and function
+ScheduledTransaction with scheduled_time, gas params, and function
 
 
 <pre><code><b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">ScheduledTransaction</a> <b>has</b> <b>copy</b>, drop, store
@@ -114,7 +114,7 @@ ScheduledTransaction with permission signer handle, scheduled_time, gas params, 
 
 ## Struct `ScheduledTransactionInfoWithKey`
 
-We pass the id around instead re-computing it
+We pass around only needed info
 
 
 <pre><code><b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a> <b>has</b> drop
@@ -843,7 +843,7 @@ Constructor
 
 ## Function `insert`
 
-Insert a scheduled transaction into the queue. Txn_id is returned to user, which can be used to cancel the txn.
+Insert a scheduled transaction into the queue. ScheduleMapKey is returned to user, which can be used to cancel the txn.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_insert">insert</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransaction">scheduled_txns::ScheduledTransaction</a>): <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>

@@ -505,7 +505,7 @@ impl PipelineBuilder {
         };
 
         // todo: Can we assume that user txns are mostly sorted by their gas priority and avoid this
-        //       extra looping over usert txns ??
+        //       extra looping over user txns ??
         // todo: aptos_global_constants::GAS_UNIT_PRICE
         //       Is this the right config to use or should we get this from onchain config ?
         const MIN_GAS_UNIT_PRICE: u64 = 100;
@@ -1034,5 +1034,103 @@ impl PipelineBuilder {
             format!("{epoch} {round} {block_id} commit ledger"),
         )
         .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::{
+        transaction::{
+            RawTransaction, Script, SignedTransaction, scheduled_txn::ScheduledTransactionInfoWithKey,
+        },
+        account_address::AccountAddress,
+    };
+    use aptos_types::chain_id::ChainId;
+    use aptos_types::transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator};
+    use aptos_types::transaction::scheduled_txn::ScheduleMapKey;
+
+    fn create_user_txn(gas_unit_price: u64) -> SignatureVerifiedTransaction {
+        let sender = AccountAddress::random();
+        let raw_txn = RawTransaction::new_script(
+            sender,
+            0,                      // sequence_number
+            Script::new(vec![], vec![], vec![]),
+            100,                    // max_gas_amount
+            gas_unit_price,
+            0,                      // expiration_timestamp_secs
+            ChainId::new(1),       // test chain id
+        );
+
+        let signed_txn = SignedTransaction::new_signed_transaction(
+            raw_txn,
+            TransactionAuthenticator::SingleSender {
+                sender: AccountAuthenticator::NoAccountAuthenticator,
+            },
+        );
+        SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(signed_txn))
+    }
+
+    fn create_scheduled_txn(max_gas_unit_price: u64) -> ScheduledTransactionInfoWithKey {
+        ScheduledTransactionInfoWithKey {
+            sender_handle: AccountAddress::random(),
+            max_gas_amount: 100000,
+            max_gas_unit_price,
+            gas_unit_price_charged: 0,
+            key: ScheduleMapKey {
+                time: 0,
+                gas_priority: max_gas_unit_price,
+                txn_id: Vec::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn test_empty_scheduled_txns() {
+        let scheduled_txns = vec![];
+        let user_txns = vec![
+            create_user_txn(100),
+            create_user_txn(200),
+            create_user_txn(300),
+        ];
+        let merged = PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns.clone());
+        assert_eq!(merged.len(), user_txns.len());
+    }
+
+    #[test]
+    fn test_empty_user_txns() {
+        let scheduled_txns = vec![
+            create_scheduled_txn(100),
+            create_scheduled_txn(200),
+        ];
+        let user_txns = vec![];
+        let merged = PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn test_merge_with_ordering() {
+        let scheduled_txns = vec![
+            create_scheduled_txn(500),
+            create_scheduled_txn(200),
+            create_scheduled_txn(300),
+        ];
+        let user_txns = vec![
+            create_user_txn(400),
+            create_user_txn(100),
+            create_user_txn(250),
+        ];
+
+        let merged = PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
+        let gas_prices: Vec<u64> = merged
+            .iter()
+            .map(|txn| match txn.get_transaction().unwrap() {
+                Transaction::UserTransaction(t) => t.gas_unit_price(),
+                Transaction::ScheduledTransaction(t) => t.gas_unit_price_charged,
+                _ => panic!("Unexpected transaction type"),
+            })
+            .collect();
+        assert_eq!(merged.len(), 6);
+        assert_eq!(gas_prices, vec![401, 400, 300, 200, 100, 250]);
     }
 }
