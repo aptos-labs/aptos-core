@@ -15,6 +15,7 @@ pub struct AptosNodeIdentity {
     pub peer_id: Option<PeerId>,
     // Holds Peer ID as String to reduce overhead for frequent lookups.
     pub peer_id_str: Option<String>,
+    pub git_hash: OnceCell<String>,
 }
 
 /// Initializes the [AptosNodeIdentity] using the provided [PeerId] and
@@ -24,6 +25,7 @@ pub fn init(peer_id: Option<PeerId>) -> Result<()> {
         chain_id: OnceCell::new(),
         peer_id,
         peer_id_str: peer_id.map(|id| id.to_string()),
+        git_hash: OnceCell::new(),
     };
 
     APTOS_NODE_IDENTITY
@@ -39,6 +41,18 @@ pub fn set_chain_id(chain_id: ChainId) -> Result<()> {
             .chain_id
             .set(chain_id)
             .map_err(|_| format_err!("chain_id was already set.")),
+        None => Err(format_err!("APTOS_NODE_IDENTITY has not been set yet")),
+    }
+}
+
+/// Sets the [GitHash] in the global [AptosNodeIdentity], returning an error
+/// if [init] was not called already.
+pub fn set_git_hash(git_hash: String) -> Result<()> {
+    match APTOS_NODE_IDENTITY.get() {
+        Some(identity) => identity
+            .git_hash
+            .set(git_hash)
+            .map_err(|_| format_err!("git_hash was already set.")),
         None => Err(format_err!("APTOS_NODE_IDENTITY has not been set yet")),
     }
 }

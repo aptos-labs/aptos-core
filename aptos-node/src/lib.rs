@@ -21,7 +21,7 @@ use crate::utils::ensure_max_open_files_limit;
 use anyhow::{anyhow, Context};
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
-use aptos_build_info::build_information;
+use aptos_build_info::{build_information, get_git_hash};
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::GenesisConfiguration;
@@ -709,6 +709,8 @@ pub fn setup_environment_and_start_node(
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
+
+    aptos_node_identity::set_git_hash(get_git_hash())?;
 
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(

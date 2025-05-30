@@ -15,7 +15,6 @@ rust-version = { workspace = true }
 # Do NOT add any inter-project dependencies.
 # This is to avoid ever having a circular dependency with the aptos-logger crate.
 [dependencies]
-aptos-build-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-log-derive = { workspace = true }
 aptos-node-identity = { workspace = true, optional = true }
