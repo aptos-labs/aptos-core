@@ -21,8 +21,8 @@ fn main() -> Result<()> {
     let state_store = InMemoryStateStore::new();
     state_store.apply_write_set(&genesis_write_set)?;
 
-    let alice = AccountData::new(100_000_000, 0);
-    let bob = AccountData::new(100_000_000, 0);
+    let alice = AccountData::new(100_000_000, Some(0));
+    let bob = AccountData::new(100_000_000, Some(0));
     state_store.add_account_data(&alice)?;
     state_store.add_account_data(&bob)?;
 
