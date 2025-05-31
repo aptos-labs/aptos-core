@@ -230,6 +230,17 @@ impl<'input> Lexer<'input> {
         self.prev_end
     }
 
+    pub fn beginning_of_line(&self) -> bool {
+        self.cur_start == 0
+            || matches!(
+                self.text[self.cur_start - 1..self.cur_start]
+                    .chars()
+                    .last()
+                    .unwrap(),
+                '\n' | '\r'
+            )
+    }
+
     /// Strips line and block comments from input source, and collects documentation comments,
     /// putting them into a map indexed by the span of the comment region. Comments in the original
     /// source will be replaced by spaces, such that positions of source items stay unchanged.
