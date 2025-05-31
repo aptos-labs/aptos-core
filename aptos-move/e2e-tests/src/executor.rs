@@ -1103,7 +1103,7 @@ impl FakeExecutor {
         let mut i = 0;
         let mut measurements = Vec::new();
         while i < iterations {
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
+            let mut session = vm.new_session(None, &resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
             let _ = module_storage.load_function(
@@ -1240,7 +1240,7 @@ impl FakeExecutor {
             let vm = MoveVmExt::new(&env);
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
+            let mut session = vm.new_session(None, &resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -1301,7 +1301,7 @@ impl FakeExecutor {
             let vm = MoveVmExt::new(&env);
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
+            let mut session = vm.new_session(None, &resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
                 .execute_function_bypass_visibility(
@@ -1345,7 +1345,7 @@ impl FakeExecutor {
 
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 
-        let mut session = vm.new_session(&resolver, SessionId::void(), None);
+        let mut session = vm.new_session(None, &resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
