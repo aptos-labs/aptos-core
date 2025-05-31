@@ -1,0 +1,140 @@
+{
+  "version": "5",
+  "hash": "",
+  "state_change_hash": "",
+  "event_root_hash": "",
+  "state_checkpoint_hash": null,
+  "gas_used": "9",
+  "success": false,
+  "vm_status": "Move abort in 0x1::fungible_asset: EINSUFFICIENT_BALANCE(0x10004): Insufficient balance to withdraw or transfer.",
+  "accumulator_root_hash": "",
+  "changes": [
+    {
+      "state_key_hash": "",
+      "handle": "0x76f312dfa6875b5e1ec3d7c7aa0156cb480b60aca2b42cefda7e156c6499477e",
+      "key": "0x0a00000000000000",
+      "value": "0x010000000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0x76f312dfa6875b5e1ec3d7c7aa0156cb480b60aca2b42cefda7e156c6499477e",
+      "key": "0x0b00000000000000",
+      "value": "0x010a00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0x76f312dfa6875b5e1ec3d7c7aa0156cb480b60aca2b42cefda7e156c6499477e",
+      "key": "0x0c00000000000000",
+      "value": "0x010b00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0x76f312dfa6875b5e1ec3d7c7aa0156cb480b60aca2b42cefda7e156c6499477e",
+      "key": "0x0d00000000000000",
+      "value": "0x010c00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0x76f312dfa6875b5e1ec3d7c7aa0156cb480b60aca2b42cefda7e156c6499477e",
+      "key": "0x0e00000000000000",
+      "value": "0x010d00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0xbda46f5b2653963ea38cae9266704b946ff4cc7b5d6746e561cb5324903a628e",
+      "key": "0x0a00000000000000",
+      "value": "0x010000000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0xbda46f5b2653963ea38cae9266704b946ff4cc7b5d6746e561cb5324903a628e",
+      "key": "0x0b00000000000000",
+      "value": "0x010a00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0xbda46f5b2653963ea38cae9266704b946ff4cc7b5d6746e561cb5324903a628e",
+      "key": "0x0c00000000000000",
+      "value": "0x010b00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0xbda46f5b2653963ea38cae9266704b946ff4cc7b5d6746e561cb5324903a628e",
+      "key": "0x0d00000000000000",
+      "value": "0x010c00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0xbda46f5b2653963ea38cae9266704b946ff4cc7b5d6746e561cb5324903a628e",
+      "key": "0x0e00000000000000",
+      "value": "0x010d00000000000000",
+      "data": null,
+      "type": "write_table_item"
+    },
+    {
+      "state_key_hash": "",
+      "handle": "0xdc3189011da6e60643ef48030b4f8fc315beddc236c6c523db96778af7b47056",
+      "key": "0x75bc000000000000",
+      "value": "0x00000100013b0000000000000034bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afafe2a8cb18c3b7335f0101000000000000000000000000000000000001bda46f5b2653963ea38cae9266704b946ff4cc7b5d6746e561cb5324903a628e05000000000000000f00000000000000010e0000000000000005000000010000000000000001000000000000000155005300000001000134bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afafe2a8cb18c3b7335f013b0000000000000000000000000000000000000000000000000176f312dfa6875b5e1ec3d7c7aa0156cb480b60aca2b42cefda7e156c6499477e05000000000000000f00000000000000010e0000000000000005000000010000000000000001000000000000000166005500",
+      "data": null,
+      "type": "write_table_item"
+    }
+  ],
+  "sender": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+  "sequence_number": "18446744073709551615",
+  "max_gas_amount": "100000000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "59",
+  "payload": {
+    "function": "0x1::aptos_account::transfer",
+    "type_arguments": [],
+    "arguments": [
+      "0x1",
+      "1"
+    ],
+    "type": "entry_function_payload"
+  },
+  "signature": {
+    "public_key": "0xd5a781494d2bf1a174ddffde1e02cb8881cff6dab70e61cbdef393deac0ce639",
+    "signature": "0x3f40fc95b6ed22fca21e31f9658798914ad84eb5e78fc089f15671e3980c2ebd615fb6456f8fd9e813c84d6ea17f38992cbbab4d952c8bc712ad71af52c70a07",
+    "type": "ed25519_signature"
+  },
+  "replay_protection_nonce": "6860028705977903330",
+  "events": [
+    {
+      "guid": {
+        "creation_number": "0",
+        "account_address": "0x0"
+      },
+      "sequence_number": "0",
+      "type": "0x1::transaction_fee::FeeStatement",
+      "data": {
+        "execution_gas_units": "4",
+        "io_gas_units": "6",
+        "storage_fee_octas": "0",
+        "storage_fee_refund_octas": "0",
+        "total_charge_gas_units": "9"
+      }
+    }
+  ],
+  "timestamp": "1000000",
+  "type": "user_transaction"
+}
