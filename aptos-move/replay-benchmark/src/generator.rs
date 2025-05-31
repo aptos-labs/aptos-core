@@ -8,8 +8,8 @@ use crate::{
     workload::{TransactionBlock, Workload},
 };
 use aptos_logger::error;
-use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_types::transaction::Version;
+use aptos_validator_interface::{AptosValidatorInterface, DebuggerStateView};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::{
     sync::{
@@ -20,14 +20,14 @@ use std::{
 };
 
 pub struct InputOutputDiffGenerator {
-    debugger: AptosDebugger,
+    debugger: Arc<dyn AptosValidatorInterface + Send>,
     override_config: OverrideConfig,
 }
 
 impl InputOutputDiffGenerator {
     /// Generates a sequence of inputs (pre-block states) for benchmarking or comparison.
     pub(crate) async fn generate(
-        debugger: AptosDebugger,
+        debugger: Arc<dyn AptosValidatorInterface + Send>,
         override_config: OverrideConfig,
         txn_blocks: Vec<TransactionBlock>,
     ) -> anyhow::Result<Vec<ReadSet>> {
@@ -74,7 +74,7 @@ impl InputOutputDiffGenerator {
     /// Note: transaction execution is sequential, so that multiple inputs can be constructed in
     /// parallel.
     fn generate_inputs(&self, txn_block: TransactionBlock) -> ReadSet {
-        let state_view = self.debugger.state_view_at_version(txn_block.begin_version);
+        let state_view = DebuggerStateView::new(self.debugger.clone(), txn_block.begin_version);
         let state_override = self.override_config.get_state_override(&state_view);
         let workload = Workload::from(txn_block);
 
