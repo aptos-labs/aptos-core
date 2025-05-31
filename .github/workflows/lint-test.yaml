@@ -121,8 +121,17 @@ jobs:
         contains(github.event.pull_request.body, '#e2e'
       )
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - name: Run rust smoke tests
         uses: ./.github/actions/rust-smoke-tests
@@ -183,12 +192,21 @@ jobs:
         contains(github.event.pull_request.base.ref, '-release-')
       )
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       # Install Move Prover tools
       - name: Run dev_setup.sh
         run: |
           scripts/dev_setup.sh -b -y
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
         with:
