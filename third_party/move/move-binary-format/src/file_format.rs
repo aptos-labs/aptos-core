@@ -1162,9 +1162,6 @@ impl SignatureToken {
             (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2)) => {
                 ty1.is_assignable_from(ty2)
             },
-            (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
-                ty1.is_assignable_from(ty2)
-            },
             _ => self == source,
         }
     }
