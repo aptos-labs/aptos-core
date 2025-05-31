@@ -29,7 +29,6 @@ use crate::{
     },
     VMBlockExecutor, VMValidator,
 };
-use anyhow::anyhow;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager,
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -2313,13 +2312,23 @@ impl AptosVM {
         let vm_gas_params = match vm.gas_params(&log_context) {
             Ok(gas_params) => gas_params.vm.clone(),
             Err(err) => {
-                return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+                return ViewFunctionOutput::new_err(
+                    err,
+                    0,
+                    vm.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                )
             },
         };
         let storage_gas_params = match vm.storage_gas_params(&log_context) {
             Ok(gas_params) => gas_params.clone(),
             Err(err) => {
-                return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+                return ViewFunctionOutput::new_err(
+                    err,
+                    0,
+                    vm.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                )
             },
         };
 
@@ -2349,7 +2358,20 @@ impl AptosVM {
         let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
         match execution_result {
             Ok(result) => ViewFunctionOutput::new(Ok(result), gas_used),
-            Err(e) => ViewFunctionOutput::new(Err(e), gas_used),
+            Err(e) => {
+                let txn_status = TransactionStatus::from_vm_status(
+                    e.clone(),
+                    vm.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                );
+                let execution_status = match txn_status {
+                    TransactionStatus::Keep(status) => status,
+                    _ => ExecutionStatus::MiscellaneousError(Some(e.status_code())),
+                };
+                let status_with_abort_info =
+                    vm.inject_abort_info_if_available(&module_storage, execution_status);
+                ViewFunctionOutput::new(Err(status_with_abort_info), gas_used)
+            },
         }
     }
 
@@ -2369,7 +2391,8 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
         module_storage: &impl AptosModuleStorage,
-    ) -> anyhow::Result<Vec<Vec<u8>>> {
+    ) -> Result<Vec<Vec<u8>>, VMStatus> {
+        // (VMStatus, VMOutput)
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
@@ -2381,12 +2404,13 @@ impl AptosVM {
             module_storage,
             arguments,
             func_name.as_ident_str(),
+            module_id,
             &func,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        Ok(session
+        let result = session
             .execute_loaded_function(
                 func,
                 arguments,
@@ -2394,7 +2418,9 @@ impl AptosVM {
                 &mut traversal_context,
                 module_storage,
             )
-            .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
+            .map_err(|err| err.clone().into_vm_status())?;
+
+        Ok(result
             .return_values
             .into_iter()
             .map(|(bytes, _ty)| bytes)

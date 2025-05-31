@@ -140,8 +140,14 @@ fn view_request(
         view_function.args.clone(),
         context.node_config.api.max_gas_view_function,
     );
-    let values = output.values.map_err(|err| {
-        BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+
+    let values = output.values.map_err(|status| {
+        BasicErrorWith404::bad_request_with_code_no_info(
+            anyhow::anyhow!(state_view
+                .as_converter(context.db.clone(), context.indexer_reader.clone())
+                .explain_vm_status(&status, None)),
+            AptosErrorCode::InvalidInput,
+        )
     })?;
     let result = match accept_type {
         AcceptType::Bcs => {

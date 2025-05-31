@@ -643,7 +643,9 @@ impl TransactionsApi {
                 );
                 let values = output.values.map_err(|err| {
                     SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
+                        state_view
+                            .as_converter(context.db.clone(), context.indexer_reader.clone())
+                            .explain_vm_status(&err, None),
                         AptosErrorCode::InvalidInput,
                     )
                 })?;
