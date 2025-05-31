@@ -1,0 +1,6 @@
+[package]
+name = "scheduled_txns_usage"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
