@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf-8-in-keyword.move:4:14
+  │
+4 │         const字符串 C: vector<u8> = b"abc";
+  │              ^^ Invalid character: `字`
