@@ -1,0 +1,251 @@
+processed 7 tasks
+
+task 0 'publish'. lines 1-102:
+Error: compilation errors:
+ error: unsupported language construct
+   ┌─ TEMPFILE:30:17
+   │
+30 │         assert!(x.a[0] == y.a[0], 0);
+   │                 ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:30:27
+   │
+30 │         assert!(x.a[0] == y.a[0], 0);
+   │                           ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:31:18
+   │
+31 │         assert!(&x.a[0] == &y.a[0], 0);
+   │                  ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:31:29
+   │
+31 │         assert!(&x.a[0] == &y.a[0], 0);
+   │                             ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:40:17
+   │
+40 │         assert!(x.a[0] == y.a[0], 0);
+   │                 ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:40:27
+   │
+40 │         assert!(x.a[0] == y.a[0], 0);
+   │                           ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:41:18
+   │
+41 │         assert!(&x.a[0] == &y.a[0], 0);
+   │                  ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:41:29
+   │
+41 │         assert!(&x.a[0] == &y.a[0], 0);
+   │                             ^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:48:17
+   │
+48 │         assert!(x[0] == y[0], 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:48:25
+   │
+48 │         assert!(x[0] == y[0], 0);
+   │                         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:49:18
+   │
+49 │         assert!(&x[0] == &y[0], 0);
+   │                  ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:49:27
+   │
+49 │         assert!(&x[0] == &y[0], 0);
+   │                           ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:50:17
+   │
+50 │         assert!(x[1] == y[1], 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:50:25
+   │
+50 │         assert!(x[1] == y[1], 0);
+   │                         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:51:18
+   │
+51 │         assert!(&x[1] == &y[1], 0);
+   │                  ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:51:27
+   │
+51 │         assert!(&x[1] == &y[1], 0);
+   │                           ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:58:17
+   │
+58 │         assert!(x[0] == y[0], 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:58:25
+   │
+58 │         assert!(x[0] == y[0], 0);
+   │                         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:59:18
+   │
+59 │         assert!(&x[0] == &y[0], 0);
+   │                  ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:59:27
+   │
+59 │         assert!(&x[0] == &y[0], 0);
+   │                           ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:60:17
+   │
+60 │         assert!(x[1] != y[1], 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:60:25
+   │
+60 │         assert!(x[1] != y[1], 0);
+   │                         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:61:18
+   │
+61 │         assert!(&x[1] != &y[1], 0);
+   │                  ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:61:27
+   │
+61 │         assert!(&x[1] != &y[1], 0);
+   │                           ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:68:17
+   │
+68 │         assert!(x[0] == y[0], 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:68:25
+   │
+68 │         assert!(x[0] == y[0], 0);
+   │                         ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:69:18
+   │
+69 │         assert!(&x[0] == &y[0], 0);
+   │                  ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:69:27
+   │
+69 │         assert!(&x[0] == &y[0], 0);
+   │                           ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:70:17
+   │
+70 │         assert!(x[0].a == y[0].a, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:70:27
+   │
+70 │         assert!(x[0].a == y[0].a, 0);
+   │                           ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:71:18
+   │
+71 │         assert!(&x[0].a == &y[0].a, 0);
+   │                  ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+error: unsupported language construct
+   ┌─ TEMPFILE:71:29
+   │
+71 │         assert!(&x[0].a == &y[0].a, 0);
+   │                             ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2 and beyond
+
+
+
+task 1 'run'. lines 104-104:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 2 'run'. lines 106-106:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 3 'run'. lines 108-108:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 4 'run'. lines 110-110:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 5 'run'. lines 112-112:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
+task 6 'run'. lines 114-114:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

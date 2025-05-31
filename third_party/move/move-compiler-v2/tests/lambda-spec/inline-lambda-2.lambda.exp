@@ -62,7 +62,7 @@ module 0x42::m {
           assume Gt(Len<u8>($t0), 0);
         }
         ;
-        And(Eq<vector<u8>>(select m::T.issuer<&T>(obj), issuer), Gt<u64>(x, 0))
+        And(Eq<vector<u8>>(Borrow(Immutable)(select m::T.issuer<&T>(obj)), Borrow(Immutable)(issuer)), Gt<u64>(x, 0))
     }
     spec fun $inline___lambda__1_inline_1_956__test(issuer: vector<u8>,x: u64,obj: T): bool {
         And(Eq<vector<u8>>(select m::T.issuer<0x42::m::T>(obj), issuer), Gt<u64>(x, 0))
@@ -114,7 +114,7 @@ module 0x42::m {
         }
          */
         ;
-        obj.issuer == issuer && x > 0
+        &obj.issuer == &issuer && x > 0
     }
 }
 
@@ -194,7 +194,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
      var $t3: bool
      var $t4: bool
-     var $t5: vector<u8>
+     var $t5: &vector<u8>
      var $t6: &vector<u8>
      var $t7: u64
      var $t8: u64
@@ -202,9 +202,9 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
   assume Gt(Len<u8>($t0), 0);
 }
 
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
-  2: $t5 := read_ref($t6)
-  3: $t4 := ==($t5, $t0)
+  1: $t5 := borrow_field<0x42::m::T>.issuer($t2)
+  2: $t6 := borrow_local($t0)
+  3: $t4 := ==($t5, $t6)
   4: if ($t4) goto 5 else goto 10
   5: label L0
   6: $t7 := infer($t1)
@@ -609,7 +609,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
      var $t3: bool
      var $t4: bool
-     var $t5: vector<u8>
+     var $t5: &vector<u8>
      var $t6: &vector<u8>
      var $t7: u64
      var $t8: u64
@@ -633,21 +633,27 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
      # #root
      #   <no edges>
      #
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
+  1: $t5 := borrow_field<0x42::m::T>.issuer($t2)
      # abort state: {returns}
-     # live vars: $t0, $t1, $t6
-     # refs: [$t6 => #6]
-     # #6
+     # live vars: $t0, $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
      #   <no edges>
      # #root
      #   <no edges>
      #
-  2: $t5 := read_ref($t6)
+  2: $t6 := borrow_local($t0)
      # abort state: {returns}
-     # live vars: $t0, $t1, $t5
-     # refs: []
+     # live vars: $t1, $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `issuer`] at line 43
      #
-  3: $t4 := ==($t5, $t0)
+  3: $t4 := ==($t5, $t6)
      # abort state: {returns}
      # live vars: $t1, $t4
      # refs: []
@@ -764,7 +770,7 @@ module 0x42::m {
           assume Gt(Len<u8>($t0), 0);
         }
         ;
-        And(Eq<vector<u8>>(select m::T.issuer<&T>(obj), issuer), Gt<u64>(x, 0))
+        And(Eq<vector<u8>>(Borrow(Immutable)(select m::T.issuer<&T>(obj)), Borrow(Immutable)(issuer)), Gt<u64>(x, 0))
     }
     spec fun $inline___lambda__1_inline_1_956__test(issuer: vector<u8>,x: u64,obj: T): bool {
         And(Eq<vector<u8>>(select m::T.issuer<0x42::m::T>(obj), issuer), Gt<u64>(x, 0))
@@ -847,7 +853,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
      var $t3: bool
      var $t4: bool
-     var $t5: vector<u8>
+     var $t5: &vector<u8>
      var $t6: &vector<u8>
      var $t7: u64
      var $t8: u64
@@ -855,9 +861,9 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
   assume Gt(Len<u8>($t0), 0);
 }
 
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
-  2: $t5 := read_ref($t6)
-  3: $t4 := ==($t5, $t0)
+  1: $t5 := borrow_field<0x42::m::T>.issuer($t2)
+  2: $t6 := borrow_local($t0)
+  3: $t4 := ==($t5, $t6)
   4: if ($t4) goto 5 else goto 10
   5: label L0
   6: $t7 := infer($t1)
@@ -975,7 +981,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
      var $t3: bool [unused]
      var $t4: bool
-     var $t5: vector<u8>
+     var $t5: &vector<u8>
      var $t6: &vector<u8>
      var $t7: u64
      var $t8: u64
@@ -985,11 +991,11 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
 }
 
      # live vars: $t0, $t1, $t2
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
-     # live vars: $t0, $t1, $t6
-  2: $t5 := read_ref($t6)
+  1: $t5 := borrow_field<0x42::m::T>.issuer($t2)
      # live vars: $t0, $t1, $t5
-  3: $t4 := ==($t5, $t0)
+  2: $t6 := borrow_local($t0)
+     # live vars: $t1, $t5, $t6
+  3: $t4 := ==($t5, $t6)
      # live vars: $t1, $t4
   4: if ($t4) goto 5 else goto 11
      # live vars: $t1
@@ -1093,22 +1099,21 @@ B0:
 	0: Nop
 	1: MoveLoc[2](obj: &T)
 	2: ImmBorrowField[1](T.issuer: vector<u8>)
-	3: ReadRef
-	4: MoveLoc[0](issuer: vector<u8>)
-	5: Eq
-	6: BrFalse(13)
+	3: ImmBorrowLoc[0](issuer: vector<u8>)
+	4: Eq
+	5: BrFalse(12)
 B1:
-	7: MoveLoc[1](x: u64)
-	8: LdU64(0)
-	9: Gt
-	10: StLoc[3]($t4: bool)
+	6: MoveLoc[1](x: u64)
+	7: LdU64(0)
+	8: Gt
+	9: StLoc[3]($t4: bool)
 B2:
-	11: MoveLoc[3]($t4: bool)
-	12: Ret
+	10: MoveLoc[3]($t4: bool)
+	11: Ret
 B3:
-	13: LdFalse
-	14: StLoc[3]($t4: bool)
-	15: Branch(11)
+	12: LdFalse
+	13: StLoc[3]($t4: bool)
+	14: Branch(10)
 }
 }
 ============ bytecode verification succeeded ========
