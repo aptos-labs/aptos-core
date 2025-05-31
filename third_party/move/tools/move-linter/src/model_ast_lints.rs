@@ -12,6 +12,7 @@ mod needless_ref_in_field_access;
 mod nonminimal_bool;
 mod self_assignment;
 mod simpler_numeric_expression;
+mod simplifiable_boolean_expression;
 mod unnecessary_boolean_identity_comparison;
 mod unnecessary_numerical_extreme_comparison;
 mod while_true;
@@ -30,6 +31,7 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),
         Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
+        Box::<simplifiable_boolean_expression::SimplifiableBooleanExpression>::default(),
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
