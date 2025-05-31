@@ -468,6 +468,14 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                             user_use_case_spread_factor: 0,
                         };
                     }
+                    OnChainExecutionConfig::V6(config_v6) => {
+                        config_v6.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v6.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
+                    }
                 }
                 helm_values["chain"]["on_chain_execution_config"] =
                     serde_yaml::to_value(on_chain_execution_config).expect("must serialize");

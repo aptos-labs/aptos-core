@@ -83,13 +83,14 @@ impl MempoolNotificationSender for MempoolNotifier {
         // Get only user transactions from committed transactions
         let user_transactions: Vec<CommittedTransaction> = transactions
             .iter()
-            .filter_map(|transaction| match transaction {
-                Transaction::UserTransaction(signed_txn) => Some(CommittedTransaction {
-                    sender: signed_txn.sender(),
-                    replay_protector: signed_txn.replay_protector(),
-                    use_case: signed_txn.parse_use_case(),
-                }),
-                _ => None,
+            .filter_map(|transaction| {
+                transaction
+                    .try_as_signed_user_txn()
+                    .map(|signed_txn| CommittedTransaction {
+                        sender: signed_txn.sender(),
+                        replay_protector: signed_txn.replay_protector(),
+                        use_case: signed_txn.parse_use_case(),
+                    })
             })
             .collect();
 

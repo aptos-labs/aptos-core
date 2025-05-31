@@ -11,7 +11,7 @@ use aptos_gas_algebra::GasQuantity;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{
-    EntryFunction, ExecutionStatus, SignedTransaction, TransactionStatus,
+    BlockchainGeneratedInfo, EntryFunction, ExecutionStatus, SignedTransaction, TransactionStatus,
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, value::MoveValue};
 use petgraph::{algo::toposort, graph::NodeIndex, Direction, Graph};
@@ -344,6 +344,7 @@ impl DependencyGraph {
             txns.push(txn);
         }
         let outputs = executor.execute_block(txns).unwrap();
+        let mut txn_index = (outputs.len() + 2) as u32;
         for output in outputs {
             assert_eq!(
                 output.status(),
@@ -354,7 +355,15 @@ impl DependencyGraph {
         self.caculate_dependency_sizes();
         for account_idx in accounts.iter() {
             let txn = self.invoke_at(account_idx);
-            let (output, log) = executor.execute_transaction_with_gas_profiler(txn).unwrap();
+            txn_index += 1;
+            let (output, log) = executor
+                .execute_transaction_with_gas_profiler(
+                    txn,
+                    Some(BlockchainGeneratedInfo::V1 {
+                        transaction_index: txn_index,
+                    }),
+                )
+                .unwrap();
             assert_eq!(
                 output.status(),
                 &TransactionStatus::Keep(ExecutionStatus::Success)

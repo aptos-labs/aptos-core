@@ -48,6 +48,7 @@ impl Command {
             let id = block.id();
             #[allow(clippy::unwrap_in_result)]
             if self.block_id.is_none() || id == self.block_id.unwrap() {
+                // TODO[MI counter]: Figure out a way to add blockchain generated info here.
                 txns.extend(
                     extract_txns_from_block(&block, &all_batches)?
                         .into_iter()

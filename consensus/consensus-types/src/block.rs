@@ -13,13 +13,16 @@ use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     randomness::Randomness,
-    transaction::{SignedTransaction, Transaction, Version},
+    transaction::{
+        BlockchainGeneratedInfo, SignedTransaction, SignedTransactionWithInfo, Transaction, Version,
+    },
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
@@ -428,17 +431,32 @@ impl Block {
 
     pub fn combine_to_input_transactions(
         validator_txns: Vec<ValidatorTransaction>,
-        txns: Vec<SignedTransaction>,
+        user_txns: Vec<SignedTransaction>,
         metadata: BlockMetadataExt,
+        block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Vec<Transaction> {
-        once(Transaction::from(metadata))
+        let mut txns = once(Transaction::from(metadata))
             .chain(
                 validator_txns
                     .into_iter()
                     .map(Transaction::ValidatorTransaction),
             )
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .collect()
+            .collect::<Vec<_>>();
+        let start_index = txns.len();
+        txns.extend(user_txns.iter().enumerate().map(|(i, signed_txn)| {
+            if block_executor_onchain_config.blockchain_generated_info_version() == 1 {
+                let info = BlockchainGeneratedInfo::V1 {
+                    transaction_index: (start_index + i) as u32,
+                };
+                Transaction::UserTransactionWithInfo(SignedTransactionWithInfo::new(
+                    signed_txn.clone(),
+                    info,
+                ))
+            } else {
+                Transaction::UserTransaction(signed_txn.clone())
+            }
+        }));
+        txns
     }
 
     fn previous_bitvec(&self) -> BitVec {

@@ -37,7 +37,9 @@ use aptos_types::{
     account_config::ChainIdResource,
     on_chain_config::{ApprovedExecutionHashes, GasScheduleV2, OnChainConfig},
     state_store::TStateView,
-    transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    transaction::{
+        BlockchainGeneratedInfo, ExecutionStatus, Script, TransactionArgument, TransactionStatus,
+    },
 };
 use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -488,8 +490,13 @@ pub async fn simulate_multistep_proposal(
             .sign();
 
         let vm_output = if !profile_gas {
-            let (_vm_status, vm_output) =
-                vm.execute_user_transaction(&resolver, &code_storage, &txn, &log_context);
+            let (_vm_status, vm_output) = vm.execute_user_transaction(
+                &resolver,
+                &code_storage,
+                &txn,
+                &log_context,
+                Some(BlockchainGeneratedInfo::default()),
+            );
             vm_output
         } else {
             let (_vm_status, vm_output, gas_profiler) = vm
@@ -499,6 +506,7 @@ pub async fn simulate_multistep_proposal(
                     &txn,
                     &log_context,
                     GasProfiler::new_script,
+                    Some(BlockchainGeneratedInfo::default()),
                 )?;
 
             let gas_log = gas_profiler.finish();

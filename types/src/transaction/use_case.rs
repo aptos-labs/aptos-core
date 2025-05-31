@@ -67,6 +67,9 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
         let payload: Option<&TransactionPayload> = match self {
             SignatureVerifiedTransaction::Valid(txn) => match txn {
                 Transaction::UserTransaction(signed_txn) => Some(signed_txn.payload()),
+                Transaction::UserTransactionWithInfo(signed_txn) => {
+                    Some(signed_txn.transaction().payload())
+                },
                 Transaction::GenesisTransaction(_)
                 | Transaction::BlockMetadata(_)
                 | Transaction::StateCheckpoint(_)

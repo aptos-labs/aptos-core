@@ -183,7 +183,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::{
             BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            UserTransaction, UserTransactionWithInfo,
         };
         let aux_data = self
             .db
@@ -200,6 +200,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
+            },
+            UserTransactionWithInfo(txn) => {
+                let payload =
+                    self.try_into_transaction_payload(txn.transaction().payload().clone())?;
+                (txn.transaction(), info, payload, events, timestamp).into()
             },
             GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;

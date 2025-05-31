@@ -130,15 +130,30 @@ proptest! {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
 pub(crate) fn init_db(
     mut universe: AccountInfoUniverse,
     gens: Vec<(Index, SignatureCheckedTransactionGen)>,
     transaction_db: &TransactionDb,
 ) -> Vec<Transaction> {
+    use aptos_types::transaction::{BlockchainGeneratedInfo, SignedTransactionWithInfo};
+
     let txns = gens
         .into_iter()
-        .map(|(index, gen)| {
-            Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+        .enumerate()
+        .map(|(i, (index, gen))| {
+            // Committing both Transaction::UserTransaction and Transaction::UserTransactionWithInfo
+            // to test the correctness of the transaction db.
+            if i % 2 == 0 {
+                Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+            } else {
+                Transaction::UserTransactionWithInfo(SignedTransactionWithInfo::new(
+                    gen.materialize(*index, &mut universe).into_inner(),
+                    BlockchainGeneratedInfo::V1 {
+                        transaction_index: i as u32,
+                    },
+                ))
+            }
         })
         .collect::<Vec<_>>();
 
