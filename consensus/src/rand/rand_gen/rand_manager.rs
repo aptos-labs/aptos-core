@@ -184,6 +184,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     fn process_reset(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
         let target_round = match signal {
+            ResetSignal::CriticalError => 0,
             ResetSignal::Stop => 0,
             ResetSignal::TargetRound(round) => round,
         };

@@ -141,7 +141,7 @@ pub fn prepare_buffer_manager(
         execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
-        buffer_manager,
+        (buffer_manager, _),
     ) = prepare_phases_and_buffer_manager(
         author,
         mocked_execution_proxy,
