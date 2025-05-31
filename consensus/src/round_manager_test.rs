@@ -359,6 +359,10 @@ impl NodeSetup {
 
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
+        let (opt_proposal_loopback_tx, _) = aptos_channels::new_unbounded(
+            &counters::OP_COUNTERS.gauge("opt_proposal_loopback_queue"),
+        );
+
         let local_config = local_consensus_config.clone();
 
         let mut round_manager = RoundManager::new(
@@ -377,6 +381,7 @@ impl NodeSetup {
             onchain_jwk_consensus_config.clone(),
             None,
             Arc::new(MockPastProposalStatusTracker {}),
+            opt_proposal_loopback_tx,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
