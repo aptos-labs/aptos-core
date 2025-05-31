@@ -14,6 +14,7 @@ use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::future::Shared;
 use std::{future::Future, sync::Arc, time::Instant};
+use aptos_logger::info;
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -60,6 +61,7 @@ impl BlockPreparer {
                    result
                 }
         }?;
+        info!("epoch {:?}, round {:?}, txns_before_preparation: {:?}", block.epoch(), block.round(), txns.iter().map(|txn| txn.committed_hash()));
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
@@ -84,6 +86,9 @@ impl BlockPreparer {
         .await
         .expect("Failed to spawn blocking task for transaction generation");
         counters::BLOCK_PREPARER_LATENCY.observe_duration(start_time.elapsed());
-        result.map(|result| (result, block_gas_limit))
+        result.map(|result| {
+            info!("epoch {:?}, round {:?}, txns_after_preparation: {:?}", block.epoch(), block.round(), result.iter().map(|txn| txn.committed_hash()));
+            (result, block_gas_limit)
+        })
     }
 }
