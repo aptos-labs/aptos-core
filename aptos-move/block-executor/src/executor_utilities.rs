@@ -14,6 +14,7 @@ use aptos_types::{
 use aptos_vm_logging::{alert, prelude::*};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
+#[cfg(test)]
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
@@ -86,7 +87,8 @@ pub(crate) use resource_writes_to_materialize;
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
-    finalized_group: anyhow::Result<(Vec<(T::Tag, ValueWithLayout<T::Value>)>, ResourceGroupSize)>,
+    finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+    group_size: ResourceGroupSize,
     metadata_op: T::Value,
     is_read_needing_exchange: bool,
 ) -> Result<
@@ -100,29 +102,21 @@ pub(crate) fn map_finalized_group<T: Transaction>(
 > {
     let metadata_is_deletion = metadata_op.is_deletion();
 
-    match finalized_group {
-        Ok((finalized_group, group_size)) => {
-            if is_read_needing_exchange && metadata_is_deletion {
-                // Value needed exchange but was not written / modified during the txn
-                // execution: may not be empty.
-                Err(code_invariant_error(
-                    "Value only read and exchanged, but metadata op is Deletion".to_string(),
-                ))
-            } else if finalized_group.is_empty() != metadata_is_deletion {
-                // finalize_group already applies the deletions.
-                Err(code_invariant_error(format!(
-                    "Group is empty = {} but op is deletion = {} in parallel execution",
-                    finalized_group.is_empty(),
-                    metadata_is_deletion
-                )))
-            } else {
-                Ok((group_key, metadata_op, finalized_group, group_size))
-            }
-        },
-        Err(e) => Err(code_invariant_error(format!(
-            "Error committing resource group {:?}",
-            e
-        ))),
+    if is_read_needing_exchange && metadata_is_deletion {
+        // Value needed exchange but was not written / modified during the txn
+        // execution: may not be empty.
+        Err(code_invariant_error(
+            "Value only read and exchanged, but metadata op is Deletion".to_string(),
+        ))
+    } else if finalized_group.is_empty() != metadata_is_deletion {
+        // finalize_group already applies the deletions.
+        Err(code_invariant_error(format!(
+            "Group is empty = {} but op is deletion = {} in parallel execution",
+            finalized_group.is_empty(),
+            metadata_is_deletion
+        )))
+    } else {
+        Ok((group_key, metadata_op, finalized_group, group_size))
     }
 }
 
@@ -134,6 +128,7 @@ pub(crate) fn serialize_groups<T: Transaction>(
         ResourceGroupSize,
     )>,
 ) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
+    #[cfg(test)]
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),

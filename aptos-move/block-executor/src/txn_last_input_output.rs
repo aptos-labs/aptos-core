@@ -52,6 +52,7 @@ pub(crate) enum KeyKind<T> {
     Resource,
     // Contains the set of tags for the given group key.
     Group(HashSet<T>),
+    AggregatorV1,
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
@@ -234,15 +235,17 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
-                        .map(|(k, _, _)| k)
-                        .chain(t.aggregator_v1_write_set().into_keys())
+                        .map(|(k, _, _)| (k, KeyKind::Resource))
+                        .chain(
+                            t.aggregator_v1_write_set()
+                                .into_keys()
+                                .map(|k| (k, KeyKind::AggregatorV1)),
+                        )
                         .chain(
                             t.aggregator_v1_delta_set()
                                 .into_iter()
-                                .map(|(k, _)| k)
-                                .collect::<Vec<_>>(),
+                                .map(|(k, _)| (k, KeyKind::AggregatorV1)),
                         )
-                        .map(|k| (k, KeyKind::Resource))
                         .chain(
                             group_keys_and_tags
                                 .into_iter()
