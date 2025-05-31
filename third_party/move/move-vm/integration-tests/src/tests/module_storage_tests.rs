@@ -56,7 +56,7 @@ fn test_module_does_not_exist() {
     let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
     assert!(!assert_ok!(result));
 
-    let result = module_storage.fetch_module_size_in_bytes(&AccountAddress::ZERO, ident_str!("a"));
+    let result = module_storage.unmetered_get_module_size(&AccountAddress::ZERO, ident_str!("a"));
     assert_none!(assert_ok!(result));
 
     let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
