@@ -213,16 +213,16 @@ impl LogEntry {
 
         let peer_id: Option<&str>;
         let chain_id: Option<u8>;
-        let git_hash: Option<&str>;
+        let git_hash: Option<&'static str>;
 
-        #[cfg(node_identity)]
+        #[cfg(feature = "aptos-node-identity")]
         {
             peer_id = aptos_node_identity::peer_id_as_str();
             chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
             git_hash = aptos_node_identity::git_hash();
         }
 
-        #[cfg(not(node_identity))]
+        #[cfg(not(feature = "aptos-node-identity"))]
         {
             peer_id = None;
             chain_id = None;
@@ -301,7 +301,7 @@ impl LogEntry {
         self.chain_id
     }
 
-    pub fn git_hash(&self) -> Option<&str> {
+    pub fn git_hash(&self) -> Option<&'static str> {
         self.git_hash
     }
 }

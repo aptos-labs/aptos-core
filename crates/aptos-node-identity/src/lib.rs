@@ -15,7 +15,7 @@ pub struct AptosNodeIdentity {
     pub peer_id: Option<PeerId>,
     // Holds Peer ID as String to reduce overhead for frequent lookups.
     pub peer_id_str: Option<String>,
-    pub git_hash: OnceCell<String>,
+    pub git_hash: OnceCell<&'static str>,
 }
 
 /// Initializes the [AptosNodeIdentity] using the provided [PeerId] and
@@ -53,10 +53,12 @@ pub fn set_git_hash(git_hash: String) -> Result<()> {
     } else {
         git_hash.to_string()
     };
+    // Convert to &'static str by leaking the String
+    let static_hash = Box::leak(short_git_hash.into_boxed_str());
     match APTOS_NODE_IDENTITY.get() {
         Some(identity) => identity
             .git_hash
-            .set(short_git_hash)
+            .set(static_hash)
             .map_err(|_| format_err!("git_hash was already set.")),
         None => Err(format_err!("APTOS_NODE_IDENTITY has not been set yet")),
     }
@@ -81,6 +83,13 @@ pub fn chain_id() -> Option<ChainId> {
     APTOS_NODE_IDENTITY
         .get()
         .and_then(|identity| identity.chain_id.get().cloned())
+}
+
+/// Returns the [GitHash] as [str] from the global `APTOS_NODE_IDENTITY`
+pub fn git_hash() -> Option<&'static str> {
+    APTOS_NODE_IDENTITY
+        .get()
+        .and_then(|identity| identity.git_hash.get().copied())
 }
 
 #[cfg(test)]
