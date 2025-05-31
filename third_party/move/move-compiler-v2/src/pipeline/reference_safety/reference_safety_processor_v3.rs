@@ -19,9 +19,12 @@
 //!
 //! Prerequisites: there are no uninitialized locals.
 
-use crate::pipeline::{
-    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-    reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset},
+use crate::{
+    pipeline::{
+        livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+        reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset},
+    },
+    Experiment, Options,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -362,6 +365,8 @@ struct LifeTimeAnalysis<'env> {
     target: &'env FunctionTarget<'env>,
     /// The live-var annotation extracted from a previous phase
     live_var_annotation: &'env LiveVarAnnotation,
+    /// If true, any errors generated during this analysis are suppressed.
+    suppress_errors: bool,
 }
 
 /// A structure encapsulating, in addition to the analysis context, context
@@ -565,13 +570,15 @@ impl LifetimeAnalysisStep<'_, '_> {
         primary: impl AsRef<str>,
         hints: impl Iterator<Item = (Loc, String)>,
     ) {
-        self.global_env().diag_with_primary_and_labels(
-            Severity::Error,
-            loc.as_ref(),
-            msg.as_ref(),
-            primary.as_ref(),
-            hints.collect(),
-        )
+        if !self.parent.suppress_errors {
+            self.global_env().diag_with_primary_and_labels(
+                Severity::Error,
+                loc.as_ref(),
+                msg.as_ref(),
+                primary.as_ref(),
+                hints.collect(),
+            )
+        }
     }
 
     #[inline]
@@ -1140,9 +1147,16 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("livevar annotation");
+        let suppress_errors = !fun_env
+            .module_env
+            .env
+            .get_extension::<Options>()
+            .unwrap_or_default()
+            .experiment_on(Experiment::REPORT_ERRORS_REF_SAFETY);
         let analyzer = LifeTimeAnalysis {
             target: &target,
             live_var_annotation,
+            suppress_errors,
         };
         let code = target.get_bytecode();
         let cfg = StacklessControlFlowGraph::new_forward(code);
