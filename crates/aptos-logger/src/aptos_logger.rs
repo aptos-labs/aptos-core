@@ -121,6 +121,7 @@ pub struct LogEntry {
     message: Option<String>,
     peer_id: Option<&'static str>,
     chain_id: Option<u8>,
+    git_hash: Option<&'static str>,
 }
 
 // implement custom serializer for LogEntry since we want to promote the `metadata.level` field into a top-level `level` field
@@ -154,6 +155,9 @@ impl Serialize for LogEntry {
         }
         if let Some(peer_id) = &self.peer_id {
             state.serialize_field("peer_id", peer_id)?;
+        }
+        if let Some(git_hash) = &self.git_hash {
+            state.serialize_field("git_hash", git_hash)?;
         }
         state.end()
     }
@@ -209,17 +213,20 @@ impl LogEntry {
 
         let peer_id: Option<&str>;
         let chain_id: Option<u8>;
+        let git_hash: Option<&str>;
 
         #[cfg(node_identity)]
         {
             peer_id = aptos_node_identity::peer_id_as_str();
             chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
+            git_hash = aptos_node_identity::git_hash();
         }
 
         #[cfg(not(node_identity))]
         {
             peer_id = None;
             chain_id = None;
+            git_hash = None;
         }
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
@@ -250,6 +257,7 @@ impl LogEntry {
             message,
             peer_id,
             chain_id,
+            git_hash,
         }
     }
 
@@ -291,6 +299,10 @@ impl LogEntry {
 
     pub fn chain_id(&self) -> Option<u8> {
         self.chain_id
+    }
+
+    pub fn git_hash(&self) -> Option<&str> {
+        self.git_hash
     }
 }
 
@@ -967,10 +979,11 @@ mod tests {
         let original_timestamp = entry.timestamp;
         entry.timestamp = String::from("2022-07-24T23:42:29.540278Z");
         entry.hostname = Some("test-host");
+        entry.git_hash = Some("1234567");
         line_num += 1;
         let thread_name = thread::current().name().map(|s| s.to_string()).unwrap();
 
-        let expected = format!("{{\"level\":\"INFO\",\"source\":{{\"package\":\"aptos_logger\",\"file\":\"crates/aptos-logger/src/aptos_logger.rs:{line_num}\"}},\"thread_name\":\"{thread_name}\",\"hostname\":\"test-host\",\"timestamp\":\"2022-07-24T23:42:29.540278Z\",\"message\":\"This is a log\",\"data\":{{\"bar\":\"foo_bar\",\"category\":\"name\",\"display\":\"12345\",\"foo\":5,\"test\":true}}}}");
+        let expected = format!("{{\"level\":\"INFO\",\"source\":{{\"package\":\"aptos_logger\",\"file\":\"crates/aptos-logger/src/aptos_logger.rs:{line_num}\"}},\"thread_name\":\"{thread_name}\",\"hostname\":\"test-host\",\"timestamp\":\"2022-07-24T23:42:29.540278Z\",\"message\":\"This is a log\",\"data\":{{\"bar\":\"foo_bar\",\"category\":\"name\",\"display\":\"12345\",\"foo\":5,\"test\":true}},\"git_hash\":\"1234567\"}}");
 
         assert_eq!(json_format(&entry).unwrap(), expected);
 
