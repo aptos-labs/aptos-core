@@ -230,7 +230,24 @@ impl NumberOperationAnalysis<'_> {
                     // Update num_oper for the node for the temporary variable
                     global_state.update_node_oper(*id, *oper, true);
                 },
-                ExpData::Block(id, _, _, exp) => {
+                ExpData::Block(id, pattern, opt_exp, exp) => {
+                    // Assume that the pattern is a single variable because spec does not support
+                    // tuple or function that returns a tuple for now
+                    if let move_model::ast::Pattern::Var(pid, _) = pattern {
+                        if let Some(exp) = opt_exp {
+                            let source_ty = self.func_target.global_env().get_node_type(*pid);
+                            if matches!(source_ty, Type::Primitive(PrimitiveType::Num)) {
+                                self.func_target.global_env().update_node_type(
+                                    *pid,
+                                    self.func_target
+                                        .global_env()
+                                        .get_node_type(exp.node_id())
+                                        .skip_reference()
+                                        .clone(),
+                                );
+                            }
+                        }
+                    }
                     let exp_oper = global_state.get_node_num_oper(exp.node_id());
                     global_state.update_node_oper(*id, exp_oper, true);
                 },

@@ -77,6 +77,24 @@ address 0x123 {
       if (e == (0 as u64)) { int2bv((1 as u64)) } else { n & spec_bv_and(n, e - int2bv((1 as u64))) }
     }
 
+    fun bv_shl_256(n: u256, e: u8): u256 {
+      n << e
+    }
+    spec bv_shl_256 {
+      pragma bv=b"0,1";
+      pragma bv_ret=b"0";
+      aborts_if false;
+    }
+
+    fun bv_shr_256(n: u256, e: u8): u256 {
+      n >> e
+    }
+    spec bv_shr_256 {
+      pragma bv=b"0,1";
+      pragma bv_ret=b"0";
+      aborts_if false;
+    }
+
   }
 
 }

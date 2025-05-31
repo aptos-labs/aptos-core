@@ -701,10 +701,15 @@ function $shlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{in
 
 procedure {:inline 1} $ShlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (dst: bv{{impl.base}})
 {
+    {%- if impl.base != 256 or instance != 8 %}
     if ($Ge'Bv{{instance}}'(src2, {{impl.base}}bv{{instance}})) {
         call $ExecFailureAbort();
         return;
     }
+    {% else %}
+    assume $bv2int.{{instance}}(src2) >= 0 && $bv2int.{{instance}}(src2) < 256;
+    {%- endif %}
+
     {%- if base_diff > 0 %}
     dst := $Shl'Bv{{impl.base}}'(src1, 0bv{{base_diff}} ++ src2);
     {%- elif base_diff == 0 %}
@@ -727,10 +732,15 @@ function $shrBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{in
 
 procedure {:inline 1} $ShrBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (dst: bv{{impl.base}})
 {
+    {%- if impl.base != 256 or instance != 8 %}
     if ($Ge'Bv{{instance}}'(src2, {{impl.base}}bv{{instance}})) {
         call $ExecFailureAbort();
         return;
     }
+    {% else %}
+    assume $bv2int.{{instance}}(src2) >= 0 && $bv2int.{{instance}}(src2) < 256;
+    {%- endif %}
+
     {%- if base_diff > 0 %}
     dst := $Shr'Bv{{impl.base}}'(src1, 0bv{{base_diff}} ++ src2);
     {%- elif base_diff == 0 %}
