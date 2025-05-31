@@ -13,7 +13,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Value},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 
 #[derive(Default)]
@@ -24,8 +24,9 @@ impl ExpChecker for NeedlessBool {
         "needless_bool".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::IfElse;
+        let env = function.env();
         if let IfElse(id, _, then, else_) = expr {
             match Self::fixed_bool_values(then, else_) {
                 None => {},
