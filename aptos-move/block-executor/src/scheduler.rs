@@ -21,6 +21,7 @@ const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
 pub type Wave = u32;
 
+// try_lock succeeds when the lock is unlocked and armed (there is work to do).
 #[derive(Debug)]
 pub struct ArmedLock {
     // Last bit:   1 -> unlocked; 0 -> locked
