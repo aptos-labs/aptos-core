@@ -49,7 +49,7 @@ Key Responsibilities:
 4.  **Commit Sequencing**: `SchedulerV2` ensures that transactions are committed in their
     original sequence (by transaction index). It manages a `next_to_commit_idx` and uses
     `CommitMarkerFlag`s to track the commit state of each transaction (NotCommitted,
-    PendingCommitHook, Committed). A lock (`queueing_commits_lock`) is used to serialize
+    CommitStarted, Committed). A lock (`queueing_commits_lock`) is used to serialize
     the dispatching of sequential commit hooks. Once the lock is acquired,
     `[SchedulerV2::start_commit]` and `[SchedulerV2::end_commit]` are called to
     start and end the commit process for a transaction (which includes the caller
@@ -121,7 +121,7 @@ pub(crate) struct AbortManager<'a> {
     // Transaction index in the map implies a write by (owner_txn_idx, owner_incarnation)
     // invalidated a read by the said transaction. If the incarnation is stored in the
     // entry, then start_abort call was successful, implying a promise to call finish_abort.
-    invalidations: BTreeMap<TxnIndex, Option<Incarnation>>,
+    invalidated_dependencies: BTreeMap<TxnIndex, Option<Incarnation>>,
 }
 
 impl<'a> AbortManager<'a> {
@@ -134,7 +134,7 @@ impl<'a> AbortManager<'a> {
             owner_txn_idx,
             owner_incarnation,
             scheduler,
-            invalidations: BTreeMap::new(),
+            invalidated_dependencies: BTreeMap::new(),
         }
     }
 
@@ -142,6 +142,8 @@ impl<'a> AbortManager<'a> {
         &mut self,
         dependencies: BTreeSet<(TxnIndex, Incarnation)>,
     ) -> Result<(), PanicError> {
+        // Might want to consider iterating over incarnations in reverse order to ensure
+        // that invalidate method implementation can avoid outdated try_abort calls.
         for (txn_idx, incarnation) in dependencies {
             self.invalidate(txn_idx, incarnation)?;
         }
@@ -163,9 +165,10 @@ impl<'a> AbortManager<'a> {
             )));
         }
 
-        // Decide whether to proceed with an abort attempt based on the current state of `self.invalidations`.
-        // This initial check is read-only to avoid borrow conflicts with `self.start_abort`.
-        let action_needed = match self.invalidations.get(&invalidated_txn_idx) {
+        // Decide whether to proceed with an abort attempt based on the current state of
+        // `self.invalidated_dependencies`. Separated in two steps (as computing action_needed,
+        // then performing the action) in order to satisfy the borrowing rules.
+        let action_needed = match self.invalidated_dependencies.get(&invalidated_txn_idx) {
             None => {
                 // An abort attempt is needed as there's no prior record for this `invalidated_txn_idx`.
                 true
@@ -196,7 +199,8 @@ impl<'a> AbortManager<'a> {
                 // or a newer incarnation (compared to the current invalidation) has already been
                 // successfully aborted by this AbortManager instance. This can happen because
                 // the reads from outdated incarnations are not assumed to be (eagerly) cleared.
-                // In such cases, no new abort action is needed for this specific call.
+                // In such cases, no new abort action is needed for this specific call. Note also
+                // that an incarnation can register multiple reads that may later be invalidated.
                 false
             },
         };
@@ -207,7 +211,7 @@ impl<'a> AbortManager<'a> {
 
             // Update self.invalidations with the outcome. This will either insert a new entry
             // or update an existing one from None to Some(outcome).
-            self.invalidations
+            self.invalidated_dependencies
                 .insert(invalidated_txn_idx, abort_outcome);
         }
 
@@ -233,9 +237,8 @@ impl<'a> AbortManager<'a> {
             .then_some(incarnation))
     }
 
-    // Returns an iterator over invalidated transaction indices, as well as full versions,
-    // i.e. (txn_idx, incarnation) pairs, for which start_abort was successful. For those
-    // versions, the finish abort still needs to be performed.
+    // For invalidated dependencies that are mapped to an incarnation, [SchedulerV2::start_abort]
+    // was successful, and the [SchedulerV2::finish_abort] still needs to be performed.
     fn take(
         self,
     ) -> (
@@ -246,7 +249,7 @@ impl<'a> AbortManager<'a> {
         (
             self.owner_txn_idx,
             self.owner_incarnation,
-            self.invalidations,
+            self.invalidated_dependencies,
         )
     }
 }
@@ -299,7 +302,7 @@ impl AbortedDependencies {
     fn add_stall(
         &mut self,
         statuses: &ExecutionStatuses,
-        propagation_queue: &mut BTreeSet<usize>,
+        stall_propagation_queue: &mut BTreeSet<usize>,
     ) -> Result<(), PanicError> {
         for idx in &self.not_stalled_deps {
             // Assert the invariant in tests.
@@ -308,7 +311,7 @@ impl AbortedDependencies {
 
             if statuses.add_stall(*idx)? {
                 // May require recursive add_stalls.
-                propagation_queue.insert(*idx as usize);
+                stall_propagation_queue.insert(*idx as usize);
             }
         }
 
@@ -317,13 +320,14 @@ impl AbortedDependencies {
         Ok(())
     }
 
-    // Calls remove_stall on the status and adds all indices from stalled to not_stalled.
-    // Inserts indices for which remove_stall returned true into the propagation queue.
-    // Additionally if status requires execution, index is added to the scheduling queue.
+    // Calls [ExecutionStatuses::remove_stall] on the status and adds all indices from
+    // stalled to not_stalled. Inserts indices for which remove_stall returned true into
+    // the stall propagation queue. If such status is pending scheduling, ExecutionStatuses
+    // uses execution queue manager to add the transaction to execution queue.
     fn remove_stall(
         &mut self,
         statuses: &ExecutionStatuses,
-        propagation_queue: &mut BTreeSet<usize>,
+        stall_propagation_queue: &mut BTreeSet<usize>,
     ) -> Result<(), PanicError> {
         for idx in &self.stalled_deps {
             // Assert the invariant in tests.
@@ -332,7 +336,7 @@ impl AbortedDependencies {
 
             if statuses.remove_stall(*idx)? {
                 // May require recursive remove_stalls.
-                propagation_queue.insert(*idx as usize);
+                stall_propagation_queue.insert(*idx as usize);
             }
         }
 
@@ -458,7 +462,7 @@ pub(crate) enum TaskKind {
 /// These constant flag values are stored in `SchedulerV2::committed_marker` for each transaction
 /// to track its progress through the final stages of the commit process.
 ///
-/// The typical lifecycle is: `NotCommitted` -> `PendingCommitHook` -> `Committed`.
+/// The typical lifecycle is: `NotCommitted` -> `CommitStarted` -> `Committed`.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq)]
 enum CommitMarkerFlag {
@@ -468,9 +472,9 @@ enum CommitMarkerFlag {
     /// The transaction has been identified as the next to commit, and its sequential
     /// commit hook has been dispatched (obtained via `[SchedulerV2::start_commit]`).
     /// The system is now waiting for `[SchedulerV2::end_commit]` to be called for this transaction.
-    PendingCommitHook = 1,
+    CommitStarted = 1,
     /// The transaction's sequential commit hook has been successfully performed (indicated
-    /// by a call to `[SchedulerV2::commit_hook_performed]`), and it is now fully committed from the
+    /// by a call to `[SchedulerV2::end_commit]`), and it is now fully committed from the
     /// scheduler's perspective. Its `PostCommitProcessing` task can now be scheduled.
     Committed = 2,
 }
@@ -511,7 +515,7 @@ pub(crate) struct SchedulerV2 {
     /// are ready for their parallel post-commit processing phase.
     post_commit_processing_queue: CachePadded<ConcurrentQueue<TxnIndex>>,
     /// For each transaction `i`, `committed_marker[i]` stores its `CommitMarkerFlag`,
-    /// indicating its current stage in the commit process (NotCommitted, PendingCommitHook, Committed).
+    /// indicating its current stage in the commit process (NotCommitted, CommitStarted, Committed).
     committed_marker: Vec<CachePadded<AtomicU8>>,
 }
 
@@ -546,11 +550,112 @@ impl SchedulerV2 {
         }
     }
 
-    /// Called by a worker after it has successfully executed the sequential commit hook for `txn_idx`.
+    /// Attempts to acquire the `queueing_commits_lock` in a non-blocking way.
+    ///
+    /// Workers should call this to gain exclusive access to the critical section for
+    /// dispatching sequential commit hooks. If the lock is acquired (`true`), the worker
+    /// should proceed to call `[SchedulerV2::start_commit]` repeatedly, and then ensure
+    /// `[SchedulerV2::commit_hooks_unlock]` is called.
+    ///
+    /// Returns `true` if the lock was acquired, `false` otherwise.
+    pub(crate) fn commit_hooks_try_lock(&self) -> bool {
+        self.queueing_commits_lock.try_lock()
+    }
+
+    /// Attempts to get the next transaction index that is ready to be committed. This method
+    /// MUST be called only while holding the `queueing_commits_lock` (acquired via
+    /// [SchedulerV2::commit_hooks_try_lock]). The worker can then perform a critical section
+    /// consisting of any logic for committing a txn that needs to occur sequentially.
+    /// The completion of this sequential commit hook logic must be followed by a call to
+    /// [SchedulerV2::end_commit].
+    ///
+    /// The method checks the following conditions:
+    /// 1. The scheduler is not halted.
+    /// 2. `next_to_commit_idx` is less than `num_txns` (i.e., there are transactions remaining).
+    /// 3. The transaction at `next_to_commit_idx` has its status as `Executed` (verified by
+    ///    `[ExecutionStatuses::is_executed]`).
+    ///
+    /// If all conditions are met:
+    /// - The `committed_marker` for `next_to_commit_idx` is updated from `NotCommitted` to
+    ///   `CommitStarted`. Panics if the marker was not `NotCommitted`.
+    /// - `next_to_commit_idx` is atomically incremented.
+    /// - Returns `Ok(Some((txn_idx, incarnation)))` for the transaction to be committed.
+    ///
+    /// If conditions are not met it returns `Ok(None)` or an `Err` for invariant violations.
+    ///
+    /// An important invariant check: Before attempting to dispatch transaction `i`, it verifies
+    /// that transaction `i-1` has its `committed_marker` as `Committed`. This ensures strict
+    /// sequential processing of commit hooks.
+    pub(crate) fn start_commit(&self) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
+        // Relaxed ordering due to armed lock acq-rel.
+        let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
+
+        assert!(next_to_commit_idx <= self.num_txns);
+        if next_to_commit_idx > 0 {
+            // Since the commit hooks lock is held by caller during this method and while performing
+            // the hook itself, the marker here should be 'COMMITTED'. NOT_COMMITTED means the previous
+            // call to start_commit that must have increased the index did not set the status, while
+            // PENDING_COMMIT_HOOK means the caller never successfully followed the hook by the
+            // end_commit call (should only happen in error scenarios).
+            let prev_committed_marker =
+                self.committed_marker[next_to_commit_idx as usize - 1].load(Ordering::Relaxed);
+            if prev_committed_marker != CommitMarkerFlag::Committed as u8 {
+                return Err(code_invariant_error(format!(
+                    "Trying to get commit hook for {}, but previous index marker {} != {} (COMMITTED)",
+                    next_to_commit_idx, prev_committed_marker, CommitMarkerFlag::Committed as u8,
+                )));
+            };
+        }
+
+        if self.is_halted() || next_to_commit_idx == self.num_txns {
+            // All sequential commit hooks are already dispatched.
+            return Ok(None);
+        }
+
+        if self.txn_statuses.is_executed(next_to_commit_idx) {
+            // All prior transactions are committed and the latest incarnation of the transaction
+            // at next_to_commit_idx has finished but has not been aborted. If any of its reads was
+            // incorrect, it would have been invalidated by the respective transaction's last
+            // (committed) (re-)execution, and led to an abort in the corresponding finish execution
+            // (which, inductively, must occur before the transaction is committed). Hence, it
+            // must also be safe to commit the current transaction.
+
+            if self.committed_marker[next_to_commit_idx as usize]
+                .swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
+                != CommitMarkerFlag::NotCommitted as u8
+            {
+                return Err(code_invariant_error(format!(
+                    "Marking {} as PENDING_COMMIT_HOOK, but previous marker != NOT_COMMITTED",
+                    self.post_commit_processing_queue.len()
+                )));
+            }
+
+            // TODO(BlockSTMv2): fetch_add as a RMW instruction causes a barrier even with
+            // Relaxed ordering. The read is only used to check an invariant, so we can
+            // eventually change to just a relaxed write.
+            let prev_idx = self.next_to_commit_idx.fetch_add(1, Ordering::Relaxed);
+            if prev_idx != next_to_commit_idx {
+                return Err(code_invariant_error(format!(
+                    "Scheduler committing {}, stored next to commit idx = {}",
+                    next_to_commit_idx, prev_idx
+                )));
+            }
+
+            return Ok(Some((
+                next_to_commit_idx,
+                self.txn_statuses.incarnation(next_to_commit_idx),
+            )));
+        }
+
+        Ok(None)
+    }
+
+    /// Called by a worker after it has successfully executed sequential commit hook logic
+    /// for 'txn_idx' in the critical section following [SchedulerV2::start_commit].
     ///
     /// This method performs two main actions:
-    /// 1. Updates the `committed_marker` for `txn_idx` from `PendingCommitHook` to `Committed`.
-    ///    Panics if the previous marker was not `PendingCommitHook`.
+    /// 1. Updates the `committed_marker` for `txn_idx` from `CommitStarted` to `Committed`.
+    ///    Panics if the previous marker was not `CommitStarted`.
     /// 2. Pushes `txn_idx` to the `post_commit_processing_queue`, making it available for
     ///    a `PostCommitProcessing` task to be dispatched by `[SchedulerV2::next_task]`.
     ///    Panics if the queue push fails (e.g., if the queue is full, which shouldn't happen
@@ -560,21 +665,24 @@ impl SchedulerV2 {
     /// `[SchedulerV2::start_commit]`, and that the `queueing_commits_lock` was held
     /// by the worker during the execution of the commit hook and this call.
     pub(crate) fn end_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
-        // Allows next sequential commit hook to be processed.
-        if self.committed_marker[txn_idx as usize]
-            .swap(CommitMarkerFlag::Committed as u8, Ordering::Relaxed)
-            != CommitMarkerFlag::PendingCommitHook as u8
-        {
+        let prev_marker = self.committed_marker[txn_idx as usize].load(Ordering::Relaxed);
+        if prev_marker != CommitMarkerFlag::CommitStarted as u8 {
             return Err(code_invariant_error(format!(
-                "Marking txn {} as COMMITTED, but previous marker != PENDING_COMMIT_HOOK",
-                txn_idx
+                "Marking txn {} as COMMITTED, but previous marker {} != {}",
+                txn_idx,
+                prev_marker,
+                CommitMarkerFlag::CommitStarted as u8
             )));
         }
+        // Allows next sequential commit hook to be processed.
+        self.committed_marker[txn_idx as usize]
+            .store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
 
-        if self.post_commit_processing_queue.push(txn_idx).is_err() {
+        if let Err(e) = self.post_commit_processing_queue.push(txn_idx) {
             return Err(code_invariant_error(format!(
-                "Error adding {txn_idx} to commit queue, len {}",
-                self.post_commit_processing_queue.len()
+                "Error adding {txn_idx} to commit queue, len {}, error: {:?}",
+                self.post_commit_processing_queue.len(),
+                e
             )));
         }
 
@@ -600,107 +708,6 @@ impl SchedulerV2 {
         }
 
         self.queueing_commits_lock.unlock();
-    }
-
-    /// Attempts to acquire the `queueing_commits_lock` in a non-blocking way.
-    ///
-    /// Workers should call this to gain exclusive access to the critical section for
-    /// dispatching sequential commit hooks. If the lock is acquired (`true`), the worker
-    /// should proceed to call `[SchedulerV2::start_commit]` repeatedly, and then ensure
-    /// `[SchedulerV2::commit_hooks_unlock]` is called.
-    ///
-    /// Returns `true` if the lock was acquired, `false` otherwise.
-    pub(crate) fn commit_hooks_try_lock(&self) -> bool {
-        self.queueing_commits_lock.try_lock()
-    }
-
-    /// Should be called (i.e. in a while loop until None) after a successful should_perform_commit_hooks
-    /// call. Completing the hooks should be followed by a commit_hook_performed call.
-    /// Attempts to get the next transaction index that is ready for its sequential commit hook.
-    ///
-    /// This method MUST be called only while holding the `queueing_commits_lock` (acquired via
-    /// `[SchedulerV2::commit_hooks_try_lock]`).
-    ///
-    /// It checks the following conditions:
-    /// 1. The scheduler is not halted.
-    /// 2. `next_to_commit_idx` is less than `num_txns` (i.e., there are transactions remaining).
-    /// 3. The transaction at `next_to_commit_idx` has its status as `Executed` (verified by
-    ///    `[ExecutionStatuses::is_executed]`).
-    ///
-    /// If all conditions are met:
-    /// - The `committed_marker` for `next_to_commit_idx` is updated from `NotCommitted` to
-    ///   `PendingCommitHook`. Panics if the marker was not `NotCommitted`.
-    /// - `next_to_commit_idx` is atomically incremented.
-    /// - Returns `Ok(Some((txn_idx, incarnation)))` for the transaction to be committed.
-    ///
-    /// If conditions are not met it returns `Ok(None)` or an `Err` for invariant violations.
-    ///
-    /// An important invariant check: Before attempting to dispatch transaction `i`, it verifies
-    /// that transaction `i-1` has its `committed_marker` as `Committed`. This ensures strict
-    /// sequential processing of commit hooks.
-    pub(crate) fn start_commit(&self) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
-        // Relaxed ordering due to armed lock acq-rel.
-        let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
-
-        assert!(next_to_commit_idx <= self.num_txns);
-        if next_to_commit_idx > 0 {
-            // Since the commit hooks lock is held by caller during this method and while performing
-            // the hook itself, the marker here should be 'COMMITTED'. NOT_COMMITTED means the previous
-            // call to start_commit that must have increased the index did not set the status, while
-            // PENDING_COMMIT_HOOK means the caller never successfully followed the hook by the
-            // end_commit call (should only happen in error scenarios).
-            let prev_committed_marker =
-                self.committed_marker[next_to_commit_idx as usize - 1].load(Ordering::Relaxed);
-            if prev_committed_marker != CommitMarkerFlag::Committed as u8 {
-                return Err(code_invariant_error(format!(
-                    "Trying to get commit hook for {}, but previous index marker {} != 2 (COMMITTED)",
-                    next_to_commit_idx, prev_committed_marker,
-                )));
-            };
-        }
-
-        if self.is_halted() || next_to_commit_idx == self.num_txns {
-            // All sequential commit hooks are already dispatched.
-            return Ok(None);
-        }
-
-        if self.txn_statuses.is_executed(next_to_commit_idx) {
-            // All prior transactions are committed and the latest incarnation of the transaction
-            // at next_to_commit_idx has finished but has not been aborted. If any of its read was
-            // incorrect, it would have been invalidated by the respective transaction's last
-            // (committed) (re-)execution, and led to an abort in the corresponding finish execution
-            // (which, inductively, must occur before the transaction is committed). Hence, it
-            // must also be safe to commit the current transaction.
-
-            if self.committed_marker[next_to_commit_idx as usize]
-                .swap(CommitMarkerFlag::PendingCommitHook as u8, Ordering::Relaxed)
-                != CommitMarkerFlag::NotCommitted as u8
-            {
-                return Err(code_invariant_error(format!(
-                    "Marking {} as PENDING_COMMIT_HOOK, but previous marker != NOT_COMMITTED",
-                    self.post_commit_processing_queue.len()
-                )));
-            }
-
-            // Increments cause cache invalidations, but finish_execution / try_commit
-            // performs only a relaxed read to check (see above).
-            let prev_idx = self
-                .next_to_commit_idx
-                .swap(next_to_commit_idx + 1, Ordering::Relaxed);
-            if prev_idx != next_to_commit_idx {
-                return Err(code_invariant_error(format!(
-                    "Scheduler committing {}, stored next to commit idx = {}",
-                    next_to_commit_idx, prev_idx
-                )));
-            }
-
-            return Ok(Some((
-                next_to_commit_idx,
-                self.txn_statuses.incarnation(next_to_commit_idx),
-            )));
-        }
-
-        Ok(None)
     }
 
     /// Checks if the `post_commit_processing_queue` is empty.
@@ -733,6 +740,21 @@ impl SchedulerV2 {
         Ok(ret)
     }
 
+    fn pop_post_commit_task(&self) -> Result<Option<TxnIndex>, PanicError> {
+        match self.post_commit_processing_queue.pop() {
+            Ok(txn_idx) => {
+                if txn_idx == self.num_txns - 1 {
+                    self.is_done.store(true, Ordering::SeqCst);
+                }
+                Ok(Some(txn_idx))
+            },
+            Err(PopError::Empty) => Ok(None),
+            Err(PopError::Closed) => {
+                Err(code_invariant_error("Commit queue should never be closed"))
+            },
+        }
+    }
+
     /// Fetches the next task for a worker thread.
     ///
     /// This is the primary method workers call to get work from the scheduler.
@@ -761,22 +783,16 @@ impl SchedulerV2 {
             return Ok(TaskKind::Done);
         }
 
-        match self.post_commit_processing_queue.pop() {
-            Ok(txn_idx) => {
-                if txn_idx == self.num_txns - 1 {
-                    self.is_done.store(true, Ordering::SeqCst);
-                }
+        match self.pop_post_commit_task()? {
+            Some(txn_idx) => {
                 return Ok(TaskKind::PostCommitProcessing(txn_idx));
             },
-            Err(PopError::Empty) => {
+            None => {
                 if self.is_halted() {
                     return Ok(TaskKind::Done);
                 }
             },
-            Err(PopError::Closed) => {
-                return Err(code_invariant_error("Commit queue should never be closed"));
-            },
-        };
+        }
 
         if let Some(txn_idx) = self.txn_statuses.get_execution_queue_manager().pop_next() {
             if let Some(incarnation) = self.start_executing(txn_idx)? {
@@ -803,12 +819,12 @@ impl SchedulerV2 {
     /// 3.  **Finish Aborts**: For each transaction in `invalidated_set` for which `start_abort`
     ///     was successful (i.e., `Some(incarnation)` was stored by `AbortManager`), calls
     ///     `[ExecutionStatuses::finish_abort]` to complete the abort process. These transactions
-    ///     are added to a `propagation_queue`.
+    ///     are added to a `stall_propagation_queue`.
     /// 4.  **Finish Own Execution**: Calls `[ExecutionStatuses::finish_execution]`
     ///     to update the status of the just-executed transaction (e.g., to `Executed` or to
     ///     `PendingScheduling` if it was aborted concurrently). If this call indicates the
     ///     transaction is now `Executed` (returns true), `txn_idx` is also added to the
-    ///     `propagation_queue`.
+    ///     `stall_propagation_queue`.
     /// 5.  **Arm Commit Lock**: If the transaction is now `Executed` and it's either transaction 0
     ///     or the preceding transaction (`txn_idx - 1`) is no longer `NotCommitted`, it arms
     ///     the `queueing_commits_lock`, implying that `txn_idx` might be ready for commit.
@@ -816,7 +832,7 @@ impl SchedulerV2 {
     ///     `[SchedulerV2::try_increase_executed_once_max_idx]`.
     /// 7.  **Propagate Stalls/Unstalls**: Calls `[SchedulerV2::propagate]` to recursively
     ///     process stall/unstall signals based on the status changes of transactions in the
-    ///     `propagation_queue`.
+    ///     `stall_propagation_queue`.
     ///
     /// Returns `Err(PanicError)` if any underlying status update fails.
     pub(crate) fn finish_execution<'a>(
@@ -835,16 +851,16 @@ impl SchedulerV2 {
                 .record_dependencies(invalidated_set.keys().copied());
         }
 
-        let mut propagation_queue: BTreeSet<usize> = BTreeSet::new();
+        let mut stall_propagation_queue: BTreeSet<usize> = BTreeSet::new();
         for (txn_idx, maybe_incarnation) in invalidated_set {
             if let Some(incarnation) = maybe_incarnation {
                 self.txn_statuses.finish_abort(txn_idx, incarnation, true)?;
-                propagation_queue.insert(txn_idx as usize);
+                stall_propagation_queue.insert(txn_idx as usize);
             }
         }
 
         if self.txn_statuses.finish_execution(txn_idx, incarnation)? {
-            propagation_queue.insert(txn_idx as usize);
+            stall_propagation_queue.insert(txn_idx as usize);
 
             if txn_idx == 0
                 || self.committed_marker[txn_idx as usize - 1].load(Ordering::Relaxed)
@@ -863,7 +879,7 @@ impl SchedulerV2 {
         }
 
         // Handle recursive propagation of add / remove stall.
-        self.propagate(propagation_queue)?;
+        self.propagate(stall_propagation_queue)?;
 
         Ok(())
     }
@@ -924,7 +940,7 @@ impl SchedulerV2 {
     // However, we need to distinguish the case to make sure in case (2) an execution task
     // is not added to the scheduler's execution queue (the caller will re-execute itself).
     // In this case, add_to_schedule is false.
-    // (3) The module validation pass can cause invalidation and require aborting.
+    // (3) The module validation pass can cause invalidation, which requires aborting.
     pub(crate) fn direct_abort(
         &self,
         txn_idx: TxnIndex,
@@ -967,7 +983,7 @@ impl SchedulerV2 {
 impl SchedulerV2 {
     /// Propagates stall or unstall signals recursively through the dependency graph.
     ///
-    /// This method processes a `propagation_queue` containing transaction indices whose
+    /// This method processes a `stall_propagation_queue` containing transaction indices whose
     /// states might have changed (e.g., executed, aborted, stalled, unstalled).
     /// For each `task_idx` popped from the queue:
     /// 1. It acquires a lock on `self.aborted_dependencies[task_idx]`.
@@ -976,20 +992,23 @@ impl SchedulerV2 {
     ///      and not currently considered stalled by `ExecutionStatuses`), it calls
     ///      `[AbortedDependencies::remove_stall]` on its `AbortedDependencies`. This, in turn, might add
     ///      more indices (dependencies of `task_idx` that were unstalled) to the
-    ///      `propagation_queue`.
+    ///      `stall_propagation_queue`.
     ///    - Otherwise (if `task_idx` is not executed or is stalled), it calls `[AbortedDependencies::add_stall]`
     ///      on its `AbortedDependencies`. This might add more indices (dependencies of
-    ///      `task_idx` that were stalled) to the `propagation_queue`.
+    ///      `task_idx` that were stalled) to the `stall_propagation_queue`.
     ///
-    /// The process continues until the `propagation_queue` is empty.
+    /// The process continues until the `stall_propagation_queue` is empty.
     /// This mechanism ensures that stall states are consistently propagated based on the
     /// most up-to-date status of transactions.
-    fn propagate(&self, mut propagation_queue: BTreeSet<usize>) -> Result<(), PanicError> {
-        while let Some(task_idx) = propagation_queue.pop_first() {
+    fn propagate(&self, mut stall_propagation_queue: BTreeSet<usize>) -> Result<(), PanicError> {
+        // Dependencies of each transaction always have higher indices than the transaction itself.
+        // This means that the stall propagation queue is always processed in ascending order of
+        // transaction indices, and that the processing loop is guaranteed to terminate.
+        while let Some(task_idx) = stall_propagation_queue.pop_first() {
             // Make sure the conditions are checked under dependency lock.
             let mut aborted_deps_guard = self.aborted_dependencies[task_idx].lock();
 
-            // checks the current status to determine whether to propagate add / remove stall,
+            // Checks the current status to determine whether to propagate add / remove stall,
             // calling which only affects its currently not_stalled (or stalled) dependencies.
             // Allows to store indices in propagation queue (not add or remove commands) & avoids
             // handling corner cases such as merging commands (as propagation process is not atomic).
@@ -998,10 +1017,11 @@ impl SchedulerV2 {
                 .shortcut_executed_and_not_stalled(task_idx)
             {
                 // Still makes sense to propagate remove_stall.
-                aborted_deps_guard.remove_stall(&self.txn_statuses, &mut propagation_queue)?;
+                aborted_deps_guard
+                    .remove_stall(&self.txn_statuses, &mut stall_propagation_queue)?;
             } else {
                 // Not executed or stalled - still makes sense to propagate add_stall.
-                aborted_deps_guard.add_stall(&self.txn_statuses, &mut propagation_queue)?;
+                aborted_deps_guard.add_stall(&self.txn_statuses, &mut stall_propagation_queue)?;
             }
         }
         Ok(())
@@ -1155,7 +1175,7 @@ mod tests {
 
     #[test]
     fn stall_aborted_dependencies() {
-        let mut propagation_queue = BTreeSet::new();
+        let mut stall_propagation_queue = BTreeSet::new();
 
         // num_txns is 6.
         let statuses =
@@ -1186,11 +1206,11 @@ mod tests {
         let mut deps = AbortedDependencies::new();
 
         assert!(!deps.is_stalled);
-        assert_ok!(deps.add_stall(&statuses, &mut propagation_queue));
+        assert_ok!(deps.add_stall(&statuses, &mut stall_propagation_queue));
         assert!(deps.is_stalled);
         deps.not_stalled_deps.insert(0);
         // Err because of incarnation 0.
-        assert_err!(deps.add_stall(&statuses, &mut propagation_queue));
+        assert_err!(deps.add_stall(&statuses, &mut stall_propagation_queue));
         // From now on, mark 0 as already stalled.
         assert!(deps.stalled_deps.insert(0));
         assert!(deps.not_stalled_deps.remove(&0));
@@ -1200,7 +1220,7 @@ mod tests {
         manager.execution_queue.lock().clear();
         manager.execution_queue.lock().append(&mut (2..6).collect());
         deps.not_stalled_deps.append(&mut (2..6).collect());
-        assert_ok!(deps.add_stall(&statuses, &mut propagation_queue));
+        assert_ok!(deps.add_stall(&statuses, &mut stall_propagation_queue));
 
         // Check the results: execution queue, propagation_queue, deps.stalled & not_stalled.
         assert_eq!(manager.execution_queue.lock().len(), 3);
@@ -1209,9 +1229,9 @@ mod tests {
         }
 
         // 5 is not in the propagation queue because it was already stalled.
-        assert_eq!(propagation_queue.len(), 3);
+        assert_eq!(stall_propagation_queue.len(), 3);
         for i in 2..5 {
-            assert!(propagation_queue.contains(&i));
+            assert!(stall_propagation_queue.contains(&i));
         }
 
         assert_eq!(deps.stalled_deps.len(), 5);
@@ -1224,7 +1244,7 @@ mod tests {
 
     #[test]
     fn remove_stall_aborted_dependencies() {
-        let mut propagation_queue = BTreeSet::new();
+        let mut stall_propagation_queue = BTreeSet::new();
 
         // num_txns is 8.
         let mut statuses =
@@ -1270,17 +1290,17 @@ mod tests {
         assert_eq!(statuses.len(), 8);
 
         deps.is_stalled = true;
-        assert_ok!(deps.remove_stall(&statuses, &mut propagation_queue));
+        assert_ok!(deps.remove_stall(&statuses, &mut stall_propagation_queue));
         assert!(!deps.is_stalled);
         deps.stalled_deps.insert(0);
         // Removing stall should fail because num_stalls = 0.
-        assert_err!(deps.remove_stall(&statuses, &mut propagation_queue));
+        assert_err!(deps.remove_stall(&statuses, &mut stall_propagation_queue));
         *statuses.get_status_mut(0) = ExecutionStatus::new_for_test(
             StatusWithIncarnation::new_for_test(SchedulingStatus::PendingScheduling, 0),
             1,
         );
         // Removing stall should fail because incarnation = 0.
-        assert_err!(deps.remove_stall(&statuses, &mut propagation_queue));
+        assert_err!(deps.remove_stall(&statuses, &mut stall_propagation_queue));
 
         let manager = &statuses.get_execution_queue_manager();
         manager.executed_once_max_idx.store(4, Ordering::Relaxed);
@@ -1291,7 +1311,7 @@ mod tests {
 
         manager.execution_queue.lock().clear();
         deps.stalled_deps.append(&mut (2..8).collect());
-        assert_ok!(deps.remove_stall(&statuses, &mut propagation_queue,));
+        assert_ok!(deps.remove_stall(&statuses, &mut stall_propagation_queue,));
 
         // Check the results: scheduling queue, propagation_queue, deps.stalled & not_stalled.
         assert_eq!(manager.execution_queue.lock().len(), 2);
@@ -1299,9 +1319,9 @@ mod tests {
             assert!(manager.execution_queue.lock().contains(i));
         }
 
-        assert_eq!(propagation_queue.len(), 5);
+        assert_eq!(stall_propagation_queue.len(), 5);
         for i in 2..7 {
-            propagation_queue.contains(&i);
+            stall_propagation_queue.contains(&i);
         }
 
         assert_eq!(deps.stalled_deps.len(), 0);
@@ -1410,7 +1430,7 @@ mod tests {
         let mut abort_manager = AbortManager::new(2, 0, &scheduler);
 
         // Check initial state - no invalidations should be recorded
-        assert!(abort_manager.invalidations.is_empty());
+        assert!(abort_manager.invalidated_dependencies.is_empty());
 
         let scenario = FailScenario::setup();
         assert!(fail::has_failpoints());
@@ -1424,34 +1444,34 @@ mod tests {
         // Test case where start_abort returns None (simulating false)
         fail::cfg("abort-manager-start-abort-none", "return").unwrap();
         assert_ok!(abort_manager.invalidate(3, 0));
-        assert_some_eq!(abort_manager.invalidations.get(&3), &None);
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&3), &None);
         fail::remove("abort-manager-start-abort-none");
         // Make sure None can get replaced with an incarnation.
         fail::cfg("abort-manager-start-abort-some", "return").unwrap();
         assert_ok!(abort_manager.invalidate(3, 2));
-        assert_some_eq!(abort_manager.invalidations.get(&3), &Some(2));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&3), &Some(2));
 
         // Test case where start_abort returns Some(incarnation).
         assert_ok!(abort_manager.invalidate(4, 0));
-        assert_some_eq!(abort_manager.invalidations.get(&4), &Some(0));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&4), &Some(0));
 
         // Test occupied entry with Some value - error if lower incarnation start_aborted.
         fail::cfg("abort-manager-start-abort-some", "panic").unwrap();
         assert_err!(abort_manager.invalidate(4, 1));
-        assert_some_eq!(abort_manager.invalidations.get(&4), &Some(0));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&4), &Some(0));
 
         // Test invalidating with equal incarnation as stored - should be ignored.
         // Configure failpoint to panic but it shouldn't be called since incarnation matches.
         assert_ok!(abort_manager.invalidate(4, 0));
-        assert_some_eq!(abort_manager.invalidations.get(&4), &Some(0));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&4), &Some(0));
         fail::remove("abort-manager-start-abort");
 
         // Test multiple invalidations for different transactions
         fail::cfg("abort-manager-start-abort-some", "return").unwrap();
         assert_ok!(abort_manager.invalidate(5, 2));
         assert_ok!(abort_manager.invalidate(6, 4));
-        assert_some_eq!(abort_manager.invalidations.get(&5), &Some(2));
-        assert_some_eq!(abort_manager.invalidations.get(&6), &Some(4));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&5), &Some(2));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&6), &Some(4));
         fail::remove("abort-manager-start-abort-some");
 
         // Test that invalidations are preserved after multiple calls (in different order),
@@ -1461,8 +1481,8 @@ mod tests {
         assert_err!(abort_manager.invalidate(5, 4));
         assert_err!(abort_manager.invalidate(6, 6));
         assert_ok!(abort_manager.invalidate(6, 1));
-        assert_some_eq!(abort_manager.invalidations.get(&5), &Some(2));
-        assert_some_eq!(abort_manager.invalidations.get(&6), &Some(4));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&5), &Some(2));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&6), &Some(4));
 
         scenario.teardown();
     }
@@ -1485,10 +1505,10 @@ mod tests {
         assert_ok!(abort_manager.invalidate(5, 2));
 
         // Verify the invalidations before taking them.
-        assert_eq!(abort_manager.invalidations.len(), 3);
-        assert_some_eq!(abort_manager.invalidations.get(&3), &None);
-        assert_some_eq!(abort_manager.invalidations.get(&4), &Some(1));
-        assert_some_eq!(abort_manager.invalidations.get(&5), &Some(2));
+        assert_eq!(abort_manager.invalidated_dependencies.len(), 3);
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&3), &None);
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&4), &Some(1));
+        assert_some_eq!(abort_manager.invalidated_dependencies.get(&5), &Some(2));
 
         // Take the invalidations and verify the returned values.
         let (owner_txn_idx, owner_incarnation, invalidations) = abort_manager.take();
@@ -1555,14 +1575,11 @@ mod tests {
                 CommitMarkerFlag::NotCommitted as u8
             );
             assert_err!(scheduler.end_commit(i));
-            // Reset it back, as the call w. error swaps the status.
-            scheduler.committed_marker[i as usize]
-                .store(CommitMarkerFlag::NotCommitted as u8, Ordering::Relaxed);
 
             assert_some_eq!(scheduler.start_commit().unwrap(), (i, 0));
             assert_eq!(
                 scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
-                CommitMarkerFlag::PendingCommitHook as u8
+                CommitMarkerFlag::CommitStarted as u8
             );
 
             // Commit hook needs to complete for next one to be dispatched.
@@ -1574,9 +1591,6 @@ mod tests {
             );
 
             assert_err!(scheduler.end_commit(i));
-            // Reset again.
-            scheduler.committed_marker[i as usize]
-                .store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
         }
 
         assert_eq!(
@@ -1646,7 +1660,7 @@ mod tests {
         assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 1);
         assert_eq!(
             scheduler.committed_marker[0].load(Ordering::Relaxed),
-            CommitMarkerFlag::PendingCommitHook as u8
+            CommitMarkerFlag::CommitStarted as u8
         );
 
         assert_err!(scheduler.start_commit());
@@ -1672,12 +1686,6 @@ mod tests {
         assert_none!(scheduler.start_commit().unwrap());
     }
 
-    #[test_case(1)]
-    #[test_case(2)]
-    #[test_case(4)]
-    #[test_case(8)]
-    #[test_case(16)]
-    #[test_case(32)]
     // This test generates a DAG of dependencies, where each transaction depends on
     // exactly one prior transaction. When the first incarnation of the transaction
     // is executed, it checks if the dependent transaction has recorded its output.
@@ -1690,6 +1698,12 @@ mod tests {
     //
     // The test is internally executed multiple times, with a different seed. Some seeds
     // halts the scheduler before all transactions are committed.
+    #[test_case(1)]
+    #[test_case(2)]
+    #[test_case(4)]
+    #[test_case(8)]
+    #[test_case(16)]
+    #[test_case(32)]
     fn dependency_graph_single_reexecution(num_workers: u32) {
         if num_workers as usize > num_cpus::get() {
             // Ideally, we would want:
@@ -1728,14 +1742,14 @@ mod tests {
                                 assert_eq!(
                                     scheduler.committed_marker[txn_idx as usize]
                                         .load(Ordering::Relaxed),
-                                    CommitMarkerFlag::PendingCommitHook as u8
+                                    CommitMarkerFlag::CommitStarted as u8
                                 );
                                 scheduler.end_commit(txn_idx).unwrap();
 
                                 if num_committed.fetch_add(1, Ordering::Relaxed) == num_txns / 2
                                     && seed & 7 == 0
                                 {
-                                    // Halt must occur after commit_hook_performed call (so we
+                                    // Halt must occur after end_commit call (so we
                                     // do not miss a post-processing task in next_task).
                                     scheduler.halt();
                                 }
