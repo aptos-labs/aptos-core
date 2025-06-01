@@ -670,7 +670,7 @@ where
 
     fn publish_module_writes(
         txn_idx: TxnIndex,
-        module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        module_write_set: Vec<ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -680,9 +680,9 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
-        for (_, write) in module_write_set {
+        for write in module_write_set {
             Self::add_module_write_to_module_cache(
-                write,
+                write.clone(),
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
@@ -1254,7 +1254,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (_, write) in output.module_write_set().into_iter() {
+        for write in output.module_write_set().into_iter() {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,

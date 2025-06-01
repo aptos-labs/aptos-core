@@ -5,5 +5,10 @@
 pub(crate) mod baseline;
 pub mod bencher;
 #[cfg(test)]
-mod tests;
+mod delta_tests;
+#[cfg(test)]
+mod group_tests;
+pub(crate) mod mock_executor;
+mod module_tests;
+mod resource_tests;
 pub(crate) mod types;
