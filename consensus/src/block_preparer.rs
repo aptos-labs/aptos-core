@@ -61,7 +61,7 @@ impl BlockPreparer {
                    result
                 }
         }?;
-        info!("epoch {:?}, round {:?}, txns_before_preparation: {:?}", block.epoch(), block.round(), txns.iter().map(|txn| txn.committed_hash()));
+        info!("epoch {:?}, round {:?}, txns_before_preparation: {:?}", block.epoch(), block.round(), txns.iter().map(|txn| txn.committed_hash()).collect::<Vec<_>>());
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
@@ -87,7 +87,7 @@ impl BlockPreparer {
         .expect("Failed to spawn blocking task for transaction generation");
         counters::BLOCK_PREPARER_LATENCY.observe_duration(start_time.elapsed());
         result.map(|result| {
-            info!("epoch {:?}, round {:?}, txns_after_preparation: {:?}", block.epoch(), block.round(), result.iter().map(|txn| txn.committed_hash()));
+            info!("epoch {:?}, round {:?}, txns_after_preparation: {:?}", block.epoch(), block.round(), result.iter().map(|txn| txn.committed_hash()).collect::<Vec<_>>());
             (result, block_gas_limit)
         })
     }
