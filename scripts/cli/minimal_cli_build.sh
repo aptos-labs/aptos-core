@@ -47,11 +47,10 @@ case "$OS" in
     elif has_command zypper; then
       # OpenSUSE zypper
       sh install_pkg.sh gcc gcc-c++ make pkg-config libopenssl-devel git libudev-devel lld libdw-devel clang llvm cmake
-    #elif has_command emerge; then
+    elif has_command emerge; then
       # Gentoo Emerge
-      # TODO: This doesn't quite work correctly yet
-    #  sudo emerge --sync
-    #  sh install_pkg.sh --skip-overrides sys-devel/gcc dev-libs/openssl dev-vcs/git dev-lang/rust
+      sudo emerge --sync
+      sh install_pkg.sh --skip-overrides sys-devel/gcc dev-libs/openssl dev-vcs/git dev-lang/rust llvm-core/clang
     elif has_command xbps-install; then
       # Void linux xbps
       sh install_pkg.sh gcc make pkg-config git lld elfutils-devel clang llvm cmake
