@@ -4,4 +4,4 @@ error: invalid character
   ┌─ tests/folding/constants_string_non_utf8.move:5:31
   │
 5 │     const C12: vector<u8> = b"ÿ";
-  │                               ^ Invalid character 'ÿ' found when reading file. Only ASCII printable characters, tabs (\t), lf (\n) and crlf (\r\n) are permitted.
+  │                               ^ Invalid character: `ÿ`
