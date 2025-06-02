@@ -79,6 +79,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `get_order_id`](#0x7_market_get_order_id)
 -  [Function `new_market_config`](#0x7_market_new_market_config)
 -  [Function `new_market`](#0x7_market_new_market)
+-  [Function `destroy_market`](#0x7_market_destroy_market)
 -  [Function `get_market`](#0x7_market_get_market)
 -  [Function `get_order_book`](#0x7_market_get_order_book)
 -  [Function `get_order_book_mut`](#0x7_market_get_order_book_mut)
@@ -88,8 +89,9 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `place_order`](#0x7_market_place_order)
 -  [Function `next_order_id`](#0x7_market_next_order_id)
 -  [Function `place_order_with_user_addr`](#0x7_market_place_order_with_user_addr)
--  [Function `place_maker_order`](#0x7_market_place_maker_order)
+-  [Function `place_maker_order_internal`](#0x7_market_place_maker_order_internal)
 -  [Function `cancel_maker_order_internal`](#0x7_market_cancel_maker_order_internal)
+-  [Function `cancel_order_internal`](#0x7_market_cancel_order_internal)
 -  [Function `place_order_with_order_id`](#0x7_market_place_order_with_order_id)
 -  [Function `cancel_order`](#0x7_market_cancel_order)
 -  [Function `decrease_order_size`](#0x7_market_decrease_order_size)
@@ -1033,6 +1035,38 @@ Post Only order type - ensures that the order is not a taker order
 
 </details>
 
+<a id="0x7_market_destroy_market"></a>
+
+## Function `destroy_market`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_destroy_market">destroy_market</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_destroy_market">destroy_market</a>&lt;M: store + <b>copy</b> + drop&gt;(self: <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;) {
+    <b>let</b> <a href="market.md#0x7_market_Market">Market</a> {
+        parent: _parent,
+        <a href="market.md#0x7_market">market</a>: _market,
+        last_order_id: _last_order_id,
+        config,
+        <a href="order_book.md#0x7_order_book">order_book</a>
+    } = self;
+    <b>let</b> <a href="market.md#0x7_market_MarketConfig">MarketConfig</a> { allow_self_trade: _ } = config;
+    <a href="order_book.md#0x7_order_book">order_book</a>.destroy_order_book()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_market_get_market"></a>
 
 ## Function `get_market`
@@ -1338,13 +1372,13 @@ to verify that the transaction signer is authorized to place orders on behalf of
 
 </details>
 
-<a id="0x7_market_place_maker_order"></a>
+<a id="0x7_market_place_maker_order_internal"></a>
 
-## Function `place_maker_order`
+## Function `place_maker_order_internal`
 
 
 
-<pre><code><b>fun</b> <a href="market.md#0x7_market_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
+<pre><code><b>fun</b> <a href="market.md#0x7_market_place_maker_order_internal">place_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, num_fills: u64, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
 </code></pre>
 
 
@@ -1353,7 +1387,7 @@ to verify that the transaction signer is authorized to place orders on behalf of
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="market.md#0x7_market_place_maker_order">place_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>fun</b> <a href="market.md#0x7_market_place_maker_order_internal">place_maker_order_internal</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;,
     user_addr: <b>address</b>,
     price: u64,
@@ -1364,60 +1398,28 @@ to verify that the transaction signer is authorized to place orders on behalf of
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     order_id: u64,
+    num_fills: u64,
+    emit_order_open: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
     // Validate that the order is valid from position management perspective
     <b>if</b> (time_in_force == <a href="market.md#0x7_market_TIME_IN_FORCE_IOC">TIME_IN_FORCE_IOC</a>) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                parent: self.parent,
-                <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                order_id,
-                user: user_addr,
-                orig_size,
-                remaining_size: orig_size,
-                size_delta: orig_size,
-                price,
-                is_buy: is_bid,
-                is_taker: <b>false</b>,
-                status: <a href="market.md#0x7_market_ORDER_STATUS_OPEN">ORDER_STATUS_OPEN</a>,
-                details: std::string::utf8(b"")
-            }
-        );
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                parent: self.parent,
-                <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                order_id,
-                user: user_addr,
-                orig_size,
-                remaining_size: orig_size,
-                size_delta: orig_size,
-                price,
-                is_buy: is_bid,
-                is_taker: <b>false</b>,
-                status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
-                details: std::string::utf8(b"IOC_VIOLATION")
-            }
-        );
-        <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
+        <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
+            user_addr,
+            price,
             order_id,
+            orig_size,
             remaining_size,
-            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(OrderCancellationReason::IOCViolation),
-            num_fills: 0
-        };
+            is_bid,
+            <b>false</b>, // is_taker
+            OrderCancellationReason::IOCViolation,
+            std::string::utf8(b"IOC Violation"),
+            num_fills,
+            callbacks
+        );
     };
 
-    <b>if</b> (
-        !callbacks.validate_order_placement(
-            user_addr,
-            order_id,
-            <b>false</b>, // is_taker
-            is_bid,
-            price,
-            orig_size,
-            metadata
-        )) {
+    <b>if</b> (emit_order_open) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
                 parent: self.parent,
@@ -1426,32 +1428,25 @@ to verify that the transaction signer is authorized to place orders on behalf of
                 user: user_addr,
                 orig_size,
                 remaining_size,
-                size_delta: 0, // 0 because order was never placed
+                size_delta: orig_size,
                 price,
                 is_buy: is_bid,
                 is_taker: <b>false</b>,
-                status: <a href="market.md#0x7_market_ORDER_STATUS_REJECTED">ORDER_STATUS_REJECTED</a>,
-                details: std::string::utf8(b"Position Update violation")
+                status: <a href="market.md#0x7_market_ORDER_STATUS_OPEN">ORDER_STATUS_OPEN</a>,
+                details: std::string::utf8(b"")
             }
         );
-        <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-            order_id,
-            remaining_size,
-            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                OrderCancellationReason::PositionUpdateViolation
-            ),
-            num_fills: 0
-        };
     };
-    callbacks.<a href="market.md#0x7_market_place_maker_order">place_maker_order</a>(
+
+    callbacks.place_maker_order(
         user_addr,
         order_id,
         is_bid,
         price,
-        orig_size,
+        remaining_size,
         metadata
     );
-    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_place_maker_order">place_maker_order</a>(
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.place_maker_order(
         new_order_request(
             user_addr,
             order_id,
@@ -1464,28 +1459,11 @@ to verify that the transaction signer is authorized to place orders on behalf of
             metadata
         )
     );
-    // Order was successfully placed
-    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-        <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-            parent: self.parent,
-            <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-            order_id,
-            user: user_addr,
-            orig_size,
-            remaining_size,
-            size_delta: orig_size,
-            price,
-            is_buy: is_bid,
-            is_taker: <b>false</b>,
-            status: <a href="market.md#0x7_market_ORDER_STATUS_OPEN">ORDER_STATUS_OPEN</a>,
-            details: std::string::utf8(b"")
-        }
-    );
     <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
         order_id,
         remaining_size,
         cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-        num_fills: 0
+        num_fills
     }
 }
 </code></pre>
@@ -1552,6 +1530,65 @@ to verify that the transaction signer is authorized to place orders on behalf of
 
 </details>
 
+<a id="0x7_market_cancel_order_internal"></a>
+
+## Function `cancel_order_internal`
+
+
+
+<pre><code><b>fun</b> <a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, order_id: u64, orig_size: u64, size_delta: u64, is_bid: bool, is_taker: bool, cancel_reason: <a href="market.md#0x7_market_OrderCancellationReason">market::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, num_fills: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;,
+    user_addr: <b>address</b>,
+    price: u64,
+    order_id: u64,
+    orig_size: u64,
+    size_delta: u64,
+    is_bid: bool,
+    is_taker: bool,
+    cancel_reason: <a href="market.md#0x7_market_OrderCancellationReason">OrderCancellationReason</a>,
+    cancel_details: String,
+    num_fills: u64,
+    callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
+): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
+            parent: self.parent,
+            <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
+            order_id,
+            user: user_addr,
+            orig_size,
+            remaining_size: 0,
+            size_delta,
+            price,
+            is_buy: is_bid,
+            is_taker,
+            status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
+            details: cancel_details
+        }
+    );
+    callbacks.cleanup_order(user_addr, order_id, is_bid, size_delta);
+    <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
+        order_id,
+        remaining_size: 0,
+        cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(cancel_reason),
+        num_fills
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_market_place_order_with_order_id"></a>
 
 ## Function `place_order_with_order_id`
@@ -1564,7 +1601,7 @@ the caller do not wants to emit an open order event for a taker in case the take
 of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, max_fill_limit: u64, emit_cancel_on_fill_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user_addr: <b>address</b>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: u8, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: u64, max_fill_limit: u64, cancel_on_fill_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;): <a href="market.md#0x7_market_OrderMatchResult">market::OrderMatchResult</a>
 </code></pre>
 
 
@@ -1585,7 +1622,7 @@ of fill limit violation  in the previous transaction and the order is just a con
     metadata: M,
     order_id: u64,
     max_fill_limit: u64,
-    emit_cancel_on_fill_limit: bool,
+    cancel_on_fill_limit: bool,
     emit_taker_order_open: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
@@ -1606,51 +1643,23 @@ of fill limit violation  in the previous transaction and the order is just a con
             remaining_size,
             metadata
         )) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                parent: self.parent,
-                <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                order_id,
-                user: user_addr,
-                orig_size,
-                remaining_size,
-                size_delta: 0, // 0 because order was never placed
-                price,
-                is_buy: is_bid,
-                is_taker: <b>false</b>,
-                status: <a href="market.md#0x7_market_ORDER_STATUS_REJECTED">ORDER_STATUS_REJECTED</a>,
-                details: std::string::utf8(b"Position Update violation")
-            }
-        );
-        <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-            order_id,
-            remaining_size: orig_size,
-            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                OrderCancellationReason::PositionUpdateViolation
-            ),
-            num_fills: 0
-        };
-    };
-
-    <b>let</b> is_taker_order =
-        self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_is_taker_order">is_taker_order</a>(price, is_bid, trigger_condition);
-    <b>if</b> (!is_taker_order) {
-        <b>return</b> self.<a href="market.md#0x7_market_place_maker_order">place_maker_order</a>(
+        <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
             user_addr,
             price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            time_in_force,
-            trigger_condition,
-            metadata,
             order_id,
+            orig_size,
+            0, // 0 because order was never placed
+            is_bid,
+            <b>true</b>, // is_taker
+            OrderCancellationReason::PositionUpdateViolation,
+            std::string::utf8(b"Position Update violation"),
+            0,
             callbacks
         );
     };
 
-    // NOTE: We should always <b>use</b> is_taker: <b>true</b> for this order past this
-    // point so that indexer can consistently track the order's status
+    <b>let</b> is_taker_order =
+        self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_is_taker_order">is_taker_order</a>(price, is_bid, trigger_condition);
     <b>if</b> (emit_taker_order_open) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
@@ -1663,35 +1672,45 @@ of fill limit violation  in the previous transaction and the order is just a con
                 size_delta: orig_size,
                 price,
                 is_buy: is_bid,
-                is_taker: <b>true</b>,
+                is_taker: is_taker_order,
                 status: <a href="market.md#0x7_market_ORDER_STATUS_OPEN">ORDER_STATUS_OPEN</a>,
                 details: std::string::utf8(b"")
             }
         );
     };
-    <b>if</b> (time_in_force == <a href="market.md#0x7_market_TIME_IN_FORCE_POST_ONLY">TIME_IN_FORCE_POST_ONLY</a>) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                parent: self.parent,
-                <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                order_id,
-                user: user_addr,
-                orig_size,
-                remaining_size,
-                size_delta: remaining_size,
-                price,
-                is_buy: is_bid,
-                is_taker: <b>true</b>,
-                status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
-                details: std::string::utf8(b"Post only violation")
-            }
-        );
-        <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
+    <b>if</b> (!is_taker_order) {
+        <b>return</b> self.<a href="market.md#0x7_market_place_maker_order_internal">place_maker_order_internal</a>(
+            user_addr,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            time_in_force,
+            trigger_condition,
+            metadata,
             order_id,
-            remaining_size: orig_size,
-            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(OrderCancellationReason::PostOnlyViolation),
-            num_fills: 0
-        };
+            0, // num_fills
+            <b>false</b>,
+            callbacks
+        );
+    };
+
+    // NOTE: We should always <b>use</b> is_taker: <b>true</b> for this order past this
+    // point so that indexer can consistently track the order's status
+    <b>if</b> (time_in_force == <a href="market.md#0x7_market_TIME_IN_FORCE_POST_ONLY">TIME_IN_FORCE_POST_ONLY</a>) {
+        <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
+            user_addr,
+            price,
+            order_id,
+            orig_size,
+            remaining_size,
+            is_bid,
+            <b>true</b>, // is_taker
+            OrderCancellationReason::PostOnlyViolation,
+            std::string::utf8(b"Post Only violation"),
+            0,
+            callbacks
+        );
     };
     <b>let</b> num_fills = 0;
     <b>loop</b> {
@@ -1781,27 +1800,18 @@ of fill limit violation  in the previous transaction and the order is just a con
 
         <b>let</b> taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
         <b>if</b> (taker_cancellation_reason.is_some()) {
-            callbacks.cleanup_order(
+            <b>let</b> result = self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
                 user_addr,
+                price,
                 order_id,
+                orig_size,
+                remaining_size,
                 is_bid,
-                remaining_size
-            );
-            <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-                <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                    parent: self.parent,
-                    <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                    order_id,
-                    user: user_addr,
-                    orig_size,
-                    remaining_size,
-                    size_delta: remaining_size,
-                    price,
-                    is_buy: is_bid,
-                    is_taker: <b>true</b>,
-                    status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
-                    details: taker_cancellation_reason.destroy_some()
-                }
+                <b>true</b>, // is_taker
+                OrderCancellationReason::ClearinghouseSettleViolation,
+                taker_cancellation_reason.destroy_some(),
+                num_fills,
+                callbacks
             );
             <b>if</b> (maker_cancellation_reason.is_none() && unsettled_maker_size &gt; 0) {
                 // If the taker is cancelled but the maker is not cancelled, then we need <b>to</b> re-insert
@@ -1820,16 +1830,17 @@ of fill limit violation  in the previous transaction and the order is just a con
                     )
                 );
             };
-            <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-                order_id,
-                remaining_size,
-                cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                    OrderCancellationReason::ClearinghouseSettleViolation
-                ),
-                num_fills
-            };
+            <b>return</b> result;
         };
 
+        <b>if</b> (maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>() == 0) {
+            callbacks.cleanup_order(
+                maker_address,
+                maker_order_id,
+                !is_bid, // is_bid is inverted for maker orders
+                0 // 0 because the order is fully filled
+            );
+        };
         <b>if</b> (remaining_size == 0) {
             callbacks.cleanup_order(
                 user_addr,
@@ -1845,89 +1856,62 @@ of fill limit violation  in the previous transaction and the order is just a con
             self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_is_taker_order">is_taker_order</a>(price, is_bid, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>());
         <b>if</b> (!is_taker_order) {
             <b>if</b> (time_in_force == <a href="market.md#0x7_market_TIME_IN_FORCE_IOC">TIME_IN_FORCE_IOC</a>) {
-                <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-                    <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                        parent: self.parent,
-                        <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                        order_id,
-                        user: user_addr,
-                        orig_size,
-                        remaining_size,
-                        size_delta: remaining_size,
-                        price,
-                        is_buy: is_bid,
-                        // NOTE: Keep consistent <b>with</b> all the logs we've
-                        // emitted for this taker order
-                        is_taker: <b>true</b>,
-                        status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
-                        details: std::string::utf8(b"IOC_VIOLATION")
-                    }
-                );
-                <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
+                <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
+                    user_addr,
+                    price,
                     order_id,
-                    remaining_size,
-                    cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(OrderCancellationReason::IOCViolation),
-                    num_fills
-                };
-            };
-            <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-                <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                    parent: self.parent,
-                    <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                    order_id,
-                    user: user_addr,
                     orig_size,
                     remaining_size,
-                    size_delta: orig_size,
-                    price,
-                    is_buy: is_bid,
-                    is_taker: <b>false</b>,
-                    status: <a href="market.md#0x7_market_ORDER_STATUS_OPEN">ORDER_STATUS_OPEN</a>,
-                    details: std::string::utf8(b"")
-                }
-            );
-            self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_place_maker_order">place_maker_order</a>(
-                new_order_request(
+                    is_bid,
+                    <b>true</b>, // is_taker
+                    OrderCancellationReason::IOCViolation,
+                    std::string::utf8(b"IOC_VIOLATION"),
+                    num_fills,
+                    callbacks
+                );
+            } <b>else</b> {
+                // If the order is not a taker order, then we can place it <b>as</b> a maker order
+                <b>return</b> self.<a href="market.md#0x7_market_place_maker_order_internal">place_maker_order_internal</a>(
                     user_addr,
-                    order_id,
-                    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
                     price,
                     orig_size,
                     remaining_size,
                     is_bid,
+                    time_in_force,
                     trigger_condition,
-                    metadata
-                )
-            );
-            <b>break</b>;
+                    metadata,
+                    order_id,
+                    num_fills,
+                    <b>true</b>, // emit_order_open
+                    callbacks
+                );
+            };
         };
 
         <b>if</b> (num_fills &gt;= max_fill_limit) {
-            <b>if</b> (emit_cancel_on_fill_limit) {
-                <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-                    <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
-                        parent: self.parent,
-                        <a href="market.md#0x7_market">market</a>: self.<a href="market.md#0x7_market">market</a>,
-                        order_id,
-                        user: user_addr,
-                        orig_size,
-                        remaining_size,
-                        size_delta: remaining_size,
-                        price,
-                        is_buy: is_bid,
-                        is_taker: <b>true</b>,
-                        status: <a href="market.md#0x7_market_ORDER_STATUS_CANCELLED">ORDER_STATUS_CANCELLED</a>,
-                        details: std::string::utf8(b"Fill limit reached")
-                    }
+            <b>if</b> (cancel_on_fill_limit) {
+                <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
+                    user_addr,
+                    price,
+                    order_id,
+                    orig_size,
+                    remaining_size,
+                    is_bid,
+                    <b>true</b>, // is_taker
+                    OrderCancellationReason::MaxFillLimitViolation,
+                    std::string::utf8(b"Max fill limit reached"),
+                    num_fills,
+                    callbacks
                 );
-            };
-            <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
-                order_id,
-                remaining_size,
-                cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                    OrderCancellationReason::MaxFillLimitViolation
-                ),
-                num_fills
+            } <b>else</b> {
+                <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
+                    order_id,
+                    remaining_size,
+                    cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
+                        OrderCancellationReason::MaxFillLimitViolation
+                    ),
+                    num_fills
+                }
             };
         };
     };

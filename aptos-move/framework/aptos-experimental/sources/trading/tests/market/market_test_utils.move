@@ -3,7 +3,6 @@ module aptos_experimental::market_test_utils {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use aptos_std::debug::print;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore};
     use aptos_experimental::market_types::MarketClearinghouseCallbacks;

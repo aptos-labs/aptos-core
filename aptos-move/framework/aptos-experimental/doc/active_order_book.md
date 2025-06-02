@@ -11,6 +11,7 @@
 -  [Enum `ActiveOrderBook`](#0x7_active_order_book_ActiveOrderBook)
 -  [Constants](#@Constants_0)
 -  [Function `new_active_order_book`](#0x7_active_order_book_new_active_order_book)
+-  [Function `destroy_active_order_book`](#0x7_active_order_book_destroy_active_order_book)
 -  [Function `best_bid_price`](#0x7_active_order_book_best_bid_price)
 -  [Function `best_ask_price`](#0x7_active_order_book_best_ask_price)
 -  [Function `get_mid_price`](#0x7_active_order_book_get_mid_price)
@@ -219,6 +220,32 @@ There is a code bug that breaks internal invariant
         buys: new_default_big_ordered_map(),
         sells: new_default_big_ordered_map()
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_active_order_book_destroy_active_order_book"></a>
+
+## Function `destroy_active_order_book`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_destroy_active_order_book">destroy_active_order_book</a>(self: <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_destroy_active_order_book">destroy_active_order_book</a>(self: <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>) {
+    <b>let</b> ActiveOrderBook::V1 { sells, buys } = self;
+    sells.destroy(|_v| {});
+    buys.destroy(|_v| {});
 }
 </code></pre>
 

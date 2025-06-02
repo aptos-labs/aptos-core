@@ -9,6 +9,7 @@
 -  [Struct `PendingOrderKey`](#0x7_pending_order_book_index_PendingOrderKey)
 -  [Enum `PendingOrderBookIndex`](#0x7_pending_order_book_index_PendingOrderBookIndex)
 -  [Function `new_pending_order_book_index`](#0x7_pending_order_book_index_new_pending_order_book_index)
+-  [Function `destroy_pending_order_book_index`](#0x7_pending_order_book_index_destroy_pending_order_book_index)
 -  [Function `cancel_pending_order`](#0x7_pending_order_book_index_cancel_pending_order)
 -  [Function `place_pending_maker_order`](#0x7_pending_order_book_index_place_pending_maker_order)
 -  [Function `take_ready_price_based_orders`](#0x7_pending_order_book_index_take_ready_price_based_orders)
@@ -128,6 +129,39 @@
         price_move_down_index: new_default_big_ordered_map(),
         time_based_index: new_default_big_ordered_map()
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_pending_order_book_index_destroy_pending_order_book_index"></a>
+
+## Function `destroy_pending_order_book_index`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_destroy_pending_order_book_index">destroy_pending_order_book_index</a>(self: <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_destroy_pending_order_book_index">destroy_pending_order_book_index</a>(
+    self: <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">PendingOrderBookIndex</a>
+) {
+    <b>let</b> PendingOrderBookIndex::V1 {
+        price_move_up_index,
+        price_move_down_index,
+        time_based_index
+    } = self;
+    price_move_up_index.destroy(|_v| {});
+    price_move_down_index.destroy(|_v| {});
+    time_based_index.destroy(|_v| {});
 }
 </code></pre>
 

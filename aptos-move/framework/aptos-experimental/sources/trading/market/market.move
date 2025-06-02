@@ -57,6 +57,7 @@ module aptos_experimental::market {
     use std::option::Option;
     use std::signer;
     use std::string::String;
+    use std::vector;
     use aptos_framework::event;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
     use aptos_experimental::order_book_types::{TriggerCondition, Order};
@@ -180,19 +181,23 @@ module aptos_experimental::market {
         order_id: u64,
         remaining_size: u64,
         cancel_reason: Option<OrderCancellationReason>,
-        num_fills: u64
+        fill_sizes: vector<u64>,
     }
 
     public fun destroy_order_match_result(
         self: OrderMatchResult
-    ): (u64, u64, Option<OrderCancellationReason>, u64) {
-        let OrderMatchResult { order_id, remaining_size, cancel_reason, num_fills } =
+    ): (u64, u64, Option<OrderCancellationReason>, vector<u64>) {
+        let OrderMatchResult { order_id, remaining_size, cancel_reason, fill_sizes } =
             self;
-        (order_id, remaining_size, cancel_reason, num_fills)
+        (order_id, remaining_size, cancel_reason, fill_sizes)
     }
 
     public fun number_of_fills(self: &OrderMatchResult): u64 {
-        self.num_fills
+        self.fill_sizes.length()
+    }
+
+    public fun total_fill_size(self: &OrderMatchResult): u64 {
+        self.fill_sizes.fold(0, |acc, fill_size| acc + fill_size)
     }
 
     public fun get_cancel_reason(self: &OrderMatchResult): Option<OrderCancellationReason> {
@@ -237,17 +242,7 @@ module aptos_experimental::market {
         }
     }
 
-    public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
-        let Market {
-            parent: _parent,
-            market: _market,
-            last_order_id: _last_order_id,
-            config,
-            order_book
-        } = self;
-        let MarketConfig { allow_self_trade: _ } = config;
-        order_book.destroy_order_book()
-    }
+
 
     public fun get_market<M: store + copy + drop>(self: &Market<M>): address {
         self.market
@@ -380,12 +375,12 @@ module aptos_experimental::market {
         price: u64,
         orig_size: u64,
         remaining_size: u64,
+        fill_sizes: vector<u64>,
         is_bid: bool,
         time_in_force: u8,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: u64,
-        num_fills: u64,
         emit_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
@@ -397,11 +392,11 @@ module aptos_experimental::market {
                 order_id,
                 orig_size,
                 remaining_size,
+                fill_sizes,
                 is_bid,
                 false, // is_taker
                 OrderCancellationReason::IOCViolation,
                 std::string::utf8(b"IOC Violation"),
-                num_fills,
                 callbacks
             );
         };
@@ -450,7 +445,7 @@ module aptos_experimental::market {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
-            num_fills
+            fill_sizes,
         }
     }
 
@@ -499,11 +494,11 @@ module aptos_experimental::market {
         order_id: u64,
         orig_size: u64,
         size_delta: u64,
+        fill_sizes: vector<u64>,
         is_bid: bool,
         is_taker: bool,
         cancel_reason: OrderCancellationReason,
         cancel_details: String,
-        num_fills: u64,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         event::emit(
@@ -527,7 +522,7 @@ module aptos_experimental::market {
             order_id,
             remaining_size: 0,
             cancel_reason: option::some(cancel_reason),
-            num_fills
+            fill_sizes,
         }
     }
 
@@ -576,11 +571,11 @@ module aptos_experimental::market {
                 order_id,
                 orig_size,
                 0, // 0 because order was never placed
+                vector[],
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
                 std::string::utf8(b"Position Update violation"),
-                0,
                 callbacks
             );
         };
@@ -611,12 +606,12 @@ module aptos_experimental::market {
                 price,
                 orig_size,
                 remaining_size,
+                vector[],
                 is_bid,
                 time_in_force,
                 trigger_condition,
                 metadata,
                 order_id,
-                0, // num_fills
                 false,
                 callbacks
             );
@@ -631,15 +626,15 @@ module aptos_experimental::market {
                 order_id,
                 orig_size,
                 remaining_size,
+                vector[],
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::PostOnlyViolation,
                 std::string::utf8(b"Post Only violation"),
-                0,
                 callbacks
             );
         };
-        let num_fills = 0;
+        let fill_sizes = vector::empty();
         loop {
             let result =
                 self.order_book.get_single_match_for_taker(price, remaining_size, is_bid);
@@ -675,7 +670,7 @@ module aptos_experimental::market {
             if (settled_size > 0) {
                 remaining_size -= settled_size;
                 unsettled_maker_size -= settled_size;
-                num_fills += 1;
+                fill_sizes.push_back(settled_size);
                 // Event for taker fill
                 event::emit(
                     OrderEvent {
@@ -733,11 +728,11 @@ module aptos_experimental::market {
                     order_id,
                     orig_size,
                     remaining_size,
+                    fill_sizes,
                     is_bid,
                     true, // is_taker
                     OrderCancellationReason::ClearinghouseSettleViolation,
                     taker_cancellation_reason.destroy_some(),
-                    num_fills,
                     callbacks
                 );
                 if (maker_cancellation_reason.is_none() && unsettled_maker_size > 0) {
@@ -789,11 +784,11 @@ module aptos_experimental::market {
                         order_id,
                         orig_size,
                         remaining_size,
+                        fill_sizes,
                         is_bid,
                         true, // is_taker
                         OrderCancellationReason::IOCViolation,
                         std::string::utf8(b"IOC_VIOLATION"),
-                        num_fills,
                         callbacks
                     );
                 } else {
@@ -803,19 +798,19 @@ module aptos_experimental::market {
                         price,
                         orig_size,
                         remaining_size,
+                        fill_sizes,
                         is_bid,
                         time_in_force,
                         trigger_condition,
                         metadata,
                         order_id,
-                        num_fills,
                         true, // emit_order_open
                         callbacks
                     );
                 };
             };
 
-            if (num_fills >= max_fill_limit) {
+            if (fill_sizes.length() >= max_fill_limit) {
                 if (cancel_on_fill_limit) {
                     return self.cancel_order_internal(
                         user_addr,
@@ -823,11 +818,11 @@ module aptos_experimental::market {
                         order_id,
                         orig_size,
                         remaining_size,
+                        fill_sizes,
                         is_bid,
                         true, // is_taker
                         OrderCancellationReason::MaxFillLimitViolation,
                         std::string::utf8(b"Max fill limit reached"),
-                        num_fills,
                         callbacks
                     );
                 } else {
@@ -837,7 +832,7 @@ module aptos_experimental::market {
                         cancel_reason: option::some(
                             OrderCancellationReason::MaxFillLimitViolation
                         ),
-                        num_fills
+                        fill_sizes,
                     }
                 };
             };
@@ -846,7 +841,7 @@ module aptos_experimental::market {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
-            num_fills
+            fill_sizes,
         }
     }
 
@@ -970,6 +965,19 @@ module aptos_experimental::market {
     }
 
     // ============================= test_only APIs ====================================
+
+    #[test_only]
+    public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
+        let Market {
+            parent: _parent,
+            market: _market,
+            last_order_id: _last_order_id,
+            config,
+            order_book
+        } = self;
+        let MarketConfig { allow_self_trade: _ } = config;
+        order_book.destroy_order_book()
+    }
 
     #[test_only]
     public fun is_clearinghouse_settle_violation(
