@@ -39,12 +39,15 @@ impl TransactionFilter {
 mod test {
     use crate::transaction_filter::TransactionFilter;
     use aptos_config::config::transaction_filter_type::{Filter, Matcher};
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_crypto::{
+        ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+        HashValue, PrivateKey, SigningKey, Uniform,
+    };
     use aptos_types::{
         chain_id::ChainId,
         move_utils::MemberId,
         transaction::{
-            authenticator::{AccountAuthenticator, TransactionAuthenticator},
+            authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
             EntryFunction, Multisig, MultisigTransactionPayload, RawTransaction, Script,
             SignedTransaction, TransactionExecutable, TransactionExecutableRef,
             TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
@@ -53,9 +56,13 @@ mod test {
     use move_core_types::{
         account_address::AccountAddress, transaction_argument::TransactionArgument,
     };
+    use rand::thread_rng;
 
-    fn create_account_authenticator() -> AccountAuthenticator {
-        AccountAuthenticator::NoAccountAuthenticator
+    fn create_account_authenticator(public_key: Ed25519PublicKey) -> AccountAuthenticator {
+        AccountAuthenticator::Ed25519 {
+            public_key,
+            signature: Ed25519Signature::dummy_signature(),
+        }
     }
 
     fn create_entry_function(function: MemberId) -> EntryFunction {
@@ -170,17 +177,17 @@ mod test {
             ChainId::new(10),
         );
 
-        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let private_key = Ed25519PrivateKey::generate(&mut thread_rng());
         let public_key = private_key.public_key();
 
         if fee_payer {
             SignedTransaction::new_fee_payer(
                 raw_transaction.clone(),
-                create_account_authenticator(),
+                create_account_authenticator(public_key.clone()),
                 vec![],
                 vec![],
                 AccountAddress::random(),
-                create_account_authenticator(),
+                create_account_authenticator(public_key.clone()),
             )
         } else {
             SignedTransaction::new(
@@ -207,6 +214,15 @@ mod test {
             }
         }
         panic!("No address argument found in script transaction");
+    }
+
+    fn get_auth_public_key(signed_transaction: &SignedTransaction) -> AnyPublicKey {
+        match signed_transaction.authenticator() {
+            TransactionAuthenticator::Ed25519 { public_key, .. } => {
+                AnyPublicKey::ed25519(public_key)
+            },
+            authenticator => panic!("Unexpected transaction authenticator: {:?}", authenticator),
+        }
     }
 
     fn get_block_id_and_entry_function_transactions(
@@ -269,6 +285,13 @@ mod test {
         }
 
         (block_id, script_transactions)
+    }
+
+    fn get_ed25519_public_key(signed_transaction: &SignedTransaction) -> Ed25519PublicKey {
+        match signed_transaction.authenticator() {
+            TransactionAuthenticator::Ed25519 { public_key, .. } => public_key.clone(),
+            authenticator => panic!("Unexpected transaction authenticator: {:?}", authenticator),
+        }
     }
 
     fn get_function_name(txn: &SignedTransaction) -> String {
@@ -872,6 +895,38 @@ mod test {
     }
 
     #[test]
+    fn test_public_key_filter() {
+        for use_new_txn_payload_format in [false, true] {
+            // Create a filter that only allows transactions from specific public keys.
+            // These are: (i) txn 0 authenticator public key; and (ii) txn 1 authenticator public key.
+            let (block_id, txns) =
+                get_block_id_and_entry_function_transactions(use_new_txn_payload_format);
+            let filter = TransactionFilter::new(
+                Filter::empty()
+                    .add_public_key_filter(true, get_auth_public_key(&txns[0]))
+                    .add_public_key_filter(true, get_auth_public_key(&txns[1]))
+                    .add_all_filter(false),
+            );
+
+            // Verify that it returns transactions from the specified account address
+            let filtered_txns = filter.filter(block_id, 0, 0, txns.clone());
+            assert_eq!(filtered_txns, txns[0..2].to_vec());
+
+            // Create a filter that denies transactions from the specified account addresses (as above)
+            let filter = TransactionFilter::new(
+                Filter::empty()
+                    .add_public_key_filter(false, get_auth_public_key(&txns[0]))
+                    .add_public_key_filter(false, get_auth_public_key(&txns[1]))
+                    .add_all_filter(true),
+            );
+
+            // Verify that it returns transactions from other account addresses
+            let filtered_txns = filter.filter(block_id, 0, 0, txns.clone());
+            assert_eq!(filtered_txns, txns[2..].to_vec());
+        }
+    }
+
+    #[test]
     fn test_composite_allow_list_filter() {
         for use_new_txn_payload_format in [false, true] {
             // Create a filter that only allows transactions based on multiple criteria
@@ -885,10 +940,9 @@ mod test {
                 - Allow:
                     ModuleAddress: "0000000000000000000000000000000000000000000000000000000000000001"
                 - Allow:
-                    EntryFunction:
-                        - "0000000000000000000000000000000000000000000000000000000000000002"
-                        - entry
-                        - new
+                    PublicKey:
+                        Ed25519:
+                            - "{}"
                 - Allow:
                     EntryFunction:
                         - "0000000000000000000000000000000000000000000000000000000000000003"
@@ -899,6 +953,7 @@ mod test {
                 - Deny: All
           "#,
                 txns[0].sender().to_standard_string(),
+                get_ed25519_public_key(&txns[2]),
                 get_module_address(&txns[4]).to_standard_string(),
             );
             let filter = serde_yaml::from_str::<Filter>(&filter_string).unwrap();
