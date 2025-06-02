@@ -265,6 +265,10 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+    ScheduleTxnPerf {
+        /// schedule time
+        time_ms: u64,
+    },
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -319,6 +323,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::CoinInitAndMint
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
+            | EntryPoints::ScheduleTxnPerf { .. }
             | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
             EntryPoints::OrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
@@ -402,6 +407,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::ScheduleTxnPerf { .. } => "scheduled_txns_perf",
         }
     }
 
@@ -866,6 +872,11 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_buy).unwrap(), // is_buy
                 ])
             },
+            EntryPoints::ScheduleTxnPerf { time_ms } => {
+                get_payload(module_id, ident_str!("test_insert_transactions").to_owned(), vec![
+                    bcs::to_bytes(time_ms).unwrap(),
+                ])
+            },
         }
     }
 
@@ -987,6 +998,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::ScheduleTxnPerf { .. } => AutomaticArgs::Signer,
         }
     }
 }
