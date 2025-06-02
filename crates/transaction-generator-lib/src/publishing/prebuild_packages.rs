@@ -73,7 +73,8 @@ use std::collections::HashMap;",
     writeln!(string_buffer).expect("Empty line failed");
 
     let mut packages = Vec::new();
-    for (package_name, additional_package, use_latest_language) in packages_to_build {
+    for (package_name, additional_package, mut use_latest_language) in packages_to_build {
+        use_latest_language = true;
         let mut build_options = if use_latest_language {
             BuildOptions::move_2().set_latest_language()
         } else {
