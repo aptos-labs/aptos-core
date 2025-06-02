@@ -23,7 +23,6 @@ types of pending orders are supported.
 -  [Constants](#@Constants_0)
 -  [Function `new_order_request`](#0x7_order_book_new_order_request)
 -  [Function `new_order_book`](#0x7_order_book_new_order_book)
--  [Function `destroy_order_book`](#0x7_order_book_destroy_order_book)
 -  [Function `cancel_order`](#0x7_order_book_cancel_order)
 -  [Function `is_taker_order`](#0x7_order_book_is_taker_order)
 -  [Function `place_maker_order`](#0x7_order_book_place_maker_order)
@@ -404,33 +403,6 @@ types of pending orders are supported.
         active_orders: new_active_order_book(),
         pending_orders: new_pending_order_book_index()
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_destroy_order_book"></a>
-
-## Function `destroy_order_book`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_destroy_order_book">destroy_order_book</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_destroy_order_book">destroy_order_book</a>&lt;M: store + <b>copy</b> + drop&gt;(self: <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;) {
-    <b>let</b> OrderBook::V1 { orders, active_orders, pending_orders } = self;
-    orders.destroy(|_v| {});
-    active_orders.destroy_active_order_book();
-    pending_orders.destroy_pending_order_book_index();
 }
 </code></pre>
 
