@@ -607,7 +607,7 @@ module aptos_experimental::confidential_asset {
     }
 
     #[view]
-    /// Checks if the user has a confidential asset store for the specified token.
+    /// Returns the pending balance transfer count for the specified token.
     public fun get_pending_balance_transfer_count(user: address, token: Object<Metadata>): u64 acquires ConfidentialAssetStore {
         assert!(has_confidential_asset_store(user, token), error::not_found(ECA_STORE_NOT_PUBLISHED));
 
