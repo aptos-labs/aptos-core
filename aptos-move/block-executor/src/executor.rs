@@ -40,7 +40,7 @@ use aptos_types::{
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
+        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction as Transaction, TBlockOutput,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -512,7 +512,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -904,7 +904,7 @@ where
         >,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
@@ -1041,7 +1041,7 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<TBlockOutput<E::Output, T::Key>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1058,12 +1058,13 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
+            return Ok(TBlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
+            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -1149,7 +1150,7 @@ where
         };
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
+            .then(|| TBlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
     }
 
@@ -1298,7 +1299,7 @@ where
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<TBlockOutput<E::Output, T::Key>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
@@ -1310,7 +1311,8 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
+        let mut block_limit_processor = BlockGasLimitProcessor::<T, S>::new(
+            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
             num_txns,
@@ -1561,7 +1563,7 @@ where
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
 
-                    if latest_view.is_incorrect_use() {
+                    if sequential_reads.incorrect_use {
                         return Err(
                             code_invariant_error("Incorrect use in sequential execution").into(),
                         );
@@ -1604,22 +1606,17 @@ where
             None
         };
 
-        Ok(BlockOutput::new(ret, block_end_info))
+        Ok(TBlockOutput::new(ret, block_end_info))
     }
 
-    fn empty_block_end_info(&self) -> Option<BlockEndInfo> {
+    fn empty_block_end_info(&self) -> Option<TBlockEndInfoExt<T::Key>> {
         if self
             .config
             .onchain
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
         {
-            Some(BlockEndInfo::V0 {
-                block_gas_limit_reached: false,
-                block_output_limit_reached: false,
-                block_effective_block_gas_units: 0,
-                block_approx_output_size: 0,
-            })
+            Some(TBlockEndInfoExt::new_empty())
         } else {
             None
         }
@@ -1630,7 +1627,7 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+    ) -> BlockExecutionResult<TBlockOutput<E::Output, T::Key>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
@@ -1725,7 +1722,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, self.empty_block_end_info()));
+            return Ok(TBlockOutput::new(ret, self.empty_block_end_info()));
         }
 
         Err(sequential_error)

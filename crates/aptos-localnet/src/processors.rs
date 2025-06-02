@@ -17,7 +17,7 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
             ProcessorConfig::AccountTransactionsProcessor(Default::default())
         },
         ProcessorName::AccountRestorationProcessor => {
-            bail!("AccountRestorationProcessor is not supported in the localnet")
+            ProcessorConfig::AccountRestorationProcessor(Default::default())
         },
         ProcessorName::AnsProcessor => {
             bail!("ANS processor is not supported in the localnet")

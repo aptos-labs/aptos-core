@@ -41,7 +41,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
-        TransactionOutput, TransactionStatus, WriteSetPayload,
+        TransactionStatus, WriteSetPayload,
     },
     write_set::WriteOp,
     AptosCoinType,
@@ -90,7 +90,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -355,7 +355,9 @@ impl NativeVMExecutorTask {
         };
 
         events.push((
-            FeeStatement::new(gas_units, gas_units, 0, 0, 0).create_event_v2(),
+            FeeStatement::new(gas_units, gas_units, 0, 0, 0)
+                .create_event_v2()
+                .expect("Creating FeeStatement should always succeed"),
             None,
         ));
 
@@ -547,8 +549,7 @@ impl NativeVMExecutorTask {
         );
         let materialized_size = view
             .get_resource_state_value_size(&apt_metadata_object_state_key)
-            .map_err(hide_error)?
-            .unwrap();
+            .map_err(hide_error)?;
         let metadata = view
             .get_resource_state_value_metadata(&apt_metadata_object_state_key)
             .map_err(hide_error)?
@@ -656,7 +657,8 @@ impl NativeVMExecutorTask {
                                 store: sender_store_address,
                                 amount: transfer_amount,
                             }
-                            .create_event_v2(),
+                            .create_event_v2()
+                            .expect("Creating WithdrawFAEvent should always succeed"),
                             None,
                         ));
                     }
@@ -809,7 +811,12 @@ impl NativeVMExecutorTask {
                 store: recipient_store_address,
                 amount: transfer_amount,
             };
-            events.push((event.create_event_v2(), None));
+            events.push((
+                event
+                    .create_event_v2()
+                    .expect("Creating DepositFAEvent should always succeed"),
+                None,
+            ));
         }
         Ok(existed)
     }
@@ -838,7 +845,8 @@ impl NativeVMExecutorTask {
                             type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()
                                 .map_err(hide_error)?,
                         }
-                        .create_event_v2(),
+                        .create_event_v2()
+                        .expect("Creating CoinRegister should always succeed"),
                         None,
                     ));
                     (

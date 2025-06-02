@@ -30,13 +30,14 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    value::MoveTypeLayout,
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
-use move_vm_types::value_serde::ValueSerDeContext;
+use move_vm_types::values::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
@@ -114,14 +115,12 @@ pub trait MoveTestAdapter<'a>: Sized {
     type Subcommand: Parser;
     type ExtraInitArgs: Parser;
 
+    fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value>;
     fn compiled_state(&mut self) -> &mut CompiledState<'a>;
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            experiments: vec![],
-        }
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![])
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -215,6 +214,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     TestRunConfig::CompilerV2 {
                         language_version,
                         experiments,
+                        vm_config: _,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -286,6 +286,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     TestRunConfig::CompilerV2 {
                         language_version,
                         experiments: v2_experiments,
+                        vm_config: _,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -462,7 +463,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     gas_budget,
                     extra_args,
                 )?;
-                let rendered_return_value = display_return_values(return_values);
+                let rendered_return_value = self.display_return_values(return_values);
                 Ok(merge_output(output, rendered_return_value))
             },
             TaskCommand::View(ViewCommand { address, resource }) => {
@@ -524,63 +525,60 @@ pub trait MoveTestAdapter<'a>: Sized {
             output
         }
     }
+
+    fn display_return_values(&self, return_values: SerializedReturnValues) -> Option<String> {
+        let SerializedReturnValues {
+            mutable_reference_outputs,
+            return_values,
+        } = return_values;
+        let mut output = vec![];
+        if !mutable_reference_outputs.is_empty() {
+            let values = mutable_reference_outputs
+                .iter()
+                .map(|(idx, bytes, layout)| {
+                    let value = self.deserialize(bytes, layout).unwrap();
+                    (idx, value)
+                })
+                .collect::<Vec<_>>();
+            let printed = values
+                .iter()
+                .map(|(idx, v)| {
+                    let mut buf = String::new();
+                    move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
+                    format!("local#{}: {}", idx, buf)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            output.push(format!("mutable inputs after call: {}", printed))
+        };
+        if !return_values.is_empty() {
+            let values = return_values
+                .iter()
+                .map(|(bytes, layout)| self.deserialize(bytes, layout).unwrap())
+                .collect::<Vec<_>>();
+            let printed = values
+                .iter()
+                .map(|v| {
+                    let mut buf = String::new();
+                    move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
+                    buf
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            output.push(format!("return values: {}", printed))
+        };
+        if output.is_empty() {
+            None
+        } else {
+            Some(output.join("\n"))
+        }
+    }
 }
 
 fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
     let source_mapping =
         SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
     Disassembler::new(source_mapping, DisassemblerOptions::new())
-}
-
-fn display_return_values(return_values: SerializedReturnValues) -> Option<String> {
-    let SerializedReturnValues {
-        mutable_reference_outputs,
-        return_values,
-    } = return_values;
-    let mut output = vec![];
-    if !mutable_reference_outputs.is_empty() {
-        let values = mutable_reference_outputs
-            .iter()
-            .map(|(idx, bytes, layout)| {
-                let value = ValueSerDeContext::new().deserialize(bytes, layout).unwrap();
-                (idx, value)
-            })
-            .collect::<Vec<_>>();
-        let printed = values
-            .iter()
-            .map(|(idx, v)| {
-                let mut buf = String::new();
-                move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
-                format!("local#{}: {}", idx, buf)
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        output.push(format!("mutable inputs after call: {}", printed))
-    };
-    if !return_values.is_empty() {
-        let values = return_values
-            .iter()
-            .map(|(bytes, layout)| {
-                // TODO: add support for functions.
-                ValueSerDeContext::new().deserialize(bytes, layout).unwrap()
-            })
-            .collect::<Vec<_>>();
-        let printed = values
-            .iter()
-            .map(|v| {
-                let mut buf = String::new();
-                move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
-                buf
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        output.push(format!("return values: {}", printed))
-    };
-    if output.is_empty() {
-        None
-    } else {
-        Some(output.join("\n"))
-    }
 }
 
 impl<'a> CompiledState<'a> {

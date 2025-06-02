@@ -11,7 +11,7 @@ use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
 pub const DEFEAULT_MAX_BATCH_TXNS: usize = 250;
-const DEFAULT_MAX_NUM_BATCHES: usize = 20;
+const DEFAULT_MAX_NUM_BATCHES: usize = 10;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -113,7 +113,7 @@ impl Default for QuorumStoreConfig {
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
-            sender_max_total_txns: 2000,
+            sender_max_total_txns: 1500,
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
             sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
             receiver_max_batch_txns: 250,

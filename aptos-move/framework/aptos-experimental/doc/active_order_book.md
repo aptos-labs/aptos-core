@@ -25,6 +25,8 @@
 -  [Function `get_single_match_for_buy_order`](#0x7_active_order_book_get_single_match_for_buy_order)
 -  [Function `get_single_match_for_sell_order`](#0x7_active_order_book_get_single_match_for_sell_order)
 -  [Function `get_single_match_result`](#0x7_active_order_book_get_single_match_result)
+-  [Function `increase_order_size`](#0x7_active_order_book_increase_order_size)
+-  [Function `decrease_order_size`](#0x7_active_order_book_decrease_order_size)
 -  [Function `place_maker_order`](#0x7_active_order_book_place_maker_order)
 
 
@@ -730,6 +732,80 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
     } <b>else</b> {
         self.<a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(price, size)
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_active_order_book_increase_order_size"></a>
+
+## Function `increase_order_size`
+
+Increase the size of the order in the orderbook without altering its position in the price-time priority.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_buy: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    size_delta: u64,
+    is_buy: bool
+) {
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
+    <b>if</b> (is_buy) {
+        self.buys.borrow_mut(&key).size += size_delta;
+    } <b>else</b> {
+        self.sells.borrow_mut(&key).size += size_delta;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_active_order_book_decrease_order_size"></a>
+
+## Function `decrease_order_size`
+
+Decrease the size of the order in the order book without altering its position in the price-time priority.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_buy: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
+    price: u64,
+    unique_priority_idx: UniqueIdxType,
+    size_delta: u64,
+    is_buy: bool
+) {
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
+    <b>if</b> (is_buy) {
+        self.buys.borrow_mut(&key).size -= size_delta;
+    } <b>else</b> {
+        self.sells.borrow_mut(&key).size -= size_delta;
+    };
 }
 </code></pre>
 

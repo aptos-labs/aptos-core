@@ -111,8 +111,8 @@ async fn jwk_consensus_basic() {
     let txn_summary = update_jwk_consensus_config(cli, root_idx, &config).await;
     debug!("txn_summary={:?}", txn_summary);
 
-    info!("Waiting for an on-chain update. 10 sec should be enough.");
-    sleep(Duration::from_secs(10)).await;
+    info!("Waiting for an on-chain update. 30 sec should be enough.");
+    sleep(Duration::from_secs(30)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
     assert_eq!(
@@ -120,7 +120,7 @@ async fn jwk_consensus_basic() {
             entries: vec![
                 ProviderJWKs {
                     issuer: alice_issuer_id.as_bytes().to_vec(),
-                    version: 1,
+                    version: 2, // in per-key mode, kid0 and kid1 each needs a txn.
                     jwks: vec![
                         JWK::RSA(RSA_JWK::new_256_aqab("kid0", "n0")).into(),
                         JWK::RSA(RSA_JWK::new_from_strs("kid1", "RSA", "RS384", "AQAB", "n1"))
@@ -161,7 +161,7 @@ async fn jwk_consensus_basic() {
             entries: vec![
                 ProviderJWKs {
                     issuer: alice_issuer_id.as_bytes().to_vec(),
-                    version: 2,
+                    version: 5, // in per-key mode, deleting kid0, deleting kid1, adding ALICE_JWK_V1B each takes 1 txn.
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
                         "\"ALICE_JWK_V1B\""
                     ))

@@ -130,7 +130,7 @@ module aptos_framework::nonce_validation {
     ): bool acquires NonceHistory {
         assert!(exists<NonceHistory>(@aptos_framework), error::invalid_state(E_NONCE_HISTORY_DOES_NOT_EXIST));
         // Check if the transaction expiration time is too far in the future.
-        assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS, error::invalid_state(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
+        assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS, error::invalid_argument(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
         let nonce_history = &mut NonceHistory[@aptos_framework];
         let nonce_key = NonceKey {
             sender_address,

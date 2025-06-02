@@ -69,7 +69,8 @@ module aptos_experimental::confidential_asset_tests {
         let (
             proof,
             new_balance,
-            transfer_amount,
+            sender_amount,
+            recipient_amount,
             _
         ) = confidential_proof::prove_transfer(
             sender_dk,
@@ -90,7 +91,8 @@ module aptos_experimental::confidential_asset_tests {
             token,
             to,
             confidential_balance::balance_to_bytes(&new_balance),
-            confidential_balance::balance_to_bytes(&transfer_amount),
+            confidential_balance::balance_to_bytes(&sender_amount),
+            confidential_balance::balance_to_bytes(&recipient_amount),
             b"",
             b"",
             zkrp_new_balance,
@@ -118,7 +120,8 @@ module aptos_experimental::confidential_asset_tests {
         let (
             proof,
             new_balance,
-            transfer_amount,
+            sender_amount,
+            recipient_amount,
             auditor_amounts
         ) = confidential_proof::prove_transfer(
             sender_dk,
@@ -139,7 +142,8 @@ module aptos_experimental::confidential_asset_tests {
             token,
             to,
             confidential_balance::balance_to_bytes(&new_balance),
-            confidential_balance::balance_to_bytes(&transfer_amount),
+            confidential_balance::balance_to_bytes(&sender_amount),
+            confidential_balance::balance_to_bytes(&recipient_amount),
             confidential_asset::serialize_auditor_eks(auditor_eks),
             confidential_asset::serialize_auditor_amounts(&auditor_amounts),
             zkrp_new_balance,

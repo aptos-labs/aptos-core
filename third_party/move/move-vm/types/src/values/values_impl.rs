@@ -3470,42 +3470,14 @@ where
     write!(f, "]")
 }
 
-impl Container {
-    fn raw_address(&self) -> usize {
-        use Container::*;
-
-        match self {
-            Locals(r) => r.as_ptr() as usize,
-            Vec(r) => r.as_ptr() as usize,
-            Struct(r) => r.as_ptr() as usize,
-            VecU8(r) => r.as_ptr() as usize,
-            VecU16(r) => r.as_ptr() as usize,
-            VecU32(r) => r.as_ptr() as usize,
-            VecU64(r) => r.as_ptr() as usize,
-            VecU128(r) => r.as_ptr() as usize,
-            VecU256(r) => r.as_ptr() as usize,
-            VecBool(r) => r.as_ptr() as usize,
-            VecAddress(r) => r.as_ptr() as usize,
-        }
-    }
-}
-
-impl Locals {
-    pub fn raw_address(&self) -> usize {
-        self.0.as_ptr() as usize
-    }
-}
-
 impl Display for ContainerRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Local(c) => write!(f, "(&container {:x})", c.raw_address()),
-            Self::Global { status, container } => write!(
-                f,
-                "(&container {:x} -- {:?})",
-                container.raw_address(),
-                &*status.borrow(),
-            ),
+            Self::Local(_) => write!(f, "(&container)"),
+            Self::Global {
+                status,
+                container: _,
+            } => write!(f, "(&container -- {:?})", &*status.borrow()),
         }
     }
 }
@@ -3518,7 +3490,7 @@ impl Display for IndexedRef {
 
 impl Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(container {:x}: ", self.raw_address())?;
+        write!(f, "(container: ")?;
 
         match self {
             Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
@@ -3798,9 +3770,9 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             },
 
             // Functions.
-            (L::Function(fun_layout), ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
+            (L::Function, ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
                 ctx: self.ctx,
-                layout: fun_layout,
+                layout: &(),
                 value: clos,
             }
             .serialize(serializer),
@@ -4070,10 +4042,10 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
             }),
 
             // Functions
-            L::Function(fun_layout) => {
+            L::Function => {
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
-                    layout: fun_layout,
+                    layout: (),
                 };
                 let closure = deserializer.deserialize_seq(ClosureVisitor(seed))?;
                 Ok(Value(ValueImpl::ClosureValue(closure)))
@@ -4738,7 +4710,7 @@ pub mod prop {
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
 
-            L::Function(_function_layout) => {
+            L::Function => {
                 // TODO(#15664): not clear how to generate closure values, we'd need
                 //   some test functions for this, and generate `AbstractFunction` impls.
                 //   As we do not generate function layouts in the first place, we can bail

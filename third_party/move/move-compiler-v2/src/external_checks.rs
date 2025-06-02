@@ -7,7 +7,7 @@
 use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_model::{
     ast::ExpData,
-    model::{GlobalEnv, Loc},
+    model::{FunctionEnv, GlobalEnv, Loc},
 };
 use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeSet, fmt, sync::Arc};
@@ -55,11 +55,11 @@ pub trait ExpChecker {
 
     /// Examine `expr` before any of its children have been visited.
     /// Potentially emit reports using `self.report()`.
-    fn visit_expr_pre(&mut self, _env: &GlobalEnv, _expr: &ExpData) {}
+    fn visit_expr_pre(&mut self, _function: &FunctionEnv, _expr: &ExpData) {}
 
     /// Examine `expr` after all its children have been visited.
     /// Potentially emit reports using `self.report()`.
-    fn visit_expr_post(&mut self, _env: &GlobalEnv, _expr: &ExpData) {}
+    fn visit_expr_post(&mut self, _function: &FunctionEnv, _expr: &ExpData) {}
 
     /// Report the `msg` highlighting the `loc`.
     fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {

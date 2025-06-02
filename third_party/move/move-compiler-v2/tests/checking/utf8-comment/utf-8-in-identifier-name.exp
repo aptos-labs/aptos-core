@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf-8-in-identifier-name.move:4:16
+  │
+4 │         const C字符串: vector<u8> = b"abc";
+  │                ^^ Invalid character: `字`

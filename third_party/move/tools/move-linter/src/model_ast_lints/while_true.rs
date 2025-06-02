@@ -8,7 +8,7 @@ use legacy_move_compiler::parser::syntax::FOR_LOOP_UPDATE_ITER_FLAG;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{Exp, ExpData, Value},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 
 #[derive(Default)]
@@ -19,7 +19,7 @@ impl ExpChecker for WhileTrue {
         "while_true".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::{IfElse, Loop};
         // Check if `expr` is of the form: Loop(IfElse(true, then, _)).
         let Loop(id, body) = expr else { return };
@@ -33,9 +33,10 @@ impl ExpChecker for WhileTrue {
             return;
         }
         // Check if it is the `for` loop.
-        if detect_for_loop(then, env) {
+        if detect_for_loop(then, function) {
             return;
         }
+        let env = function.env();
         // If we are here, it is `while (true) {...}`.
         self.report(
             env,
@@ -45,7 +46,7 @@ impl ExpChecker for WhileTrue {
     }
 }
 
-fn detect_for_loop(then: &Exp, env: &GlobalEnv) -> bool {
+fn detect_for_loop(then: &Exp, function: &FunctionEnv) -> bool {
     use ExpData::{IfElse, LocalVar, Sequence};
     // Check if `then` is of the form:
     //   Sequence([IfElse(LocalVar(FOR_LOOP_UPDATE_ITER_FLAG), ...)])
@@ -62,5 +63,5 @@ fn detect_for_loop(then: &Exp, env: &GlobalEnv) -> bool {
     let LocalVar(_, name) = cond.as_ref() else {
         return false;
     };
-    name.display(env.symbol_pool()).to_string() == FOR_LOOP_UPDATE_ITER_FLAG
+    name.display(function.symbol_pool()).to_string() == FOR_LOOP_UPDATE_ITER_FLAG
 }

@@ -72,7 +72,7 @@ impl VMBlockExecutor for MockVM {
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -119,7 +119,8 @@ impl VMBlockExecutor for MockVM {
                     vec![ContractEvent::new_v2(
                         NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
                         bcs::to_bytes(&0).unwrap(),
-                    )],
+                    )
+                    .unwrap()],
                     0,
                     KEEP_STATUS.clone(),
                     TransactionAuxiliaryData::default(),
@@ -337,7 +338,8 @@ fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),
         b"event_data".to_vec(),
-    )]
+    )
+    .unwrap()]
 }
 
 pub fn encode_mint_program(amount: u64) -> Script {

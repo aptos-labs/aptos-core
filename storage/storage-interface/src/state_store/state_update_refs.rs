@@ -7,9 +7,9 @@ use crate::{
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::state_key::StateKey,
     transaction::Version,
-    write_set::WriteSet,
+    write_set::{BaseStateOp, WriteSet},
 };
 use arr_macro::arr;
 use itertools::Itertools;
@@ -20,12 +20,13 @@ pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
     /// Converting to Vec to Box<[]> to release over-allocated memory during construction
+    /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
     pub shards: [Box<[(&'kv StateKey, StateUpdateRef<'kv>)]>; NUM_STATE_SHARDS],
 }
 
 impl<'kv> PerVersionStateUpdateRefs<'kv> {
     pub fn index<
-        UpdateIter: IntoIterator<Item = (&'kv StateKey, Option<&'kv StateValue>)>,
+        UpdateIter: IntoIterator<Item = (&'kv StateKey, &'kv BaseStateOp)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
     >(
         first_version: Version,
@@ -42,8 +43,11 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
             let version = first_version + versions_seen as Version;
             versions_seen += 1;
 
-            for (key, value) in update_iter.into_iter() {
-                shards[key.get_shard_id() as usize].push((key, StateUpdateRef { version, value }));
+            for (key, write_op) in update_iter.into_iter() {
+                shards[key.get_shard_id() as usize].push((key, StateUpdateRef {
+                    version,
+                    state_op: write_op,
+                }));
             }
         }
         assert_eq!(versions_seen, num_versions);
@@ -114,14 +118,14 @@ impl<'kv> StateUpdateRefs<'kv> {
             first_version,
             write_sets
                 .into_iter()
-                .map(|write_set| write_set.state_update_refs()),
+                .map(|write_set| write_set.base_op_iter()),
             num_write_sets,
             last_checkpoint_index,
         )
     }
 
     pub fn index<
-        UpdateIter: IntoIterator<Item = (&'kv StateKey, Option<&'kv StateValue>)>,
+        UpdateIter: IntoIterator<Item = (&'kv StateKey, &'kv BaseStateOp)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
     >(
         first_version: Version,

@@ -154,24 +154,42 @@ impl ExtendedChecker<'_> {
                     &format!("`{}` function must be private", INIT_MODULE_FUN),
                 )
             }
-            for Parameter(_, ty, _) in fun.get_parameters() {
+
+            let record_param_mismatch_error = || {
+                let msg = format!(
+                    "`{}` function can only take a single parameter of type `signer` or `&signer`",
+                    INIT_MODULE_FUN
+                );
+                self.env.error(&fun.get_id_loc(), &msg);
+            };
+
+            if fun.get_parameter_count() != 1 {
+                record_param_mismatch_error();
+            } else {
+                let Parameter(_, ty, _) = &fun.get_parameters()[0];
                 let ok = match ty {
                     Type::Primitive(PrimitiveType::Signer) => true,
-                    Type::Reference(_, ty) => matches!(*ty, Type::Primitive(PrimitiveType::Signer)),
+                    Type::Reference(_, ty) => {
+                        matches!(ty.as_ref(), Type::Primitive(PrimitiveType::Signer))
+                    },
                     _ => false,
                 };
                 if !ok {
-                    self.env.error(
-                        &fun.get_id_loc(),
-                        &format!("`{}` function can only take values of type `signer` or `&signer` as parameters",
-                                 INIT_MODULE_FUN),
-                    );
+                    record_param_mismatch_error();
                 }
             }
+
             if fun.get_return_count() > 0 {
                 self.env.error(
                     &fun.get_id_loc(),
                     &format!("`{}` function cannot return values", INIT_MODULE_FUN),
+                )
+            }
+
+            if fun.get_type_parameter_count() > 0 {
+                self.env.error(
+                    &fun.get_id_loc(),
+                    &format!("`{}` function cannot have type parameters", INIT_MODULE_FUN),
                 )
             }
         }

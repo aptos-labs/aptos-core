@@ -26,7 +26,9 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
+use aptos_framework::chunked_publish::{
+    default_large_packages_module_address, CHUNK_SIZE_IN_BYTES,
+};
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -1176,7 +1178,7 @@ impl FromStr for OptimizationLevel {
             "" | "default" => Ok(Self::Default),
             "extra" => Ok(Self::Extra),
             _ => bail!(
-                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `extra`)",
                 s
             ),
         }
@@ -1783,7 +1785,7 @@ pub struct TransactionOptions {
 
 impl TransactionOptions {
     /// Builds a rest client
-    fn rest_client(&self) -> CliTypedResult<Client> {
+    pub fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options)
     }
 
@@ -2494,6 +2496,37 @@ pub struct OverrideSizeCheckOption {
 }
 
 #[derive(Parser)]
+pub struct LargePackagesModuleOption {
+    /// Address of the `large_packages` move module for chunked publishing
+    ///
+    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet, and `0x7` on localnest/devnet.
+    /// On any custom network where neither is used, you will need to first publish it from the framework
+    /// under move-examples/large_packages.
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: Option<AccountAddress>,
+}
+
+impl LargePackagesModuleOption {
+    pub(crate) async fn large_packages_module_address(
+        &self,
+        client: &Client,
+    ) -> Result<AccountAddress, CliError> {
+        if let Some(address) = self.large_packages_module_address {
+            Ok(address)
+        } else {
+            let chain_id = ChainId::new(client.get_ledger_information().await?.inner().chain_id);
+            Ok(
+                AccountAddress::from_str_strict(default_large_packages_module_address(&chain_id))
+                    .map_err(|err| {
+                    CliError::UnableToParse("Default Large Package Module Address", err.to_string())
+                })?,
+            )
+        }
+    }
+}
+
+#[derive(Parser)]
 pub struct ChunkedPublishOption {
     /// Whether to publish a package in a chunked mode. This may require more than one transaction
     /// for publishing the Move package.
@@ -2502,13 +2535,8 @@ pub struct ChunkedPublishOption {
     #[clap(long)]
     pub(crate) chunked_publish: bool,
 
-    /// Address of the `large_packages` move module for chunked publishing
-    ///
-    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
-    /// on Testnet and Mainnet. On any other network, you will need to first publish it from the framework
-    /// under move-examples/large_packages.
-    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
-    pub(crate) large_packages_module_address: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) large_packages_module: LargePackagesModuleOption,
 
     /// Size of the code chunk in bytes for splitting bytecode and metadata of large packages
     ///

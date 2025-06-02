@@ -122,7 +122,7 @@ impl<'view> Worker<'view> {
         let txn_out = vm_output
             .try_materialize_into_transaction_output(&self.state_view)
             .unwrap();
-        for (key, op) in txn_out.write_set() {
+        for (key, op) in txn_out.write_set().expect_write_op_iter() {
             // TODO(ptx): hack: deal only with the total supply
             if key == Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {
                 self.state_view.overwrite(key.clone(), op.as_state_value());

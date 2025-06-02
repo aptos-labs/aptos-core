@@ -1,0 +1,10 @@
+error: failed to parse manifest
+  |
+1 | [package]
+2 | name = "some_package_name"
+3 | version = "0.1.2"
+4 |
+5 | [dev-addresses]
+6 | addr1 = ""
+  |         ^^ Hex string is too short, must be 1 to 64 chars long, excluding the leading 0x
+  |

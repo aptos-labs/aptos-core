@@ -20,6 +20,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::alert;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use cfg_if::cfg_if;
 use move_binary_format::{
     errors::{Location, VMError},
     CompiledModule,
@@ -286,14 +287,22 @@ fn prefetch_aptos_framework(
 ) -> Result<(), PanicError> {
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
-    // If framework code exists in storage, the transitive closure will be verified and cached.
-    let maybe_loaded = code_storage
-        .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
-        .map_err(|err| {
-            // There should be no errors when pre-fetching the framework, if there are, we
-            // better return an error here.
-            PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-        })?;
+    cfg_if! {
+        if #[cfg(fuzzing)] {
+            let maybe_loaded = code_storage.fetch_module_skip_verification(
+                &AccountAddress::ONE,
+                ident_str!("transaction_validation"),
+            ).map_err(|err| {
+                PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+            })?;
+        } else {
+            let maybe_loaded = code_storage
+                .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+                .map_err(|err| {
+                    PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+                })?;
+        }
+    }
 
     if maybe_loaded.is_some() {
         // Framework must have been loaded. Drain verified modules from local cache into
