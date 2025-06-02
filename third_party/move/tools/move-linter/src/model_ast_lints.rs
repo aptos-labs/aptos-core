@@ -27,6 +27,7 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
         Box::<known_to_abort::KnownToAbort>::default(),
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
+        Box::<known_to_abort::KnownToAbort>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),

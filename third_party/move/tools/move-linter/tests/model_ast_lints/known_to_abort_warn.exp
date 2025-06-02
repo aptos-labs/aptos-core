@@ -1,0 +1,64 @@
+
+Diagnostics:
+warning: [lint] Division by zero will cause the program to abort
+  ┌─ tests/model_ast_lints/known_to_abort_warn.move:3:9
+  │
+3 │         x / 0
+  │         ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Modulo by zero will cause the program to abort
+  ┌─ tests/model_ast_lints/known_to_abort_warn.move:7:9
+  │
+7 │         x % 0
+  │         ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
+   ┌─ tests/model_ast_lints/known_to_abort_warn.move:11:9
+   │
+11 │         256 as u8
+   │         ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
+   ┌─ tests/model_ast_lints/known_to_abort_warn.move:15:9
+   │
+15 │         70000 as u16
+   │         ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
+   ┌─ tests/model_ast_lints/known_to_abort_warn.move:19:9
+   │
+19 │         300 as u8
+   │         ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Left shift by amount greater than or equal to the type's bit width will cause the program to abort
+   ┌─ tests/model_ast_lints/known_to_abort_warn.move:28:9
+   │
+28 │         x << 8
+   │         ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Right shift by amount greater than or equal to the type's bit width will cause the program to abort
+   ┌─ tests/model_ast_lints/known_to_abort_warn.move:32:9
+   │
+32 │         x >> 8
+   │         ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
