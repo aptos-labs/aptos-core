@@ -521,13 +521,13 @@ where
         let use_case_key = txn.parse_use_case();
         let use_case_opt = self.use_cases.get_mut(&use_case_key);
 
-        let account_should_delay = account_opt.as_ref().map_or(false, |account| {
+        let account_should_delay = account_opt.as_ref().is_some_and(|account| {
             !account.is_empty()  // needs delaying due to queued txns under the same account
                     || account.try_delay_till > self.output_idx
         });
         let use_case_should_delay = use_case_opt
             .as_ref()
-            .map_or(false, |use_case| use_case.try_delay_till > self.output_idx);
+            .is_some_and(|use_case| use_case.try_delay_till > self.output_idx);
 
         if account_should_delay || use_case_should_delay {
             self.queue_txn(input_idx, address, use_case_key, txn);

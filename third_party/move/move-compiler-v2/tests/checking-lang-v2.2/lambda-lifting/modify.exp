@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda-lifting/modify.move:14:13
+   │
+14 │             x = 2;
+   │             ^
+
+error: captured variable `c` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda-lifting/modify.move:21:26
+   │
+21 │             let r = &mut c;
+   │                          ^
+
+error: captured variable `z` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda-lifting/modify.move:29:13
+   │
+29 │             z = 2;
+   │             ^
+
+error: captured variable `z` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda-lifting/modify.move:37:26
+   │
+37 │             let r = &mut z;
+   │                          ^

@@ -1,0 +1,301 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    use std::vector;
+    struct TestOrder {
+        price: u64,
+        size: u64,
+    }
+    private fun price(self: &TestOrder): u64 {
+        select m::TestOrder.price<&TestOrder>(self)
+    }
+    private fun size(self: &TestOrder): u64 {
+        select m::TestOrder.size<&TestOrder>(self)
+    }
+    private fun test_self(orders: vector<TestOrder>) {
+        {
+          let (v: &vector<TestOrder>): (&vector<TestOrder>) = Tuple(Borrow(Immutable)(orders));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, vector::length<TestOrder>(v)) {
+                {
+                  let (order: &TestOrder): (&TestOrder) = Tuple(vector::borrow<TestOrder>(v, i));
+                  {
+                    let _price: u64 = m::price(order);
+                    {
+                      let _size: u64 = m::size(order);
+                      Tuple()
+                    }
+                  }
+                };
+                i: u64 = Add<u64>(i, 1)
+              } else {
+                break
+              }
+            }
+          }
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct TestOrder has copy, drop, store {
+        price: u64,
+        size: u64,
+    }
+    fun price(self: &TestOrder): u64 {
+        self.price
+    }
+    fun size(self: &TestOrder): u64 {
+        self.size
+    }
+    fun test_self(orders: vector<TestOrder>) {
+        {
+            let (v) = (&orders);
+            let i = 0;
+            while (i < 0x1::vector::length<TestOrder>(v)) {
+                {
+                    let (order) = (0x1::vector::borrow<TestOrder>(v, i));
+                    let _price = price(order);
+                    let _size = size(order);
+                };
+                i = i + 1
+            }
+        };
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::price($t0: &0xc0ffee::m::TestOrder): u64 {
+     var $t1: u64
+     var $t2: &u64
+  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.price($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::size($t0: &0xc0ffee::m::TestOrder): u64 {
+     var $t1: u64
+     var $t2: &u64
+  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.size($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::test_self($t0: vector<0xc0ffee::m::TestOrder>) {
+     var $t1: &vector<0xc0ffee::m::TestOrder>
+     var $t2: &vector<0xc0ffee::m::TestOrder>
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: &0xc0ffee::m::TestOrder
+     var $t8: &0xc0ffee::m::TestOrder
+     var $t9: &vector<0xc0ffee::m::TestOrder>
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: $t2 := borrow_local($t0)
+  1: $t1 := infer($t2)
+  2: $t3 := 0
+  3: label L0
+  4: $t5 := infer($t3)
+  5: $t6 := vector::length<0xc0ffee::m::TestOrder>($t1)
+  6: $t4 := <($t5, $t6)
+  7: if ($t4) goto 8 else goto 19
+  8: label L2
+  9: $t9 := infer($t1)
+ 10: $t8 := vector::borrow<0xc0ffee::m::TestOrder>($t9, $t3)
+ 11: $t7 := infer($t8)
+ 12: $t10 := m::price($t7)
+ 13: $t11 := m::size($t7)
+ 14: $t13 := infer($t3)
+ 15: $t14 := 1
+ 16: $t12 := +($t13, $t14)
+ 17: $t3 := infer($t12)
+ 18: goto 21
+ 19: label L3
+ 20: goto 23
+ 21: label L4
+ 22: goto 3
+ 23: label L1
+ 24: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    use std::vector;
+    struct TestOrder {
+        price: u64,
+        size: u64,
+    }
+    private fun price(self: &TestOrder): u64 {
+        select m::TestOrder.price<&TestOrder>(self)
+    }
+    private fun size(self: &TestOrder): u64 {
+        select m::TestOrder.size<&TestOrder>(self)
+    }
+    private fun test_self(orders: vector<TestOrder>) {
+        {
+          let (v: &vector<TestOrder>): (&vector<TestOrder>) = Tuple(Borrow(Immutable)(orders));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, vector::length<TestOrder>(v)) {
+                {
+                  let (order: &TestOrder): (&TestOrder) = Tuple(vector::borrow<TestOrder>(v, i));
+                  {
+                    let _price: u64 = m::price(order);
+                    {
+                      let _size: u64 = m::size(order);
+                      Tuple()
+                    }
+                  }
+                };
+                i: u64 = Add<u64>(i, 1)
+              } else {
+                break
+              }
+            }
+          }
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::price($t0: &0xc0ffee::m::TestOrder): u64 {
+     var $t1: u64
+     var $t2: &u64
+  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.price($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::size($t0: &0xc0ffee::m::TestOrder): u64 {
+     var $t1: u64
+     var $t2: &u64
+  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.size($t0)
+  1: $t1 := read_ref($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::test_self($t0: vector<0xc0ffee::m::TestOrder>) {
+     var $t1: &vector<0xc0ffee::m::TestOrder>
+     var $t2: &vector<0xc0ffee::m::TestOrder>
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: &0xc0ffee::m::TestOrder
+     var $t8: &0xc0ffee::m::TestOrder
+     var $t9: &vector<0xc0ffee::m::TestOrder>
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: $t2 := borrow_local($t0)
+  1: $t1 := infer($t2)
+  2: $t3 := 0
+  3: label L0
+  4: $t5 := infer($t3)
+  5: $t6 := vector::length<0xc0ffee::m::TestOrder>($t1)
+  6: $t4 := <($t5, $t6)
+  7: if ($t4) goto 8 else goto 19
+  8: label L2
+  9: $t9 := infer($t1)
+ 10: $t8 := vector::borrow<0xc0ffee::m::TestOrder>($t9, $t3)
+ 11: $t7 := infer($t8)
+ 12: $t10 := m::price($t7)
+ 13: $t11 := m::size($t7)
+ 14: $t13 := infer($t3)
+ 15: $t14 := 1
+ 16: $t12 := +($t13, $t14)
+ 17: $t3 := infer($t12)
+ 18: goto 21
+ 19: label L3
+ 20: goto 23
+ 21: label L4
+ 22: goto 3
+ 23: label L1
+ 24: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+struct TestOrder has copy, drop, store {
+	price: u64,
+	size: u64
+}
+
+price(self: &TestOrder): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](self: &TestOrder)
+	1: ImmBorrowField[0](TestOrder.price: u64)
+	2: ReadRef
+	3: Ret
+}
+size(self: &TestOrder): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](self: &TestOrder)
+	1: ImmBorrowField[1](TestOrder.size: u64)
+	2: ReadRef
+	3: Ret
+}
+test_self(orders: vector<TestOrder>) /* def_idx: 2 */ {
+L1:	$t2: &vector<TestOrder>
+L2:	i: u64
+L3:	$t8: &TestOrder
+B0:
+	0: ImmBorrowLoc[0](orders: vector<TestOrder>)
+	1: StLoc[1]($t2: &vector<TestOrder>)
+	2: LdU64(0)
+	3: StLoc[2](i: u64)
+B1:
+	4: CopyLoc[2](i: u64)
+	5: CopyLoc[1]($t2: &vector<TestOrder>)
+	6: VecLen(4)
+	7: Lt
+	8: BrFalse(24)
+B2:
+	9: CopyLoc[1]($t2: &vector<TestOrder>)
+	10: CopyLoc[2](i: u64)
+	11: VecImmBorrow(4)
+	12: StLoc[3]($t8: &TestOrder)
+	13: CopyLoc[3]($t8: &TestOrder)
+	14: Call price(&TestOrder): u64
+	15: Pop
+	16: MoveLoc[3]($t8: &TestOrder)
+	17: Call size(&TestOrder): u64
+	18: Pop
+	19: MoveLoc[2](i: u64)
+	20: LdU64(1)
+	21: Add
+	22: StLoc[2](i: u64)
+	23: Branch(4)
+B3:
+	24: MoveLoc[1]($t2: &vector<TestOrder>)
+	25: Pop
+	26: Ret
+}
+}
+============ bytecode verification succeeded ========

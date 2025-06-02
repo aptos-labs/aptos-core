@@ -44,7 +44,7 @@ pub struct MempoolConfig {
     pub capacity: usize,
     /// Maximum number of bytes allowed in the Mempool
     pub capacity_bytes: usize,
-    /// Maximum number of transactions allowed in the Mempool per user
+    /// Maximum number of sequence number based transactions allowed in the Mempool per user
     pub capacity_per_user: usize,
     /// Number of failover peers to broadcast to when the primary network is alive
     pub default_failovers: usize,
@@ -100,6 +100,8 @@ pub struct MempoolConfig {
     /// up to 10 minutes (shared_mempool_priority_update_interval_secs) to enable the load balancing. If this flag is enabled,
     /// then the PFNs will always do load balancing irrespective of the load.
     pub enable_max_load_balancing_at_any_load: bool,
+    /// Maximum number of orderless transactions allowed in the Mempool per user
+    pub orderless_txn_capacity_per_user: usize,
 }
 
 impl Default for MempoolConfig {
@@ -164,6 +166,7 @@ impl Default for MempoolConfig {
                 },
             ],
             enable_max_load_balancing_at_any_load: false,
+            orderless_txn_capacity_per_user: 1000,
         }
     }
 }

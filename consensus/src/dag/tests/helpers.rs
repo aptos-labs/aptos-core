@@ -35,8 +35,8 @@ impl TPayloadManager for MockPayloadManager {
         &self,
         _block: &Block,
         _block_signers: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
-        Ok((Vec::new(), None))
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)> {
+        Ok((Vec::new(), None, None))
     }
 }
 

@@ -34,14 +34,6 @@ impl UserSessionChangeSet {
         Ok(user_session_change_set)
     }
 
-    pub(crate) fn has_modules_published_to_special_address(&self) -> bool {
-        self.module_write_set.has_writes_to_special_address()
-    }
-
-    pub(crate) fn module_write_set_is_empty_or_invariant_violation(&self) -> PartialVMResult<()> {
-        self.module_write_set.is_empty_or_invariant_violation()
-    }
-
     pub(crate) fn unpack(self) -> (VMChangeSet, ModuleWriteSet) {
         (self.change_set, self.module_write_set)
     }
@@ -62,13 +54,11 @@ impl ChangeSetInterface for UserSessionChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+        fix_prev_materialized_size: bool,
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.change_set
-            .write_op_info_iter_mut(executor_view, module_storage)
-            .chain(
-                self.module_write_set
-                    .write_op_info_iter_mut(executor_view, module_storage),
-            )
+            .write_op_info_iter_mut(executor_view, module_storage, fix_prev_materialized_size)
+            .chain(self.module_write_set.write_op_info_iter_mut(module_storage))
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
@@ -115,9 +105,13 @@ impl ChangeSetInterface for SystemSessionChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.change_set
-            .write_op_info_iter_mut(executor_view, module_storage)
+        fix_prev_materialized_size: bool,
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
+        self.change_set.write_op_info_iter_mut(
+            executor_view,
+            module_storage,
+            fix_prev_materialized_size,
+        )
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {

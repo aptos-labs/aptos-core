@@ -46,7 +46,7 @@ use std::{fmt, fmt::Debug};
 pub enum AccessSpecifier {
     /// Universal access granted
     Any,
-    /// A constraint in normalized form: `Constraint(inclusions, exclusions)`.
+    /// A constraint in normalized form `Constraint(inclusions, exclusions)`.
     /// The inclusions are a _disjunction_ and the exclusions a _conjunction_ of
     /// access clauses. An access is valid if it is enabled by any of the
     /// inclusions, and not enabled for each of the exclusions.
@@ -146,77 +146,8 @@ impl AccessSpecifier {
         match self {
             Any => true,
             Constraint(incls, excls) => {
-                incls.iter().any(|c| c.enables(access)) && excls.iter().all(|c| !c.enables(access))
-            },
-        }
-    }
-
-    pub fn join(&self, other: &Self) -> Self {
-        use AccessSpecifier::*;
-        match (self, other) {
-            (Any, s) | (s, Any) => s.clone(),
-            (Constraint(incls, excls), Constraint(other_incls, other_excls)) => {
-                // Inclusions are disjunctions. The join of two disjunctions is
-                //   (a + b) * (c + d) = a*(c + d) + b*(c + d) = a*c + a*d + b*c + b*d
-                // For the exclusions, we can simply concatenate them.
-                // TODO: this is quadratic and  need to be metered, OR protected by some
-                //   bound.
-                let mut new_incls = vec![];
-                for incl in incls {
-                    for other_incl in other_incls {
-                        // try_join returns None if the result is empty.
-                        if let Some(new_incl) = incl.join(other_incl) {
-                            new_incls.push(new_incl);
-                        }
-                    }
-                }
-                if new_incls.is_empty() {
-                    // Drop exclusions since they are redundant
-                    Constraint(new_incls, vec![])
-                } else {
-                    Constraint(
-                        new_incls,
-                        excls
-                            .iter()
-                            .cloned()
-                            .chain(other_excls.iter().cloned())
-                            .collect(),
-                    )
-                }
-            },
-        }
-    }
-
-    /// Check whether self allows all the accesses than other. Returns None if this is not
-    /// decidable.
-    pub fn subsumes(&self, other: &Self) -> Option<bool> {
-        use AccessSpecifier::*;
-        match (self, other) {
-            (Any, _) => Some(true),
-            (_, Any) => Some(false),
-            (Constraint(_, excls), _) if !excls.is_empty() => {
-                // If there are exclusions, we don't know the effective subset, so bail out
-                None
-            },
-            (Constraint(incls, _), Constraint(other_incls, _)) => {
-                // We can ignore the exclusions from other. As long as the inclusions are subsumed
-                // subset can be decided.
-                // TODO: this is quadratic and  need to be metered
-                'outer: for other in other_incls {
-                    if incls.is_empty() {
-                        // Known to be not inclusive
-                        return Some(false);
-                    }
-                    for incl in incls {
-                        if incl.subsumes(other) {
-                            // Can discharge this one.
-                            continue 'outer;
-                        }
-                    }
-                    // We don't know (but can likely improve this)
-                    return None;
-                }
-                Some(true)
+                (incls.is_empty() && !excls.is_empty() || incls.iter().any(|c| c.includes(access)))
+                    && excls.iter().all(|c| !c.excludes(access))
             },
         }
     }
@@ -224,17 +155,43 @@ impl AccessSpecifier {
 
 impl AccessSpecifierClause {
     /// Checks whether this clause allows the access.
-    fn enables(&self, access: &AccessInstance) -> bool {
+    fn includes(&self, access: &AccessInstance) -> bool {
+        use AccessKind::*;
         let AccessInstance {
             kind,
             resource,
             instance,
             address,
         } = access;
-        if self.kind != AccessKind::Acquires && &self.kind != kind {
-            return false;
-        }
-        self.resource.enables(resource, instance) && self.address.enables(address)
+        let kind_allows = match (self.kind, kind) {
+            (Reads, Reads) => true,
+            (Reads, Writes) => false,
+            // `writes` enables both read and write access
+            (Writes, Reads) => true,
+            (Writes, Writes) => true,
+        };
+        kind_allows && self.resource.matches(resource, instance) && self.address.matches(address)
+    }
+
+    /// Checks whether this clause disallows the access.
+    /// There is a difference in the interpretation of Reads/Writes in negated mode.
+    /// With `!reads`, both reading and writing are excluded (since write access also allows
+    /// read). With `!writes`, only writing is excluded, while reading is still allowed.
+    fn excludes(&self, access: &AccessInstance) -> bool {
+        use AccessKind::*;
+        let AccessInstance {
+            kind,
+            resource,
+            instance,
+            address,
+        } = access;
+        let kind_excludes = match (self.kind, kind) {
+            (Reads, Reads) => true,
+            (Reads, Writes) => true,
+            (Writes, Reads) => false,
+            (Writes, Writes) => true,
+        };
+        kind_excludes && self.resource.matches(resource, instance) && self.address.matches(address)
     }
 
     /// Specializes this clause.
@@ -242,71 +199,11 @@ impl AccessSpecifierClause {
         // Only addresses can be specialized right now.
         self.address.specialize(env)
     }
-
-    /// Join two clauses. Returns None if there is no intersection in access.
-    fn join(&self, other: &Self) -> Option<Self> {
-        let Self {
-            kind,
-            resource,
-            address,
-        } = self;
-        let Self {
-            kind: other_kind,
-            resource: other_resource,
-            address: other_address,
-        } = other;
-
-        kind.try_join(*other_kind).and_then(|kind| {
-            resource.join(other_resource).and_then(|resource| {
-                address.join(other_address).map(|address| Self {
-                    kind,
-                    resource,
-                    address,
-                })
-            })
-        })
-    }
-
-    fn subsumes(&self, other: &Self) -> bool {
-        self.kind.subsumes(&other.kind)
-            && self.resource.subsumes(&other.resource)
-            && self.address.subsumes(&other.address)
-    }
-}
-
-/// A few macros to make complex match arms better readable. Those data types are struct with
-/// named fields, and formatters tend to layout those very verbose.
-macro_rules! module_addr {
-    ($addr:pat) => {
-        ModuleId { address: $addr, .. }
-    };
-}
-
-macro_rules! struct_identifier_module {
-    ($m:pat) => {
-        StructIdentifier { module: $m, .. }
-    };
-}
-
-macro_rules! struct_identifier_addr {
-    ($addr:pat) => {
-        struct_identifier_module!(module_addr!($addr))
-    };
-}
-
-macro_rules! some_if {
-    ($val:expr, $check:expr) => {{
-        if $check {
-            Some($val)
-        } else {
-            None
-        }
-    }};
 }
 
 impl ResourceSpecifier {
     /// Checks whether the struct/type pair is enabled by this specifier.
-    fn enables(&self, struct_id: &StructIdentifier, type_inst: &[Type]) -> bool {
+    fn matches(&self, struct_id: &StructIdentifier, type_inst: &[Type]) -> bool {
         use ResourceSpecifier::*;
         match self {
             Any => true,
@@ -318,101 +215,11 @@ impl ResourceSpecifier {
             },
         }
     }
-
-    /// Joins two resource specifiers. Returns none of there is no intersection.
-    fn join(&self, other: &Self) -> Option<Self> {
-        use ResourceSpecifier::*;
-        match &self {
-            Any => Some(other.clone()),
-            DeclaredAtAddress(addr) => match &other {
-                Any => Some(self.clone()),
-                DeclaredAtAddress(other_addr)
-                | DeclaredInModule(module_addr!(other_addr))
-                | Resource(struct_identifier_addr!(other_addr))
-                | ResourceInstantiation(struct_identifier_addr!(other_addr), _) => {
-                    some_if!(other.clone(), addr == other_addr)
-                },
-            },
-            DeclaredInModule(module_id) => match &other {
-                Any => Some(self.clone()),
-                DeclaredAtAddress(addr) => some_if!(self.clone(), addr == module_id.address()),
-                DeclaredInModule(other_module_id)
-                | Resource(struct_identifier_module!(other_module_id))
-                | ResourceInstantiation(struct_identifier_module!(other_module_id), _) => {
-                    some_if!(other.clone(), module_id == other_module_id)
-                },
-            },
-            Resource(struct_id) => match &other {
-                Any => Some(self.clone()),
-                DeclaredAtAddress(addr) => {
-                    some_if!(self.clone(), addr == struct_id.module.address())
-                },
-                DeclaredInModule(module_id) => {
-                    some_if!(self.clone(), module_id == &struct_id.module)
-                },
-                Resource(other_struct_id) | ResourceInstantiation(other_struct_id, _) => {
-                    some_if!(other.clone(), struct_id == other_struct_id)
-                },
-            },
-            ResourceInstantiation(struct_id, inst) => match other {
-                Any => Some(self.clone()),
-                DeclaredAtAddress(addr) => {
-                    some_if!(self.clone(), struct_id.module.address() == addr)
-                },
-                DeclaredInModule(module_id) => {
-                    some_if!(self.clone(), &struct_id.module == module_id)
-                },
-                Resource(other_struct_id) => some_if!(self.clone(), struct_id == other_struct_id),
-                ResourceInstantiation(other_struct_id, other_inst) => {
-                    some_if!(
-                        self.clone(),
-                        struct_id == other_struct_id && inst == other_inst
-                    )
-                },
-            },
-        }
-    }
-
-    fn subsumes(&self, other: &Self) -> bool {
-        use ResourceSpecifier::*;
-        match &self {
-            Any => true,
-            DeclaredAtAddress(addr) => match &other {
-                Any => false,
-                DeclaredAtAddress(other_addr)
-                | DeclaredInModule(module_addr!(other_addr))
-                | Resource(struct_identifier_addr!(other_addr))
-                | ResourceInstantiation(struct_identifier_addr!(other_addr), _) => {
-                    addr == other_addr
-                },
-            },
-            DeclaredInModule(module_id) => match &other {
-                Any | DeclaredAtAddress(_) => false,
-                DeclaredInModule(other_module_id)
-                | Resource(struct_identifier_module!(other_module_id))
-                | ResourceInstantiation(struct_identifier_module!(other_module_id), _) => {
-                    module_id == other_module_id
-                },
-            },
-            Resource(struct_id) => match &other {
-                Any | DeclaredAtAddress(_) | DeclaredInModule(_) => false,
-                Resource(other_struct_id) | ResourceInstantiation(other_struct_id, _) => {
-                    struct_id == other_struct_id
-                },
-            },
-            ResourceInstantiation(struct_id, inst) => match other {
-                Any | DeclaredAtAddress(_) | DeclaredInModule(_) | Resource(_) => false,
-                ResourceInstantiation(other_struct_id, other_inst) => {
-                    struct_id == other_struct_id && inst == other_inst
-                },
-            },
-        }
-    }
 }
 
 impl AddressSpecifier {
     /// Checks whether the given address is enabled by this specifier.
-    fn enables(&self, addr: &AccountAddress) -> bool {
+    fn matches(&self, addr: &AccountAddress) -> bool {
         use AddressSpecifier::*;
         match self {
             Any => true,
@@ -427,34 +234,6 @@ impl AddressSpecifier {
             *self = AddressSpecifier::Literal(env.eval_address_specifier_function(*fun, *arg)?)
         }
         Ok(())
-    }
-
-    /// Joins two address specifiers. Returns None if there is no intersection.
-    fn join(&self, other: &Self) -> Option<Self> {
-        use AddressSpecifier::*;
-        match (self, other) {
-            (Any, s) | (s, Any) => Some(s.clone()),
-            (Literal(a1), Literal(a2)) => some_if!(self.clone(), a1 == a2),
-            (_, _) => {
-                // Eval should be specialized away when join is called.
-                debug_assert!(false, "unexpected AddressSpecifier::Eval found");
-                None
-            },
-        }
-    }
-
-    fn subsumes(&self, other: &Self) -> bool {
-        use AddressSpecifier::*;
-        match (self, other) {
-            (Any, _) => true,
-            (_, Any) => false,
-            (Literal(a1), Literal(a2)) => a1 == a2,
-            (_, _) => {
-                // Eval should be specialized away when subsumes is called.
-                debug_assert!(false, "unexpected AddressSpecifier::Eval found");
-                false
-            },
-        }
     }
 }
 

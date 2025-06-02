@@ -140,6 +140,8 @@ impl GrpcManager for GrpcManagerService {
         Ok(Response::new(TransactionsResponse {
             transactions,
             chain_id: Some(self.chain_id),
+            // Not used.
+            processed_range: None,
         }))
     }
 
@@ -149,16 +151,28 @@ impl GrpcManager for GrpcManagerService {
     ) -> Result<Response<GetDataServiceForRequestResponse>, Status> {
         let request = request.into_inner();
 
-        if request.user_request.is_none() {
-            return Err(Status::invalid_argument("Bad request."));
+        if request.user_request.is_none()
+            || request
+                .user_request
+                .as_ref()
+                .unwrap()
+                .starting_version
+                .is_none()
+        {
+            let candidates = self.metadata_manager.get_live_data_services_info();
+            if let Some(candidate) = candidates.iter().next() {
+                let data_service_address = candidate.0.clone();
+                return Ok(Response::new(GetDataServiceForRequestResponse {
+                    data_service_address,
+                }));
+            } else {
+                return Err(Status::internal(
+                    "Cannot find a data service instance to serve the provided request.",
+                ));
+            }
         }
 
-        let user_request = request.user_request.unwrap();
-        if user_request.starting_version.is_none() {
-            return Err(Status::invalid_argument("Bad request."));
-        }
-
-        let starting_version = user_request.starting_version();
+        let starting_version = request.user_request.unwrap().starting_version();
 
         let data_service_address =
             // TODO(grao): Use a simple strategy for now. Consider to make it smarter in the

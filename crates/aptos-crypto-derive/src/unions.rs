@@ -90,6 +90,8 @@ pub fn impl_enum_valid_crypto_material(name: &Ident, variants: &DataEnum) -> Tok
     try_from.extend(quote! {
 
         impl aptos_crypto::ValidCryptoMaterial for #name {
+            const AIP_80_PREFIX: &'static str = "";
+
             fn to_bytes(&self) -> Vec<u8> {
                 match self {
                     #to_bytes_arms

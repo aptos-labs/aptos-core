@@ -3,19 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{
-        access_specifier_loader::load_access_specifier, LegacyModuleStorageAdapter, Loader, Module,
-        Resolver, Script,
-    },
+    loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    ModuleStorage, RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
     },
@@ -48,7 +45,7 @@ pub struct Function {
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) is_native: bool,
-    pub(crate) is_friend_or_private: bool,
+    pub(crate) visibility: Visibility,
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
     pub(crate) return_tys: Vec<Type>,
@@ -61,7 +58,7 @@ pub struct Function {
 
 /// For loaded function representation, specifies the owner: a script or a module.
 #[derive(Clone)]
-pub(crate) enum LoadedFunctionOwner {
+pub enum LoadedFunctionOwner {
     Script(Arc<Script>),
     Module(Arc<Module>),
 }
@@ -69,12 +66,48 @@ pub(crate) enum LoadedFunctionOwner {
 /// A loaded runtime function representation along with type arguments used to instantiate it.
 #[derive(Clone)]
 pub struct LoadedFunction {
-    pub(crate) owner: LoadedFunctionOwner,
+    pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
-    pub(crate) ty_args: Vec<Type>,
+    pub ty_args: Vec<Type>,
     // Definition of the loaded function.
-    pub(crate) function: Arc<Function>,
+    pub function: Arc<Function>,
+}
+
+impl LoadedFunction {
+    pub(crate) fn owner(&self) -> &LoadedFunctionOwner {
+        &self.owner
+    }
+
+    /// Returns a reference to parent [Script] owning the script's entrypoint function. Returns an
+    /// invariant violation error if the function comes from a module.
+    pub fn owner_as_script(&self) -> VMResult<&Script> {
+        match &self.owner {
+            LoadedFunctionOwner::Script(script) => Ok(script.as_ref()),
+            LoadedFunctionOwner::Module(_) => {
+                let msg = "Expected function from script, got module instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
+
+    /// Returns a reference to parent [Module] owning the function. Returns an invariant violation
+    /// error if the function comes from a script.
+    pub fn owner_as_module(&self) -> VMResult<&Module> {
+        match &self.owner {
+            LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
+            LoadedFunctionOwner::Script(_) => {
+                let msg = "Expected function from module, but got script instead".to_string();
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined);
+                Err(err)
+            },
+        }
+    }
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -109,14 +142,14 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        converter: &TypeTagConverter,
+        runtime_environment: &RuntimeEnvironment,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| converter.ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
             LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
@@ -202,14 +235,9 @@ impl LazyLoadedFunction {
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
+        let function = module_storage
+            .load_function(module_id, fun_id, ty_args)
             .map_err(|err| err.to_partial())?;
-        let ty_args = ty_args
-            .iter()
-            .map(|t| module_storage.fetch_ty(t))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
 
         // Verify that the function argument types match the layouts used for deserialization.
         // This is only done in paranoid mode. Since integrity of storage
@@ -228,12 +256,25 @@ impl LazyLoadedFunction {
                         "captured argument count does not match declared parameters".to_string(),
                     ));
             }
+
+            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
             for (actual_arg_ty, serialized_layout) in
                 captured_arg_types.into_iter().zip(captured_layouts)
             {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
-                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+                // We do not allow function values to capture any delayed fields, for now. Note
+                // that this is enforced at serialization time. Here we cannot enforce it because
+                // function value could have stored an old version of an enum without an aggregator
+                // but the new layout has the new variant with the aggregator. In any case, the
+                // serializer will fail on this resolved closure if there is an attempt to put it
+                // back into storage.
+                let actual_arg_layout = if function.ty_args().is_empty() {
+                    converter.type_to_type_layout(actual_arg_ty)?
+                } else {
+                    let actual_arg_ty =
+                        ty_builder.create_ty_with_subst(actual_arg_ty, function.ty_args())?;
+                    converter.type_to_type_layout(&actual_arg_ty)?
+                };
+
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
@@ -243,11 +284,7 @@ impl LazyLoadedFunction {
                 }
             }
         }
-        Ok(Rc::new(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
-            ty_args,
-            function,
-        }))
+        Ok(Rc::new(function))
     }
 }
 
@@ -298,7 +335,7 @@ impl AbstractFunction for LazyLoadedFunction {
                         .join(",")
                 )
             };
-            format!("{}::{}:{}", prefix, fun_id, ty_args_str)
+            format!("{}::{}{}", prefix, fun_id, ty_args_str)
         })
     }
 }
@@ -341,18 +378,24 @@ impl LoadedFunction {
 
     /// Returns true if the loaded function has friend or private visibility.
     pub fn is_friend_or_private(&self) -> bool {
-        self.function.is_friend_or_private()
+        self.function.is_friend() || self.function.is_private()
     }
 
-    /// Returns true if the loaded function has public visibility. This is the
-    /// opposite of the above (for better readability).
+    /// Returns true if the loaded function has public visibility.
     pub fn is_public(&self) -> bool {
-        !self.function.is_friend_or_private()
+        self.function.is_public()
     }
 
-    /// Returns true if the loaded function is an entry function.
-    pub(crate) fn is_entry(&self) -> bool {
-        self.function.is_entry()
+    /// Returns an error if the loaded function is **NOT** an entry function.
+    pub fn is_entry_or_err(&self) -> VMResult<()> {
+        if !self.function.is_entry() {
+            let module_id = self.owner_as_module()?.self_id().clone();
+            let err = PartialVMError::new(
+                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+            );
+            return Err(err.finish(Location::Module(module_id)));
+        }
+        Ok(())
     }
 
     /// Returns parameter types from the function's definition signature.
@@ -412,22 +455,6 @@ impl LoadedFunction {
             ),
         }
     }
-
-    pub(crate) fn get_resolver<'a>(
-        &self,
-        loader: &'a Loader,
-        module_store: &'a LegacyModuleStorageAdapter,
-        module_storage: &'a impl ModuleStorage,
-    ) -> Resolver<'a> {
-        match &self.owner {
-            LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module_storage, module.clone())
-            },
-            LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, module_storage, script.clone())
-            },
-        }
-    }
 }
 
 impl Debug for Function {
@@ -450,12 +477,6 @@ impl Function {
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();
-
-        let is_friend_or_private = match def.visibility {
-            Visibility::Friend | Visibility::Private => true,
-            Visibility::Public => false,
-        };
-        let is_entry = def.is_entry;
 
         let (native, is_native) = if def.is_native() {
             let native = natives.resolve(
@@ -497,8 +518,8 @@ impl Function {
             ty_param_abilities,
             native,
             is_native,
-            is_friend_or_private,
-            is_entry,
+            visibility: def.visibility,
+            is_entry: def.is_entry,
             name,
             local_tys,
             return_tys,
@@ -530,6 +551,11 @@ impl Function {
         &self.ty_param_abilities
     }
 
+    /// Returns the number of type parameters this function has.
+    pub fn ty_params_count(&self) -> usize {
+        self.ty_param_abilities.len()
+    }
+
     pub(crate) fn local_tys(&self) -> &[Type] {
         &self.local_tys
     }
@@ -543,7 +569,7 @@ impl Function {
     }
 
     pub fn is_persistent(&self) -> bool {
-        self.is_persistent || !self.is_friend_or_private()
+        self.is_persistent || self.is_public()
     }
 
     pub fn has_module_lock(&self) -> bool {
@@ -561,11 +587,11 @@ impl Function {
     }
 
     /// Returns the abilities associated with this function, without consideration of any captured
-    /// closure arguments. By default, this is copy and drop, and if the function is
-    /// immutable (public), also store.
+    /// closure arguments. By default, this is copy and drop, and if the function signature cannot
+    /// be changed (i.e., the function has `#[persistent]` attribute or is public), also store.
     pub fn abilities(&self) -> AbilitySet {
         let result = AbilitySet::singleton(Ability::Copy).add(Ability::Drop);
-        if !self.is_friend_or_private {
+        if self.is_persistent() {
             result.add(Ability::Store)
         } else {
             result
@@ -576,8 +602,16 @@ impl Function {
         self.is_native
     }
 
-    pub fn is_friend_or_private(&self) -> bool {
-        self.is_friend_or_private
+    pub fn is_public(&self) -> bool {
+        matches!(self.visibility, Visibility::Public)
+    }
+
+    pub fn is_friend(&self) -> bool {
+        matches!(self.visibility, Visibility::Friend)
+    }
+
+    pub fn is_private(&self) -> bool {
+        matches!(self.visibility, Visibility::Private)
     }
 
     pub(crate) fn is_entry(&self) -> bool {
@@ -591,14 +625,6 @@ impl Function {
         })
     }
 }
-
-//
-// Internal structures that are saved at the proper index in the proper tables to access
-// execution information (interpreter).
-// The following structs are internal to the loader and never exposed out.
-// The `Loader` will create those struct and the proper table when loading a module.
-// The `Resolver` uses those structs to return information to the `Interpreter`.
-//
 
 // A function instantiation.
 #[derive(Clone, Debug)]

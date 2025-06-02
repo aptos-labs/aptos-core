@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, ResourceSpecifier,
-        TempIndex, Value,
+        AccessSpecifierKind, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
+        ResourceSpecifier, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -18,7 +18,6 @@ use crate::{
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
 };
 use itertools::Itertools;
-use move_binary_format::file_format::AccessKind;
 use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 //
@@ -177,9 +176,9 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "!")
                 }
                 match &spec.kind {
-                    AccessKind::Reads => emit!(self.writer, "reads "),
-                    AccessKind::Writes => emit!(self.writer, "writes "),
-                    AccessKind::Acquires => emit!(self.writer, "acquires "),
+                    AccessSpecifierKind::Reads => emit!(self.writer, "reads "),
+                    AccessSpecifierKind::Writes => emit!(self.writer, "writes "),
+                    AccessSpecifierKind::LegacyAcquires => emit!(self.writer, "acquires "),
                 }
                 match &spec.resource.1 {
                     ResourceSpecifier::Any => emit!(self.writer, "*"),
@@ -542,7 +541,7 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             // Following forms may require parenthesis
-            Lambda(_, pat, body, capture_kind) => {
+            Lambda(_, pat, body, capture_kind, spec_opt) => {
                 self.parenthesize(context_prio, Prio::General, || {
                     if *capture_kind != LambdaCaptureKind::Default {
                         emit!(self.wr(), "{} ", capture_kind);
@@ -551,6 +550,9 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_pat(pat);
                     emit!(self.wr(), "| ");
                     self.print_exp(Prio::General, true, body);
+                    if let Some(spec) = spec_opt {
+                        self.print_exp(Prio::General, true, spec);
+                    }
                 });
             },
             Block(..) | Sequence(..) => {
@@ -842,8 +844,14 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp(
                         context_prio,
                         false,
-                        &ExpData::Lambda(id, lambda_pat, call_exp, LambdaCaptureKind::Default)
-                            .into_exp(),
+                        &ExpData::Lambda(
+                            id,
+                            lambda_pat,
+                            call_exp,
+                            LambdaCaptureKind::Default,
+                            None,
+                        )
+                        .into_exp(),
                     )
                 })
             },

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: captured variable `accu` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/lambda_cast.move:18:35
+   │
+18 │         vector_for_each(v, |elem| accu = f(accu, elem));
+   │                                   ^^^^

@@ -26,7 +26,6 @@ fn random_message(rng: &mut ThreadRng) -> TestAptosCrypto {
     TestAptosCrypto(
         rng.sample_iter(&distributions::Alphanumeric)
             .take(256)
-            .map(char::from)
             .collect::<String>(),
     )
 }

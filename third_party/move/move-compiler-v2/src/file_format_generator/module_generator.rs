@@ -8,7 +8,7 @@ use crate::{
         MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
         MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
     },
-    Experiment, Options,
+    Options,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -19,7 +19,7 @@ use move_core_types::{
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::{AccessSpecifier, Address, AddressSpecifier, Attribute, ResourceSpecifier},
+    ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
     metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
@@ -124,8 +124,7 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
-            && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_3);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
@@ -517,34 +516,18 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
-        let access_specifiers = if self.gen_access_specifiers {
-            fun_env.get_access_specifiers().as_ref().map(|v| {
+        let access_specifiers = fun_env
+            .get_access_specifiers()
+            .as_ref()
+            .map(|v| {
                 v.iter()
-                    .map(|s| self.access_specifier(ctx, fun_env, s))
-                    .collect()
+                    .filter_map(|s| self.access_specifier(ctx, fun_env, s))
+                    .collect_vec()
             })
-        } else {
-            // Report an error if we cannot drop the access specifiers.
-            // TODO(#12623): remove this once the bug is fixed
-            if fun_env
-                .get_access_specifiers()
-                .map(|v| {
-                    v.iter().any(|s| {
-                        s.kind != FF::AccessKind::Acquires
-                            || s.negated
-                            || !matches!(s.resource.1, ResourceSpecifier::Resource(_))
-                            || !matches!(s.address.1, AddressSpecifier::Any)
-                    })
-                })
-                .unwrap_or_default()
-            {
-                ctx.internal_error(
-                    loc,
-                    "cannot strip extended access specifiers to mitigate bug #12623",
-                )
-            }
-            None
-        };
+            .and_then(|specs| if specs.is_empty() { None } else { Some(specs) });
+        if !self.gen_access_specifiers && access_specifiers.is_some() {
+            ctx.error(loc, "access specifiers not enabled");
+        }
         let attributes = if self.gen_function_attributes {
             ctx.function_attributes(fun_env)
         } else {
@@ -581,7 +564,15 @@ impl ModuleGenerator {
         ctx: &ModuleContext,
         fun_env: &FunctionEnv,
         access_specifier: &AccessSpecifier,
-    ) -> FF::AccessSpecifier {
+    ) -> Option<FF::AccessSpecifier> {
+        let kind = match access_specifier.kind {
+            AccessSpecifierKind::Reads => FF::AccessKind::Reads,
+            AccessSpecifierKind::Writes => FF::AccessKind::Writes,
+            AccessSpecifierKind::LegacyAcquires => {
+                // Legacy acquires not represented in file format
+                return None;
+            },
+        };
         let resource = match &access_specifier.resource.1 {
             ResourceSpecifier::Any => FF::ResourceSpecifier::Any,
             ResourceSpecifier::DeclaredAtAddress(addr) => FF::ResourceSpecifier::DeclaredAtAddress(
@@ -639,12 +630,12 @@ impl ModuleGenerator {
                     FF::AddressSpecifier::Parameter(param_index, Some(fun_index))
                 },
             };
-        FF::AccessSpecifier {
-            kind: access_specifier.kind,
+        Some(FF::AccessSpecifier {
+            kind,
             negated: access_specifier.negated,
             resource,
             address,
-        }
+        })
     }
 
     pub fn function_instantiation_index(
@@ -973,10 +964,11 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
+        let canonical_const = cons.to_canonical();
+        if let Some(idx) = self.cons_to_idx.get(&(canonical_const.clone(), ty.clone())) {
             return *idx;
         }
-        let data = cons
+        let data = canonical_const
             .to_move_value()
             .simple_serialize()
             .expect("serialization succeeds");
@@ -991,12 +983,12 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
+        self.cons_to_idx.insert((canonical_const, ty.clone()), idx);
         idx
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Emits an error at the location.
     pub fn error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
         self.env.diag(Severity::Error, loc.as_ref(), msg.as_ref())
@@ -1035,29 +1027,37 @@ impl<'env> ModuleContext<'env> {
         inst_sign: Option<FF::SignatureIndex>,
     ) -> Option<FF::Bytecode> {
         let fun = self.env.get_function(qid);
-        let mod_name = fun.module_env.get_name();
-        if mod_name.addr() != &Address::Numerical(AccountAddress::ONE) {
+        if !fun.module_env.is_std_vector() {
             return None;
         }
         let pool = self.env.symbol_pool();
-        if pool.string(mod_name.name()).as_str() == "vector" {
-            if let Some(inst) = inst_sign {
-                match pool.string(fun.get_name()).as_str() {
-                    "empty" => Some(FF::Bytecode::VecPack(inst, 0)),
-                    "length" => Some(FF::Bytecode::VecLen(inst)),
-                    "borrow" => Some(FF::Bytecode::VecImmBorrow(inst)),
-                    "borrow_mut" => Some(FF::Bytecode::VecMutBorrow(inst)),
-                    "push_back" => Some(FF::Bytecode::VecPushBack(inst)),
-                    "pop_back" => Some(FF::Bytecode::VecPopBack(inst)),
-                    "destroy_empty" => Some(FF::Bytecode::VecUnpack(inst, 0)),
-                    "swap" => Some(FF::Bytecode::VecSwap(inst)),
-                    _ => None,
-                }
-            } else {
-                self.internal_error(loc, "expected type instantiation for vector operation");
-                None
+        let function_name = pool.string(fun.get_name());
+        if !well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&function_name.as_str()) {
+            // early return if vector function does not have a bytecode instruction
+            return None;
+        }
+
+        if let Some(inst) = inst_sign {
+            match function_name.as_str() {
+                // note: the following matched strings should all be present in `well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS`
+                "empty" => Some(FF::Bytecode::VecPack(inst, 0)),
+                "length" => Some(FF::Bytecode::VecLen(inst)),
+                "borrow" => Some(FF::Bytecode::VecImmBorrow(inst)),
+                "borrow_mut" => Some(FF::Bytecode::VecMutBorrow(inst)),
+                "push_back" => Some(FF::Bytecode::VecPushBack(inst)),
+                "pop_back" => Some(FF::Bytecode::VecPopBack(inst)),
+                "destroy_empty" => Some(FF::Bytecode::VecUnpack(inst, 0)),
+                "swap" => Some(FF::Bytecode::VecSwap(inst)),
+                _ => {
+                    self.internal_error(
+                        loc,
+                        format!("unexpected vector function `{}`", function_name),
+                    );
+                    None
+                },
             }
         } else {
+            self.internal_error(loc, "expected type instantiation for vector operation");
             None
         }
     }
@@ -1068,7 +1068,7 @@ impl<'env> ModuleContext<'env> {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Acquires analysis. This is temporary until we have the full reference analysis.
     fn generate_acquires_map(&self, module: &ModuleEnv) -> BTreeMap<FunId, BTreeSet<StructId>> {
         // Compute map with direct usage of resources

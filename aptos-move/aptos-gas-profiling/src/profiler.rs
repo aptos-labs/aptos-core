@@ -7,6 +7,7 @@ use crate::log::{
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
@@ -503,6 +504,10 @@ where
 
         res
     }
+
+    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.base.charge_heap_memory(amount)
+    }
 }
 
 fn write_op_type(op: &WriteOpSize) -> WriteOpType {
@@ -594,7 +599,12 @@ where
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
         let mut total_refund = Fee::new(0);
-        for res in change_set.write_op_info_iter_mut(executor_view, module_storage) {
+        let fix_prev_materialized_size = self.feature_version() > RELEASE_V1_30;
+        for res in change_set.write_op_info_iter_mut(
+            executor_view,
+            module_storage,
+            fix_prev_materialized_size,
+        ) {
             let write_op_info = res.map_err(|err| err.finish(Location::Undefined))?;
             let key = write_op_info.key.clone();
             let op_type = write_op_type(&write_op_info.op_size);

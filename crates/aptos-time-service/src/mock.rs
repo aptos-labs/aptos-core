@@ -19,7 +19,7 @@ use std::{
 #[inline]
 #[allow(clippy::arithmetic_side_effects)]
 fn duration_max() -> Duration {
-    Duration::new(std::u64::MAX, 1_000_000_000 - 1)
+    Duration::new(u64::MAX, 1_000_000_000 - 1)
 }
 
 /// Each waiter in the pending queue has a unique index to distinguish waiters

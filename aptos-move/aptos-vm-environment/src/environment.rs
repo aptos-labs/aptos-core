@@ -232,7 +232,8 @@ impl Environment {
             gas_hook,
         );
         let natives = aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim);
-        let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
+        let vm_config =
+            aptos_prod_vm_config(gas_feature_version, &features, &timed_features, ty_builder);
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
         let hash = sha3_256.finalize().into();
@@ -329,8 +330,8 @@ pub mod tests {
         non_default_configuration.set_last_reconfiguration_time_for_test(1);
 
         let mut non_default_features = Features::default();
-        assert!(non_default_features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
-        non_default_features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
+        assert!(non_default_features.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT));
+        non_default_features.disable(FeatureFlag::EMIT_FEE_STATEMENT);
 
         let state_views = [
             MockStateView::empty(),

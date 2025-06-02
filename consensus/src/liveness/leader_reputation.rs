@@ -111,7 +111,7 @@ impl AptosDBBackend {
         // Do not warn when round==0, because check will always be unsure of whether we have
         // all events from the previous epoch. If there is an actual issue, next round will log it.
         if target_round != 0 {
-            let has_larger = events.first().map_or(false, |e| {
+            let has_larger = events.first().is_some_and(|e| {
                 (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
             });
             if !has_larger {
@@ -191,9 +191,9 @@ impl MetadataBackend for AptosDBBackend {
             (&result.0, result.1, result.2)
         };
 
-        let has_larger = events.first().map_or(false, |e| {
-            (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
-        });
+        let has_larger = events
+            .first()
+            .is_some_and(|e| (e.event.epoch(), e.event.round()) >= (target_epoch, target_round));
         // check if fresher data has potential to give us different result
         if !has_larger && version < latest_db_version {
             let fresh_db_result = self.refresh_db_result(&mut locked, latest_db_version);
@@ -227,7 +227,7 @@ pub trait ReputationHeuristic: Send + Sync {
 }
 
 pub struct NewBlockEventAggregation {
-    // Window sizes are in number of succesfull blocks, not number of rounds.
+    // Window sizes are in number of successful blocks, not number of rounds.
     // i.e. we can be looking at different number of rounds for the same window,
     // dependig on how many failures we have.
     voter_window_size: usize,

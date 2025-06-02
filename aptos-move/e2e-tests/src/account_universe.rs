@@ -120,24 +120,18 @@ pub struct AccountCurrent {
     initial_data: AccountData,
     balance: u64,
     sequence_number: u64,
-    sent_events_count: u64,
-    received_events_count: u64,
     // creation of event counter affects gas usage in create account. This tracks it
     event_counter_created: bool,
 }
 
 impl AccountCurrent {
     fn new(initial_data: AccountData) -> Self {
-        let balance = initial_data.coin_balance().unwrap();
+        let balance = initial_data.fungible_balance().unwrap();
         let sequence_number = initial_data.sequence_number();
-        let sent_events_count = initial_data.sent_events_count();
-        let received_events_count = initial_data.received_events_count();
         Self {
             initial_data,
             balance,
             sequence_number,
-            sent_events_count,
-            received_events_count,
             event_counter_created: false,
         }
     }
@@ -157,18 +151,6 @@ impl AccountCurrent {
     /// are applied.
     pub fn sequence_number(&self) -> u64 {
         self.sequence_number
-    }
-
-    /// Returns the current sent events count for this account, assuming all transactions seen so
-    /// far are applied.
-    pub fn sent_events_count(&self) -> u64 {
-        self.sent_events_count
-    }
-
-    /// Returns the current received events count for this account, assuming all transactions seen
-    /// so far are applied.
-    pub fn received_events_count(&self) -> u64 {
-        self.received_events_count
     }
 
     /// Returns the gas cost of a create-account transaction.
@@ -252,7 +234,6 @@ pub fn txn_one_account_result(
         (true, true, true) => {
             // Success!
             sender.sequence_number += 1;
-            sender.sent_events_count += 1;
             sender.balance -= to_deduct;
             (TransactionStatus::Keep(ExecutionStatus::Success), true)
         },
@@ -338,8 +319,8 @@ pub fn run_and_assert_gas_cost_stability(
     universe: AccountUniverseGen,
     transaction_gens: Vec<impl AUTransactionGen + Clone>,
 ) -> Result<(), TestCaseError> {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let mut universe = universe.setup_gas_cost_stability(&mut executor);
+    let executor = FakeExecutor::from_head_genesis();
+    let mut universe = universe.setup_gas_cost_stability(executor.state_store());
     let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
         .iter()
         .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))
@@ -400,8 +381,8 @@ pub fn assert_accounts_match(
         let resource = executor
             .read_account_resource(account.account())
             .expect("account resource must exist");
-        let coin_store_resource = executor
-            .read_apt_coin_store_resource(account.account())
+        let fungible_store_resource = executor
+            .read_apt_fungible_store_resource(account.account())
             .expect("account balance resource must exist");
         let auth_key = account.account().auth_key();
         prop_assert_eq!(
@@ -412,7 +393,7 @@ pub fn assert_accounts_match(
         );
         prop_assert_eq!(
             account.balance(),
-            coin_store_resource.coin(),
+            fungible_store_resource.balance(),
             "account {} should have correct balance",
             idx
         );

@@ -1,0 +1,161 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun bar(): u64 {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, 10) {
+              i: u64 = Add<u64>(i, 1);
+              if Eq<u64>(i, 5) {
+                m::brk2(closure#0m::__lambda__1__bar());
+                m::brk2(closure#0m::__lambda__2__bar());
+                m::brk2(closure#0m::__lambda__3__bar());
+                Tuple()
+              } else {
+                Tuple()
+              }
+            } else {
+              break
+            }
+          };
+          i
+        }
+    }
+    private fun brk() {
+        break;
+        Tuple()
+    }
+    private fun brk2(f: ||) {
+        (f)();
+        Tuple()
+    }
+    private fun brk3() {
+        loop {
+          if true {
+            break;
+            Tuple()
+          } else {
+            break
+          }
+        }
+    }
+    private fun brk4() {
+        loop {
+          if true {
+            continue;
+            Tuple()
+          } else {
+            break
+          }
+        }
+    }
+    private fun broken() {
+        break;
+        Tuple()
+    }
+    private fun continued() {
+        continue;
+        Tuple()
+    }
+    public fun foo(): u64 {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, 10) {
+              i: u64 = Add<u64>(i, 1);
+              if Eq<u64>(i, 5) {
+                m::brk();
+                m::brk3();
+                m::brk4();
+                Tuple()
+              } else {
+                Tuple()
+              }
+            } else {
+              break
+            }
+          };
+          i
+        }
+    }
+    private fun __lambda__1__bar() {
+        break
+    }
+    private fun __lambda__2__bar() {
+        loop {
+          if true {
+            break
+          } else {
+            break
+          }
+        }
+    }
+    private fun __lambda__3__bar() {
+        loop {
+          if true {
+            continue
+          } else {
+            break
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun bar(): u64 {
+        let i = 0;
+        while (i < 10) {
+            i = i + 1;
+            if (i == 5) {
+                brk2(|()| __lambda__1__bar());
+                brk2(|()| __lambda__2__bar());
+                brk2(|()| __lambda__3__bar());
+            }
+        };
+        i
+    }
+    fun brk() {
+        break;
+    }
+    fun brk2(f: ||) {
+        f();
+    }
+    fun brk3() {
+        while (true) {
+            break;
+        }
+    }
+    fun brk4() {
+        while (true) {
+            continue;
+        }
+    }
+    fun broken() {
+        break;
+    }
+    fun continued() {
+        continue;
+    }
+    public fun foo(): u64 {
+        let i = 0;
+        while (i < 10) {
+            i = i + 1;
+            if (i == 5) {
+                brk();
+                brk3();
+                brk4();
+            }
+        };
+        i
+    }
+    fun __lambda__1__bar() {
+        break
+    }
+    fun __lambda__2__bar() {
+        while (true) break
+    }
+    fun __lambda__3__bar() {
+        while (true) continue
+    }
+}

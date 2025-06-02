@@ -20,7 +20,7 @@ use move_binary_format::{
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
-    vm_status::{StatusType, VMStatus},
+    vm_status::{StatusCode, StatusType, VMStatus},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -152,13 +152,26 @@ fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload
     code_publish_package_txn(pkg_metadata, pkg_code)
 }
 
+// List of known false positive messages for invariant violations
+// If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
+const KNOWN_FALSE_POSITIVES_VMSTATUS: &[&str] = &["moving container with dangling references"];
+
 // panic to catch invariant violations
 pub(crate) fn check_for_invariant_violation(e: VMStatus) {
-    if e.status_type() == StatusType::InvariantViolation {
-        // known false positive
-        if e.message() != Some(&"moving container with dangling references".to_string()) {
-            panic!("invariant violation {:?}", e);
-        }
+    let is_known_false_positive = e.message().map_or(false, |msg| {
+        KNOWN_FALSE_POSITIVES_VMSTATUS
+            .iter()
+            .any(|known| msg.starts_with(known))
+    });
+
+    if !is_known_false_positive {
+        panic!(
+            "invariant violation {:?}\n{}{:?} {}",
+            e,
+            "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
+            e.status_code(),
+            "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
+        );
     }
 }
 
@@ -190,7 +203,11 @@ pub(crate) fn publish_group(
         TransactionStatus::Keep(status) => status,
         TransactionStatus::Discard(e) => {
             if e.status_type() == StatusType::InvariantViolation {
-                panic!("invariant violation {:?}", e);
+                panic!(
+                    "invariant violation via TransactionStatus: {:?}, {:?}",
+                    e,
+                    res.auxiliary_data()
+                );
             }
             return Err(Corpus::Keep);
         },
@@ -203,8 +220,14 @@ pub(crate) fn publish_group(
         ExecutionStatus::Success => Ok(()),
         ExecutionStatus::MiscellaneousError(e) => {
             if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation {
-                    panic!("invariant violation {:?}", e);
+                if e.status_type() == StatusType::InvariantViolation
+                    && *e != StatusCode::VERIFICATION_ERROR
+                {
+                    panic!(
+                        "invariant violation via ExecutionStatus: {:?}, {:?}",
+                        e,
+                        res.auxiliary_data()
+                    );
                 }
             }
             Err(Corpus::Keep)

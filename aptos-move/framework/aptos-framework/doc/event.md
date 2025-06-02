@@ -10,6 +10,7 @@ events emitted to a handle and emit events to the event store.
 
 
 -  [Struct `EventHandle`](#0x1_event_EventHandle)
+-  [Constants](#@Constants_0)
 -  [Function `emit`](#0x1_event_emit)
 -  [Function `write_module_event_to_store`](#0x1_event_write_module_event_to_store)
 -  [Function `new_event_handle`](#0x1_event_new_event_handle)
@@ -18,16 +19,16 @@ events emitted to a handle and emit events to the event store.
 -  [Function `counter`](#0x1_event_counter)
 -  [Function `write_to_event_store`](#0x1_event_write_to_event_store)
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
--  [Specification](#@Specification_0)
+-  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
-    -  [Function `emit`](#@Specification_0_emit)
-    -  [Function `write_module_event_to_store`](#@Specification_0_write_module_event_to_store)
-    -  [Function `emit_event`](#@Specification_0_emit_event)
-    -  [Function `guid`](#@Specification_0_guid)
-    -  [Function `counter`](#@Specification_0_counter)
-    -  [Function `write_to_event_store`](#@Specification_0_write_to_event_store)
-    -  [Function `destroy_handle`](#@Specification_0_destroy_handle)
+    -  [Function `emit`](#@Specification_1_emit)
+    -  [Function `write_module_event_to_store`](#@Specification_1_write_module_event_to_store)
+    -  [Function `emit_event`](#@Specification_1_emit_event)
+    -  [Function `guid`](#@Specification_1_guid)
+    -  [Function `counter`](#@Specification_1_counter)
+    -  [Function `write_to_event_store`](#@Specification_1_write_to_event_store)
+    -  [Function `destroy_handle`](#@Specification_1_destroy_handle)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -72,6 +73,22 @@ A handle for an event such that:
 
 
 </details>
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_event_ECANNOT_CREATE_EVENT"></a>
+
+An event cannot be created. This error is returned by native implementations when
+- The type tag for event is too deeply nested.
+
+
+<pre><code><b>const</b> <a href="event.md#0x1_event_ECANNOT_CREATE_EVENT">ECANNOT_CREATE_EVENT</a>: u64 = 1;
+</code></pre>
+
+
 
 <a id="0x1_event_emit"></a>
 
@@ -282,7 +299,7 @@ Destroy a unique handle.
 
 </details>
 
-<a id="@Specification_0"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -353,7 +370,7 @@ Destroy a unique handle.
 
 
 
-<a id="@Specification_0_emit"></a>
+<a id="@Specification_1_emit"></a>
 
 ### Function `emit`
 
@@ -369,7 +386,7 @@ Destroy a unique handle.
 
 
 
-<a id="@Specification_0_write_module_event_to_store"></a>
+<a id="@Specification_1_write_module_event_to_store"></a>
 
 ### Function `write_module_event_to_store`
 
@@ -386,7 +403,7 @@ Native function use opaque.
 
 
 
-<a id="@Specification_0_emit_event"></a>
+<a id="@Specification_1_emit_event"></a>
 
 ### Function `emit_event`
 
@@ -406,7 +423,7 @@ Native function use opaque.
 
 
 
-<a id="@Specification_0_guid"></a>
+<a id="@Specification_1_guid"></a>
 
 ### Function `guid`
 
@@ -424,7 +441,7 @@ Native function use opaque.
 
 
 
-<a id="@Specification_0_counter"></a>
+<a id="@Specification_1_counter"></a>
 
 ### Function `counter`
 
@@ -442,7 +459,7 @@ Native function use opaque.
 
 
 
-<a id="@Specification_0_write_to_event_store"></a>
+<a id="@Specification_1_write_to_event_store"></a>
 
 ### Function `write_to_event_store`
 
@@ -460,7 +477,7 @@ Native function use opaque.
 
 
 
-<a id="@Specification_0_destroy_handle"></a>
+<a id="@Specification_1_destroy_handle"></a>
 
 ### Function `destroy_handle`
 

@@ -10,6 +10,12 @@ module addr::exceed_limit {
     use aptos_token::token::TokenId;
 
     // This struct is too large and exceeds the maximum allowed number of type nodes.
+    enum MyStructEnum has key, store {
+        V1 { x: MyStruct },
+        V2 { x: MyStruct, y: u64 },
+        V3 { x: MyStruct, y: u64, z: u64 },
+    }
+
     struct MyStruct has key, store {
         token_owner: SimpleMap<TokenId, Account>,
         owners: vector<address>,
@@ -82,28 +88,29 @@ module addr::exceed_limit {
         let list = vector::empty<address>();
         let account_addr = signer::address_of(source_account);
         vector::push_back(&mut list, account_addr);
+        let x = MyStruct {
+            token_owner: simple_map::create(),
+            owners: list,
+            game_servers: list,
+            minimal_fee_rate: 1,
+            epoch_minimal_interval: 1,
+            max_bug_per_session: 1000,
+            token_types: simple_map::create(),
+            token_health: simple_map::create(),
+            percent_for_track: simple_map::create(),
+            price_main_coin_usd: 1,
+            one_main_coin: 1,
+            game_sessions: simple_map::create(),
+            game_bids: simple_map::create(),
+            previous_owners: simple_map::create(),
+            bug_owners: simple_map::create(),
+            tracks_owners: simple_map::create(),
+            latest_epoch_update: 0,
+            counter: 0,
+        };
         move_to(
             source_account,
-            MyStruct {
-                token_owner: simple_map::create(),
-                owners: list,
-                game_servers: list,
-                minimal_fee_rate: 1,
-                epoch_minimal_interval: 1,
-                max_bug_per_session: 1000,
-                token_types: simple_map::create(),
-                token_health: simple_map::create(),
-                percent_for_track: simple_map::create(),
-                price_main_coin_usd: 1,
-                one_main_coin: 1,
-                game_sessions: simple_map::create(),
-                game_bids: simple_map::create(),
-                previous_owners: simple_map::create(),
-                bug_owners: simple_map::create(),
-                tracks_owners: simple_map::create(),
-                latest_epoch_update: 0,
-                counter: 0,
-            }
+            MyStructEnum::V3 { x, y: 1, z: 2 },
         );
     }
 

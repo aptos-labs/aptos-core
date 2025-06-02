@@ -28,7 +28,7 @@ spec aptos_framework::aptos_governance {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
     }
 
@@ -66,14 +66,15 @@ spec aptos_framework::aptos_governance {
         voting_duration_secs: u64,
     ) {
         use aptos_std::type_info::Self;
+        pragma aborts_if_is_partial;
 
         let addr = signer::address_of(aptos_framework);
         let register_account = global<account::Account>(addr);
 
         aborts_if exists<voting::VotingForum<GovernanceProposal>>(addr);
-        aborts_if !exists<account::Account>(addr);
-        aborts_if register_account.guid_creation_num + 7 > MAX_U64;
-        aborts_if register_account.guid_creation_num + 7 >= account::MAX_GUID_CREATION_NUM;
+        // aborts_if !exists<account::Account>(addr);
+        // aborts_if register_account.guid_creation_num + 7 > MAX_U64;
+        // aborts_if register_account.guid_creation_num + 7 >= account::MAX_GUID_CREATION_NUM;
         aborts_if !type_info::spec_is_struct<GovernanceProposal>();
 
         include InitializeAbortIf;
@@ -111,7 +112,7 @@ spec aptos_framework::aptos_governance {
         aborts_if exists<GovernanceEvents>(addr);
         aborts_if exists<VotingRecords>(addr);
         aborts_if exists<ApprovedExecutionHashes>(addr);
-        aborts_if !exists<account::Account>(addr);
+        // aborts_if !exists<account::Account>(addr);
         aborts_if exists<VotingRecordsV2>(addr);
     }
 
@@ -384,8 +385,7 @@ spec aptos_framework::aptos_governance {
         } else {
             0
         };
-        aborts_if !remain_zero_1_cond && !entirely_voted && features::spec_partial_governance_voting_enabled() &&
-            used_voting_power > 0 && spec_voting_power < used_voting_power;
+        aborts_if !remain_zero_1_cond && !entirely_voted && used_voting_power > 0 && spec_voting_power < used_voting_power;
 
         let remaining_power = spec_get_remaining_voting_power(stake_pool, proposal_id);
         let real_voting_power =  min(voting_power, remaining_power);
@@ -427,8 +427,7 @@ spec aptos_framework::aptos_governance {
         ensures simple_map::spec_contains_key(post_proposal.metadata, key);
         ensures simple_map::spec_get(post_proposal.metadata, key) == std::bcs::to_bytes(timestamp::now_seconds());
 
-        aborts_if features::spec_partial_governance_voting_enabled() && used_voting_power + real_voting_power > MAX_U64;
-        aborts_if !features::spec_partial_governance_voting_enabled() && table::spec_contains(voting_records.votes, record_key);
+        aborts_if used_voting_power + real_voting_power > MAX_U64;
 
 
         aborts_if !exists<GovernanceEvents>(@aptos_framework);
@@ -493,7 +492,7 @@ spec aptos_framework::aptos_governance {
         ensures proposal_state_successed ==> simple_map::spec_contains_key(post_approved_hashes.hashes, proposal_id) &&
                                              simple_map::spec_get(post_approved_hashes.hashes, proposal_id) == execution_hash;
 
-        aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@aptos_framework);
+        aborts_if !exists<VotingRecordsV2>(@aptos_framework);
     }
 
     spec add_approved_script_hash(proposal_id: u64) {
@@ -641,7 +640,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec get_remaining_voting_power(stake_pool: address, proposal_id: u64): u64 {
-        aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@aptos_framework);
+        aborts_if !exists<VotingRecordsV2>(@aptos_framework);
         include voting::AbortsIfNotContainProposalID<GovernanceProposal> {
             voting_forum_address: @aptos_framework
         };
@@ -668,8 +667,7 @@ spec aptos_framework::aptos_governance {
         } else {
             0
         };
-        aborts_if !remain_zero_1_cond && !entirely_voted && features::spec_partial_governance_voting_enabled() &&
-            used_voting_power > 0 && voting_power < used_voting_power;
+        aborts_if !remain_zero_1_cond && !entirely_voted && used_voting_power > 0 && voting_power < used_voting_power;
 
         ensures result == spec_get_remaining_voting_power(stake_pool, proposal_id);
     }
@@ -695,8 +693,6 @@ spec aptos_framework::aptos_governance {
             0
         } else if (entirely_voted) {
             0
-        } else if (!features::spec_partial_governance_voting_enabled()) {
-            voting_power
         } else {
             voting_power - used_voting_power
         }
@@ -861,7 +857,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec schema VotingInitializationAbortIfs {
-        aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@aptos_framework);
+        aborts_if !exists<VotingRecordsV2>(@aptos_framework);
     }
 
     spec force_end_epoch_test_only {

@@ -1,0 +1,18 @@
+[package]
+name = "staking"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
+Pyth = { local = "../pyth" }
+
+[addresses]
+staking = "_"
+manager = "_"
+operator = "_"
+
+[dev-addresses]
+staking = "0xcafe"
+manager = "0x123"
+operator = "0x124"
+pyth = "0x182"

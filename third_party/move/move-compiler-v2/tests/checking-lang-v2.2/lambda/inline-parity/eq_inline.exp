@@ -1,0 +1,26 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    private fun foo(f: |&u64| has drop) {
+        Tuple()
+    }
+    private fun g() {
+        m::foo(closure#0m::__lambda__1__g());
+        Tuple()
+    }
+    private fun __lambda__1__g(v: &u64) {
+        Eq<u64>(v, Borrow(Immutable)(1));
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    fun foo(f: |&u64| has drop) {
+    }
+    fun g() {
+        foo(|arg0| __lambda__1__g(arg0));
+    }
+    fun __lambda__1__g(v: &u64) {
+        v == &1;
+    }
+}

@@ -5,12 +5,13 @@ use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
         local_simulation,
+        transactions::TxnOptions,
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
-            ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary, GIT_IGNORE,
+            LargePackagesModuleOption, MoveManifestAccountWrapper, MovePackageOptions,
+            OverrideSizeCheckOption, ProfileOptions, PromptOptions, RestOptions, SaveFile,
+            ScriptFunctionArguments, TransactionOptions, TransactionSummary, GIT_IGNORE,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -32,7 +33,6 @@ use aptos_crypto::HashValue;
 use aptos_framework::{
     chunked_publish::{
         chunk_package_and_create_payloads, large_packages_cleanup_staging_area, PublishType,
-        LARGE_PACKAGES_MODULE_ADDRESS,
     },
     docgen::DocgenOptions,
     extended_checks,
@@ -60,7 +60,6 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
@@ -126,6 +125,7 @@ pub enum MoveTool {
     Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
+    Simulate(Simulate),
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
@@ -163,6 +163,7 @@ impl MoveTool {
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
+            MoveTool::Simulate(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
@@ -397,7 +398,7 @@ pub struct CompilePackage {
     #[clap(flatten)]
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 #[async_trait]
@@ -443,7 +444,7 @@ pub struct CompileScript {
     #[clap(long, value_parser)]
     pub output_file: Option<PathBuf>,
     #[clap(flatten)]
-    pub move_options: MovePackageDir,
+    pub move_options: MovePackageOptions,
 }
 
 #[async_trait]
@@ -514,7 +515,7 @@ pub struct TestPackage {
     pub ignore_compile_warnings: bool,
 
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
 
     /// The maximum number of instructions that can be executed by a test
     ///
@@ -564,7 +565,7 @@ impl CliCommand<&'static str> for TestPackage {
             dev_mode: self.move_options.dev,
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
-            full_model_generation: self.move_options.check_test_code,
+            full_model_generation: !self.move_options.skip_checks_on_test_code,
             install_dir: self.move_options.output_dir.clone(),
             skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
             compiler_config: CompilerConfig {
@@ -582,7 +583,7 @@ impl CliCommand<&'static str> for TestPackage {
                     .move_options
                     .language_version
                     .or_else(|| Some(LanguageVersion::latest_stable())),
-                experiments: experiments_from_opt_level(&self.move_options.optimize),
+                experiments: self.move_options.compute_experiments(),
             },
             ..Default::default()
         };
@@ -651,7 +652,7 @@ impl CliCommand<&'static str> for TestPackage {
 #[derive(Parser)]
 pub struct ProvePackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    move_options: MovePackageOptions,
 
     #[clap(flatten)]
     prover_options: ProverOptions,
@@ -704,7 +705,7 @@ impl CliCommand<&'static str> for ProvePackage {
 #[derive(Parser)]
 pub struct DocumentPackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    move_options: MovePackageOptions,
 
     #[clap(flatten)]
     docgen_options: DocgenOptions,
@@ -740,7 +741,7 @@ impl CliCommand<&'static str> for DocumentPackage {
                 .language_version
                 .or_else(|| Some(LanguageVersion::latest_stable())),
             skip_attribute_checks: move_options.skip_attribute_checks,
-            check_test_code: move_options.check_test_code,
+            check_test_code: !move_options.skip_checks_on_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             ..BuildOptions::default()
         };
@@ -774,7 +775,7 @@ pub struct PublishPackage {
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -839,7 +840,10 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             package,
             PublishType::AccountDeploy,
             None,
-            self.chunked_publish_option.large_packages_module_address,
+            self.chunked_publish_option
+                .large_packages_module
+                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .await?,
             self.chunked_publish_option.chunk_size,
         )?;
 
@@ -886,30 +890,17 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-pub fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
-    match optlevel {
-        None | Some(OptimizationLevel::Default) => {
-            vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
-        },
-        Some(OptimizationLevel::None) => vec![format!("{}=off", Experiment::OPTIMIZE.to_string())],
-        Some(OptimizationLevel::Extra) => vec![
-            format!("{}=on", Experiment::OPTIMIZE_EXTRA.to_string()),
-            format!("{}=on", Experiment::OPTIMIZE.to_string()),
-        ],
-    }
-}
-
 impl IncludedArtifacts {
     pub(crate) fn build_options(
         self,
-        move_options: &MovePackageDir,
+        move_options: &MovePackageOptions,
     ) -> CliTypedResult<BuildOptions> {
         self.build_options_with_experiments(move_options, vec![], false)
     }
 
     pub(crate) fn build_options_with_experiments(
         self,
-        move_options: &MovePackageDir,
+        move_options: &MovePackageOptions,
         mut more_experiments: Vec<String>,
         _skip_codegen: bool, // we currently cannot do this, so ignore it.
     ) -> CliTypedResult<BuildOptions> {
@@ -926,25 +917,9 @@ impl IncludedArtifacts {
             .language_version
             .or_else(|| Some(LanguageVersion::latest_stable()));
         let skip_attribute_checks = move_options.skip_attribute_checks;
-        let check_test_code = move_options.check_test_code;
-        let optimize = move_options.optimize.clone();
-        let mut experiments = experiments_from_opt_level(&optimize);
-        experiments.append(&mut move_options.experiments.clone());
+        let check_test_code = !move_options.skip_checks_on_test_code;
+        let mut experiments = move_options.compute_experiments();
         experiments.append(&mut more_experiments);
-
-        if matches!(compiler_version, Some(CompilerVersion::V1)) {
-            if !matches!(optimize, Option::None | Some(OptimizationLevel::Default)) {
-                return Err(CliError::CommandArgumentError(
-                    "`--optimization-level`/`--optimize` flag is not compatible with Move Compiler V1"
-                        .to_string(),
-                ));
-            };
-            if !move_options.experiments.is_empty() {
-                return Err(CliError::CommandArgumentError(
-                    "`--experiments` flag is not compatible with Move Compiler V1".to_string(),
-                ));
-            };
-        }
 
         let base_options = BuildOptions {
             dev,
@@ -1072,7 +1047,10 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             submit_chunked_publish_transactions(
                 chunked_package_payloads.payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option
+                    .large_packages_module
+                    .large_packages_module_address(&self.txn_options.rest_client()?)
+                    .await?,
             )
             .await
         } else {
@@ -1153,7 +1131,7 @@ pub struct CreateObjectAndPublishPackage {
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1164,8 +1142,21 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         "CreateObjectAndPublishPackage"
     }
 
+    // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
+
+        let chunked_publish_large_packages_module_address =
+            if self.chunked_publish_option.chunked_publish {
+                Some(
+                    self.chunked_publish_option
+                        .large_packages_module
+                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .await?,
+                )
+            } else {
+                None
+            };
 
         let sequence_number = if self.chunked_publish_option.chunked_publish {
             // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
@@ -1178,7 +1169,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1205,7 +1196,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1221,7 +1212,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
             )
             .await
         } else {
@@ -1274,7 +1265,7 @@ pub struct UpgradeObjectPackage {
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1314,11 +1305,17 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
+            let chunked_publish_large_packages_module_address = self
+                .chunked_publish_option
+                .large_packages_module
+                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .await?;
+
             let payloads = create_chunked_publish_payloads(
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1333,7 +1330,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
             )
             .await
         } else {
@@ -1386,7 +1383,7 @@ pub struct DeployObjectCode {
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1397,8 +1394,22 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         "DeployObject"
     }
 
+    // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
+
+        let chunked_publish_large_packages_module_address =
+            if self.chunked_publish_option.chunked_publish {
+                Some(
+                    self.chunked_publish_option
+                        .large_packages_module
+                        .large_packages_module_address(&self.txn_options.rest_client()?)
+                        .await?,
+                )
+            } else {
+                None
+            };
+
         let sequence_number = if self.chunked_publish_option.chunked_publish {
             // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
             // This involves building the package with mock account address `0xcafe` to calculate the transaction count.
@@ -1410,7 +1421,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1437,7 +1448,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1453,7 +1464,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address.unwrap(),
             )
             .await
         } else {
@@ -1510,7 +1521,7 @@ pub struct UpgradeCodeObject {
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1552,11 +1563,17 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
+            let chunked_publish_large_packages_module_address = self
+                .chunked_publish_option
+                .large_packages_module
+                .large_packages_module_address(&self.txn_options.rest_client()?)
+                .await?;
+
             let payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
                 self.chunked_publish_option.chunk_size,
             )?
             .payloads;
@@ -1571,7 +1588,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             submit_chunked_publish_transactions(
                 payloads,
                 &self.txn_options,
-                self.chunked_publish_option.large_packages_module_address,
+                chunked_publish_large_packages_module_address,
             )
             .await
         } else {
@@ -1610,7 +1627,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
 }
 
 fn build_package_options(
-    move_options: &MovePackageDir,
+    move_options: &MovePackageOptions,
     included_artifacts_args: &IncludedArtifactsArgs,
 ) -> anyhow::Result<BuiltPackage> {
     let options = included_artifacts_args
@@ -1630,7 +1647,7 @@ async fn submit_chunked_publish_transactions(
     let payloads_length = payloads.len() as u64;
     let mut tx_hashes = vec![];
 
-    let account_address = txn_options.profile_options.account_address()?;
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
 
     if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
         let message = format!(
@@ -1696,12 +1713,12 @@ async fn is_staging_area_empty(
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
 ) -> CliTypedResult<bool> {
-    let url = txn_options.rest_options.url(&txn_options.profile_options)?;
-    let client = Client::new(url);
+    let client = txn_options.rest_client()?;
 
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
     let staging_area_response = client
         .get_account_resource(
-            txn_options.profile_options.account_address()?,
+            account_address,
             &format!(
                 "{}::large_packages::StagingArea",
                 large_packages_module_address
@@ -1729,9 +1746,8 @@ pub struct ClearStagingArea {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
-    /// Address of the `large_packages` move module for chunked publishing
-    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
-    pub(crate) large_packages_module_address: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) large_packages_module: LargePackagesModuleOption,
 }
 
 #[async_trait]
@@ -1741,12 +1757,17 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let (_, account_address) = self.txn_options.get_public_key_and_address()?;
+
+        let large_packages_module_address = self
+            .large_packages_module
+            .large_packages_module_address(&self.txn_options.rest_client()?)
+            .await?;
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
-            &self.large_packages_module_address,
-            self.txn_options.profile_options.account_address()?
+            &large_packages_module_address, account_address,
         );
-        let payload = large_packages_cleanup_staging_area(self.large_packages_module_address);
+        let payload = large_packages_cleanup_staging_area(large_packages_module_address);
         self.txn_options
             .submit_transaction(payload)
             .await
@@ -1771,7 +1792,7 @@ pub struct CreateResourceAccountAndPublishPackage {
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1937,7 +1958,7 @@ pub struct VerifyPackage {
     pub(crate) included_artifacts: IncludedArtifacts,
 
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
@@ -2060,7 +2081,7 @@ impl CliCommand<&'static str> for ListPackage {
 #[derive(Parser)]
 pub struct CleanPackage {
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 }
@@ -2119,6 +2140,43 @@ impl CliCommand<TransactionSummary> for RunFunction {
             &self.txn_options,
         )
         .await
+    }
+}
+
+/// BETA: Simulate a Move function or script
+///
+/// BETA: subject to change
+///
+/// This allows you to simulate and see the output from any function or Move script all in one command.
+/// It additionally lets you simulate for any account
+///
+/// TODO: This should be simpler than the rest of the commands, soon to move other commands to a flow like this
+#[derive(Parser)]
+pub struct Simulate {
+    #[clap(flatten)]
+    txn_options: TxnOptions,
+    // TODO: Mix entry function and script together with some smarts
+    #[clap(flatten)]
+    entry_function_args: EntryFunctionArguments,
+
+    #[clap(long)]
+    local: bool,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for Simulate {
+    fn command_name(&self) -> &'static str {
+        "Simulate"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let payload = TransactionPayload::EntryFunction(self.entry_function_args.try_into()?);
+
+        if self.local {
+            self.txn_options.simulate_locally(payload).await
+        } else {
+            self.txn_options.simulate_remotely(payload).await
+        }
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
         state_value::StateValue,
         table::{TableHandle, TableInfo},
     },
-    transaction::{AccountTransactionsWithProof, Version},
+    transaction::{AccountOrderedTransactionsWithProof, Version},
 };
 use anyhow::Result;
 
@@ -43,14 +43,14 @@ pub trait IndexerReader: Send + Sync {
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>>;
 
-    fn get_account_transactions(
+    fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof>;
+    ) -> Result<AccountOrderedTransactionsWithProof>;
 
     fn get_prefixed_state_value_iterator(
         &self,

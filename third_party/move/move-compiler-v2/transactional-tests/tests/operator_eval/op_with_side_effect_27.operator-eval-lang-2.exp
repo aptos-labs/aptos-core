@@ -5,5 +5,3 @@ return values: true
 
 task 2 'run'. lines 10-10:
 return values: false
-
-==> Compiler v2 delivered same results!

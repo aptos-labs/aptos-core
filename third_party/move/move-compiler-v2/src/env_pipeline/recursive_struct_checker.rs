@@ -101,7 +101,20 @@ impl<'a> RecursiveStructChecker<'a> {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
                 },
-                Type::Primitive(_) | Type::TypeParameter(_) | Type::Fun(..) => {},
+                Type::Fun(arg_ty, ret_ty, _) => {
+                    if self.ty_contains_struct(path, &arg_ty, loc.clone(), struct_id, checked) {
+                        self.report_invalid_field(&struct_env, &field_env);
+                    }
+                    if self.ty_contains_struct(path, &ret_ty, loc.clone(), struct_id, checked) {
+                        self.report_invalid_field(&struct_env, &field_env);
+                    }
+                },
+                Type::Reference(_, ty) => {
+                    if self.ty_contains_struct(path, &ty, loc.clone(), struct_id, checked) {
+                        self.report_invalid_field(&struct_env, &field_env);
+                    }
+                },
+                Type::Primitive(_) | Type::TypeParameter(_) => {},
                 _ => unreachable!("invalid field type"),
             }
             path.pop();
@@ -195,7 +208,20 @@ impl<'a> RecursiveStructChecker<'a> {
                     .iter()
                     .any(|ty| self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked))
             },
-            Type::Primitive(_) | Type::TypeParameter(_) | Type::Fun(..) => false,
+            Type::Tuple(ty_vec) => {
+                for ty in ty_vec.iter() {
+                    if self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked) {
+                        return true;
+                    }
+                }
+                false
+            },
+            Type::Fun(arg_ty, ret_ty, _abi) => {
+                self.ty_contains_struct(path, arg_ty, loc.clone(), struct_id, checked)
+                    || self.ty_contains_struct(path, ret_ty, loc, struct_id, checked)
+            },
+            Type::Reference(_, ty) => self.ty_contains_struct(path, ty, loc, struct_id, checked),
+            Type::Primitive(_) | Type::TypeParameter(_) => false,
             _ => panic!("ICE: {:?} used as a type parameter", ty),
         }
     }

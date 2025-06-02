@@ -1,4 +1,370 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::bar($t0: &mut u64, $t1: u64) {
+  0: write_ref($t0, $t1)
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::foo($t0: &u64): u64 {
+     var $t1: u64
+  0: $t1 := read_ref($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: &mut u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+  0: $t3 := infer($t1)
+  1: $t5 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t4 := read_ref($t5)
+  3: $t2 := /($t3, $t4)
+  4: $t7 := borrow_field<0xc0ffee::m::S>.y($t0)
+  5: $t6 := m::foo($t7)
+  6: label L0
+  7: $t9 := infer($t2)
+  8: $t8 := <($t9, $t6)
+  9: if ($t8) goto 10 else goto 21
+ 10: label L2
+ 11: $t10 := borrow_field<0xc0ffee::m::S>.z($t0)
+ 12: $t12 := infer($t2)
+ 13: $t13 := 1
+ 14: $t11 := -($t12, $t13)
+ 15: m::bar($t10, $t11)
+ 16: $t15 := infer($t2)
+ 17: $t16 := 1
+ 18: $t14 := +($t15, $t16)
+ 19: $t2 := infer($t14)
+ 20: goto 23
+ 21: label L3
+ 22: goto 25
+ 23: label L4
+ 24: goto 6
+ 25: label L1
+ 26: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::bar($t0: &mut u64, $t1: u64) {
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: write_ref($t0, $t1)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::foo($t0: &u64): u64 {
+     var $t1: u64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := read_ref($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: &u64
+     var $t6: u64
+     var $t7: &u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: &mut u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := borrow_field<0xc0ffee::m::S>.x($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t5
+     # refs: [$t0 => #0, $t5 => #5]
+     # #0
+     #   => #5 via [field `x`] at line 17
+     # #5
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := read_ref($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t4
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t2 := /($t3, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t7 := borrow_field<0xc0ffee::m::S>.y($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t7
+     # refs: [$t0 => #0, $t7 => #7]
+     # #0
+     #   => #7 via [field `y`] at line 18
+     # #7
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  5: $t6 := m::foo($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  6: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  7: $t9 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6, $t9
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  8: $t8 := <($t9, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6, $t8
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  9: if ($t8) goto 10 else goto 21
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 10: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 11: $t10 := borrow_field<0xc0ffee::m::S>.z($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6, $t10
+     # refs: [$t0 => #0, $t10 => #10]
+     # #0
+     #   => (mut) #10 via [field `z`] at line 20
+     # #10
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 12: $t12 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6, $t10, $t12
+     # refs: [$t0 => #0, $t10 => #10]
+     # #0
+     #   => (mut) #10 via [field `z`] at line 20
+     # #10
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 13: $t13 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6, $t10, $t12, $t13
+     # refs: [$t0 => #0, $t10 => #10]
+     # #0
+     #   => (mut) #10 via [field `z`] at line 20
+     # #10
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 14: $t11 := -($t12, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6, $t10, $t11
+     # refs: [$t0 => #0, $t10 => #10]
+     # #0
+     #   => (mut) #10 via [field `z`] at line 20
+     # #10
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 15: m::bar($t10, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 16: $t15 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6, $t15
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 17: $t16 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6, $t15, $t16
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 18: $t14 := +($t15, $t16)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6, $t14
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 19: $t2 := infer($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 20: goto 23
+     # abort state: {returns}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 21: label L3
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 22: goto 25
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 23: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t6
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+ 24: goto 6
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 25: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 26: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::bar($t0: &mut u64, $t1: u64) {

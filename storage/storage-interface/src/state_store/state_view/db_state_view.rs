@@ -48,13 +48,17 @@ impl TStateView for DbStateView {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        self.get(state_key).map_err(Into::into)
+        self.get(state_key)
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         self.db
             .get_state_storage_usage(self.version)
             .map_err(Into::into)
+    }
+
+    fn next_version(&self) -> Version {
+        self.version.map_or(0, |v| v + 1)
     }
 }
 

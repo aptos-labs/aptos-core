@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::chain_id::{ChainId, NamedChain};
+use chrono::{DateTime, TimeZone, Utc};
+use chrono_tz::America::Los_Angeles;
 use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
@@ -9,9 +11,15 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 #[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
     DisableInvariantViolationCheckInSwapLoc,
-    LimitTypeTagSize,
-    ModuleComplexityCheck,
+    // Was always enabled.
+    _LimitTypeTagSize,
+    // Enabled on mainnet, cannot be disabled.
+    _ModuleComplexityCheck,
     EntryCompatibility,
+    ChargeBytesForPrints,
+
+    // Fixes the bug of table natives not tracking the memory usage of the global values they create.
+    FixMemoryUsageTracking,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -39,8 +47,8 @@ impl TimedFeatureOverride {
 
         Some(match self {
             Replay => match flag {
-                LimitTypeTagSize => true,
-                ModuleComplexityCheck => true,
+                _LimitTypeTagSize => true,
+                _ModuleComplexityCheck => true,
                 // Add overrides for replay here.
                 _ => return None,
             },
@@ -52,26 +60,65 @@ impl TimedFeatureOverride {
     }
 }
 
+const BEGINNING_OF_TIME: DateTime<Utc> = DateTime::UNIX_EPOCH;
+
 impl TimedFeatureFlag {
     /// Returns the activation time of the feature on the given chain.
-    /// The time is specified as a Unix Epoch timestamp in microseconds.
-    pub const fn activation_time_micros_on(&self, chain_id: &NamedChain) -> u64 {
+    pub fn activation_time_on(&self, chain_id: &NamedChain) -> DateTime<Utc> {
         use NamedChain::*;
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
             // Enabled from the beginning of time.
-            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => 0,
-            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => 0,
+            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => BEGINNING_OF_TIME,
+            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => BEGINNING_OF_TIME,
 
-            (ModuleComplexityCheck, TESTNET) => 1_719_356_400_000_000, /* Tuesday, June 21, 2024 16:00:00 AM GMT-07:00 */
-            (ModuleComplexityCheck, MAINNET) => 1_720_033_200_000_000, /* Wednesday, July 3, 2024 12:00:00 AM GMT-07:00 */
+            // Note: These have been enabled since the start due to a bug.
+            (_LimitTypeTagSize, TESTNET) => BEGINNING_OF_TIME,
+            (_LimitTypeTagSize, MAINNET) => BEGINNING_OF_TIME,
 
-            (EntryCompatibility, TESTNET) => 1_730_923_200_000_000, /* Wednesday, Nov 6, 2024 12:00:00 AM GMT-07:00 */
-            (EntryCompatibility, MAINNET) => 1_731_441_600_000_000, /* Tuesday, Nov 12, 2024 12:00:00 AM GMT-07:00 */
+            (_ModuleComplexityCheck, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 6, 25, 16, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (_ModuleComplexityCheck, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 7, 3, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
 
-            // If unspecified, a timed feature is considered enabled from the very beginning of time.
-            _ => 0,
+            (EntryCompatibility, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 11, 6, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (EntryCompatibility, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2024, 11, 12, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: Activation time set to 1 hour after the beginning of time
+            //       so we can test the old and new behaviors in tests.
+            (FixMemoryUsageTracking, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (FixMemoryUsageTracking, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixMemoryUsageTracking, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (ChargeBytesForPrints, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (ChargeBytesForPrints, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // For chains other than testnet and mainnet, a timed feature is considered enabled from
+            // the very beginning, if left unspecified.
+            (_, TESTING | DEVNET | PREMAINNET) => BEGINNING_OF_TIME,
         }
     }
 }
@@ -126,7 +173,9 @@ impl TimedFeaturesBuilder {
             OnNamedChain {
                 named_chain,
                 timestamp_micros,
-            } => *timestamp_micros >= flag.activation_time_micros_on(named_chain),
+            } => {
+                *timestamp_micros >= flag.activation_time_on(named_chain).timestamp_micros() as u64
+            },
             EnableAll => true,
         }
     }
@@ -163,12 +212,61 @@ mod test {
     }
 
     #[test]
+    fn test_micros_conversion() {
+        use NamedChain::*;
+
+        assert_eq!(
+            Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros(),
+            1_704_067_200_000_000
+        );
+
+        assert_eq!(
+            Utc.with_ymd_and_hms(2024, 11, 15, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros(),
+            1_731_628_800_000_000
+        );
+
+        assert_eq!(
+            TimedFeatureFlag::_ModuleComplexityCheck
+                .activation_time_on(&TESTNET)
+                .timestamp_micros(),
+            1_719_356_400_000_000
+        );
+        assert_eq!(
+            TimedFeatureFlag::_ModuleComplexityCheck
+                .activation_time_on(&MAINNET)
+                .timestamp_micros(),
+            1_720_033_200_000_000
+        );
+
+        assert_eq!(
+            TimedFeatureFlag::EntryCompatibility
+                .activation_time_on(&TESTNET)
+                .timestamp_micros(),
+            1_730_923_200_000_000
+        );
+        assert_eq!(
+            TimedFeatureFlag::EntryCompatibility
+                .activation_time_on(&MAINNET)
+                .timestamp_micros(),
+            1_731_441_600_000_000
+        );
+    }
+
+    #[test]
     fn test_timed_features_activation() {
         use TimedFeatureFlag::*;
-        // Monday, Jan 01, 2024 12:00:00.000 AM GMT
-        let jan_1_2024_micros: u64 = 1_704_067_200_000_000;
-        // Friday, November 15, 2024 12:00:00 AM GMT
-        let nov_15_2024_micros: u64 = 1_731_628_800_000_000;
+        let jan_1_2024_micros = Utc
+            .with_ymd_and_hms(2024, 1, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros() as u64;
+        let nov_15_2024_micros = Utc
+            .with_ymd_and_hms(2024, 11, 15, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros() as u64;
 
         // Check testnet on Jan 1, 2024.
         let testnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), jan_1_2024_micros);
@@ -177,11 +275,11 @@ mod test {
             "DisableInvariantViolationCheckInSwapLoc should always be enabled"
         );
         assert!(
-            testnet_jan_1_2024.is_enabled(LimitTypeTagSize),
+            testnet_jan_1_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
         assert!(
-            !testnet_jan_1_2024.is_enabled(ModuleComplexityCheck),
+            !testnet_jan_1_2024.is_enabled(_ModuleComplexityCheck),
             "ModuleComplexityCheck should be disabled on Jan 1, 2024 on testnet"
         );
         assert!(
@@ -195,11 +293,11 @@ mod test {
             "DisableInvariantViolationCheckInSwapLoc should always be enabled"
         );
         assert!(
-            testnet_nov_15_2024.is_enabled(LimitTypeTagSize),
+            testnet_nov_15_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
         assert!(
-            testnet_nov_15_2024.is_enabled(ModuleComplexityCheck),
+            testnet_nov_15_2024.is_enabled(_ModuleComplexityCheck),
             "ModuleComplexityCheck should be enabled on Nov 15, 2024 on testnet"
         );
         assert!(
@@ -213,11 +311,11 @@ mod test {
             "DisableInvariantViolationCheckInSwapLoc should always be enabled"
         );
         assert!(
-            mainnet_jan_1_2024.is_enabled(LimitTypeTagSize),
+            mainnet_jan_1_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
         assert!(
-            !mainnet_jan_1_2024.is_enabled(ModuleComplexityCheck),
+            !mainnet_jan_1_2024.is_enabled(_ModuleComplexityCheck),
             "ModuleComplexityCheck should be disabled on Jan 1, 2024 on mainnet"
         );
         assert!(
@@ -231,11 +329,11 @@ mod test {
             "DisableInvariantViolationCheckInSwapLoc should always be enabled"
         );
         assert!(
-            mainnet_nov_15_2024.is_enabled(LimitTypeTagSize),
+            mainnet_nov_15_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
         assert!(
-            mainnet_nov_15_2024.is_enabled(ModuleComplexityCheck),
+            mainnet_nov_15_2024.is_enabled(_ModuleComplexityCheck),
             "ModuleComplexityCheck should be enabled on Nov 15, 2024 on mainnet"
         );
         assert!(

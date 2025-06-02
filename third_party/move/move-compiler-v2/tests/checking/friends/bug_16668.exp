@@ -1,0 +1,104 @@
+
+Diagnostics:
+warning: public inline function `outer` cannot be called from all locations it is accessible
+  ┌─ tests/checking/friends/bug_16668.move:6:23
+  │
+6 │     public inline fun outer(): u64 {
+  │                       ^^^^^ if called from a location where `m::package_inner` is not accessible
+7 │         package_inner() + package_inner()
+  │         --------------- inline expansion calls package function that may not be accessible in all locations that `m::outer` can be called
+
+warning: public inline function `outer_2` cannot be called from all locations it is accessible
+   ┌─ tests/checking/friends/bug_16668.move:10:23
+   │
+ 7 │         package_inner() + package_inner()
+   │         --------------- inline expansion calls package function that may not be accessible in all locations that `m::outer_2` can be called
+   ·
+10 │     public inline fun outer_2(): u64 {
+   │                       ^^^^^^^ if called from a location where `m::package_inner` is not accessible
+11 │         outer() + outer()
+   │         ------- from a call inlined at this callsite
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public inline fun outer(): u64 {
+        Add<u64>(m::package_inner(), m::package_inner())
+    }
+    public inline fun outer_2(): u64 {
+        Add<u64>({
+          let (): ();
+          Add<u64>(m::package_inner(), m::package_inner())
+        }, {
+          let (): ();
+          Add<u64>(m::package_inner(), m::package_inner())
+        })
+    }
+    friend fun package_inner(): u64 {
+        12
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>(m::package_inner(), m::package_inner())
+        }, 24) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        if Eq<u64>({
+          let (): ();
+          Add<u64>({
+            let (): ();
+            Add<u64>(m::package_inner(), m::package_inner())
+          }, {
+            let (): ();
+            Add<u64>(m::package_inner(), m::package_inner())
+          })
+        }, 48) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    public inline fun outer(): u64 {
+        package_inner() + package_inner()
+    }
+    public inline fun outer_2(): u64 {
+        {
+            let ();
+            package_inner() + package_inner()
+        } + {
+            let ();
+            package_inner() + package_inner()
+        }
+    }
+    friend fun package_inner(): u64 {
+        12
+    }
+}
+module 0xc0ffee::n {
+    fun test() {
+        if ({
+            let ();
+            0xc0ffee::m::package_inner() + 0xc0ffee::m::package_inner()
+        } == 24) () else abort 14566554180833181696;
+        if ({
+            let ();
+            {
+                let ();
+                0xc0ffee::m::package_inner() + 0xc0ffee::m::package_inner()
+            } + {
+                let ();
+                0xc0ffee::m::package_inner() + 0xc0ffee::m::package_inner()
+            }
+        } == 48) () else abort 14566554180833181696;
+    }
+}

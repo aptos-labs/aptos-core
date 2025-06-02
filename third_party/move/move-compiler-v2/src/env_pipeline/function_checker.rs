@@ -185,7 +185,7 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
 
 fn access_error(
     env: &GlobalEnv,
-    fun_loc: &Loc,
+    fun_env: &FunctionEnv,
     id: &NodeId,
     oper: &str,
     msg: String,
@@ -200,14 +200,56 @@ fn access_error(
         msg,
         module_env.get_full_name_str()
     );
-    env.diag_with_labels(Severity::Error, fun_loc, &msg, call_details);
+    env.diag_with_labels(Severity::Error, &fun_env.get_id_loc(), &msg, call_details);
 }
 
-/// check privileged operations on a struct such as storage operation, pack/unpack and field accesses
-/// can only be performed within the module that defines it.
+fn access_warning(
+    env: &GlobalEnv,
+    fun_env: &FunctionEnv,
+    id: &NodeId,
+    oper: &str,
+    msg: String,
+    module_env: &ModuleEnv,
+) {
+    let call_details: Vec<_> = [*id]
+        .iter()
+        .map(|node_id| (env.get_node_loc(*node_id), format!("{} here", oper)))
+        .collect();
+    let msg = format!(
+        "{} can only be done within the defining module `{}`, but `{}` could be called (and expanded) outside the module",
+        msg,
+        module_env.get_full_name_str(),
+        fun_env.get_full_name_str()
+    );
+    env.diag_with_labels(Severity::Warning, &fun_env.get_id_loc(), &msg, call_details);
+}
+
+fn check_for_access_error_or_warning<F>(
+    env: &GlobalEnv,
+    fun_env: &FunctionEnv,
+    id: &NodeId,
+    oper: &str,
+    msg_maker: F,
+    module_env: &ModuleEnv,
+    cross_module: bool,
+    caller_is_inline_non_private: bool,
+) where
+    F: Fn() -> String,
+{
+    if cross_module {
+        access_error(env, fun_env, id, oper, msg_maker(), module_env);
+    } else if caller_is_inline_non_private {
+        access_warning(env, fun_env, id, oper, msg_maker(), module_env);
+    }
+}
+
+/// Check for privileged operations on a struct/enum that can only be performed
+/// within the module that defines it.
 fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv) {
     if let Some(fun_body) = fun_env.get_def() {
         let caller_module_id = fun_env.module_env.get_id();
+        let caller_is_inline_non_private =
+            fun_env.is_inline() && fun_env.visibility() != Visibility::Private;
         fun_body.visit_pre_order(&mut |exp: &ExpData| {
             match exp {
                 ExpData::Call(id, oper, _) => match oper {
@@ -220,80 +262,170 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                         if let Some((struct_env, _)) = inst[0].get_struct(env) {
                             let mid = struct_env.module_env.get_id();
                             let sid = struct_env.get_id();
-                            if mid != caller_module_id {
-                                let qualified_struct_id = mid.qualified(sid);
-                                let struct_env = env.get_struct(qualified_struct_id);
-                                access_error(
-                                    env,
-                                    &fun_env.get_id_loc(),
-                                    id,
-                                    "called",
-                                    format!(
-                                        "storage operation on type `{}`",
-                                        struct_env.get_full_name_str(),
-                                    ),
-                                    &struct_env.module_env,
-                                );
-                            }
+                            let qualified_struct_id = mid.qualified(sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            let msg_maker = || {
+                                format!(
+                                    "storage operation on type `{}`",
+                                    struct_env.get_full_name_str(),
+                                )
+                            };
+                            check_for_access_error_or_warning(
+                                env,
+                                fun_env,
+                                id,
+                                "called",
+                                msg_maker,
+                                &struct_env.module_env,
+                                mid != caller_module_id,
+                                caller_is_inline_non_private,
+                            );
                         }
                     },
-                    Operation::Select(mid, sid, fid) if *mid != caller_module_id => {
+                    Operation::Select(mid, sid, fid) => {
                         let qualified_struct_id = mid.qualified(*sid);
                         let struct_env = env.get_struct(qualified_struct_id);
-                        access_error(
-                            env,
-                            &fun_env.get_id_loc(),
-                            id,
-                            "accessed",
+                        let msg_maker = || {
                             format!(
                                 "access of the field `{}` on type `{}`",
                                 fid.symbol().display(struct_env.symbol_pool()),
                                 struct_env.get_full_name_str(),
-                            ),
+                            )
+                        };
+                        check_for_access_error_or_warning(
+                            env,
+                            fun_env,
+                            id,
+                            "accessed",
+                            msg_maker,
                             &struct_env.module_env,
+                            *mid != caller_module_id,
+                            caller_is_inline_non_private,
+                        );
+                    },
+                    Operation::SelectVariants(mid, sid, fids) => {
+                        let qualified_struct_id = mid.qualified(*sid);
+                        let struct_env = env.get_struct(qualified_struct_id);
+                        // All field names are the same, so take one representative field id to report.
+                        let field_env = struct_env.get_field(fids[0]);
+                        let msg_maker = || {
+                            format!(
+                                "access of the field `{}` on enum type `{}`",
+                                field_env.get_name().display(struct_env.symbol_pool()),
+                                struct_env.get_full_name_str(),
+                            )
+                        };
+                        check_for_access_error_or_warning(
+                            env,
+                            fun_env,
+                            id,
+                            "accessed",
+                            msg_maker,
+                            &struct_env.module_env,
+                            *mid != caller_module_id,
+                            caller_is_inline_non_private,
+                        );
+                    },
+                    Operation::TestVariants(mid, sid, _) => {
+                        let qualified_struct_id = mid.qualified(*sid);
+                        let struct_env = env.get_struct(qualified_struct_id);
+                        let msg_maker = || {
+                            format!(
+                                "variant test on enum type `{}`",
+                                struct_env.get_full_name_str(),
+                            )
+                        };
+                        check_for_access_error_or_warning(
+                            env,
+                            fun_env,
+                            id,
+                            "tested",
+                            msg_maker,
+                            &struct_env.module_env,
+                            *mid != caller_module_id,
+                            caller_is_inline_non_private,
                         );
                     },
                     Operation::Pack(mid, sid, _) => {
-                        if *mid != caller_module_id {
-                            let qualified_struct_id = mid.qualified(*sid);
-                            let struct_env = env.get_struct(qualified_struct_id);
-                            access_error(
-                                env,
-                                &fun_env.get_id_loc(),
-                                id,
-                                "packed",
-                                format!("pack of `{}`", struct_env.get_full_name_str(),),
-                                &struct_env.module_env,
-                            );
-                        }
+                        let qualified_struct_id = mid.qualified(*sid);
+                        let struct_env = env.get_struct(qualified_struct_id);
+                        let msg_maker = || format!("pack of `{}`", struct_env.get_full_name_str());
+                        check_for_access_error_or_warning(
+                            env,
+                            fun_env,
+                            id,
+                            "packed",
+                            msg_maker,
+                            &struct_env.module_env,
+                            *mid != caller_module_id,
+                            caller_is_inline_non_private,
+                        );
                     },
-                    _ => {},
+                    _ => {
+                        // all the other operations are either:
+                        // - not related to structs
+                        // - spec-only
+                    },
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _, _) => {
+                | ExpData::Lambda(_, pat, _, _, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
                         if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;
-                            if module_id != caller_module_id {
-                                let struct_env = env.get_struct(str.to_qualified_id());
-                                access_error(
-                                    env,
-                                    &fun_env.get_id_loc(),
-                                    id,
-                                    "unpacked",
-                                    format!("unpack of `{}`", struct_env.get_full_name_str(),),
-                                    &struct_env.module_env,
-                                );
-                            }
+                            let struct_env = env.get_struct(str.to_qualified_id());
+                            let msg_maker =
+                                || format!("unpack of `{}`", struct_env.get_full_name_str(),);
+                            check_for_access_error_or_warning(
+                                env,
+                                fun_env,
+                                id,
+                                "unpacked",
+                                msg_maker,
+                                &struct_env.module_env,
+                                module_id != caller_module_id,
+                                caller_is_inline_non_private,
+                            );
                         }
                     });
                 },
+                ExpData::Match(_, discriminator, _) => {
+                    let discriminator_node_id = discriminator.node_id();
+                    if let Type::Struct(mid, sid, _) =
+                        env.get_node_type(discriminator_node_id).drop_reference()
+                    {
+                        let qualified_struct_id = mid.qualified(sid);
+                        let struct_env = env.get_struct(qualified_struct_id);
+                        let msg_maker =
+                            || format!("match on enum type `{}`", struct_env.get_full_name_str(),);
+                        check_for_access_error_or_warning(
+                            env,
+                            fun_env,
+                            &discriminator_node_id,
+                            "matched",
+                            msg_maker,
+                            &struct_env.module_env,
+                            mid != caller_module_id,
+                            caller_is_inline_non_private,
+                        );
+                    }
+                },
+                ExpData::Invalid(_)
+                | ExpData::Value(..)
+                | ExpData::LocalVar(..)
+                | ExpData::Temporary(..)
+                | ExpData::Invoke(..)
+                | ExpData::Quant(..)
+                | ExpData::IfElse(..)
+                | ExpData::Return(..)
+                | ExpData::Sequence(..)
+                | ExpData::Loop(..)
+                | ExpData::LoopCont(..)
+                | ExpData::Mutate(..) => {},
                 // access in specs is not restricted
                 ExpData::SpecBlock(_, _) => {
                     return false;
                 },
-                _ => {},
             }
             true
         });
@@ -325,6 +457,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
             for caller_func in caller_module.get_functions() {
                 if !before_inlining {
                     check_privileged_operations_on_structs(env, &caller_func);
+                    check_inline_function_bodies_for_calls(env, &caller_func);
                 }
                 let caller_qfid = caller_func.get_qualified_id();
 
@@ -476,6 +609,135 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                 }
             }
         }
+    }
+}
+
+/// Check the body of inline functions (after inlining) to ensure they do not call
+/// inaccessible functions.
+fn check_inline_function_bodies_for_calls(env: &GlobalEnv, caller_func: &FunctionEnv) {
+    if !caller_func.is_inline() {
+        return;
+    }
+    let Some(def) = caller_func.get_def() else {
+        return;
+    };
+    let caller_visibility = caller_func.visibility();
+    if caller_visibility == Visibility::Private {
+        // if caller is private inline function, it can only be called from the same module
+        return;
+    }
+    let callees_with_sites = def.used_funs_with_uses();
+    for (callee, sites) in &callees_with_sites {
+        let callee_func = env.get_function(*callee);
+        let callee_visibility = callee_func.visibility();
+        let warn_info = match (caller_visibility, callee_visibility) {
+            (_, Visibility::Public) => {
+                // callee can be called from anywhere, so nothing to warn about
+                None
+            },
+            (Visibility::Public, _) => Some("".to_string()),
+            (Visibility::Friend, Visibility::Private) => {
+                let caller_module = &caller_func.module_env;
+                Some(format!(
+                    ", such as in a {}friend module of `{}`",
+                    if caller_module.has_no_friends() {
+                        "(future) "
+                    } else {
+                        ""
+                    },
+                    caller_module.get_full_name_str()
+                ))
+            },
+            (Visibility::Friend, Visibility::Friend) => {
+                match (
+                    caller_func.has_package_visibility(),
+                    callee_func.has_package_visibility(),
+                ) {
+                    (_, true) => {
+                        // TODO(#13745): fix when we can explicitly say if two modules are in the same package.
+                        let same_package = callee_func.module_env.is_primary_target()
+                            && callee_func.module_env.self_address()
+                                == caller_func.module_env.self_address();
+                        if !same_package {
+                            Some("".to_string())
+                        } else {
+                            // caller and callee are in the same package, caller can only be called from
+                            // friend contexts, so callee (package function) can also be called there.
+                            None
+                        }
+                    },
+                    (true, false) => Some(format!(
+                        ", such as from a module in this package that is not a friend of `{}`",
+                        callee_func.module_env.get_full_name_str()
+                    )),
+                    (false, false) => {
+                        let caller_friends = caller_func.module_env.get_friend_modules();
+                        let callee_friends = callee_func.module_env.get_friend_modules();
+                        let covered = caller_friends.difference(&callee_friends).next().is_none();
+                        if !covered {
+                            Some(format!(
+                                ", such as from a module that is a friend of `{}` but not a friend of `{}`",
+                                caller_func.module_env.get_full_name_str(),
+                                callee_func.module_env.get_full_name_str()
+                            ))
+                        } else {
+                            // all of caller's friends are also callee's friends, so no warning
+                            None
+                        }
+                    },
+                }
+            },
+            (Visibility::Private, _) => {
+                unreachable!("we return early")
+            },
+        };
+        if let Some(additional_context) = warn_info {
+            // We use just one call site as the warning label.
+            let label: Vec<_> = sites
+                    .first()
+                    .map(|node_id| {
+                        (
+                            env.get_node_loc(*node_id),
+                            format!(
+                                "inline expansion calls {} function that may not be accessible in all locations that `{}` can be called",
+                                function_visibility_description(&callee_func),
+                                caller_func.get_full_name_str()
+                            ),
+                        )
+                    })
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<(Loc, String)>>();
+            env.diag_with_primary_and_labels(
+                Severity::Warning,
+                &caller_func.get_id_loc(),
+                &format!(
+                    "{} inline function `{}` cannot be called from all locations it is accessible",
+                    function_visibility_description(caller_func),
+                    caller_func.get_name_str()
+                ),
+                &format!(
+                    "if called from a location where `{}` is not accessible{}",
+                    callee_func.get_full_name_str(),
+                    additional_context
+                ),
+                label,
+            );
+        }
+    }
+}
+
+fn function_visibility_description(func: &FunctionEnv) -> String {
+    match func.visibility() {
+        Visibility::Public => "public".to_string(),
+        Visibility::Friend => {
+            if func.has_package_visibility() {
+                "package".to_string()
+            } else {
+                "friend".to_string()
+            }
+        },
+        Visibility::Private => "private".to_string(),
     }
 }
 

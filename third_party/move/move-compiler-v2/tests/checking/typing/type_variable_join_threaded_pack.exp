@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x2::Container {
     struct T<V> {
         f: V,
@@ -34,7 +34,7 @@ module 0x2::M {
     }
 } // end 0x2::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x2::Container {
     struct T<V> has drop {
         f: V,

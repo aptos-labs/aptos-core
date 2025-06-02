@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: expected `S2<u8>` but found a value of type `S1`
+  ┌─ tests/bytecode-generator/type_param_enum_is_crash.move:7:14
+  │
+7 │         s is S1;
+  │              ^^
+
+error: expected variant of enum type but found type `(std=0x1)::modules::S1`
+  ┌─ tests/bytecode-generator/type_param_enum_is_crash.move:7:14
+  │
+7 │         s is S1;
+  │              ^^
+
+error: expected variant of enum type but found type `(std=0x1)::modules::S2<u8>`
+  ┌─ tests/bytecode-generator/type_param_enum_is_crash.move:8:14
+  │
+8 │         s is S2<u8>;
+  │              ^^^^^^
+
+error: variants not allowed in this context
+  ┌─ tests/bytecode-generator/type_param_enum_is_crash.move:9:17
+  │
+9 │         s is S2<S1::Inner>;
+  │                 ^^^^^^^^^
+
+error: expected `S2<u8>` but found a value of type `S2<S1>`
+  ┌─ tests/bytecode-generator/type_param_enum_is_crash.move:9:14
+  │
+9 │         s is S2<S1::Inner>;
+  │              ^^^^^^^^^^^^^
+
+error: expected variant of enum type but found type `(std=0x1)::modules::S2<(std=0x1)::modules::S1::Inner>`
+  ┌─ tests/bytecode-generator/type_param_enum_is_crash.move:9:14
+  │
+9 │         s is S2<S1::Inner>;
+  │              ^^^^^^^^^^^^^

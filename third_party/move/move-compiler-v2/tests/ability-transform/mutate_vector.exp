@@ -1,4 +1,4 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
@@ -66,6 +66,276 @@ public fun m::scalar_zero(): 0x42::m::Scalar {
      # live vars: $t1
   1: $t0 := pack 0x42::m::Scalar($t1)
      # live vars: $t0
+  2: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # live vars: $t0
+  0: $t2 := m::scalar_zero()
+     # live vars: $t0, $t2
+  1: $t5 := borrow_local($t2)
+     # live vars: $t0, $t2, $t5
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # live vars: $t0, $t2, $t4
+  3: $t6 := 0
+     # live vars: $t0, $t2, $t4, $t6
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # live vars: $t0, $t2, $t3
+  5: write_ref($t3, $t0)
+     # live vars: $t2
+  6: $t1 := infer($t2)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := [0]
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := m::scalar_zero()
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t5 := borrow_local($t2)
+     # live vars: $t0, $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 11
+     #
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # live vars: $t0, $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
+     #
+  3: $t6 := 0
+     # live vars: $t0, $t2, $t4, $t6
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
+     #
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [local `s`, field `data`] at line 11
+     #
+  5: write_ref($t3, $t0)
+     # live vars: $t2
+     # refs: []
+     #
+  6: $t1 := infer($t2)
+     # live vars: $t1
+     # refs: []
+     #
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := [0]
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := m::scalar_zero()
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t5 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 11
+     #
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
+     #
+  3: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t6
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
+     #
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # abort state: {returns}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [local `s`, field `data`] at line 11
+     #
+  5: write_ref($t3, $t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: $t1 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := [0]
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+  0: $t2 := m::scalar_zero()
+  1: $t5 := borrow_local($t2)
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+  3: $t6 := 0
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+  5: write_ref($t3, $t0)
+  6: $t1 := move($t2)
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+  0: $t1 := [0]
+  1: $t0 := pack 0x42::m::Scalar($t1)
+  2: return $t0
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+  0: $t2 := m::scalar_zero()
+  1: $t5 := borrow_local($t2)
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+  3: $t6 := 0
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+  5: write_ref($t3, $t0)
+  6: $t1 := infer($t2)
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+  0: $t1 := [0]
+  1: $t0 := pack 0x42::m::Scalar($t1)
   2: return $t0
 }
 

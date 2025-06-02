@@ -12,6 +12,7 @@ use warp::{reply::Response, Rejection};
 
 pub(crate) static GRPC_MANAGER: OnceCell<GrpcManager> = OnceCell::const_new();
 
+pub(crate) const MAX_MESSAGE_SIZE: usize = 256 * (1 << 20);
 pub(crate) type GrpcAddress = String;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

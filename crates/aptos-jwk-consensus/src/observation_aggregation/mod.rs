@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{
-    JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse,
+use crate::{
+    mode::TConsensusMode,
+    types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse},
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
@@ -16,29 +17,33 @@ use aptos_types::{
     validator_verifier::VerifyError,
 };
 use move_core_types::account_address::AccountAddress;
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
 /// The aggregation state of reliable broadcast where a validator broadcast JWK observation requests
 /// and produce quorum-certified JWK updates.
-pub struct ObservationAggregationState {
+pub struct ObservationAggregationState<ConsensusMode> {
     epoch_state: Arc<EpochState>,
     local_view: ProviderJWKs,
     inner_state: Mutex<PartialSignatures>,
+    _phantom: PhantomData<ConsensusMode>,
 }
 
-impl ObservationAggregationState {
+impl<ConsensusMode> ObservationAggregationState<ConsensusMode> {
     pub fn new(epoch_state: Arc<EpochState>, local_view: ProviderJWKs) -> Self {
         Self {
             epoch_state,
             local_view,
             inner_state: Mutex::new(PartialSignatures::empty()),
+            _phantom: Default::default(),
         }
     }
 }
 
-impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
+impl<ConsensusMode: TConsensusMode> BroadcastStatus<JWKConsensusMsg>
+    for Arc<ObservationAggregationState<ConsensusMode>>
+{
     type Aggregated = QuorumCertifiedUpdate;
-    type Message = ObservedUpdateRequest;
+    type Message = ConsensusMode::ReliableBroadcastRequest;
     type Response = ObservedUpdateResponse;
 
     fn add(

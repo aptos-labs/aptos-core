@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: expected `&mut` but `&` was provided
+error: cannot adapt `&u64` to annotated type `&mut u64` (mutability mismatch)
   ┌─ tests/checking/typing/subtype_bind_invalid.move:5:27
   │
 5 │         let x: &mut u64 = &0;
   │                           ^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &integer)` to annotated type `(&mut u64, &mut u64)` (mutability mismatch)
   ┌─ tests/checking/typing/subtype_bind_invalid.move:9:44
   │
 9 │         let (x, y): (&mut u64, &mut u64) = (&0, &0);
   │                                            ^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &integer)` to annotated type `(&mut u64, &u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_bind_invalid.move:10:40
    │
 10 │         let (x, y): (&mut u64, &u64) = (&0, &0);
    │                                        ^^^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: cannot adapt `(&u64, &u64)` to annotated type `(&u64, &mut u64)` (mutability mismatch)
    ┌─ tests/checking/typing/subtype_bind_invalid.move:11:40
    │
 11 │         let (x, y): (&u64, &mut u64) = (&0, &0);

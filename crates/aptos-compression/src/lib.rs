@@ -161,9 +161,9 @@ fn get_decompressed_size(
 
     // Parse the size prefix
     let size = (compressed_data[0] as i32)
-        | (compressed_data[1] as i32) << 8
-        | (compressed_data[2] as i32) << 16
-        | (compressed_data[3] as i32) << 24;
+        | ((compressed_data[1] as i32) << 8)
+        | ((compressed_data[2] as i32) << 16)
+        | ((compressed_data[3] as i32) << 24);
     if size < 0 {
         return Err(DecompressionError(format!(
             "Parsed size prefix in buffer must not be negative! Got: {}",

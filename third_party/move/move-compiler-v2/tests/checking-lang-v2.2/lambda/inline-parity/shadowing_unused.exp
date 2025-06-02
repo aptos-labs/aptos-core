@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: captured variable `_x` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/shadowing_unused.move:18:13
+   │
+18 │             _x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^^
+
+error: captured variable `_x` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/shadowing_unused.move:28:13
+   │
+28 │             _x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^^

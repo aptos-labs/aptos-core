@@ -1,29 +1,41 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun t0(x8: u8,x64: u64,x128: u128) {
         {
-          let _: u8 = x8;
+          let _: u8 = Cast<u8>(0);
           {
-            let _: u64 = x64;
+            let _: u64 = Cast<u64>(0);
             {
-              let _: u128 = x128;
+              let _: u128 = Cast<u128>(0);
               {
-                let _: u8 = Cast<u8>(x64);
+                let _: u8 = Cast<u8>(x8);
                 {
-                  let _: u64 = Cast<u64>(x128);
+                  let _: u64 = Cast<u64>(x64);
                   {
-                    let _: u128 = Cast<u128>(x8);
+                    let _: u128 = Cast<u128>(x128);
                     {
-                      let _: u8 = Cast<u8>(x128);
+                      let _: u8 = Cast<u8>(x64);
                       {
-                        let _: u64 = Cast<u64>(x8);
+                        let _: u64 = Cast<u64>(x128);
                         {
-                          let _: u128 = Cast<u128>(x64);
+                          let _: u128 = Cast<u128>(x8);
                           {
-                            let _: u8 = Cast<u8>(340282366920938463463374607431768211455);
+                            let _: u8 = Cast<u8>(x128);
                             {
-                              let _: u64 = Cast<u64>(340282366920938463463374607431768211455);
-                              Tuple()
+                              let _: u64 = Cast<u64>(x8);
+                              {
+                                let _: u128 = Cast<u128>(x64);
+                                {
+                                  let _: u8 = Cast<u8>(340282366920938463463374607431768211455);
+                                  {
+                                    let _: u64 = Cast<u64>(340282366920938463463374607431768211455);
+                                    {
+                                      let _: u128 = Cast<u128>(340282366920938463463374607431768211455);
+                                      Tuple()
+                                    }
+                                  }
+                                }
+                              }
                             }
                           }
                         }
@@ -38,12 +50,15 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun t0(x8: u8, x64: u64, x128: u128) {
-        let _ = x8;
-        let _ = x64;
-        let _ = x128;
+        let _ = 0 as u8;
+        let _ = 0 as u64;
+        let _ = 0 as u128;
+        let _ = x8 as u8;
+        let _ = x64 as u64;
+        let _ = x128 as u128;
         let _ = x64 as u8;
         let _ = x128 as u64;
         let _ = x8 as u128;
@@ -52,5 +67,6 @@ module 0x8675309::M {
         let _ = x64 as u128;
         let _ = 340282366920938463463374607431768211455u128 as u8;
         let _ = 340282366920938463463374607431768211455u128 as u64;
+        let _ = 340282366920938463463374607431768211455u128 as u128;
     }
 }

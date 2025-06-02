@@ -83,6 +83,7 @@ pub struct Entry {
     /// The noise port.
     noise_port: u16,
 
+    #[allow(dead_code)]
     /// The port the metrics server is running on.
     pub metrics_port: u16,
 

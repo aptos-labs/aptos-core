@@ -1,5 +1,4 @@
 {
-  "message": "Account not found by Address(0xf) and Ledger version(0)",
-  "error_code": "account_not_found",
-  "vm_error_code": null
+  "sequence_number": "0",
+  "authentication_key": "0x000000000000000000000000000000000000000000000000000000000000000f"
 }

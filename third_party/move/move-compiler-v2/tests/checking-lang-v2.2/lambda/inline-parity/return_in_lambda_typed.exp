@@ -1,0 +1,47 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    private fun adder(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun main(): u64 {
+        Test::apply(closure#0Test::__lambda__1__main(), 10, 100);
+        Test::apply(closure#0Test::__lambda__2__main(), 10, 100);
+        Test::apply(closure#0Test::__lambda__3__main(), 10, 100)
+    }
+    private fun __lambda__1__main(x: u64,y: u64): u64 {
+        return Test::adder(x, y)
+    }
+    private fun __lambda__2__main(x: u64,y: u64): u64 {
+        return Test::adder(x, y)
+    }
+    private fun __lambda__3__main(x: u64,y: u64): u64 {
+        return Test::adder(x, y)
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    fun adder(x: u64, y: u64): u64 {
+        x + y
+    }
+    fun apply(f: |(u64, u64)|u64, x: u64, y: u64): u64 {
+        f(x, y)
+    }
+    public fun main(): u64 {
+        apply(|(arg0,arg1)| __lambda__1__main(arg0, arg1), 10, 100);
+        apply(|(arg0,arg1)| __lambda__2__main(arg0, arg1), 10, 100);
+        apply(|(arg0,arg1)| __lambda__3__main(arg0, arg1), 10, 100)
+    }
+    fun __lambda__1__main(x: u64, y: u64): u64 {
+        adder(x, y)
+    }
+    fun __lambda__2__main(x: u64, y: u64): u64 {
+        adder(x, y)
+    }
+    fun __lambda__3__main(x: u64, y: u64): u64 {
+        adder(x, y)
+    }
+}

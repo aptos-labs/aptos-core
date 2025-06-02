@@ -60,7 +60,7 @@ pub struct BatchProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // Map of Batch key to QueueItem containing Batch data and proofs
     items: HashMap<BatchKey, QueueItem>,
-    // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, sequence number, hash, expiration)
+    // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, replay protector, hash, expiration)
     // has been included. We only count those batches that are in both author_to_batches and items along with proofs.
     txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
     // Expiration index
@@ -777,9 +777,9 @@ impl BatchProofQueue {
             count += batches
                 .iter()
                 .filter(|(sort_key, _)| {
-                    self.items.get(&sort_key.batch_key).map_or(false, |item| {
-                        item.proof.is_some() && item.txn_summaries.is_none()
-                    })
+                    self.items
+                        .get(&sort_key.batch_key)
+                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_none())
                 })
                 .count() as u64;
         });
@@ -794,9 +794,9 @@ impl BatchProofQueue {
             count += batches
                 .iter()
                 .filter(|(sort_key, _)| {
-                    self.items.get(&sort_key.batch_key).map_or(false, |item| {
-                        item.proof.is_some() && item.txn_summaries.is_some()
-                    })
+                    self.items
+                        .get(&sort_key.batch_key)
+                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_some())
                 })
                 .count() as u64;
         });

@@ -44,7 +44,7 @@ impl<'a> InMemoryCache<'a> {
         max_num_transactions_per_batch: usize,
         max_bytes_per_batch: usize,
         filter: &Option<BooleanTransactionFilter>,
-    ) -> Option<(Vec<Transaction>, usize)> {
+    ) -> Option<(Vec<Transaction>, usize, u64)> {
         let _timer = TIMER.with_label_values(&["cache_get_data"]).start_timer();
 
         while starting_version >= self.data_manager.read().await.end_version {
@@ -97,7 +97,7 @@ impl<'a> InMemoryCache<'a> {
                 }
             }
             trace!("Data was sent from cache, last version: {}.", version - 1);
-            return Some((result, total_bytes));
+            return Some((result, total_bytes, version - 1));
         }
     }
 }

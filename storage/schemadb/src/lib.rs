@@ -127,22 +127,24 @@ impl DB {
         open_mode: OpenMode,
     ) -> DbResult<DB> {
         // ignore error, since it'll fail to list cfs on the first open
-        let existing_cfs = rocksdb::DB::list_cf(db_opts, path.de_unc()).unwrap_or_default();
-
-        let unrecognized_cfds = existing_cfs
-            .iter()
-            .map(AsRef::as_ref)
-            .collect::<HashSet<&str>>()
-            .difference(&cfds.iter().map(|cfd| cfd.name()).collect())
+        let existing_cfs: HashSet<String> = rocksdb::DB::list_cf(db_opts, path.de_unc())
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        let requested_cfs: HashSet<String> =
+            cfds.iter().map(|cfd| cfd.name().to_string()).collect();
+        let missing_cfs: HashSet<&str> = requested_cfs
+            .difference(&existing_cfs)
             .map(|cf| {
-                warn!("Unrecognized CF: {}", cf);
-
-                let mut cf_opts = Options::default();
-                cf_opts.set_compression_type(DBCompressionType::Lz4);
-                ColumnFamilyDescriptor::new(cf.to_string(), cf_opts)
+                warn!("Missing CF: {}", cf);
+                cf.as_ref()
             })
-            .collect::<Vec<_>>();
-        let all_cfds = cfds.into_iter().chain(unrecognized_cfds);
+            .collect();
+        let unrecognized_cfs = existing_cfs.difference(&requested_cfs);
+
+        let all_cfds = cfds
+            .into_iter()
+            .chain(unrecognized_cfs.map(Self::cfd_for_unrecognized_cf));
 
         let inner = {
             use rocksdb::DB;
@@ -154,7 +156,7 @@ impl DB {
                     DB::open_cf_descriptors_read_only(
                         db_opts,
                         path.de_unc(),
-                        all_cfds,
+                        all_cfds.filter(|cfd| !missing_cfs.contains(cfd.name())),
                         false, /* error_if_log_file_exist */
                     )
                 },
@@ -169,6 +171,14 @@ impl DB {
         .into_db_res()?;
 
         Ok(Self::log_construct(name, open_mode, inner))
+    }
+
+    fn cfd_for_unrecognized_cf(cf: &String) -> ColumnFamilyDescriptor {
+        warn!("Unrecognized CF: {}", cf);
+
+        let mut cf_opts = Options::default();
+        cf_opts.set_compression_type(DBCompressionType::Lz4);
+        ColumnFamilyDescriptor::new(cf.to_string(), cf_opts)
     }
 
     fn log_construct(name: &str, open_mode: OpenMode, inner: rocksdb::DB) -> DB {

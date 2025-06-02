@@ -1,80 +1,56 @@
 
 Diagnostics:
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:20:11
-   │
-20 │         let S { x, y } = s;
-   │                 ^
-
-warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:20:14
-   │
-20 │         let S { x, y } = s;
-   │                    ^
-
 warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
    ┌─ tests/unused-assignment/unused_in_pattern.move:26:7
    │
 26 │         let z: S;
    │             ^
 
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:33:18
-   │
-33 │         let T { z: S { x, y } } = t;
-   │                        ^
-
-warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:33:21
-   │
-33 │         let T { z: S { x, y } } = t;
-   │                           ^
-
 
 Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:15:3
    │
 15 │         S { x, y } = s;
    │         ^^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:15:3
    │
 15 │         S { x, y } = s;
    │         ^^^^^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:20:7
    │
 20 │         let S { x, y } = s;
    │             ^^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:20:7
    │
 20 │         let S { x, y } = s;
    │             ^^^^^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:28:10
    │
 28 │         T { z: S { x, y } } = t;
    │                ^^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:28:10
    │
 28 │         T { z: S { x, y } } = t;
    │                ^^^^^^^^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:33:14
    │
 33 │         let T { z: S { x, y } } = t;
    │                    ^^^^^^^^^^
 
-warning: Unused assignment/binding to `y`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/unused-assignment/unused_in_pattern.move:33:14
    │
 33 │         let T { z: S { x, y } } = t;

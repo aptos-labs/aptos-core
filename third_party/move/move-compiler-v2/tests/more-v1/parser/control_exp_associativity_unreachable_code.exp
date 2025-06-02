@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Unused parameter `cond`. Consider removing or prefixing with an underscore: `_cond`
+warning: Unused value of parameter `cond`. Consider removing the parameter, or prefixing with an underscore (e.g., `_cond`), or binding to `_`
   ┌─ tests/more-v1/parser/control_exp_associativity_unreachable_code.move:9:11
   │
 9 │     fun t(cond: bool): u64 {

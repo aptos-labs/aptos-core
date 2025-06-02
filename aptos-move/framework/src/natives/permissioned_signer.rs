@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use aptos_gas_schedule::gas_params::natives::aptos_framework::{
-    IS_PERMISSIONED_SIGNER_BASE, PERMISSION_ADDRESS_BASE, SIGNER_FROM_PERMISSIONED_HANDLE_BASE,
+use aptos_gas_schedule::gas_params::natives::{
+    aptos_framework::{
+        IS_PERMISSIONED_SIGNER_BASE, PERMISSION_ADDRESS_BASE, SIGNER_FROM_PERMISSIONED_HANDLE_BASE,
+    },
+    move_stdlib::SIGNER_BORROW_ADDRESS_BASE,
 };
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -116,6 +119,38 @@ fn native_signer_from_permissioned(
 }
 
 /***************************************************************************************************
+ * native fun borrow_address
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[inline]
+fn native_borrow_address(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 1);
+
+    let signer_reference = safely_pop_arg!(arguments, SignerRef);
+
+    if !context
+        .get_feature_flags()
+        .is_enabled(aptos_types::on_chain_config::FeatureFlag::PERMISSIONED_SIGNER)
+        && signer_reference.is_permissioned()?
+    {
+        return SafeNativeResult::Err(SafeNativeError::Abort {
+            abort_code: EPERMISSION_SIGNER_DISABLED,
+        });
+    }
+
+    context.charge(SIGNER_BORROW_ADDRESS_BASE)?;
+
+    Ok(smallvec![signer_reference.borrow_signer()?])
+}
+
+/***************************************************************************************************
  * module
  *
  **************************************************************************************************/
@@ -136,6 +171,7 @@ pub fn make_all(
             "signer_from_permissioned_handle_impl",
             native_signer_from_permissioned,
         ),
+        ("borrow_address", native_borrow_address),
     ];
 
     builder.make_named_natives(natives)

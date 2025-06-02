@@ -1,4 +1,280 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    private fun foo(self: &mut S): u64 {
+        {
+          let $t2: u64 = 1;
+          {
+            let $t1: &mut u64 = Borrow(Mutable)(select m::S.x<&mut S>(self));
+            $t1 = Add<u64>(Deref($t1), $t2)
+          }
+        };
+        1
+    }
+    public fun test(): u64 {
+        {
+          let s: S = pack m::S(0);
+          {
+            let $t2: u64 = m::foo(Borrow(Mutable)(s));
+            {
+              let $t1: &mut u64 = Borrow(Mutable)(select m::S.x<S>(s));
+              $t1 = Add<u64>(Deref($t1), $t2)
+            }
+          };
+          select m::S.x<S>(s)
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S has drop {
+        x: u64,
+    }
+    fun foo(self: &mut S): u64 {
+        {
+            let $t2 = 1;
+            let $t1 = &mut self.x;
+            *$t1 = *$t1 + $t2
+        };
+        1
+    }
+    public fun test(): u64 {
+        let s = S{x: 0};
+        {
+            let $t2 = foo(&mut s);
+            let $t1 = &mut s.x;
+            *$t1 = *$t1 + $t2
+        };
+        s.x
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::foo($t0: &mut 0xc0ffee::m::S): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := 1
+  1: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t5 := read_ref($t3)
+  3: $t4 := +($t5, $t2)
+  4: write_ref($t3, $t4)
+  5: $t1 := 1
+  6: return $t1
+}
+
+
+[variant baseline]
+public fun m::test(): u64 {
+     var $t0: u64
+     var $t1: 0xc0ffee::m::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut 0xc0ffee::m::S
+     var $t5: &mut u64
+     var $t6: &mut 0xc0ffee::m::S
+     var $t7: u64
+     var $t8: u64
+     var $t9: &0xc0ffee::m::S
+     var $t10: &u64
+  0: $t2 := 0
+  1: $t1 := pack 0xc0ffee::m::S($t2)
+  2: $t4 := borrow_local($t1)
+  3: $t3 := m::foo($t4)
+  4: $t6 := borrow_local($t1)
+  5: $t5 := borrow_field<0xc0ffee::m::S>.x($t6)
+  6: $t8 := read_ref($t5)
+  7: $t7 := +($t8, $t3)
+  8: write_ref($t5, $t7)
+  9: $t9 := borrow_local($t1)
+ 10: $t10 := borrow_field<0xc0ffee::m::S>.x($t9)
+ 11: $t0 := read_ref($t10)
+ 12: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: &mut 0xc0ffee::m::S): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t5 := read_ref($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3, $t5
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: $t4 := +($t5, $t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: write_ref($t3, $t4)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  5: $t1 := 1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  6: return $t1
+}
+
+
+[variant baseline]
+public fun m::test(): u64 {
+     var $t0: u64
+     var $t1: 0xc0ffee::m::S
+     var $t2: u64
+     var $t3: u64
+     var $t4: &mut 0xc0ffee::m::S
+     var $t5: &mut u64
+     var $t6: &mut 0xc0ffee::m::S
+     var $t7: u64
+     var $t8: u64
+     var $t9: &0xc0ffee::m::S
+     var $t10: &u64
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := pack 0xc0ffee::m::S($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  2: $t4 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`] at line 13
+     #
+  3: $t3 := m::foo($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  4: $t6 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => (mut) #6 via [local `s`] at line 13
+     #
+  5: $t5 := borrow_field<0xc0ffee::m::S>.x($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`, field `x`] at line 13
+     #
+  6: $t8 := read_ref($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t8
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`, field `x`] at line 13
+     #
+  7: $t7 := +($t8, $t3)
+     # abort state: {returns}
+     # live vars: $t1, $t5, $t7
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`, field `x`] at line 13
+     #
+  8: write_ref($t5, $t7)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  9: $t9 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s`] at line 14
+     #
+ 10: $t10 := borrow_field<0xc0ffee::m::S>.x($t9)
+     # abort state: {returns}
+     # live vars: $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s`, field `x`] at line 14
+     #
+ 11: $t0 := read_ref($t10)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
 module 0xc0ffee::m {
     struct S {
         x: u64,
@@ -25,30 +301,7 @@ module 0xc0ffee::m {
     }
 } // end 0xc0ffee::m
 
-// -- Sourcified model before bytecode pipeline
-module 0xc0ffee::m {
-    struct S has drop {
-        x: u64,
-    }
-    fun foo(self: &mut S): u64 {
-        {
-            let $t1 = &mut self.x;
-            *$t1 = *$t1 + 1
-        };
-        1
-    }
-    public fun test(): u64 {
-        let s = S{x: 0};
-        {
-            let $t2 = foo(&mut s);
-            let $t1 = &mut s.x;
-            *$t1 = *$t1 + $t2
-        };
-        s.x
-    }
-}
-
-============ initial bytecode ================
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::foo($t0: &mut 0xc0ffee::m::S): u64 {

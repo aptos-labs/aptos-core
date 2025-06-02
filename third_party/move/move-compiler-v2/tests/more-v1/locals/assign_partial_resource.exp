@@ -1,24 +1,24 @@
 
 Diagnostics:
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
   ┌─ tests/more-v1/locals/assign_partial_resource.move:6:21
   │
 6 │         if (cond) { r = R{}; };
   │                     ^^^^^^^
 
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
    ┌─ tests/more-v1/locals/assign_partial_resource.move:13:29
    │
 13 │         if (cond) {} else { r = R{}; };
    │                             ^^^^^^^
 
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
    ┌─ tests/more-v1/locals/assign_partial_resource.move:20:24
    │
 20 │         while (cond) { r = R{} };
    │                        ^^^^^^^
 
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
    ┌─ tests/more-v1/locals/assign_partial_resource.move:27:16
    │
 27 │         loop { r = R{} }

@@ -14,7 +14,6 @@ use crate::{
     FullNode, K8sApi, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
     REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
-use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_retrier::fixed_retry_strategy;
@@ -31,6 +30,7 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
+use log::{debug, info, warn};
 use prometheus_http_query::{
     response::{PromqlResult, Sample},
     Client as PrometheusClient,
@@ -39,7 +39,7 @@ use regex::Regex;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
-    env, str,
+    str,
     sync::{atomic::AtomicU32, Arc},
 };
 use tokio::{
@@ -66,7 +66,7 @@ pub struct K8sSwarm {
 }
 
 impl K8sSwarm {
-    pub async fn new<'b>(
+    pub async fn new(
         root_key: &[u8],
         image_tag: &str,
         upgrade_image_tag: &str,
@@ -494,9 +494,7 @@ fn stateful_set_labels_matches(sts: &StatefulSet, labels: &BTreeMap<String, Stri
                 k, truncated_k, v, truncated_v
             );
         }
-        sts_labels
-            .get(&truncated_k)
-            .map_or(false, |val| val == &truncated_v)
+        sts_labels.get(&truncated_k) == Some(&truncated_v)
     })
 }
 
@@ -790,7 +788,7 @@ fn check_all_injected(status: &Option<ChaosStatus>) -> bool {
     status
         .as_ref()
         .and_then(|status| status.conditions.as_ref())
-        .map_or(false, |conditions| {
+        .is_some_and(|conditions| {
             conditions.iter().any(|c| {
                 c.r#type == ChaosConditionType::AllInjected && c.status == ConditionStatus::True
             }) && conditions.iter().any(|c| {
@@ -799,6 +797,7 @@ fn check_all_injected(status: &Option<ChaosStatus>) -> bool {
         })
 }
 
+#[allow(dead_code)]
 struct MockChaosExperimentOps {
     network_chaos: Vec<NetworkChaos>,
     stress_chaos: Vec<StressChaos>,

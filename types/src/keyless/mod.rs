@@ -121,6 +121,8 @@ impl TryFrom<&[u8]> for KeylessSignature {
 }
 
 impl ValidCryptoMaterial for KeylessSignature {
+    const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }

@@ -1,0 +1,34 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    private fun foo(g: |(u64, u64)|u64,x: u64,_y: u64): u64 {
+        (g)(x, _y)
+    }
+    public fun test() {
+        if Eq<u64>(Test::foo(closure#0Test::__lambda__1__test(), 10, 100), 100) {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+    private fun __lambda__1__test(param$0: u64,y: u64): u64 {
+        {
+          let _: u64 = param$0;
+          y
+        }
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    fun foo(g: |(u64, u64)|u64, x: u64, _y: u64): u64 {
+        g(x, _y)
+    }
+    public fun test() {
+        if (foo(|(arg0,arg1)| __lambda__1__test(arg0, arg1), 10, 100) == 100) () else abort 0;
+    }
+    fun __lambda__1__test(param$0: u64, y: u64): u64 {
+        let _ = param$0;
+        y
+    }
+}

@@ -21,8 +21,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl, SpecVarDecl,
-        TempIndex, Value,
+        Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind,
+        SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -144,7 +144,7 @@ impl<'env> SpecTranslator<'env> {
 // Axioms
 // ======
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_axioms(&self, env: &GlobalEnv, mono_info: &MonoInfo) {
         let type_display_ctx = env.get_type_display_ctx();
         for (axiom, type_insts) in &mono_info.axioms {
@@ -174,7 +174,7 @@ impl<'env> SpecTranslator<'env> {
 // Specification Variables
 // =======================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_spec_vars(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
@@ -226,7 +226,7 @@ impl<'env> SpecTranslator<'env> {
 // Specification Functions
 // =======================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_spec_funs(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
@@ -255,6 +255,99 @@ impl<'env> SpecTranslator<'env> {
         }
     }
 
+    /// Generates axioms for uninterpreted spec function.
+    fn generate_spec_function_axioms(
+        &self,
+        fun: &SpecFunDecl,
+        module_env: &ModuleEnv,
+        boogie_name: String,
+        param_list: String,
+    ) {
+        let collect_conditions = |kind: ConditionKind| {
+            fun.spec
+                .borrow()
+                .conditions
+                .clone()
+                .into_iter()
+                .filter(|cond| cond.kind == kind)
+                .collect_vec()
+        };
+        let emit_condition = |conditions: &[Condition], negate: bool| {
+            for (i, cond) in conditions.iter().enumerate() {
+                if i > 0 {
+                    emitln!(self.writer, " && ");
+                }
+                for (j, exp) in cond.all_exps().enumerate() {
+                    emit!(self.writer, "{}(", if negate { "!" } else { "" });
+                    self.translate_exp(exp);
+                    emit!(self.writer, ")");
+                    if j > 0 {
+                        emitln!(self.writer, " && ");
+                    }
+                }
+            }
+        };
+        let aborts_if = collect_conditions(ConditionKind::AbortsIf);
+        let requires = collect_conditions(ConditionKind::Requires);
+        let ensures = collect_conditions(ConditionKind::Ensures);
+        let emit_requires = || {
+            if !requires.is_empty() {
+                emit!(self.writer, "(");
+                emit_condition(&requires, false);
+                emit!(self.writer, ") ");
+            }
+            if !aborts_if.is_empty() {
+                if !requires.is_empty() {
+                    emitln!(self.writer, " && ");
+                }
+                emit!(self.writer, "(");
+                emit_condition(&aborts_if, true);
+                emit!(self.writer, ")");
+            }
+        };
+        let emit_predicate = |exp| {
+            if !requires.is_empty() || !aborts_if.is_empty() {
+                emit!(self.writer, "(");
+                emit_requires();
+                emit!(self.writer, "==> ");
+            }
+            emit!(self.writer, "(");
+            self.translate_exp(exp);
+            emit!(self.writer, ")");
+            if !requires.is_empty() || !aborts_if.is_empty() {
+                emit!(self.writer, ")");
+            }
+        };
+        for cond in ensures.iter() {
+            let call = format!(
+                "{}({})",
+                boogie_name,
+                fun.params
+                    .iter()
+                    .map(|Parameter(n, ..)| { format!("{}", n.display(module_env.symbol_pool())) })
+                    .join(", ")
+            );
+            //TODO(#16256): currently spec function does not support tuple as return type
+            for exp in cond.all_exps() {
+                if !param_list.is_empty() {
+                    emitln!(
+                        self.writer,
+                        "axiom (forall {} ::\n(var $ret0 := {};",
+                        param_list,
+                        call,
+                    );
+                    emit_predicate(exp);
+                    emitln!(self.writer, "\n));");
+                } else {
+                    emitln!(self.writer, "axiom (var $ret0 := {};", call,);
+                    emit_predicate(exp);
+                    emitln!(self.writer, "\n);");
+                }
+            }
+        }
+    }
+
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
             // This function is native and expected to be found in the prelude.
@@ -322,7 +415,7 @@ impl<'env> SpecTranslator<'env> {
                         .type_inst
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| Type::TypeParameter(i as u16));
+                        .unwrap_or(Type::TypeParameter(i as u16));
                     // There can be name clashes after instantiation. Parameters still need
                     // to be there but all are instantiated with the same type. We escape
                     // the redundant parameters.
@@ -436,6 +529,9 @@ impl<'env> SpecTranslator<'env> {
                     );
                 }
             }
+            // Generate axioms from the spec block attached to the spec function
+            // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
+            self.generate_spec_function_axioms(fun, module_env, boogie_name, param_list);
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
@@ -452,12 +548,13 @@ impl<'env> SpecTranslator<'env> {
 // Emit any finalization items
 // ============================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
     }
 
     /// Translate lifted functions for choice expressions.
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_choice_functions(&self) {
         let env = self.env;
         let infos_ref = self.lifted_choice_infos.borrow();
@@ -655,7 +752,7 @@ impl<'env> SpecTranslator<'env> {
 // Expressions
 // ===========
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub(crate) fn translate(&self, exp: &Exp, type_inst: &[Type]) {
         *self.fresh_var_count.borrow_mut() = 0;
         if type_inst.is_empty() {
@@ -881,7 +978,7 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
             },
             Operation::SelectVariants(module_id, struct_id, field_ids) => {
-                self.translate_select(node_id, *module_id, *struct_id, field_ids[0], args);
+                self.translate_select_variant(node_id, *module_id, *struct_id, field_ids, args);
             },
             Operation::TestVariants(module_id, struct_id, variants) => {
                 self.translate_test_variants(node_id, *module_id, *struct_id, variants, args);
@@ -1271,6 +1368,59 @@ impl<'env> SpecTranslator<'env> {
         let field_env = struct_env.get_field(field_id);
         self.translate_exp(&args[0]);
         emit!(self.writer, "->{}", boogie_field_sel(&field_env));
+    }
+
+    fn translate_select_variant(
+        &self,
+        node_id: NodeId,
+        module_id: ModuleId,
+        struct_id: StructId,
+        field_ids: &[FieldId],
+        args: &[Exp],
+    ) {
+        let struct_env = self.env.get_module(module_id).into_struct(struct_id);
+        if struct_env.is_intrinsic() || field_ids.is_empty() {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "cannot select field of intrinsic struct",
+            );
+        }
+        let struct_type = &self.get_node_type(args[0].node_id());
+        let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let l = self.fresh_var_name("l");
+        emit!(self.writer, "(var {} := ", l);
+        self.translate_exp(&args[0]);
+        emit!(self.writer, ";");
+        let mut else_symbol = "";
+        // When translating into boogie representation,
+        // field with the same name is attached with the corresponding variant name
+        // to avoid type error when they have different types in different variants
+        for field_id in field_ids.iter() {
+            let field_env = struct_env.get_field(*field_id);
+
+            let struct_variant_name =
+                boogie_struct_variant_name(&struct_env, inst, field_env.get_variant().unwrap());
+            let match_condition = format!("{} is {}", l, struct_variant_name);
+            emit!(self.writer, "{} if {} then ", else_symbol, match_condition);
+            emit!(self.writer, "{} -> {}", l, boogie_field_sel(&field_env));
+            if else_symbol.is_empty() {
+                else_symbol = " else ";
+            }
+        }
+        emit!(self.writer, " else ");
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+        emit!(
+            self.writer,
+            &format!(
+                "$Arbitrary_value_of'{}'()",
+                boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+            )
+        );
+        emit!(self.writer, ")");
     }
 
     fn translate_test_variants(

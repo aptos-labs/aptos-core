@@ -1,0 +1,8 @@
+error: failed to parse manifest
+  |
+1 | [package]
+2 | name = "some_package_name"
+3 | version = "0.1.2"
+4 | upgrade_policy = "invalid-policy"
+  |                  ^^^^^^^^^^^^^^^^ unknown variant `invalid-policy`, expected `compatible` or `immutable`
+  |

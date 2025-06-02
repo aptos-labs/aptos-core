@@ -28,7 +28,7 @@ pub(crate) fn execute_workload(
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
         },
         // For replay, there is no block limit.
-        onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        onchain: BlockExecutorConfigFromOnchain::on_but_large_for_test(),
     };
 
     executor

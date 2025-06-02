@@ -1,0 +1,56 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        m::test(0, closure#0m::__lambda__1__unused_lambda());
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        m::test(0, closure#0m::__lambda__1__unused_lambda_suppressed1());
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        m::test(0, closure#0m::__lambda__1__unused_lambda_suppressed2());
+        Tuple()
+    }
+    private fun __lambda__1__unused_lambda(x: u64): u64 {
+        1
+    }
+    private fun __lambda__1__unused_lambda_suppressed1(_x: u64): u64 {
+        1
+    }
+    private fun __lambda__1__unused_lambda_suppressed2(param$0: u64): u64 {
+        {
+          let _: u64 = param$0;
+          1
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    fun test(p: u64, f: |u64|u64): u64 {
+        f(p)
+    }
+    fun unused_lambda() {
+        test(0, |arg0| __lambda__1__unused_lambda(arg0));
+    }
+    fun unused_lambda_suppressed1() {
+        test(0, |arg0| __lambda__1__unused_lambda_suppressed1(arg0));
+    }
+    fun unused_lambda_suppressed2() {
+        test(0, |arg0| __lambda__1__unused_lambda_suppressed2(arg0));
+    }
+    fun __lambda__1__unused_lambda(x: u64): u64 {
+        1
+    }
+    fun __lambda__1__unused_lambda_suppressed1(_x: u64): u64 {
+        1
+    }
+    fun __lambda__1__unused_lambda_suppressed2(param$0: u64): u64 {
+        let _ = param$0;
+        1
+    }
+}

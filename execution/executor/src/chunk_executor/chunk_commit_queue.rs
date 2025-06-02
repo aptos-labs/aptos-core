@@ -117,12 +117,12 @@ impl ChunkCommitQueue {
         );
         self.latest_state_summary = chunk
             .output
-            .expect_state_checkpoint_output()
+            .ensure_state_checkpoint_output()?
             .state_summary
             .clone();
         self.latest_txn_accumulator = chunk
             .output
-            .expect_ledger_update_output()
+            .ensure_ledger_update_output()?
             .transaction_accumulator
             .clone();
         self.to_update_ledger.pop_front();

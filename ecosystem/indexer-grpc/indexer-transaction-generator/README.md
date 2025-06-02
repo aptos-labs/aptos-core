@@ -4,27 +4,31 @@ This tool is to generate transactions for testing purposes.
 
 ## Usage
 
-Under the root folder, i.e., `aptos-core`, run
+Under the root folder, i.e., `aptos-core`, run the follow command. This will default to importing transactions for all networks.
 
 ```bash
-cargo run -p aptos-indexer-transaction-generator -- \
-  --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions \ 
-  --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src
+cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src
 ```
 
-**You can also use absolute path, run (using binary as an example)**
+You can optionally specify the mode, e.g. for script mode
 
 ```bash
-./aptos-indexer-transaction-generator \
-  --testing-folder /your/aptos-core/ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions \ 
-  --output-folder /tmp/ttt
+cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --mode script
 ```
 
-### Command-Line Options
+Or network, e.g. mainnet
 
-  - `mode`: (Optional) Specify the mode of operation for the indexer. Possible values are `import` and `script`. Default is `import`.
+```bash
+cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --network mainnet
+```
 
-### Config Overview
+Or testnet
+
+```bash
+cargo run -p aptos-indexer-transaction-generator -- --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src --network testnet
+```
+
+### Config overview
 
 Your testing folder should contain:
 - One file called `testing_accounts.yaml`, which contains testing accounts used.

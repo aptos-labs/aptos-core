@@ -45,7 +45,7 @@ pub(crate) mod transaction_accumulator_db;
 pub(crate) mod transaction_auxiliary_data_db;
 #[cfg(test)]
 mod transaction_auxiliary_data_db_test;
-mod transaction_db;
+pub(crate) mod transaction_db;
 #[cfg(test)]
 pub(crate) mod transaction_db_test;
 pub(crate) mod transaction_info_db;

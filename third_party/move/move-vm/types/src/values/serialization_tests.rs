@@ -8,10 +8,7 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{
-            values_impl, AbstractFunction, SerializedFunctionData, Struct, Value,
-            FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-        },
+        values::{values_impl, AbstractFunction, SerializedFunctionData, Struct, Value},
     };
     use better_any::{Tid, TidAble, TidExt};
     use claims::{assert_err, assert_ok, assert_some};
@@ -19,7 +16,7 @@ mod tests {
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{ClosureMask, MoveClosure, MoveFunctionLayout},
+        function::{ClosureMask, MoveClosure, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
         identifier::Identifier,
         language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
         u256,
@@ -209,12 +206,7 @@ mod tests {
     // Closures
 
     fn make_fun_layout() -> MoveTypeLayout {
-        // Currently, content of layout doesn't influence parsing, so can set anything here
-        MoveTypeLayout::Function(MoveFunctionLayout(
-            vec![],
-            vec![],
-            AbilitySet::PUBLIC_FUNCTIONS,
-        ))
+        MoveTypeLayout::Function
     }
 
     fn make_type_args() -> Vec<TypeTag> {

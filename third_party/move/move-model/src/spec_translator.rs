@@ -585,7 +585,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b, T> {
+impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Do some pre-processing of the expression before actual rewrite, reporting
         // errors.

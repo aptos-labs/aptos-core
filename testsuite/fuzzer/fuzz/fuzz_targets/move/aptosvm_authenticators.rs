@@ -8,9 +8,8 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
-use aptos_language_e2e_tests::{
-    account::Account, data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor,
-};
+use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
     chain_id::ChainId,
     jwks::{secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs},

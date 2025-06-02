@@ -8,7 +8,7 @@ To play with these examples:
      - If you need to install the Aptos CLI, you can follow these instructions: https://aptos.dev/tools/aptos-cli/install-cli/
 
 **WARNING:** These Move examples have NOT been audited. If you are using them in a production system, proceed at your own risk.
-Particular care should be taken with Move examples that contain complex cryptographic code (e.g., `drand`, `veiled_coin`).
+Particular care should be taken with Move examples that contain complex cryptographic code (e.g., `drand`).
 
 # Additional Resources
 

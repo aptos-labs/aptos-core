@@ -1,0 +1,10 @@
+processed 4 tasks
+
+task 1 'run'. lines 31-31:
+return values: 42
+
+task 2 'run'. lines 33-33:
+return values: 87
+
+task 3 'run'. lines 35-35:
+return values: 42

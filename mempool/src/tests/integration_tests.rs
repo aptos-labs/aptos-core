@@ -19,6 +19,7 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_types::transaction::ReplayProtector;
 use once_cell::sync::Lazy;
 use std::time::Duration;
 
@@ -248,7 +249,7 @@ async fn test_broadcast_self_txns() {
 /// Test that gas price updates work and push onward to other nodes
 #[tokio::test]
 async fn test_update_gas_price() {
-    let new_txn = TestTransaction::new(1, 0, 100);
+    let new_txn = TestTransaction::new(1, ReplayProtector::SequenceNumber(0), 100);
     let new_txn = &[new_txn];
 
     let mut node = MempoolTestFrameworkBuilder::single_validator();

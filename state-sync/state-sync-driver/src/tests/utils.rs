@@ -32,8 +32,8 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, ReplayProtector,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus, Version,
     },
@@ -80,7 +80,7 @@ pub fn create_epoch_ending_ledger_info_for_epoch(
 /// Creates a single test event
 pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
     let event_key = event_key.unwrap_or_else(EventKey::random);
-    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap()).unwrap()
 }
 
 pub fn create_reconfig_event() -> ContractEvent {
@@ -88,6 +88,7 @@ pub fn create_reconfig_event() -> ContractEvent {
         NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
         bcs::to_bytes(&0).unwrap(),
     )
+    .unwrap()
 }
 
 /// Creates a test driver configuration for full nodes
@@ -291,7 +292,7 @@ pub async fn verify_commit_notification(
             let signed = txn.try_as_signed_user_txn().unwrap();
             CommittedTransaction {
                 sender: signed.sender(),
-                sequence_number: 0,
+                replay_protector: ReplayProtector::SequenceNumber(0),
                 use_case: signed.parse_use_case(),
             }
         })

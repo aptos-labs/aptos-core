@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_store_operator_v2::common::{BatchMetadata, FileMetadata};
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
 use tokio::sync::mpsc::Sender;
@@ -18,7 +18,7 @@ pub struct FileStoreOperatorV2 {
 }
 
 impl FileStoreOperatorV2 {
-    pub async fn new(
+    pub fn new(
         max_size_per_file: usize,
         num_txns_per_folder: u64,
         version: u64,
@@ -47,6 +47,12 @@ impl FileStoreOperatorV2 {
     ) -> Result<()> {
         let end_batch = (transaction.version + 1) % self.num_txns_per_folder == 0;
         let size_bytes = transaction.encoded_len();
+        ensure!(
+            self.version == transaction.version,
+            "Gap is found when buffering transaction, expected: {}, actual: {}",
+            self.version,
+            transaction.version,
+        );
         self.buffer.push(transaction);
         self.buffer_size_in_bytes += size_bytes;
         self.version += 1;

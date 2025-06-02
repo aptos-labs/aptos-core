@@ -378,7 +378,7 @@ Helper to validate an acquire. Returns the root address of the capability.
         <b>let</b> root_addr = <b>borrow_global</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root;
         // double check that requester is actually registered <b>as</b> a delegate
         <b>assert</b>!(<b>exists</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="capability.md#0x1_capability_EDELEGATE">EDELEGATE</a>));
-        <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&<b>borrow_global</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr).delegates, &addr),
+        <b>assert</b>!(<b>borrow_global</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr).delegates.contains(&addr),
             <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="capability.md#0x1_capability_EDELEGATE">EDELEGATE</a>));
         root_addr
     } <b>else</b> {
@@ -519,9 +519,9 @@ Helper to remove an element from a vector.
 
 
 <pre><code><b>fun</b> <a href="capability.md#0x1_capability_remove_element">remove_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: &E) {
-    <b>let</b> (found, index) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(v, x);
+    <b>let</b> (found, index) = v.index_of(x);
     <b>if</b> (found) {
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(v, index);
+        v.remove(index);
     }
 }
 </code></pre>
@@ -547,8 +547,8 @@ Helper to add an element to a vector.
 
 
 <pre><code><b>fun</b> <a href="capability.md#0x1_capability_add_element">add_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: E) {
-    <b>if</b> (!<a href="../../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(v, &x)) {
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(v, x)
+    <b>if</b> (!v.contains(&x)) {
+        v.push_back(x)
     }
 }
 </code></pre>

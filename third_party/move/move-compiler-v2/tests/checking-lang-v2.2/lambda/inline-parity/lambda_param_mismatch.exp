@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: expected function type returns value of type `()` but `u64` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/lambda_param_mismatch.move:20:32
+   │
+20 │           vector_for_each(input, |item| {
+   │ ╭────────────────────────────────^
+21 │ │             vector::remove(&mut mut_ref.inner, item)
+22 │ │         })
+   │ ╰─────────^

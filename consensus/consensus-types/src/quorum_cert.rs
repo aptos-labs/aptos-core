@@ -17,7 +17,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct QuorumCert {
-    /// The vote information certified by the quorum.
+    /// The vote information is certified by the quorum.
     vote_data: VoteData,
     /// The signed LedgerInfo of a committed block that carries the data about the certified block.
     signed_ledger_info: LedgerInfoWithSignatures,

@@ -4,11 +4,14 @@
 use crate::{
     ability::AbilitySet,
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
+
+/// Version number for the serialization format of function data.
+pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V1: u16 = 1;
 
 //===========================================================================================
 
@@ -153,15 +156,45 @@ impl ClosureMask {
         i
     }
 
-    pub fn merge_placeholder_strings(
-        &self,
-        arity: usize,
-        captured: Vec<String>,
-    ) -> Option<Vec<String>> {
-        let provided = (0..arity - captured.len())
-            .map(|_| "_".to_string())
-            .collect::<Vec<_>>();
-        self.compose(captured, provided)
+    /// Given a vector of captured arguments (converted into strings), formats them as a vector of
+    /// all arguments such that:
+    ///   - if argument is captured, an entry from the vector is added to the final vector,
+    ///   - if argument is not captured, "_" is added to the final vector.
+    /// The last element of a vector is "..", indicating possibly mor non-captured arguments (it is
+    /// not possible to deduce if there are any because the mask is simply 0).
+    ///
+    /// In case there is any error, a vector of a single dummy value is returned.
+    pub fn format_arguments(&self, captured: Vec<String>) -> Vec<String> {
+        // If the function returns None, this means not all arguments were captured. Should not
+        // happen. Do not return an error because this is used to implement `Display`, which can
+        // make `format!` panic.
+        self.format_arguments_impl(captured)
+            .unwrap_or_else(|| vec!["*invalid*".to_string()])
+    }
+
+    fn format_arguments_impl(&self, captured: Vec<String>) -> Option<Vec<String>> {
+        let mut mask = self.0;
+        let mut captured = captured.into_iter();
+
+        let mut result = vec![];
+        while mask != 0 {
+            if mask & 0x1 != 0 {
+                result.push(captured.next()?)
+            } else {
+                result.push("_".to_string())
+            }
+            mask >>= 1;
+        }
+
+        // We do not know arity information of the function, so the simplest option is to indicate
+        // that there can be more arguments in the end.
+        result.push("..".to_string());
+
+        if captured.next().is_some() {
+            return None;
+        }
+
+        Some(result)
     }
 }
 
@@ -220,10 +253,9 @@ pub struct MoveClosure {
     pub captured: Vec<(MoveTypeLayout, MoveValue)>,
 }
 
-#[allow(unused)] // Currently, we do not use the expected function layout
-pub(crate) struct ClosureVisitor<'a>(pub(crate) &'a MoveFunctionLayout);
+pub(crate) struct ClosureVisitor;
 
-impl<'d, 'a> serde::de::Visitor<'d> for ClosureVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
     type Value = MoveClosure;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -234,6 +266,13 @@ impl<'d, 'a> serde::de::Visitor<'d> for ClosureVisitor<'a> {
     where
         A: serde::de::SeqAccess<'d>,
     {
+        let version = read_required_value::<_, u16>(&mut seq)?;
+        if version != FUNCTION_DATA_SERIALIZATION_FORMAT_V1 {
+            return Err(A::Error::custom(format!(
+                "unexpected function data version {}",
+                version
+            )));
+        }
         let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
@@ -280,7 +319,8 @@ impl serde::Serialize for MoveClosure {
             mask,
             captured,
         } = self;
-        let mut s = serializer.serialize_seq(Some(4 + captured.len() * 2))?;
+        let mut s = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
+        s.serialize_element(&FUNCTION_DATA_SERIALIZATION_FORMAT_V1)?;
         s.serialize_element(module_id)?;
         s.serialize_element(fun_id)?;
         s.serialize_element(ty_args)?;
@@ -336,55 +376,14 @@ mod serialization_tests {
         eprintln!("{:?}", blob);
         assert_eq!(
             value,
-            MoveValue::simple_deserialize(
-                &blob,
-                // The type layout is currently ignored by the serializer, so pass in some
-                // arbitrary one
-                &MoveTypeLayout::Function(MoveFunctionLayout(vec![], vec![], AbilitySet::EMPTY))
-            )
-            .expect("deserialization must succeed"),
+            MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
+                .expect("deserialization must succeed"),
             "deserialized value not equal to original one"
         );
     }
 }
 
 //===========================================================================================
-
-impl fmt::Display for MoveFunctionLayout {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        let fmt_list = |l: &[MoveTypeLayout]| {
-            l.iter()
-                .map(|t| t.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        let MoveFunctionLayout(args, results, abilities) = self;
-        write!(
-            f,
-            "|{}|{}{}",
-            fmt_list(args),
-            fmt_list(results),
-            abilities.display_postfix()
-        )
-    }
-}
-
-impl TryInto<FunctionTag> for &MoveFunctionLayout {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<FunctionTag, Self::Error> {
-        let into_list = |ts: &[MoveTypeLayout]| {
-            ts.iter()
-                .map(|t| t.try_into())
-                .collect::<Result<Vec<TypeTag>, _>>()
-        };
-        Ok(FunctionTag {
-            args: into_list(&self.0)?,
-            results: into_list(&self.1)?,
-            abilities: self.2,
-        })
-    }
-}
 
 impl fmt::Display for MoveClosure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -396,12 +395,8 @@ impl fmt::Display for MoveClosure {
             captured,
         } = self;
         let captured_str = mask
-            .merge_placeholder_strings(
-                mask.captured_count() as usize,
-                captured.iter().map(|v| v.1.to_string()).collect(),
-            )
-            .unwrap_or_else(|| vec!["*invalid*".to_string()])
-            .join(",");
+            .format_arguments(captured.iter().map(|v| v.1.to_string()).collect())
+            .join(", ");
         let inst_str = if ty_args.is_empty() {
             "".to_string()
         } else {

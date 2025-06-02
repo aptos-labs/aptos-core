@@ -124,8 +124,8 @@ impl StateSnapshotCommitter {
 
                                         updates
                                             .iter()
-                                            .filter_map(|(k, db_update)| {
-                                                db_update.to_jmt_update_opt(k, min_version)
+                                            .filter_map(|(key, slot)| {
+                                                slot.maybe_update_jmt(key, min_version)
                                             })
                                             .collect_vec()
                                     };
@@ -147,7 +147,7 @@ impl StateSnapshotCommitter {
                         })
                     };
 
-                    let (root_hash, top_levels_batch) = {
+                    let (root_hash, leaf_count, top_levels_batch) = {
                         let _timer =
                             OTHER_TIMERS_SECONDS.timer_with(&["calculate_top_levels_batch"]);
                         self.state_db
@@ -167,6 +167,17 @@ impl StateSnapshotCommitter {
                         root_hash,
                         snapshot.summary().root_hash(),
                     );
+
+                    let usage = snapshot.state().usage();
+                    if !usage.is_untracked() {
+                        assert_eq!(
+                            leaf_count,
+                            usage.items(),
+                            "Num of state items mismatch: jmt: {}, state: {}",
+                            leaf_count,
+                            usage.items(),
+                        );
+                    }
 
                     self.last_snapshot = snapshot.clone();
 

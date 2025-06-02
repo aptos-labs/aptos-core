@@ -10,10 +10,7 @@ use crate::{
     AptosVM,
 };
 use aptos_types::transaction::user_transaction_context::UserTransactionContext;
-use aptos_vm_types::{
-    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
-    storage::change_set_configs::ChangeSetConfigs,
-};
+use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 use move_vm_runtime::ModuleStorage;
 
@@ -27,24 +24,24 @@ fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VM
 /// epilogue. The latter needs to see the state view as if the change set is applied on top of
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
-pub struct RespawnedSession<'r, 'l> {
+pub struct RespawnedSession<'r> {
     executor_view: ExecutorViewWithChangeSet<'r>,
     #[borrows(executor_view)]
     #[covariant]
     resolver: StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
-    session: Option<SessionExt<'this, 'l>>,
+    session: Option<SessionExt<'this, StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>>>,
 }
 
-impl<'r, 'l> RespawnedSession<'r, 'l> {
+impl<'r> RespawnedSession<'r> {
     pub fn spawn(
-        vm: &'l AptosVM,
+        vm: &AptosVM,
         session_id: SessionId,
         base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         user_transaction_context_opt: Option<UserTransactionContext>,
-    ) -> Self {
+    ) -> RespawnedSession<'r> {
         let executor_view = ExecutorViewWithChangeSet::new(
             base.as_executor_view(),
             base.as_resource_group_view(),
@@ -61,7 +58,10 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         .build()
     }
 
-    pub fn execute<T>(&mut self, fun: impl FnOnce(&mut SessionExt) -> T) -> T {
+    pub fn execute<T>(
+        &mut self,
+        fun: impl FnOnce(&mut SessionExt<StorageAdapter<'_, ExecutorViewWithChangeSet<'_>>>) -> T,
+    ) -> T {
         self.with_session_mut(|session| {
             fun(session
                 .as_mut()
@@ -74,8 +74,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
         assert_no_additional_creation: bool,
-    ) -> Result<(VMChangeSet, ModuleWriteSet), VMStatus> {
-        let (additional_change_set, module_write_set) = self.with_session_mut(|session| {
+    ) -> Result<VMChangeSet, VMStatus> {
+        let additional_change_set = self.with_session_mut(|session| {
             unwrap_or_invariant_violation(
                 session.take(),
                 "VM session cannot be finished more than once.",
@@ -105,6 +105,6 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     err_msg("Failed to squash VMChangeSet"),
                 )
             })?;
-        Ok((change_set, module_write_set))
+        Ok(change_set)
     }
 }

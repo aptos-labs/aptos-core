@@ -714,7 +714,7 @@ module std::vector {
 
         let vec = vector[];
         while (start < end) {
-            vec.push_back(*self.borrow(start));
+            vec.push_back(self[start]);
             start += 1;
         };
         vec

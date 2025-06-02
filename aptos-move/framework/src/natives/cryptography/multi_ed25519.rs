@@ -99,7 +99,7 @@ fn num_valid_subpks(
             Ok(slice) => {
                 if CompressedEdwardsY(slice)
                     .decompress()
-                    .map_or(false, |point| !point.is_small_order())
+                    .is_some_and(|point| !point.is_small_order())
                 {
                     num_valid += 1;
                 } else {

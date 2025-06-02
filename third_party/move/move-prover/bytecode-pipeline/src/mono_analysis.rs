@@ -14,10 +14,8 @@ use move_model::{
         StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
-    ty::{
-        NoUnificationContext, Type, TypeDisplayContext, TypeInstantiationDerivation,
-        TypeUnificationAdapter, Variance,
-    },
+    ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
+    ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
         TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
         TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
@@ -190,7 +188,7 @@ struct Analyzer<'a> {
     inst_opt: Option<Vec<Type>>,
 }
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     fn analyze_funs(&mut self) {
         // Analyze top-level, verified functions. Any functions they call will be queued
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.

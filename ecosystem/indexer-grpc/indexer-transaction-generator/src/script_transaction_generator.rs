@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Context;
 use aptos::{
     account::fund::FundWithFaucet,
-    common::types::{CliCommand, MovePackageDir, ScriptFunctionArguments, TransactionOptions},
+    common::types::{CliCommand, MovePackageOptions, ScriptFunctionArguments, TransactionOptions},
     governance::CompileScriptFunction,
     move_tool::{CompileScript, RunScript},
 };
@@ -213,7 +213,7 @@ impl ScriptTransactions {
 }
 
 fn create_compile_script_cmd(package_dir: PathBuf) -> CompileScript {
-    let mut move_package_dir = MovePackageDir::default();
+    let mut move_package_dir = MovePackageOptions::default();
     move_package_dir.package_dir = Some(package_dir);
 
     CompileScript {

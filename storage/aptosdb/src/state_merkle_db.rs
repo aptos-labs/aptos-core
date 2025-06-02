@@ -245,9 +245,7 @@ impl StateMerkleDb {
         Option<(HashValue, (StateKey, Version))>,
         SparseMerkleProofExt,
     )> {
-        JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(key, version, root_depth)
-            .map_err(Into::into)
+        JellyfishMerkleTree::new(self).get_with_proof_ext(key, version, root_depth)
     }
 
     pub fn get_range_proof(
@@ -255,21 +253,15 @@ impl StateMerkleDb {
         rightmost_key: HashValue,
         version: Version,
     ) -> Result<SparseMerkleRangeProof> {
-        JellyfishMerkleTree::new(self)
-            .get_range_proof(rightmost_key, version)
-            .map_err(Into::into)
+        JellyfishMerkleTree::new(self).get_range_proof(rightmost_key, version)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
-        JellyfishMerkleTree::new(self)
-            .get_root_hash(version)
-            .map_err(Into::into)
+        JellyfishMerkleTree::new(self).get_root_hash(version)
     }
 
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
-        JellyfishMerkleTree::new(self)
-            .get_leaf_count(version)
-            .map_err(Into::into)
+        JellyfishMerkleTree::new(self).get_leaf_count(version)
     }
 
     pub fn batch_put_value_set_for_shard(
@@ -280,15 +272,13 @@ impl StateMerkleDb {
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(Node, TreeUpdateBatch<StateKey>)> {
-        JellyfishMerkleTree::new(self)
-            .batch_put_value_set_for_shard(
-                shard_id,
-                value_set,
-                node_hashes,
-                persisted_version,
-                version,
-            )
-            .map_err(Into::into)
+        JellyfishMerkleTree::new(self).batch_put_value_set_for_shard(
+            shard_id,
+            value_set,
+            node_hashes,
+            persisted_version,
+            version,
+        )
     }
 
     pub fn get_state_snapshot_version_before(
@@ -412,7 +402,7 @@ impl StateMerkleDb {
             .into_iter()
             .unzip();
 
-        let (root_hash, top_levels_batch) = self.calculate_top_levels(
+        let (root_hash, _leaf_count, top_levels_batch) = self.calculate_top_levels(
             shard_root_nodes,
             version,
             base_version,
@@ -487,14 +477,11 @@ impl StateMerkleDb {
         version: Version,
         base_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
-    ) -> Result<(HashValue, RawBatch)> {
+    ) -> Result<(HashValue, usize, RawBatch)> {
         assert!(shard_root_nodes.len() == 16);
 
-        let (root_hash, tree_update_batch) = JellyfishMerkleTree::new(self).put_top_levels_nodes(
-            shard_root_nodes,
-            base_version,
-            version,
-        )?;
+        let (root_hash, leaf_count, tree_update_batch) = JellyfishMerkleTree::new(self)
+            .put_top_levels_nodes(shard_root_nodes, base_version, version)?;
 
         if self.cache_enabled() {
             self.version_caches.get(&None).unwrap().add_version(
@@ -515,16 +502,14 @@ impl StateMerkleDb {
             previous_epoch_ending_version,
         )?;
 
-        Ok((root_hash, batch.into_raw_batch(self.db(None))?))
+        Ok((root_hash, leaf_count, batch.into_raw_batch(self.db(None))?))
     }
 
     pub(crate) fn get_shard_persisted_versions(
         &self,
         root_persisted_version: Option<Version>,
     ) -> Result<[Option<Version>; NUM_STATE_SHARDS]> {
-        JellyfishMerkleTree::new(self)
-            .get_shard_persisted_versions(root_persisted_version)
-            .map_err(Into::into)
+        JellyfishMerkleTree::new(self).get_shard_persisted_versions(root_persisted_version)
     }
 
     pub(crate) fn sharding_enabled(&self) -> bool {

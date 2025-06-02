@@ -36,21 +36,25 @@ module aptos_std::bcs_stream {
         }
     }
 
+    public fun has_remaining(stream: &mut BCSStream): bool {
+        stream.cur < stream.data.length()
+    }
+
     /// Deserializes a ULEB128-encoded integer from the stream.
     /// In the BCS format, lengths of vectors are represented using ULEB128 encoding.
     public fun deserialize_uleb128(stream: &mut BCSStream): u64 {
         let res = 0;
         let shift = 0;
 
-        while (stream.cur < vector::length(&stream.data)) {
-            let byte = *vector::borrow(&stream.data, stream.cur);
-            stream.cur = stream.cur + 1;
+        while (stream.cur < stream.data.length()) {
+            let byte = stream.data[stream.cur];
+            stream.cur += 1;
 
             let val = ((byte & 0x7f) as u64);
             if (((val << shift) >> shift) != val) {
                 abort error::invalid_argument(EMALFORMED_DATA)
             };
-            res = res | (val << shift);
+            res |= (val << shift);
 
             if ((byte & 0x80) == 0) {
                 if (shift > 0 && val == 0) {
@@ -59,7 +63,7 @@ module aptos_std::bcs_stream {
                 return res
             };
 
-            shift = shift + 7;
+            shift += 7;
             if (shift > 64) {
                 abort error::invalid_argument(EMALFORMED_DATA)
             };
@@ -70,9 +74,9 @@ module aptos_std::bcs_stream {
 
     /// Deserializes a `bool` value from the stream.
     public fun deserialize_bool(stream: &mut BCSStream): bool {
-        assert!(stream.cur < vector::length(&stream.data), error::out_of_range(EOUT_OF_BYTES));
-        let byte = *vector::borrow(&stream.data, stream.cur);
-        stream.cur = stream.cur + 1;
+        assert!(stream.cur < stream.data.length(), error::out_of_range(EOUT_OF_BYTES));
+        let byte = stream.data[stream.cur];
+        stream.cur += 1;
         if (byte == 0) {
             false
         } else if (byte == 1) {
@@ -90,8 +94,8 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + 32 <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
-        let res = from_bcs::to_address(vector::slice(data, cur, cur + 32));
+        assert!(cur + 32 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+        let res = from_bcs::to_address(data.slice(cur, cur + 32));
 
         stream.cur = cur + 32;
         res
@@ -103,9 +107,9 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur < vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur < data.length(), error::out_of_range(EOUT_OF_BYTES));
 
-        let res = *vector::borrow(data, cur);
+        let res = data[cur];
 
         stream.cur = cur + 1;
         res
@@ -117,13 +121,13 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + 2 <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur + 2 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
         let res =
-            (*vector::borrow(data, cur) as u16) |
-                ((*vector::borrow(data, cur + 1) as u16) << 8)
+            (data[cur] as u16) |
+                ((data[cur + 1] as u16) << 8)
         ;
 
-        stream.cur = stream.cur + 2;
+        stream.cur += 2;
         res
     }
 
@@ -133,15 +137,15 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + 4 <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur + 4 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
         let res =
-            (*vector::borrow(data, cur) as u32) |
-                ((*vector::borrow(data, cur + 1) as u32) << 8) |
-                ((*vector::borrow(data, cur + 2) as u32) << 16) |
-                ((*vector::borrow(data, cur + 3) as u32) << 24)
+            (data[cur] as u32) |
+                ((data[cur + 1] as u32) << 8) |
+                ((data[cur + 2] as u32) << 16) |
+                ((data[cur + 3] as u32) << 24)
         ;
 
-        stream.cur = stream.cur + 4;
+        stream.cur += 4;
         res
     }
 
@@ -151,19 +155,19 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + 8 <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur + 8 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
         let res =
-            (*vector::borrow(data, cur) as u64) |
-                ((*vector::borrow(data, cur + 1) as u64) << 8) |
-                ((*vector::borrow(data, cur + 2) as u64) << 16) |
-                ((*vector::borrow(data, cur + 3) as u64) << 24) |
-                ((*vector::borrow(data, cur + 4) as u64) << 32) |
-                ((*vector::borrow(data, cur + 5) as u64) << 40) |
-                ((*vector::borrow(data, cur + 6) as u64) << 48) |
-                ((*vector::borrow(data, cur + 7) as u64) << 56)
+            (data[cur] as u64) |
+                ((data[cur + 1] as u64) << 8) |
+                ((data[cur + 2] as u64) << 16) |
+                ((data[cur + 3] as u64) << 24) |
+                ((data[cur + 4] as u64) << 32) |
+                ((data[cur + 5] as u64) << 40) |
+                ((data[cur + 6] as u64) << 48) |
+                ((data[cur + 7] as u64) << 56)
         ;
 
-        stream.cur = stream.cur + 8;
+        stream.cur += 8;
         res
     }
 
@@ -173,27 +177,27 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + 16 <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur + 16 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
         let res =
-            (*vector::borrow(data, cur) as u128) |
-                ((*vector::borrow(data, cur + 1) as u128) << 8) |
-                ((*vector::borrow(data, cur + 2) as u128) << 16) |
-                ((*vector::borrow(data, cur + 3) as u128) << 24) |
-                ((*vector::borrow(data, cur + 4) as u128) << 32) |
-                ((*vector::borrow(data, cur + 5) as u128) << 40) |
-                ((*vector::borrow(data, cur + 6) as u128) << 48) |
-                ((*vector::borrow(data, cur + 7) as u128) << 56) |
-                ((*vector::borrow(data, cur + 8) as u128) << 64) |
-                ((*vector::borrow(data, cur + 9) as u128) << 72) |
-                ((*vector::borrow(data, cur + 10) as u128) << 80) |
-                ((*vector::borrow(data, cur + 11) as u128) << 88) |
-                ((*vector::borrow(data, cur + 12) as u128) << 96) |
-                ((*vector::borrow(data, cur + 13) as u128) << 104) |
-                ((*vector::borrow(data, cur + 14) as u128) << 112) |
-                ((*vector::borrow(data, cur + 15) as u128) << 120)
+            (data[cur] as u128) |
+                ((data[cur + 1] as u128) << 8) |
+                ((data[cur + 2] as u128) << 16) |
+                ((data[cur + 3] as u128) << 24) |
+                ((data[cur + 4] as u128) << 32) |
+                ((data[cur + 5] as u128) << 40) |
+                ((data[cur + 6] as u128) << 48) |
+                ((data[cur + 7] as u128) << 56) |
+                ((data[cur + 8] as u128) << 64) |
+                ((data[cur + 9] as u128) << 72) |
+                ((data[cur + 10] as u128) << 80) |
+                ((data[cur + 11] as u128) << 88) |
+                ((data[cur + 12] as u128) << 96) |
+                ((data[cur + 13] as u128) << 104) |
+                ((data[cur + 14] as u128) << 112) |
+                ((data[cur + 15] as u128) << 120)
         ;
 
-        stream.cur = stream.cur + 16;
+        stream.cur += 16;
         res
     }
 
@@ -203,50 +207,49 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + 32 <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur + 32 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
         let res =
-            (*vector::borrow(data, cur) as u256) |
-                ((*vector::borrow(data, cur + 1) as u256) << 8) |
-                ((*vector::borrow(data, cur + 2) as u256) << 16) |
-                ((*vector::borrow(data, cur + 3) as u256) << 24) |
-                ((*vector::borrow(data, cur + 4) as u256) << 32) |
-                ((*vector::borrow(data, cur + 5) as u256) << 40) |
-                ((*vector::borrow(data, cur + 6) as u256) << 48) |
-                ((*vector::borrow(data, cur + 7) as u256) << 56) |
-                ((*vector::borrow(data, cur + 8) as u256) << 64) |
-                ((*vector::borrow(data, cur + 9) as u256) << 72) |
-                ((*vector::borrow(data, cur + 10) as u256) << 80) |
-                ((*vector::borrow(data, cur + 11) as u256) << 88) |
-                ((*vector::borrow(data, cur + 12) as u256) << 96) |
-                ((*vector::borrow(data, cur + 13) as u256) << 104) |
-                ((*vector::borrow(data, cur + 14) as u256) << 112) |
-                ((*vector::borrow(data, cur + 15) as u256) << 120) |
-                ((*vector::borrow(data, cur + 16) as u256) << 128) |
-                ((*vector::borrow(data, cur + 17) as u256) << 136) |
-                ((*vector::borrow(data, cur + 18) as u256) << 144) |
-                ((*vector::borrow(data, cur + 19) as u256) << 152) |
-                ((*vector::borrow(data, cur + 20) as u256) << 160) |
-                ((*vector::borrow(data, cur + 21) as u256) << 168) |
-                ((*vector::borrow(data, cur + 22) as u256) << 176) |
-                ((*vector::borrow(data, cur + 23) as u256) << 184) |
-                ((*vector::borrow(data, cur + 24) as u256) << 192) |
-                ((*vector::borrow(data, cur + 25) as u256) << 200) |
-                ((*vector::borrow(data, cur + 26) as u256) << 208) |
-                ((*vector::borrow(data, cur + 27) as u256) << 216) |
-                ((*vector::borrow(data, cur + 28) as u256) << 224) |
-                ((*vector::borrow(data, cur + 29) as u256) << 232) |
-                ((*vector::borrow(data, cur + 30) as u256) << 240) |
-                ((*vector::borrow(data, cur + 31) as u256) << 248)
-        ;
+            (data[cur] as u256) |
+                ((data[cur + 1] as u256) << 8) |
+                ((data[cur + 2] as u256) << 16) |
+                ((data[cur + 3] as u256) << 24) |
+                ((data[cur + 4] as u256) << 32) |
+                ((data[cur + 5] as u256) << 40) |
+                ((data[cur + 6] as u256) << 48) |
+                ((data[cur + 7] as u256) << 56) |
+                ((data[cur + 8] as u256) << 64) |
+                ((data[cur + 9] as u256) << 72) |
+                ((data[cur + 10] as u256) << 80) |
+                ((data[cur + 11] as u256) << 88) |
+                ((data[cur + 12] as u256) << 96) |
+                ((data[cur + 13] as u256) << 104) |
+                ((data[cur + 14] as u256) << 112) |
+                ((data[cur + 15] as u256) << 120) |
+                ((data[cur + 16] as u256) << 128) |
+                ((data[cur + 17] as u256) << 136) |
+                ((data[cur + 18] as u256) << 144) |
+                ((data[cur + 19] as u256) << 152) |
+                ((data[cur + 20] as u256) << 160) |
+                ((data[cur + 21] as u256) << 168) |
+                ((data[cur + 22] as u256) << 176) |
+                ((data[cur + 23] as u256) << 184) |
+                ((data[cur + 24] as u256) << 192) |
+                ((data[cur + 25] as u256) << 200) |
+                ((data[cur + 26] as u256) << 208) |
+                ((data[cur + 27] as u256) << 216) |
+                ((data[cur + 28] as u256) << 224) |
+                ((data[cur + 29] as u256) << 232) |
+                ((data[cur + 30] as u256) << 240) |
+                ((data[cur + 31] as u256) << 248);
 
-        stream.cur = stream.cur + 32;
+        stream.cur += 32;
         res
     }
 
     /// Deserializes a `u256` value from the stream.
     public entry fun deserialize_u256_entry(data: vector<u8>, cursor: u64) {
         let stream = BCSStream {
-            data: data,
+            data,
             cur: cursor,
         };
         deserialize_u256(&mut stream);
@@ -260,10 +263,8 @@ module aptos_std::bcs_stream {
         let len = deserialize_uleb128(stream);
         let v = vector::empty();
 
-        let i = 0;
-        while (i < len) {
-            vector::push_back(&mut v, elem_deserializer(stream));
-            i = i + 1;
+        for (i in 0..len) {
+            v.push_back(elem_deserializer(stream));
         };
 
         v
@@ -277,9 +278,9 @@ module aptos_std::bcs_stream {
         let data = &stream.data;
         let cur = stream.cur;
 
-        assert!(cur + len <= vector::length(data), error::out_of_range(EOUT_OF_BYTES));
+        assert!(cur + len <= data.length(), error::out_of_range(EOUT_OF_BYTES));
 
-        let res = string::utf8(vector::slice(data, cur, cur + len));
+        let res = string::utf8(data.slice(cur, cur + len));
         stream.cur = cur + len;
 
         res

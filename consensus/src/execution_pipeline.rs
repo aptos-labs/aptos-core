@@ -151,17 +151,20 @@ impl ExecutionPipeline {
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer
+        let prepare_block_result = block_preparer
             .prepare_block(&block, async { block_qc }.shared())
             .await;
-        if let Err(e) = input_txns {
+        if let Err(e) = prepare_block_result {
             result_tx
                 .send(Err(e))
                 .unwrap_or_else(log_failed_to_send_result("prepare_block", block.id()));
             return;
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let input_txns = input_txns.expect("input_txns must be Some.");
+        let (input_txns, block_gas_limit) =
+            prepare_block_result.expect("prepare_block must return Ok");
+        let block_executor_onchain_config =
+            block_executor_onchain_config.with_block_gas_limit_override(block_gas_limit);
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);

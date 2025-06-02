@@ -34,8 +34,8 @@ module 0x42::LambdaTest2 {
 	LambdaTest1::inline_apply1(|z|z, g(LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x|x, 3)))) + 2
     }
 
-    public inline fun inline_apply3(g: |u64|u64, c: u64) : u64 {
-	LambdaTest1::inline_apply1(g,
+    public inline fun inline_apply3(c: u64) : u64 {
+	LambdaTest1::inline_apply1(|x| x+1,
 	    LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x| {
 		LambdaTest1::inline_apply(|y|y, x)
 	    },

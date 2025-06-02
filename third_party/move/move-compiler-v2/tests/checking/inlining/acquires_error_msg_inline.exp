@@ -10,3 +10,19 @@ error: missing acquires annotation for `Test`
    ·
 11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
    │         -------------------------------- acquired here
+
+warning: storage operation on type `test::Test` can only be done within the defining module `0x42::test`, but `test::modify` could be called (and expanded) outside the module
+   ┌─ tests/checking/inlining/acquires_error_msg_inline.move:10:23
+   │
+10 │     public inline fun modify() acquires Test {
+   │                       ^^^^^^
+11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
+   │         -------------------------------- called here
+
+warning: access of the field `value` on type `test::Test` can only be done within the defining module `0x42::test`, but `test::modify` could be called (and expanded) outside the module
+   ┌─ tests/checking/inlining/acquires_error_msg_inline.move:10:23
+   │
+10 │     public inline fun modify() acquires Test {
+   │                       ^^^^^^
+11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
+   │         -------------------------------------- accessed here

@@ -2,10 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_language_e2e_tests::{
-    common_transactions::peer_to_peer_txn, data_store::GENESIS_CHANGE_SET_HEAD,
-    executor::FakeExecutor,
-};
+use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
+use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
     transaction::{ChangeSet, Transaction, TransactionStatus, WriteSetPayload},
     write_set::TransactionWrite,
@@ -15,7 +13,11 @@ use move_core_types::vm_status::StatusCode;
 #[test]
 fn no_deletion_in_genesis() {
     let genesis = GENESIS_CHANGE_SET_HEAD.clone();
-    assert!(!genesis.write_set().iter().any(|(_, op)| op.is_deletion()))
+    assert!(!genesis
+        .write_set()
+        .expect_v0()
+        .iter()
+        .any(|(_, op)| op.is_deletion()))
 }
 
 #[test]

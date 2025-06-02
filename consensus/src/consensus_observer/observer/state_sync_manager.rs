@@ -123,6 +123,9 @@ impl StateSyncManager {
             ))
         );
 
+        // Update the state sync fallback counter
+        metrics::increment_counter_without_labels(&metrics::OBSERVER_STATE_SYNC_FALLBACK_COUNTER);
+
         // Clone the required components for the state sync task
         let consensus_observer_config = self.consensus_observer_config;
         let execution_client = self.execution_client.clone();

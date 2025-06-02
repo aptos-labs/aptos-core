@@ -47,7 +47,7 @@ where
 
     #[inline]
     fn matches_vec(&self, items: &[T]) -> bool {
-        items.iter().all(|item| self.matches(item))
+        items.iter().any(|item| self.matches(item))
     }
 
     #[inline]

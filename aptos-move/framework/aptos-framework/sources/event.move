@@ -4,11 +4,14 @@
 /// events emitted to a handle and emit events to the event store.
 module aptos_framework::event {
     use std::bcs;
-
     use aptos_framework::guid::GUID;
 
     friend aptos_framework::account;
     friend aptos_framework::object;
+
+    /// An event cannot be created. This error is returned by native implementations when
+    ///   - The type tag for event is too deeply nested.
+    const ECANNOT_CREATE_EVENT: u64 = 1;
 
     /// Emit a module event with payload `msg`.
     public fun emit<T: store + drop>(msg: T) {

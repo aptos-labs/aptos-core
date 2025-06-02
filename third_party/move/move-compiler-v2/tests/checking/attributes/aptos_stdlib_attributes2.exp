@@ -6,7 +6,7 @@ warning: unknown attribute
 4 │     #[testonly]
   │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "module_lock", "native_interface", "persistent", "test", "test_only", "verify_only"}'.
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x1::M {
     private fun bar() {
         Tuple()
@@ -16,7 +16,7 @@ module 0x1::M {
     }
 } // end 0x1::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x1::M {
     fun bar() {
     }

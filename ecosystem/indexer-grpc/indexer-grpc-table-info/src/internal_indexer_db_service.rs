@@ -205,10 +205,10 @@ impl InternalIndexerDBService {
         end_version: Option<Version>,
     ) -> Result<()> {
         let start_version = self.get_start_version(node_config).await?;
-        let end_version = end_version.unwrap_or(std::u64::MAX);
+        let end_version = end_version.unwrap_or(u64::MAX);
         let mut next_version = start_version;
         while next_version < end_version {
-            next_version = self.db_indexer.process(start_version, end_version)?;
+            next_version = self.db_indexer.process(next_version, end_version)?;
             // We shouldn't stop the internal indexer so that internal indexer can catch up with the main DB
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }

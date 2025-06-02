@@ -74,6 +74,25 @@ async fn main() -> Result<()> {
         .context("Failed get_account_resource")?;
     info!("Successfully retrieved resource {} with JSON", resource);
 
+    let balance_from_new_api = client
+        .get_account_balance(address, "0x1::aptos_coin::AptosCoin")
+        .await
+        .context("Failed get_account_balance")?;
+    info!(
+        "Successfully retrieved balance {}",
+        balance_from_new_api.inner()
+    );
+
+    let balance_from_old_api = client
+        .view_apt_account_balance(address)
+        .await
+        .context("Failed view_apt_account_balance")?;
+    info!(
+        "Successfully retrieved balance {}",
+        balance_from_old_api.inner()
+    );
+    assert_eq!(balance_from_new_api.inner(), balance_from_old_api.inner());
+
     client
         .get_account_resource_bcs::<ChainId>(address, resource)
         .await

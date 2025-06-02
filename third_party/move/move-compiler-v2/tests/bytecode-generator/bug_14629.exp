@@ -1,4 +1,83 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    struct R<T> {
+        r: T,
+    }
+    struct X<T> {
+        r: T,
+    }
+    private fun t0() {
+        {
+          let y: R<X<u64>> = pack M::R<X<u64>>(pack M::X<u64>(0));
+          {
+            let M::R<X<u64>>{ r: _r } = y;
+            Tuple()
+          }
+        }
+    }
+    private fun t0_u128() {
+        {
+          let y: R<X<u128>> = pack M::R<X<u128>>(pack M::X<u128>(Add<u128>(18446744073709551615, 1)));
+          {
+            let M::R<X<u128>>{ r: _r } = y;
+            Tuple()
+          }
+        }
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    struct R<T: key> {
+        r: T,
+    }
+    struct X<T> has drop, key {
+        r: T,
+    }
+    fun t0() {
+        let y = R<X<u64>>{r: X<u64>{r: 0}};
+        let R<X<u64>>{r: _r} = y;
+    }
+    fun t0_u128() {
+        let y = R<X<u128>>{r: X<u128>{r: 18446744073709551615u128 + 1u128}};
+        let R<X<u128>>{r: _r} = y;
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::t0() {
+     var $t0: 0x8675309::M::R<0x8675309::M::X<u64>>
+     var $t1: 0x8675309::M::X<u64>
+     var $t2: u64
+     var $t3: 0x8675309::M::X<u64>
+  0: $t2 := 0
+  1: $t1 := pack 0x8675309::M::X<u64>($t2)
+  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u64>>($t1)
+  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u64>>($t0)
+  4: return ()
+}
+
+
+[variant baseline]
+fun M::t0_u128() {
+     var $t0: 0x8675309::M::R<0x8675309::M::X<u128>>
+     var $t1: 0x8675309::M::X<u128>
+     var $t2: u128
+     var $t3: u128
+     var $t4: u128
+     var $t5: 0x8675309::M::X<u128>
+  0: $t3 := 18446744073709551615
+  1: $t4 := 1
+  2: $t2 := +($t3, $t4)
+  3: $t1 := pack 0x8675309::M::X<u128>($t2)
+  4: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u128>>($t1)
+  5: $t5 := unpack 0x8675309::M::R<0x8675309::M::X<u128>>($t0)
+  6: return ()
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x8675309::M {
     struct R<T> {
         r: T,
@@ -26,25 +105,7 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
-module 0x8675309::M {
-    struct R<T: key> {
-        r: T,
-    }
-    struct X<T> has drop, key {
-        r: T,
-    }
-    fun t0() {
-        let y = R<X<u64>>{r: X<u64>{r: 0}};
-        let R<X<u64>>{r: _r} = y;
-    }
-    fun t0_u128() {
-        let y = R<X<u128>>{r: X<u128>{r: 18446744073709551616u128}};
-        let R<X<u128>>{r: _r} = y;
-    }
-}
-
-============ initial bytecode ================
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun M::t0() {

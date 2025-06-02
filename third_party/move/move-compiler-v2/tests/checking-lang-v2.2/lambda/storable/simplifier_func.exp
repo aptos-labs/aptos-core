@@ -1,0 +1,33 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::mod1 {
+    struct S {
+        x: u64,
+    }
+    public fun triple(x: u64): u64 {
+        {
+          let _f: |u64|u64 has drop = closure#0mod1::__lambda__1__triple();
+          Mul<u64>(x, 3)
+        }
+    }
+    private fun __lambda__1__triple(x: u64): u64 {
+        {
+          let _t: S = pack mod1::S(3);
+          x
+        }
+    }
+} // end 0x42::mod1
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::mod1 {
+    struct S has drop {
+        x: u64,
+    }
+    public fun triple(x: u64): u64 {
+        let _f = |arg0| __lambda__1__triple(arg0);
+        x * 3
+    }
+    fun __lambda__1__triple(x: u64): u64 {
+        let _t = S{x: 3};
+        x
+    }
+}

@@ -1,22 +1,4 @@
-
-Diagnostics:
-warning: unused type parameter
-  ┌─ tests/checking/typing/v1-examples/multi_pool_money_market_token.move:5:21
-  │
-5 │     native struct T<K, V> has copy, drop, store;
-  │                     ^
-  │                     │
-  │                     Unused type parameter `K`. Consider declaring it as phantom
-
-warning: unused type parameter
-  ┌─ tests/checking/typing/v1-examples/multi_pool_money_market_token.move:5:24
-  │
-5 │     native struct T<K, V> has copy, drop, store;
-  │                        ^
-  │                        │
-  │                        Unused type parameter `V`. Consider declaring it as phantom
-
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x2::Map {
     struct T<K,V> {
     }
@@ -299,7 +281,7 @@ module 0x70dd::ToddNickels {
     }
 } // end 0x70dd::ToddNickels
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x2::Map {
     struct T<K, V> has copy, drop, store {
     }

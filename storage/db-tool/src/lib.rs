@@ -57,7 +57,7 @@ impl DBTool {
             },
             DBTool::GenReplayVerifyJobs(cmd) => cmd.run().await,
             DBTool::Restore(cmd) => cmd.run().await,
-            DBTool::ReplayOnArchive(cmd) => cmd.run().await.map_err(anyhow::Error::from),
+            DBTool::ReplayOnArchive(cmd) => cmd.run().await,
         }
     }
 }

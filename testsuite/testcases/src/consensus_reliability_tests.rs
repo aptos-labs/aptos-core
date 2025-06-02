@@ -10,8 +10,8 @@ use aptos_forge::{
     NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm, SwarmExt, Test,
     TestReport,
 };
-use aptos_logger::{info, warn};
 use async_trait::async_trait;
+use log::{info, warn};
 use rand::Rng;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 

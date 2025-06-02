@@ -25,22 +25,21 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
-use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Deref, DerefMut)]
-pub struct EpilogueSession<'r, 'l> {
+pub struct EpilogueSession<'r> {
     #[deref]
     #[deref_mut]
-    session: RespawnedSession<'r, 'l>,
+    session: RespawnedSession<'r>,
     storage_refund: Fee,
     module_write_set: ModuleWriteSet,
 }
 
-impl<'r, 'l> EpilogueSession<'r, 'l> {
+impl<'r> EpilogueSession<'r> {
     pub fn on_user_session_success(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         user_session_change_set: UserSessionChangeSet,
         storage_refund: Fee,
@@ -57,8 +56,8 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
     }
 
     pub fn on_user_session_failure(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: SystemSessionChangeSet,
     ) -> Self {
@@ -73,8 +72,8 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
     }
 
     fn new(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         module_write_set: ModuleWriteSet,
@@ -113,20 +112,10 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
             module_write_set,
         } = self;
 
-        let (change_set, empty_module_write_set) =
+        let change_set =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, true)?;
         let epilogue_session_change_set =
             UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)?;
-
-        // Epilogue can never publish modules! When we move publishing outside MoveVM, we do not need to have
-        // this check here, as modules will only be visible in user session.
-        empty_module_write_set
-            .is_empty_or_invariant_violation()
-            .map_err(|e| {
-                e.with_message("Non-empty module write set in epilogue session".to_string())
-                    .finish(Location::Undefined)
-                    .into_vm_status()
-            })?;
 
         let (change_set, module_write_set) = epilogue_session_change_set.unpack();
         Ok(VMOutput::new(

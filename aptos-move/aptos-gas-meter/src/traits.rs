@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
-use aptos_gas_schedule::VMGasParameters;
+use aptos_gas_schedule::{gas_feature_versions::RELEASE_V1_30, VMGasParameters};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
@@ -168,7 +168,12 @@ pub trait AptosGasMeter: MoveGasMeter {
         // Write set
         let mut write_fee = Fee::new(0);
         let mut total_refund = Fee::new(0);
-        for res in change_set.write_op_info_iter_mut(executor_view, module_storage) {
+        let fix_prev_materialized_size = self.feature_version() > RELEASE_V1_30;
+        for res in change_set.write_op_info_iter_mut(
+            executor_view,
+            module_storage,
+            fix_prev_materialized_size,
+        ) {
             let ChargeAndRefund { charge, refund } = pricing.charge_refund_write_op(
                 params,
                 res.map_err(|err| err.finish(Location::Undefined))?,

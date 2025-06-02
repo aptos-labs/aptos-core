@@ -1,0 +1,70 @@
+
+Diagnostics:
+error: cannot return `Option<|u64|u64 has store>` from a function with result type `Option<Function>`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:25:9
+   │
+25 │         x
+   │         ^
+
+error: expected `&mut Function` but found a value of type `|u64|u64 has store`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:32:17
+   │
+32 │                 f.f = f;
+   │                 ^^^
+
+error: undeclared receiver function `append` for type `vector<Function>`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:38:13
+   │
+38 │             v.append(new_record);
+   │             ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `Option<Function>`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:38:33
+   │
+38 │             v.append(new_record);
+   │                                 ^
+
+error: cannot return nothing from a function with result type `Option<Function>`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:36:9
+   │
+36 │ ╭         if (!done) {
+37 │ │             let new_record = Function { f: f, key: k };
+38 │ │             v.append(new_record);
+39 │ │         }
+   │ ╰─────────^
+
+error: expected a struct with field `address` but found `signer`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:43:20
+   │
+43 │         let addr = owner.address;
+   │                    ^^^^^
+
+error: undeclared `registry`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:48:38
+   │
+48 │             move_to<Registry>(owner, registry);
+   │                                      ^^^^^^^^
+
+error: cannot pass `vector<Function>` to a function which expects argument of type `&vector<Function>`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:68:29
+   │
+68 │         match (get_function(registry.functions, k)) {
+   │                             ^^^^^^^^^^^^^^^^^^
+
+error: undeclared struct `test::Some`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:69:13
+   │
+69 │             Some(func) => {
+   │             ^^^^
+
+error: undeclared `func`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:70:52
+   │
+70 │                 let Function { f: f, key: key } = &func;
+   │                                                    ^^^^
+
+error: expected function of type `|u64|u64` but found `&|u64|u64 has store`
+   ┌─ tests/checking-lang-v2.2/lambda/storable/registry_errors.move:71:22
+   │
+71 │                 Some(f(x))
+   │                      ^^^^

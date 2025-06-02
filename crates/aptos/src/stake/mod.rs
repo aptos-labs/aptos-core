@@ -346,7 +346,7 @@ impl CliCommand<TransactionSummary> for InitializeStakeOwner {
 
 /// Delegate operator capability to another account
 ///
-/// This changes teh operator capability from its current operator to a different operator.
+/// This changes the operator capability from its current operator to a different operator.
 /// By default, the operator of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetOperator {

@@ -1,0 +1,105 @@
+name: Bump Release Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Release branch to run the workflow against"
+        required: true
+        default: "aptos-release-v1."
+      override-version:
+        description: "Optional version to override the calculated version"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Determine next version and update aptos-node/Cargo.toml
+        uses: actions/github-script@v6
+        id: determine-version
+        with:
+          script: |
+            const branch = "${{ github.event.inputs.branch }}".trim();
+            const overrideVersion = "${{ github.event.inputs.override-version }}".trim();
+
+            // Read Cargo.toml
+            const fs = require("fs");
+            const cargoFilePath = "aptos-node/Cargo.toml";
+            const cargoContent = fs.readFileSync(cargoFilePath, "utf8");
+
+            // Extract and update the version
+            const versionMatch = cargoContent.match(/version\s*=\s*"(.*?)"/);
+            if (!versionMatch) {
+              throw new Error("Could not find version in Cargo.toml");
+            }
+            const currentVersion = versionMatch[1];
+            console.log(`Current version found in Cargo.toml: ${currentVersion}`);
+
+            let newVersion;
+
+            // If override version is provided, check if it's valid and use it directly
+            if (overrideVersion) {
+              const overrideVersionMatch = overrideVersion.match(/^\d+\.\d+\.\d+$/);
+              if (!overrideVersionMatch) {
+                throw new Error(`Invalid override version format: ${overrideVersion}. Expected format: x.y.z`);
+              }
+              console.log(`Using overridden version: ${overrideVersion}`);
+              newVersion = overrideVersion;
+            } else {
+              // Match everything after 'v' in the branch name
+              const match = branch.match(/aptos-release-v(.*)/);
+              if (!match) {
+                throw new Error(`Branch name does not match expected pattern 'aptos-release-v*'. Got: ${branch}`);
+              }
+              const versionSuffix = match[1]; // Extract everything after 'v'
+              console.log(`Version suffix extracted from branch: ${versionSuffix}`);           
+
+              if (currentVersion === "0.0.0-main") {
+                newVersion = `${versionSuffix}.0`; // Use the branch suffix for the new version
+              } else {
+                const [major, minor, patch] = currentVersion.split(".").map(Number);
+                newVersion = `${major}.${minor}.${patch + 1}`;
+              }
+            }
+
+            const updatedCargoContent = cargoContent.replace(
+              /version\s*=\s*"(.*?)"/,
+              `version = "${newVersion}"`
+            );
+
+            // Write the updated content back to Cargo.toml
+            fs.writeFileSync(cargoFilePath, updatedCargoContent);
+
+            console.log(`Updated version to ${newVersion}`);
+            core.setOutput("newVersion", newVersion);
+            core.setOutput("releaseBranch", branch);
+            core.setOutput("currentVersion", currentVersion);
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: update-version-${{ github.run_id }}
+          base: ${{ github.event.inputs.branch }}
+          title: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
+          body: "This PR bumps the aptos-node version to ${{ steps.determine-version.outputs.newVersion }} in ${{ steps.determine-version.outputs.releaseBranch }}."
+          commit-message: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
+          add-paths: "aptos-node/Cargo.toml"
+      - name: Log PR URL
+        if: ${{ steps.create-pr.outputs.pull-request-number }}
+        run: |
+          echo "### Pull Request Created" >> $GITHUB_STEP_SUMMARY
+          echo "- [View Pull Request](${{ steps.create-pr.outputs.pull-request-url }})" >> $GITHUB_STEP_SUMMARY
+
+            

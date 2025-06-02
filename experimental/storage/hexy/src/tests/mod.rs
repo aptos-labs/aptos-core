@@ -4,7 +4,7 @@
 use crate::{
     in_mem::{base::HexyBase, overlay::HexyOverlay},
     utils::sort_dedup,
-    LeafIdx, ARITY,
+    LeafIdx, NodePosition, ARITY,
 };
 use aptos_crypto::{
     hash::{CryptoHasher, HexyHasher, HOT_STATE_PLACE_HOLDER_HASH},
@@ -155,5 +155,46 @@ proptest! {
         quit_signal.store(true, Ordering::Release);
         merge_thread.join().unwrap();
         prop_assert_eq!(base.root_hash(), root_hash);
+    }
+}
+
+#[test]
+fn test_get_hash() {
+    let base = Arc::new(HexyBase::allocate(17));
+    // level 0: 0-16
+    // level 1: 0-1
+    // level 2 (root): 0
+
+    unsafe {
+        base.unsafe_get_hash(NodePosition::height_and_index(0, 0))
+            .unwrap();
+        base.unsafe_get_hash(NodePosition::height_and_index(0, 16))
+            .unwrap();
+        // 31 should work, since it's one of 16's siblings.
+        base.unsafe_get_hash(NodePosition::height_and_index(0, 31))
+            .unwrap();
+        assert!(base
+            .unsafe_get_hash(NodePosition::height_and_index(0, 32))
+            .is_err());
+
+        base.unsafe_get_hash(NodePosition::height_and_index(1, 0))
+            .unwrap();
+        base.unsafe_get_hash(NodePosition::height_and_index(1, 1))
+            .unwrap();
+        base.unsafe_get_hash(NodePosition::height_and_index(1, 7))
+            .unwrap();
+        assert!(base
+            .unsafe_get_hash(NodePosition::height_and_index(1, 16))
+            .is_err());
+
+        base.unsafe_get_hash(NodePosition::height_and_index(2, 0))
+            .unwrap();
+        assert!(base
+            .unsafe_get_hash(NodePosition::height_and_index(2, 1))
+            .is_err());
+
+        assert!(base
+            .unsafe_get_hash(NodePosition::height_and_index(3, 0))
+            .is_err());
     }
 }

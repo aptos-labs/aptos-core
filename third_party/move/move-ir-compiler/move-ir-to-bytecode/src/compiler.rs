@@ -391,6 +391,7 @@ pub fn compile_script<'a>(
 
         type_parameters: sig.type_parameters,
         parameters: parameters_sig_idx,
+        access_specifiers: None,
         code,
     };
     Ok((script, source_map))

@@ -17,6 +17,7 @@ aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
 aptos-infallible = { workspace = true }
+aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -24,6 +25,7 @@ aptos-node-resource-metrics = { workspace = true }
 aptos-push-metrics =  { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-storage-interface = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }

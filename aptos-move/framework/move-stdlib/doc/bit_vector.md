@@ -324,9 +324,9 @@ sequence, then <code>0</code> is returned.
     <b>while</b> ({
         <b>spec</b> {
             <b>invariant</b> index &gt;= start_index;
-            <b>invariant</b> index == start_index || <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(self, index - 1);
+            <b>invariant</b> index == start_index || self.<a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(index - 1);
             <b>invariant</b> index == start_index || index - 1 &lt; len(self.bit_field);
-            <b>invariant</b> <b>forall</b> j in start_index..index: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(self, j);
+            <b>invariant</b> <b>forall</b> j in start_index..index: self.<a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(j);
             <b>invariant</b> <b>forall</b> j in start_index..index: j &lt; len(self.bit_field);
         };
         index &lt; self.length
@@ -435,7 +435,7 @@ sequence, then <code>0</code> is returned.
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_SetAbortsIf">SetAbortsIf</a> {
     self: <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>;
     bit_index: u64;
-    <b>aborts_if</b> bit_index &gt;= <a href="bit_vector.md#0x1_bit_vector_length">length</a>(self) <b>with</b> <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>;
+    <b>aborts_if</b> bit_index &gt;= self.<a href="bit_vector.md#0x1_bit_vector_length">length</a>() <b>with</b> <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>;
 }
 </code></pre>
 
@@ -465,7 +465,7 @@ sequence, then <code>0</code> is returned.
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_UnsetAbortsIf">UnsetAbortsIf</a> {
     self: <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>;
     bit_index: u64;
-    <b>aborts_if</b> bit_index &gt;= <a href="bit_vector.md#0x1_bit_vector_length">length</a>(self) <b>with</b> <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>;
+    <b>aborts_if</b> bit_index &gt;= self.<a href="bit_vector.md#0x1_bit_vector_length">length</a>() <b>with</b> <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>;
 }
 </code></pre>
 
@@ -511,7 +511,7 @@ sequence, then <code>0</code> is returned.
 <pre><code><b>schema</b> <a href="bit_vector.md#0x1_bit_vector_IsIndexSetAbortsIf">IsIndexSetAbortsIf</a> {
     self: <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>;
     bit_index: u64;
-    <b>aborts_if</b> bit_index &gt;= <a href="bit_vector.md#0x1_bit_vector_length">length</a>(self) <b>with</b> <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>;
+    <b>aborts_if</b> bit_index &gt;= self.<a href="bit_vector.md#0x1_bit_vector_length">length</a>() <b>with</b> <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>;
 }
 </code></pre>
 
@@ -522,7 +522,7 @@ sequence, then <code>0</code> is returned.
 
 
 <pre><code><b>fun</b> <a href="bit_vector.md#0x1_bit_vector_spec_is_index_set">spec_is_index_set</a>(self: <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, bit_index: u64): bool {
-   <b>if</b> (bit_index &gt;= <a href="bit_vector.md#0x1_bit_vector_length">length</a>(self)) {
+   <b>if</b> (bit_index &gt;= self.<a href="bit_vector.md#0x1_bit_vector_length">length</a>()) {
        <b>false</b>
    } <b>else</b> {
        self.bit_field[bit_index]
@@ -544,7 +544,7 @@ sequence, then <code>0</code> is returned.
 
 
 <pre><code><b>aborts_if</b> start_index &gt;= self.length;
-<b>ensures</b> <b>forall</b> i in start_index..result: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(self, i);
+<b>ensures</b> <b>forall</b> i in start_index..result: self.<a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(i);
 </code></pre>
 
 

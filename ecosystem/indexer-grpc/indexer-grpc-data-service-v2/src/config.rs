@@ -35,6 +35,7 @@ const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::f
 const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
 
 const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 5;
+const DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES: usize = 10_000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -87,6 +88,8 @@ pub struct IndexerGrpcDataServiceConfig {
     pub(crate) historical_data_service_config: HistoricalDataServiceConfig,
     pub(crate) grpc_manager_addresses: Vec<String>,
     pub(crate) self_advertised_address: String,
+    #[serde(default = "IndexerGrpcDataServiceConfig::default_max_transaction_filter_size_bytes")]
+    pub(crate) max_transaction_filter_size_bytes: usize,
     #[serde(default = "IndexerGrpcDataServiceConfig::default_data_service_response_channel_size")]
     pub data_service_response_channel_size: usize,
 }
@@ -94,6 +97,10 @@ pub struct IndexerGrpcDataServiceConfig {
 impl IndexerGrpcDataServiceConfig {
     const fn default_data_service_response_channel_size() -> usize {
         DEFAULT_MAX_RESPONSE_CHANNEL_SIZE
+    }
+
+    const fn default_max_transaction_filter_size_bytes() -> usize {
+        DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES
     }
 
     async fn create_live_data_service(
@@ -128,9 +135,17 @@ impl IndexerGrpcDataServiceConfig {
 
         let chain_id = self.chain_id;
         let config = self.live_data_service_config.clone();
+        let max_transaction_filter_size_bytes = self.max_transaction_filter_size_bytes;
         tasks.push(tokio::task::spawn_blocking(move || {
             LIVE_DATA_SERVICE
-                .get_or_init(|| LiveDataService::new(chain_id, config, connection_manager))
+                .get_or_init(|| {
+                    LiveDataService::new(
+                        chain_id,
+                        config,
+                        connection_manager,
+                        max_transaction_filter_size_bytes,
+                    )
+                })
                 .run(handler_rx);
             Ok(())
         }));
@@ -170,9 +185,17 @@ impl IndexerGrpcDataServiceConfig {
 
         let chain_id = self.chain_id;
         let config = self.historical_data_service_config.clone();
+        let max_transaction_filter_size_bytes = self.max_transaction_filter_size_bytes;
         tasks.push(tokio::task::spawn_blocking(move || {
             HISTORICAL_DATA_SERVICE
-                .get_or_init(|| HistoricalDataService::new(chain_id, config, connection_manager))
+                .get_or_init(|| {
+                    HistoricalDataService::new(
+                        chain_id,
+                        config,
+                        connection_manager,
+                        max_transaction_filter_size_bytes,
+                    )
+                })
                 .run(handler_rx);
             Ok(())
         }));

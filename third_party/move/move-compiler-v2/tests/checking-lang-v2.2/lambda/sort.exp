@@ -1,0 +1,38 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::sort {
+    use std::vector;
+    public fun sort<T>(arr: &mut vector<T>,a_less_b: |(T, T)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun sort_recursive<T>(arr: &mut vector<T>,low: u64,high: u64,a_less_b: |(T, T)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::sort {
+    public fun sort<T: copy>(arr: &mut vector<T>, a_less_b: |(T, T)|bool) {
+        let n = 0x1::vector::length<T>(/*freeze*/arr);
+        sort_recursive<T>(arr, 0, n - 1, a_less_b)
+    }
+    public fun sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |(T, T)|bool) {
+        if (low < high) {
+            let pi = low + high / 2;
+            sort_recursive<T>(arr, low, pi - 1, a_less_b);
+            sort_recursive<T>(arr, pi + 1, high, a_less_b);
+        };
+    }
+}

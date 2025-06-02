@@ -25,7 +25,7 @@
               }
             }
           },
-          "guid_creation_num": "4",
+          "guid_creation_num": "2",
           "key_rotation_events": {
             "counter": "0",
             "guid": {
@@ -72,6 +72,7 @@
     "signature": "0xf2193dc55d63b63b5e45cee43d38e5a77dc127fc57f4bea7aff6ee09806332850eaa321f2fb7cf6662568c9dd65654642a240b3272d9ad06b2700cb2ff246004",
     "type": "ed25519_signature"
   },
+  "replay_protection_nonce": null,
   "events": [
     {
       "guid": {

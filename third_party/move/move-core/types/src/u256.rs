@@ -1,6 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unexpected_cfgs)]
+
 use ethnum::U256 as EthnumU256;
 use num::{bigint::Sign, BigInt};
 // This U256 impl was chosen for now but we are open to changing it as needed

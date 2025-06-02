@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: function takes arguments of type `(u64, integer)` but `(u64, vector<u8>)` was expected
-   ┌─ tests/lambda/inline-parity/lambda_cast_err.move:26:52
-   │
-26 │         vector_fold(gas_schedule_blob, (0 as u64), |sum, addend| sum + (addend as u64))
-   │                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -89,7 +89,7 @@ impl VerifyCoordinator {
             self.concurrent_downloads,
         )
         .await?;
-        let ver_max = Version::max_value();
+        let ver_max = Version::MAX;
         let state_snapshot =
             metadata_view.select_state_snapshot(self.state_snapshot_before_version)?;
         let transactions =

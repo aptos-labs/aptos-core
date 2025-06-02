@@ -6,10 +6,10 @@ use aptos_forge::{
     GroupNetEm, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos,
     SwarmNetEm, Test,
 };
-use aptos_logger::info;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use itertools::{self, EitherOrBoth, Itertools};
+use log::info;
 use std::{collections::BTreeMap, sync::Arc};
 
 /// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
@@ -179,11 +179,11 @@ impl Default for IntraRegionNetEmConfig {
     fn default() -> Self {
         Self {
             bandwidth_rate_mbps: 10 * 1000, // 10 Gbps
-            delay_latency_ms: 50,
+            delay_latency_ms: 20,
             delay_jitter_ms: 0,
-            delay_correlation_percentage: 50,
+            delay_correlation_percentage: 20,
             loss_percentage: 1,
-            loss_correlation_percentage: 50,
+            loss_correlation_percentage: 20,
         }
     }
 }

@@ -356,9 +356,8 @@ impl NetworkPlayground {
 
     fn is_message_dropped(&self, src: &TwinId, dst: &TwinId, msg: ConsensusMsg) -> bool {
         self.drop_config.read().is_message_dropped(src, dst)
-            || Self::get_message_round(msg).map_or(false, |r| {
-                self.drop_config_round.is_message_dropped(src, dst, r)
-            })
+            || Self::get_message_round(msg)
+                .is_some_and(|r| self.drop_config_round.is_message_dropped(src, dst, r))
     }
 
     pub fn split_network(
@@ -458,7 +457,7 @@ struct DropConfig(HashMap<TwinId, HashSet<TwinId>>);
 
 impl DropConfig {
     pub fn is_message_dropped(&self, src: &TwinId, dst: &TwinId) -> bool {
-        self.0.get(src).map_or(false, |set| set.contains(dst))
+        self.0.get(src).is_some_and(|set| set.contains(dst))
     }
 
     pub fn drop_message_for(&mut self, src: &TwinId, dst: &TwinId) -> bool {
@@ -490,7 +489,7 @@ pub(crate) struct TimeoutConfig(HashMap<TwinId, HashSet<TwinId>>);
 
 impl TimeoutConfig {
     pub fn is_message_timedout(&self, src: &TwinId, dst: &TwinId) -> bool {
-        self.0.get(src).map_or(false, |set| set.contains(dst))
+        self.0.get(src).is_some_and(|set| set.contains(dst))
     }
 
     pub fn timeout_message_for(&mut self, src: &TwinId, dst: &TwinId) -> bool {
@@ -511,7 +510,7 @@ impl DropConfigRound {
     fn is_message_dropped(&self, src: &TwinId, dst: &TwinId, round: u64) -> bool {
         self.0
             .get(&round)
-            .map_or(false, |config| config.is_message_dropped(src, dst))
+            .is_some_and(|config| config.is_message_dropped(src, dst))
     }
 
     /// Create partition for the round
@@ -535,7 +534,10 @@ mod tests {
     };
     use aptos_config::network_id::{NetworkId, PeerNetworkId};
     use aptos_consensus_types::{
-        block_retrieval::{BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus},
+        block_retrieval::{
+            BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
+            BlockRetrievalStatus,
+        },
         common::Payload,
     };
     use aptos_crypto::HashValue;
@@ -829,7 +831,12 @@ mod tests {
                     IncomingRpcRequest::DeprecatedBlockRetrieval(request) => {
                         request.response_sender.send(Ok(bytes)).unwrap()
                     },
-                    _ => panic!("unexpected message"),
+                    // TODO @bchocho @hariria fix after release, this is a sanity check to make sure
+                    // we're not making new BlockRetrievalRequest network requests anywhere
+                    IncomingRpcRequest::BlockRetrieval(request) => {
+                        request.response_sender.send(Ok(bytes)).unwrap()
+                    },
+                    request => panic!("test_rpc unexpected message {:?}", request),
                 }
             }
         };
@@ -838,12 +845,12 @@ mod tests {
         timed_block_on(&runtime, async {
             let response = nodes[0]
                 .request_block(
-                    BlockRetrievalRequestV1::new(HashValue::zero(), 1),
+                    BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::zero(), 1)),
                     peer,
                     Duration::from_secs(5),
                 )
-                .await
-                .unwrap();
+                .await;
+            let response = response.unwrap();
             assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
         });
     }
@@ -880,6 +887,7 @@ mod tests {
             .push((peer_id, protocol_id), bad_msg)
             .unwrap();
 
+        // TODO @bchocho @hariria change in new release once new ConsensusMsg is available (ConsensusMsg::BlockRetrievalRequest)
         let liveness_check_msg = ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(
             BlockRetrievalRequestV1::new(HashValue::random(), 1),
         ));

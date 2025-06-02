@@ -84,13 +84,13 @@ impl AptosVM {
         session_id: SessionId,
         dkg_node: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
-        let dkg_state = OnChainConfig::fetch_config(resolver)
-            .ok_or_else(|| Expected(MissingResourceDKGState))?;
+        let dkg_state =
+            OnChainConfig::fetch_config(resolver).ok_or(Expected(MissingResourceDKGState))?;
         let config_resource = ConfigurationResource::fetch_config(resolver)
-            .ok_or_else(|| Expected(MissingResourceConfiguration))?;
+            .ok_or(Expected(MissingResourceConfiguration))?;
         let DKGState { in_progress, .. } = dkg_state;
         let in_progress_session_state =
-            in_progress.ok_or_else(|| Expected(MissingResourceInprogressDKGSession))?;
+            in_progress.ok_or(Expected(MissingResourceInprogressDKGSession))?;
 
         // Check epoch number.
         if dkg_node.metadata.epoch != config_resource.epoch() {

@@ -41,9 +41,3 @@ error: the receiver function takes 1 type argument but 2 were provided
    │
 26 │         s.receiver_ref_mut::<u8, u8>(1);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
-   ┌─ tests/checking/receiver/call_errors.move:27:9
-   │
-27 │         s.receiver_needs_type_args(x)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

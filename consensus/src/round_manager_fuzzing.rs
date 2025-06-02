@@ -42,7 +42,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorSet,
-        ValidatorTxnConfig,
+        ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -92,6 +92,7 @@ fn build_empty_store(
         10,
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
+        DEFAULT_ENABLED_WINDOW_SIZE,
         Arc::new(Mutex::new(PendingBlocks::new())),
         None,
     ))
@@ -178,6 +179,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PayloadTxnsSize::new(1, 1024),
         10,
         1,
+        Some(30_000),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,

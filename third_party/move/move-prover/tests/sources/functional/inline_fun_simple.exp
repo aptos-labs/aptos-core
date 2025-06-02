@@ -6,6 +6,10 @@ error: unknown assertion failed
   │             ^^^^^^^^^^^^^^^
   │
   =     at tests/sources/functional/inline_fun_simple.move:4: apply
+  =     at tests/sources/functional/inline_fun_simple.move:6: apply
+  =     at tests/sources/functional/inline_fun_simple.move:22: test_apply_error
+  =         v = <redacted>
+  =         result = <redacted>
   =     at tests/sources/functional/inline_fun_simple.move:22: test_apply_error
   =         r1 = <redacted>
   =     at tests/sources/functional/inline_fun_simple.move:24: test_apply_error

@@ -14,6 +14,13 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use colored::Colorize;
 use itertools::{Either, Itertools};
+use legacy_move_compiler::{
+    compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
+    shared::{
+        known_attributes::{AttributeKind, KnownAttribute},
+        Flags, NamedAddressMap, NumericalAddress, PackagePaths,
+    },
+};
 use move_abigen::{Abigen, AbigenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_source_map::utils::source_map_from_file;
@@ -21,20 +28,9 @@ use move_bytecode_utils::Modules;
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
-use move_compiler::{
-    compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
-    shared::{
-        known_attributes::{AttributeKind, KnownAttribute},
-        Flags, NamedAddressMap, NumericalAddress, PackagePaths,
-    },
-    Compiler,
-};
 use move_compiler_v2::{external_checks::ExternalChecks, Experiment};
 use move_docgen::{Docgen, DocgenOptions};
-use move_model::{
-    model::GlobalEnv, options::ModelBuilderOptions,
-    run_model_builder_with_options_and_compilation_flags,
-};
+use move_model::model::GlobalEnv;
 use move_symbol_pool::Symbol;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -263,7 +259,7 @@ impl OnDiskCompiledPackage {
                     let id = module.self_id();
                     let parsed_addr = NumericalAddress::new(
                         id.address().into_bytes(),
-                        move_compiler::shared::NumberFormat::Hex,
+                        legacy_move_compiler::shared::NumberFormat::Hex,
                     );
                     let module_name = FileName::from(id.name().as_str());
                     (parsed_addr, module_name)
@@ -549,8 +545,7 @@ impl CompiledPackage {
         config: &CompilerConfig,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
         resolution_graph: &ResolvedGraph,
-        mut compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
-        mut compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
+        mut compiler_driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
     ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
         let immediate_dependencies = transitive_dependencies
             .iter()
@@ -626,19 +621,9 @@ impl CompiledPackage {
         let effective_language_version = config.language_version.unwrap_or_default();
         effective_compiler_version.check_language_support(effective_language_version)?;
 
-        let (file_map, all_compiled_units, optional_global_env) =
+        let (file_map, all_compiled_units, model) =
             match config.compiler_version.unwrap_or_default() {
-                CompilerVersion::V1 => {
-                    let mut paths = src_deps;
-                    paths.push(sources_package_paths.clone());
-                    let compiler = Compiler::from_package_paths(
-                        paths,
-                        bytecode_deps.clone(),
-                        flags,
-                        &known_attributes,
-                    );
-                    compiler_driver_v1(compiler)?
-                },
+                CompilerVersion::V1 => anyhow::bail!("Compiler v1 is no longer supported"),
                 version @ CompilerVersion::V2_0 | version @ CompilerVersion::V2_1 => {
                     let to_str_vec = |ps: &[Symbol]| {
                         ps.iter()
@@ -693,7 +678,7 @@ impl CompiledPackage {
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-                    compiler_driver_v2(options)?
+                    compiler_driver(options)?
                 },
             };
         let mut root_compiled_units = vec![];
@@ -744,31 +729,6 @@ impl CompiledPackage {
             || resolution_graph.build_options.generate_abis
             || resolution_graph.build_options.generate_move_model
         {
-            let mut flags = if resolution_graph.build_options.full_model_generation {
-                Flags::all_functions()
-            } else {
-                // Include verification functions as this has been legacy behavior.
-                Flags::verification()
-            };
-
-            if skip_attribute_checks {
-                flags = flags.set_skip_attribute_checks(true)
-            }
-
-            let model = if let Some(env) = optional_global_env {
-                env
-            } else {
-                run_model_builder_with_options_and_compilation_flags(
-                    // Otherwise, use V1 generated model
-                    vec![sources_package_paths],
-                    vec![],
-                    deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
-                    ModelBuilderOptions::default(),
-                    flags,
-                    &known_attributes,
-                )?
-            };
-
             if resolution_graph.build_options.generate_docs {
                 compiled_docs = Some(Self::build_docs(
                     resolved_package.source_package.package.name,
@@ -791,6 +751,8 @@ impl CompiledPackage {
                 move_model = Some(model)
             }
         };
+
+        Self::check_duplicate_script_function_names(&root_compiled_units)?;
 
         let compiled_package = CompiledPackage {
             root_compiled_units,
@@ -953,6 +915,41 @@ impl CompiledPackage {
         Ok(on_disk_package)
     }
 
+    fn check_duplicate_script_function_names(units: &[CompiledUnitWithSource]) -> Result<()> {
+        let mut seen_names: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut seen_error = false;
+        for unit in units {
+            if let CompiledUnit::Script(named) = &unit.unit {
+                let name = named.name.as_str().to_owned();
+                let script_path = unit.source_path.to_string_lossy().to_string();
+                let entry = seen_names.entry(name).or_default();
+                entry.push(script_path);
+                if entry.len() > 1 {
+                    seen_error = true;
+                }
+            }
+        }
+        if !seen_error {
+            return Ok(());
+        }
+        let mut error_strs = vec![];
+        for (script_name, paths) in seen_names.into_iter() {
+            if paths.len() > 1 {
+                error_strs.push(format!(
+                    "Script function name `{}` duplicated in the following files:\n{}",
+                    script_name,
+                    paths
+                        .iter()
+                        .map(|path| format!("\t`{}`", path))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ));
+            }
+        }
+        error_strs.push("Please rename script functions to remove duplication".to_string());
+        bail!(error_strs.join("\n"));
+    }
+
     fn build_abis(
         bytecode_version: u32,
         model: &GlobalEnv,
@@ -1041,8 +1038,10 @@ pub(crate) fn named_address_mapping_for_compiler(
     resolution_table
         .iter()
         .map(|(ident, addr)| {
-            let parsed_addr =
-                NumericalAddress::new(addr.into_bytes(), move_compiler::shared::NumberFormat::Hex);
+            let parsed_addr = NumericalAddress::new(
+                addr.into_bytes(),
+                legacy_move_compiler::shared::NumberFormat::Hex,
+            );
             (*ident, parsed_addr)
         })
         .collect::<BTreeMap<_, _>>()
@@ -1130,11 +1129,7 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     let mut emitter = options.error_emitter(&mut stderr);
     match move_compiler_v2::run_move_compiler(emitter.as_mut(), options) {
-        Ok((env, units)) => Ok((
-            move_compiler_v2::make_files_source_text(&env),
-            units,
-            Some(env),
-        )),
+        Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units, env)),
         Err(_) => {
             // Error reported, exit
             std::process::exit(1);
@@ -1149,11 +1144,7 @@ pub fn build_and_report_no_exit_v2_driver(
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     let mut emitter = options.error_emitter(&mut stderr);
     let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
-    Ok((
-        move_compiler_v2::make_files_source_text(&env),
-        units,
-        Some(env),
-    ))
+    Ok((move_compiler_v2::make_files_source_text(&env), units, env))
 }
 
 /// Returns the deserialized module from the bytecode file

@@ -1,0 +1,182 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private fun apply(f: |u8|bool,x: u8): bool {
+        (f)(x)
+    }
+    private fun bar() {
+        Tuple()
+    }
+    private fun foo<T>(x: T): T {
+        x
+    }
+    public fun test1(x: u8) {
+        if Gt<u8>(Add<u8>(x, 1), 255) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+    public fun test2(x: &u8,y: &u8) {
+        if Eq<bool>(Gt<u8>(Add<u8>(Deref(x), Deref(y)), 255), true) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+    public fun test3(x: u8) {
+        if Or(Lt<u8>(x, 0), Gt<u8>(0, x)) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Le<u8>(m::foo<u8>(x), 0) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Ge<u8>(0, m::foo<u8>(x)) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Gt<u8>(m::foo<u8>(x), 0) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Lt<u8>(0, m::foo<u8>(x)) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Ge<u8>(m::foo<u8>(x), 0) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Le<u8>(0, m::foo<u8>(x)) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+    public fun test4(a: u8,b: u16,c: u32,d: u64,e: u128,f: u256) {
+        if Or(Gt<u8>(a, 255), Gt<u256>(f, Cast<u256>(255))) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Ge<u16>(b, 65535) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Lt<u32>(4294967295, c) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Le<u64>(18446744073709551615, d) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Lt<u128>(e, 340282366920938463463374607431768211455) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Le<u256>(f, 115792089237316195423570985008687907853269984665640564039457584007913129639935) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Ge<u256>(115792089237316195423570985008687907853269984665640564039457584007913129639935, f) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        if Gt<u128>(340282366920938463463374607431768211455, e) {
+          m::bar()
+        } else {
+          Tuple()
+        };
+        spec {
+          assert Le($t0, 255);
+        }
+
+    }
+    public fun test5(x: u8): bool {
+        m::apply(closure#0m::__lambda__1__test5(), x)
+    }
+    private fun __lambda__1__test5(x: u8): bool {
+        Gt<u8>(x, 255)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::no_warn {
+    public fun test(x: u8) {
+        if Lt<u8>(x, 0) {
+          Abort(1)
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::no_warn
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    fun apply(f: |u8|bool, x: u8): bool {
+        f(x)
+    }
+    fun bar() {
+    }
+    fun foo<T>(x: T): T {
+        x
+    }
+    public fun test1(x: u8) {
+        if (x + 1u8 > 255u8) bar();
+    }
+    public fun test2(x: &u8, y: &u8) {
+        if (*x + *y > 255u8 == true) bar();
+    }
+    public fun test3(x: u8) {
+        if (x < 0u8 || 0u8 > x) bar();
+        if (foo<u8>(x) <= 0u8) bar();
+        if (0u8 >= foo<u8>(x)) bar();
+        if (foo<u8>(x) > 0u8) bar();
+        if (0u8 < foo<u8>(x)) bar();
+        if (foo<u8>(x) >= 0u8) bar();
+        if (0u8 <= foo<u8>(x)) bar();
+    }
+    public fun test4(a: u8, b: u16, c: u32, d: u64, e: u128, f: u256) {
+        if (a > 255u8 || f > (255u8 as u256)) bar();
+        if (b >= 65535u16) bar();
+        if (4294967295u32 < c) bar();
+        if (18446744073709551615 <= d) bar();
+        if (e < 340282366920938463463374607431768211455u128) bar();
+        if (f <= 115792089237316195423570985008687907853269984665640564039457584007913129639935u256) bar();
+        if (115792089237316195423570985008687907853269984665640564039457584007913129639935u256 >= f) bar();
+        if (340282366920938463463374607431768211455u128 > e) bar();
+
+        /* spec {
+          assert Le($t0, 255);
+        }
+         */
+
+    }
+    public fun test5(x: u8): bool {
+        apply(|arg0| __lambda__1__test5(arg0), x)
+    }
+    fun __lambda__1__test5(x: u8): bool {
+        x > 255u8
+    }
+}
+module 0xc0ffee::no_warn {
+    public fun test(x: u8) {
+        if (x < 0u8) abort 1;
+    }
+}

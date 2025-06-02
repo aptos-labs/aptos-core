@@ -338,6 +338,10 @@ pub trait GasMeter {
         name: &IdentStr,
         size: NumBytes,
     ) -> PartialVMResult<()>;
+
+    /// A special interface for the VM to signal to the gas meter that certain internal ops or
+    /// native functions have used additional heap memory that needs to be metered.
+    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -581,6 +585,10 @@ impl GasMeter for UnmeteredGasMeter {
         _name: &IdentStr,
         _size: NumBytes,
     ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
     }
 }

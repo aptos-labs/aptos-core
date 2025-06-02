@@ -2,19 +2,19 @@ spec aptos_std::smart_vector {
 
     spec SmartVector {
         // `bucket_size` shouldn't be 0, if specified.
-        invariant option::is_none(bucket_size)
-            || (option::is_some(bucket_size) && option::borrow(bucket_size) != 0);
+        invariant bucket_size.is_none()
+            || (bucket_size.is_some() && bucket_size.borrow() != 0);
         // vector length should be <= `inline_capacity`, if specified.
-        invariant option::is_none(inline_capacity)
-            || (len(inline_vec) <= option::borrow(inline_capacity));
+        invariant inline_capacity.is_none()
+            || (len(inline_vec) <= inline_capacity.borrow());
         // both `inline_capacity` and `bucket_size` should either exist or shouldn't exist at all.
-        invariant (option::is_none(inline_capacity) && option::is_none(bucket_size))
-            || (option::is_some(inline_capacity) && option::is_some(bucket_size));
+        invariant (inline_capacity.is_none() && bucket_size.is_none())
+            || (inline_capacity.is_some() && bucket_size.is_some());
     }
 
     spec length {
-        aborts_if option::is_some(self.big_vec) && len(self.inline_vec) + big_vector::length(option::spec_borrow(
-            self.big_vec)) > MAX_U64;
+        aborts_if self.big_vec.is_some() && len(self.inline_vec) + option::spec_borrow(
+            self.big_vec).length() > MAX_U64;
     }
 
     spec empty {
@@ -26,15 +26,15 @@ spec aptos_std::smart_vector {
     }
 
     spec destroy_empty {
-        aborts_if !(is_empty(self));
+        aborts_if !(self.is_empty());
         aborts_if len(self.inline_vec) != 0
-            || option::is_some(self.big_vec);
+            || self.big_vec.is_some();
     }
 
     spec borrow {
-        aborts_if i >= length(self);
-        aborts_if option::is_some(self.big_vec) && (
-            (len(self.inline_vec) + big_vector::length<T>(option::borrow(self.big_vec))) > MAX_U64
+        aborts_if i >= self.length();
+        aborts_if self.big_vec.is_some() && (
+            (len(self.inline_vec) + self.big_vec.borrow().length::<T>()) > MAX_U64
         );
     }
 
@@ -66,24 +66,24 @@ spec aptos_std::smart_vector {
 
         pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
 
-        aborts_if  option::is_some(self.big_vec)
+        aborts_if  self.big_vec.is_some()
             &&
-            (table_with_length::spec_len(option::borrow(self.big_vec).buckets) == 0);
-        aborts_if is_empty(self);
-        aborts_if option::is_some(self.big_vec) && (
-            (len(self.inline_vec) + big_vector::length<T>(option::borrow(self.big_vec))) > MAX_U64
+            (table_with_length::spec_len(self.big_vec.borrow().buckets) == 0);
+        aborts_if self.is_empty();
+        aborts_if self.big_vec.is_some() && (
+            (len(self.inline_vec) + self.big_vec.borrow().length::<T>()) > MAX_U64
         );
 
-        ensures length(self) == length(old(self)) - 1;
+        ensures self.length() == old(self).length() - 1;
     }
 
     spec swap_remove {
         pragma verify = false; // TODO: set because of timeout
-        aborts_if i >= length(self);
-        aborts_if option::is_some(self.big_vec) && (
-            (len(self.inline_vec) + big_vector::length<T>(option::borrow(self.big_vec))) > MAX_U64
+        aborts_if i >= self.length();
+        aborts_if self.big_vec.is_some() && (
+            (len(self.inline_vec) + self.big_vec.borrow().length::<T>()) > MAX_U64
         );
-        ensures length(self) == length(old(self)) - 1;
+        ensures self.length() == old(self).length() - 1;
     }
 
     spec swap {
@@ -96,6 +96,10 @@ spec aptos_std::smart_vector {
     }
 
     spec remove {
+        pragma verify = false;
+    }
+
+    spec singleton {
         pragma verify = false;
     }
 }

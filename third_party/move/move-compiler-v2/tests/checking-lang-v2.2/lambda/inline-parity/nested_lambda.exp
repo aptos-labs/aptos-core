@@ -1,0 +1,31 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    public fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    public fun test(): u64 {
+        Test::apply(closure#0Test::__lambda__1__test(), 1, Test::apply(closure#0Test::__lambda__2__test(), 2, 1))
+    }
+    private fun __lambda__1__test(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    private fun __lambda__2__test(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    public fun apply(f: |(u64, u64)|u64, x: u64, y: u64): u64 {
+        f(x, y)
+    }
+    public fun test(): u64 {
+        apply(|(arg0,arg1)| __lambda__1__test(arg0, arg1), 1, apply(|(arg0,arg1)| __lambda__2__test(arg0, arg1), 2, 1))
+    }
+    fun __lambda__1__test(x: u64, y: u64): u64 {
+        x + y
+    }
+    fun __lambda__2__test(x: u64, y: u64): u64 {
+        x * y
+    }
+}

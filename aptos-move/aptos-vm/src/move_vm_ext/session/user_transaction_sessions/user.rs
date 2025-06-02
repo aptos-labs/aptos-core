@@ -14,6 +14,7 @@ use crate::{
     verifier, AptosVM,
 };
 use aptos_gas_meter::AptosGasMeter;
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
 use aptos_types::{on_chain_config::Features, transaction::ModuleBundle};
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
@@ -24,19 +25,22 @@ use move_binary_format::{compatibility::Compatibility, errors::Location, Compile
 use move_core_types::{
     account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
 };
-use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage, StagingModuleStorage};
+use move_vm_runtime::{
+    module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, ModuleStorage,
+    StagingModuleStorage,
+};
 
 #[derive(Deref, DerefMut)]
-pub struct UserSession<'r, 'l> {
+pub struct UserSession<'r> {
     #[deref]
     #[deref_mut]
-    pub session: RespawnedSession<'r, 'l>,
+    pub session: RespawnedSession<'r>,
 }
 
-impl<'r, 'l> UserSession<'r, 'l> {
+impl<'r> UserSession<'r> {
     pub fn new(
-        vm: &'l AptosVM,
-        txn_meta: &'l TransactionMetadata,
+        vm: &AptosVM,
+        txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         prologue_change_set: VMChangeSet,
     ) -> Self {
@@ -53,32 +57,34 @@ impl<'r, 'l> UserSession<'r, 'l> {
         Self { session }
     }
 
-    pub fn legacy_inherit_prologue_session(prologue_session: RespawnedSession<'r, 'l>) -> Self {
+    pub fn legacy_inherit_prologue_session(prologue_session: RespawnedSession<'r>) -> Self {
         Self {
             session: prologue_session,
         }
     }
 
-    pub fn finish(
+    /// Finishes the user session if there is no module publishing request.
+    pub(crate) fn finish(
         self,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
-    ) -> Result<UserSessionChangeSet, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let Self { session } = self;
-        let (change_set, module_write_set) =
+        let change_set =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
-        UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
+        Ok(change_set)
     }
 
     /// Finishes the session while also processing the publish request, and running module
-    /// initialization if necessary. This function is used by the new loader and code cache.
-    pub fn finish_with_module_publishing_and_initialization(
+    /// initialization if necessary.
+    pub(crate) fn finish_with_module_publishing_and_initialization(
         mut self,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         features: &Features,
+        gas_feature_version: u64,
         change_set_configs: &ChangeSetConfigs,
         destination: AccountAddress,
         bundle: ModuleBundle,
@@ -102,40 +108,63 @@ impl<'r, 'l> UserSession<'r, 'l> {
             }
 
             self.session.execute(|session| {
-                let module_id = module.self_id();
-                let init_function_exists = session
-                    .load_function(&staging_module_storage, &module_id, init_func_name, &[])
-                    .is_ok();
+                if gas_feature_version <= RELEASE_V1_30 {
+                    let module_id = module.self_id();
+                    let init_function_exists = staging_module_storage
+                        .load_function(&module_id, init_func_name, &[])
+                        .is_ok();
 
-                if init_function_exists {
-                    // We need to check that init_module function we found is well-formed.
-                    verifier::module_init::verify_module_init_function(module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
+                    if init_function_exists {
+                        // We need to check that init_module function we found is well-formed.
+                        verifier::module_init::legacy_verify_module_init_function(module)
+                            .map_err(|e| e.finish(Location::Undefined))?;
 
-                    session.execute_function_bypass_visibility(
-                        &module_id,
-                        init_func_name,
-                        vec![],
-                        vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
-                        gas_meter,
-                        traversal_context,
-                        &staging_module_storage,
-                    )?;
+                        session.execute_function_bypass_visibility(
+                            &module_id,
+                            init_func_name,
+                            vec![],
+                            vec![MoveValue::Signer(destination)
+                                .simple_serialize()
+                                .expect("Signer is always serializable")],
+                            gas_meter,
+                            traversal_context,
+                            &staging_module_storage,
+                        )?;
+                    }
+                } else {
+                    let module = staging_module_storage
+                        .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
+                    if let Ok(function) = module.get_function(init_func_name) {
+                        verifier::module_init::verify_init_module_function(&function)?;
+
+                        let loaded_function = LoadedFunction {
+                            owner: LoadedFunctionOwner::Module(module),
+                            ty_args: vec![],
+                            function,
+                        };
+                        session.execute_loaded_function(
+                            loaded_function,
+                            vec![MoveValue::Signer(destination)
+                                .simple_serialize()
+                                .expect("Signer is always serializable")],
+                            gas_meter,
+                            traversal_context,
+                            &staging_module_storage,
+                        )?;
+                    }
                 }
                 Ok::<_, VMStatus>(())
             })?;
         }
 
-        // Get the changes from running module initialization.
-        let (change_set, empty_write_set) = self
-            .finish(change_set_configs, &staging_module_storage)?
-            .unpack();
-        empty_write_set
-            .is_empty_or_invariant_violation()
-            .map_err(|e| {
-                e.with_message("init_module cannot publish modules".to_string())
-                    .finish(Location::Undefined)
-            })?;
+        // Get the changes from running module initialization. Note that here we use the staged
+        // module storage to ensure resource group metadata from new modules is visible.
+        let Self { session } = self;
+        let change_set = session.finish_with_squashed_change_set(
+            change_set_configs,
+            &staging_module_storage,
+            false,
+        )?;
 
         let write_ops = convert_modules_into_write_ops(
             resolver,
@@ -144,7 +173,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
             staging_module_storage.release_verified_module_bundle(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
-        let module_write_set = ModuleWriteSet::new(false, write_ops);
+        let module_write_set = ModuleWriteSet::new(write_ops);
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 }

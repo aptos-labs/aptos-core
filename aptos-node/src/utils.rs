@@ -73,6 +73,10 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     }
 }
 
+#[cfg(not(unix))]
+pub fn ensure_max_open_files_limit(_required: u64, _assert_success: bool) {}
+
+#[cfg(unix)]
 pub fn ensure_max_open_files_limit(required: u64, assert_success: bool) {
     if required == 0 {
         return;

@@ -285,11 +285,11 @@ where
             // is being called.
             output.set_state_checkpoint_output(
                 parent_out
-                    .expect_state_checkpoint_output()
+                    .ensure_state_checkpoint_output()?
                     .reconfig_suffix(),
             );
             output.set_ledger_update_output(
-                parent_out.expect_ledger_update_output().reconfig_suffix(),
+                parent_out.ensure_ledger_update_output()?.reconfig_suffix(),
             );
         } else {
             THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
@@ -299,15 +299,15 @@ where
                 });
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
-                    parent_block.output.expect_result_state_summary(),
+                    parent_block.output.ensure_result_state_summary()?,
                     &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
                     None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(
                     &output.execution_output,
-                    output.expect_state_checkpoint_output(),
+                    output.ensure_state_checkpoint_output()?,
                     parent_out
-                        .expect_ledger_update_output()
+                        .ensure_ledger_update_output()?
                         .transaction_accumulator
                         .clone(),
                 )?);
@@ -356,7 +356,7 @@ where
         // Check for any potential retries
         // TODO: do we still have such retries?
         let committed_block = self.block_tree.root_block();
-        if committed_block.num_persisted_transactions()
+        if committed_block.num_persisted_transactions()?
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
             return Ok(());

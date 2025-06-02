@@ -1,7 +1,10 @@
 module aptos_std::type_info {
     use std::bcs;
     use std::features;
-    use std::string::{Self, String};
+    use std::string::String;
+
+    #[test_only]
+    use std::string;
 
     //
     // Error codes
@@ -76,17 +79,17 @@ module aptos_std::type_info {
     #[test]
     fun test_type_of() {
         let type_info = type_of<TypeInfo>();
-        assert!(account_address(&type_info) == @aptos_std, 0);
-        assert!(module_name(&type_info) == b"type_info", 1);
-        assert!(struct_name(&type_info) == b"TypeInfo", 2);
+        assert!(type_info.account_address() == @aptos_std, 0);
+        assert!(type_info.module_name() == b"type_info", 1);
+        assert!(type_info.struct_name() == b"TypeInfo", 2);
     }
 
     #[test]
     fun test_type_of_with_type_arg() {
         let type_info = type_of<Table<String, String>>();
-        assert!(account_address(&type_info) == @aptos_std, 0);
-        assert!(module_name(&type_info) == b"table", 1);
-        assert!(struct_name(&type_info) == b"Table<0x1::string::String, 0x1::string::String>", 2);
+        assert!(type_info.account_address() == @aptos_std, 0);
+        assert!(type_info.module_name() == b"table", 1);
+        assert!(type_info.struct_name() == b"Table<0x1::string::String, 0x1::string::String>", 2);
     }
 
     #[test(fx = @std)]
@@ -128,9 +131,9 @@ module aptos_std::type_info {
     #[verify_only]
     fun verify_type_of() {
         let type_info = type_of<TypeInfo>();
-        let account_address = account_address(&type_info);
-        let module_name = module_name(&type_info);
-        let struct_name = struct_name(&type_info);
+        let account_address = type_info.account_address();
+        let module_name = type_info.module_name();
+        let struct_name = type_info.struct_name();
         spec {
             assert account_address == @aptos_std;
             assert module_name == b"type_info";
@@ -141,9 +144,9 @@ module aptos_std::type_info {
     #[verify_only]
     fun verify_type_of_generic<T>() {
         let type_info = type_of<T>();
-        let account_address = account_address(&type_info);
-        let module_name = module_name(&type_info);
-        let struct_name = struct_name(&type_info);
+        let account_address = type_info.account_address();
+        let module_name = type_info.module_name();
+        let struct_name = type_info.struct_name();
         spec {
             assert account_address == type_of<T>().account_address;
             assert module_name == type_of<T>().module_name;
@@ -224,14 +227,14 @@ module aptos_std::type_info {
         // Declare a bool in a vector.
         let bool_vector = vector::singleton(false);
         // Push back another bool.
-        vector::push_back(&mut bool_vector, false);
+        bool_vector.push_back(false);
         // Assert size is 3 bytes (1 per element, 1 for base vector).
         assert!(size_of_val(&bool_vector) == 3, 0);
         // Get a some option, which is implemented as a vector.
         let u64_option = option::some(0);
         // Assert size is 9 bytes (8 per element, 1 for base vector).
         assert!(size_of_val(&u64_option) == 9, 0);
-        option::extract(&mut u64_option); // Remove the value inside.
+        u64_option.extract(); // Remove the value inside.
         // Assert size reduces to 1 byte.
         assert!(size_of_val(&u64_option) == 1, 0);
     }
@@ -285,26 +288,26 @@ module aptos_std::type_info {
         let i = 0; // Declare loop counter.
         while (i < n_elems_cutoff_1) { // Iterate until first cutoff:
             // Add an element.
-            vector::push_back(&mut vector_u64, null_element);
-            i = i + 1; // Increment counter.
+            vector_u64.push_back(null_element);
+            i += 1; // Increment counter.
         };
         // Vector base size is still 1 byte.
         assert!(size_of_val(&vector_u64) - element_size * i == base_size_1, 0);
         // Add another element, exceeding the cutoff.
-        vector::push_back(&mut vector_u64, null_element);
-        i = i + 1; // Increment counter.
+        vector_u64.push_back(null_element);
+        i += 1; // Increment counter.
         // Vector base size is now 2 bytes.
         assert!(size_of_val(&vector_u64) - element_size * i == base_size_2, 0);
         while (i < n_elems_cutoff_2) { // Iterate until second cutoff:
             // Add an element.
-            vector::push_back(&mut vector_u64, null_element);
-            i = i + 1; // Increment counter.
+            vector_u64.push_back(null_element);
+            i += 1; // Increment counter.
         };
         // Vector base size is still 2 bytes.
         assert!(size_of_val(&vector_u64) - element_size * i == base_size_2, 0);
         // Add another element, exceeding the cutoff.
-        vector::push_back(&mut vector_u64, null_element);
-        i = i + 1; // Increment counter.
+        vector_u64.push_back(null_element);
+        i += 1; // Increment counter.
         // Vector base size is now 3 bytes.
         assert!(size_of_val(&vector_u64) - element_size * i == base_size_3, 0);
         // Repeat for custom struct.
@@ -324,26 +327,26 @@ module aptos_std::type_info {
         i = 0; // Re-initialize loop counter.
         while (i < n_elems_cutoff_1) { // Iterate until first cutoff:
             // Add an element.
-            vector::push_back(&mut vector_complex, copy null_element);
-            i = i + 1; // Increment counter.
+            vector_complex.push_back(copy null_element);
+            i += 1; // Increment counter.
         };
         assert!( // Vector base size is still 1 byte.
             size_of_val(&vector_complex) - element_size * i == base_size_1, 0);
         // Add another element, exceeding the cutoff.
-        vector::push_back(&mut vector_complex, null_element);
-        i = i + 1; // Increment counter.
+        vector_complex.push_back(null_element);
+        i += 1; // Increment counter.
         assert!( // Vector base size is now 2 bytes.
             size_of_val(&vector_complex) - element_size * i == base_size_2, 0);
         while (i < n_elems_cutoff_2) { // Iterate until second cutoff:
             // Add an element.
-            vector::push_back(&mut vector_complex, copy null_element);
-            i = i + 1; // Increment counter.
+            vector_complex.push_back(copy null_element);
+            i += 1; // Increment counter.
         };
         assert!( // Vector base size is still 2 bytes.
             size_of_val(&vector_complex) - element_size * i == base_size_2, 0);
         // Add another element, exceeding the cutoff.
-        vector::push_back(&mut vector_complex, null_element);
-        i = i + 1; // Increment counter.
+        vector_complex.push_back(null_element);
+        i += 1; // Increment counter.
         assert!( // Vector base size is now 3 bytes.
             size_of_val(&vector_complex) - element_size * i == base_size_3, 0);
     }

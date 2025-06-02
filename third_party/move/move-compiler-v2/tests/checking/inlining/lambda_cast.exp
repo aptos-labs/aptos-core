@@ -1,4 +1,121 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          {
+            let (v: vector<u8>, init: u64): (vector<u8>, u64) = Tuple(gas_schedule_blob, Cast<u64>(0));
+            {
+              let accu: u64 = init;
+              {
+                let (v: vector<u8>): (vector<u8>) = Tuple(v);
+                vector::reverse<u8>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
+                    {
+                      let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
+                      {
+                        let (elem: u8): (u8) = Tuple(e);
+                        accu: u64 = {
+                          let (sum: u64, addend: u8): (u64, u8) = Tuple(accu, elem);
+                          Add<u64>(sum, Cast<u64>(addend))
+                        }
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              accu
+            }
+          }
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          {
+            let (v: vector<u8>, init: u64): (vector<u8>, u64) = Tuple(gas_schedule_blob, Cast<u64>(0));
+            {
+              let accu: u64 = init;
+              {
+                let (v: vector<u8>): (vector<u8>) = Tuple(v);
+                vector::reverse<u8>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
+                    {
+                      let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
+                      {
+                        let (elem: u8): (u8) = Tuple(e);
+                        accu: u64 = {
+                          let (sum: u64, addend: u8): (u64, u8) = Tuple(accu, elem);
+                          Add<u64>(sum, Cast<u64>(addend))
+                        }
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              accu
+            }
+          }
+        }
+    }
+} // end 0x12391283::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x12391283::M {
+    fun test_1(): u64 {
+        let gas_schedule_blob = vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
+        let (v,init) = (gas_schedule_blob, 0 as u64);
+        let accu = init;
+        {
+            let (v) = (v);
+            0x1::vector::reverse<u8>(&mut v);
+            while (!0x1::vector::is_empty<u8>(&v)) {
+                let e = 0x1::vector::pop_back<u8>(&mut v);
+                {
+                    let (elem) = (e);
+                    accu = {
+                        let (sum,addend) = (accu, elem);
+                        sum + (addend as u64)
+                    }
+                };
+            };
+        };
+        accu
+    }
+    fun test_2(): u64 {
+        let gas_schedule_blob = vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
+        let (v,init) = (gas_schedule_blob, 0 as u64);
+        let accu = init;
+        {
+            let (v) = (v);
+            0x1::vector::reverse<u8>(&mut v);
+            while (!0x1::vector::is_empty<u8>(&v)) {
+                let e = 0x1::vector::pop_back<u8>(&mut v);
+                {
+                    let (elem) = (e);
+                    accu = {
+                        let (sum,addend) = (accu, elem);
+                        sum + (addend as u64)
+                    }
+                };
+            };
+        };
+        accu
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x12391283::M {
     use std::vector;
     private fun test_1(): u64 {
@@ -58,46 +175,6 @@ module 0x12391283::M {
         }
     }
 } // end 0x12391283::M
-
-// -- Sourcified model before bytecode pipeline
-module 0x12391283::M {
-    fun test_1(): u64 {
-        let accu = 0;
-        {
-            let (v) = (vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]);
-            0x1::vector::reverse<u8>(&mut v);
-            while (!0x1::vector::is_empty<u8>(&v)) {
-                let e = 0x1::vector::pop_back<u8>(&mut v);
-                {
-                    let (elem) = (e);
-                    accu = {
-                        let (sum,addend) = (accu, elem);
-                        sum + (addend as u64)
-                    }
-                };
-            };
-        };
-        accu
-    }
-    fun test_2(): u64 {
-        let accu = 0;
-        {
-            let (v) = (vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]);
-            0x1::vector::reverse<u8>(&mut v);
-            while (!0x1::vector::is_empty<u8>(&v)) {
-                let e = 0x1::vector::pop_back<u8>(&mut v);
-                {
-                    let (elem) = (e);
-                    accu = {
-                        let (sum,addend) = (accu, elem);
-                        sum + (addend as u64)
-                    }
-                };
-            };
-        };
-        accu
-    }
-}
 
 
 ============ bytecode verification succeeded ========

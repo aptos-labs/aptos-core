@@ -75,7 +75,7 @@ Square root of fixed point number
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_sqrt">sqrt</a>(x: FixedPoint32): FixedPoint32 {
-    <b>let</b> y = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
+    <b>let</b> y = (x.get_raw_value() <b>as</b> u128);
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math128.md#0x1_math128_sqrt">math128::sqrt</a>(y &lt;&lt; 32) <b>as</b> u64))
 }
 </code></pre>
@@ -101,7 +101,7 @@ Exponent function with a precission of 9 digits.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x: FixedPoint32): FixedPoint32 {
-    <b>let</b> raw_value = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
+    <b>let</b> raw_value = (x.get_raw_value() <b>as</b> u128);
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math_fixed.md#0x1_math_fixed_exp_raw">exp_raw</a>(raw_value) <b>as</b> u64))
 }
 </code></pre>
@@ -128,7 +128,7 @@ is positive for all values of x.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_log2_plus_32">log2_plus_32</a>(x: FixedPoint32): FixedPoint32 {
-    <b>let</b> raw_value = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
+    <b>let</b> raw_value = (x.get_raw_value() <b>as</b> u128);
     <a href="math128.md#0x1_math128_log2">math128::log2</a>(raw_value)
 }
 </code></pre>
@@ -153,8 +153,8 @@ is positive for all values of x.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_ln_plus_32ln2">ln_plus_32ln2</a>(x: FixedPoint32): FixedPoint32 {
-    <b>let</b> raw_value = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
-    <b>let</b> x = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(<a href="math128.md#0x1_math128_log2">math128::log2</a>(raw_value)) <b>as</b> u128);
+    <b>let</b> raw_value = (x.get_raw_value() <b>as</b> u128);
+    <b>let</b> x = (<a href="math128.md#0x1_math128_log2">math128::log2</a>(raw_value).get_raw_value() <b>as</b> u128);
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((x * <a href="math_fixed.md#0x1_math_fixed_LN2">LN2</a> &gt;&gt; 32 <b>as</b> u64))
 }
 </code></pre>
@@ -180,7 +180,7 @@ Integer power of a fixed point number
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_pow">pow</a>(x: FixedPoint32, n: u64): FixedPoint32 {
-    <b>let</b> raw_value = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
+    <b>let</b> raw_value = (x.get_raw_value() <b>as</b> u128);
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(raw_value, (n <b>as</b> u128)) <b>as</b> u64))
 }
 </code></pre>
@@ -206,9 +206,9 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_mul_div">mul_div</a>(x: FixedPoint32, y: FixedPoint32, z: FixedPoint32): FixedPoint32 {
-    <b>let</b> a = <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x);
-    <b>let</b> b = <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(y);
-    <b>let</b> c = <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(z);
+    <b>let</b> a = x.get_raw_value();
+    <b>let</b> b = y.get_raw_value();
+    <b>let</b> c = z.get_raw_value();
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (<a href="math64.md#0x1_math64_mul_div">math64::mul_div</a>(a, b, c))
 }
 </code></pre>
@@ -248,7 +248,7 @@ Specialized function for x * y / z that omits intermediate shifting
     // This <b>has</b> an <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> of 5000 / 4 10^9 roughly 6 digits of precission
     <b>let</b> power = <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(roottwo, exponent);
     <b>let</b> eps_correction = 1241009291;
-    power = power + ((power * eps_correction * exponent) &gt;&gt; 64);
+    power += ((power * eps_correction * exponent) &gt;&gt; 64);
     // x is fixed point number smaller than 595528/2^32 &lt; 0.00014 so we need only 2 tayler steps
     // <b>to</b> get the 6 digits of precission
     <b>let</b> taylor1 = (power * x) &gt;&gt; (32 - shift);
@@ -279,12 +279,12 @@ Specialized function for x * y / z that omits intermediate shifting
 
 <pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(x: u128, n: u128): u128 {
     <b>let</b> res: u256 = 1 &lt;&lt; 64;
-    x = x &lt;&lt; 32;
+    x &lt;&lt;= 32;
     <b>while</b> (n != 0) {
         <b>if</b> (n & 1 != 0) {
             res = (res * (x <b>as</b> u256)) &gt;&gt; 64;
         };
-        n = n &gt;&gt; 1;
+        n &gt;&gt;= 1;
         x = ((((x <b>as</b> u256) * (x <b>as</b> u256)) &gt;&gt; 64) <b>as</b> u128);
     };
     ((res &gt;&gt; 32) <b>as</b> u128)

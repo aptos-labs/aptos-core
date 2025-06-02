@@ -29,12 +29,17 @@ impl StateWithSummary {
 
     pub fn new_at_version(
         version: Option<Version>,
+        hot_state_root_hash: HashValue,
         global_state_root_hash: HashValue,
         usage: StateStorageUsage,
     ) -> Self {
         Self::new(
             State::new_at_version(version, usage),
-            StateSummary::new_at_version(version, SparseMerkleTree::new(global_state_root_hash)),
+            StateSummary::new_at_version(
+                version,
+                SparseMerkleTree::new(hot_state_root_hash),
+                SparseMerkleTree::new(global_state_root_hash),
+            ),
         )
     }
 
@@ -81,7 +86,7 @@ impl LedgerStateWithSummary {
         Self::from_latest_and_last_checkpoint(checkpoint.clone(), checkpoint)
     }
 
-    pub fn new_dummy() -> Self {
+    pub fn new_empty() -> Self {
         let empty = StateWithSummary::new_empty();
         Self::from_latest_and_last_checkpoint(empty.clone(), empty)
     }

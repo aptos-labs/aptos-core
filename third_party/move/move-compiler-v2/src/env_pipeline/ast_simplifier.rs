@@ -363,7 +363,7 @@ fn find_possibly_modified_vars(
                     _ => {},
                 }
             },
-            Lambda(node_id, pat, _, _) => {
+            Lambda(node_id, pat, _, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {
@@ -666,7 +666,7 @@ impl<'env> SimplifierRewriter<'env> {
     }
 }
 
-impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
+impl ExpRewriterFunctions for SimplifierRewriter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         let old_id = exp.as_ref().node_id().as_usize();
         trace!(

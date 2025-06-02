@@ -25,9 +25,9 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
+        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -297,9 +297,9 @@ pub trait DbReader: Send + Sync {
             next_version: Version,
         ) -> Result<Option<(Version, HashValue)>>;
 
-        /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
-        /// the transaction with given `seq_num` doesn't exist, returns `None`.
-        fn get_account_transaction(
+        /// Returns a transaction that is the `sequence_number`-th one associated with the given account. If
+        /// the transaction with given `sequence_number` doesn't exist, returns `None`.
+        fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -307,18 +307,35 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<Option<TransactionWithProof>>;
 
-        /// Returns the list of transactions sent by an account with `address` starting
+        /// Returns the list of ordered transactions (transactions that include a sequence number)
+        /// sent by an account with `address` starting
         /// at sequence number `seq_num`. Will return no more than `limit` transactions.
         /// Will ignore transactions with `txn.version > ledger_version`. Optionally
         /// fetch events for each transaction when `fetch_events` is `true`.
-        fn get_account_transactions(
+        fn get_account_ordered_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountOrderedTransactionsWithProof>;
+
+        /// Returns the list of summaries of transactions committed by an account.
+        /// Each transaction summary contains the sender address, transaction hash, version, replay protector
+        /// of the committed transaction.
+        /// If `start_version` is provided, the returned list contains transactions starting from `start_version`.
+        /// Or else if `end_version` is provided, the returned list contains transactions ending at `end_version`.
+        /// The returned list contains at most `limit` transactions.
+        /// The returned list is always sorted by version in ascending order.
+        fn get_account_transaction_summaries(
+            &self,
+            address: AccountAddress,
+            start_version: Option<u64>,
+            end_version: Option<u64>,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<IndexedTransactionSummary>>;
 
         /// Returns proof of new state for a given ledger info with signatures relative to version known
         /// to client

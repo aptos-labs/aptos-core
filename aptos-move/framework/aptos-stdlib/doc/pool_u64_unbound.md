@@ -43,8 +43,6 @@ shares left.
 -  [Function `shares_to_amount_with_total_coins`](#0x1_pool_u64_unbound_shares_to_amount_with_total_coins)
 -  [Function `shares_to_amount_with_total_stats`](#0x1_pool_u64_unbound_shares_to_amount_with_total_stats)
 -  [Function `multiply_then_divide`](#0x1_pool_u64_unbound_multiply_then_divide)
--  [Function `to_u128`](#0x1_pool_u64_unbound_to_u128)
--  [Function `to_u256`](#0x1_pool_u64_unbound_to_u256)
 -  [Specification](#@Specification_1)
     -  [Struct `Pool`](#@Specification_1_Pool)
     -  [Function `contains`](#@Specification_1_contains)
@@ -58,8 +56,6 @@ shares left.
     -  [Function `amount_to_shares_with_total_coins`](#@Specification_1_amount_to_shares_with_total_coins)
     -  [Function `shares_to_amount_with_total_coins`](#@Specification_1_shares_to_amount_with_total_coins)
     -  [Function `multiply_then_divide`](#@Specification_1_multiply_then_divide)
-    -  [Function `to_u128`](#@Specification_1_to_u128)
-    -  [Function `to_u256`](#@Specification_1_to_u256)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -313,7 +309,7 @@ Destroy an empty pool. This will fail if the pool has any balance of coins.
         shares,
         scaling_factor: _,
     } = self;
-    table::destroy_empty&lt;<b>address</b>, u128&gt;(shares);
+    shares.destroy_empty::&lt;<b>address</b>, u128&gt;();
 }
 </code></pre>
 
@@ -388,7 +384,7 @@ Return true if <code>shareholder</code> is in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>): bool {
-    <a href="table.md#0x1_table_contains">table::contains</a>(&self.shares, shareholder)
+    self.shares.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(shareholder)
 }
 </code></pre>
 
@@ -413,8 +409,8 @@ Return the number of shares of <code>stakeholder</code> in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>): u128 {
-    <b>if</b> (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(self, shareholder)) {
-        *<a href="table.md#0x1_table_borrow">table::borrow</a>(&self.shares, shareholder)
+    <b>if</b> (self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(shareholder)) {
+        *self.shares.borrow(shareholder)
     } <b>else</b> {
         0
     }
@@ -442,8 +438,8 @@ Return the balance in coins of <code>shareholder</code> in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_balance">balance</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>): u64 {
-    <b>let</b> num_shares = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(self, shareholder);
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount">shares_to_amount</a>(self, num_shares)
+    <b>let</b> num_shares = self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(shareholder);
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount">shares_to_amount</a>(num_shares)
 }
 </code></pre>
 
@@ -468,7 +464,7 @@ Return the number of shareholders in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shareholders_count">shareholders_count</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>): u64 {
-    table::length(&self.shares)
+    self.shares.length()
 }
 </code></pre>
 
@@ -520,13 +516,13 @@ Allow an existing or new shareholder to add their coins to the pool in exchange 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_buy_in">buy_in</a>(self: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>, coins_amount: u64): u128 {
     <b>if</b> (coins_amount == 0) <b>return</b> 0;
 
-    <b>let</b> new_shares = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_amount_to_shares">amount_to_shares</a>(self, coins_amount);
+    <b>let</b> new_shares = self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_amount_to_shares">amount_to_shares</a>(coins_amount);
     <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U64">MAX_U64</a> - self.total_coins &gt;= coins_amount, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EPOOL_TOTAL_COINS_OVERFLOW">EPOOL_TOTAL_COINS_OVERFLOW</a>));
     <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a> - self.total_shares &gt;= new_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EPOOL_TOTAL_SHARES_OVERFLOW">EPOOL_TOTAL_SHARES_OVERFLOW</a>));
 
-    self.total_coins = self.total_coins + coins_amount;
-    self.total_shares = self.total_shares + new_shares;
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_add_shares">add_shares</a>(self, shareholder, new_shares);
+    self.total_coins += coins_amount;
+    self.total_shares += new_shares;
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_add_shares">add_shares</a>(shareholder, new_shares);
     new_shares
 }
 </code></pre>
@@ -553,15 +549,15 @@ This would dilute other shareholders if the pool's balance of coins didn't chang
 
 
 <pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_add_shares">add_shares</a>(self: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>, new_shares: u128): u128 {
-    <b>if</b> (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(self, shareholder)) {
-        <b>let</b> existing_shares = <a href="table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> self.shares, shareholder);
+    <b>if</b> (self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(shareholder)) {
+        <b>let</b> existing_shares = self.shares.borrow_mut(shareholder);
         <b>let</b> current_shares = *existing_shares;
         <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a> - current_shares &gt;= new_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_SHARES_OVERFLOW">ESHAREHOLDER_SHARES_OVERFLOW</a>));
 
         *existing_shares = current_shares + new_shares;
         *existing_shares
     } <b>else</b> <b>if</b> (new_shares &gt; 0) {
-        <a href="table.md#0x1_table_add">table::add</a>(&<b>mut</b> self.shares, shareholder, new_shares);
+        self.shares.add(shareholder, new_shares);
         new_shares
     } <b>else</b> {
         new_shares
@@ -590,15 +586,15 @@ Allow <code>shareholder</code> to redeem their shares in <code>self</code> for c
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_redeem_shares">redeem_shares</a>(self: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>, shares_to_redeem: u128): u64 {
-    <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(self, shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
-    <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(self, shareholder) &gt;= shares_to_redeem, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
+    <b>assert</b>!(self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
+    <b>assert</b>!(self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(shareholder) &gt;= shares_to_redeem, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
 
     <b>if</b> (shares_to_redeem == 0) <b>return</b> 0;
 
-    <b>let</b> redeemed_coins = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount">shares_to_amount</a>(self, shares_to_redeem);
-    self.total_coins = self.total_coins - redeemed_coins;
-    self.total_shares = self.total_shares - shares_to_redeem;
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_deduct_shares">deduct_shares</a>(self, shareholder, shares_to_redeem);
+    <b>let</b> redeemed_coins = self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount">shares_to_amount</a>(shares_to_redeem);
+    self.total_coins -= redeemed_coins;
+    self.total_shares -= shares_to_redeem;
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_deduct_shares">deduct_shares</a>(shareholder, shares_to_redeem);
 
     redeemed_coins
 }
@@ -630,12 +626,12 @@ Transfer shares from <code>shareholder_1</code> to <code>shareholder_2</code>.
     shareholder_2: <b>address</b>,
     shares_to_transfer: u128,
 ) {
-    <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(self, shareholder_1), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
-    <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(self, shareholder_1) &gt;= shares_to_transfer, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
+    <b>assert</b>!(self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(shareholder_1), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
+    <b>assert</b>!(self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(shareholder_1) &gt;= shares_to_transfer, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
     <b>if</b> (shares_to_transfer == 0) <b>return</b>;
 
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_deduct_shares">deduct_shares</a>(self, shareholder_1, shares_to_transfer);
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_add_shares">add_shares</a>(self, shareholder_2, shares_to_transfer);
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_deduct_shares">deduct_shares</a>(shareholder_1, shares_to_transfer);
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_add_shares">add_shares</a>(shareholder_2, shares_to_transfer);
 }
 </code></pre>
 
@@ -660,16 +656,16 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>self</code>
 
 
 <pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_deduct_shares">deduct_shares</a>(self: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>, num_shares: u128): u128 {
-    <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(self, shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
-    <b>assert</b>!(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(self, shareholder) &gt;= num_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
+    <b>assert</b>!(self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(shareholder), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_ESHAREHOLDER_NOT_FOUND">ESHAREHOLDER_NOT_FOUND</a>));
+    <b>assert</b>!(self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(shareholder) &gt;= num_shares, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_EINSUFFICIENT_SHARES">EINSUFFICIENT_SHARES</a>));
 
-    <b>let</b> existing_shares = <a href="table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> self.shares, shareholder);
-    *existing_shares = *existing_shares - num_shares;
+    <b>let</b> existing_shares = self.shares.borrow_mut(shareholder);
+    *existing_shares -= num_shares;
 
     // Remove the shareholder completely <b>if</b> they have no shares left.
     <b>let</b> remaining_shares = *existing_shares;
     <b>if</b> (remaining_shares == 0) {
-        <a href="table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> self.shares, shareholder);
+        self.shares.remove(shareholder);
     };
 
     remaining_shares
@@ -698,7 +694,7 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>self<
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_amount_to_shares">amount_to_shares</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, coins_amount: u64): u128 {
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_amount_to_shares_with_total_coins">amount_to_shares_with_total_coins</a>(self, coins_amount, self.total_coins)
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_amount_to_shares_with_total_coins">amount_to_shares_with_total_coins</a>(coins_amount, self.total_coins)
 }
 </code></pre>
 
@@ -728,12 +724,12 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>self<
     <b>if</b> (self.total_coins == 0 || self.total_shares == 0) {
         // Multiply by scaling factor <b>to</b> minimize rounding errors during <b>internal</b> calculations for buy ins/redeems.
         // This can overflow but scaling factor is expected <b>to</b> be chosen carefully so this would not overflow.
-        <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(coins_amount) * <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(self.scaling_factor)
+        (coins_amount <b>as</b> u128) * (self.scaling_factor <b>as</b> u128)
     } <b>else</b> {
         // Shares price = total_coins / total existing shares.
         // New number of shares = new_amount / shares_price = new_amount * existing_shares / total_amount.
         // We rearrange the calc and do multiplication first <b>to</b> avoid rounding errors.
-        <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(self, <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(coins_amount), self.total_shares, <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(total_coins))
+        self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(coins_amount <b>as</b> u128, self.total_shares, total_coins <b>as</b> u128)
     }
 }
 </code></pre>
@@ -760,7 +756,7 @@ Return the number of coins <code>shares</code> are worth in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount">shares_to_amount</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shares: u128): u64 {
-    <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount_with_total_coins">shares_to_amount_with_total_coins</a>(self, shares, self.total_coins)
+    self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount_with_total_coins">shares_to_amount_with_total_coins</a>(shares, self.total_coins)
 }
 </code></pre>
 
@@ -793,7 +789,7 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
         // Shares price = total_coins / total existing shares.
         // Shares worth = shares * shares price = shares * total_coins / total existing shares.
         // We rearrange the calc and do multiplication first <b>to</b> avoid rounding errors.
-        (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(self, shares, <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(total_coins), self.total_shares) <b>as</b> u64)
+        (self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(shares, total_coins <b>as</b> u128, self.total_shares) <b>as</b> u64)
     }
 }
 </code></pre>
@@ -827,7 +823,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
     <b>if</b> (self.total_coins == 0 || total_shares == 0) {
         0
     } <b>else</b> {
-        (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(self, shares, <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(total_coins), total_shares) <b>as</b> u64)
+        (self.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(shares, total_coins <b>as</b> u128, total_shares) <b>as</b> u64)
     }
 }
 </code></pre>
@@ -852,56 +848,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(self: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, x: u128, y: u128, z: u128): u128 {
-    <b>let</b> result = (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(x) * <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(y)) / <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(z);
-    (result <b>as</b> u128)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_pool_u64_unbound_to_u128"></a>
-
-## Function `to_u128`
-
-
-
-<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(num: u64): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(num: u64): u128 {
-    (num <b>as</b> u128)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_pool_u64_unbound_to_u256"></a>
-
-## Function `to_u256`
-
-
-
-<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(num: u128): u256
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(num: u128): u256 {
-    (num <b>as</b> u256)
+    <a href="math128.md#0x1_math128_mul_div">math128::mul_div</a>(x, y, z)
 }
 </code></pre>
 
@@ -1053,8 +1000,8 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 <pre><code><b>let</b> new_shares = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_amount_to_shares_with_total_coins">spec_amount_to_shares_with_total_coins</a>(self, coins_amount, self.total_coins);
 <b>aborts_if</b> self.total_coins + coins_amount &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U64">MAX_U64</a>;
 <b>aborts_if</b> self.total_shares + new_shares &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
-<b>include</b> coins_amount &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesAbortsIf">AddSharesAbortsIf</a> { new_shares: new_shares };
-<b>include</b> coins_amount &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesEnsures">AddSharesEnsures</a> { new_shares: new_shares };
+<b>include</b> coins_amount &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesAbortsIf">AddSharesAbortsIf</a> { new_shares };
+<b>include</b> coins_amount &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesEnsures">AddSharesEnsures</a> { new_shares };
 <b>ensures</b> self.total_coins == <b>old</b>(self.total_coins) + coins_amount;
 <b>ensures</b> self.total_shares == <b>old</b>(self.total_shares) + new_shares;
 <b>ensures</b> result == new_shares;
@@ -1296,40 +1243,6 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 <pre><code><b>aborts_if</b> z == 0;
 <b>aborts_if</b> (x * y) / z &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
 <b>ensures</b> result == (x * y) / z;
-</code></pre>
-
-
-
-<a id="@Specification_1_to_u128"></a>
-
-### Function `to_u128`
-
-
-<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(num: u64): u128
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == num;
-</code></pre>
-
-
-
-<a id="@Specification_1_to_u256"></a>
-
-### Function `to_u256`
-
-
-<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(num: u128): u256
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == num;
 </code></pre>
 
 

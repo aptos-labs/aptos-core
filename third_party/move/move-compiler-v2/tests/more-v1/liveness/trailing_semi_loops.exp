@@ -1,14 +1,6 @@
 
 Diagnostics:
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/more-v1/liveness/trailing_semi_loops.move:27:17
-   │
-27 │             let x: u64 = if (true) break else break;
-   │                 ^
-
-
-Diagnostics:
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/more-v1/liveness/trailing_semi_loops.move:76:17
    │
 76 │                 x = 2;

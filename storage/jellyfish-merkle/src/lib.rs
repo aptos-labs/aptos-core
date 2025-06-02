@@ -83,9 +83,10 @@ pub mod restore;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
 
-use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT};
+use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT, COUNTER};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_metrics_core::IntCounterHelper;
 use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
@@ -268,7 +269,7 @@ impl<'a, K> NibbleRangeIterator<'a, K> {
     }
 }
 
-impl<'a, K> std::iter::Iterator for NibbleRangeIterator<'a, K> {
+impl<K> std::iter::Iterator for NibbleRangeIterator<'_, K> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -366,9 +367,8 @@ where
     ) -> Result<(Node<K>, TreeUpdateBatch<K>)> {
         let deduped_and_sorted_kvs = value_set
             .into_iter()
-            .map(|kv| {
+            .inspect(|kv| {
                 assert!(kv.0.nibble(0) == shard_id);
-                kv
             })
             .collect::<BTreeMap<_, _>>()
             .into_iter()
@@ -419,7 +419,7 @@ where
         shard_root_nodes: Vec<Node<K>>,
         persisted_version: Option<Version>,
         version: Version,
-    ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
+    ) -> Result<(HashValue, usize, TreeUpdateBatch<K>)> {
         ensure!(
             shard_root_nodes.len() == 16,
             "sharded root nodes {} must be 16",
@@ -446,6 +446,7 @@ where
         APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
 
         let root_hash = root_node.hash();
+        let leaf_count = root_node.leaf_count();
 
         let mut tree_update_batch = TreeUpdateBatch::new();
         if let Some(persisted_version) = persisted_version {
@@ -453,7 +454,7 @@ where
         }
         tree_update_batch.put_node(NodeKey::new_empty_path(version), root_node);
 
-        Ok((root_hash, tree_update_batch))
+        Ok((root_hash, leaf_count, tree_update_batch))
     }
 
     /// Returns the node versions of the root of each shard, or None if the shard is empty.
@@ -696,7 +697,7 @@ where
             shard_root_nodes.push(shard_root_node);
         }
 
-        let (root_hash, top_levels_batch) =
+        let (root_hash, _leaf_count, top_levels_batch) =
             self.put_top_levels_nodes(shard_root_nodes, version.checked_sub(1), version)?;
         tree_update_batch.combine(top_levels_batch);
 
@@ -890,7 +891,10 @@ where
     if let Some(cache) = hash_cache {
         match cache.get(node_key.nibble_path()) {
             Some(hash) => *hash,
-            None => unreachable!("{:?} can not be found in hash cache", node_key),
+            None => {
+                COUNTER.inc_with(&["get_hash_miss"]);
+                node.hash()
+            },
         }
     } else {
         node.hash()

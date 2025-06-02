@@ -113,7 +113,8 @@ impl Block {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(_txns) => 0,
                 Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
+                | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches.len() + proof_with_data.proofs.len()
                 },
                 Payload::OptQuorumStore(opt_quorum_store_payload) => {
@@ -340,6 +341,7 @@ impl Block {
 
     /// Makes sure that the proposal makes sense, independently of the current state.
     /// If this is the genesis block, we skip these checks.
+    #[allow(unexpected_cfgs)]
     pub fn verify_well_formed(&self) -> anyhow::Result<()> {
         ensure!(
             !self.is_genesis_block(),

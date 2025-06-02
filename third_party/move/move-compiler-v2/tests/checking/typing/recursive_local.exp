@@ -3,5 +3,5 @@ Diagnostics:
 error: unable to infer type due to cyclic type constraints (try annotating the type)
   ┌─ tests/checking/typing/recursive_local.move:5:9
   │
-5 │         x = (x, 0);
+5 │         x = vector[x];
   │         ^

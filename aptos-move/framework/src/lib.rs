@@ -12,16 +12,12 @@ use std::io::{Read, Write};
 mod built_package;
 pub use built_package::*;
 
-mod module_metadata;
-pub use module_metadata::*;
-
 pub mod natives;
 mod release_builder;
 pub use release_builder::*;
+pub mod chunked_publish;
 pub mod docgen;
 pub mod extended_checks;
-pub use extended_checks::ResourceGroupScope;
-pub mod chunked_publish;
 pub mod prover;
 mod release_bundle;
 mod released_framework;

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x2::X {
     struct R {
         dummy_field: bool,
@@ -16,8 +16,11 @@ module 0x2::M {
     }
     private fun t1(): u64 {
         loop {
-          0;
-          Tuple()
+          {
+            let x: u64 = 0;
+            x;
+            Tuple()
+          }
         }
     }
     private fun t2() {
@@ -53,7 +56,7 @@ module 0x2::M {
     }
 } // end 0x2::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x2::X {
     struct R {
     }
@@ -67,7 +70,8 @@ module 0x2::M {
     }
     fun t1(): u64 {
         loop {
-            0;
+            let x = 0;
+            x;
         }
     }
     fun t2() {

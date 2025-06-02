@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: public inline function `foo` cannot be called from all locations it is accessible
+  ┌─ tests/checking/inlining/private_call_2.move:3:23
+  │
+3 │     public inline fun foo(): u64 {
+  │                       ^^^ if called from a location where `m::bar` is not accessible
+4 │         bar()
+  │         ----- inline expansion calls friend function that may not be accessible in all locations that `m::foo` can be called
+
 error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because module `0x42::n` is not a `friend` of `0x42::m`
    ┌─ tests/checking/inlining/private_call_2.move:7:24
    │
@@ -14,6 +22,26 @@ error: function `0x42::m::bar` cannot be called from function `0x42::n::test` be
    ·
 25 │         assert!(o::foo() == 42, 1);
    │                 -------- from a call inlined at this callsite
+
+warning: public inline function `foo` cannot be called from all locations it is accessible
+   ┌─ tests/checking/inlining/private_call_2.move:13:23
+   │
+ 4 │         bar()
+   │         ----- inline expansion calls friend function that may not be accessible in all locations that `o::foo` can be called
+   ·
+13 │     public inline fun foo(): u64 {
+   │                       ^^^ if called from a location where `m::bar` is not accessible
+14 │         m::foo();
+   │         -------- from a call inlined at this callsite
+
+warning: public inline function `foo` cannot be called from all locations it is accessible
+   ┌─ tests/checking/inlining/private_call_2.move:13:23
+   │
+13 │     public inline fun foo(): u64 {
+   │                       ^^^ if called from a location where `o::bar` is not accessible
+14 │         m::foo();
+15 │     bar()
+   │     ----- inline expansion calls private function that may not be accessible in all locations that `o::foo` can be called
 
 error: function `0x42::o::bar` cannot be called from function `0x42::n::test` because it is private to module `0x42::o`
    ┌─ tests/checking/inlining/private_call_2.move:18:9

@@ -3,13 +3,16 @@
 
 //! Flow-insensitive checks can be done on the AST.
 //!
-//! Warnings about Unused parameter and local variable
-//!   "Unused assignment or binding for local 's'. Consider removing, replacing with '_' or prefixing with '_' (e.g., '_r_ref')
+//! Warnings about:
+//! - unused parameters and local variables in inline functions.
+//! - unused unbound block variables (e.g., `let x: u64;`) in all target functions.
+//! Other forms of unused variables/parameters are reported by the stackless bytecode
+//! pass later called `UnusedAssignmentChecker`.
 
 use codespan_reporting::diagnostic::Severity;
 use move_model::{
     ast::{ExpData, TempIndex, VisitorPosition},
-    model::{GlobalEnv, Loc, NodeId, Parameter},
+    model::{FunctionEnv, GlobalEnv, Loc, NodeId, Parameter},
     symbol::Symbol,
     well_known,
 };
@@ -22,17 +25,20 @@ pub fn check_for_unused_vars_and_params(env: &mut GlobalEnv) {
             for func in module.get_functions() {
                 if let Some(def) = func.get_def() {
                     let params = &func.get_parameters();
-                    find_unused_params_and_vars(env, params, def)
+                    find_unused_params_and_vars(&func, params, def)
                 }
             }
         }
     }
 }
 
-fn find_unused_params_and_vars(env: &GlobalEnv, params: &[Parameter], exp: &ExpData) {
-    let mut visitor = SymbolVisitor::new(env, params);
+fn find_unused_params_and_vars(func: &FunctionEnv, params: &[Parameter], exp: &ExpData) {
+    let is_inline = func.is_inline();
+    let mut visitor = SymbolVisitor::new(func, params, is_inline);
     exp.visit_positions(&mut |position, exp_data| visitor.entry(position, exp_data));
-    visitor.check_parameter_usage();
+    if is_inline {
+        visitor.check_parameter_usage();
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -41,6 +47,8 @@ enum UsageKind {
     RangeParameter,
     LocalVar,
     Lambda,
+    /// Block variables that are not bound to a value right away.
+    UnboundBlockVar,
 }
 
 impl fmt::Display for UsageKind {
@@ -50,6 +58,7 @@ impl fmt::Display for UsageKind {
             UsageKind::RangeParameter => "range parameter",
             UsageKind::LocalVar => "local variable",
             UsageKind::Lambda => "anonymous function parameter",
+            UsageKind::UnboundBlockVar => "local variable",
         })
     }
 }
@@ -103,19 +112,32 @@ where
     }
 }
 
-// Visits all symbols in a function.
+/// Visits all symbols in a function.
 struct SymbolVisitor<'env, 'params> {
     env: &'env GlobalEnv,
     params: &'params [Parameter],
     seen_uses: ScopedVisibleSet<Symbol>,
+    /// Is this an inline function?
+    inline: bool,
 }
 
 impl<'env, 'params> SymbolVisitor<'env, 'params> {
-    fn new(env: &'env GlobalEnv, params: &'params [Parameter]) -> SymbolVisitor<'env, 'params> {
+    fn new(
+        func: &'env FunctionEnv,
+        params: &'params [Parameter],
+        inline: bool,
+    ) -> SymbolVisitor<'env, 'params> {
+        let mut seen_uses = ScopedVisibleSet::new();
+        for spec in func.get_access_specifiers().unwrap_or_default() {
+            for var in spec.used_vars() {
+                seen_uses.insert(var)
+            }
+        }
         SymbolVisitor {
-            env,
+            env: func.module_env.env,
             params,
-            seen_uses: ScopedVisibleSet::new(),
+            seen_uses,
+            inline,
         }
     }
 
@@ -123,12 +145,17 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
         use ExpData::*;
         use VisitorPosition::*;
         match e {
-            Block(_, pat, _, _) => {
+            Block(_, pat, opt_binding, _) => {
                 match position {
                     BeforeBody => self.seen_uses.enter_scope(),
                     Post => {
+                        let usage_kind = if opt_binding.is_none() {
+                            UsageKind::UnboundBlockVar
+                        } else {
+                            UsageKind::LocalVar
+                        };
                         for (id, var) in pat.vars() {
-                            self.node_symbol_decl_visitor(true, &id, &var, UsageKind::LocalVar)
+                            self.node_symbol_decl_visitor(true, &id, &var, usage_kind);
                         }
                         self.seen_uses.exit_scope();
                     },
@@ -147,7 +174,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                 Pre | Post | BeforeBody | MidMutate | BeforeThen | BeforeElse
                 | PreSequenceValue => {},
             },
-            Lambda(_, pat, _, _) => {
+            Lambda(_, pat, _, _, _) => {
                 match position {
                     Pre => self.seen_uses.enter_scope(),
                     Post => {
@@ -207,6 +234,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
             && !self.seen_uses.contains(sym)
             // The `self` parameter is exempted from the check
             && (sym != &receiver_param_name || kind != UsageKind::Parameter)
+            && (self.inline || kind == UsageKind::UnboundBlockVar || kind == UsageKind::RangeParameter)
         {
             let msg = format!(
                 "Unused {} `{}`. Consider removing or prefixing with an underscore: `_{}`",

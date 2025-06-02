@@ -18,6 +18,6 @@ module 0x42::test {
 
 }
 
-//# run 0x42::test::test_u64 --verbose --args 3
+//# run 0x42::test::test_u64 --args 3
 
-//# run 0x42::test::test_S --verbose --args 2
+//# run 0x42::test::test_S --args 2

@@ -88,7 +88,7 @@ impl SimulatedTimeService {
                 now: Duration::from_secs(0),
                 pending: vec![],
                 time_limit: Duration::from_secs(0),
-                max: Duration::from_secs(std::u64::MAX),
+                max: Duration::from_secs(u64::MAX),
             })),
         }
     }
@@ -100,7 +100,7 @@ impl SimulatedTimeService {
                 now: Duration::from_secs(0),
                 pending: vec![],
                 time_limit,
-                max: Duration::from_secs(std::u64::MAX),
+                max: Duration::from_secs(u64::MAX),
             })),
         }
     }

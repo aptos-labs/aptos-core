@@ -1,0 +1,39 @@
+// -- Model dump before first bytecode pipeline
+module 0xcafe::m {
+    struct S<T> {
+        x: T,
+    }
+    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
+        (f)(s, x)
+    }
+    private fun pattern(s: S<u64>,x: u64): u64 {
+        m::consume<u64>(s, x, closure#0m::__lambda__1__pattern())
+    }
+    private fun __lambda__1__pattern(param$0: S<u64>,_y: u64): u64 {
+        {
+          let m::S<u64>{ x } = param$0;
+          {
+            let y: u64 = x;
+            Add<u64>(x, y)
+          }
+        }
+    }
+} // end 0xcafe::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcafe::m {
+    struct S<T> {
+        x: T,
+    }
+    fun consume<T>(s: S<T>, x: T, f: |(S<T>, T)|T): T {
+        f(s, x)
+    }
+    fun pattern(s: S<u64>, x: u64): u64 {
+        consume<u64>(s, x, |(arg0,arg1)| __lambda__1__pattern(arg0, arg1))
+    }
+    fun __lambda__1__pattern(param$0: S<u64>, _y: u64): u64 {
+        let S<u64>{x: x} = param$0;
+        let y = x;
+        x + y
+    }
+}

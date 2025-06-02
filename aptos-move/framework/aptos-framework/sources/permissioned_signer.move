@@ -626,6 +626,16 @@ module aptos_framework::permissioned_signer {
         }
     }
 
+    /// Unused function. Keeping it for compatibility purpose.
+    public fun address_of(_s: &signer): address {
+        abort error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+    }
+
+    /// Unused function. Keeping it for compatibility purpose.
+    public fun borrow_address(_s: &signer): &address {
+        abort error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+    }
+
     // =====================================================================================================
     // Native Functions
     ///

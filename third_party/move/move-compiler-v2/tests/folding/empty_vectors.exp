@@ -1,4 +1,122 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    use std::vector;
+    public entry fun init() {
+        {
+          let _x: vector<u64> = {
+            let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple([]);
+            {
+              let result: vector<u64> = Vector<u64>();
+              {
+                let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple(v);
+                vector::reverse<vector<u8>>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<vector<u8>>(Borrow(Immutable)(v))) {
+                    {
+                      let e: vector<u8> = vector::pop_back<vector<u8>>(Borrow(Mutable)(v));
+                      {
+                        let (elem: vector<u8>): (vector<u8>) = Tuple(e);
+                        vector::push_back<u64>(Borrow(Mutable)(result), {
+                          let (key: vector<u8>): (vector<u8>) = Tuple(elem);
+                          {
+                            let t: vector<u8> = key;
+                            Add<u64>(vector::length<u8>(Borrow(Immutable)(t)), 2)
+                          }
+                        })
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              result
+            }
+          };
+          {
+            let _y: vector<u64> = {
+              let (v: vector<u64>): (vector<u64>) = Tuple([]);
+              {
+                let result: vector<u64> = Vector<u64>();
+                {
+                  let (v: vector<u64>): (vector<u64>) = Tuple(v);
+                  vector::reverse<u64>(Borrow(Mutable)(v));
+                  loop {
+                    if Not(vector::is_empty<u64>(Borrow(Immutable)(v))) {
+                      {
+                        let e: u64 = vector::pop_back<u64>(Borrow(Mutable)(v));
+                        {
+                          let (elem: u64): (u64) = Tuple(e);
+                          vector::push_back<u64>(Borrow(Mutable)(result), {
+                            let (v: u64): (u64) = Tuple(elem);
+                            Add<u64>(v, 3)
+                          })
+                        };
+                        Tuple()
+                      }
+                    } else {
+                      break
+                    }
+                  };
+                  Tuple()
+                };
+                result
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    public entry fun init() {
+        let _x = {
+            let (v) = (vector[]);
+            let result = vector[];
+            {
+                let (v) = (v);
+                0x1::vector::reverse<vector<u8>>(&mut v);
+                while (!0x1::vector::is_empty<vector<u8>>(&v)) {
+                    let e = 0x1::vector::pop_back<vector<u8>>(&mut v);
+                    {
+                        let (elem) = (e);
+                        0x1::vector::push_back<u64>(&mut result, {
+                            let (key) = (elem);
+                            let t = key;
+                            0x1::vector::length<u8>(&t) + 2
+                        })
+                    };
+                };
+            };
+            result
+        };
+        let _y = {
+            let (v) = (vector[]);
+            let result = vector[];
+            {
+                let (v) = (v);
+                0x1::vector::reverse<u64>(&mut v);
+                while (!0x1::vector::is_empty<u64>(&v)) {
+                    let e = 0x1::vector::pop_back<u64>(&mut v);
+                    {
+                        let (elem) = (e);
+                        0x1::vector::push_back<u64>(&mut result, {
+                            let (v) = (elem);
+                            v + 3
+                        })
+                    };
+                };
+            };
+            result
+        };
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::m {
     use std::vector;
     public entry fun init() {
@@ -64,49 +182,6 @@ module 0x42::m {
         }
     }
 } // end 0x42::m
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::m {
-    public entry fun init() {
-        let _x = {
-            let result = vector[];
-            {
-                let (v) = (vector[]);
-                0x1::vector::reverse<vector<u8>>(&mut v);
-                while (!0x1::vector::is_empty<vector<u8>>(&v)) {
-                    let e = 0x1::vector::pop_back<vector<u8>>(&mut v);
-                    {
-                        let (elem) = (e);
-                        0x1::vector::push_back<u64>(&mut result, {
-                            let (key) = (elem);
-                            let t = key;
-                            0x1::vector::length<u8>(&t) + 2
-                        })
-                    };
-                };
-            };
-            result
-        };
-        let _y = {
-            let result = vector[];
-            {
-                let (v) = (vector[]);
-                0x1::vector::reverse<u64>(&mut v);
-                while (!0x1::vector::is_empty<u64>(&v)) {
-                    let e = 0x1::vector::pop_back<u64>(&mut v);
-                    {
-                        let (elem) = (e);
-                        0x1::vector::push_back<u64>(&mut result, {
-                            let (v) = (elem);
-                            v + 3
-                        })
-                    };
-                };
-            };
-            result
-        };
-    }
-}
 
 
 ============ bytecode verification succeeded ========

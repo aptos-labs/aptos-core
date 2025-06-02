@@ -3,7 +3,7 @@
 
 use super::reroot_path;
 use clap::*;
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use legacy_move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_disassembler::disassembler::Disassembler;
 use move_model::ast::ModuleName;
 use move_package::{compilation::compiled_package::CompiledUnitWithSource, BuildConfig};

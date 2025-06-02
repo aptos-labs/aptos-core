@@ -10,7 +10,7 @@ module 0x42::test {
         borrow_global<R>(@0x1).value
     }
 
-    fun ok2(): bool acquires *, !reads 0x43::*::* {
+    fun ok2(): bool writes *, !reads 0x43::*::* {
         borrow_global<R>(@0x1).value
     }
 
@@ -19,6 +19,10 @@ module 0x42::test {
     }
 
     fun fail2(): bool !reads *(0x1) {
+        borrow_global<R>(@0x1).value
+    }
+
+    fun ok3(): bool !reads *(0x2) {
         borrow_global<R>(@0x1).value
     }
 }
@@ -32,3 +36,5 @@ module 0x42::test {
 //# run --verbose -- 0x42::test::fail1
 
 //# run --verbose -- 0x42::test::fail2
+
+//# run --verbose -- 0x42::test::ok3

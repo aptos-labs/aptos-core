@@ -24,7 +24,7 @@ error: cannot pass `&bool` to a function which expects argument of type `&mut ad
 26 │         h(&mut x, &true);
    │                   ^^^^^
 
-error: the function takes `&mut` but `&` was provided
+error: cannot pass `&bool` to a function which expects argument of type `&mut bool` (mutability mismatch)
    ┌─ tests/checking/error_context/argument.move:30:15
    │
 30 │         g(&1, x)

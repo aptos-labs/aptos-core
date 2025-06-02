@@ -1,0 +1,55 @@
+// -- Model dump before first bytecode pipeline
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64 has drop): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, closure#1m::__lambda__1__no_name_clash(c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, closure#1m::__lambda__1__with_name_clash1(c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, closure#1m::__lambda__1__with_name_clash2(c))
+    }
+    private fun __lambda__1__no_name_clash(c: u64,y: u64): u64 {
+        Add<u64>(y, c)
+    }
+    private fun __lambda__1__with_name_clash1(c: u64,x: u64): u64 {
+        Add<u64>(x, c)
+    }
+    private fun __lambda__1__with_name_clash2(c: u64,x: u64): u64 {
+        Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x)
+    }
+} // end 0xcafe::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcafe::m {
+    fun map(x: u64, f: |u64|u64 has drop): u64 {
+        f(x)
+    }
+    fun no_name_clash(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__no_name_clash(c, arg0))
+    }
+    fun with_name_clash1(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__with_name_clash1(c, arg0))
+    }
+    fun with_name_clash2(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__with_name_clash2(c, arg0))
+    }
+    fun __lambda__1__no_name_clash(c: u64, y: u64): u64 {
+        y + c
+    }
+    fun __lambda__1__with_name_clash1(c: u64, x: u64): u64 {
+        x + c
+    }
+    fun __lambda__1__with_name_clash2(c: u64, x: u64): u64 {
+        {
+            let x = c + 1;
+            x
+        } + x
+    }
+}

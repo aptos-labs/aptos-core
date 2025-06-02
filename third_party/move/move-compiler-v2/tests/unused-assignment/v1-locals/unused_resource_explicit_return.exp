@@ -1,38 +1,18 @@
 
 Diagnostics:
-warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
-  ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:5:13
-  │
-5 │         let r = R{};
-  │             ^
-
-warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
-   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:28:13
-   │
-28 │         let r = R{};
-   │             ^
-
-warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:33:13
-   │
-33 │         let x = &R{};
-   │             ^
-
-
-Diagnostics:
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:5:17
   │
 5 │         let r = R{};
   │                 ^^^
 
-warning: Unused assignment/binding to `r`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_r`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `r` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_r`), or renaming to `_`
    ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:28:17
    │
 28 │         let r = R{};
    │                 ^^^
 
-warning: Unused assignment/binding to `x`. Consider removing the assignment/binding, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:33:17
    │
 33 │         let x = &R{};

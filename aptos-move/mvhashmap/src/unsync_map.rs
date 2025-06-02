@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, TxnIndex, UnsyncGroupError, ValueWithLayout},
+    types::{TxnIndex, UnsyncGroupError, ValueWithLayout},
     BlockStateStats,
 };
 use anyhow::anyhow;
 use aptos_aggregator::types::DelayedFieldValue;
-use aptos_crypto::hash::HashValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     executable::ModulePath,
@@ -44,12 +43,7 @@ pub struct UnsyncMap<
     group_cache: RefCell<HashMap<K, RefCell<(HashMap<T, ValueWithLayout<V>>, ResourceGroupSize)>>>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
-    // Optional hash can store the hash of the module to avoid re-computations. This map is used by
-    // V1 loader and will be removed in the future.
-    #[deprecated]
-    deprecated_module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
-
-    // Code caches for loader V2 implementation: contains modules and scripts.
+    // Code caches for modules and scripts.
     module_cache:
         UnsyncModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension, Option<TxnIndex>>,
     script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
@@ -66,10 +60,8 @@ impl<
     > Default for UnsyncMap<K, T, V, I>
 {
     fn default() -> Self {
-        #[allow(deprecated)]
         Self {
             resource_map: RefCell::new(HashMap::new()),
-            deprecated_module_map: RefCell::new(HashMap::new()),
             module_cache: UnsyncModuleCache::empty(),
             script_cache: UnsyncScriptCache::empty(),
             group_cache: RefCell::new(HashMap::new()),
@@ -117,14 +109,11 @@ impl<
     }
 
     pub fn stats(&self) -> BlockStateStats {
-        #[allow(deprecated)]
-        let num_modules =
-            self.deprecated_module_map.borrow().len() + self.module_cache.num_modules();
         BlockStateStats {
             num_resources: self.resource_map.borrow().len(),
             num_resource_groups: self.group_cache.borrow().len(),
             num_delayed_fields: self.delayed_field_map.borrow().len(),
-            num_modules,
+            num_modules: self.module_cache.num_modules(),
             base_resources_size: self.total_base_resource_size.load(Ordering::Relaxed),
             base_delayed_fields_size: self.total_base_delayed_field_size.load(Ordering::Relaxed),
         }
@@ -177,11 +166,11 @@ impl<
             .insert(tag, ValueWithLayout::Exchanged(Arc::new(value), layout));
     }
 
-    pub fn get_group_size(&self, group_key: &K) -> GroupReadResult {
-        match self.group_cache.borrow().get(group_key) {
-            Some(entry) => GroupReadResult::Size(entry.borrow().1),
-            None => GroupReadResult::Uninitialized,
-        }
+    pub fn get_group_size(&self, group_key: &K) -> Option<ResourceGroupSize> {
+        self.group_cache
+            .borrow()
+            .get(group_key)
+            .map(|entry| entry.borrow().1)
     }
 
     pub fn fetch_group_tagged_data(
@@ -302,15 +291,6 @@ impl<
         })
     }
 
-    #[deprecated]
-    pub fn fetch_module_for_loader_v1(&self, key: &K) -> Option<Arc<V>> {
-        #[allow(deprecated)]
-        self.deprecated_module_map
-            .borrow()
-            .get(key)
-            .map(|entry| entry.0.clone())
-    }
-
     pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
         self.delayed_field_map.borrow().get(id).cloned()
     }
@@ -319,14 +299,6 @@ impl<
         self.resource_map
             .borrow_mut()
             .insert(key, ValueWithLayout::Exchanged(value, layout));
-    }
-
-    #[deprecated]
-    pub fn write_module(&self, key: K, value: V) {
-        #[allow(deprecated)]
-        self.deprecated_module_map
-            .borrow_mut()
-            .insert(key, (Arc::new(value), None));
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
@@ -493,7 +465,7 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
-        assert_eq!(map.get_group_size(&ap), GroupReadResult::Uninitialized);
+        assert_none!(map.get_group_size(&ap));
 
         map.set_group_base_values(
             ap.clone(),
@@ -509,7 +481,7 @@ mod test {
         let four_entry_len = TestValue::creation_with_len(4).bytes().unwrap().len();
 
         let base_size = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
-        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(base_size));
+        assert_some_eq!(map.get_group_size(&ap), base_size);
 
         let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
             (
@@ -537,7 +509,7 @@ mod test {
             ],
             exp_size
         ));
-        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        assert_some_eq!(map.get_group_size(&ap), exp_size);
 
         let exp_size = group_size_as_sum(
             vec![(&tag, one_entry_len); 2]
@@ -554,7 +526,7 @@ mod test {
             ],
             exp_size
         ));
-        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        assert_some_eq!(map.get_group_size(&ap), exp_size);
 
         let exp_size = group_size_as_sum(
             vec![(&tag, one_entry_len); 2]
@@ -571,7 +543,7 @@ mod test {
             ],
             exp_size
         ));
-        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        assert_some_eq!(map.get_group_size(&ap), exp_size);
     }
 
     #[test]

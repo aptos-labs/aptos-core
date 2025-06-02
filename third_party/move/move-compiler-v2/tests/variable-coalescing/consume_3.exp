@@ -1,4 +1,37 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::consume($t0: u32) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: 0xc0ffee::m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test($t0: u32) {
+     var $t1: u32
+  0: $t1 := copy($t0)
+  1: m::consume($t1)
+  2: m::consume($t0)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test_($t0: 0xc0ffee::m::W) {
+     var $t1: 0xc0ffee::m::W
+  0: $t1 := copy($t0)
+  1: m::consume_($t1)
+  2: m::consume_($t0)
+  3: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::consume($t0: u32) {

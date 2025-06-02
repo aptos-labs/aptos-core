@@ -1,0 +1,27 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-27:
+Error: compilation errors:
+ bug: bytecode verification failed with unexpected status code `RECURSIVE_STRUCT_DEFINITION`. This is a compiler bug, consider reporting it.
+Error message: none
+   ┌─ TEMPFILE:2:1
+   │  
+ 2 │ ╭ module 0xc0ffee::m {
+ 3 │ │     enum Foo {
+ 4 │ │         A(Bar)
+ 5 │ │     } has drop;
+   · │
+22 │ │     }
+23 │ │ }
+   │ ╰─^
+
+
+
+task 1 'run'. lines 29-29:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

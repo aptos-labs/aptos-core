@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     use std::vector;
     struct E {
@@ -12,7 +12,7 @@ module 0x42::m {
     }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     struct E {
         k: u8,
@@ -25,7 +25,38 @@ module 0x42::m {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::foo($t0: &0x42::m::S): u8 {
+     var $t1: u8
+     var $t2: &0x42::m::E
+     var $t3: &vector<0x42::m::E>
+     var $t4: u64
+     var $t5: &u8
+  0: $t3 := borrow_field<0x42::m::S>.data($t0)
+  1: $t4 := 0
+  2: $t2 := vector::borrow<0x42::m::E>($t3, $t4)
+  3: $t5 := borrow_field<0x42::m::E>.k($t2)
+  4: $t1 := read_ref($t5)
+  5: return $t1
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::m {
+    use std::vector;
+    struct E {
+        k: u8,
+    }
+    struct S {
+        data: vector<E>,
+    }
+    public fun foo(v: &S): u8 {
+        select m::E.k<&E>(vector::borrow<E>(Borrow(Immutable)(select m::S.data<&S>(v)), 0))
+    }
+} // end 0x42::m
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::foo($t0: &0x42::m::S): u8 {

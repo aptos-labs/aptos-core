@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{IndexerGrpcManagerConfig, ServiceConfig},
+    config::{IndexerGrpcManagerConfig, ServiceConfig, MAX_MESSAGE_SIZE},
     data_manager::DataManager,
     file_store_uploader::FileStoreUploader,
     metadata_manager::MetadataManager,
@@ -12,7 +12,7 @@ use crate::{
 use anyhow::Result;
 use aptos_protos::indexer::v1::grpc_manager_server::GrpcManagerServer;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot::channel, Mutex};
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
 
@@ -94,27 +94,26 @@ impl GrpcManager {
             self.data_manager.clone(),
         ))
         .send_compressed(CompressionEncoding::Zstd)
-        .accept_compressed(CompressionEncoding::Zstd);
+        .accept_compressed(CompressionEncoding::Zstd)
+        .max_encoding_message_size(MAX_MESSAGE_SIZE)
+        .max_decoding_message_size(MAX_MESSAGE_SIZE);
         let server = Server::builder()
             .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
             .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
             .add_service(service);
 
+        let (tx, rx) = channel();
         tokio_scoped::scope(|s| {
             s.spawn(async move {
                 self.metadata_manager.start().await.unwrap();
             });
-            s.spawn(async move {
-                self.data_manager
-                    .start(/*watch_file_store_version=*/ !self.is_master)
-                    .await
-            });
+            s.spawn(async move { self.data_manager.start(self.is_master, rx).await });
             if self.is_master {
                 s.spawn(async move {
                     self.file_store_uploader
                         .lock()
                         .await
-                        .start(self.data_manager.clone())
+                        .start(self.data_manager.clone(), tx)
                         .await
                         .unwrap();
                 });

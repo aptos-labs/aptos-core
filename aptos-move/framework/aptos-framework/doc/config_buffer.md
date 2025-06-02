@@ -22,13 +22,15 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 -  [Function `does_exist`](#0x1_config_buffer_does_exist)
 -  [Function `upsert`](#0x1_config_buffer_upsert)
 -  [Function `extract`](#0x1_config_buffer_extract)
+-  [Function `extract_v2`](#0x1_config_buffer_extract_v2)
 -  [Specification](#@Specification_1)
     -  [Function `does_exist`](#@Specification_1_does_exist)
     -  [Function `upsert`](#@Specification_1_upsert)
-    -  [Function `extract`](#@Specification_1_extract)
+    -  [Function `extract_v2`](#@Specification_1_extract_v2)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">0x1::any</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -68,6 +70,16 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 <a id="@Constants_0"></a>
 
 ## Constants
+
+
+<a id="0x1_config_buffer_EDEPRECATED"></a>
+
+Function is deprecated.
+
+
+<pre><code><b>const</b> <a href="config_buffer.md#0x1_config_buffer_EDEPRECATED">EDEPRECATED</a>: u64 = 2;
+</code></pre>
+
 
 
 <a id="0x1_config_buffer_ESTD_SIGNER_NEEDED"></a>
@@ -173,13 +185,11 @@ Typically used in <code>X::set_for_next_epoch()</code> where X is an on-chain co
 
 ## Function `extract`
 
-Take the buffered config <code>T</code> out (buffer cleared). Abort if the buffer is empty.
-Should only be used at the end of a reconfiguration.
-
-Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
+Use <code>extract_v2</code> instead.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract">extract</a>&lt;T: store&gt;(): T
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract">extract</a>&lt;T: store&gt;(): T
 </code></pre>
 
 
@@ -188,7 +198,35 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract">extract</a>&lt;T: store&gt;(): T <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract">extract</a>&lt;T: store&gt;(): T {
+    <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="config_buffer.md#0x1_config_buffer_EDEPRECATED">EDEPRECATED</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_config_buffer_extract_v2"></a>
+
+## Function `extract_v2`
+
+Take the buffered config <code>T</code> out (buffer cleared). Abort if the buffer is empty.
+Should only be used at the end of a reconfiguration.
+
+Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract_v2">extract_v2</a>&lt;T: store&gt;(): T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract_v2">extract_v2</a>&lt;T: store&gt;(): T <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
     <b>let</b> configs = <b>borrow_global_mut</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
     <b>let</b> key = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
     <b>let</b> (_, value_packed) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> configs.configs, &key);
@@ -261,12 +299,12 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 
 
 
-<a id="@Specification_1_extract"></a>
+<a id="@Specification_1_extract_v2"></a>
 
-### Function `extract`
+### Function `extract_v2`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract">extract</a>&lt;T: store&gt;(): T
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract_v2">extract_v2</a>&lt;T: store&gt;(): T
 </code></pre>
 
 

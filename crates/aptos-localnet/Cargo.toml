@@ -22,9 +22,7 @@ version-compare = { workspace = true }
 
 aptos-protos = { workspace = true }
 aptos-rest-client = { workspace = true }
-diesel = { workspace = true, features = [
-    "postgres_backend",
-] }
+diesel = { workspace = true, features = ["postgres_backend"] }
 diesel-async = { workspace = true }
 processor = { workspace = true }
 reqwest = { workspace = true }

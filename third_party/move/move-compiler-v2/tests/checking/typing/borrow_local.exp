@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         dummy_field: bool,
@@ -7,6 +7,7 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun t0(b: bool,u: u64,s: S,r: R): R {
+        Borrow(Immutable)(b);
         Borrow(Immutable)(b);
         Borrow(Mutable)(b);
         Borrow(Immutable)(u);
@@ -42,13 +43,14 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
     }
     struct S has drop {
     }
     fun t0(b: bool, u: u64, s: S, r: R): R {
+        &b;
         &b;
         &mut b;
         &u;

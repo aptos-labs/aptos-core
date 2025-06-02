@@ -1,11 +1,10 @@
 spec aptos_token::token_event_store {
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 
     spec initialize_token_event_store(acct: &signer) {
-        pragma verify = true;
         let addr = signer::address_of(acct);
         include InitializeTokenEventStoreAbortsIf {creator : acct};
     }

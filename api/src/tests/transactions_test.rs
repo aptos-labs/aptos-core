@@ -1666,7 +1666,7 @@ async fn test_simulation_filter_deny() {
 
     // Blocklist the balance function.
     let mut filter = node_config.api.simulation_filter.clone();
-    filter = filter.add_deny_all();
+    filter = filter.add_all_filter(false);
     node_config.api.simulation_filter = filter;
 
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
@@ -1691,8 +1691,8 @@ async fn test_simulation_filter_allow_sender() {
 
     // Allow the root sender only.
     let mut filter = node_config.api.simulation_filter.clone();
-    filter = filter.add_allow_sender(aptos_test_root_address());
-    filter = filter.add_deny_all();
+    filter = filter.add_sender_filter(true, aptos_test_root_address());
+    filter = filter.add_all_filter(false);
     node_config.api.simulation_filter = filter;
 
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
@@ -1728,7 +1728,6 @@ fn gen_string(len: u64) -> String {
     std::iter::repeat(())
         .map(|()| rng.sample(Alphanumeric))
         .take(len as usize)
-        .map(char::from)
         .collect()
 }
 

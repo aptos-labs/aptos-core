@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::M {
     struct Ghost$some_global {
         v: u64,
@@ -31,7 +31,7 @@ module 0x42::M {
 
 } // end 0x42::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::M {
     struct Ghost$some_global has copy, drop, store, key {
         v: u64,

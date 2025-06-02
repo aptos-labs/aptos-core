@@ -11,4 +11,4 @@ error: function acquires global `A::T1` which is currently mutably borrowed
    │         ------ conflicting reference `x` used here
    ·
 11 │     fun acquires_t1(account: &signer) acquires T1 {
-   │                                                --- access declared here
+   │                                                --- `acquires` declared here

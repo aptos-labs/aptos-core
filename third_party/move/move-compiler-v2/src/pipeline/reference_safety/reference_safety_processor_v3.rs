@@ -25,10 +25,10 @@ use crate::pipeline::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::{file_format, file_format::CodeOffset};
+use move_binary_format::file_format::CodeOffset;
 use move_borrow_graph::{graph::BorrowGraph, references::RefID};
 use move_model::{
-    ast::TempIndex,
+    ast::{AccessSpecifierKind, ResourceSpecifier, TempIndex},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, QualifiedId, QualifiedInstId, StructId},
     ty::{ReferenceKind, Type},
 };
@@ -43,11 +43,9 @@ use move_stackless_bytecode::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Display, Formatter},
-    iter,
     ops::Range,
     rc::Rc,
 };
-
 // =================================================================================================
 // Lifetime Analysis Domain
 
@@ -379,13 +377,13 @@ struct LifetimeAnalysisStep<'env, 'state> {
     state: &'state mut LifetimeState,
 }
 
-impl<'env> LifeTimeAnalysis<'env> {
+impl LifeTimeAnalysis<'_> {
     fn new_step<'a>(
         &'a self,
         code_offset: CodeOffset,
         attr_id: AttrId,
         state: &'a mut LifetimeState,
-    ) -> LifetimeAnalysisStep {
+    ) -> LifetimeAnalysisStep<'a, 'a> {
         let alive = self
             .live_var_annotation
             .get_live_var_info_at(code_offset)
@@ -402,7 +400,7 @@ impl<'env> LifeTimeAnalysis<'env> {
 // -------------------------------------------------------------------------------------------------
 // Analysing, Diagnosing, and Primitives
 
-impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
+impl LifetimeAnalysisStep<'_, '_> {
     /// Get the location associated with bytecode attribute.
     fn loc(&self, id: AttrId) -> Loc {
         self.target().get_bytecode_loc(id)
@@ -695,38 +693,53 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// currently borrowed.
     fn check_global_access(&mut self, fun_id: QualifiedInstId<FunId>) {
         let fun = self.global_env().get_function(fun_id.to_qualified_id());
-        let specifiers = fun.get_access_specifiers().unwrap_or(&[]);
+        if self.parent.target.func_env.module_env.get_id() != fun_id.module_id
+            || fun.is_native()
+            || fun.is_inline()
+        {
+            // Not function in the same module, a native function, or inline
+            return;
+        }
+        let empty_acquires = BTreeSet::new();
+        let acquires = fun.get_acquired_structs().unwrap_or(&empty_acquires);
 
         for (_code_id, struct_id, target) in self.state.global_borrow_edges() {
             let is_mut = self.state.borrow_graph.is_mutable(target);
-            for spec in specifiers.iter().filter(|s| !s.negated) {
-                if spec
-                    .resource
-                    .1
-                    // To support v1 semantics, the graph does not carry instantiation of
-                    // resources right now
-                    .matches_modulo_type_instantiation(self.global_env(), &struct_id)
-                    // For mut global borrows, no access is allowed at all. For
-                    // non-mut, write access is not allowed.
-                    && (is_mut || spec.kind.subsumes(&file_format::AccessKind::Writes))
-                {
-                    self.error_with_hints(
-                        self.cur_loc(),
-                        format!(
-                            "function {} global `{}` which is currently {}borrowed",
-                            spec.kind,
-                            self.global_env().display(&struct_id),
-                            if is_mut { "mutably " } else { "" }
-                        ),
-                        "function called here",
-                        self.borrow_info_for_global(struct_id)
-                            .into_iter()
-                            .chain(iter::once((
-                                spec.loc.clone(),
-                                "access declared here".to_owned(),
-                            ))),
-                    )
-                }
+            if struct_id.module_id == fun.module_env.get_id() && acquires.contains(&struct_id.id) {
+                // Try to find the location of the access declaration via the access specifier
+                // list.
+                let access_origin_hint = fun
+                    .get_access_specifiers()
+                    .unwrap_or_default()
+                    .iter()
+                    .find_map(|s| {
+                        if s.kind == AccessSpecifierKind::LegacyAcquires
+                            && matches!(&s.resource.1,
+                    ResourceSpecifier::Resource(s) if s.to_qualified_id() == struct_id)
+                        {
+                            Some(vec![(s.loc.clone(), "`acquires` declared here".to_owned())])
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| {
+                        vec![(
+                            fun.get_id_loc(),
+                            "`acquires` of this function was inferred".to_owned(),
+                        )]
+                    });
+                self.error_with_hints(
+                    self.cur_loc(),
+                    format!(
+                        "function acquires global `{}` which is currently {}borrowed",
+                        self.global_env().display(&struct_id),
+                        if is_mut { "mutably " } else { "" }
+                    ),
+                    "function called here",
+                    self.borrow_info_for_global(struct_id)
+                        .into_iter()
+                        .chain(access_origin_hint),
+                )
             }
         }
     }
@@ -735,7 +748,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 // -------------------------------------------------------------------------------------------------
 // Program Steps
 
-impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
+impl LifetimeAnalysisStep<'_, '_> {
     fn assign(&mut self, dest: TempIndex, src: TempIndex, kind: AssignKind) {
         if src != dest {
             self.drop(dest);
@@ -1037,7 +1050,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 // -------------------------------------------------------------------------------------------------
 // Transfer Function
 
-impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
+impl TransferFunctions for LifeTimeAnalysis<'_> {
     type State = LifetimeState;
 
     const BACKWARD: bool = false;
@@ -1104,7 +1117,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
 }
 
 /// Instantiate the data flow analysis framework based on the transfer function
-impl<'env> DataflowAnalysis for LifeTimeAnalysis<'env> {}
+impl DataflowAnalysis for LifeTimeAnalysis<'_> {}
 
 // ===============================================================================
 // Processor
@@ -1184,7 +1197,7 @@ impl Label {
     }
 }
 
-impl<'a> Display for LabelDisplay<'a> {
+impl Display for LabelDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.1 {
             Label::Local(local) if /*raw*/self.2 => write!(f, "$t{}", local),
@@ -1231,7 +1244,7 @@ impl LifetimeState {
     }
 }
 
-impl<'a> Display for LifetimeStateDisplay<'a> {
+impl Display for LifetimeStateDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let fmt_ref_id = |id: RefID| {
             if self.1.frame_root() == id {

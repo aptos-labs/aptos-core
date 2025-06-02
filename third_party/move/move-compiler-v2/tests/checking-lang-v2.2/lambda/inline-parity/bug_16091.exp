@@ -1,0 +1,56 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    struct T {
+        t: S<u64>,
+    }
+    struct S<T1> {
+        t1: T1,
+    }
+    private inline fun foo<T1>(self: &S<T1>,f: |&S<T1>|) {
+        (f)(self)
+    }
+    public fun test() {
+        {
+          let t: S<u64> = pack Test::S<u64>(Cast<u64>(2));
+          {
+            let (self: &S<u64>): (&S<u64>) = Tuple(Borrow(Immutable)(t));
+            {
+              let (t2: &S<u64>): (&S<u64>) = Tuple(self);
+              {
+                let (self: &S<u64>): (&S<u64>) = Tuple(t2);
+                {
+                  let (_t4: &S<u64>): (&S<u64>) = Tuple(self);
+                  Tuple()
+                }
+              };
+              Tuple()
+            }
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    struct T has drop, key {
+        t: S<u64>,
+    }
+    struct S<T1> has drop, store {
+        t1: T1,
+    }
+    inline fun foo<T1>(self: &S<T1>, f: |&S<T1>|) {
+        f(self)
+    }
+    public fun test() {
+        let t = S<u64>{t1: 2 as u64};
+        {
+            let (self) = (&t);
+            let (t2) = (self);
+            {
+                let (self) = (t2);
+                let (_t4) = (self);
+            };
+        };
+    }
+}

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/shadowing_renamed.move:12:13
+   │
+12 │             x = y  // We expect this to assign 3 via foo if renaming works correctly. If not it would
+   │             ^

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     private fun t0(cond: bool,u: &u64,u_mut: &mut u64) {
         {
@@ -50,7 +50,7 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     fun t0(cond: bool, u: &u64, u_mut: &mut u64) {
         let _ = if (cond) u else /*freeze*/u_mut;

@@ -67,11 +67,9 @@ impl AUTransactionGen for P2PTransferGen {
             (true, true, true) => {
                 // Success!
                 sender.sequence_number += 1;
-                sender.sent_events_count += 1;
                 sender.balance -= to_deduct;
 
                 receiver.balance += self.amount;
-                receiver.received_events_count += 1;
 
                 status = TransactionStatus::Keep(ExecutionStatus::Success);
                 gas_used = sender.peer_to_peer_gas_cost();

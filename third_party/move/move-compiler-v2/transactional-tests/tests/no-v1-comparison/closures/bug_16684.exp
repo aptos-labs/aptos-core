@@ -1,0 +1,43 @@
+processed 16 tasks
+
+task 1 'run'. lines 92-92:
+return values: []
+
+task 2 'run'. lines 94-94:
+return values: []
+
+task 3 'run'. lines 96-96:
+return values: []
+
+task 4 'run'. lines 98-98:
+return values: []
+
+task 5 'run'. lines 100-100:
+return values: []
+
+task 6 'run'. lines 102-102:
+return values: []
+
+task 7 'run'. lines 104-104:
+return values: []
+
+task 8 'run'. lines 106-106:
+return values: []
+
+task 9 'run'. lines 108-108:
+return values: []
+
+task 10 'run'. lines 110-110:
+return values: [42]
+
+task 12 'run'. lines 114-114:
+return values: 3
+
+task 13 'run'. lines 116-116:
+return values: [3, 2, 1]
+
+task 14 'run'. lines 118-118:
+return values: [3, 2, 1]
+
+task 15 'run'. lines 120-120:
+return values: [1, 2, 3, 4]

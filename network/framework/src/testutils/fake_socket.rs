@@ -52,7 +52,7 @@ impl<'a> ReadOnlyTestSocket<'a> {
 }
 
 /// Does nothing, but looks to the caller as if write worked
-impl<'a> AsyncWrite for ReadOnlyTestSocket<'a> {
+impl AsyncWrite for ReadOnlyTestSocket<'_> {
     fn poll_write(
         self: Pin<&mut Self>,
         _context: &mut Context,
@@ -72,7 +72,7 @@ impl<'a> AsyncWrite for ReadOnlyTestSocket<'a> {
 }
 
 /// Read based on the mode set
-impl<'a> AsyncRead for ReadOnlyTestSocket<'a> {
+impl AsyncRead for ReadOnlyTestSocket<'_> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         mut _context: &mut Context,
@@ -256,7 +256,7 @@ impl<'a> ReadWriteTestSocket<'a> {
     }
 }
 
-impl<'a> AsyncWrite for ReadWriteTestSocket<'a> {
+impl AsyncWrite for ReadWriteTestSocket<'_> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         context: &mut Context,
@@ -287,7 +287,7 @@ impl<'a> AsyncWrite for ReadWriteTestSocket<'a> {
     }
 }
 
-impl<'a> AsyncRead for ReadWriteTestSocket<'a> {
+impl AsyncRead for ReadWriteTestSocket<'_> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         context: &mut Context,

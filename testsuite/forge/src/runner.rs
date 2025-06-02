@@ -143,7 +143,7 @@ pub enum AnyTestRef<'a> {
     Network(&'a dyn NetworkTest),
 }
 
-impl<'a> Test for AnyTestRef<'a> {
+impl Test for AnyTestRef<'_> {
     fn name(&self) -> &'static str {
         match self {
             AnyTestRef::Aptos(t) => t.name(),

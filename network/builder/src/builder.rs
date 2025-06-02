@@ -70,7 +70,7 @@ pub struct NetworkBuilder {
 
 impl NetworkBuilder {
     /// Return a new NetworkBuilder initialized with default configuration values.
-    // TODO:  Remove `pub`.  NetworkBuilder should only be created thorugh `::create()`
+    // TODO:  Remove `pub`.  NetworkBuilder should only be created through `::create()`
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         chain_id: ChainId,

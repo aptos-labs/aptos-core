@@ -1,18 +1,4 @@
-
-Diagnostics:
-warning: Unused local variable `r_ref`. Consider removing or prefixing with an underscore: `_r_ref`
-   ┌─ tests/checking/typing/assign_nested2.move:12:13
-   │
-12 │         let r_ref = &mut r;
-   │             ^^^^^
-
-warning: Unused local variable `s`. Consider removing or prefixing with an underscore: `_s`
-   ┌─ tests/checking/typing/assign_nested2.move:13:13
-   │
-13 │         let s = S { f: 0 };
-   │             ^
-
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::A {
     struct S {
         f: u64,
@@ -38,7 +24,7 @@ module 0x8675309::A {
     }
 } // end 0x8675309::A
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::A {
     struct S has drop {
         f: u64,

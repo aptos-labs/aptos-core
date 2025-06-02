@@ -1,4 +1,4 @@
-Move prover returns: exiting with checking errors
+Move prover returns: exiting with context checking errors
 error: A specification variable in the schema TestSchemaName::TestNameConflict conflicts with...
    ┌─ tests/sources/functional/schema_name.move:9:16
    │

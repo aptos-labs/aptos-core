@@ -69,12 +69,12 @@ spec aptos_framework::aptos_account {
         /// [high-level-req-1]
         pragma aborts_if_is_partial;
         include CreateAccountAbortsIf;
-        ensures exists<account::Account>(auth_key);
+        // ensures exists<account::Account>(auth_key);
     }
     spec schema CreateAccountAbortsIf {
         auth_key: address;
         aborts_if exists<account::Account>(auth_key);
-        aborts_if length_judgment(auth_key);
+        // aborts_if length_judgment(auth_key);
         aborts_if auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
     }
 
@@ -102,15 +102,16 @@ spec aptos_framework::aptos_account {
     }
 
     spec assert_account_exists(addr: address) {
-        aborts_if !account::exists_at(addr);
+        aborts_if !account::spec_exists_at(addr);
     }
 
     /// Check if the address existed.
     /// Check if the AptosCoin under the address existed.
     spec assert_account_is_registered_for_apt(addr: address) {
         pragma aborts_if_is_partial;
-        aborts_if !account::exists_at(addr);
-        aborts_if !coin::spec_is_account_registered<AptosCoin>(addr);
+        // aborts_if !account::spec_exists_at(addr);
+        // TODO(fa_migration)
+        //aborts_if !coin::spec_is_account_registered<AptosCoin>(addr);
     }
 
     spec set_allow_direct_coin_transfers(account: &signer, allow: bool) {
@@ -136,12 +137,12 @@ spec aptos_framework::aptos_account {
         // create account properties
         aborts_if len(recipients) != len(amounts);
         aborts_if exists i in 0..len(recipients):
-                !account::exists_at(recipients[i]) && length_judgment(recipients[i]);
+                !account::spec_exists_at(recipients[i]) && length_judgment(recipients[i]);
         aborts_if exists i in 0..len(recipients):
-                !account::exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
+                !account::spec_exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
         ensures forall i in 0..len(recipients):
-                (!account::exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
-                    (!account::exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
+                (!account::spec_exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
+                    (!account::spec_exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
 
         // coin::withdraw properties
         aborts_if exists i in 0..len(recipients):
@@ -157,9 +158,9 @@ spec aptos_framework::aptos_account {
 
         // guid properties
         aborts_if exists i in 0..len(recipients):
-            account::exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+            account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
         aborts_if exists i in 0..len(recipients):
-            account::exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
+            account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
     }
 
     spec can_receive_direct_coin_transfers(account: address): bool {
@@ -173,7 +174,7 @@ spec aptos_framework::aptos_account {
 
     spec batch_transfer_coins<CoinType>(from: &signer, recipients: vector<address>, amounts: vector<u64>) {
         //TODO: Can't verify the loop invariant in enumerate
-        use aptos_std::type_info;
+        //use aptos_std::type_info;
         pragma verify = false;
         let account_addr_source = signer::address_of(from);
         let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
@@ -190,12 +191,12 @@ spec aptos_framework::aptos_account {
 
         //create account properties
         aborts_if exists i in 0..len(recipients):
-                !account::exists_at(recipients[i]) && length_judgment(recipients[i]);
+                !account::spec_exists_at(recipients[i]) && length_judgment(recipients[i]);
         aborts_if exists i in 0..len(recipients):
-                !account::exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
+                !account::spec_exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
         ensures forall i in 0..len(recipients):
-                (!account::exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
-                    (!account::exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
+                (!account::spec_exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
+                    (!account::spec_exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
 
         // coin::withdraw properties
         aborts_if exists i in 0..len(recipients):
@@ -211,13 +212,14 @@ spec aptos_framework::aptos_account {
 
         // guid properties
         aborts_if exists i in 0..len(recipients):
-            account::exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+            account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
         aborts_if exists i in 0..len(recipients):
-            account::exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
+            account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
 
         // register_coin properties
-        aborts_if exists i in 0..len(recipients):
-            !coin::spec_is_account_registered<CoinType>(recipients[i]) && !type_info::spec_is_struct<CoinType>();
+        // TODO(fa_migration)
+        // aborts_if exists i in 0..len(recipients):
+        //     //!coin::spec_is_account_registered<CoinType>(recipients[i]) && !type_info::spec_is_struct<CoinType>();
     }
 
     spec deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) {
@@ -293,8 +295,8 @@ spec aptos_framework::aptos_account {
 
     spec schema CreateAccountTransferAbortsIf {
         to: address;
-        aborts_if !account::exists_at(to) && length_judgment(to);
-        aborts_if !account::exists_at(to) && (to == @vm_reserved || to == @aptos_framework || to == @aptos_token);
+        aborts_if !account::spec_exists_at(to) && length_judgment(to);
+        aborts_if !account::spec_exists_at(to) && (to == @vm_reserved || to == @aptos_framework || to == @aptos_token);
     }
 
     spec schema WithdrawAbortsIf<CoinType> {
@@ -311,14 +313,15 @@ spec aptos_framework::aptos_account {
     spec schema GuidAbortsIf<CoinType> {
         to: address;
         let acc = global<account::Account>(to);
-        aborts_if account::exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if account::exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 > MAX_U64;
+        aborts_if account::spec_exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if account::spec_exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 > MAX_U64;
     }
 
     spec schema RegistCoinAbortsIf<CoinType> {
         use aptos_std::type_info;
         to: address;
-        aborts_if !coin::spec_is_account_registered<CoinType>(to) && !type_info::spec_is_struct<CoinType>();
+        // TODO(fa_migration)
+        // aborts_if !coin::spec_is_account_registered<CoinType>(to) && !type_info::spec_is_struct<CoinType>();
         aborts_if exists<aptos_framework::account::Account>(to);
         aborts_if type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
     }

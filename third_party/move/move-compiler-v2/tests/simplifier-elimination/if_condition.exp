@@ -1,3 +1,55 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    private fun t0() {
+        if true {
+          Tuple()
+        } else {
+          Tuple()
+        };
+        if false {
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+    private fun t1() {
+        if {
+          let x: bool = true;
+          x
+        } {
+          Tuple()
+        } else {
+          Tuple()
+        };
+        if {
+          let x: bool = false;
+          x
+        } {
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    fun t0() {
+        if (true) ();
+        if (false) ()
+    }
+    fun t1() {
+        if ({
+            let x = true;
+            x
+        }) ();
+        if ({
+            let x = false;
+            x
+        }) ()
+    }
+}
+
 
 Diagnostics:
 warning: If condition is always true, so else branch code eliminated as dead code
@@ -44,7 +96,7 @@ warning: If condition is always false, so then branch code eliminated as dead co
   │                              │
   │                              condition is always false
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before second bytecode pipeline
 module 0x8675309::M {
     private fun t0() {
         Tuple()
@@ -53,14 +105,6 @@ module 0x8675309::M {
         Tuple()
     }
 } // end 0x8675309::M
-
-// -- Sourcified model before bytecode pipeline
-module 0x8675309::M {
-    fun t0() {
-    }
-    fun t1() {
-    }
-}
 
 
 ============ bytecode verification succeeded ========

@@ -72,7 +72,9 @@ async fn test_indexer() {
         .await
         .unwrap();
 
-    wait_for_account(&client, account1.address()).await.unwrap();
+    wait_for_account_balance(&client, account1.address())
+        .await
+        .unwrap();
 
     let txn = account1.sign_with_transaction_builder(
         factory.payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 10)),
@@ -88,11 +90,17 @@ async fn test_indexer() {
     assert_eq!(balance, 10);
 }
 
-async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Result<()> {
+async fn wait_for_account_balance(client: &RestClient, address: AccountAddress) -> Result<()> {
     const DEFAULT_WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
     let start = std::time::Instant::now();
     while start.elapsed() < DEFAULT_WAIT_TIMEOUT {
-        if client.get_account(address).await.is_ok() {
+        if client
+            .get_account_balance(address, "0x1::aptos_coin::AptosCoin")
+            .await
+            .unwrap()
+            .into_inner()
+            > 0
+        {
             return Ok(());
         }
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;

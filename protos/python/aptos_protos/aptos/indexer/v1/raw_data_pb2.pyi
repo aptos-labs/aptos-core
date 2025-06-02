@@ -53,18 +53,31 @@ class GetTransactionsRequest(_message.Message):
         ] = ...,
     ) -> None: ...
 
+class ProcessedRange(_message.Message):
+    __slots__ = ["first_version", "last_version"]
+    FIRST_VERSION_FIELD_NUMBER: _ClassVar[int]
+    LAST_VERSION_FIELD_NUMBER: _ClassVar[int]
+    first_version: int
+    last_version: int
+    def __init__(
+        self, first_version: _Optional[int] = ..., last_version: _Optional[int] = ...
+    ) -> None: ...
+
 class TransactionsResponse(_message.Message):
-    __slots__ = ["transactions", "chain_id"]
+    __slots__ = ["transactions", "chain_id", "processed_range"]
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
+    PROCESSED_RANGE_FIELD_NUMBER: _ClassVar[int]
     transactions: _containers.RepeatedCompositeFieldContainer[
         _transaction_pb2.Transaction
     ]
     chain_id: int
+    processed_range: ProcessedRange
     def __init__(
         self,
         transactions: _Optional[
             _Iterable[_Union[_transaction_pb2.Transaction, _Mapping]]
         ] = ...,
         chain_id: _Optional[int] = ...,
+        processed_range: _Optional[_Union[ProcessedRange, _Mapping]] = ...,
     ) -> None: ...

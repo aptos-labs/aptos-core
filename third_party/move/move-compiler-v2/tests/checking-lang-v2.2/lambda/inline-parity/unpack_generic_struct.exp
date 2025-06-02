@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: captured value cannot be a reference, but has type `&mut Key`
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/unpack_generic_struct.move:38:14
+   │
+38 │             *v = key;
+   │              ^

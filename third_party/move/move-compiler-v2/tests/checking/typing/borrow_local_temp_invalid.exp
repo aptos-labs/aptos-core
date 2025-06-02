@@ -1,5 +1,23 @@
 
 Diagnostics:
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_local_temp_invalid.move:3:9
+  │
+3 │         &();
+  │         ^^^
+
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_local_temp_invalid.move:4:9
+  │
+4 │         &(0, 1);
+  │         ^^^^^^^
+
+error: cannot borrow a tuple
+  ┌─ tests/checking/typing/borrow_local_temp_invalid.move:5:9
+  │
+5 │         &(0, 1, true, @0x0);
+  │         ^^^^^^^^^^^^^^^^^^^
+
 error: cannot borrow from a reference
   ┌─ tests/checking/typing/borrow_local_temp_invalid.move:9:9
   │

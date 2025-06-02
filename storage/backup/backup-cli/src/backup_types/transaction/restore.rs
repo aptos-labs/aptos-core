@@ -76,7 +76,7 @@ pub struct TransactionRestoreOpt {
 
 impl TransactionRestoreOpt {
     pub fn replay_from_version(&self) -> Version {
-        self.replay_from_version.unwrap_or(Version::max_value())
+        self.replay_from_version.unwrap_or(Version::MAX)
     }
 }
 
@@ -291,7 +291,7 @@ impl TransactionRestoreBatchController {
             );
             AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
 
-            let kv_only = self.replay_from_version.map_or(false, |(_, k)| k);
+            let kv_only = self.replay_from_version.is_some_and(|(_, k)| k);
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
                 .await?;

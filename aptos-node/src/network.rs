@@ -192,10 +192,7 @@ pub fn consensus_observer_network_configuration(
 pub fn netbench_network_configuration(
     node_config: &NodeConfig,
 ) -> Option<NetworkApplicationConfig> {
-    let cfg = match node_config.netbench {
-        None => return None,
-        Some(x) => x,
-    };
+    let cfg = node_config.netbench?;
     if !cfg.enabled {
         return None;
     }
@@ -580,7 +577,7 @@ fn transform_network_handles_into_interfaces(
     )
 }
 
-/// Creates an application network inteface using the given
+/// Creates an application network interface using the given
 /// handles and config.
 fn create_network_interfaces<
     T: Serialize + for<'de> Deserialize<'de> + Send + Sync + Clone + 'static,

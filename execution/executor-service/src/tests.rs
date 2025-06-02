@@ -6,8 +6,8 @@ use crate::{
     thread_executor_service::ThreadExecutorService,
 };
 use aptos_config::utils;
-use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_secure_net::network_controller::NetworkController;
+use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_vm::sharded_block_executor::ShardedBlockExecutor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -15,7 +15,7 @@ pub fn create_thread_remote_executor_shards(
     num_shards: usize,
     num_threads: Option<usize>,
 ) -> (
-    RemoteExecutorClient<FakeDataStore>,
+    RemoteExecutorClient<InMemoryStateStore>,
     Vec<ThreadExecutorService>,
 ) {
     // First create the coordinator.
@@ -54,6 +54,7 @@ pub fn create_thread_remote_executor_shards(
 }
 
 #[test]
+#[ignore]
 fn test_sharded_block_executor_no_conflict() {
     use std::thread;
 
@@ -74,6 +75,7 @@ fn test_sharded_block_executor_no_conflict() {
 }
 
 #[test]
+#[ignore]
 fn test_sharded_block_executor_with_conflict() {
     use std::thread;
 

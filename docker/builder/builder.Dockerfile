@@ -59,8 +59,6 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
 
 FROM builder-base as tools-builder
 
-ENV MOVE_COMPILER_V2=true
-ENV MOVE_LANGUAGE_V2=true
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \

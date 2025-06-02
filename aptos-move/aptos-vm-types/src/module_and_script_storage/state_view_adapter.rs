@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::duplicated_attributes)]
+
 use crate::{
     module_and_script_storage::module_storage::AptosModuleStorage,
     resolver::BlockSynchronizationKillSwitch,
@@ -25,13 +27,16 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
-    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Function, Module,
-    ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Function,
+    LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};
@@ -41,7 +46,7 @@ struct StateViewAdapter<'ctx, S, E> {
     state_view: &'ctx S,
 }
 
-impl<'ctx, S, E> WithRuntimeEnvironment for StateViewAdapter<'ctx, S, E>
+impl<S, E> WithRuntimeEnvironment for StateViewAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -51,7 +56,7 @@ where
     }
 }
 
-impl<'ctx, S, E> ModuleBytesStorage for StateViewAdapter<'ctx, S, E>
+impl<S, E> ModuleBytesStorage for StateViewAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -68,7 +73,7 @@ where
     }
 }
 
-impl<'ctx, S, E> Deref for StateViewAdapter<'ctx, S, E>
+impl<S, E> Deref for StateViewAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -94,7 +99,7 @@ pub struct AptosCodeStorageAdapter<'ctx, S, E> {
     storage: UnsyncCodeStorage<UnsyncModuleStorage<'ctx, StateViewAdapter<'ctx, S, E>>>,
 }
 
-impl<'ctx, S, E> AptosCodeStorageAdapter<'ctx, S, E>
+impl<S, E> AptosCodeStorageAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
@@ -151,8 +156,8 @@ where
     }
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
-    for AptosCodeStorageAdapter<'s, S, E>
+impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
+    for AptosCodeStorageAdapter<'_, S, E>
 {
     fn fetch_state_value_metadata(
         &self,
@@ -171,8 +176,8 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
     }
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> BlockSynchronizationKillSwitch
-    for AptosCodeStorageAdapter<'s, S, E>
+impl<S: StateView, E: WithRuntimeEnvironment> BlockSynchronizationKillSwitch
+    for AptosCodeStorageAdapter<'_, S, E>
 {
     fn interrupt_requested(&self) -> bool {
         false
@@ -194,7 +199,10 @@ where
     S: StateView,
     E: WithRuntimeEnvironment,
 {
-    fn as_aptos_code_storage(&'ctx self, environment: &'ctx E) -> AptosCodeStorageAdapter<S, E> {
+    fn as_aptos_code_storage(
+        &'ctx self,
+        environment: &'ctx E,
+    ) -> AptosCodeStorageAdapter<'ctx, S, E> {
         let adapter = StateViewAdapter {
             environment,
             state_view: self,

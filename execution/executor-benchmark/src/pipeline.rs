@@ -4,21 +4,25 @@
 use crate::{
     block_preparation::BlockPreparationStage,
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
+    measurements::{EventMeasurements, OverallMeasuring},
     metrics::NUM_TXNS,
-    OverallMeasuring, TransactionCommitter, TransactionExecutor,
+    OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
+use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
-    transaction::{Transaction, Version},
+    transaction::{Transaction, TransactionPayload, Version},
 };
 use aptos_vm::VMBlockExecutor;
 use derivative::Derivative;
+use move_core_types::language_storage::StructTag;
 use std::{
+    collections::{BTreeMap, HashMap},
     marker::PhantomData,
     sync::{
         mpsc::{self, SyncSender},
@@ -44,12 +48,16 @@ pub struct PipelineConfig {
     pub partitioner_config: PartitionerV2Config,
     #[derivative(Default(value = "8"))]
     pub num_sig_verify_threads: usize,
+
+    pub print_transactions: bool,
 }
 
 pub struct Pipeline<V> {
     join_handles: Vec<JoinHandle<u64>>,
     phantom: PhantomData<V>,
     start_pipeline_tx: Option<SyncSender<()>>,
+    staged_result: Arc<Mutex<Vec<OverallMeasurement>>>,
+    staged_events: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
 }
 
 impl<V> Pipeline<V>
@@ -126,13 +134,22 @@ where
         } else {
             CommitProcessing::SendToQueue(commit_sender)
         };
+
+        let staged_events = Arc::new(Mutex::new(BTreeMap::new()));
+        let staged_events_clone = staged_events.clone();
+
         let mut ledger_update_stage = LedgerUpdateStage::new(
             executor_2,
             commit_processing,
             config.allow_aborts,
             config.allow_discards,
             config.allow_retries,
+            staged_events_clone,
         );
+
+        let print_transactions = config.print_transactions;
+        let staged_result = Arc::new(Mutex::new(Vec::new()));
+        let staged_result_clone = staged_result.clone();
 
         let preparation_thread = std::thread::Builder::new()
             .name("block_preparation".to_string())
@@ -141,6 +158,12 @@ where
                 let mut processed = 0;
                 while let Ok(txns) = raw_block_receiver.recv() {
                     processed += txns.len() as u64;
+                    if print_transactions {
+                        println!("Transactions:");
+                        for txn in &txns {
+                            println!("{:?}", txn);
+                        }
+                    }
                     let exe_block_msg = preparation_stage.process(txns);
                     executable_block_sender.send(exe_block_msg).unwrap();
                 }
@@ -161,6 +184,7 @@ where
                 let mut stage_index = 0;
                 let mut stage_overall_measuring = overall_measuring.clone();
                 let mut stage_executed = 0;
+                let mut stage_txn_occurences: HashMap<String, usize> = HashMap::new();
 
                 while let Ok(msg) = executable_block_receiver.recv() {
                     let ExecuteBlockMessage {
@@ -169,13 +193,27 @@ where
                         block,
                     } = msg;
                     let block_size = block.transactions.num_transactions() as u64;
+                    for txn in block.transactions.txns() {
+                        if let Some(txn) = txn.borrow_into_inner().try_as_signed_user_txn() {
+                            if let TransactionPayload::EntryFunction(entry) = txn.payload() {
+                                *stage_txn_occurences
+                                    .entry(format!(
+                                        "{}::{}",
+                                        entry.module().name(),
+                                        entry.function()
+                                    ))
+                                    .or_insert(0) += 1;
+                            }
+                        }
+                    }
+
                     NUM_TXNS
                         .with_label_values(&["execution"])
                         .inc_by(block_size);
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     stage_executed += block_size;
-                    exe.execute_block(current_block_start_time, partition_time, block);
+                    exe.execute_block(current_block_start_time, partition_time, block, stage_index);
                     info!("Finished executing block");
 
                     // Empty blocks indicate the end of a stage.
@@ -183,27 +221,45 @@ where
                     if block_size == 0 {
                         if stage_executed > 0 {
                             info!("Execution finished stage {}", stage_index);
-                            stage_overall_measuring.print_end(
-                                &format!("Staged execution: stage {}:", stage_index),
+                            let stage_measurement = stage_overall_measuring.elapsed(
+                                format!("Staged execution: stage {}:", stage_index),
+                                format!("{:?}", stage_txn_occurences),
                                 stage_executed,
                             );
+
+                            stage_measurement.print_end();
+                            staged_result_clone.lock().push(stage_measurement);
                         }
                         stage_index += 1;
                         stage_overall_measuring = OverallMeasuring::start();
                         stage_executed = 0;
+                        stage_txn_occurences = HashMap::new();
                     }
                 }
 
                 if stage_index > 0 && stage_executed > 0 {
                     info!("Execution finished stage {}", stage_index);
-                    stage_overall_measuring.print_end(
-                        &format!("Staged execution: stage {}:", stage_index),
+                    let stage_measurement = stage_overall_measuring.elapsed(
+                        format!("Staged execution: stage {}:", stage_index),
+                        format!("{:?}", stage_txn_occurences),
                         stage_executed,
                     );
+                    stage_measurement.print_end();
+                    staged_result_clone.lock().push(stage_measurement);
                 }
 
                 if num_blocks.is_some() {
-                    overall_measuring.print_end("Overall execution", executed);
+                    overall_measuring
+                        .elapsed(
+                            "Overall execution".to_string(),
+                            if stage_index == 0 {
+                                format!("{:?}", stage_txn_occurences)
+                            } else {
+                                "across all stages".to_string()
+                            },
+                            executed,
+                        )
+                        .print_end();
                 }
                 start_ledger_update_tx.map(|tx| tx.send(()));
                 executed
@@ -250,6 +306,8 @@ where
                 join_handles,
                 phantom: PhantomData,
                 start_pipeline_tx,
+                staged_result,
+                staged_events,
             },
             raw_block_sender,
         )
@@ -259,7 +317,7 @@ where
         self.start_pipeline_tx.as_ref().map(|tx| tx.send(()));
     }
 
-    pub fn join(self) -> Option<u64> {
+    pub fn join(self) -> (Option<u64>, Vec<OverallMeasurement>, EventMeasurements) {
         let mut counts = vec![];
         for handle in self.join_handles {
             let count = handle.join().unwrap();
@@ -267,7 +325,13 @@ where
                 counts.push(count);
             }
         }
-        counts.into_iter().min()
+        (
+            counts.into_iter().min(),
+            Arc::try_unwrap(self.staged_result).unwrap().into_inner(),
+            EventMeasurements {
+                staged_events: Arc::try_unwrap(self.staged_events).unwrap().into_inner(),
+            },
+        )
     }
 }
 
@@ -296,6 +360,7 @@ pub struct LedgerUpdateMessage {
     pub block_id: HashValue,
     pub parent_block_id: HashValue,
     pub num_input_txns: usize,
+    pub stage: usize,
 }
 
 /// Message from execution stage to commit stage.

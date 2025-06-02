@@ -17,14 +17,14 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId,
     },
-    write_set::TransactionWrite,
+    write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::{
-    abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
+    abstract_write_op::{AbstractResourceWriteOp, GroupWrite, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
+        TResourceView,
     },
 };
 use bytes::Bytes;
@@ -55,9 +55,62 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
             change_set,
         }
     }
+
+    fn try_get_resource_write_op_from_change_set<'s>(
+        &'s self,
+        state_key: &StateKey,
+        calling_fn_name: &'static str,
+    ) -> PartialVMResult<Option<&'s WriteOp>> {
+        match self.change_set.resource_write_set().get(state_key) {
+            Some(
+                AbstractResourceWriteOp::Write(write_op)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    ..
+                }),
+            ) => Ok(Some(write_op)),
+            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) => Ok(None), // Signal to forward
+            Some(AbstractResourceWriteOp::WriteResourceGroup(_))
+            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
+                // In case this is a resource group, and feature is enabled that creates these ops,
+                // this should never be called.
+                // Call to metadata should go through get_resource_state_value_metadata(), and
+                // calls to individual tagged resources should go through resource group view trait.
+                Err(code_invariant_error(format!(
+                    "{} called for a resource group with key {:?}",
+                    calling_fn_name, state_key
+                ))
+                .into())
+            },
+            None => Ok(None), // Signal to forward
+        }
+    }
+
+    fn try_get_group_write_from_change_set<'s>(
+        &'s self,
+        group_key: &StateKey,
+        calling_fn_name: &'static str,
+    ) -> Result<Option<&'s GroupWrite>, PanicError> {
+        use AbstractResourceWriteOp::*;
+
+        self.change_set
+            .resource_write_set()
+            .get(group_key)
+            .and_then(|abstract_write_op| match abstract_write_op {
+                WriteResourceGroup(group_write) => Some(Ok(group_write)),
+                ResourceGroupInPlaceDelayedFieldChange(_) => None, // Will become Ok(None) after transpose
+                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                    Some(Err(code_invariant_error(format!(
+                        "Non-ResourceGroup write found in {} call for key {:?}",
+                        calling_fn_name, group_key
+                    ))))
+                },
+            })
+            .transpose()
+    }
 }
 
-impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
+impl TAggregatorV1View for ExecutorViewWithChangeSet<'_> {
     type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
@@ -77,7 +130,7 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
+impl TDelayedFieldView for ExecutorViewWithChangeSet<'_> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
@@ -176,7 +229,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
+impl TResourceView for ExecutorViewWithChangeSet<'_> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
@@ -185,27 +238,14 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        match self.change_set.resource_write_set().get(state_key) {
-            Some(
-                AbstractResourceWriteOp::Write(write_op)
-                | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
-                    write_op,
-                    ..
-                }),
-            ) => Ok(write_op.as_state_value()),
-            // We could either return from the read, or do the base read again.
-            Some(AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)) | None => self
-                .base_executor_view
-                .get_resource_state_value(state_key, maybe_layout),
-            Some(AbstractResourceWriteOp::WriteResourceGroup(_))
-            | Some(AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_)) => {
-                // In case this is a resource group, and feature is enabled that creates these ops,
-                // this should never be called.
-                // Call to metadata should go through get_resource_state_value_metadata(), and
-                // calls to individual tagged resources should go through their trait.
-                unreachable!("get_resource_state_value should never be called for resource group");
-            },
-        }
+        self.try_get_resource_write_op_from_change_set(state_key, "get_resource_state_value")?
+            .map_or_else(
+                || {
+                    self.base_executor_view
+                        .get_resource_state_value(state_key, maybe_layout)
+                },
+                |write_op| Ok(write_op.as_state_value()),
+            )
     }
 
     fn get_resource_state_value_metadata(
@@ -231,9 +271,28 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
                 .get_resource_state_value_metadata(state_key),
         }
     }
+
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+        self.try_get_resource_write_op_from_change_set(state_key, "get_resource_state_value_size")?
+            .map_or_else(
+                || {
+                    self.base_executor_view
+                        .get_resource_state_value_size(state_key)
+                },
+                |write_op| Ok(write_op.bytes_size() as u64),
+            )
+    }
+
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        self.try_get_resource_write_op_from_change_set(state_key, "resource_exists")?
+            .map_or_else(
+                || self.base_executor_view.resource_exists(state_key),
+                |write_op| Ok(write_op.bytes().is_some()),
+            )
+    }
 }
 
-impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
+impl TResourceGroupView for ExecutorViewWithChangeSet<'_> {
     type GroupKey = StateKey;
     type Layout = MoveTypeLayout;
     type ResourceTag = StructTag;
@@ -242,25 +301,15 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         &self,
         group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
-        use AbstractResourceWriteOp::*;
-
-        if let Some(size) = self
-        .change_set
-        .resource_write_set()
-        .get(group_key)
-        .and_then(|write| match write {
-            WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
-            ResourceGroupInPlaceDelayedFieldChange(_) => None,
-            Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                // There should be no collisions, we cannot have group key refer to a resource.
-                Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
-            },
-        })
-        .transpose()? {
-            return Ok(size);
-        }
-
-        self.base_resource_group_view.resource_group_size(group_key)
+        self.try_get_group_write_from_change_set(group_key, "resource_group_size")?
+            .map_or_else(
+                || self.base_resource_group_view.resource_group_size(group_key),
+                |group_write| {
+                    Ok(group_write
+                        .maybe_group_op_size()
+                        .unwrap_or(ResourceGroupSize::zero_combined()))
+                },
+            )
     }
 
     fn get_resource_from_group(
@@ -269,32 +318,53 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
-        use AbstractResourceWriteOp::*;
-
-        if let Some((write_op, layout)) = self
-            .change_set
-            .resource_write_set()
-            .get(group_key)
-            .and_then(|write| match write {
-                WriteResourceGroup(group_write) => Some(Ok(group_write)),
-                ResourceGroupInPlaceDelayedFieldChange(_) => None,
-                Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // There should be no collisions, we cannot have group key refer to a resource.
-                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
+        self.try_get_group_write_from_change_set(group_key, "get_resource_from_group")?
+            .and_then(|group_write| group_write.inner_ops().get(resource_tag))
+            .map_or_else(
+                || {
+                    self.base_resource_group_view.get_resource_from_group(
+                        group_key,
+                        resource_tag,
+                        maybe_layout,
+                    )
                 },
-            })
-            .transpose()?
-            .and_then(|g| g.inner_ops().get(resource_tag))
-        {
-            randomly_check_layout_matches(maybe_layout, layout.as_deref())?;
-            Ok(write_op.extract_raw_bytes())
-        } else {
-            self.base_resource_group_view.get_resource_from_group(
-                group_key,
-                resource_tag,
-                maybe_layout,
+                |(write_op, layout)| {
+                    randomly_check_layout_matches(maybe_layout, layout.as_deref())?;
+                    Ok(write_op.extract_raw_bytes())
+                },
             )
-        }
+    }
+
+    fn resource_size_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> PartialVMResult<usize> {
+        self.try_get_group_write_from_change_set(group_key, "resource_size_in_group")?
+            .and_then(|group_write| group_write.inner_ops().get(resource_tag))
+            .map_or_else(
+                || {
+                    self.base_resource_group_view
+                        .resource_size_in_group(group_key, resource_tag)
+                },
+                |(write_op, _layout)| Ok(write_op.bytes_size()),
+            )
+    }
+
+    fn resource_exists_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> PartialVMResult<bool> {
+        self.try_get_group_write_from_change_set(group_key, "resource_exists_in_group")?
+            .and_then(|group_write| group_write.inner_ops().get(resource_tag))
+            .map_or_else(
+                || {
+                    self.base_resource_group_view
+                        .resource_exists_in_group(group_key, resource_tag)
+                },
+                |(write_op, _layout)| Ok(write_op.bytes().is_some()),
+            )
     }
 
     fn release_group_cache(
@@ -309,15 +379,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.base_executor_view.get_module_state_value(state_key)
-    }
-}
-
-impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
+impl StateStorageView for ExecutorViewWithChangeSet<'_> {
     type Key = StateKey;
 
     fn id(&self) -> StateViewId {
@@ -343,7 +405,7 @@ mod test {
         move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
     };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
     use aptos_vm_types::abstract_write_op::GroupWrite;
     use move_core_types::{
@@ -361,10 +423,6 @@ mod test {
 
     fn read_resource(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
         bcs::from_bytes(&view.get_resource_bytes(&key(s), None).unwrap().unwrap()).unwrap()
-    }
-
-    fn read_module(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        bcs::from_bytes(&view.get_module_bytes(&key(s)).unwrap().unwrap()).unwrap()
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
@@ -414,22 +472,56 @@ mod test {
 
     #[test]
     fn test_change_set_state_view() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(key("module_base"), serialize(&10));
+        let state_view = InMemoryStateStore::new();
 
-        state_view.set_legacy(key("resource_base"), serialize(&30));
-        state_view.set_legacy(key("resource_both"), serialize(&40));
+        state_view
+            .set_state_value(
+                key("resource_base"),
+                StateValue::new_legacy(serialize(&30).into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("resource_both"),
+                StateValue::new_legacy(serialize(&40).into()),
+            )
+            .unwrap();
 
-        state_view.set_legacy(key("aggregator_base"), serialize(&50));
-        state_view.set_legacy(key("aggregator_both"), serialize(&60));
-        state_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
+        state_view
+            .set_state_value(
+                key("aggregator_base"),
+                StateValue::new_legacy(serialize(&50).into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("aggregator_both"),
+                StateValue::new_legacy(serialize(&60).into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("aggregator_delta_set"),
+                StateValue::new_legacy(serialize(&70).into()),
+            )
+            .unwrap();
 
         let tree: BTreeMap<StructTag, Bytes> = BTreeMap::from([
             (mock_tag_0(), serialize(&100).into()),
             (mock_tag_1(), serialize(&200).into()),
         ]);
-        state_view.set_legacy(key("resource_group_base"), bcs::to_bytes(&tree).unwrap());
-        state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
+        state_view
+            .set_state_value(
+                key("resource_group_base"),
+                StateValue::new_legacy(bcs::to_bytes(&tree).unwrap().into()),
+            )
+            .unwrap();
+        state_view
+            .set_state_value(
+                key("resource_group_both"),
+                StateValue::new_legacy(bcs::to_bytes(&tree).unwrap().into()),
+            )
+            .unwrap();
 
         let resource_write_set = BTreeMap::from([
             (key("resource_both"), (write(80), None)),
@@ -496,8 +588,6 @@ mod test {
             resolver.as_resource_group_view(),
             change_set,
         );
-
-        assert_eq!(read_module(&view, "module_base"), 10);
 
         assert_eq!(read_resource(&view, "resource_base"), 30);
         assert_eq!(read_resource(&view, "resource_both"), 80);

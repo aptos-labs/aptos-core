@@ -9,7 +9,6 @@ use crate::{emitter::create_private_key_account_generator, EmitJobRequest};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
-use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, AccountKey, LocalAccount},
@@ -20,6 +19,7 @@ use aptos_transaction_generator_lib::{
 use aptos_types::account_address::AccountAddress;
 use core::result::Result::{Err, Ok};
 use futures::{future::try_join_all, StreamExt};
+use log::{error, info};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     path::Path,
@@ -36,7 +36,7 @@ pub struct SourceAccountManager<'t> {
 }
 
 #[async_trait::async_trait]
-impl<'t> RootAccountHandle for SourceAccountManager<'t> {
+impl RootAccountHandle for SourceAccountManager<'_> {
     async fn approve_funds(&self, amount: u64, reason: &str) {
         self.check_approve_funds(amount, reason).await.unwrap();
     }
@@ -46,7 +46,7 @@ impl<'t> RootAccountHandle for SourceAccountManager<'t> {
     }
 }
 
-impl<'t> SourceAccountManager<'t> {
+impl SourceAccountManager<'_> {
     fn source_account_address(&self) -> AccountAddress {
         self.source_account.address()
     }
@@ -153,7 +153,6 @@ impl<'t> SourceAccountManager<'t> {
 
 pub struct AccountMinter<'t> {
     txn_factory: TransactionFactory,
-    account_rng: StdRng,
     source_account: &'t SourceAccountManager<'t>,
 }
 
@@ -161,12 +160,10 @@ impl<'t> AccountMinter<'t> {
     pub fn new(
         source_account: &'t SourceAccountManager<'t>,
         txn_factory: TransactionFactory,
-        account_rng: StdRng,
     ) -> Self {
         Self {
             source_account,
             txn_factory,
-            account_rng,
         }
     }
 
@@ -229,7 +226,7 @@ impl<'t> AccountMinter<'t> {
         coins_per_account: u64,
         max_submit_batch_size: usize,
         mint_to_root: bool,
-        create_secondary_source_account: bool,
+        secondary_source_account: Option<LocalAccount>,
     ) -> Result<()> {
         let num_accounts = local_accounts.len();
 
@@ -238,8 +235,7 @@ impl<'t> AccountMinter<'t> {
             num_accounts, coins_per_account,
         );
 
-        let expected_children_per_seed_account =
-            (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
+        let expected_children_per_seed_account = num_accounts.div_ceil(seed_accounts.len());
 
         let coins_per_seed_account = Self::funds_needed_for_multi_transfer(
             "seed",
@@ -272,11 +268,10 @@ impl<'t> AccountMinter<'t> {
             );
         }
 
-        let new_source_account = if create_secondary_source_account {
-            Some(
-                self.create_new_source_account(txn_executor, coins_for_source)
-                    .await?,
-            )
+        let new_source_account = if let Some(new_source_account) = secondary_source_account {
+            self.create_new_source_account(txn_executor, coins_for_source, &new_source_account)
+                .await?;
+            Some(new_source_account)
         } else {
             None
         };
@@ -314,8 +309,7 @@ impl<'t> AccountMinter<'t> {
         let start = Instant::now();
         let request_counters = txn_executor.create_counter_state();
 
-        let approx_accounts_per_seed =
-            (num_accounts + seed_accounts.len() - 1) / seed_accounts.len();
+        let approx_accounts_per_seed = num_accounts.div_ceil(seed_accounts.len());
 
         let local_accounts_by_seed: Vec<Vec<Arc<LocalAccount>>> = local_accounts
             .chunks(approx_accounts_per_seed)
@@ -427,7 +421,8 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         txn_executor: &dyn ReliableTransactionSubmitter,
         coins_for_source: u64,
-    ) -> Result<LocalAccount> {
+        new_source_account: &LocalAccount,
+    ) -> Result<()> {
         const NUM_TRIES: usize = 3;
         let root_account = self.source_account.get_root_account();
         let root_address = root_account.address();
@@ -437,7 +432,6 @@ impl<'t> AccountMinter<'t> {
                 root_account.set_sequence_number(new_sequence_number);
             }
 
-            let new_source_account = LocalAccount::generate(self.account_rng());
             let txn = create_and_fund_account_request(
                 root_account.clone(),
                 coins_for_source,
@@ -455,7 +449,8 @@ impl<'t> AccountMinter<'t> {
                     tokio::time::sleep(Duration::from_secs(sleep_secs)).await;
                 }
             } else {
-                new_source_account.set_sequence_number(
+                assert_eq!(
+                    new_source_account.sequence_number(),
                     txn_executor
                         .query_sequence_number(new_source_account.address())
                         .await?,
@@ -464,14 +459,10 @@ impl<'t> AccountMinter<'t> {
                     "New source account created {}",
                     new_source_account.address()
                 );
-                return Ok(new_source_account);
+                return Ok(());
             }
         }
         bail!("Couldn't create new source account");
-    }
-
-    pub fn account_rng(&mut self) -> &mut StdRng {
-        &mut self.account_rng
     }
 }
 
@@ -630,6 +621,16 @@ pub async fn bulk_create_accounts(
 
     let mut rng = StdRng::from_seed(seed);
 
+    let secondary_source_account = if config.create_secondary_source_account {
+        let new_source_account = account_generator
+            .gen_local_accounts(txn_executor, 1, &mut rng)
+            .await?;
+        assert_eq!(1, new_source_account.len());
+        new_source_account.into_iter().next()
+    } else {
+        None
+    };
+
     let num_seed_accounts = (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
     let seed_accounts = create_private_key_account_generator()
         .gen_local_accounts(txn_executor, num_seed_accounts, &mut rng)
@@ -648,13 +649,19 @@ pub async fn bulk_create_accounts(
     let all_seed_accounts_already_exist = seed_accounts
         .iter()
         .all(|account| account.sequence_number() > 0);
+    let all_source_accounts_exist = secondary_source_account
+        .as_ref()
+        .map_or(true, |v| v.sequence_number() > 0);
 
     info!(
-        "Accounts exist: {}, seed accounts exist: {}",
-        all_accounts_already_exist, all_seed_accounts_already_exist
+        "Accounts exist: {}, seed accounts exist: {}, source account exists: {}",
+        all_accounts_already_exist, all_seed_accounts_already_exist, all_source_accounts_exist,
     );
 
-    let send_money_gas = if all_accounts_already_exist && all_seed_accounts_already_exist {
+    let send_money_gas = if all_source_accounts_exist
+        && all_accounts_already_exist
+        && all_seed_accounts_already_exist
+    {
         config.expected_gas_per_transfer
     } else {
         config.expected_gas_per_account_create
@@ -663,10 +670,6 @@ pub async fn bulk_create_accounts(
     let mut account_minter = AccountMinter::new(
         &source_account_manager,
         txn_factory.clone().with_max_gas_amount(send_money_gas),
-        // Wrap seed once, to not have conflicts between worker and seed accounts.
-        // We also don't want to continue from the same rng, as number of accounts will affect
-        // seed accounts.
-        StdRng::from_seed(StdRng::from_seed(seed).gen()),
     );
 
     if !config.skip_funding_accounts {
@@ -681,7 +684,7 @@ pub async fn bulk_create_accounts(
                 coins_per_account,
                 config.max_submit_batch_size,
                 config.mint_to_root,
-                config.create_secondary_source_account,
+                secondary_source_account,
             )
             .await?;
         let accounts: Vec<_> = accounts

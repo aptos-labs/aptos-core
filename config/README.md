@@ -88,7 +88,7 @@ Validator with a Fullnode network. The input is similar for all three cases
 with only the command (create vs. extend) differing between them. When
 extending a Validator, `config-builder` assumes that there are `n + 1`
 Fullnodes and gives the `n + 1` identity to the Validator. The `n + 1` peer id
-is also used to define the upstream peer for state sychronization and mempool.
+is also used to define the upstream peer for state synchronization and mempool.
 Note: currently, the tool does not support the creation of trees of Fullnode
 networks.
 

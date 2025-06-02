@@ -2,11 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{ModuleId, StructTag},
-};
+use crate::{account_address::AccountAddress, language_storage::StructTag};
 use anyhow::{bail, Result};
 use bytes::Bytes;
 use std::collections::btree_map::{self, BTreeMap};
@@ -71,10 +67,9 @@ impl<T> Op<T> {
     }
 }
 
-/// A collection of resource and module operations on a Move account.
+/// A collection of resource operations on a Move account.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AccountChanges<Module, Resource> {
-    modules: BTreeMap<Identifier, Op<Module>>,
+pub struct AccountChanges<Resource> {
     resources: BTreeMap<StructTag, Op<Resource>>,
 }
 
@@ -127,33 +122,16 @@ where
     Ok(())
 }
 
-impl<Module, Resource> AccountChanges<Module, Resource> {
-    pub fn from_modules_resources(
-        modules: BTreeMap<Identifier, Op<Module>>,
-        resources: BTreeMap<StructTag, Op<Resource>>,
-    ) -> Self {
-        Self { modules, resources }
+impl<Resource> AccountChanges<Resource> {
+    pub fn from_resources(resources: BTreeMap<StructTag, Op<Resource>>) -> Self {
+        Self { resources }
     }
 
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            modules: BTreeMap::new(),
             resources: BTreeMap::new(),
         }
-    }
-
-    pub fn add_module_op(&mut self, name: Identifier, op: Op<Module>) -> Result<()> {
-        use btree_map::Entry::*;
-
-        match self.modules.entry(name) {
-            Occupied(entry) => bail!("Module {} already exists", entry.key()),
-            Vacant(entry) => {
-                entry.insert(op);
-            },
-        }
-
-        Ok(())
     }
 
     pub fn add_resource_op(&mut self, struct_tag: StructTag, op: Op<Resource>) -> Result<()> {
@@ -169,25 +147,8 @@ impl<Module, Resource> AccountChanges<Module, Resource> {
         Ok(())
     }
 
-    pub fn into_inner(
-        self,
-    ) -> (
-        BTreeMap<Identifier, Op<Module>>,
-        BTreeMap<StructTag, Op<Resource>>,
-    ) {
-        (self.modules, self.resources)
-    }
-
     pub fn into_resources(self) -> BTreeMap<StructTag, Op<Resource>> {
         self.resources
-    }
-
-    pub fn into_modules(self) -> BTreeMap<Identifier, Op<Module>> {
-        self.modules
-    }
-
-    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Module>> {
-        &self.modules
     }
 
     pub fn resources(&self) -> &BTreeMap<StructTag, Op<Resource>> {
@@ -195,11 +156,10 @@ impl<Module, Resource> AccountChanges<Module, Resource> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.modules.is_empty() && self.resources.is_empty()
+        self.resources.is_empty()
     }
 
     pub fn squash(&mut self, other: Self) -> Result<()> {
-        squash(&mut self.modules, other.modules)?;
         squash(&mut self.resources, other.resources)
     }
 }
@@ -209,11 +169,11 @@ impl<Module, Resource> AccountChanges<Module, Resource> {
 /// A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts`
 /// is guaranteed to be nonempty
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Changes<Module, Resource> {
-    accounts: BTreeMap<AccountAddress, AccountChanges<Module, Resource>>,
+pub struct Changes<Resource> {
+    accounts: BTreeMap<AccountAddress, AccountChanges<Resource>>,
 }
 
-impl<Module, Resource> Changes<Module, Resource> {
+impl<Resource> Changes<Resource> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -224,7 +184,7 @@ impl<Module, Resource> Changes<Module, Resource> {
     pub fn add_account_changeset(
         &mut self,
         addr: AccountAddress,
-        account_changeset: AccountChanges<Module, Resource>,
+        account_changeset: AccountChanges<Resource>,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(_) => bail!(
@@ -239,27 +199,22 @@ impl<Module, Resource> Changes<Module, Resource> {
         Ok(())
     }
 
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChanges<Module, Resource>> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChanges<Resource>> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChanges<Module, Resource>> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChanges<Resource>> {
         self.accounts
     }
 
     fn get_or_insert_account_changeset(
         &mut self,
         addr: AccountAddress,
-    ) -> &mut AccountChanges<Module, Resource> {
+    ) -> &mut AccountChanges<Resource> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(entry) => entry.into_mut(),
             btree_map::Entry::Vacant(entry) => entry.insert(AccountChanges::new()),
         }
-    }
-
-    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Module>) -> Result<()> {
-        let account = self.get_or_insert_account_changeset(*module_id.address());
-        account.add_module_op(module_id.name().to_owned(), op)
     }
 
     pub fn add_resource_op(
@@ -286,24 +241,6 @@ impl<Module, Resource> Changes<Module, Resource> {
         Ok(())
     }
 
-    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Op<Module>)> {
-        self.accounts.into_iter().flat_map(|(addr, account)| {
-            account
-                .modules
-                .into_iter()
-                .map(move |(module_name, blob_opt)| (ModuleId::new(addr, module_name), blob_opt))
-        })
-    }
-
-    pub fn modules(&self) -> impl Iterator<Item = (&AccountAddress, &Identifier, Op<&Module>)> {
-        self.accounts.iter().flat_map(|(addr, account)| {
-            account
-                .modules
-                .iter()
-                .map(move |(module_name, op)| (addr, module_name, op.as_ref()))
-        })
-    }
-
     pub fn resources(&self) -> impl Iterator<Item = (AccountAddress, &StructTag, Op<&Resource>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
             let addr = *addr;
@@ -318,5 +255,5 @@ impl<Module, Resource> Changes<Module, Resource> {
 // These aliases are necessary because AccountChangeSet and ChangeSet were not
 // generic before. In order to minimise the code changes we alias new generic
 // types.
-pub type AccountChangeSet = AccountChanges<Bytes, Bytes>;
-pub type ChangeSet = Changes<Bytes, Bytes>;
+pub type AccountChangeSet = AccountChanges<Bytes>;
+pub type ChangeSet = Changes<Bytes>;

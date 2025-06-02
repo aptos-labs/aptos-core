@@ -34,7 +34,7 @@ error: cannot pass `u256` to a function which expects argument of type `bool`
 37 │     fun wrongly_typed_caller(): num { wrongly_typed_callee(1, 1) }
    │                                                               ^
 
-error: function returns value of type `bool` but `num` was expected
+error: expected function type returns value of type `num` but `bool` was provided
    ┌─ tests/sources/expressions_err.move:41:76
    │
 41 │     fun wrongly_typed_fun_arg_caller(): num { wrongly_typed_fun_arg_callee(|x| false) }

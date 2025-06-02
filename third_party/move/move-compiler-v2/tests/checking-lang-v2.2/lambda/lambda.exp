@@ -1,0 +1,39 @@
+
+Diagnostics:
+error: expected function type has argument of type `(&T, u64)` but `&T` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/lambda.move:40:13
+   │
+40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected function type has argument of type `u64` but `&T` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/lambda.move:48:13
+   │
+48 │             action(i); // expected to have wrong argument type
+   │             ^^^^^^^^^
+
+error: cannot use `()` with an operator which expects a value of type `u64`
+   ┌─ tests/checking-lang-v2.2/lambda/lambda.move:56:21
+   │
+56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected function of type `|integer|` but found `u64`
+   ┌─ tests/checking-lang-v2.2/lambda/lambda.move:61:9
+   │
+61 │         x(1) // expected to be not a function
+   │         ^^^^
+
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking-lang-v2.2/lambda/lambda.move:67:35
+   │
+67 │         foreach(&v, |e| sum = sum + e)
+   │                                   ^
+   │
+   = required by instantiating type parameter `T` of function `+`
+
+error: expected function type returns value of type `()` but `u64` was provided
+   ┌─ tests/checking-lang-v2.2/lambda/lambda.move:73:21
+   │
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use crate::{
+    counters::{CHANNEL_SIZE, LATENCY_MS},
+    stream_coordinator::IndexerStreamCoordinator,
+    ServiceContext,
+};
 use aptos_indexer_grpc_utils::{
     counters::{log_grpc_step_fullnode, IndexerGrpcStep},
     timestamp_now_proto,
@@ -17,7 +21,10 @@ use aptos_protos::{
     },
 };
 use futures::Stream;
-use std::pin::Pin;
+use std::{
+    pin::Pin,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -57,6 +64,11 @@ impl FullnodeData for FullnodeDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let ending_version = if let Some(count) = r.transactions_count {
+            starting_version.saturating_add(count)
+        } else {
+            u64::MAX
+        };
 
         // Some node metadata
         let context = self.service_context.context.clone();
@@ -74,6 +86,7 @@ impl FullnodeData for FullnodeDataService {
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
                 starting_version,
+                ending_version,
                 processor_task_count,
                 processor_batch_size,
                 output_batch_size,
@@ -96,7 +109,7 @@ impl FullnodeData for FullnodeDataService {
                 },
             }
             let mut base: u64 = 0;
-            loop {
+            while coordinator.current_version < coordinator.end_version {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
@@ -169,16 +182,33 @@ impl FullnodeData for FullnodeDataService {
         _request: Request<PingFullnodeRequest>,
     ) -> Result<Response<PingFullnodeResponse>, Status> {
         let timestamp = timestamp_now_proto();
+        let known_latest_version = self
+            .service_context
+            .context
+            .db
+            .get_synced_version()
+            .map_err(|e| Status::internal(format!("{e}")))?;
+
+        let table_info_version = self
+            .service_context
+            .context
+            .indexer_reader
+            .as_ref()
+            .and_then(|r| r.get_latest_table_info_ledger_version().ok().flatten());
+
+        if known_latest_version.is_some() && table_info_version.is_some() {
+            let version = std::cmp::min(known_latest_version.unwrap(), table_info_version.unwrap());
+            if let Ok(timestamp_us) = self.service_context.context.db.get_block_timestamp(version) {
+                let latency = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+                    - Duration::from_micros(timestamp_us);
+                LATENCY_MS.set(latency.as_millis() as i64);
+            }
+        }
 
         let info = FullnodeInfo {
             chain_id: self.service_context.context.chain_id().id() as u64,
             timestamp: Some(timestamp),
-            known_latest_version: self
-                .service_context
-                .context
-                .db
-                .get_synced_version()
-                .map_err(|e| Status::internal(format!("{e}")))?,
+            known_latest_version,
         };
         let response = PingFullnodeResponse { info: Some(info) };
         Ok(Response::new(response))

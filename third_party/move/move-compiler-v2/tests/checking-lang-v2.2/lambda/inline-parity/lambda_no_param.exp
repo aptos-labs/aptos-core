@@ -1,0 +1,44 @@
+// -- Model dump before first bytecode pipeline
+module 0xdecafbad::m {
+    private fun bar(f: ||u64): u64 {
+        (f)()
+    }
+    private fun foo(f: ||) {
+        (f)();
+        Tuple()
+    }
+    public fun one() {
+        m::foo(closure#0m::__lambda__1__one());
+        Tuple()
+    }
+    public fun two(x: u64): u64 {
+        m::bar(closure#1m::__lambda__1__two(x))
+    }
+    private fun __lambda__1__one() {
+        Tuple()
+    }
+    private fun __lambda__1__two(x: u64): u64 {
+        x
+    }
+} // end 0xdecafbad::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xdecafbad::m {
+    fun bar(f: ||u64): u64 {
+        f()
+    }
+    fun foo(f: ||) {
+        f();
+    }
+    public fun one() {
+        foo(|()| __lambda__1__one());
+    }
+    public fun two(x: u64): u64 {
+        bar(|()| __lambda__1__two(x))
+    }
+    fun __lambda__1__one() {
+    }
+    fun __lambda__1__two(x: u64): u64 {
+        x
+    }
+}

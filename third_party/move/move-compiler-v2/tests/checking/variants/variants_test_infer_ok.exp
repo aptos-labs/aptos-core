@@ -1,0 +1,98 @@
+// -- Model dump before first bytecode pipeline
+module 0x815::m {
+    enum S1<T> {
+        One,
+    }
+    enum S2<T> {
+        Two {
+            inner: S1<T>,
+        }
+    }
+    enum S3<T> {
+        Three {
+            inner: S1<T>,
+        }
+        Four {
+            inner: S1<u8>,
+        }
+    }
+    enum S4<T> {
+        Five {
+            inner: S1<T>,
+        }
+    }
+    enum Unused<T> {
+        Two,
+    }
+    private fun infer_nested<G>(first: S2<u8>,second: S2<G>) {
+        test_variants m::S2::Two<u8>(first);
+        test_variants m::S2::Two<G>(second);
+        test_variants m::S2::Two<u8>(first);
+        test_variants m::S2::Two<G>(second);
+        test_variants m::S1::One<u8>(select_variants m::S2.Two.inner<S2<u8>>(first));
+        test_variants m::S1::One<G>(select_variants m::S2.Two.inner<S2<G>>(second));
+        test_variants m::S1::One<u8>(select_variants m::S2.Two.inner<S2<u8>>(first));
+        test_variants m::S1::One<G>(select_variants m::S2.Two.inner<S2<G>>(second));
+        Tuple()
+    }
+    private fun infer_nested_choice<G>(first: S3<G>,second: S4<G>) {
+        test_variants m::S3::Three|Four<G>(first);
+        test_variants m::S1::One<G>(select_variants m::S4.Five.inner<S4<G>>(second));
+        Tuple()
+    }
+    private fun infer_phantom(first: S1<u8>) {
+        test_variants m::S1::One<u8>(first);
+        test_variants m::S1::One<u8>(first);
+        test_variants m::S1::One<u8>(first);
+        test_variants m::S1::One<u8>(first);
+        Tuple()
+    }
+} // end 0x815::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x815::m {
+    enum S1<phantom T> {
+        One,
+    }
+    enum S2<T> {
+        Two {
+            inner: S1<T>,
+        }
+    }
+    enum S3<T> {
+        Three {
+            inner: S1<T>,
+        }
+        Four {
+            inner: S1<u8>,
+        }
+    }
+    enum S4<T> {
+        Five {
+            inner: S1<T>,
+        }
+    }
+    enum Unused<phantom T> {
+        Two,
+    }
+    fun infer_nested<G>(first: S2<u8>, second: S2<G>) {
+        first is Two;
+        second is Two;
+        first is Two;
+        second is Two;
+        first.inner is One;
+        second.inner is One;
+        first.inner is One;
+        second.inner is One;
+    }
+    fun infer_nested_choice<G>(first: S3<G>, second: S4<G>) {
+        first is Three | Four;
+        second.inner is One;
+    }
+    fun infer_phantom(first: S1<u8>) {
+        first is One;
+        first is One;
+        first is One;
+        first is One;
+    }
+}

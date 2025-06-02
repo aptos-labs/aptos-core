@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
+use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_framework::{
+    natives::code::{PackageRegistry, UpgradePolicy},
+    BuiltPackage,
 };
-use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
@@ -102,7 +103,7 @@ fn code_publishing_upgrade_success_compat() {
 }
 
 #[test]
-fn code_publishing_disallow_native() {
+fn code_publishing_disallow_user_native() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
@@ -116,25 +117,14 @@ fn code_publishing_disallow_native() {
 }
 
 #[test]
-fn code_publishing_disallow_native_entry_func() {
+fn code_publishing_disallow_user_native_entry() {
     let mut h = MoveHarness::new();
-    // Disable feature for now to publish the package.
-    h.enable_features(vec![], vec![FeatureFlag::DISALLOW_USER_NATIVES]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(h.publish_package_cache_building(
-        &acc,
-        &common::test_dir_path("code_publishing.data/pack_native"),
-    ));
-
-    // Re-enable the flag to test the behavior for this entry native
-    h.enable_features(vec![FeatureFlag::DISALLOW_USER_NATIVES], vec![]);
     assert_vm_status!(
-        h.run_entry_function(
+        h.publish_package_cache_building(
             &acc,
-            str::parse("0xcafe::test::hello").unwrap(),
-            vec![],
-            vec![]
+            &common::test_dir_path("code_publishing.data/pack_native_entry"),
         ),
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
     );
@@ -143,12 +133,26 @@ fn code_publishing_disallow_native_entry_func() {
 #[test]
 fn code_publishing_allow_system_native() {
     let mut h = MoveHarness::new();
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
+    let acc = h.aptos_framework_account();
 
     assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_native_system"),
     ));
+}
+
+#[test]
+fn code_publishing_disallow_system_native_entry() {
+    let mut h = MoveHarness::new();
+    let acc = h.aptos_framework_account();
+
+    assert_vm_status!(
+        h.publish_package_cache_building(
+            &acc,
+            &common::test_dir_path("code_publishing.data/pack_native_system_entry"),
+        ),
+        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    );
 }
 
 #[test]
@@ -290,7 +294,7 @@ fn code_publishing_using_resource_account() {
         ),
     );
     let pack_dir = pack.write_to_temp().unwrap();
-    let package = build_package(
+    let package = BuiltPackage::build(
         pack_dir.path().to_owned(),
         aptos_framework::BuildOptions::default(),
     )
@@ -498,7 +502,7 @@ fn publish_module_txn(source: String, module_name: &str) -> TransactionPayload {
     builder.add_source(module_name, &source);
 
     let pack_dir = assert_ok!(builder.write_to_temp());
-    let package = assert_ok!(build_package(
+    let package = assert_ok!(BuiltPackage::build(
         pack_dir.path().to_owned(),
         aptos_framework::BuildOptions::default(),
     ));

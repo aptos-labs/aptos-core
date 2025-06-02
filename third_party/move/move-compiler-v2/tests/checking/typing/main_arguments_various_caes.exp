@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::M {
     struct Cup<T> {
         f1: T,
@@ -20,7 +20,7 @@ module <SELF>_0 {
     }
 } // end <SELF>_0
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::M {
     struct Cup<T> {
         f1: T,

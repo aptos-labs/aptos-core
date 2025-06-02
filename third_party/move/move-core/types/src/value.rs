@@ -9,7 +9,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    function::{ClosureVisitor, MoveClosure, MoveFunctionLayout},
+    function::{ClosureVisitor, MoveClosure},
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -59,12 +59,10 @@ static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'st
     Lazy::new(|| Mutex::new(Default::default()));
 
 /// Returns variant name placeholders for providing dummy names in serde serialization.
-pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
-    assert!(
-        len < VARIANT_COUNT_MAX as usize,
-        "variant count is restricted to {}",
-        VARIANT_COUNT_MAX
-    );
+pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], anyhow::Error> {
+    if len > VARIANT_COUNT_MAX as usize {
+        bail!("variant count is restricted to {}", VARIANT_COUNT_MAX);
+    }
     let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
     let mut lock = mutex.lock().expect("acquire index name lock");
     match lock.entry(len) {
@@ -76,9 +74,9 @@ pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
             )
             .leak();
             e.insert(signature);
-            signature
+            Ok(signature)
         },
-        Entry::Occupied(e) => e.get(),
+        Entry::Occupied(e) => Ok(e.get()),
     }
 }
 
@@ -269,7 +267,7 @@ pub enum MoveTypeLayout {
 
     // Added in bytecode version v8
     #[serde(rename(serialize = "fun", deserialize = "fun"))]
-    Function(MoveFunctionLayout),
+    Function,
 }
 
 impl MoveTypeLayout {
@@ -278,17 +276,6 @@ impl MoveTypeLayout {
     pub fn is_compatible_with(&self, other: &Self) -> bool {
         use MoveTypeLayout::*;
         match (self, other) {
-            (
-                Function(MoveFunctionLayout(args1, res1, ab1)),
-                Function(MoveFunctionLayout(args2, res2, ab2)),
-            ) => {
-                // Notice that (currently) the function layout is not influencing
-                // serialization, but we anyway don't want it to diverge.
-                // Notice contra-variance for arguments.
-                Self::is_compatible_with_slice(args2, args1)
-                    && Self::is_compatible_with_slice(res1, res2)
-                    && ab1.is_subset(*ab2)
-            },
             (Vector(t1), Vector(t2)) => t1.is_compatible_with(t2),
             (Struct(s1), Struct(s2)) => s1.is_compatible_with(s2),
             // For all other cases, equality is used
@@ -625,8 +612,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             },
             MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
             MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
-            MoveTypeLayout::Function(fun) => Ok(MoveValue::Closure(Box::new(
-                deserializer.deserialize_seq(ClosureVisitor(fun))?,
+            MoveTypeLayout::Function => Ok(MoveValue::Closure(Box::new(
+                deserializer.deserialize_seq(ClosureVisitor)?,
             ))),
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
@@ -642,7 +629,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
 
 struct VectorElementVisitor<'a>(&'a MoveTypeLayout);
 
-impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
     type Value = Vec<MoveValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -663,7 +650,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
 
 struct DecoratedStructFieldVisitor<'a>(&'a [MoveFieldLayout]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'_> {
     type Value = Vec<(Identifier, MoveValue)>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -687,7 +674,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'a> {
 
 struct StructFieldVisitor<'a>(&'a [MoveTypeLayout]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for StructFieldVisitor<'_> {
     type Value = Vec<MoveValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -711,7 +698,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
 
 struct StructVariantVisitor<'a>(&'a [Vec<MoveTypeLayout>]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for StructVariantVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for StructVariantVisitor<'_> {
     type Value = (u16, Vec<MoveValue>);
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -773,7 +760,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                 if variants.len() > (u16::MAX as usize) {
                     return Err(D::Error::custom("variant count out of range"));
                 }
-                let variant_names = variant_name_placeholder(variants.len());
+                let variant_names = variant_name_placeholder(variants.len())
+                    .map_err(|e| D::Error::custom(format!("{}", e)))?;
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
@@ -799,7 +787,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
             },
             MoveStructLayout::WithVariants(decorated_variants) => {
                 // Downgrade the decorated variants to simple layouts to deserialize the fields.
-                let variant_names = variant_name_placeholder(decorated_variants.len());
+                let variant_names = variant_name_placeholder(decorated_variants.len())
+                    .map_err(|e| D::Error::custom(format!("{}", e)))?;
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
@@ -853,7 +842,7 @@ impl serde::Serialize for MoveValue {
 
 struct MoveFields<'a>(&'a [(Identifier, MoveValue)]);
 
-impl<'a> serde::Serialize for MoveFields<'a> {
+impl serde::Serialize for MoveFields<'_> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut t = serializer.serialize_map(Some(self.0.len()))?;
         for (f, v) in self.0.iter() {
@@ -877,7 +866,9 @@ impl serde::Serialize for MoveStruct {
                 // Variants need to be serialized as sequences, as the size is not statically known.
                 let tag_idx = *tag as usize;
                 let variant_tag = tag_idx as u32;
-                let variant_name = variant_name_placeholder((tag + 1) as usize)[tag_idx];
+                let variant_names = variant_name_placeholder((tag + 1) as usize)
+                    .map_err(|e| serde::ser::Error::custom(format!("{}", e)))?;
+                let variant_name = variant_names[tag_idx];
                 match values.len() {
                     0 => {
                         serializer.serialize_unit_variant(MOVE_ENUM_NAME, variant_tag, variant_name)
@@ -950,7 +941,7 @@ impl fmt::Display for MoveTypeLayout {
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => fmt::Display::fmt(s, f),
-            Function(fun) => fmt::Display::fmt(fun, f),
+            Function => write!(f, "function"),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),
@@ -1018,7 +1009,12 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
-            MoveTypeLayout::Function(f) => TypeTag::Function(Box::new(f.try_into()?)),
+
+            // For function values, we cannot reconstruct the tag because we do not know the
+            // argument and return types.
+            MoveTypeLayout::Function => {
+                bail!("Function layout cannot be constructed from type tag")
+            },
 
             // Native layout variant is only used by MoveVM, and is irrelevant
             // for type tags which are used to key resources in the global state.

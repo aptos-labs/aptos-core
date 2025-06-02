@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters::DKG_STAGE_SECONDS, types::DKGTranscriptRequest, DKGMessage};
-use anyhow::{anyhow, ensure};
+use anyhow::{anyhow, ensure, Context};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::info;
@@ -92,6 +92,9 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         if trx_aggregator.contributors.contains(&metadata.author) {
             return Ok(None);
         }
+
+        S::verify_transcript_extra(&transcript, &self.epoch_state.verifier, false, Some(sender))
+            .context("extra verification failed")?;
 
         S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e| {
             anyhow!("[DKG] adding peer transcript failed with trx verification failure: {e}")

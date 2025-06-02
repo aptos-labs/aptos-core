@@ -8,4 +8,4 @@ mod move_workloads;
 mod raw_module_data;
 mod token_workflow;
 
-pub use move_workloads::{EntryPoints, LoopType, MapType};
+pub use move_workloads::{EntryPoints, LoopType, MapType, OrderBookState};

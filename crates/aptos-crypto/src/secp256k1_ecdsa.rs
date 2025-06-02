@@ -117,6 +117,8 @@ impl traits::Uniform for PrivateKey {
 }
 
 impl ValidCryptoMaterial for PrivateKey {
+    const AIP_80_PREFIX: &'static str = "secp256k1-priv-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
@@ -181,6 +183,8 @@ impl traits::Length for PublicKey {
 }
 
 impl ValidCryptoMaterial for PublicKey {
+    const AIP_80_PREFIX: &'static str = "secp256k1-pub-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
@@ -282,6 +286,8 @@ impl traits::Length for Signature {
 }
 
 impl ValidCryptoMaterial for Signature {
+    const AIP_80_PREFIX: &'static str = "secp256k1-sig-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes()
     }

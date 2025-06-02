@@ -1,13 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{EntryFunction, TransactionPayload},
+};
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 /// The default address where the `large_packages.move` module is deployed.
 /// This address is used on both mainnet and testnet.
-pub const LARGE_PACKAGES_MODULE_ADDRESS: &str =
+pub const LARGE_PACKAGES_PROD_MODULE_ADDRESS: &str =
     "0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7";
+
+/// Address where large packages module is deployed on dev network started from genesis
+/// (including devnet and localnet)
+pub const LARGE_PACKAGES_DEV_MODULE_ADDRESS: &str = "0x7";
 
 /// The default chunk size for splitting code and metadata to fit within the transaction size limits.
 pub const CHUNK_SIZE_IN_BYTES: usize = 55_000;
@@ -16,6 +23,14 @@ pub enum PublishType {
     AccountDeploy,
     ObjectDeploy,
     ObjectUpgrade,
+}
+
+pub fn default_large_packages_module_address(chain_id: &ChainId) -> &'static str {
+    if chain_id.is_mainnet() || chain_id.is_testnet() {
+        LARGE_PACKAGES_PROD_MODULE_ADDRESS
+    } else {
+        LARGE_PACKAGES_DEV_MODULE_ADDRESS
+    }
 }
 
 pub fn chunk_package_and_create_payloads(
@@ -130,6 +145,7 @@ fn large_packages_stage_code_chunk_and_publish_to_account(
     code_chunks: Vec<Vec<u8>>,
     large_packages_module_address: AccountAddress,
 ) -> TransactionPayload {
+    // TODO[Orderless]: Change this to payload v2 format.
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             large_packages_module_address,

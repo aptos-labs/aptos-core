@@ -5,8 +5,6 @@ Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
     location: script,
-    indices: redacted,
-    offsets: redacted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 10)],
 }
-
-==> Compiler v2 delivered same results!

@@ -1,0 +1,48 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::acquires_inferred {
+    struct R {
+        f: u64,
+    }
+    private fun check(a: address): bool {
+        exists<R>(a)
+    }
+    private fun publish(s: &signer) {
+        MoveTo<R>(s, pack acquires_inferred::R(1));
+        Tuple()
+    }
+    private fun read(a: address): u64 {
+        {
+          let r: &R = BorrowGlobal(Immutable)<R>(a);
+          select acquires_inferred::R.f<&R>(r)
+        }
+    }
+    private fun write(a: address,x: u64): u64 {
+        {
+          let r: &mut R = BorrowGlobal(Mutable)<R>(a);
+          select acquires_inferred::R.f<&mut R>(r) = x;
+          9
+        }
+    }
+} // end 0x42::acquires_inferred
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::acquires_inferred {
+    struct R has store, key {
+        f: u64,
+    }
+    fun check(a: address): bool {
+        exists<R>(a)
+    }
+    fun publish(s: &signer) {
+        move_to<R>(s, R{f: 1});
+    }
+    fun read(a: address): u64 {
+        let r = borrow_global<R>(a);
+        r.f
+    }
+    fun write(a: address, x: u64): u64 {
+        let r = borrow_global_mut<R>(a);
+        r.f = x;
+        9
+    }
+}

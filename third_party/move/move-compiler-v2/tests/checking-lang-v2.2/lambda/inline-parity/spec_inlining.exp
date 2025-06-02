@@ -1,0 +1,80 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    private fun apply(v: u64,predicate: |u64|bool): bool {
+        spec {
+          assert Ge($t0, 0);
+        }
+        ;
+        (predicate)(v)
+    }
+    public fun test_apply(x: u64) {
+        {
+          let r1: bool = Test::apply(x, closure#0Test::__lambda__1__test_apply());
+          spec {
+            assert r1;
+          }
+          ;
+          if r1 {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          {
+            let r2: bool = Test::apply(x, closure#0Test::__lambda__2__test_apply());
+            spec {
+              assert r2;
+            }
+            ;
+            if r2 {
+              Tuple()
+            } else {
+              Abort(2)
+            };
+            Tuple()
+          }
+        }
+    }
+    private fun __lambda__1__test_apply(v: u64): bool {
+        Ge<u64>(v, 0)
+    }
+    private fun __lambda__2__test_apply(v: u64): bool {
+        Neq<u64>(v, 0)
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    fun apply(v: u64, predicate: |u64|bool): bool {
+
+        /* spec {
+          assert Ge($t0, 0);
+        }
+         */
+        ;
+        predicate(v)
+    }
+    public fun test_apply(x: u64) {
+        let r1 = apply(x, |arg0| __lambda__1__test_apply(arg0));
+
+        /* spec {
+          assert r1;
+        }
+         */
+        ;
+        if (r1) () else abort 1;
+        let r2 = apply(x, |arg0| __lambda__2__test_apply(arg0));
+
+        /* spec {
+          assert r2;
+        }
+         */
+        ;
+        if (r2) () else abort 2;
+    }
+    fun __lambda__1__test_apply(v: u64): bool {
+        v >= 0
+    }
+    fun __lambda__2__test_apply(v: u64): bool {
+        v != 0
+    }
+}

@@ -58,25 +58,16 @@ pub trait TResourceView {
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
 
+    // These methods should not be auto-implemented via get_resource_state_value, as they do not
+    // provide maybe_layout (and do not need know whether the resource contains delayed fields).
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        // For metadata, layouts are not important.
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
-    }
+    ) -> PartialVMResult<Option<StateValueMetadata>>;
 
-    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.map(|state_value| state_value.size() as u64))
-    }
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64>;
 
-    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        // For existence, layouts are not important.
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.is_some())
-    }
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool>;
 }
 
 /// Metadata and exists queries for the resource group, determined by a key, must be resolved
@@ -125,11 +116,7 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<usize> {
-        Ok(self
-            .get_resource_from_group(group_key, resource_tag, None)?
-            .map_or(0, |bytes| bytes.len()))
-    }
+    ) -> PartialVMResult<usize>;
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
     /// groups, where the violation of the following invariant causes transaction failure:
@@ -145,48 +132,11 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<bool> {
-        self.get_resource_from_group(group_key, resource_tag, None)
-            .map(|maybe_bytes| maybe_bytes.is_some())
-    }
+    ) -> PartialVMResult<bool>;
 
     fn release_group_cache(
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>>;
-}
-
-/// Allows to query modules from the state.
-pub trait TModuleView {
-    type Key;
-
-    /// Returns
-    ///   -  Ok(None)         if the module is not in storage,
-    ///   -  Ok(Some(...))    if the module exists in storage,
-    ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
-
-    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
-    }
-
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
-    }
-
-    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
-    }
-
-    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_module_state_value(state_key)
-            .map(|maybe_state_value| maybe_state_value.is_some())
-    }
 }
 
 /// Allows to query state information, e.g. its usage.
@@ -208,8 +158,8 @@ pub trait StateStorageView {
 ///   state values.
 /// - The `ExecutorView` trait is used at executor level, e.g. BlockSTM. When
 ///   a block is executed, the types of accesses are always known (for example,
-///   whether a resource is accessed or a module). Fine-grained structure of
-///   `ExecutorView` allows to:
+///   whether a resource is accessed). Fine-grained structure of `ExecutorView`
+///   allows to:
 ///     1. Specialize on access type,
 ///     2. Separate execution and storage abstractions.
 ///
@@ -220,7 +170,6 @@ pub trait StateStorageView {
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, V>:
     TResourceView<Key = K, Layout = L>
-    + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView<Key = K>
@@ -229,7 +178,6 @@ pub trait TExecutorView<K, T, L, V>:
 
 impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
     A: TResourceView<Key = K, Layout = L>
-        + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView<Key = K>
@@ -263,29 +211,42 @@ where
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for resource at {:?}: {:?}",
-                state_key, e
-            ))
-        })
+        self.get_state_value(state_key)
+            .map_err(|e| map_storage_error(state_key, e))
+    }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| Ok(maybe_state_value.map(StateValue::into_metadata)),
+        )
+    }
+
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| {
+                Ok(maybe_state_value.map_or(0, |state_value| state_value.size() as u64))
+            },
+        )
+    }
+
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| Ok(maybe_state_value.is_some()),
+        )
     }
 }
 
-impl<S> TModuleView for S
-where
-    S: StateView,
-{
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for module at {:?}: {:?}",
-                state_key, e
-            ))
-        })
-    }
+fn map_storage_error<E: std::fmt::Debug>(state_key: &StateKey, e: E) -> PartialVMError {
+    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+        "Unexpected storage error for resource at {:?}: {:?}",
+        state_key, e
+    ))
 }
 
 impl<S> StateStorageView for S
@@ -304,7 +265,7 @@ where
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
-        self.get_usage().map_err(Into::into)
+        self.get_usage()
     }
 }
 

@@ -3,17 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::db_access::DbAccessUtil;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
 };
 use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::AccountResource,
     state_store::MoveResourceExt,
     transaction::{SignedTransaction, Transaction},
-    AptosCoinType,
 };
 use async_trait::async_trait;
 use std::{
@@ -31,22 +30,19 @@ pub struct DbReliableTransactionSubmitter {
 impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
-        let sender_coin_store_key = DbAccessUtil::new().new_state_key_aptos_coin(&account_address);
-        let sender_coin_store = DbAccessUtil::get_value::<CoinStoreResource<AptosCoinType>>(
-            &sender_coin_store_key,
-            &db_state_view,
-        )?
-        .unwrap();
-
-        Ok(sender_coin_store.coin())
+        DbAccessUtil::get_fungible_store(&account_address, &db_state_view)
+            .map(|fungible_store| fungible_store.balance())
     }
 
     async fn query_sequence_number(&self, address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
-        AccountResource::fetch_move_resource(&db_state_view, &address)
-            .unwrap()
-            .map(|account| account.sequence_number())
-            .context("account doesn't exist")
+        Ok(
+            AccountResource::fetch_move_resource(&db_state_view, &address)
+                .unwrap()
+                .map(|account| account.sequence_number())
+                .unwrap_or(0),
+        )
+        //.context("account doesn't exist")
     }
 
     async fn execute_transactions_with_counter(

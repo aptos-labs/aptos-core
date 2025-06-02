@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{state::State, versioned_state_value::DbStateUpdate, NUM_STATE_SHARDS};
+use crate::state_store::{state::State, NUM_STATE_SHARDS};
 use aptos_experimental_layered_map::LayeredMap;
-use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_slot::StateSlot},
+    transaction::Version,
+};
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -18,7 +21,7 @@ use std::sync::Arc;
 pub struct StateDelta {
     pub base: State,
     pub current: State,
-    pub shards: Arc<[LayeredMap<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
+    pub shards: Arc<[LayeredMap<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
 }
 
 impl StateDelta {
@@ -53,7 +56,7 @@ impl StateDelta {
 
     /// Get the state update for a given state key.
     /// `None` indicates the key is not updated in the delta.
-    pub fn get_state_update(&self, state_key: &StateKey) -> Option<DbStateUpdate> {
+    pub fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
         self.shards[state_key.get_shard_id() as usize].get(state_key)
     }
 }

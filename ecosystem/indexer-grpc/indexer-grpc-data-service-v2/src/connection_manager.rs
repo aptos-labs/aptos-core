@@ -155,6 +155,7 @@ impl ConnectionManager {
                     retries += 1;
                     if retries > MAX_HEARTBEAT_RETRIES {
                         warn!("Failed to send heartbeat to GrpcManager at {address}, last error: {result:?}.");
+                        break;
                     }
                 }
                 continue;

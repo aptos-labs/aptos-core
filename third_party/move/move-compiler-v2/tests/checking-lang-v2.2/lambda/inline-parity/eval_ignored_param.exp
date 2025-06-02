@@ -1,0 +1,84 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    private fun foo(f: |(u64, u64, u64)|u64,g: |(u64, u64, u64)|u64,x: u64,_: u64,y: u64,z: u64): u64 {
+        {
+          let r1: u64 = (f)(x: u64 = Add<u64>(x, 1);
+          x, y: u64 = Add<u64>(y, 1);
+          y, z: u64 = Add<u64>(z, 1);
+          z);
+          {
+            let r2: u64 = (g)(x: u64 = Add<u64>(x, 1);
+            x, y: u64 = Add<u64>(y, 1);
+            y, z: u64 = Add<u64>(z, 1);
+            z);
+            Add<u64>(Add<u64>(Add<u64>(Add<u64>(r1, r2), Mul<u64>(3, x)), Mul<u64>(5, y)), Mul<u64>(7, z))
+          }
+        }
+    }
+    public fun test() {
+        {
+          let r: u64 = Test::foo(closure#0Test::__lambda__1__test(), closure#0Test::__lambda__2__test(), 1, 10, 100, 1000);
+          if Eq<u64>(r, 9637) {
+            Tuple()
+          } else {
+            Abort(r)
+          };
+          Tuple()
+        }
+    }
+    private fun __lambda__1__test(x: u64,param$1: u64,z: u64): u64 {
+        {
+          let _: u64 = param$1;
+          Mul<u64>(x, z)
+        }
+    }
+    private fun __lambda__2__test(param$0: u64,y: u64,param$2: u64): u64 {
+        {
+          let _: u64 = param$2;
+          {
+            let _: u64 = param$0;
+            y
+          }
+        }
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    fun foo(f: |(u64, u64, u64)|u64, g: |(u64, u64, u64)|u64, x: u64, _: u64, y: u64, z: u64): u64 {
+        let r1 = f({
+            x = x + 1;
+            x
+        }, {
+            y = y + 1;
+            y
+        }, {
+            z = z + 1;
+            z
+        });
+        let r2 = g({
+            x = x + 1;
+            x
+        }, {
+            y = y + 1;
+            y
+        }, {
+            z = z + 1;
+            z
+        });
+        r1 + r2 + 3 * x + 5 * y + 7 * z
+    }
+    public fun test() {
+        let r = foo(|(arg0,arg1,arg2)| __lambda__1__test(arg0, arg1, arg2), |(arg0,arg1,arg2)| __lambda__2__test(arg0, arg1, arg2), 1, 10, 100, 1000);
+        if (r == 9637) () else abort r;
+    }
+    fun __lambda__1__test(x: u64, param$1: u64, z: u64): u64 {
+        let _ = param$1;
+        x * z
+    }
+    fun __lambda__2__test(param$0: u64, y: u64, param$2: u64): u64 {
+        let _ = param$2;
+        let _ = param$0;
+        y
+    }
+}

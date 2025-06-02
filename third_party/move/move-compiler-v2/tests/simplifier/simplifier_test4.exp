@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
@@ -13,24 +13,27 @@ module 0x8675309::M {
         {
           let x: u64 = 0;
           {
-            let f: &mut u64 = x: u64 = Add<u64>(x, 1);
-            Borrow(Mutable)(select M::S.f<&mut S>(x: u64 = Add<u64>(x, 1);
-            1;
-            s));
-            if true {
-              x: u64 = Add<u64>(x, 1);
-              M::foo(Freeze(true)<S>(s), x: u64 = Add<u64>(x, 1);
-              f = 0;
-              1)
-            } else {
-              x: u64 = Add<u64>(x, 1)
-            };
-            if Eq<u64>(x, 4) {
+            let z: u64 = 1;
+            {
+              let f: &mut u64 = x: u64 = Add<u64>(x, 1);
+              Borrow(Mutable)(select M::S.f<&mut S>(x: u64 = Add<u64>(x, 1);
+              z;
+              s));
+              if Eq<u64>(z, 1) {
+                x: u64 = Add<u64>(x, 1);
+                M::foo(Freeze(true)<S>(s), x: u64 = Add<u64>(x, 1);
+                f = 0;
+                1)
+              } else {
+                x: u64 = Add<u64>(x, 1)
+              };
+              if Eq<u64>(x, 4) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
               Tuple()
-            } else {
-              Abort(0)
-            };
-            Tuple()
+            }
           }
         }
     }
@@ -40,7 +43,7 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
@@ -51,15 +54,16 @@ module 0x8675309::M {
     }
     fun t0(s: &mut S) {
         let x = 0;
+        let z = 1;
         let f = {
             x = x + 1;
             &mut {
                 x = x + 1;
-                1;
+                z;
                 s
             }.f
         };
-        if (true) {
+        if (z == 1) {
             x = x + 1;
             foo(/*freeze*/s, {
                 *{

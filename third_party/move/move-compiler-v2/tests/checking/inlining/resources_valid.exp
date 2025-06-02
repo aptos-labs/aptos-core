@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::objects {
     struct ReaderRef<T> {
         addr: address,
@@ -25,7 +25,7 @@ module 0x42::token {
     }
 } // end 0x42::token
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::objects {
     struct ReaderRef<phantom T: key> has store {
         addr: address,
@@ -51,6 +51,33 @@ module 0x42::token {
         }.val
     }
 }
+
+// -- Model dump before second bytecode pipeline
+module 0x42::objects {
+    struct ReaderRef<T> {
+        addr: address,
+    }
+    public fun get_addr<T>(ref: &ReaderRef<T>): address {
+        select objects::ReaderRef.addr<&ReaderRef<T>>(ref)
+    }
+    public inline fun reader<T>(ref: &ReaderRef<T>): &T {
+        BorrowGlobal(Immutable)<T>(objects::get_addr<T>(ref))
+    }
+} // end 0x42::objects
+module 0x42::token {
+    use 0x42::objects as obj; // resolved as: 0x42::objects
+    struct Token {
+        val: u64,
+    }
+    public fun get_value(ref: &objects::ReaderRef<Token>): u64
+        acquires Token(*)
+     {
+        select token::Token.val<&Token>({
+          let (ref: &objects::ReaderRef<Token>): (&objects::ReaderRef<Token>) = Tuple(ref);
+          BorrowGlobal(Immutable)<Token>(objects::get_addr<Token>(ref))
+        })
+    }
+} // end 0x42::token
 
 
 ============ bytecode verification succeeded ========

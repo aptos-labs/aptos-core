@@ -67,7 +67,7 @@ impl ReachableStateAnnotation {
         // Thus, such offsets are considered to be definitely not reachable.
         self.0
             .get(&offset)
-            .map_or(true, |state| matches!(state, ReachableState::No))
+            .is_none_or(|state| matches!(state, ReachableState::No))
     }
 }
 

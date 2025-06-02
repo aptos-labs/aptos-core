@@ -55,22 +55,27 @@ impl ReleaseTarget {
     /// Returns the package directories (relative to `framework`), in the order
     /// they need to be published, as well as an optional path to the file where
     /// rust bindings generated from the package should be stored.
-    pub fn packages(self) -> Vec<(&'static str, Option<&'static str>)> {
+    /// Last element is a boolean on whether to use set_latest_language while building it.
+    pub fn packages(self) -> Vec<(&'static str, Option<&'static str>, bool)> {
         let result = vec![
-            ("move-stdlib", None),
-            ("aptos-stdlib", None),
+            ("move-stdlib", None, false),
+            ("aptos-stdlib", None, false),
             (
                 "aptos-framework",
                 Some("cached-packages/src/aptos_framework_sdk_builder.rs"),
+                false,
             ),
             (
                 "aptos-token",
                 Some("cached-packages/src/aptos_token_sdk_builder.rs"),
+                false,
             ),
             (
                 "aptos-token-objects",
                 Some("cached-packages/src/aptos_token_objects_sdk_builder.rs"),
+                false,
             ),
+            ("aptos-experimental", None, true),
         ];
         // Currently we don't have experimental packages only included in particular targets.
         result
@@ -93,10 +98,18 @@ impl ReleaseTarget {
         let packages = self
             .packages()
             .into_iter()
-            .map(|(path, binding_path)| {
-                (crate_dir.join(path), binding_path.unwrap_or("").to_owned())
+            .map(|(path, binding_path, latest_language)| {
+                (
+                    crate_dir.join(path),
+                    binding_path.unwrap_or("").to_owned(),
+                    latest_language,
+                )
             })
             .collect::<Vec<_>>();
+        let package_use_latest_language = packages
+            .iter()
+            .map(|(_, _, latest_language)| *latest_language)
+            .collect();
         ReleaseOptions {
             build_options: BuildOptions {
                 with_srcs,
@@ -115,10 +128,13 @@ impl ReleaseTarget {
                 skip_fetch_latest_git_deps: true,
                 ..BuildOptions::default()
             },
-            packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
+            packages: packages
+                .iter()
+                .map(|(path, _, _)| path.to_owned())
+                .collect(),
             rust_bindings: packages
                 .into_iter()
-                .map(|(_, binding)| {
+                .map(|(_, binding, _)| {
                     if !binding.is_empty() {
                         crate_dir.join(binding).display().to_string()
                     } else {
@@ -126,6 +142,7 @@ impl ReleaseTarget {
                     }
                 })
                 .collect(),
+            package_use_latest_language,
             output: if let Some(path) = out {
                 path
             } else {
@@ -171,6 +188,7 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     let one = NumericalAddress::parse_str("0x1").unwrap();
     let three = NumericalAddress::parse_str("0x3").unwrap();
     let four = NumericalAddress::parse_str("0x4").unwrap();
+    let seven = NumericalAddress::parse_str("0x7").unwrap();
     let ten = NumericalAddress::parse_str("0xA").unwrap();
     let resources = NumericalAddress::parse_str("0xA550C18").unwrap();
     result.insert("std".to_owned(), one);
@@ -178,6 +196,7 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     result.insert("aptos_framework".to_owned(), one);
     result.insert("aptos_token".to_owned(), three);
     result.insert("aptos_token_objects".to_owned(), four);
+    result.insert("aptos_experimental".to_owned(), seven);
     result.insert("aptos_fungible_asset".to_owned(), ten);
     result.insert("core_resources".to_owned(), resources);
     result.insert("vm".to_owned(), zero);

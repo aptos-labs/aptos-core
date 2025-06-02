@@ -18,7 +18,55 @@ warning: Unused parameter `i`. Consider removing or prefixing with an underscore
 20 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
    │                                                         ^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x42::OtherModule {
+    public fun g(a: u64,b: u64): u64 {
+        Add<u64>(a, b)
+    }
+    public fun h(a: u64,b: u64): u64 {
+        Add<u64>(Mul<u64>(2, a), b)
+    }
+} // end 0x42::OtherModule
+module 0x42::Test {
+    use 0x42::OtherModule::{g}; // resolved as: 0x42::OtherModule
+    public fun f(a: u64,b: u64): u64 {
+        Mul<u64>(a, b)
+    }
+    public inline fun quux(f: |(u64, u64)|u64,g: |u64|u64,i: |u8|u8,a: u64,b: u64): u64 {
+        Mul<u64>(Mul<u64>(Test::f(a, b), OtherModule::g(a, b)), OtherModule::h(a, b))
+    }
+    public fun test_shadowing(): u64 {
+        {
+          let (a: u64, b: u64): (u64, u64) = Tuple(10, 2);
+          Mul<u64>(Mul<u64>(Test::f(a, b), OtherModule::g(a, b)), OtherModule::h(a, b))
+        }
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::OtherModule {
+    public fun g(a: u64, b: u64): u64 {
+        a + b
+    }
+    public fun h(a: u64, b: u64): u64 {
+        2 * a + b
+    }
+}
+module 0x42::Test {
+    use 0x42::OtherModule;
+    public fun f(a: u64, b: u64): u64 {
+        a * b
+    }
+    public inline fun quux(f: |(u64, u64)|u64, g: |u64|u64, i: |u8|u8, a: u64, b: u64): u64 {
+        f(a, b) * OtherModule::g(a, b) * OtherModule::h(a, b)
+    }
+    public fun test_shadowing(): u64 {
+        let (a,b) = (10, 2);
+        f(a, b) * OtherModule::g(a, b) * OtherModule::h(a, b)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x42::OtherModule {
     public fun g(a: u64,b: u64): u64 {
         Add<u64>(a, b)
@@ -39,28 +87,6 @@ module 0x42::Test {
         Mul<u64>(Mul<u64>(Test::f(10, 2), OtherModule::g(10, 2)), OtherModule::h(10, 2))
     }
 } // end 0x42::Test
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::OtherModule {
-    public fun g(a: u64, b: u64): u64 {
-        a + b
-    }
-    public fun h(a: u64, b: u64): u64 {
-        2 * a + b
-    }
-}
-module 0x42::Test {
-    use 0x42::OtherModule;
-    public fun f(a: u64, b: u64): u64 {
-        a * b
-    }
-    public inline fun quux(f: |(u64, u64)|u64, g: |u64|u64, i: |u8|u8, a: u64, b: u64): u64 {
-        f(a, b) * OtherModule::g(a, b) * OtherModule::h(a, b)
-    }
-    public fun test_shadowing(): u64 {
-        f(10, 2) * OtherModule::g(10, 2) * OtherModule::h(10, 2)
-    }
-}
 
 
 ============ bytecode verification succeeded ========

@@ -1,2 +1,10 @@
 
+Diagnostics:
+warning: Unused value of parameter `s1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_s1`), or binding to `_`
+  ┌─ tests/more-v1/translated_ir_tests/move/signer/st_loc.move:2:11
+  │
+2 │     fun t(s1: signer, s2: signer): signer {
+  │           ^^
+
+
 ============ bytecode verification succeeded ========

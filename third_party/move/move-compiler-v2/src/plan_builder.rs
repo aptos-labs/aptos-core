@@ -5,8 +5,7 @@
 
 //! Build a vector of module test plans for a Move program compiled with V2.
 //!
-//! This reimplements move-compiler/src/unit_test/plan_builder.rs in terms
-//! of data structures available in V2's `GlobalEnv` structure after AST processing.
+//! This reimplements the legacy move compiler functionality.
 //!
 //! Each module containing any labeled `#[test]` functions gets an item in the output list, which
 //! includes info about each '#[test]' function: name, arguments to provide, and expected failure or
@@ -14,11 +13,11 @@
 
 use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
-use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
-use move_compiler::{
+use legacy_move_compiler::{
     shared::known_attributes::{AttributeKind, TestingAttribute},
     unit_test::{ExpectedFailure, ExpectedMoveError, ModuleTestPlan, TestCase},
 };
+use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
 use move_core_types::{
     identifier::Identifier, language_storage::ModuleId, value::MoveValue, vm_status::StatusCode,
 };
@@ -602,7 +601,7 @@ fn convert_constant_value_u64_constant_or_value(
     let (severity, message) = match value {
         Value::Number(u) => match ty {
             Type::Primitive(PrimitiveType::U64) => {
-                if u <= BigInt::from(std::u64::MAX) {
+                if u <= BigInt::from(u64::MAX) {
                     return Some((vloc, mod_id, u.to_u64().unwrap()));
                 } else {
                     (
@@ -616,7 +615,7 @@ fn convert_constant_value_u64_constant_or_value(
                 }
             },
             Type::Primitive(PrimitiveType::Num) => {
-                if u <= BigInt::from(std::u64::MAX) {
+                if u <= BigInt::from(u64::MAX) {
                     return Some((vloc, mod_id, u.to_u64().unwrap()));
                 } else {
                     (
@@ -670,7 +669,7 @@ fn convert_module_id(env: &GlobalEnv, _vloc: Loc, module: Option<ModuleName>) ->
 fn convert_model_ast_value_u64(env: &GlobalEnv, loc: Loc, value: &Value) -> Option<(Loc, u64)> {
     match value {
         Value::Number(u) => {
-            if u <= &BigInt::from(std::u64::MAX) {
+            if u <= &BigInt::from(u64::MAX) {
                 Some((loc, u.to_u64().unwrap()))
             } else {
                 env.error(

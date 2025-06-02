@@ -1,0 +1,32 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct S<T> {
+        x: T,
+    }
+    private fun id<T>(self: S<T>): S<T> {
+        self
+    }
+    private fun inlined<T>(f: |S<T>|S<T>,s: S<T>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: S<u64>) {
+        m::inlined<u64>(closure#0m::id<u64>(), s)
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct S<T> has drop {
+        x: T,
+    }
+    fun id<T>(self: S<T>): S<T> {
+        self
+    }
+    fun inlined<T: drop>(f: |S<T>|S<T>, s: S<T>) {
+        f(s);
+    }
+    fun test_receiver_inference(s: S<u64>) {
+        inlined<u64>(|arg0| id(arg0), s)
+    }
+}

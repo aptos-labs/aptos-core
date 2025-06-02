@@ -1,0 +1,45 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::map_opt {
+    use std::option;
+    public fun map<Element,OtherElement>(t: 0x1::option::Option<Element>,f: |Element|OtherElement has drop): 0x1::option::Option<OtherElement> {
+        if option::is_some<Element>(Borrow(Immutable)(t)) {
+          option::some<OtherElement>((f)(option::extract<Element>(Borrow(Mutable)(t))))
+        } else {
+          option::none<OtherElement>()
+        }
+    }
+} // end 0x42::map_opt
+module 0x42::Test {
+    use std::option;
+    use 0x42::map_opt; // resolved as: 0x42::map_opt
+    public fun test(): u64 {
+        {
+          let t: 0x1::option::Option<u64> = option::some<u64>(1);
+          {
+            let x: 0x1::option::Option<u64> = map_opt::map<u64, u64>(t, closure#0Test::__lambda__1__test());
+            option::extract<u64>(Borrow(Mutable)(x))
+          }
+        }
+    }
+    private fun __lambda__1__test(e: u64): u64 {
+        Add<u64>(e, 1)
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::map_opt {
+    public fun map<Element: drop, OtherElement>(t: 0x1::option::Option<Element>, f: |Element|OtherElement has drop): 0x1::option::Option<OtherElement> {
+        if (0x1::option::is_some<Element>(&t)) 0x1::option::some<OtherElement>(f(0x1::option::extract<Element>(&mut t))) else 0x1::option::none<OtherElement>()
+    }
+}
+module 0x42::Test {
+    use 0x42::map_opt;
+    public fun test(): u64 {
+        let t = 0x1::option::some<u64>(1);
+        let x = map_opt::map<u64,u64>(t, |arg0| __lambda__1__test(arg0));
+        0x1::option::extract<u64>(&mut x)
+    }
+    fun __lambda__1__test(e: u64): u64 {
+        e + 1
+    }
+}

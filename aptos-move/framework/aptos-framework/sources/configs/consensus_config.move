@@ -59,7 +59,7 @@ module aptos_framework::consensus_config {
     public(friend) fun on_new_epoch(framework: &signer) acquires ConsensusConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ConsensusConfig>()) {
-            let new_config = config_buffer::extract<ConsensusConfig>();
+            let new_config = config_buffer::extract_v2<ConsensusConfig>();
             if (exists<ConsensusConfig>(@aptos_framework)) {
                 *borrow_global_mut<ConsensusConfig>(@aptos_framework) = new_config;
             } else {

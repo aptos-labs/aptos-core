@@ -1,5 +1,6 @@
 [tool.poetry]
 name = "aptos-cli-e2e-tests"
+package-mode = false
 version = "0.1.0"
 description = "Aptos CLI E2E tests"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
@@ -7,7 +8,7 @@ license = "Apache-2.0"
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<=4"
-aptos-sdk = "^0.8.6"
+aptos-sdk = "^0.10.0"
 requests = "^2.31.0"
 
 [tool.poetry.dev-dependencies]

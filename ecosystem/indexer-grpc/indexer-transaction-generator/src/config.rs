@@ -66,6 +66,10 @@ pub struct IndexerCliArgs {
     /// Mode of operation for the indexer.
     #[clap(long, default_value_t = Mode::Import, value_parser = Mode::from_str)]
     pub mode: Mode,
+
+    /// Leave this blank if want all the networks
+    #[clap(long)]
+    pub network: Option<String>,
 }
 
 impl IndexerCliArgs {
@@ -93,7 +97,7 @@ impl IndexerCliArgs {
                         serde_yaml::from_str(&imported_transactions_config_raw)?;
 
                     imported_transactions_config
-                        .validate_and_run(&output_folder)
+                        .validate_and_run(&output_folder, self.network.clone())
                         .await
                         .context("Importing transactions failed.")?;
                 }
@@ -258,12 +262,22 @@ impl TransactionImporterConfig {
         Ok(())
     }
 
-    pub async fn validate_and_run(&self, output_path: &Path) -> anyhow::Result<()> {
+    pub async fn validate_and_run(
+        &self,
+        output_path: &Path,
+        network: Option<String>,
+    ) -> anyhow::Result<()> {
         // Validate the configuration.
         self.validate()?;
 
         // Run the transaction importer for each network.
         for (network_name, network_config) in self.configs.iter() {
+            // If network is specified, only run the transaction importer for the specified network.
+            if let Some(network) = &network {
+                if network != network_name {
+                    continue;
+                }
+            }
             // Modify the output path by appending the network name to the base path
             let modified_output_path = match network_name.as_str() {
                 "mainnet" => output_path.join(IMPORTED_MAINNET_TXNS),
@@ -364,7 +378,7 @@ mod tests {
         // create a temporary folder for the output.
         let tempfile = tempfile::tempdir().unwrap();
         let result = transaction_generator_config
-            .validate_and_run(tempfile.path())
+            .validate_and_run(tempfile.path(), None)
             .await;
         assert!(result.is_err());
     }
@@ -402,6 +416,7 @@ mod tests {
             testing_folder: tempfile.path().to_path_buf(),
             output_folder,
             mode: Mode::Script,
+            network: None,
         };
         let result = indexer_cli_args.run().await;
         assert!(result.is_err());

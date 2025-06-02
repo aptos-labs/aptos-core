@@ -1,13 +1,29 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
     public fun test(): u64 {
-        5
+        {
+          let x: u64 = 1;
+          {
+            let x: u64 = Add<u64>(x, 1);
+            {
+              let y: u64 = 2;
+              {
+                let y: u64 = Add<u64>(y, 1);
+                Add<u64>(x, y)
+              }
+            }
+          }
+        }
     }
 } // end 0xc0ffee::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
     public fun test(): u64 {
-        5
+        let x = 1;
+        let x = x + 1;
+        let y = 2;
+        let y = y + 1;
+        x + y
     }
 }

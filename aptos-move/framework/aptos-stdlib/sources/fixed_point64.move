@@ -31,8 +31,8 @@ module aptos_std::fixed_point64 {
 
     /// Returns self - y. self must be not less than y.
     public fun sub(self: FixedPoint64, y: FixedPoint64): FixedPoint64 {
-        let x_raw = get_raw_value(self);
-        let y_raw = get_raw_value(y);
+        let x_raw = self.get_raw_value();
+        let y_raw = y.get_raw_value();
         assert!(x_raw >= y_raw, ENEGATIVE_RESULT);
         create_from_raw_value(x_raw - y_raw)
     }
@@ -44,8 +44,8 @@ module aptos_std::fixed_point64 {
 
     /// Returns self + y. The result cannot be greater than MAX_U128.
     public fun add(self: FixedPoint64, y: FixedPoint64): FixedPoint64 {
-        let x_raw = get_raw_value(self);
-        let y_raw = get_raw_value(y);
+        let x_raw = self.get_raw_value();
+        let y_raw = y.get_raw_value();
         let result = (x_raw as u256) + (y_raw as u256);
         assert!(result <= MAX_U128, ERATIO_OUT_OF_RANGE);
         create_from_raw_value((result as u128))
@@ -348,7 +348,7 @@ module aptos_std::fixed_point64 {
 
     /// Rounds up the given FixedPoint64 to the next largest integer.
     public fun ceil(self: FixedPoint64): u128 {
-        let floored_num = floor(self) << 64;
+        let floored_num = self.floor() << 64;
         if (self.value == floored_num) {
             return floored_num >> 64
         };
@@ -374,12 +374,12 @@ module aptos_std::fixed_point64 {
 
     /// Returns the value of a FixedPoint64 to the nearest integer.
     public fun round(self: FixedPoint64): u128 {
-        let floored_num = floor(self) << 64;
+        let floored_num = self.floor() << 64;
         let boundary = floored_num + ((1 << 64) / 2);
         if (self.value < boundary) {
             floored_num >> 64
         } else {
-            ceil(self)
+            self.ceil()
         }
     }
     spec round {
@@ -410,10 +410,10 @@ module aptos_std::fixed_point64 {
     public entry fun test_sub() {
         let x = create_from_rational(9, 7);
         let y = create_from_rational(1, 3);
-        let result = sub(x, y);
+        let result = x.sub(y);
         // 9/7 - 1/3 = 20/21
         let expected_result = create_from_rational(20, 21);
-        assert_approx_the_same((get_raw_value(result) as u256), (get_raw_value(expected_result) as u256), 16);
+        assert_approx_the_same((result.get_raw_value() as u256), (expected_result.get_raw_value() as u256), 16);
     }
 
     #[test]
@@ -421,13 +421,13 @@ module aptos_std::fixed_point64 {
     public entry fun test_sub_should_abort() {
         let x = create_from_rational(1, 3);
         let y = create_from_rational(9, 7);
-        let _ = sub(x, y);
+        let _ = x.sub(y);
     }
 
     #[test_only]
     /// For functions that approximate a value it's useful to test a value is close
     /// to the most correct value up to last digit
-    fun assert_approx_the_same(x: u256, y: u256, precission: u128) {
+    fun assert_approx_the_same(x: u256, y: u256, precision: u128) {
         if (x < y) {
             let tmp = x;
             x = y;
@@ -435,12 +435,12 @@ module aptos_std::fixed_point64 {
         };
         let mult = 1u256;
         let n = 10u256;
-        while (precission > 0) {
-            if (precission % 2 == 1) {
-                mult = mult * n;
+        while (precision > 0) {
+            if (precision % 2 == 1) {
+                mult *= n;
             };
-            precission = precission / 2;
-            n = n * n;
+            precision /= 2;
+            n *= n;
         };
         assert!((x - y) * mult < x, 0);
     }

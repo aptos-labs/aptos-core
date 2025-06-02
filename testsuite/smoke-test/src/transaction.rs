@@ -79,7 +79,7 @@ async fn test_external_transaction_signer() {
     // query the transaction and check it contains the same values as requested
     let txn = info
         .client()
-        .get_account_transactions(sender_address, Some(test_sequence_number), Some(1))
+        .get_account_ordered_transactions(sender_address, Some(test_sequence_number), Some(1))
         .await
         .unwrap()
         .into_inner()

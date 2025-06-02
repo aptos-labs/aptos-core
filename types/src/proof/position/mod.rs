@@ -33,7 +33,7 @@ mod position_test;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Position(u64);
-// invariant Position.0 < u64::max_value() - 1
+// invariant Position.0 < u64::MAX - 1
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum NodeDirection {
@@ -91,7 +91,7 @@ impl Position {
 
     /// What is the parent of this node?
     pub fn parent(self) -> Self {
-        assert!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::MAX - 1); // invariant
         Self(
             (self.0 | isolate_rightmost_zero_bit(self.0))
                 & !(isolate_rightmost_zero_bit(self.0) << 1),
@@ -112,7 +112,7 @@ impl Position {
 
     fn child(self, dir: NodeDirection) -> Self {
         assert!(!self.is_leaf());
-        assert!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::MAX - 1); // invariant
 
         let direction_bit = match dir {
             NodeDirection::Left => 0,
@@ -125,7 +125,7 @@ impl Position {
     /// after stripping out all right-most 1 bits, a left child will have a bit pattern
     /// of xxx00(11..), while a right child will be represented by xxx10(11..)
     pub fn is_left_child(self) -> bool {
-        assert!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::MAX - 1); // invariant
         self.0 & (isolate_rightmost_zero_bit(self.0) << 1) == 0
     }
 
@@ -145,7 +145,7 @@ impl Position {
     /// To find out the right-most common bits, first remove all the right-most ones
     /// because they are corresponding to level's indicator. Then remove next zero right after.
     pub fn sibling(self) -> Self {
-        assert!(self.0 < u64::max_value() - 1); // invariant
+        assert!(self.0 < u64::MAX - 1); // invariant
         Self(self.0 ^ (isolate_rightmost_zero_bit(self.0) << 1))
     }
 
@@ -341,7 +341,7 @@ impl Iterator for AncestorIterator {
 pub struct FrozenSubTreeIterator {
     bitmap: u64,
     seen_leaves: u64,
-    // invariant seen_leaves < u64::max_value() - bitmap
+    // invariant seen_leaves < u64::MAX - bitmap
 }
 
 impl FrozenSubTreeIterator {
@@ -357,7 +357,7 @@ impl Iterator for FrozenSubTreeIterator {
     type Item = Position;
 
     fn next(&mut self) -> Option<Position> {
-        assert!(self.seen_leaves < u64::max_value() - self.bitmap); // invariant
+        assert!(self.seen_leaves < u64::MAX - self.bitmap); // invariant
 
         if self.bitmap == 0 {
             return None;

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x123::a {
     friend entry fun a() {
         Tuple()
@@ -13,7 +13,7 @@ module 0x123::b {
     }
 } // end 0x123::b
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x123::a {
     friend entry fun a() {
     }

@@ -4,7 +4,7 @@
 //! This module contains common code useful for lint checkers at various stages
 //! of the compilation pipeline.
 
-use move_compiler::shared::known_attributes::LintAttribute;
+use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_model::{ast::Attribute, model::GlobalEnv};
 use std::collections::BTreeSet;
 

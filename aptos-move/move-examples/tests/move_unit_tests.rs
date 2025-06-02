@@ -50,9 +50,8 @@ pub fn run_tests_for_pkg(
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
-    )
-    .unwrap();
-    if ok != UnitTestResult::Success {
+    );
+    if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
         panic!("move unit tests failed")
     }
 }
@@ -98,15 +97,6 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
-fn test_veiled_coin() {
-    let named_address = BTreeMap::from([(
-        String::from("veiled_coin"),
-        AccountAddress::from_hex_literal("0x1").unwrap(),
-    )]);
-    run_tests_for_pkg("veiled_coin", named_address);
-}
-
-#[test]
 fn test_vector_pushback() {
     let named_address = BTreeMap::new();
     run_tests_for_pkg("vector_pushback", named_address);
@@ -116,6 +106,12 @@ fn test_vector_pushback() {
 fn test_fixed_point64() {
     let named_address = BTreeMap::new();
     run_tests_for_pkg("fixed_point64", named_address);
+}
+
+#[test]
+#[should_panic(expected = "move unit tests failed")]
+fn test_duplicate_scripts() {
+    run_tests_for_pkg("duplicate_scripts", BTreeMap::new());
 }
 
 #[test]
@@ -161,6 +157,11 @@ fn test_marketplace() {
 #[test]
 fn test_message_board() {
     test_common("message_board");
+}
+
+#[test]
+fn test_dispatching() {
+    test_common("dispatching");
 }
 
 #[test]

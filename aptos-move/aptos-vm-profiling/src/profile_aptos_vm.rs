@@ -3,7 +3,7 @@
 
 use crate::{BUILD_PROFILE, PATH_CRATE_ROOT};
 use anyhow::{bail, Result};
-use aptos_language_e2e_tests::data_store::GENESIS_CHANGE_SET_HEAD;
+use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use once_cell::sync::Lazy;
 use std::{
     path::{Path, PathBuf},

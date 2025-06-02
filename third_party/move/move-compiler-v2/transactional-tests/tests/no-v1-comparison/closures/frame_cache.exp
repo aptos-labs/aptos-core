@@ -1,0 +1,7 @@
+processed 7 tasks
+
+task 5 'run'. lines 47-47:
+return values: true
+
+task 6 'run'. lines 49-49:
+return values: false

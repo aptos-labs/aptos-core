@@ -9,10 +9,8 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::ConditionKind,
     model::{FunId, FunctionEnv, GlobalEnv, GlobalId, QualifiedId, QualifiedInstId, StructId},
-    ty::{
-        NoUnificationContext, Type, TypeDisplayContext, TypeInstantiationDerivation,
-        TypeUnificationAdapter, Variance,
-    },
+    ty::{NoUnificationContext, Type, TypeDisplayContext, Variance},
+    ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},

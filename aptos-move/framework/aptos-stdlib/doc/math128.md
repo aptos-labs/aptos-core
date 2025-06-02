@@ -266,10 +266,10 @@ Return the value of n raised to power e
         <b>let</b> p = 1;
         <b>while</b> (e &gt; 1) {
             <b>if</b> (e % 2 == 1) {
-                p = p * n;
+                p *= n;
             };
-            e = e / 2;
-            n = n * n;
+            e /= 2;
+            n *= n;
         };
         p * n
     }
@@ -303,10 +303,10 @@ Returns floor(log2(x))
     <b>let</b> n = 64;
     <b>while</b> (n &gt; 0) {
         <b>if</b> (x &gt;= (1 &lt;&lt; n)) {
-            x = x &gt;&gt; n;
-            res = res + n;
+            x &gt;&gt;= n;
+            res += n;
         };
-        n = n &gt;&gt; 1;
+        n &gt;&gt;= 1;
     };
     res
 }
@@ -335,9 +335,9 @@ Returns floor(log2(x))
     <b>let</b> integer_part = <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x);
     // Normalize x <b>to</b> [1, 2) in fixed point 32.
     <b>if</b> (x &gt;= 1 &lt;&lt; 32) {
-        x = x &gt;&gt; (integer_part - 32);
+        x &gt;&gt;= (integer_part - 32);
     } <b>else</b> {
-        x = x &lt;&lt; (32 - integer_part);
+        x &lt;&lt;= (32 - integer_part);
     };
     <b>let</b> frac = 0;
     <b>let</b> delta = 1 &lt;&lt; 31;
@@ -347,8 +347,8 @@ Returns floor(log2(x))
         x = (x * x) &gt;&gt; 32;
         // x is now in [1, 4)
         // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
-        <b>if</b> (x &gt;= (2 &lt;&lt; 32)) { frac = frac + delta; x = x &gt;&gt; 1; };
-        delta = delta &gt;&gt; 1;
+        <b>if</b> (x &gt;= (2 &lt;&lt; 32)) { frac += delta; x &gt;&gt;= 1; };
+        delta &gt;&gt;= 1;
     };
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
 }
@@ -377,9 +377,9 @@ Returns floor(log2(x))
     <b>let</b> integer_part = <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x);
     // Normalize x <b>to</b> [1, 2) in fixed point 63. To ensure x is smaller then 1&lt;&lt;64
     <b>if</b> (x &gt;= 1 &lt;&lt; 63) {
-        x = x &gt;&gt; (integer_part - 63);
+        x &gt;&gt;= (integer_part - 63);
     } <b>else</b> {
-        x = x &lt;&lt; (63 - integer_part);
+        x &lt;&lt;= (63 - integer_part);
     };
     <b>let</b> frac = 0;
     <b>let</b> delta = 1 &lt;&lt; 63;
@@ -389,8 +389,8 @@ Returns floor(log2(x))
         x = (x * x) &gt;&gt; 63;
         // x is now in [1, 4)
         // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
-        <b>if</b> (x &gt;= (2 &lt;&lt; 63)) { frac = frac + delta; x = x &gt;&gt; 1; };
-        delta = delta &gt;&gt; 1;
+        <b>if</b> (x &gt;= (2 &lt;&lt; 63)) { frac += delta; x &gt;&gt;= 1; };
+        delta &gt;&gt;= 1;
     };
     <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (((integer_part <b>as</b> u128) &lt;&lt; 64) + frac)
 }

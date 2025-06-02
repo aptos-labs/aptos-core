@@ -35,10 +35,7 @@ use move_vm_types::{
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::{Add, Mul},
-    u64,
-};
+use std::ops::{Add, Mul};
 
 pub enum GasUnit {}
 
@@ -520,6 +517,10 @@ impl GasMeter for GasStatus {
         _name: &IdentStr,
         _size: NumBytes,
     ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
     }
 }

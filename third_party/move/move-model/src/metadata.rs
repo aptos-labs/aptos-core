@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use move_binary_format::file_format_common::{
-    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2, VERSION_MAX,
-};
-use move_command_line_common::{env, env::get_move_compiler_v1_from_env};
-use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
-use once_cell::sync::Lazy;
+use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
+use move_binary_format::file_format_common::{VERSION_8, VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2};
+use move_command_line_common::env;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -80,7 +77,7 @@ impl CompilationMetadata {
 /// a different/largely refactored compiler. This we have versions `1, 2.0, 2.1, 2.2, .., `.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum CompilerVersion {
-    /// The legacy v1 Move compiler
+    /// The legacy v1 Move compiler, no longer supported.
     V1,
     /// The v2 compiler, starting with 2.0-unstable. Each new released version of the compiler
     /// should get an enum entry here.
@@ -90,14 +87,8 @@ pub enum CompilerVersion {
 }
 
 impl Default for CompilerVersion {
-    /// We allow the default to be set via an environment variable.
     fn default() -> Self {
-        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
-        if *MOVE_COMPILER_V1 {
-            Self::V1
-        } else {
-            Self::latest_stable()
-        }
+        Self::latest_stable()
     }
 }
 
@@ -160,25 +151,12 @@ impl CompilerVersion {
 
     /// Check whether the compiler version supports the given language version,
     /// generates an error if not.
-    pub fn check_language_support(self, version: LanguageVersion) -> anyhow::Result<()> {
+    pub fn check_language_support(self, _version: LanguageVersion) -> anyhow::Result<()> {
         match self {
             CompilerVersion::V1 => {
-                if version != LanguageVersion::V1 {
-                    bail!("compiler v1 does only support Move language version 1")
-                } else {
-                    Ok(())
-                }
+                bail!("compiler v1 is no longer supported")
             },
             _ => Ok(()),
-        }
-    }
-
-    /// Infer the latest stable language version based on the compiler version
-    pub fn infer_stable_language_version(&self) -> LanguageVersion {
-        if *self == CompilerVersion::V1 {
-            LanguageVersion::V1
-        } else {
-            LanguageVersion::latest_stable()
         }
     }
 
@@ -201,7 +179,7 @@ impl CompilerVersion {
 /// Typically, a major version change is given with an addition of larger new language
 /// features. There are no breaking changes expected with major version changes,
 /// however, there maybe some isolated exceptions.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
     /// The version of Move at around the genesis of the Aptos network end
     /// of '22. This is the original Diem Move plus the extension of inline
@@ -214,21 +192,33 @@ pub enum LanguageVersion {
     V2_1,
     /// The currently unstable 2.2 version of Move
     V2_2,
-}
-
-impl LanguageVersion {
-    /// Leave this symbolic for now in case of more versions.
-    pub const V2_LAMBDA: Self = Self::V2_2;
+    /// The currently unstable 2.3 version of Move
+    V2_3,
 }
 
 impl Default for LanguageVersion {
     fn default() -> Self {
-        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
-        if *MOVE_COMPILER_V1 {
-            Self::V1
-        } else {
-            Self::latest_stable()
-        }
+        Self::latest_stable()
+    }
+}
+
+impl Serialize for LanguageVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for LanguageVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        Self::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -245,8 +235,9 @@ impl FromStr for LanguageVersion {
             "2.0" => Ok(Self::V2_0),
             "2" | "2.1" => Ok(Self::V2_1),
             "2.2" => Ok(Self::V2_2),
+            "2.3" => Ok(Self::V2_3),
             _ => bail!(
-                "unrecognized language version `{}` (supported versions: `1`, `2`, `2.0`, `2.1`)",
+                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.3\")",
                 s
             ),
         }
@@ -260,6 +251,7 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
             LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
             LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
             LanguageVersion::V2_2 => CompilerLanguageVersion::V2_2,
+            LanguageVersion::V2_3 => CompilerLanguageVersion::V2_3,
         }
     }
 }
@@ -271,13 +263,13 @@ impl LanguageVersion {
         use LanguageVersion::*;
         match self {
             V1 | V2_0 | V2_1 => false,
-            V2_2 => true,
+            V2_2 | V2_3 => true,
         }
     }
 
     /// The latest language version.
     pub const fn latest() -> Self {
-        LanguageVersion::V2_2
+        LanguageVersion::V2_3
     }
 
     /// The latest stable language version.
@@ -297,7 +289,7 @@ impl LanguageVersion {
             LanguageVersion::V1 => VERSION_DEFAULT,
             LanguageVersion::V2_0 => VERSION_DEFAULT_LANG_V2,
             LanguageVersion::V2_1 => VERSION_DEFAULT_LANG_V2,
-            LanguageVersion::V2_2 => VERSION_MAX,
+            LanguageVersion::V2_2 | LanguageVersion::V2_3 => VERSION_8,
         })
     }
 
@@ -307,6 +299,7 @@ impl LanguageVersion {
             LanguageVersion::V2_0 => "2.0",
             LanguageVersion::V2_1 => "2.1",
             LanguageVersion::V2_2 => "2.2",
+            LanguageVersion::V2_3 => "2.3",
         }
     }
 }
@@ -321,6 +314,7 @@ impl Display for LanguageVersion {
                 LanguageVersion::V2_0 => "2.0",
                 LanguageVersion::V2_1 => "2.1",
                 LanguageVersion::V2_2 => "2.2",
+                LanguageVersion::V2_3 => "2.3",
             },
             if self.unstable() { UNSTABLE_MARKER } else { "" }
         )

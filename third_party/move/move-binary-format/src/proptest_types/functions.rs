@@ -54,7 +54,7 @@ where
     IndexT: Clone,
 {
     fn add(&mut self, handle: HandleT, make_index: impl Fn(TableIndex) -> IndexT) -> IndexT {
-        debug_assert!(self.handles.len() < TableSize::max_value() as usize);
+        debug_assert!(self.handles.len() < TableSize::MAX as usize);
         if let Some(idx) = self.map.get(&handle) {
             return idx.clone();
         }
@@ -112,7 +112,7 @@ where
 
     #[allow(unused)]
     fn add_instantiation(&mut self, inst: T) -> TableIndex {
-        debug_assert!(self.instantiations.len() < TableSize::max_value() as usize);
+        debug_assert!(self.instantiations.len() < TableSize::MAX as usize);
         if let Some(idx) = self.instantiation_map.get(&inst) {
             return *idx;
         }
@@ -317,7 +317,7 @@ impl<'a> FnDefnMaterializeState<'a> {
     }
 
     fn add_function_handle(&mut self, handle: FunctionHandle) -> FunctionHandleIndex {
-        debug_assert!(self.function_handles.len() < TableSize::max_value() as usize);
+        debug_assert!(self.function_handles.len() < TableSize::MAX as usize);
         self.function_handles.push(handle);
         FunctionHandleIndex((self.function_handles.len() - 1) as TableIndex)
     }

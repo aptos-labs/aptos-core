@@ -1,5 +1,5 @@
 {
-  "resource_version": 38,
+  "resource_version": 10000,
   "metadata": {
     "version": 3,
     "sources": [
@@ -797,6 +797,57 @@
           },
           {
             "table": {
+              "name": "ledger_infos",
+              "schema": "processor_metadata"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "ledger_infos",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "chain_id"
+                  ],
+                  "filter": {}
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "processor_status",
+              "schema": "processor_metadata"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "processor_status",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "last_success_version",
+                    "processor",
+                    "last_transaction_timestamp",
+                    "last_updated"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "account_transactions",
               "schema": "public"
             },
@@ -1024,6 +1075,27 @@
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "auth_key_account_addresses",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "auth_key",
+                    "account_address",
+                    "last_transaction_version",
+                    "is_auth_key_used"
+                  ],
+                  "filter": {},
+                  "limit": 100
                 }
               }
             ]
@@ -2081,23 +2153,6 @@
           },
           {
             "table": {
-              "name": "ledger_infos",
-              "schema": "public"
-            },
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "chain_id"
-                  ],
-                  "filter": {}
-                }
-              }
-            ]
-          },
-          {
-            "table": {
               "name": "num_active_delegator_per_pool",
               "schema": "public"
             },
@@ -2117,7 +2172,7 @@
           },
           {
             "table": {
-              "name": "processor_status",
+              "name": "public_key_auth_keys",
               "schema": "public"
             },
             "select_permissions": [
@@ -2125,10 +2180,13 @@
                 "role": "anonymous",
                 "permission": {
                   "columns": [
-                    "last_success_version",
-                    "last_transaction_timestamp",
-                    "last_updated",
-                    "processor"
+                    "public_key",
+                    "public_key_type",
+                    "auth_key",
+                    "account_public_key",
+                    "last_transaction_version",
+                    "is_public_key_used",
+                    "signature_type"
                   ],
                   "filter": {},
                   "limit": 100
@@ -2314,6 +2372,12 @@
                 }
               }
             ]
+          },
+          {
+            "table": {
+              "name": "token_datas_v2",
+              "schema": "public"
+            }
           },
           {
             "table": {

@@ -53,9 +53,13 @@ impl FileStoreReader {
 
     /// Returns the file path for the given version. Requires the version to be the first version
     /// in the file.
-    pub fn get_path_for_version(&self, version: u64) -> PathBuf {
+    pub fn get_path_for_version(&self, version: u64, suffix: Option<u64>) -> PathBuf {
         let mut buf = self.get_folder_name(version);
-        buf.push(format!("{}", version));
+        if let Some(suffix) = suffix {
+            buf.push(format!("{version}_{suffix}"));
+        } else {
+            buf.push(format!("{version}"));
+        }
         buf
     }
 
@@ -76,7 +80,8 @@ impl FileStoreReader {
         retries: u8,
         max_files: Option<usize>,
         filter: Option<BooleanTransactionFilter>,
-        tx: Sender<(Vec<Transaction>, usize, Timestamp)>,
+        ending_version: Option<u64>,
+        tx: Sender<(Vec<Transaction>, usize, Timestamp, (u64, u64))>,
     ) {
         trace!(
             "Getting transactions from file store, version: {version}, max_files: {max_files:?}."
@@ -109,8 +114,13 @@ impl FileStoreReader {
 
         for i in file_index..end_file_index {
             let current_version = batch_metadata.files[i].first_version;
+            if let Some(ending_version) = ending_version {
+                if current_version >= ending_version {
+                    break;
+                }
+            }
             let transactions = self
-                .get_transaction_file_at_version(current_version, retries)
+                .get_transaction_file_at_version(current_version, batch_metadata.suffix, retries)
                 .await;
             if let Ok(mut transactions) = transactions {
                 let timestamp = transactions.last().unwrap().timestamp.unwrap();
@@ -118,13 +128,22 @@ impl FileStoreReader {
                 if num_to_skip > 0 {
                     transactions = transactions.split_off(num_to_skip);
                 }
+                let mut processed_range = (
+                    transactions.first().unwrap().version,
+                    transactions.last().unwrap().version,
+                );
+                if let Some(ending_version) = ending_version {
+                    transactions
+                        .truncate(transactions.partition_point(|t| t.version < ending_version));
+                    processed_range.1 = processed_range.1.min(ending_version - 1);
+                }
                 if let Some(ref filter) = filter {
                     transactions.retain(|t| filter.matches(t));
                 }
                 let size_bytes = transactions.iter().map(|t| t.encoded_len()).sum();
-                trace!("Got {} transactions from file store to send, size: {size_bytes}, first_version: {:?}", transactions.len(), transactions.first().map(|t| t.version));
+                trace!("Got {} transactions from file store to send, size: {size_bytes}, processed_range: [{}, {}]", transactions.len(), processed_range.0, processed_range.1);
                 if tx
-                    .send((transactions, size_bytes, timestamp))
+                    .send((transactions, size_bytes, timestamp, processed_range))
                     .await
                     .is_err()
                 {
@@ -194,11 +213,12 @@ impl FileStoreReader {
     async fn get_transaction_file_at_version(
         &self,
         version: u64,
+        suffix: Option<u64>,
         retries: u8,
     ) -> Result<Vec<Transaction>> {
         let mut retries = retries;
         let bytes = loop {
-            let path = self.get_path_for_version(version);
+            let path = self.get_path_for_version(version, suffix);
             match self.reader.get_raw_file(path.clone()).await {
                 Ok(bytes) => break bytes.unwrap_or_else(|| panic!("File should exist: {path:?}.")),
                 Err(err) => {

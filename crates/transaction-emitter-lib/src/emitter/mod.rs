@@ -20,7 +20,7 @@ use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_logger::{error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{sample, sample::SampleRate};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -32,6 +32,7 @@ use aptos_transaction_generator_lib::{
 };
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
+use log::{error, info, warn};
 use once_cell::sync::Lazy;
 use rand::{
     rngs::StdRng,
@@ -55,7 +56,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 const MAX_TXNS: u64 = 1_000_000_000;
 
 // TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
-pub const EXPECTED_GAS_PER_TRANSFER: u64 = 22;
+pub const EXPECTED_GAS_PER_TRANSFER: u64 = 50;
 pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 1100 + 20;
 
 const MAX_RETRIES: usize = 12;
@@ -988,7 +989,7 @@ impl TxnEmitter {
 }
 
 #[allow(dead_code)]
-fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
+fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
@@ -1200,8 +1201,7 @@ pub fn get_needed_balance_per_account(
     max_gas_per_txn: u64,
 ) -> u64 {
     // round up:
-    let txnx_per_account =
-        (num_workload_transactions + num_accounts as u64 - 1) / num_accounts as u64;
+    let txnx_per_account = num_workload_transactions.div_ceil(num_accounts as u64);
     let coins_per_account = txnx_per_account
         .checked_mul(octas_per_workload_transaction + gas_per_workload_transaction * gas_price)
         .unwrap()

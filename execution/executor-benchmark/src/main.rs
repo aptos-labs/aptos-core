@@ -165,6 +165,7 @@ impl PipelineOpt {
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
             num_sig_verify_threads: self.num_sig_verify_threads,
+            print_transactions: false,
         }
     }
 }
@@ -576,7 +577,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
 
-    aptos_node_resource_metrics::register_node_metrics_collector();
+    aptos_node_resource_metrics::register_node_metrics_collector(None);
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     let execution_threads = opt.execution_threads();

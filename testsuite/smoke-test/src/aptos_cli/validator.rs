@@ -206,7 +206,7 @@ async fn test_onchain_config_change() {
                     alg: ConsensusAlgorithmConfig::Jolteon { main, .. },
                     ..
                 } => main,
-                _ => unimplemented!(),
+                _ => panic!("Other branches for OnChainConsensusConfig are not covered"),
             };
 
             let leader_reputation_type =

@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x2::Token {
     struct Coin<AssetType> {
         type: AssetType,
@@ -246,7 +246,7 @@ module 0xb055::OneToOneMarket {
     }
 } // end 0xb055::OneToOneMarket
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x2::Token {
     struct Coin<AssetType: copy + drop> has store {
         type: AssetType,

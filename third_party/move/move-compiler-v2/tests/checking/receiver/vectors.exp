@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x1::vector {
     private fun receiver<T>(self: vector<T>,_y: T) {
         Tuple()
@@ -17,7 +17,7 @@ module 0x1::vector {
     }
 } // end 0x1::vector
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x1::vector {
     fun receiver<T>(self: vector<T>, _y: T) {
     }

@@ -1,0 +1,37 @@
+// -- Model dump before first bytecode pipeline
+module 0xcafe::m {
+    private fun map1(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun map2(x: u8,f: |u8|u8): u8 {
+        (f)(x)
+    }
+    private fun nested(x: u64,c: u64): u64 {
+        m::map1(x, closure#1m::__lambda__2__nested(c))
+    }
+    private fun __lambda__1__nested(c: u64,y: u8): u8 {
+        Add<u8>(y, Cast<u8>(c))
+    }
+    private fun __lambda__2__nested(c: u64,y: u64): u64 {
+        Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), closure#1m::__lambda__1__nested(c)))
+    }
+} // end 0xcafe::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcafe::m {
+    fun map1(x: u64, f: |u64|u64): u64 {
+        f(x)
+    }
+    fun map2(x: u8, f: |u8|u8): u8 {
+        f(x)
+    }
+    fun nested(x: u64, c: u64): u64 {
+        map1(x, |arg0| __lambda__2__nested(c, arg0))
+    }
+    fun __lambda__1__nested(c: u64, y: u8): u8 {
+        y + (c as u8)
+    }
+    fun __lambda__2__nested(c: u64, y: u64): u64 {
+        map2(y - c as u8, |arg0| __lambda__1__nested(c, arg0)) as u64
+    }
+}

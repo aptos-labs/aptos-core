@@ -106,7 +106,7 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
                     .collect();
                 let proof_reader = ProofReader::new(proofs);
 
-                let mut naive_smt = naive_q.back().unwrap().clone().update(&updates_flat_batch);
+                let naive_smt = naive_q.back().unwrap().clone().update(&updates_flat_batch);
 
                 let updater_smt = updater_q
                     .back()

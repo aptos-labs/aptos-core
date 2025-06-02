@@ -351,5 +351,5 @@ fn log_monitoring_service_response(
             format!("{:?}", error)
         },
     };
-    debug!(LogSchema::new(LogEntry::SentPeerMonitoringResponse).response(&response));
+    trace!(LogSchema::new(LogEntry::SentPeerMonitoringResponse).response(&response));
 }

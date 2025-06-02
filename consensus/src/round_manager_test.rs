@@ -14,9 +14,7 @@ use crate::{
         round_state::{ExponentialTimeInterval, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
-    network::{
-        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
-    },
+    network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::DirectMempoolPayloadManager,
@@ -68,18 +66,23 @@ use aptos_network::{
 use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
+    dkg::{real_dkg::RealDKG, DKGSessionMetadata, DKGTrait, DKGTranscript},
     epoch_state::EpochState,
     jwks::QuorumCertifiedUpdate,
     ledger_info::LedgerInfo,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
-        DEFAULT_WINDOW_SIZE,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
+        ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
-    validator_verifier::{generate_validator_verifier, random_validator_verifier},
+    validator_verifier::{
+        generate_validator_verifier, random_validator_verifier,
+        random_validator_verifier_with_voting_power, ValidatorConsensusInfoMoveStruct,
+        ValidatorVerifier,
+    },
     waypoint::Waypoint,
 };
 use futures::{
@@ -89,6 +92,7 @@ use futures::{
     FutureExt, Stream, StreamExt,
 };
 use maplit::hashmap;
+use rand::{rngs::ThreadRng, thread_rng};
 use std::{
     collections::VecDeque,
     iter::FromIterator,
@@ -151,6 +155,30 @@ impl NodeSetup {
         onchain_randomness_config: Option<OnChainRandomnessConfig>,
         onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     ) -> Vec<Self> {
+        Self::create_nodes_with_validator_set(
+            playground,
+            executor,
+            num_nodes,
+            proposer_indices,
+            onchain_consensus_config,
+            local_consensus_config,
+            onchain_randomness_config,
+            onchain_jwk_consensus_config,
+            None,
+        )
+    }
+
+    fn create_nodes_with_validator_set(
+        playground: &mut NetworkPlayground,
+        executor: Handle,
+        num_nodes: usize,
+        proposer_indices: Option<Vec<usize>>,
+        onchain_consensus_config: Option<OnChainConsensusConfig>,
+        local_consensus_config: Option<ConsensusConfig>,
+        onchain_randomness_config: Option<OnChainRandomnessConfig>,
+        onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
+        validator_set: Option<(Vec<ValidatorSigner>, ValidatorVerifier)>,
+    ) -> Vec<Self> {
         let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
         // With order votes feature, the validators additionally send order votes.
         // next_proposal and next_vote functions could potentially break because of it.
@@ -172,7 +200,8 @@ impl NodeSetup {
         let onchain_jwk_consensus_config = onchain_jwk_consensus_config
             .unwrap_or_else(OnChainJWKConsensusConfig::default_if_missing);
         let local_consensus_config = local_consensus_config.unwrap_or_default();
-        let (signers, validators) = random_validator_verifier(num_nodes, None, false);
+        let (signers, validators) =
+            validator_set.unwrap_or_else(|| random_validator_verifier(num_nodes, None, false));
         let proposers = proposer_indices
             .unwrap_or_else(|| vec![0])
             .iter()
@@ -287,6 +316,7 @@ impl NodeSetup {
         ));
         let time_service = Arc::new(ClockTimeService::new(executor));
 
+        let window_size = onchain_consensus_config.window_size();
         let block_store = Arc::new(BlockStore::new(
             storage.clone(),
             initial_data,
@@ -296,6 +326,7 @@ impl NodeSetup {
             10,
             Arc::from(DirectMempoolPayloadManager::new()),
             false,
+            window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
             None,
         ));
@@ -312,6 +343,7 @@ impl NodeSetup {
             PayloadTxnsSize::new(5, 500),
             10,
             1,
+            Some(30_000),
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
@@ -375,7 +407,10 @@ impl NodeSetup {
     pub fn restart(self, playground: &mut NetworkPlayground, executor: Handle) -> Self {
         let recover_data = self
             .storage
-            .try_start(self.onchain_consensus_config.order_vote_enabled())
+            .try_start(
+                self.onchain_consensus_config.order_vote_enabled(),
+                self.onchain_consensus_config.window_size(),
+            )
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
             playground,
@@ -508,37 +543,7 @@ impl NodeSetup {
         self.commit_decision_queue.pop_front().unwrap()
     }
 
-    /// SOON TO BE DEPRECATED: Please use [`poll_block_retrieval_v2`](NodeSetup::poll_block_retrieval_v2) going forward
-    /// NOTE: [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) is being phased out over two releases
-    /// After the first release, this can be deleted
-    pub async fn poll_block_retrieval(
-        &mut self,
-    ) -> Option<DeprecatedIncomingBlockRetrievalRequest> {
-        match self.poll_next_network_event() {
-            Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
-                ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
-                    Some(DeprecatedIncomingBlockRetrievalRequest {
-                        req: *v,
-                        protocol,
-                        response_sender,
-                    })
-                },
-                msg => panic!(
-                    "Unexpected Consensus Message: {:?} on node {}",
-                    msg,
-                    self.identity_desc()
-                ),
-            },
-            Some(Event::Message(_, msg)) => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
-            None => None,
-        }
-    }
-
-    pub async fn poll_block_retrieval_v2(&mut self) -> Option<IncomingBlockRetrievalRequest> {
+    pub async fn poll_block_retrieval(&mut self) -> Option<IncomingBlockRetrievalRequest> {
         match self.poll_next_network_event() {
             Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
                 ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
@@ -617,8 +622,13 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
                         request,
                         node.identity_desc()
                     );
+                    let wrapped_request = IncomingBlockRetrievalRequest {
+                        req: request.req,
+                        protocol: request.protocol,
+                        response_sender: request.response_sender,
+                    };
                     node.block_store
-                        .process_block_retrieval(request)
+                        .process_block_retrieval(wrapped_request)
                         .await
                         .unwrap();
                 } else {
@@ -1378,8 +1388,8 @@ fn response_on_block_retrieval() {
 
         // first verify that we can retrieve the block if it's in the tree
         let (tx1, rx1) = oneshot::channel();
-        let single_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(block_id, 1),
+        let single_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(block_id, 1)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx1,
         };
@@ -1401,8 +1411,8 @@ fn response_on_block_retrieval() {
 
         // verify that if a block is not there, return ID_NOT_FOUND
         let (tx2, rx2) = oneshot::channel();
-        let missing_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(HashValue::random(), 1),
+        let missing_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::random(), 1)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx2,
         };
@@ -1425,8 +1435,8 @@ fn response_on_block_retrieval() {
 
         // if asked for many blocks, return NOT_ENOUGH_BLOCKS
         let (tx3, rx3) = oneshot::channel();
-        let many_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(block_id, 3),
+        let many_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(block_id, 3)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx3,
         };
@@ -2469,6 +2479,7 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
 
     assert_process_proposal_result(
         None,
+        None,
         Some(OnChainJWKConsensusConfig::default_disabled()),
         vtxns.clone(),
         false,
@@ -2476,9 +2487,106 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
 
     assert_process_proposal_result(
         None,
+        None,
         Some(OnChainJWKConsensusConfig::default_enabled()),
         vtxns,
         true,
+    );
+}
+
+#[test]
+fn no_vote_on_proposal_with_uncertified_dkg_result() {
+    test_dkg_result_handling(
+        &[25_000_000; 4],
+        1,
+        RealDKG::sample_secret_and_generate_transcript,
+        false,
+    );
+}
+
+#[test]
+fn no_vote_on_proposal_with_inconsistent_secret_dkg_result() {
+    test_dkg_result_handling(
+        &[10_000_000, 70_000_000, 10_000_000, 10_000_000],
+        1,
+        RealDKG::generate_transcript_for_inconsistent_secrets,
+        false,
+    );
+}
+
+#[test]
+fn no_vote_on_proposal_with_dup_dealers_in_dkg_transcript() {
+    test_dkg_result_handling(
+        &[10_000_000, 40_000_000, 10_000_000, 40_000_000],
+        1,
+        RealDKG::deal_twice_and_aggregate,
+        false,
+    );
+}
+
+#[test]
+fn vote_on_proposal_with_valid_dkg_result() {
+    test_dkg_result_handling(
+        &[10_000_000, 70_000_000, 10_000_000, 10_000_000],
+        1,
+        RealDKG::sample_secret_and_generate_transcript,
+        true,
+    );
+}
+
+fn test_dkg_result_handling<F>(
+    voting_powers: &[u64],
+    dealer_idx: usize,
+    trx_gen_func: F,
+    should_accept: bool,
+) where
+    F: Fn(
+        &mut ThreadRng,
+        &<RealDKG as DKGTrait>::PublicParams,
+        u64,
+        &<RealDKG as DKGTrait>::DealerPrivateKey,
+    ) -> <RealDKG as DKGTrait>::Transcript,
+{
+    let mut rng = thread_rng();
+    let epoch = 123;
+    let num_validators = voting_powers.len();
+    let (signers, verifier) =
+        random_validator_verifier_with_voting_power(num_validators, None, false, voting_powers);
+    let validator_set: Vec<ValidatorConsensusInfoMoveStruct> = verifier
+        .validator_infos
+        .clone()
+        .into_iter()
+        .map(ValidatorConsensusInfoMoveStruct::from)
+        .collect();
+
+    let dkg_session_metadata = DKGSessionMetadata {
+        dealer_epoch: epoch,
+        randomness_config: RandomnessConfigMoveStruct::from(
+            OnChainRandomnessConfig::default_enabled(),
+        ),
+        dealer_validator_set: validator_set.clone(),
+        target_validator_set: validator_set,
+    };
+    let public_params = RealDKG::new_public_params(&dkg_session_metadata);
+    let trx = trx_gen_func(
+        &mut rng,
+        &public_params,
+        dealer_idx as u64,
+        signers[dealer_idx].private_key(),
+    );
+    let trx_bytes = bcs::to_bytes(&trx).unwrap();
+    let vtxns = vec![ValidatorTransaction::DKGResult(DKGTranscript::new(
+        epoch,
+        verifier.get_ordered_account_addresses()[dealer_idx],
+        trx_bytes,
+    ))];
+
+    assert_process_proposal_result(
+        Some((signers, verifier)),
+        Some(OnChainRandomnessConfig::default_enabled()),
+        Some(OnChainJWKConsensusConfig::default_enabled()),
+        vtxns.clone(),
+        should_accept,
     );
 }
 
@@ -2486,6 +2594,7 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
 /// Create a block, fill it with the given vtxns, and process it with the `RoundManager` from the setup.
 /// Assert the processing result.
 fn assert_process_proposal_result(
+    validator_set: Option<(Vec<ValidatorSigner>, ValidatorVerifier)>,
     randomness_config: Option<OnChainRandomnessConfig>,
     jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     vtxns: Vec<ValidatorTransaction>,
@@ -2493,7 +2602,7 @@ fn assert_process_proposal_result(
 ) {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(
+    let mut nodes = NodeSetup::create_nodes_with_validator_set(
         &mut playground,
         runtime.handle().clone(),
         1,
@@ -2502,6 +2611,7 @@ fn assert_process_proposal_result(
         None,
         randomness_config,
         jwk_consensus_config,
+        validator_set,
     );
 
     let node = &mut nodes[0];
@@ -2531,8 +2641,10 @@ fn assert_process_proposal_result(
     });
 }
 
+#[ignore]
 #[test]
 /// If receiving txn num/block size limit is exceeded, ProposalExt should be rejected.
+/// TODO: re-implement dummy vtxn and re-enable.
 fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());

@@ -37,6 +37,7 @@ const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 100_000;
 // Basically a handler for a single GRPC stream request
 pub struct IndexerStreamCoordinator {
     pub current_version: u64,
+    pub end_version: u64,
     pub processor_task_count: u16,
     pub processor_batch_size: u16,
     pub output_batch_size: u16,
@@ -58,6 +59,7 @@ impl IndexerStreamCoordinator {
     pub fn new(
         context: Arc<Context>,
         request_start_version: u64,
+        end_version: u64,
         processor_task_count: u16,
         processor_batch_size: u16,
         output_batch_size: u16,
@@ -65,6 +67,7 @@ impl IndexerStreamCoordinator {
     ) -> Self {
         Self {
             current_version: request_start_version,
+            end_version,
             processor_task_count,
             processor_batch_size,
             output_batch_size,
@@ -266,13 +269,12 @@ impl IndexerStreamCoordinator {
         let mut starting_version = self.current_version;
         let mut num_fetches = 0;
         let mut batches = vec![];
+        let end_version = std::cmp::min(self.end_version, self.highest_known_version + 1);
 
-        while num_fetches < self.processor_task_count
-            && starting_version <= self.highest_known_version
-        {
+        while num_fetches < self.processor_task_count && starting_version < end_version {
             let num_transactions_to_fetch = std::cmp::min(
                 self.processor_batch_size as u64,
-                self.highest_known_version - starting_version + 1,
+                end_version - starting_version,
             ) as u16;
 
             batches.push(TransactionBatchInfo {
@@ -472,7 +474,7 @@ impl IndexerStreamCoordinator {
                 .collect(),
             write_op_size_info: raw_txn
                 .changes
-                .iter()
+                .write_op_iter()
                 .map(|(state_key, write_op)| WriteOpSizeInfo {
                     key_bytes: Self::ser_size_u32(state_key),
                     value_bytes: write_op.bytes_size() as u32,

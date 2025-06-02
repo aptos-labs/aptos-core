@@ -86,7 +86,7 @@ spec aptos_std::simple_map {
         ensures [abstract] spec_len(result) == len(keys);
         ensures [abstract] forall k: Key: spec_contains_key(result, k) <==> vector::spec_contains(keys, k);
         ensures [abstract] forall i in 0..len(keys):
-            spec_get(result, vector::borrow(keys, i)) == vector::borrow(values, i);
+            spec_get(result, keys.borrow(i)) == values.borrow(i);
     }
 
     spec to_vec_pair<Key: store, Value: store>(self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
@@ -96,7 +96,7 @@ spec aptos_std::simple_map {
             forall k: Key: vector::spec_contains(result_1, k) <==>
                 spec_contains_key(self, k);
         ensures [abstract] forall i in 0..len(result_1):
-            spec_get(self, vector::borrow(result_1, i)) == vector::borrow(result_2, i);
+            spec_get(self, result_1.borrow(i)) == result_2.borrow(i);
     }
 
     spec upsert<Key: store, Value: store>(

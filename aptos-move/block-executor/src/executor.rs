@@ -27,7 +27,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -40,7 +40,7 @@ use aptos_types::{
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
+        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction as Transaction, TBlockOutput,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -95,10 +95,12 @@ where
         executor_thread_pool: Arc<ThreadPool>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
+        let num_cpus = num_cpus::get();
         assert!(
-            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            config.local.concurrency_level
+            config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus,
+            "Parallel execution concurrency level {} should be between 1 and number of CPUs ({})",
+            config.local.concurrency_level,
+            num_cpus,
         );
         Self {
             config,
@@ -181,12 +183,6 @@ where
                             group_key,
                         )));
                     },
-                    Some(KeyKind::Module) => {
-                        return Err(code_invariant_error(format!(
-                            "Group key {:?} recorded as module KeyKind",
-                            group_key,
-                        )));
-                    },
                     None => {
                         // Previously no write to the group at all.
                         needs_suffix_validation = true;
@@ -217,7 +213,7 @@ where
 
             let resource_write_set = output.resource_write_set();
 
-            // Then, process resource & aggregator_v1 & module writes.
+            // Then, process resource & aggregator_v1 writes.
             for (k, v, maybe_layout) in resource_write_set.clone().into_iter().chain(
                 output
                     .aggregator_v1_write_set()
@@ -230,21 +226,6 @@ where
                 versioned_cache
                     .data()
                     .write(k, idx_to_execute, incarnation, v, maybe_layout);
-            }
-
-            for (k, v) in output.module_write_set().into_iter() {
-                if !runtime_environment.vm_config().use_loader_v2 {
-                    if prev_modified_keys.remove(&k).is_none() {
-                        needs_suffix_validation = true;
-                    }
-
-                    #[allow(deprecated)]
-                    versioned_cache.deprecated_modules().write(
-                        k,
-                        idx_to_execute,
-                        v.into_write_op(),
-                    );
-                }
             }
 
             // Then, apply deltas.
@@ -343,14 +324,6 @@ where
             use KeyKind::*;
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
-                Module => {
-                    if !runtime_environment.vm_config().use_loader_v2 {
-                        #[allow(deprecated)]
-                        versioned_cache
-                            .deprecated_modules()
-                            .remove(&k, idx_to_execute);
-                    }
-                },
                 Group(tags) => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
@@ -377,21 +350,13 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(
+        last_input_output.record(
             idx_to_execute,
             read_set,
             result,
             resource_write_set,
             group_keys_and_tags,
-            runtime_environment,
-        ) {
-            // Module R/W is an expected fallback behavior, no alert is required.
-            debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
-
-            return Err(PanicOr::Or(
-                ParallelBlockExecutionError::ModulePathReadWriteError,
-            ));
-        }
+        );
         Ok(needs_suffix_validation)
     }
 
@@ -435,7 +400,6 @@ where
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        runtime_environment: &RuntimeEnvironment,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
@@ -448,16 +412,6 @@ where
                 use KeyKind::*;
                 match kind {
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
-                    Module => {
-                        // In V2 loader implementation, all modules writes are "estimates":
-                        // they are pending and not visible until committed.
-                        if !runtime_environment.vm_config().use_loader_v2 {
-                            #[allow(deprecated)]
-                            versioned_cache
-                                .deprecated_modules()
-                                .mark_estimate(&k, txn_idx)
-                        }
-                    },
                     Group(tags) => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.
@@ -490,17 +444,11 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
-        runtime_environment: &RuntimeEnvironment,
     ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
-            Self::update_transaction_on_abort(
-                txn_idx,
-                last_input_output,
-                versioned_cache,
-                runtime_environment,
-            );
+            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
             scheduler.finish_abort(txn_idx, incarnation)
         } else {
             scheduler.finish_validation(txn_idx, validation_wave);
@@ -564,7 +512,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -590,12 +538,7 @@ where
             )? {
                 // Transaction needs to be re-executed, one final time.
 
-                Self::update_transaction_on_abort(
-                    txn_idx,
-                    last_input_output,
-                    versioned_cache,
-                    runtime_environment,
-                );
+                Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
@@ -620,19 +563,17 @@ where
 
                 // Publish modules before we decrease validation index so that validations observe
                 // the new module writes as well.
-                if runtime_environment.vm_config().use_loader_v2 {
-                    let module_write_set = last_input_output.module_write_set(txn_idx);
-                    if !module_write_set.is_empty() {
-                        executed_at_commit = true;
-                        Self::publish_module_writes(
-                            txn_idx,
-                            module_write_set,
-                            global_module_cache,
-                            versioned_cache,
-                            scheduler,
-                            runtime_environment,
-                        )?;
-                    }
+                let module_write_set = last_input_output.module_write_set(txn_idx);
+                if !module_write_set.is_empty() {
+                    executed_at_commit = true;
+                    Self::publish_module_writes(
+                        txn_idx,
+                        module_write_set,
+                        global_module_cache,
+                        versioned_cache,
+                        scheduler,
+                        runtime_environment,
+                    )?;
                 }
 
                 scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
@@ -663,7 +604,7 @@ where
             // If transaction was committed without delayed fields failing, i.e., without
             // re-execution, we make the published modules visible here. As a result, we need to
             // decrease the validation index to make sure the subsequent transactions see changes.
-            if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
+            if !executed_at_commit {
                 let module_write_set = last_input_output.module_write_set(txn_idx);
                 if !module_write_set.is_empty() {
                     Self::publish_module_writes(
@@ -963,7 +904,7 @@ where
         >,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
@@ -1047,7 +988,6 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
-                        runtime_environment,
                     )?
                 },
                 SchedulerTask::ExecutionTask(
@@ -1101,7 +1041,7 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<TBlockOutput<E::Output, T::Key>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1118,13 +1058,15 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
+            return Ok(TBlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
+            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
             num_txns,
         ));
         let shared_maybe_error = AtomicBool::new(false);
@@ -1208,7 +1150,7 @@ where
         };
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
+            .then(|| TBlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
     }
 
@@ -1291,19 +1233,14 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (key, write) in output.module_write_set().into_iter() {
-            if runtime_environment.vm_config().use_loader_v2 {
-                Self::add_module_write_to_module_cache(
-                    write,
-                    txn_idx,
-                    runtime_environment,
-                    global_module_cache,
-                    unsync_map.module_cache(),
-                )?;
-            } else {
-                #[allow(deprecated)]
-                unsync_map.write_module(key, write.into_write_op());
-            }
+        for (_, write) in output.module_write_set().into_iter() {
+            Self::add_module_write_to_module_cache(
+                write,
+                txn_idx,
+                runtime_environment,
+                global_module_cache,
+                unsync_map.module_cache(),
+            )?;
         }
 
         let mut second_phase = Vec::new();
@@ -1362,7 +1299,7 @@ where
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<TBlockOutput<E::Output, T::Key>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
@@ -1374,13 +1311,12 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
+        let mut block_limit_processor = BlockGasLimitProcessor::<T, S>::new(
+            base_view,
             self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
             num_txns,
         );
-
-        let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
-            TxnLastInputOutput::new(num_txns as TxnIndex);
 
         for idx in 0..num_txns {
             let txn = signature_verified_block.get_txn(idx as TxnIndex);
@@ -1460,17 +1396,6 @@ where
                                 output.get_write_summary(),
                             )
                         });
-
-                    #[allow(clippy::collapsible_if)]
-                    if !runtime_environment.vm_config().use_loader_v2 {
-                        #[allow(deprecated)]
-                        if last_input_output.check_and_append_module_rw_conflict(
-                            sequential_reads.deprecated_module_reads.iter(),
-                            output.module_write_set().keys(),
-                        ) {
-                            block_limit_processor.process_module_rw_conflict();
-                        }
-                    }
 
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,
@@ -1638,7 +1563,7 @@ where
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
 
-                    if latest_view.is_incorrect_use() {
+                    if sequential_reads.incorrect_use {
                         return Err(
                             code_invariant_error("Incorrect use in sequential execution").into(),
                         );
@@ -1681,22 +1606,17 @@ where
             None
         };
 
-        Ok(BlockOutput::new(ret, block_end_info))
+        Ok(TBlockOutput::new(ret, block_end_info))
     }
 
-    fn empty_block_end_info(&self) -> Option<BlockEndInfo> {
+    fn empty_block_end_info(&self) -> Option<TBlockEndInfoExt<T::Key>> {
         if self
             .config
             .onchain
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
         {
-            Some(BlockEndInfo::V0 {
-                block_gas_limit_reached: false,
-                block_output_limit_reached: false,
-                block_effective_block_gas_units: 0,
-                block_approx_output_size: 0,
-            })
+            Some(TBlockEndInfoExt::new_empty())
         } else {
             None
         }
@@ -1707,7 +1627,7 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+    ) -> BlockExecutionResult<TBlockOutput<E::Output, T::Key>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
@@ -1802,7 +1722,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, self.empty_block_end_info()));
+            return Ok(TBlockOutput::new(ret, self.empty_block_end_info()));
         }
 
         Err(sequential_error)

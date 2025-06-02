@@ -33,7 +33,6 @@ use move_core_types::{
     transaction_argument::TransactionArgument,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
@@ -132,31 +131,13 @@ impl TransactionComposer {
             .map_err(|e| e.to_string())
     }
 
-    /// Load up a module from a remote endpoint. Will need to invoke this function prior to the
-    /// call.
-    pub async fn load_module(
-        &mut self,
-        api_url: String,
-        module_name: String,
-    ) -> Result<(), JsValue> {
-        let module_id = ModuleId::from_str(&module_name)
-            .map_err(|err| JsValue::from(format!("Invalid module name: {:?}", err)))?;
-        self.load_module_impl(api_url.as_str(), module_id)
-            .await
-            .map_err(|err| JsValue::from(format!("{:?}", err)))
-    }
-
-    /// Load up the dependency modules of a TypeTag from a remote endpoint.
-    pub async fn load_type_tag(
-        &mut self,
-        api_url: String,
-        type_tag: String,
-    ) -> Result<(), JsValue> {
-        let type_tag = TypeTag::from_str(&type_tag)
-            .map_err(|err| JsValue::from(format!("Invalid type name: {:?}", err)))?;
-        self.load_type_tag_impl(api_url.as_str(), &type_tag)
-            .await
-            .map_err(|err| JsValue::from(format!("{:?}", err)))
+    // stored modules
+    pub fn store_module(&mut self, module_bytes: Vec<u8>) -> Result<String, String> {
+        let module =
+            CompiledModule::deserialize(module_bytes.as_slice()).map_err(|e| e.to_string())?;
+        let module_id = module.self_id();
+        self.insert_module(module);
+        Ok(module_id.to_string())
     }
 
     /// This would be the core api for the `TransactionComposer`. The function would:
@@ -446,58 +427,6 @@ impl TransactionComposer {
                 .collect(),
         })
         .unwrap())
-    }
-
-    async fn load_module_impl(&mut self, api_url: &str, module_id: ModuleId) -> anyhow::Result<()> {
-        let url = format!(
-            "{}/{}/{}/{}/{}",
-            api_url, "accounts", &module_id.address, "module", &module_id.name
-        );
-        let response = reqwest::get(url).await?;
-        let result = if response.status().is_success() {
-            Ok(response.text().await?)
-        } else {
-            Err(response.text().await?)
-        };
-
-        let bytes_result = match result {
-            Ok(json_string) => {
-                let v: Value = serde_json::from_str(&json_string)?;
-                Ok(v["bytecode"].to_string())
-            },
-            Err(json_string) => {
-                let v: Value = serde_json::from_str(&json_string)?;
-                Err(v["message"].to_string())
-            },
-        };
-
-        match bytes_result {
-            Ok(bytes_hex) => {
-                self.insert_module(CompiledModule::deserialize(
-                    hex::decode(bytes_hex.replace("0x", "").replace('\"', ""))?.as_slice(),
-                )?);
-                Ok(())
-            },
-            Err(_message) => Ok(()),
-        }
-    }
-
-    async fn load_type_tag_impl(
-        &mut self,
-        api_url: &str,
-        type_tag: &TypeTag,
-    ) -> anyhow::Result<()> {
-        match type_tag {
-            TypeTag::Struct(s) => {
-                self.load_module_impl(api_url, s.module_id()).await?;
-                for ty in s.type_args.iter() {
-                    Box::pin(self.load_type_tag_impl(api_url, ty)).await?;
-                }
-                Ok(())
-            },
-            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, v)).await,
-            _ => Ok(()),
-        }
     }
 
     #[cfg(test)]

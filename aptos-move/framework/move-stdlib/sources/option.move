@@ -32,7 +32,7 @@ module std::option {
         ensures result == spec_none<Element>();
     }
     spec fun spec_none<Element>(): Option<Element> {
-        Option{ vec: vec() }
+        Option{ vec: vector[] }
     }
 
     /// Return an `Option` containing `e`
@@ -54,7 +54,7 @@ module std::option {
     }
 
     spec from_vec {
-        aborts_if vector::length(vec) > 1;
+        aborts_if vec.length() > 1;
     }
 
     /// Return true if `self` does not hold a value
@@ -67,7 +67,7 @@ module std::option {
         ensures result == spec_is_none(self);
     }
     spec fun spec_is_none<Element>(self: Option<Element>): bool {
-        vector::is_empty(self.vec)
+        self.vec.is_empty()
     }
 
     /// Return true if `self` holds a value
@@ -80,7 +80,7 @@ module std::option {
         ensures result == spec_is_some(self);
     }
     spec fun spec_is_some<Element>(self: Option<Element>): bool {
-        !vector::is_empty(self.vec)
+        !self.vec.is_empty()
     }
 
     /// Return true if the value in `self` is equal to `e_ref`
@@ -94,7 +94,7 @@ module std::option {
         ensures result == spec_contains(self, e_ref);
     }
     spec fun spec_contains<Element>(self: Option<Element>, e: Element): bool {
-        is_some(self) && borrow(self) == e
+        self.is_some() && self.borrow() == e
     }
 
     /// Return an immutable reference to the value inside `self`
