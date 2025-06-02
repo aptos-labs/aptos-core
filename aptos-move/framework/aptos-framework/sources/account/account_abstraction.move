@@ -186,17 +186,17 @@ module aptos_framework::account_abstraction {
         assert!(features::is_derivable_account_abstraction_enabled(), error::invalid_state(EDERIVABLE_ACCOUNT_ABSTRACTION_NOT_ENABLED));
         system_addresses::assert_aptos_framework(aptos_framework);
 
+        // First initialize the DerivableDispatchableAuthenticator if not already initialized
+        if (!exists<DerivableDispatchableAuthenticator>(@aptos_framework)) {
+            move_to(
+                aptos_framework,
+                DerivableDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new_with_config(0, 0, false) }
+            );
+        };
+
         DerivableDispatchableAuthenticator[@aptos_framework].auth_functions.add(
             function_info::new_function_info_from_address(module_address, module_name, function_name),
             DerivableRegisterValue::Empty,
-        );
-    }
-
-    entry fun initialize(aptos_framework: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(
-            aptos_framework,
-            DerivableDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new_with_config(0, 0, false) }
         );
     }
 
