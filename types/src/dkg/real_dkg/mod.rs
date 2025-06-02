@@ -10,7 +10,7 @@ use crate::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use anyhow::{anyhow, bail, ensure, Context};
-use aptos_crypto::{bls12381, bls12381::PrivateKey, Uniform};
+use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
