@@ -14,7 +14,7 @@ const ACCOUNT_BALANCE: &str = "0x1::coin::balance";
 const ACCOUNT_SEQ_NUM: &str = "0x1::account::get_sequence_number";
 const SUPRA_COIN: &str = "0x1::supra_coin::SupraCoin";
 
-fn to_view_function(fn_ref: MemberId, ty_args: Vec<TypeTag>, args: Vec<Vec<u8>>) -> ViewFunction {
+pub(crate) fn to_view_function(fn_ref: MemberId, ty_args: Vec<TypeTag>, args: Vec<Vec<u8>>) -> ViewFunction {
     ViewFunction::new(fn_ref.module_id, fn_ref.member_id, ty_args, args)
 }
 

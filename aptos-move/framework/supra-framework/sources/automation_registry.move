@@ -479,6 +479,20 @@ module supra_framework::automation_registry {
     }
 
     #[view]
+    /// Retrieves the details of a automation tasks entry by their task index.
+    /// If a task does not exist, it is not included in the result, and no error is reported
+    public fun get_task_details_bulk(task_indexes: vector<u64>): vector<AutomationTaskMetaData> acquires AutomationRegistry {
+        let automation_task_metadata = borrow_global<AutomationRegistry>(@supra_framework);
+        let task_details = vector[];
+        vector::for_each(task_indexes, |task_index| {
+            if (enumerable_map::contains(&automation_task_metadata.tasks, task_index)) {
+                vector::push_back(&mut task_details, enumerable_map::get_value(&automation_task_metadata.tasks, task_index))
+            }
+        });
+        task_details
+    }
+
+    #[view]
     /// Checks whether there is an active task in registry with specified input task index.
     public fun has_sender_active_task_with_id(sender: address, task_index: u64): bool acquires AutomationRegistry {
         let automation_task_metadata = borrow_global<AutomationRegistry>(@supra_framework);
