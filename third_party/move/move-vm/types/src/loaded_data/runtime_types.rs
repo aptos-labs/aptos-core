@@ -517,10 +517,6 @@ impl Type {
                 given.paranoid_check_assignable(ty)?;
                 true
             },
-            (Type::MutableReference(ty), Type::MutableReference(given)) => {
-                given.paranoid_check_assignable(ty)?;
-                true
-            },
             _ => expected_ty == self,
         };
         if !ok {

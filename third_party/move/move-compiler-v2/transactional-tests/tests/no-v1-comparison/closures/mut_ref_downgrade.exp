@@ -1,23 +1,21 @@
 processed 2 tasks
 
-task 0 'publish'. lines 1-11:
+task 0 'publish'. lines 1-24:
 Error: compilation errors:
  bug: bytecode verification failed with unexpected status code `CALL_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
 Error message: none
-  ┌─ TEMPFILE:8:9
-  │
-8 │         f(&mut x);
-  │         ^^^^^^^^^
+   ┌─ TEMPFILE:14:9
+   │
+14 │         assn<||u64 has drop>(&mut b, a);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 
-task 1 'run'. lines 13-13:
+task 1 'run'. lines 26-26:
 Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::Test doesn't exist,
     major_status: LINKER_ERROR,
     sub_status: None,
     location: undefined,
     indices: [],
     offsets: [],
-    exec_state: None,
 }
