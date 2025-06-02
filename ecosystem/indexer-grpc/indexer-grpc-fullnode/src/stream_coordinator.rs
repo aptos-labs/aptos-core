@@ -474,7 +474,7 @@ impl IndexerStreamCoordinator {
                 .collect(),
             write_op_size_info: raw_txn
                 .changes
-                .iter()
+                .write_op_iter()
                 .map(|(state_key, write_op)| WriteOpSizeInfo {
                     key_bytes: Self::ser_size_u32(state_key),
                     value_bytes: write_op.bytes_size() as u32,

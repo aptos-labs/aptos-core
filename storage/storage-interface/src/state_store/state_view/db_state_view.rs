@@ -56,6 +56,10 @@ impl TStateView for DbStateView {
             .get_state_storage_usage(self.version)
             .map_err(Into::into)
     }
+
+    fn next_version(&self) -> Version {
+        self.version.map_or(0, |v| v + 1)
+    }
 }
 
 pub trait LatestDbStateCheckpointView {

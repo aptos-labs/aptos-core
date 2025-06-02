@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf-8-in-constant-string.move:4:36
+  │
+4 │        const C: vector<u8> = b"abc 这个是代码注释";
+  │                                    ^^ Invalid character: `这`

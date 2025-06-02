@@ -180,15 +180,7 @@ fn parse_file(
     let mut source_buffer = String::new();
     f.read_to_string(&mut source_buffer)?;
     let file_hash = FileHash::new(&source_buffer);
-    let buffer = match verify_string(file_hash, &source_buffer) {
-        Err(ds) => {
-            diags.extend(ds);
-            files.insert(file_hash, (fname, source_buffer));
-            return Ok((vec![], MatchedFileCommentMap::new(), diags, file_hash));
-        },
-        Ok(()) => &source_buffer,
-    };
-    let (defs, comments) = match parse_file_string(compilation_env, file_hash, buffer) {
+    let (defs, comments) = match parse_file_string(compilation_env, file_hash, &source_buffer) {
         Ok(defs_and_comments) => defs_and_comments,
         Err(ds) => {
             diags.extend(ds);

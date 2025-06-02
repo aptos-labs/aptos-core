@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf8-in-constant-numeric.move:4:29
+  │
+4 │        const C: u64 = 123456代码注释;
+  │                             ^^ Invalid character: `代`

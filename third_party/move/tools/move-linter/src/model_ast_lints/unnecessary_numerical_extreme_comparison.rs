@@ -15,7 +15,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation, Value},
-    model::GlobalEnv,
+    model::FunctionEnv,
     ty::Type,
 };
 use num::BigInt;
@@ -29,7 +29,7 @@ impl ExpChecker for UnnecessaryNumericalExtremeComparison {
         "unnecessary_numerical_extreme_comparison".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::Call;
         use Operation::*;
         // Let's narrow down to the comparison operators we are interested in.
@@ -39,6 +39,7 @@ impl ExpChecker for UnnecessaryNumericalExtremeComparison {
                 "there should be exactly two arguments for comparison operators"
             );
             let (lhs, rhs) = (args[0].as_ref(), args[1].as_ref());
+            let env = function.env();
             // Types on both sides of the comparison must be the same, so let's just
             // get the type of the left-hand side.
             let ty = env.get_node_type(lhs.node_id());

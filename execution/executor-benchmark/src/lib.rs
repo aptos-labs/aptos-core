@@ -829,12 +829,12 @@ mod tests {
 
         let vm_writes = vm_txn_output
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
         let other_writes = other_txn_output
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
         for (key, value) in vm_writes.iter() {

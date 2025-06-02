@@ -14,7 +14,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    function::MoveFunctionLayout,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
@@ -375,18 +374,7 @@ impl TypeLayoutBuilder {
                 compiled_module_view,
                 layout_type,
             )?),
-            Function(f) => {
-                let build_list = |ts: &[TypeTag]| {
-                    ts.iter()
-                        .map(|t| Self::build(t, compiled_module_view, layout_type))
-                        .collect::<anyhow::Result<Vec<_>>>()
-                };
-                MoveTypeLayout::Function(MoveFunctionLayout(
-                    build_list(&f.args)?,
-                    build_list(&f.results)?,
-                    f.abilities,
-                ))
-            },
+            Function(_) => MoveTypeLayout::Function,
         })
     }
 

@@ -89,7 +89,7 @@ impl InputOutputDiffGenerator {
             .begin_version()
             .expect("Transaction metadata must be a chunk");
         for (idx, on_chain_output) in onchain_outputs.iter().enumerate() {
-            for (state_key, _) in on_chain_output.write_set() {
+            for (state_key, _) in on_chain_output.write_set().write_op_iter() {
                 if state_override.contains_key(state_key) {
                     error!(
                         "Transaction {} writes to overridden state value for {:?}",

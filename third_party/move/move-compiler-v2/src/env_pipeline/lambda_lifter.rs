@@ -49,6 +49,7 @@ use move_model::{
     model::{FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -347,6 +348,17 @@ impl<'a> LambdaLifter<'a> {
                         None
                     },
                     Operation::MoveFunction(mid, fid) => {
+                        let env = self.fun_env.env();
+                        let qualified_fun_id = mid.qualified(*fid);
+                        let move_fun_env = env.get_function(qualified_fun_id);
+                        if move_fun_env.module_env.is_std_vector()
+                            && well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS
+                                .contains(&move_fun_env.get_name_str().as_str())
+                        {
+                            // Do not curry std::vector functions that are bytecode instructions
+                            return None;
+                        }
+
                         let lambda_bound = lambda_params
                             .iter()
                             .map(|Parameter(name, ..)| *name)
@@ -382,7 +394,6 @@ impl<'a> LambdaLifter<'a> {
                         }
                         // Create a new node id. We inherit location and type from the lambda,
                         // but instantiation is taken from the call of the curried function.
-                        let env = self.fun_env.module_env.env;
                         let curry_id = env.new_node(env.get_node_loc(id), env.get_node_type(id));
                         if let Some(inst) = env.get_node_instantiation_opt(*call_id) {
                             env.set_node_instantiation(curry_id, inst)

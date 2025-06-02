@@ -51,7 +51,7 @@
 -  [Function `destroy_order_id_type`](#0x7_order_book_types_destroy_order_id_type)
 -  [Function `is_active_order`](#0x7_order_book_types_is_active_order)
 -  [Function `get_price`](#0x7_order_book_types_get_price)
--  [Function `is_buy`](#0x7_order_book_types_is_buy)
+-  [Function `is_bid`](#0x7_order_book_types_is_bid)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -242,7 +242,7 @@
 
 </dd>
 <dt>
-<code>is_buy: bool</code>
+<code>is_bid: bool</code>
 </dt>
 <dd>
 
@@ -715,7 +715,7 @@
         price,
         orig_size,
         remaining_size: size,
-        is_buy,
+        is_bid: is_buy,
         trigger_condition,
         metadata
     }
@@ -1322,7 +1322,7 @@
         self.price,
         self.orig_size,
         self.remaining_size,
-        self.is_buy,
+        self.is_bid,
         self.trigger_condition,
         self.metadata
     )
@@ -1433,13 +1433,13 @@
 
 </details>
 
-<a id="0x7_order_book_types_is_buy"></a>
+<a id="0x7_order_book_types_is_bid"></a>
 
-## Function `is_buy`
+## Function `is_bid`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_buy">is_buy</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bid">is_bid</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;): bool
 </code></pre>
 
 
@@ -1448,8 +1448,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_buy">is_buy</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;): bool {
-    self.is_buy
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bid">is_bid</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;): bool {
+    self.is_bid
 }
 </code></pre>
 

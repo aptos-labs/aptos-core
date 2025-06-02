@@ -539,6 +539,7 @@ pub fn convert_event(event: &Event) -> transaction::Event {
 }
 
 pub fn convert_timestamp_secs(timestamp: u64) -> timestamp::Timestamp {
+    let timestamp = std::cmp::min(timestamp, i64::MAX as u64);
     timestamp::Timestamp {
         seconds: timestamp as i64,
         nanos: 0,
@@ -546,7 +547,7 @@ pub fn convert_timestamp_secs(timestamp: u64) -> timestamp::Timestamp {
 }
 
 pub fn convert_timestamp_usecs(timestamp: u64) -> timestamp::Timestamp {
-    let ts = Duration::from_nanos(timestamp * 1000);
+    let ts = Duration::from_micros(timestamp);
     timestamp::Timestamp {
         seconds: ts.as_secs() as i64,
         nanos: ts.subsec_nanos() as i32,

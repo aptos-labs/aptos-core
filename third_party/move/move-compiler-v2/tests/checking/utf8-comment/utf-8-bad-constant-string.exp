@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid byte string
+  ┌─ tests/checking/utf8-comment/utf-8-bad-constant-string.move:4:30
+  │
+4 │        const C: vector<u8> = "abc 这个是代码注释";
+  │                              ^ String literal must begin with b" (for a byte string) or x" (for a hex string)

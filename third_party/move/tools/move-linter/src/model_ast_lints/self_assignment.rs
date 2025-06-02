@@ -11,7 +11,7 @@ use crate::utils;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Pattern},
-    model::{GlobalEnv, Loc},
+    model::{FunctionEnv, Loc},
 };
 
 #[derive(Default)]
@@ -22,7 +22,8 @@ impl ExpChecker for SelfAssignment {
         "self_assignment".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
+        let env = function.env();
         let mut report_loc: Loc = env.get_node_loc(expr.node_id());
         let mut error = false;
         match expr {

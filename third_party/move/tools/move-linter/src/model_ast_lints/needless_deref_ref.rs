@@ -10,7 +10,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation},
-    model::{GlobalEnv, NodeId},
+    model::{FunctionEnv, NodeId},
     ty::ReferenceKind,
 };
 
@@ -22,8 +22,9 @@ impl ExpChecker for NeedlessDerefRef {
         "needless_deref_ref".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         if let Some((id, kind)) = Self::needless_deref_ref_pair(expr) {
+            let env = function.env();
             self.report(
                 env,
                 &env.get_node_loc(id),

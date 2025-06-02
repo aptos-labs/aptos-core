@@ -84,7 +84,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         let native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
                 .get_txns()

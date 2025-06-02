@@ -13,7 +13,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation, Value},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 use num::BigInt;
 
@@ -25,7 +25,7 @@ impl ExpChecker for SimplerNumericExpression {
         "simpler_numeric_expression".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::{Call, Value as ExpVal};
         use Operation::*;
         use Value::Number as N;
@@ -66,6 +66,7 @@ impl ExpChecker for SimplerNumericExpression {
             },
             _ => None,
         } {
+            let env = function.env();
             self.report(env, &env.get_node_loc(*id), msg);
         }
     }
