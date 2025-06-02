@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid byte string
+  ┌─ tests/checking/utf8-comment/crlf-invalid1.move:4:30
+  │
+4 │        const C: vector<u8> = b"abcdef
+  │                              ^^^^^^^^ Missing closing quote (") after byte string

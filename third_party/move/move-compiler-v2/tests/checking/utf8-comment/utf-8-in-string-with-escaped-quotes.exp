@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf-8-in-string-with-escaped-quotes.move:4:35
+  │
+4 │         const C1: vector<u8> = b"\注bc";
+  │                                   ^^ Invalid character: `注`

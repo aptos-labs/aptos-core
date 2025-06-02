@@ -11,7 +11,7 @@ use crate::utils;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{Exp, ExpData, ExpData::Sequence, Pattern},
-    model::{GlobalEnv, Loc},
+    model::{FunctionEnv, Loc},
 };
 
 #[derive(Default)]
@@ -22,7 +22,7 @@ impl ExpChecker for AlmostSwapped {
         "almost_swapped".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         if let Sequence(_, exprs) = expr {
             for pair in exprs.windows(2) {
                 let (first, second) = (&pair[0], &pair[1]);
@@ -51,6 +51,7 @@ impl ExpChecker for AlmostSwapped {
                 if utils::is_simple_access_equal(lhs1.as_ref(), rhs2.as_ref())
                     && utils::is_simple_access_equal(rhs1.as_ref(), lhs2.as_ref())
                 {
+                    let env = function.env();
                     let new_loc = Loc::enclosing(&[
                         env.get_node_loc(first.node_id()),
                         env.get_node_loc(second.node_id()),
