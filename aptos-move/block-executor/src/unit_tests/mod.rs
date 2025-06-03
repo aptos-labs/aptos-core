@@ -28,8 +28,13 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ModulePath, state_store::state_value::StateValueMetadata, write_set::WriteOpKind,
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
+    contract_event::TransactionEvent,
+    executable::ModulePath,
+    state_store::state_value::StateValueMetadata,
+    write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
@@ -93,12 +98,18 @@ fn test_resource_group_deletion() {
     assert_ok!(block_executor.execute_transactions_sequential(
         &txn_provider,
         &data_view,
+        &TransactionSliceMetadata::unknown(),
         &mut guard,
         false
     ));
 
     let mut guard = AptosModuleCacheManagerGuard::none();
-    assert_ok!(block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard));
+    assert_ok!(block_executor.execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard
+    ));
 }
 
 #[test]
@@ -160,8 +171,12 @@ fn resource_group_bcs_fallback() {
     let txn_provider = DefaultTxnProvider::new(transactions);
     // Execute the block normally.
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let output =
-        block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    let output = block_executor.execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
     match output {
         Ok(block_output) => {
             let txn_outputs = block_output.into_transaction_outputs_forced();
@@ -180,14 +195,19 @@ fn resource_group_bcs_fallback() {
     assert!(!fail::list().is_empty());
 
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let par_output =
-        block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    let par_output = block_executor.execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
     assert_matches!(par_output, Err(()));
 
     let mut guard = AptosModuleCacheManagerGuard::none();
     let seq_output = block_executor.execute_transactions_sequential(
         &txn_provider,
         &data_view,
+        &TransactionSliceMetadata::unknown(),
         &mut guard,
         false,
     );
@@ -199,7 +219,13 @@ fn resource_group_bcs_fallback() {
     // Now execute with fallback handling for resource group serialization error:
     let mut guard = AptosModuleCacheManagerGuard::none();
     let fallback_output = block_executor
-        .execute_transactions_sequential(&txn_provider, &data_view, &mut guard, true)
+        .execute_transactions_sequential(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+            true,
+        )
         .map_err(|e| match e {
             SequentialBlockExecutionError::ResourceGroupSerializationError => {
                 panic!("Unexpected error")
@@ -208,7 +234,12 @@ fn resource_group_bcs_fallback() {
         });
 
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let fallback_output_block = block_executor.execute_block(&txn_provider, &data_view, &mut guard);
+    let fallback_output_block = block_executor.execute_block(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
     for output in [fallback_output, fallback_output_block] {
         match output {
             Ok(block_output) => {
@@ -256,7 +287,12 @@ fn interrupt_requested() {
 
     // MockTransaction::InterruptRequested will only return if interrupt is requested (here, due
     // to abort from the first transaction). O.w. the test will hang.
-    let _ = block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    let _ = block_executor.execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
 }
 
 #[test]
@@ -303,8 +339,12 @@ fn block_output_err_precedence() {
     // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
     // Confirm that the fatal VM error is still detected and sequential fallback triggered.
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let output =
-        block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    let output = block_executor.execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
     assert_matches!(output, Err(()));
     scenario.teardown();
 }
@@ -339,7 +379,12 @@ fn skip_rest_gas_limit() {
 
     // Should hit block limit on the skip transaction.
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let _ = block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    let _ = block_executor.execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
 }
 
 // TODO: add unit test for block gas limit!
@@ -372,7 +417,12 @@ where
         executor_thread_pool,
         None,
     )
-    .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    .execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
 
     let baseline = BaselineOutput::generate(txn_provider.get_txns(), None);
     baseline.assert_parallel_output(&output);

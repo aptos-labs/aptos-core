@@ -842,7 +842,7 @@ impl TestContext {
             self.executor
                 .commit_blocks(
                     vec![metadata.id()],
-                    // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                    // BlockEpilogue is added on top of the input transactions.
                     self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
                 )
                 .unwrap();

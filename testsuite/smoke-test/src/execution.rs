@@ -43,15 +43,31 @@ async fn fallback_test() {
         .await
         .unwrap();
 
-    for _i in 0..1 {
-        let version_milestone_0 = get_current_version(&client).await;
-        let version_milestone_1 = version_milestone_0 + 5;
-        println!("Current version: {}, the chain should tolerate discarding failed blocks, waiting for {}.", version_milestone_0, version_milestone_1);
-        swarm
-            .wait_for_all_nodes_to_catchup_to_version(version_milestone_1, Duration::from_secs(30))
-            .await
-            .expect("milestone 1 taking too long");
-    }
+    let version_milestone_0 = get_current_version(&client).await;
+    let version_milestone_1 = version_milestone_0 + 1;
+    // We won't reach next version.
+    assert!(swarm
+        .wait_for_all_nodes_to_catchup_to_version(version_milestone_1, Duration::from_secs(5))
+        .await
+        .is_err());
+
+    client
+        .set_failpoint(
+            "aptos_vm::vm_wrapper::execute_transaction".to_string(),
+            "0%return".to_string(),
+        )
+        .await
+        .unwrap();
+
+    let version_milestone_2 = version_milestone_1 + 5;
+    println!(
+        "Current version: {}, the chain should tolerate discarding failed blocks, waiting for {}.",
+        version_milestone_0, version_milestone_2
+    );
+    swarm
+        .wait_for_all_nodes_to_catchup_to_version(version_milestone_2, Duration::from_secs(30))
+        .await
+        .expect("milestone 2 taking too long");
 }
 
 async fn update_execution_config(
@@ -94,6 +110,7 @@ async fn get_last_non_reconfig_block_ending_txn_name(rest_client: &Client) -> Op
     txn_names.last().copied()
 }
 
+// We always generate block_epilogue now.
 #[tokio::test]
 async fn block_epilogue_upgrade_test() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
@@ -118,7 +135,7 @@ async fn block_epilogue_upgrade_test() {
 
     assert_eq!(
         get_last_non_reconfig_block_ending_txn_name(&rest_client).await,
-        Some("state_checkpoint")
+        Some("block_epilogue")
     );
 
     for _ in 0..3 {
@@ -136,7 +153,6 @@ async fn block_epilogue_upgrade_test() {
             _ => panic!("Unexpected execution config"),
         };
 
-        // Enable BlockEpilogue
         let mut block_gas_limit = BlockGasLimitType::default_for_genesis();
         match &mut block_gas_limit {
             BlockGasLimitType::ComplexLimitV1 {
@@ -170,7 +186,6 @@ async fn block_epilogue_upgrade_test() {
             _ => panic!("Unexpected execution config"),
         };
 
-        // Disable BlockEpilogue
         let new_execution_config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::NoShuffling,
             block_gas_limit_type: BlockGasLimitType::NoLimit,
@@ -185,7 +200,7 @@ async fn block_epilogue_upgrade_test() {
 
         assert_eq!(
             get_last_non_reconfig_block_ending_txn_name(&rest_client).await,
-            Some("state_checkpoint")
+            Some("block_epilogue")
         );
     }
 }

@@ -73,7 +73,7 @@ where
             self.allow_discards,
             self.allow_retries,
         );
-        if !self.allow_retries {
+        if !self.allow_retries && num_input_txns != 0 {
             assert_eq!(output.num_transactions_to_commit(), num_input_txns + 1);
         }
 
