@@ -9,7 +9,7 @@ use crate::{
     },
     utils,
 };
-use aptos_transactions_filter::transaction_matcher::{Filter, Matcher};
+use aptos_transactions_filter::transaction_matcher::Filter;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -192,16 +192,6 @@ impl ConfigSanitizer for ApiConfig {
                 sanitizer_name,
                 "runtime_worker_multiplier must be greater than 0!".into(),
             ));
-        }
-
-        // We don't support Block ID based simulation filters.
-        for rule in api_config.simulation_filter.rules() {
-            if let Matcher::BlockId(_) = rule.matcher() {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "Block ID based simulation filters are not supported!".into(),
-                ));
-            }
         }
 
         // Sanitize the gas estimation config

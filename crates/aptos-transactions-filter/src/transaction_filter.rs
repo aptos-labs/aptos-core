@@ -29,7 +29,7 @@ impl TransactionFilter {
         txns.into_iter()
             .filter(|txn| {
                 self.filter
-                    .allows(block_id, block_epoch, block_timestamp, txn)
+                    .allows_in_block(block_id, block_epoch, block_timestamp, txn)
             })
             .collect()
     }

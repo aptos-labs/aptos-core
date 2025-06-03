@@ -96,6 +96,8 @@ pub enum AptosErrorCode {
     SequenceNumberTooOld = 402,
     /// The submitted transaction failed VM checks.
     VmError = 403,
+    /// The transaction was rejected due to a transaction filter.
+    RejectedByFilter = 404,
 
     /// Health check failed.
     HealthCheckFailed = 500,
