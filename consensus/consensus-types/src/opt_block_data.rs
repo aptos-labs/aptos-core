@@ -4,7 +4,7 @@
 
 use crate::{
     common::{Author, Payload, Round},
-    proposal_ext::OptProposalExt,
+    proposal_ext::OptProposalBody,
     quorum_cert::QuorumCert,
 };
 use anyhow::{ensure, Result};
@@ -26,7 +26,7 @@ pub struct OptBlockData {
     pub round: Round,
     pub timestamp_usecs: u64,
     pub parent: BlockInfo,
-    pub proposal: OptProposalExt,
+    pub proposal_body: OptProposalBody,
 }
 
 impl OptBlockData {
@@ -34,7 +34,6 @@ impl OptBlockData {
         validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
         author: Author,
-        failed_authors: Vec<(Round, Author)>,
         epoch: u64,
         round: Round,
         timestamp_usecs: u64,
@@ -46,11 +45,10 @@ impl OptBlockData {
             round,
             timestamp_usecs,
             parent,
-            proposal: OptProposalExt::V0 {
+            proposal_body: OptProposalBody::V0 {
                 validator_txns,
                 payload,
                 author,
-                failed_authors,
                 grandparent_qc,
             },
         }
@@ -102,32 +100,6 @@ impl OptBlockData {
 
         self.payload().verify_epoch(self.epoch())?;
 
-        let failed_authors = self.failed_authors();
-        // when validating for being well formed,
-        // allow for missing failed authors,
-        // for whatever reason (from different max configuration, etc),
-        // but don't allow anything that shouldn't be there.
-        //
-        // we validate the full correctness of this field in round_manager.process_proposal()
-        let succ_round = self.round();
-        let skipped_rounds = succ_round.checked_sub(parent.round() + 1);
-        ensure!(
-            skipped_rounds.is_some(),
-            "Block round is smaller than block's parent round"
-        );
-        ensure!(
-            failed_authors.len() <= skipped_rounds.unwrap() as usize,
-            "Block has more failed authors than missed rounds"
-        );
-        let mut bound = parent.round();
-        for (round, _) in failed_authors {
-            ensure!(
-                bound < *round && *round < succ_round,
-                "Incorrect round in failed authors"
-            );
-            bound = *round;
-        }
-
         ensure!(
             self.timestamp_usecs() > parent.timestamp_usecs()
                 && parent.timestamp_usecs() > grandparent_qc.timestamp_usecs(),
@@ -147,10 +119,10 @@ impl OptBlockData {
 }
 
 impl Deref for OptBlockData {
-    type Target = OptProposalExt;
+    type Target = OptProposalBody;
 
     fn deref(&self) -> &Self::Target {
-        &self.proposal
+        &self.proposal_body
     }
 }
 

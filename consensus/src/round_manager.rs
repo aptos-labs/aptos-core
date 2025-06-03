@@ -79,12 +79,7 @@ use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, Sin
 use lru::LruCache;
 use serde::Serialize;
 use std::{
-    collections::{BTreeMap, HashMap},
-    mem::Discriminant,
-    ops::Add,
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
+    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -439,7 +434,8 @@ impl RoundManager {
                 .send(opt_proposal)
                 .await
                 .expect("Sending to a self loopback unbounded channel cannot fail");
-        } else
+        }
+
         // If the current proposer is the leading, try to propose a regular block if not opt proposed already
         if is_current_proposer {
             let epoch_state = self.epoch_state.clone();
@@ -830,13 +826,7 @@ impl RoundManager {
             opt_block_data.parent_id(),
             hqc.certified_block().id()
         );
-        let failed_authors = self.proposal_generator.compute_failed_authors(
-            opt_block_data.round(),
-            hqc.certified_block().round(),
-            false,
-            self.proposer_election.clone(),
-        );
-        let proposal = Block::new_from_opt(opt_block_data, hqc, failed_authors);
+        let proposal = Block::new_from_opt(opt_block_data, hqc);
         observe_block(proposal.timestamp_usecs(), BlockStage::PROCESS_OPT_PROPOSAL);
         info!(
             self.new_log(LogEvent::ProcessOptProposal),
@@ -1177,20 +1167,22 @@ impl RoundManager {
             proposal,
         );
 
-        // Validate that failed_authors list is correctly specified in the block.
-        let expected_failed_authors = self.proposal_generator.compute_failed_authors(
-            proposal.round(),
-            proposal.quorum_cert().certified_block().round(),
-            false,
-            self.proposer_election.clone(),
-        );
-        ensure!(
-            proposal.block_data().failed_authors().is_some_and(|failed_authors| *failed_authors == expected_failed_authors),
-            "[RoundManager] Proposal for block {} has invalid failed_authors list {:?}, expected {:?}",
-            proposal.round(),
-            proposal.block_data().failed_authors(),
-            expected_failed_authors,
-        );
+        if !proposal.is_opt_block() {
+            // Validate that failed_authors list is correctly specified in the block.
+            let expected_failed_authors = self.proposal_generator.compute_failed_authors(
+                proposal.round(),
+                proposal.quorum_cert().certified_block().round(),
+                false,
+                self.proposer_election.clone(),
+            );
+            ensure!(
+                proposal.block_data().failed_authors().is_some_and(|failed_authors| *failed_authors == expected_failed_authors),
+                "[RoundManager] Proposal for block {} has invalid failed_authors list {:?}, expected {:?}",
+                proposal.round(),
+                proposal.block_data().failed_authors(),
+                expected_failed_authors,
+            );
+        }
 
         let block_time_since_epoch = Duration::from_micros(proposal.timestamp_usecs());
 

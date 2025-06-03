@@ -713,7 +713,6 @@ impl ProposalGenerator {
             .await?
         };
 
-        let failed_authors = vec![];
         let validator_txns = if self.vtxn_config.enabled() {
             validator_txns
         } else {
@@ -724,7 +723,6 @@ impl ProposalGenerator {
             validator_txns,
             payload,
             self.author,
-            failed_authors,
             epoch,
             round,
             timestamp,
