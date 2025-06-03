@@ -218,7 +218,7 @@ impl EventSubscriptionService {
             let maybe_subscription_ids = match event {
                 ContractEvent::V1(evt) => self.event_key_subscriptions.get(evt.key()),
                 ContractEvent::V2(evt) => {
-                    let tag = evt.type_tag().to_string();
+                    let tag = evt.type_tag().to_canonical_string();
                     self.event_v2_tag_subscriptions.get(&tag)
                 },
             };

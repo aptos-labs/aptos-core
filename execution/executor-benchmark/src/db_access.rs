@@ -200,7 +200,7 @@ impl DbAccessUtil {
                         struct_tag
                             .type_args
                             .iter()
-                            .map(|v| v.to_string())
+                            .map(|v| v.to_canonical_string())
                             .join(", ")
                     )
                     .to_string()

@@ -18,11 +18,11 @@ use std::{
 pub(crate) fn type_not_allowed(type_tag: &TypeTag) -> ! {
     panic!(
         "Transaction scripts cannot take arguments of type {}.",
-        type_tag
+        type_tag.to_canonical_string()
     );
 }
 
-/// Clean up doc comments extracter by the Move prover.
+/// Clean up doc comments extracted by the Move prover.
 pub(crate) fn prepare_doc_string(doc: &str) -> String {
     doc.replace("\n ", "\n").trim().to_string()
 }

@@ -107,7 +107,7 @@ impl Balance {
 
         Ok(vec![AccountBalance {
             asset_type: "coin".to_string(),
-            coin_type: Some(coin_type.to_string()),
+            coin_type: Some(coin_type.to_canonical_string()),
             balance,
         }])
     }

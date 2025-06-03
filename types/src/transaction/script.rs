@@ -155,7 +155,10 @@ impl EntryFunction {
             self.module.address,
             self.module.name().to_string(),
             self.function.to_string(),
-            self.ty_args.iter().map(|ty| ty.to_string()).collect(),
+            self.ty_args
+                .iter()
+                .map(|ty| ty.to_canonical_string())
+                .collect(),
             self.args.clone(),
         )
     }
