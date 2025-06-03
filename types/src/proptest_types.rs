@@ -23,12 +23,13 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::state_key::StateKey,
     transaction::{
-        block_epilogue::BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus,
-        IndexedTransactionSummary, Module, Multisig, MultisigTransactionPayload, RawTransaction,
-        ReplayProtector, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable,
-        TransactionExtraConfig, TransactionInfo, TransactionListWithProof, TransactionPayload,
-        TransactionPayloadInner, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
+        block_epilogue::BlockEndInfo, BlockchainGeneratedInfo, ChangeSet, EntryFunction,
+        ExecutionStatus, IndexedTransactionSummary, Module, Multisig, MultisigTransactionPayload,
+        RawTransaction, ReplayProtector, Script, SignatureCheckedTransaction, SignedTransaction,
+        SignedTransactionWithInfo, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        TransactionExecutable, TransactionExtraConfig, TransactionInfo, TransactionListWithProof,
+        TransactionPayload, TransactionPayloadInner, TransactionStatus, TransactionToCommit,
+        Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -510,6 +511,28 @@ impl Arbitrary for SignedTransaction {
     }
 }
 
+impl Arbitrary for BlockchainGeneratedInfo {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        any::<u32>()
+            .prop_map(|transaction_index| BlockchainGeneratedInfo::V1 { transaction_index })
+            .boxed()
+    }
+}
+
+impl Arbitrary for SignedTransactionWithInfo {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        (any::<SignedTransaction>(), any::<BlockchainGeneratedInfo>())
+            .prop_map(|(txn, info)| SignedTransactionWithInfo::new(txn, info))
+            .boxed()
+    }
+}
+
 impl Arbitrary for TransactionExecutable {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
@@ -920,6 +943,7 @@ impl TransactionToCommitGen {
             .collect();
 
         TransactionToCommit::new(
+            // TODO[MI counter]: Try using Transaction::UserTransactionWithInfo here?
             Transaction::UserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, None, self.status),
             WriteSet::new(write_set).unwrap(),

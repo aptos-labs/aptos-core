@@ -15,7 +15,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     proof::position::Position,
     state_merkle_pruner::state_storage_usage::StateStorageUsage,
-    transaction::{SignedTransaction, Transaction, TransactionInfo, Version},
+    transaction::{SignedTransaction, Transaction, TransactionInfo, Version, SignedTransactionWithInfo, BlockchainGeneratedInfo},
     write_set::WriteSet,
 };
 use proptest::{collection::vec, prelude::*, proptest};
@@ -28,6 +28,7 @@ proptest! {
         prop_oneof![
             any::<BlockMetadata>().prop_map(Transaction::BlockMetadata),
             any::<SignedTransaction>().prop_map(Transaction::UserTransaction),
+            (any::<SignedTransaction>(), any::<BlockchainGeneratedInfo>).prop_map(|(signed_txn, info)| Transaction::UserTransactionWithInfo(SignedTransactionWithInfo::new(signed_txn, info))),
         ], 1..100,),
         txn_infos in vec(any::<TransactionInfo>(),100,),
         step_size in 1usize..20,

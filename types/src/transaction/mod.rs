@@ -1220,6 +1220,8 @@ impl SignedTransaction {
     }
 
     /// Returns the hash when the transaction is committed onchain.
+
+    // Question[MI Counter]: Committed hash of the signed transaction ignores the blockchain generated info. Is this okay?
     pub fn committed_hash(&self) -> HashValue {
         *self
             .committed_hash
@@ -1267,6 +1269,86 @@ impl IndexedTransactionSummary {
     pub fn sender(&self) -> AccountAddress {
         match self {
             IndexedTransactionSummary::V1 { sender, .. } => *sender,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SignedTransactionWithInfo {
+    V1 {
+        transaction: SignedTransaction,
+
+        blockchain_generated_info: BlockchainGeneratedInfo,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BlockchainGeneratedInfo {
+    V1 { transaction_index: u32 },
+}
+
+impl SignedTransactionWithInfo {
+    pub fn new(
+        transaction: SignedTransaction,
+        blockchain_generated_info: BlockchainGeneratedInfo,
+    ) -> Self {
+        Self::V1 {
+            transaction,
+            blockchain_generated_info,
+        }
+    }
+
+    pub fn transaction(&self) -> &SignedTransaction {
+        match self {
+            Self::V1 { transaction, .. } => transaction,
+        }
+    }
+
+    pub fn into_transaction(self) -> SignedTransaction {
+        match self {
+            Self::V1 { transaction, .. } => transaction,
+        }
+    }
+
+    pub fn blockchain_generated_info(&self) -> &BlockchainGeneratedInfo {
+        match self {
+            Self::V1 {
+                blockchain_generated_info,
+                ..
+            } => blockchain_generated_info,
+        }
+    }
+
+    // The committed_hash doesn't include the blockchain generated info.
+    // It only hashes Transaction::UserTransaction(signed_txn)
+    pub fn committed_hash(&self) -> HashValue {
+        self.transaction().committed_hash()
+    }
+
+    pub fn transaction_index(&self) -> u32 {
+        match self {
+            Self::V1 {
+                blockchain_generated_info,
+                ..
+            } => blockchain_generated_info.transaction_index(),
+        }
+    }
+}
+
+impl BlockchainGeneratedInfo {
+    pub fn transaction_index(&self) -> u32 {
+        match self {
+            Self::V1 {
+                transaction_index, ..
+            } => *transaction_index,
+        }
+    }
+}
+
+impl Default for BlockchainGeneratedInfo {
+    fn default() -> Self {
+        Self::V1 {
+            transaction_index: 0,
         }
     }
 }
@@ -2455,7 +2537,7 @@ impl AccountOrderedTransactionsWithProof {
 /// transaction.
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
 pub enum Transaction {
     /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
     /// transaction, etc.
@@ -2487,6 +2569,10 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
+    /// transaction, etc., along with some blockchain generated info related to the transaction.
+    UserTransactionWithInfo(SignedTransactionWithInfo),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2495,6 +2581,26 @@ impl From<BlockMetadataExt> for Transaction {
             BlockMetadataExt::V0(v0) => Transaction::BlockMetadata(v0),
             vx => Transaction::BlockMetadataExt(vx),
         }
+    }
+}
+
+// Implementing a custom version of BCSCryptoHash for Transaction.
+// Transaction::UserTransactionWithInfo is an internal transaction type that stores signed transaction along with blockchain generated info.
+// External users should not rely on blockchain generated info. So, the hash computation converts UserTransactionWithInfo to UserTransaction before hashing.
+impl aptos_crypto::hash::CryptoHash for Transaction {
+    type Hasher = TransactionHasher;
+
+    fn hash(&self) -> aptos_crypto::hash::HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+
+        let mut state = Self::Hasher::default();
+        if let Transaction::UserTransactionWithInfo(txn) = self {
+            // TODO[MI Counter]: Every hash computation clones the data. What would be the best way to avoid this?
+            bcs::serialize_into(&mut state, &Transaction::UserTransaction(txn.transaction().clone())).expect("BCS serialization of Transaction should not fail");
+        } else {
+            bcs::serialize_into(&mut state, &self).expect("BCS serialization of Transaction should not fail");
+        }
+        state.finish()
     }
 }
 
@@ -2509,6 +2615,15 @@ impl Transaction {
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::UserTransactionWithInfo(txn) => Some(txn.transaction()),
+            _ => None,
+        }
+    }
+
+    pub fn try_into_signed_user_txn(self) -> Option<SignedTransaction> {
+        match self {
+            Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::UserTransactionWithInfo(txn) => Some(txn.into_transaction()),
             _ => None,
         }
     }
@@ -2537,6 +2652,7 @@ impl Transaction {
     pub fn type_name(&self) -> &'static str {
         match self {
             Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::UserTransactionWithInfo(_) => "user_transaction",
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
@@ -2555,6 +2671,7 @@ impl Transaction {
         match self {
             Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
             Transaction::UserTransaction(_)
+            | Transaction::UserTransactionWithInfo(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
@@ -2568,6 +2685,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_)
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
+            | Transaction::UserTransactionWithInfo(_)
             | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
         }
@@ -2580,6 +2698,7 @@ impl TryFrom<Transaction> for SignedTransaction {
     fn try_from(txn: Transaction) -> Result<Self> {
         match txn {
             Transaction::UserTransaction(txn) => Ok(txn),
+            Transaction::UserTransactionWithInfo(txn) => Ok(txn.into_transaction()),
             _ => Err(format_err!("Not a user transaction.")),
         }
     }
