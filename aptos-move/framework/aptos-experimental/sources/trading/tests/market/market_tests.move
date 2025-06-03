@@ -36,7 +36,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -124,7 +124,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -181,7 +181,7 @@ module aptos_experimental::market_tests {
         maker2: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
         let maker2_addr = signer::address_of(maker2);
@@ -250,7 +250,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
 
@@ -313,7 +313,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -382,7 +382,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -451,7 +451,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -515,7 +515,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -586,7 +586,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -665,7 +665,7 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -726,7 +726,7 @@ module aptos_experimental::market_tests {
         maker2: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(admin, market_signer, new_market_config(false, false));
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
         let maker2_addr = signer::address_of(maker2);
@@ -824,7 +824,7 @@ module aptos_experimental::market_tests {
         maker2: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(true));
+        let market = new_market(admin, market_signer, new_market_config(true, false));
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
         let event_store = event_utils::new_event_store();

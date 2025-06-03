@@ -2,10 +2,10 @@
 /// that stores an order book and provides APIs to place orders, cancel orders, and match orders. The market also acts
 /// as a wrapper around the order book and pluggable clearinghouse implementation.
 /// A clearing house implementation is expected to implement the following APIs
-///  - settle_trade(taker, maker, is_taker_long, price, size): SettleTradeResult -> Called by the market when there
-/// is an match between taker and maker. The clearinghouse is expected to settle the trade and return the result. Please
-/// note that the clearing house settlment size might not be the same as the order match size and the settlement might
-/// also fail.
+///  - settle_trade(taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size): SettleTradeResult -> 
+/// Called by the market when there is an match between taker and maker. The clearinghouse is expected to settle the trade 
+/// and return the result. Please note that the clearing house settlment size might not be the same as the order match size and 
+/// the settlement might also fail.
 ///  - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 ///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
 ///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
@@ -105,13 +105,17 @@ module aptos_experimental::market {
         market: address,
         // TODO: remove sequential order id generation
         last_order_id: u64,
+        // Incremental fill id for matched orders
+        next_fill_id: u64,
         config: MarketConfig,
         order_book: OrderBook<M>
     }
 
     struct MarketConfig has store {
         /// Weather to allow self matching orders
-        allow_self_trade: bool
+        allow_self_trade: bool,
+        /// Whether to halt events for this market
+        halt_events: bool
     }
 
     /// Order has been accepted by the engine.
@@ -222,8 +226,9 @@ module aptos_experimental::market {
         self.order_id
     }
 
-    public fun new_market_config(allow_self_matching: bool): MarketConfig {
-        MarketConfig { allow_self_trade: allow_self_matching }
+
+    public fun new_market_config(allow_self_matching: bool, halt_events: bool): MarketConfig {
+        MarketConfig { allow_self_trade: allow_self_matching, halt_events : halt_events }
     }
 
     public fun new_market<M: store + copy + drop>(
@@ -237,6 +242,7 @@ module aptos_experimental::market {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
             last_order_id: 0,
+            next_fill_id: 0,
             config,
             order_book: new_order_book()
         }
@@ -335,6 +341,45 @@ module aptos_experimental::market {
         self.last_order_id
     }
 
+        public fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
+        let next_fill_id = self.next_fill_id;
+        self.next_fill_id += 1;
+        next_fill_id
+    }
+
+        fun emit_event_for_order<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: u64,
+        user: address,
+        orig_size: u64,
+        remaining_size: u64,
+        size_delta: u64,
+        price: u64,
+        is_bid: bool,
+        is_taker: bool,
+        status: u8,
+        details: &String
+    ) {
+        if (!self.config.halt_events) {
+            event::emit(
+                OrderEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id,
+                    user,
+                    orig_size,
+                    remaining_size,
+                    size_delta,
+                    price,
+                    is_buy: is_bid,
+                    is_taker,
+                    status,
+                    details: *details
+                }
+            );
+        };
+    }
+
     /// Similar to `place_order` API but instead of a signer, it takes a user address - can be used in case trading
     /// functionality is delegated to a different address. Please note that it is the responsibility of the caller
     /// to verify that the transaction signer is authorized to place orders on behalf of the user.
@@ -402,21 +447,18 @@ module aptos_experimental::market {
         };
 
         if (emit_order_open) {
-            event::emit(
-                OrderEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    order_id,
-                    user: user_addr,
-                    orig_size,
-                    remaining_size,
-                    size_delta: orig_size,
-                    price,
-                    is_buy: is_bid,
-                    is_taker: false,
-                    status: ORDER_STATUS_OPEN,
-                    details: std::string::utf8(b"")
-                }
+            emit_event_for_order(
+                self,
+                order_id,
+                user_addr,
+                orig_size,
+                remaining_size,
+                orig_size,
+                price,
+                is_bid,
+                false, // is_taker
+                ORDER_STATUS_OPEN,
+                &std::string::utf8(b"")
             );
         };
 
@@ -459,21 +501,19 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
-        event::emit(
-            OrderEvent {
-                parent: self.parent,
-                market: self.market,
-                order_id,
-                user: maker_address,
-                orig_size: maker_order.get_orig_size(),
-                remaining_size: 0,
-                size_delta: maker_cancel_size,
-                price: maker_order.get_price(),
-                is_buy: maker_order.is_bid(),
-                is_taker: false,
-                status: ORDER_STATUS_CANCELLED,
-                details: maker_cancellation_reason
-            }
+        
+        emit_event_for_order(
+            self,
+            order_id,
+            maker_address,
+            maker_order.get_orig_size(),
+            0, 
+            maker_cancel_size,
+            maker_order.get_price(),
+            maker_order.is_bid(),
+            false,
+            ORDER_STATUS_CANCELLED,
+            &maker_cancellation_reason
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
         if (maker_order.get_remaining_size() != 0) {
@@ -501,21 +541,18 @@ module aptos_experimental::market {
         cancel_details: String,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
-        event::emit(
-            OrderEvent {
-                parent: self.parent,
-                market: self.market,
-                order_id,
-                user: user_addr,
-                orig_size,
-                remaining_size: 0,
-                size_delta,
-                price,
-                is_buy: is_bid,
-                is_taker,
-                status: ORDER_STATUS_CANCELLED,
-                details: cancel_details
-            }
+        emit_event_for_order(
+            self,
+            order_id,
+            user_addr,
+            orig_size,
+            0, // remaining size
+            size_delta,
+            price,
+            is_bid,
+            is_taker,
+            ORDER_STATUS_CANCELLED,
+            &cancel_details
         );
         callbacks.cleanup_order(user_addr, order_id, is_bid, size_delta);
         return OrderMatchResult {
@@ -583,21 +620,18 @@ module aptos_experimental::market {
         let is_taker_order =
             self.order_book.is_taker_order(price, is_bid, trigger_condition);
         if (emit_taker_order_open) {
-            event::emit(
-                OrderEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    order_id,
-                    user: user_addr,
-                    orig_size,
-                    remaining_size,
-                    size_delta: orig_size,
-                    price,
-                    is_buy: is_bid,
-                    is_taker: is_taker_order,
-                    status: ORDER_STATUS_OPEN,
-                    details: std::string::utf8(b"")
-                }
+            emit_event_for_order(
+                self,
+                order_id,
+                user_addr,
+                orig_size,
+                remaining_size,
+                orig_size,
+                price,
+                is_bid,
+                is_taker_order,
+                ORDER_STATUS_OPEN,
+                &std::string::utf8(b"")
             );
         };
         if (!is_taker_order) {
@@ -652,12 +686,16 @@ module aptos_experimental::market {
                 );
                 continue;
             };
+
+            let fill_id = self.next_fill_id();
+
             let settle_result =
                 callbacks.settle_trade(
                     user_addr,
                     maker_address,
                     order_id,
                     maker_order_id,
+                    fill_id,
                     is_bid,
                     maker_order.get_price(), // Order is always matched at the price of the maker
                     maker_matched_size,
@@ -672,39 +710,32 @@ module aptos_experimental::market {
                 unsettled_maker_size -= settled_size;
                 fill_sizes.push_back(settled_size);
                 // Event for taker fill
-                event::emit(
-                    OrderEvent {
-                        parent: self.parent,
-                        market: self.market,
-                        order_id,
-                        user: user_addr,
-                        orig_size,
-                        remaining_size,
-                        size_delta: settled_size,
-                        price: maker_order.get_price(),
-                        is_buy: is_bid,
-                        is_taker: true,
-                        status: ORDER_STATUS_FILLED,
-                        details: std::string::utf8(b"")
-                    }
+                emit_event_for_order(
+                    self,
+                    order_id,
+                    user_addr,
+                    orig_size,
+                    remaining_size,
+                    settled_size,
+                    maker_order.get_price(),
+                    is_bid,
+                    true, // is_taker
+                    ORDER_STATUS_FILLED,
+                    &std::string::utf8(b"")
                 );
                 // Event for maker fill
-                event::emit(
-                    OrderEvent {
-                        parent: self.parent,
-                        market: self.market,
-                        order_id: maker_order_id,
-                        user: maker_address,
-                        orig_size: maker_order.get_orig_size(),
-                        remaining_size: maker_order.get_remaining_size()
-                            + unsettled_maker_size,
-                        size_delta: settled_size,
-                        price: maker_order.get_price(),
-                        is_buy: !is_bid,
-                        is_taker: false,
-                        status: ORDER_STATUS_FILLED,
-                        details: std::string::utf8(b"")
-                    }
+                emit_event_for_order(
+                    self,
+                    maker_order_id,
+                    maker_address,
+                    maker_order.get_orig_size(),
+                    maker_order.get_remaining_size() + unsettled_maker_size,
+                    settled_size,
+                    maker_order.get_price(),
+                    !is_bid, 
+                    false, // is_taker
+                    ORDER_STATUS_FILLED,
+                    &std::string::utf8(b"")
                 );
             };
 
@@ -873,22 +904,19 @@ module aptos_experimental::market {
                 remaining_size
             );
             let (user, order_id) = order_id_type.destroy_order_id_type();
-            event::emit(
-                OrderEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    order_id,
-                    user,
-                    orig_size,
-                    remaining_size,
-                    size_delta: remaining_size,
-                    price,
-                    is_buy: is_bid,
-                    is_taker: false,
-                    status: ORDER_STATUS_CANCELLED,
-                    details: std::string::utf8(b"Order cancelled")
-                }
-            )
+            emit_event_for_order(
+                self,
+                order_id,
+                user,
+                orig_size,
+                remaining_size,
+                remaining_size,
+                price,
+                is_bid,
+                false, // is_taker
+                ORDER_STATUS_CANCELLED,
+                &std::string::utf8(b"Order cancelled")
+            );
         }
     }
 
@@ -923,22 +951,20 @@ module aptos_experimental::market {
             price,
             remaining_size
         );
-        event::emit(
-            OrderEvent {
-                parent: self.parent,
-                market: self.market,
-                order_id,
-                user,
-                orig_size,
-                remaining_size,
-                size_delta,
-                price,
-                is_buy: is_bid,
-                is_taker: false,
-                status: ORDER_SIZE_REDUCED,
-                details: std::string::utf8(b"Order size reduced")
-            }
-        )
+     
+        emit_event_for_order(
+            self,
+            order_id,
+            user,
+            orig_size,
+            remaining_size,
+            size_delta,
+            price,
+            is_bid,
+            false, // is_taker
+            ORDER_SIZE_REDUCED,
+            &std::string::utf8(b"Order size reduced")
+        );
     }
 
     /// Remaining size of the order in the order book.
@@ -964,18 +990,19 @@ module aptos_experimental::market {
         self.order_book.take_ready_time_based_orders()
     }
 
-    // ============================= test_only APIs ====================================
 
+    // ============================= test_only APIs ====================================
     #[test_only]
     public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
         let Market {
             parent: _parent,
             market: _market,
             last_order_id: _last_order_id,
+            next_fill_id: _next_fill_id,
             config,
             order_book
         } = self;
-        let MarketConfig { allow_self_trade: _ } = config;
+        let MarketConfig { allow_self_trade: _, halt_events: _ } = config;
         order_book.destroy_order_book()
     }
 
