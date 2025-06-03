@@ -219,6 +219,11 @@ impl Verifier {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
+                    info!(
+                        "Verify timeout: {}s elapsed. Deadline: {}s",
+                        self.replay_stat.get_elapsed_secs(),
+                        duration
+                    );
                     return Ok(total_failed_txns);
                 }
             }
