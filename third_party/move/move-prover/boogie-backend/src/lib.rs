@@ -5,7 +5,10 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    boogie_helpers::{boogie_bv_type, boogie_module_name, boogie_type, boogie_type_suffix_bv},
+    boogie_helpers::{
+        boogie_bv_type, boogie_module_name, boogie_num_type_base, boogie_type,
+        boogie_type_suffix_bv,
+    },
     bytecode_translator::has_native_equality,
     options::{BoogieOptions, VectorTheory},
 };
@@ -20,12 +23,13 @@ use move_model::{
     pragmas::{
         INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
         INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_BORROW_MUT,
-        INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
-        INTRINSIC_FUN_MAP_DEL_RETURN_KEY, INTRINSIC_FUN_MAP_DESTROY_EMPTY,
-        INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_LEN,
-        INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET,
-        INTRINSIC_FUN_MAP_SPEC_HAS_KEY, INTRINSIC_FUN_MAP_SPEC_IS_EMPTY,
-        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_SET,
+        INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
+        INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
+        INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY,
+        INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_DEL,
+        INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW,
+        INTRINSIC_FUN_MAP_SPEC_SET,
     },
     ty::{PrimitiveType, Type},
 };
@@ -89,6 +93,7 @@ struct MapImpl {
     fun_borrow: String,
     fun_borrow_mut: String,
     fun_borrow_mut_with_default: String,
+    fun_borrow_with_default: String,
     // spec functions
     fun_spec_new: String,
     fun_spec_get: String,
@@ -205,8 +210,27 @@ pub fn add_prelude(
     all_types.append(&mut bv_all_types);
     context.insert("uninterpreted_instances", &all_types);
 
+    // obtain bv number types appearing in the program, which is currently used to generate cast functions for bv types
+    let number_types = mono_info
+        .all_types
+        .iter()
+        .filter(|ty| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num)))
+        .map(|ty| {
+            boogie_num_type_base(ty)
+                .parse::<usize>()
+                .expect("parse error")
+        })
+        .collect_vec();
+    let bv_in_all_types = bv_instances
+        .iter()
+        .filter(|bv_info| number_types.contains(&bv_info.base))
+        .map(|bv_info| bv_info.base)
+        .collect_vec();
+
     context.insert("sh_instances", &sh_instances);
     context.insert("bv_instances", &bv_instances);
+    context.insert("bv_in_all_types", &bv_in_all_types);
+
     let mut vec_instances = mono_info
         .vec_inst
         .iter()
@@ -417,6 +441,10 @@ impl MapImpl {
             fun_borrow_mut_with_default: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT),
+            ),
+            fun_borrow_with_default: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT),
             ),
             fun_spec_new: Self::triple_opt_to_name(
                 env,

@@ -2033,12 +2033,26 @@ impl SpecTranslator<'_> {
             .env
             .get_cloned_extension::<GlobalNumberOperationState>();
         let arg = args[0].clone();
-        self.env
-            .update_node_type(arg.node_id(), self.env.get_node_type(node_id));
         let cast_oper = global_state.get_node_num_oper(node_id);
         global_state.update_node_oper(args[0].node_id(), cast_oper, true);
         self.env.set_extension(global_state);
-        self.translate_exp(&arg);
+        let target_type = self.env.get_node_type(node_id).skip_reference().clone();
+        let source_type = self
+            .env
+            .get_node_type(arg.node_id())
+            .skip_reference()
+            .clone();
+        let check_cast =
+            |ty: &Type| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num));
+        if cast_oper == Bitwise && check_cast(&target_type) && check_cast(&source_type) {
+            let target_base = boogie_num_type_base(&target_type);
+            let source_base = boogie_num_type_base(&source_type);
+            emit!(self.writer, "$castBv{}to{}(", source_base, target_base);
+            self.translate_exp(&arg);
+            emit!(self.writer, ")");
+        } else {
+            self.translate_exp(&arg);
+        }
     }
 
     fn translate_primitive_call(&self, fun: &str, args: &[Exp]) {
