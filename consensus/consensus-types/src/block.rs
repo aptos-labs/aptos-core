@@ -314,12 +314,8 @@ impl Block {
         }
     }
 
-    pub fn new_from_opt(
-        block_data: OptBlockData,
-        quorum_cert: QuorumCert,
-        failed_authors: Vec<(Round, Author)>,
-    ) -> Self {
-        let block_data = BlockData::new_from_opt(block_data, quorum_cert, failed_authors);
+    pub fn new_from_opt(block_data: OptBlockData, quorum_cert: QuorumCert) -> Self {
+        let block_data = BlockData::new_from_opt(block_data, quorum_cert);
         Block {
             id: block_data.hash(),
             block_data,

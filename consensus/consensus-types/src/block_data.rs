@@ -5,7 +5,7 @@
 use crate::{
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
-    proposal_ext::{OptProposalExt, ProposalExt},
+    proposal_ext::{OptProposalBody, ProposalExt},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -55,7 +55,7 @@ pub enum BlockType {
     ProposalExt(ProposalExt),
 
     /// Optimistic proposal.
-    OptProposal(OptProposalExt),
+    OptProposal(OptProposalBody),
 
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
@@ -230,8 +230,7 @@ impl BlockData {
             | BlockType::NilBlock { failed_authors, .. }
             | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
             BlockType::ProposalExt(p) => Some(p.failed_authors()),
-            BlockType::OptProposal(p) => Some(p.failed_authors()),
-            BlockType::Genesis => None,
+            BlockType::OptProposal(_) | BlockType::Genesis => None,
         }
     }
 
@@ -404,25 +403,20 @@ impl BlockData {
 
     /// Returns an instance of BlockData by converting the OptBlockData to BlockData
     /// and adding QC and failed_authors
-    pub fn new_from_opt(
-        opt_block_data: OptBlockData,
-        quorum_cert: QuorumCert,
-        new_failed_authors: Vec<(Round, Author)>,
-    ) -> Self {
+    pub fn new_from_opt(opt_block_data: OptBlockData, quorum_cert: QuorumCert) -> Self {
         let OptBlockData {
             epoch,
             round,
             timestamp_usecs,
-            mut proposal,
+            proposal_body,
             ..
         } = opt_block_data;
-        proposal.set_failed_authors(new_failed_authors);
         Self {
             epoch,
             round,
             timestamp_usecs,
             quorum_cert,
-            block_type: BlockType::OptProposal(proposal),
+            block_type: BlockType::OptProposal(proposal_body),
         }
     }
 
