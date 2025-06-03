@@ -163,6 +163,10 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT: &str = "map_borrow_mut";
 /// `[move] fun map_borrow_mut<K, V>(m: &mut Map<K, V>, k: K, default: V): &mut V`
 pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with_default";
 
+/// Mutable borrow of a value from the map, return deafult if the key does not exist
+/// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
+pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
+
 /// All intrinsic functions associated with the map type
 pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>> =
     Lazy::new(|| {
@@ -186,6 +190,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>
             (INTRINSIC_FUN_MAP_BORROW, true),
             (INTRINSIC_FUN_MAP_BORROW_MUT, true),
             (INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, true),
+            (INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT, true),
         ])
     });
 

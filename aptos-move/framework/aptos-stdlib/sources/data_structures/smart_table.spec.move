@@ -11,6 +11,7 @@ spec aptos_std::smart_table {
             map_borrow = borrow,
             map_borrow_mut = borrow_mut,
             map_borrow_mut_with_default = borrow_mut_with_default,
+            map_borrow_with_default = borrow_with_default,
             map_spec_get = spec_get,
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
