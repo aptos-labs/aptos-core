@@ -2972,6 +2972,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-time-service",
+ "aptos-transactions-filter",
  "aptos-types",
  "aptos-vm-validator",
  "bcs 0.1.4",
