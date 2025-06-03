@@ -56,7 +56,6 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
-#[cfg(test)]
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
@@ -123,7 +122,8 @@ where
                 Ok(Some(output))
             },
             ExecutionStatus::SpeculativeExecutionAbortError(_msg) => {
-                // TODO: cleaner to rename or distinguish V2 early abort from DeltaApplicationFailure.
+                // TODO(BlockSTMv2): cleaner to rename or distinguish V2 early abort
+                // from DeltaApplicationFailure.
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
                 ));
@@ -319,7 +319,7 @@ where
 
         let resource_write_set = match processed_output {
             Some(output) => apply_updates(output)?,
-            None => Vec::new(),
+            None => vec![],
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -533,11 +533,11 @@ where
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let block_limit_processor = &mut shared_commit_state.acquire();
-        let mut commit_side_effects = false;
+        let mut side_effect_at_commit = false;
 
         if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
             // Transaction needs to be re-executed, one final time.
-            commit_side_effects = true;
+            side_effect_at_commit = true;
 
             let parallel_state = ParallelState::new(
                 versioned_cache,
@@ -545,36 +545,24 @@ where
                 start_shared_counter,
                 shared_counter,
             );
-            match scheduler.is_v2() {
-                false => {
-                    Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
-                    // We are going to skip reducing validation index here, as we
-                    // are executing immediately, and will reduce it unconditionally
-                    // after execution, inside finish_execution_during_commit.
-                    // Because of that, we can also ignore _needs_suffix_validation result.
-                    let _needs_suffix_validation = Self::execute(
-                        txn_idx,
-                        incarnation + 1,
-                        block,
-                        last_input_output,
-                        versioned_cache,
-                        executor,
-                        base_view,
-                        global_module_cache,
-                        runtime_environment,
-                        parallel_state,
-                    )?;
-                },
-                true => {
-                    counters::SPECULATIVE_ABORT_COUNT.inc();
 
-                    // Any logs from the aborted execution should be cleared and not reported.
-                    clear_speculative_txn_logs(txn_idx as usize);
-
-                    // TODO: v2 logic, such as direct abort and re-execution.
-                    unimplemented!("V2 logic not implemented");
-                },
-            }
+            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+            // We are going to skip reducing validation index here, as we
+            // are executing immediately, and will reduce it unconditionally
+            // after execution, inside finish_execution_during_commit.
+            // Because of that, we can also ignore _needs_suffix_validation result.
+            let _needs_suffix_validation = Self::execute(
+                txn_idx,
+                incarnation + 1,
+                block,
+                last_input_output,
+                versioned_cache,
+                executor,
+                base_view,
+                global_module_cache,
+                runtime_environment,
+                parallel_state,
+            )?;
 
             if !Self::validate_and_commit_delayed_fields(
                 txn_idx,
@@ -595,8 +583,7 @@ where
         // Publish modules before we decrease validation index (in V1) so that validations observe
         // the new module writes as well.
         if !module_write_set.is_empty() {
-            // TODO: v2 push validation for module writes - part of normal V2 flow, nothing here.
-            commit_side_effects = true;
+            side_effect_at_commit = true;
 
             Self::publish_module_writes(
                 txn_idx,
@@ -609,7 +596,7 @@ where
             scheduler.set_module_read_validation();
         }
 
-        if commit_side_effects {
+        if side_effect_at_commit {
             scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
         }
 
@@ -669,7 +656,6 @@ where
 
             // failpoint triggering error at the last committed transaction,
             // to test that next transaction is handled correctly
-            #[cfg(test)]
             fail_point!("commit-all-halt-err", |_| Err(code_invariant_error(
                 "fail points: Last committed transaction halted"
             )
@@ -783,8 +769,9 @@ where
             // Module cache is not versioned (published at commit), so validation after
             // commit might observe later publishes (higher txn index) and be incorrect.
             // Hence, we skip the paranoid module validation after commit.
-            // TODO(BlockSTMv2): consider doing it within the sequential commit hook
-            // (if modules were published).
+            // TODO(BlockSTMv2): Do the additional checking in sequential commit hook,
+            // when modules have been published. Update the comment here as skipping
+            // in V2 is needed for a different, code cache implementation related reason.
             true,
         ) {
             return Err(code_invariant_error(format!(
@@ -909,7 +896,6 @@ where
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        // Make executor for each task. TODO: fast concurrent executor.
         let num_txns = block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(environment, base_view);
@@ -1461,7 +1447,6 @@ where
                             .group_reads_needing_delayed_field_exchange()
                             .iter()
                             .any(|(group_key, _)| {
-                                #[cfg(test)]
                                 fail_point!("fail-point-resource-group-serialization", |_| {
                                     true
                                 });
@@ -1477,7 +1462,6 @@ where
                             })
                             || output.resource_group_write_set().into_iter().any(
                                 |(group_key, _, output_group_size, group_ops)| {
-                                    #[cfg(test)]
                                     fail_point!("fail-point-resource-group-serialization", |_| {
                                         true
                                     });

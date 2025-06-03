@@ -14,7 +14,6 @@ use aptos_types::{
 use aptos_vm_logging::{alert, prelude::*};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
-#[cfg(test)]
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
@@ -24,17 +23,19 @@ use std::{collections::BTreeMap, sync::Arc};
 // not possible due to type & API mismatch.
 macro_rules! groups_to_finalize {
     ($outputs:expr, $($txn_idx:expr),*) => {{
-	let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
+        let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
 
         group_write_ops.into_iter()
             .map(|val| (val, false))
             .chain([()].into_iter().flat_map(|_| {
-		// Lazily evaluated only after iterating over group_write_ops.
+                // Lazily evaluated only after iterating over group_write_ops.
                 $outputs.group_reads_needing_delayed_field_exchange($($txn_idx),*)
                     .into_iter()
-                    .map(|(key, metadata)|
-			 ((key, TransactionWrite::from_state_value(
-			     Some(StateValue::new_with_metadata(Bytes::new(), metadata)))), true))
+                    .map(|(key, metadata)| {
+                        ((key, TransactionWrite::from_state_value(Some(
+                            StateValue::new_with_metadata(Bytes::new(), metadata)
+                        ))), true)
+                    })
             }))
     }};
 }
@@ -128,7 +129,6 @@ pub(crate) fn serialize_groups<T: Transaction>(
         ResourceGroupSize,
     )>,
 ) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
-    #[cfg(test)]
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),

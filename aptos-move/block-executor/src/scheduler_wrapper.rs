@@ -8,17 +8,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Copy, Clone)]
 pub(crate) enum SchedulerWrapper<'a> {
+    // The AtomicBool contains a flag that determines whether to skip module reads
+    // when performing validation. BlockSTMv1 uses this as an optimization to
+    // avoid unnecessary work when no modules have been published. BlockSTMv2 has
+    // a different validation logic, and does not require this flag. The flag is
+    // stored in SchedulerWrapper only for a write (it's never read), to simplify
+    // the implementation in executor.rs and avoid passing atomic booleans.
     V1(&'a Scheduler, &'a AtomicBool),
     // TODO(BlockSTMv2): connect v2.
-    #[allow(dead_code)]
-    V2,
 }
 
 impl SchedulerWrapper<'_> {
-    pub(crate) fn is_v2(&self) -> bool {
-        matches!(self, SchedulerWrapper::V2)
-    }
-
     pub(crate) fn wake_dependencies_and_decrease_validation_idx(
         &self,
         txn_idx: TxnIndex,
@@ -27,14 +27,12 @@ impl SchedulerWrapper<'_> {
             SchedulerWrapper::V1(scheduler, _) => {
                 scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)
             },
-            SchedulerWrapper::V2 => unimplemented!("V2 scheduler not connected in wrapper"),
         }
     }
 
     pub(crate) fn halt(&self) -> bool {
         match self {
             SchedulerWrapper::V1(scheduler, _) => scheduler.halt(),
-            SchedulerWrapper::V2 => unimplemented!("V2 scheduler not connected in wrapper"),
         }
     }
 
@@ -44,7 +42,6 @@ impl SchedulerWrapper<'_> {
                 scheduler.add_to_commit_queue(txn_idx);
                 Ok(())
             },
-            SchedulerWrapper::V2 => unimplemented!("V2 scheduler not connected in wrapper"),
         }
     }
 
@@ -55,14 +52,12 @@ impl SchedulerWrapper<'_> {
                 // setting the module read validation flag.
                 skip_module_reads_validation.store(false, Ordering::Relaxed);
             },
-            SchedulerWrapper::V2 => unimplemented!("V2 scheduler not connected in wrapper"),
         }
     }
 
     pub(crate) fn has_halted(&self) -> bool {
         match self {
             SchedulerWrapper::V1(scheduler, _) => scheduler.has_halted(),
-            SchedulerWrapper::V2 => unimplemented!("V2 scheduler not connected in wrapper"),
         }
     }
 }
@@ -76,9 +71,6 @@ impl TWaitForDependency for SchedulerWrapper<'_> {
         match self {
             SchedulerWrapper::V1(scheduler, _) => {
                 scheduler.wait_for_dependency(txn_idx, dep_txn_idx)
-            },
-            SchedulerWrapper::V2 => {
-                unreachable!("SchedulerV2 handles waiting w.o. TWaitForDependency")
             },
         }
     }
