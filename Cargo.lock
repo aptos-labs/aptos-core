@@ -706,6 +706,7 @@ dependencies = [
  "ambassador",
  "anyhow",
  "aptos-aggregator",
+ "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-logger",
