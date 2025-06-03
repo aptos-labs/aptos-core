@@ -10,6 +10,9 @@ script {
             @0x1,
             {{ script_hash }},
         );
+        account_abstraction::initialize(
+            &framework_signer,
+        );
         account_abstraction::register_derivable_authentication_function(
             &framework_signer,
             @0x1,
