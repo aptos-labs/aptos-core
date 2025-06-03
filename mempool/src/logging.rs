@@ -129,6 +129,7 @@ pub struct LogSchema<'a> {
     message_id: Option<&'a MempoolMessageId>,
     backpressure: Option<bool>,
     num_txns: Option<usize>,
+    message: Option<&'a str>,
 }
 
 impl LogSchema<'_> {
@@ -156,6 +157,7 @@ impl LogSchema<'_> {
             message_id: None,
             backpressure: None,
             num_txns: None,
+            message: None,
         }
     }
 }
@@ -187,6 +189,7 @@ pub enum LogEntry {
     DBError,
     UnexpectedNetworkMsg,
     MempoolSnapshot,
+    TransactionFilter,
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -208,6 +211,9 @@ pub enum LogEvent {
     // garbage-collect txns events
     SystemTTLExpiration,
     ClientExpiration,
+
+    // Transaction filter events
+    TransactionRejected,
 
     Success,
 }
