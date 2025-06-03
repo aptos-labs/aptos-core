@@ -114,7 +114,7 @@ module aptos_experimental::market {
     struct MarketConfig has store {
         /// Weather to allow self matching orders
         allow_self_trade: bool,
-        /// Whether to halt events for this market
+        /// Whether to block the sending of all events for the market
         halt_events: bool
     }
 
@@ -357,6 +357,7 @@ module aptos_experimental::market {
         status: u8,
         details: &String
     ) {
+        //Final check whether event sending is enabled
         if (!self.config.halt_events) {
             event::emit(
                 OrderEvent {
