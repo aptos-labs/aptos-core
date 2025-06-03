@@ -8,6 +8,7 @@ module 0x8675309::M {
     }
     private fun t0(b: bool,u: u64,s: S,r: R): R {
         Borrow(Immutable)(b);
+        Borrow(Immutable)(b);
         Borrow(Mutable)(b);
         Borrow(Immutable)(u);
         Borrow(Mutable)(u);
@@ -49,6 +50,7 @@ module 0x8675309::M {
     struct S has drop {
     }
     fun t0(b: bool, u: u64, s: S, r: R): R {
+        &b;
         &b;
         &mut b;
         &u;

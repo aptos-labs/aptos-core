@@ -24,7 +24,6 @@ pub mod unreachable_code_analysis;
 pub mod unreachable_code_remover;
 pub mod unused_assignment_checker;
 pub mod variable_coalescing;
-pub mod visibility_checker;
 
 /// Function to register all annotation formatters in the pipeline. Those are used
 /// to visualize the result of an analysis as annotations on the bytecode, for

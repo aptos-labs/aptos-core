@@ -35,6 +35,7 @@ impl ArmedLock {
         }
     }
 
+    // try_lock succeeds when the lock is unlocked and armed (there is work to do).
     pub fn try_lock(&self) -> bool {
         self.locked
             .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)

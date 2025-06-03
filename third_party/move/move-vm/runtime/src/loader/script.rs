@@ -1,16 +1,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{intern_type, Function, FunctionHandle, FunctionInstantiation};
+use super::{
+    intern_type, single_signature_loader::load_single_signatures_for_script, Function,
+    FunctionHandle, FunctionInstantiation,
+};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
-    errors::{PartialVMError, PartialVMResult},
-    file_format::{
-        Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility,
-    },
+    errors::PartialVMResult,
+    file_format::{CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility},
 };
-use move_core_types::{ident_str, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{ident_str, language_storage::ModuleId};
 use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
     runtime_types::{StructIdentifier, Type},
@@ -87,7 +88,7 @@ impl Script {
             });
         }
 
-        let code: Vec<Bytecode> = script.code.code.clone();
+        let code = script.code.code.clone();
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters
@@ -130,40 +131,7 @@ impl Script {
             has_module_reentrancy_lock: false,
         });
 
-        let mut single_signature_token_map = BTreeMap::new();
-        for bc in &script.code.code {
-            match bc {
-                Bytecode::VecPack(si, _)
-                | Bytecode::VecLen(si)
-                | Bytecode::VecImmBorrow(si)
-                | Bytecode::VecMutBorrow(si)
-                | Bytecode::VecPushBack(si)
-                | Bytecode::VecPopBack(si)
-                | Bytecode::VecUnpack(si, _)
-                | Bytecode::VecSwap(si) => {
-                    if !single_signature_token_map.contains_key(si) {
-                        let ty = match script.signature_at(*si).0.first() {
-                            None => {
-                                return Err(PartialVMError::new(
-                                    StatusCode::VERIFIER_INVARIANT_VIOLATION,
-                                )
-                                .with_message(
-                                    "the type argument for vector-related bytecode \
-                                                expects one and only one signature token"
-                                        .to_owned(),
-                                ));
-                            },
-                            Some(sig_token) => sig_token,
-                        };
-                        single_signature_token_map.insert(
-                            *si,
-                            intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)?,
-                        );
-                    }
-                },
-                _ => {},
-            }
-        }
+        let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;
 
         Ok(Self {
             script,

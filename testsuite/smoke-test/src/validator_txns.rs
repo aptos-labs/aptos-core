@@ -13,6 +13,8 @@ use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
 /// Chain should not be blocked by failing validator txns.
+/// TODO: reimplement dummy vtxn and reenable this.
+#[ignore]
 #[tokio::test]
 async fn dummy_validator_txns() {
     let swarm = SwarmBuilder::new_local(4)

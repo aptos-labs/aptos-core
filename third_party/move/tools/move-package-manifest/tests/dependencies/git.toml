@@ -1,0 +1,9 @@
+[package]
+name = "some_package_name"
+version = "0.1.2"
+
+[dependencies]
+a = { git = "https://github.com/a/b" }
+b = { git = "https://github.com/a/b", subdir = "b" }
+c = { git = "https://github.com/a/b", rev = "main" }
+d = { git = "https://github.com/a/b", subdir = "b", rev = "main" }

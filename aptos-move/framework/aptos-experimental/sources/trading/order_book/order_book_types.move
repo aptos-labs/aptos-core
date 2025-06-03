@@ -18,7 +18,8 @@ module aptos_experimental::order_book_types {
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EINVALID_TRIGGER_CONDITION: u64 = 2;
-    const INVALID_MATCH_RESULT: u64 = 1;
+    const INVALID_MATCH_RESULT: u64 = 3;
+    const EINVALID_ORDER_SIZE_DECREASE: u64 = 4;
 
     const SLIPPAGE_PCT_PRECISION: u64 = 100; // 100 = 1%
 
@@ -50,7 +51,7 @@ module aptos_experimental::order_book_types {
         price: u64,
         orig_size: u64,
         remaining_size: u64,
-        is_buy: bool,
+        is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
         metadata: M
     }
@@ -129,7 +130,7 @@ module aptos_experimental::order_book_types {
             price,
             orig_size,
             remaining_size: size,
-            is_buy,
+            is_bid: is_buy,
             trigger_condition,
             metadata
         }
@@ -225,6 +226,13 @@ module aptos_experimental::order_book_types {
         self.order.remaining_size += size;
     }
 
+    public fun decrease_remaining_size<M: store + copy + drop>(
+        self: &mut OrderWithState<M>, size: u64
+    ) {
+        assert!(self.order.remaining_size > size, EINVALID_ORDER_SIZE_DECREASE);
+        self.order.remaining_size -= size;
+    }
+
     public fun set_remaining_size<M: store + copy + drop>(
         self: &mut OrderWithState<M>, remaining_size: u64
     ) {
@@ -270,7 +278,7 @@ module aptos_experimental::order_book_types {
             self.price,
             self.orig_size,
             self.remaining_size,
-            self.is_buy,
+            self.is_bid,
             self.trigger_condition,
             self.metadata
         )
@@ -294,5 +302,9 @@ module aptos_experimental::order_book_types {
 
     public fun get_price<M: store + copy + drop>(self: &Order<M>): u64 {
         self.price
+    }
+
+    public fun is_bid<M: store + copy + drop>(self: &Order<M>): bool {
+        self.is_bid
     }
 }
