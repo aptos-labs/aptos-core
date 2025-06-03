@@ -186,6 +186,7 @@ impl ProverOptions {
                 template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
                 module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
             });
+        options.backend.keep_artifacts = true;
         if benchmark {
             // Special mode of benchmarking
             run_prover_benchmark(package_path, &mut model, options)?;

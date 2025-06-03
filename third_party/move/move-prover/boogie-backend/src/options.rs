@@ -74,6 +74,11 @@ pub fn custom_native_options() -> Vec<(String, String, bool)> {
             "aggregator_v2_instances".to_string(),
             true,
         ),
+        (
+            "0x1::cmp".to_string(),
+            "cmp_instances".to_string(),
+            true,
+        ),
     ]
 }
 

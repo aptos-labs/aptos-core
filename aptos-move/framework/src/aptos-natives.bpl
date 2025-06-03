@@ -17,6 +17,198 @@ procedure {:inline 1} $1_object_exists_at{{S}}(object: int) returns (res: bool) 
 {%- endfor %}
 
 
+datatype $1_cmp_Ordering {
+    $1_cmp_Ordering_Less(),
+    $1_cmp_Ordering_Equal(),
+    $1_cmp_Ordering_Greater()
+}
+function $IsValid'$1_cmp_Ordering_Less'(s: $1_cmp_Ordering): bool {
+    true
+}
+function $IsValid'$1_cmp_Ordering_Equal'(s: $1_cmp_Ordering): bool {
+    true
+}
+function $IsValid'$1_cmp_Ordering_Greater'(s: $1_cmp_Ordering): bool {
+    true
+}
+function $IsValid'$1_cmp_Ordering'(s: $1_cmp_Ordering): bool {
+    true
+}
+function {:inline} $IsEqual'$1_cmp_Ordering'(s1: $1_cmp_Ordering, s2: $1_cmp_Ordering): bool {
+    s1 == s2
+}
+
+procedure {:inline} $1_cmp_is_eq($t0: $1_cmp_Ordering) returns ($ret0: bool)
+{
+    var $t1: bool;
+    if ($t0 is $1_cmp_Ordering_Equal) { $t1 := true; }
+    else { $t1 := false; }
+    $ret0 := $t1;
+    return;
+}
+
+function {:inline} $1_cmp_$is_eq($t0: $1_cmp_Ordering): bool
+{
+    $t0 is $1_cmp_Ordering_Equal
+}
+
+procedure {:inline} $1_cmp_is_gt($t0: $1_cmp_Ordering) returns ($ret0: bool)
+{
+    var $t1: bool;
+    if ($t0 is $1_cmp_Ordering_Greater) { $t1 := true; }
+    else { $t1 := false; }
+    $ret0 := $t1;
+    return;
+}
+
+function {:inline} $1_cmp_$is_gt($t0: $1_cmp_Ordering): bool
+{
+    $t0 is $1_cmp_Ordering_Greater
+}
+
+procedure {:inline} $1_cmp_is_lt($t0: $1_cmp_Ordering) returns ($ret0: bool)
+{
+    var $t1: bool;
+    if ($t0 is $1_cmp_Ordering_Less) { $t1 := true; }
+    else { $t1 := false; }
+    $ret0 := $t1;
+    return;
+}
+
+function {:inline} $1_cmp_$is_lt($t0: $1_cmp_Ordering): bool
+{
+    $t0 is $1_cmp_Ordering_Less
+}
+
+procedure {:inline} $1_cmp_is_ge($t0: $1_cmp_Ordering) returns ($ret0: bool)
+{
+    var $t1: bool;
+    if (!($t0 is $1_cmp_Ordering_Less)) { $t1 := true; }
+    else { $t1 := false; }
+    $ret0 := $t1;
+    return;
+}
+
+function {:inline} $1_cmp_$is_ge($t0: $1_cmp_Ordering): bool
+{
+    !($t0 is $1_cmp_Ordering_Less)
+}
+
+procedure {:inline} $1_cmp_is_le($t0: $1_cmp_Ordering) returns ($ret0: bool)
+{
+    var $t1: bool;
+    if (!($t0 is $1_cmp_Ordering_Greater)) { $t1 := true; }
+    else { $t1 := false; }
+    $ret0 := $t1;
+    return;
+}
+
+function {:inline} $1_cmp_$is_le($t0: $1_cmp_Ordering): bool
+{
+    !($t0 is $1_cmp_Ordering_Greater)
+}
+
+
+
+function {:inline} $1_cmp_$compare'bool'(s1: bool, s2: bool): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if s1 == true then $1_cmp_Ordering_Greater()
+    else 
+        $1_cmp_Ordering_Less()
+}
+
+procedure {:inline} $1_cmp_compare'bool'(s1: bool, s2: bool) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'bool'(s1, s2);
+    return;
+}
+
+
+function {:inline} $1_cmp_$compare'signer'(s1: $signer, s2: $signer): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if s1 is $signer && s2 is $permissioned_signer then $1_cmp_Ordering_Less()
+    else if s1 is $permissioned_signer && s2 is $signer then $1_cmp_Ordering_Greater()
+    else if s1 is $signer then
+        $compare_int(s1 -> $addr, s2 -> $addr)
+    else if s1 -> $addr == s2 -> $addr then
+        $compare_int(s1 -> $permission_addr, s2 -> $permission_addr)
+    else
+        $compare_int(s1 -> $addr, s2 -> $addr)
+}
+
+procedure {:inline} $1_cmp_compare'signer'(s1: $signer, s2: $signer) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'signer'(s1, s2);
+    return;
+}
+
+
+function $compare_int(s1: int, s2: int): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if s1 > s2 then $1_cmp_Ordering_Greater()
+    else $1_cmp_Ordering_Less()
+}
+
+{%- for instance in cmp_int_instances -%}
+{%- set S = instance.suffix  -%}
+{%- set T = instance.name -%}
+
+
+function {:inline} $1_cmp_$compare'{{S}}'(s1: {{T}}, s2: {{T}}): $1_cmp_Ordering {
+    $compare_int(s1, s2)
+}
+
+
+procedure {:inline} $1_cmp_compare'{{S}}'(s1: {{T}}, s2: {{T}}) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $compare_int(s1, s2);
+    return;
+}
+
+{%- endfor %}
+
+{%- for instance in cmp_instances %}
+{%- set S = instance.suffix  -%}
+{%- set T = instance.name -%}
+
+{% if T is starting_with("Vec ") %}
+    {% set concat_s = "/" ~ S ~"/" %}
+    {% set rest_s = concat_s | trim_start_matches(pat="/vec'") | trim_end_matches(pat="'/") %}
+
+
+    function {:inline} $1_cmp_$compare'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering {
+        if $IsEqual'{{S}}'(v1, v2) then $1_cmp_Ordering_Equal()
+        else if v1 -> l == 0 && v2 -> l != 0 then
+            $1_cmp_Ordering_Less()
+        else if v2 -> l == 0 && v1 -> l != 0 then
+            $1_cmp_Ordering_Greater()
+        else
+            $compare_vec'{{S}}'(v1, v2)
+    }
+
+    function $compare_vec'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering;
+    axiom {:ctor "Vec"} (forall v1: {{T}}, v2: {{T}}, res: $1_cmp_Ordering ::
+        (var res := $compare_vec'{{S}}'(v1, v2);
+        if v1 -> l == 0 && v2 -> l != 0 then
+            res == $1_cmp_Ordering_Less()
+        else if v2 -> l == 0 && v1 -> l != 0 then
+            res == $1_cmp_Ordering_Greater() 
+        else if ReadVec(v1, 0) == ReadVec(v2, 0) then res == $compare_vec'{{S}}'(RemoveAtVec(v1, 0), RemoveAtVec(v2, 0))
+        else res == $1_cmp_$compare'{{rest_s}}'(ReadVec(v1, 0), ReadVec(v2, 0))));
+    
+{% endif %}
+
+{% if T is starting_with("#") %}
+    function {:inline} $1_cmp_$compare'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering {
+        if $IsEqual'{{S}}'(v1, v2) then $1_cmp_Ordering_Equal()
+        else
+           $Arbitrary_value_of'$1_cmp_Ordering'()
+    }
+
+    procedure {:inline} $1_cmp_compare'{{S}}'(v1: {{T}}, v2: {{T}}) returns ($ret0: $1_cmp_Ordering) {
+        $ret0 := $1_cmp_$compare'{{S}}'(v1, v2);
+        return;
+    }
+{% endif %}
+
+{%- endfor %}
 
 
 {%- for instance in aggregator_v2_instances %}

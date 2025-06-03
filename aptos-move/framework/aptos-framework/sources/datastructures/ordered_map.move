@@ -81,6 +81,16 @@ module aptos_std::ordered_map {
         map
     }
 
+
+    public fun test_new_from() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        spec {
+            assert spec_prev_key(map, 1) == option::none();
+        };
+    }
+
     /// Number of elements in the map.
     public fun length<K, V>(self: &OrderedMap<K, V>): u64 {
         self.entries.length()
@@ -678,7 +688,7 @@ module aptos_std::ordered_map {
     // }
 
     spec module {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     // ================= Section for tests =====================

@@ -8,6 +8,33 @@ module std::cmp {
         Greater,
     }
 
+    spec Ordering {
+        pragma intrinsic;
+    }
+
+    spec is_eq {
+        pragma intrinsic;
+    }
+
+    spec is_ne {
+        pragma intrinsic;
+    }
+
+    spec is_lt {
+        pragma intrinsic;
+    }
+
+    spec is_le {
+        pragma intrinsic;
+    }
+
+    spec is_gt {
+        pragma intrinsic;
+    }
+
+    spec is_ge {
+        pragma intrinsic;
+    }
     /// Compares two values with the natural ordering:
     /// - native types are compared identically to `<` and other operators
     /// - complex types
@@ -42,8 +69,72 @@ module std::cmp {
 
     spec compare {
         // TODO: temporary mockup.
-        pragma opaque;
+        pragma intrinsic;
     }
+
+    fun test_compare_preliminary_types(): Ordering {
+        let a = 1;
+        let b = 5;
+        spec {
+            assert compare(a, b) == Ordering::Less;
+        };
+        let x = true;
+        let y = false;
+        spec {
+            assert compare(x, y) == Ordering::Greater;
+        };
+        let addr_1 = @0x1;
+        let addr_2 = @0x2;
+        spec {
+            assert compare(addr_1, addr_1) == Ordering::Equal;
+        };
+        compare(&x, &y);
+        compare(&a, &b)
+    }
+
+    // fun test_compare_signer(s: &signer) {
+
+    // }
+
+    // spec test_compare_signer {
+    //     ensures compare(s, s) == Ordering::Equal;
+    // }
+
+    fun test_compare_vec(v2: vector<u64>) {
+        let v1 = vector[1, 2, 3];
+        let v1_1 = vector[1, 2, 3];
+        let v2 = vector[1, 2];
+        let v3 = vector[1, 2, 4];
+        let v4 = vector[1, 2, 3, 4];
+        let v5 = vector[5];
+        let v6 = vector[vector[1, 2, 3]];
+        spec {
+            assert compare(v1, v1_1) == Ordering::Equal;
+            assert compare(v1, v3) == Ordering::Less;
+            assert compare(v1, v2) == Ordering::Greater;
+            assert compare(v3, v1) == Ordering::Greater;
+            assert compare(v4, v1) == Ordering::Greater;
+            assert compare(v1, v4) == Ordering::Less;
+            assert compare(v5, v1) == Ordering::Greater;
+            assert compare(v1, v5) == Ordering::Less;
+            assert compare(v6, v6) == Ordering::Equal;
+        };
+    }
+
+    // fun test_compare_preliminary_types(): Ordering {
+    //     let a = 1;
+    //     let b = 5;
+    //     spec {
+    //         assert compare(a, b) == Ordering::Less;
+    //     };
+    //     let x = true;
+    //     let y = false;
+    //     spec {
+    //         assert compare(x, y) == Ordering::Greater;
+    //     };
+    //     compare(&x, &y);
+    //     compare(&a, &b)
+    // }
 
     #[test_only]
     struct SomeStruct has drop {

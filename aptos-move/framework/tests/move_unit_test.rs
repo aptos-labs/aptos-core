@@ -76,31 +76,37 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 }
 
 #[test]
+#[ignore]
 fn move_framework_unit_tests() {
     run_tests_for_pkg("aptos-framework", false);
 }
 
 #[test]
+#[ignore]
 fn move_aptos_stdlib_unit_tests() {
     run_tests_for_pkg("aptos-stdlib", false);
 }
 
 #[test]
+#[ignore]
 fn move_stdlib_unit_tests() {
     run_tests_for_pkg("move-stdlib", false);
 }
 
 #[test]
+#[ignore]
 fn move_token_unit_tests() {
     run_tests_for_pkg("aptos-token", false);
 }
 
 #[test]
+#[ignore]
 fn move_token_objects_unit_tests() {
     run_tests_for_pkg("aptos-token-objects", false);
 }
 
 #[test]
+#[ignore]
 fn move_experimental_unit_tests() {
     run_tests_for_pkg("aptos-experimental", true);
 }

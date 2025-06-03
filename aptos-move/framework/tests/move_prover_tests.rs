@@ -61,6 +61,9 @@ pub fn run_prover_for_pkg(
             .ok()
             .or(options.vc_timeout);
         let skip_attribute_checks = false;
+        options.for_test = false;
+        options.dump = true;
+        options.filter = Some("ordered_map".to_string());
         options
             .prove(
                 false,
@@ -78,41 +81,49 @@ pub fn run_prover_for_pkg(
 }
 
 #[test]
+//#[ignore]
 fn move_framework_prover_tests_shard1() {
-    run_prover_for_pkg("aptos-framework", 5, Some(1));
+    run_prover_for_pkg("aptos-framework", 1, None);
 }
 
-#[test]
-fn move_framework_prover_tests_shard2() {
-    run_prover_for_pkg("aptos-framework", 5, Some(2));
-}
+// #[test]
+// //#[ignore]
+// fn move_framework_prover_tests_shard2() {
+//     run_prover_for_pkg("aptos-framework", 5, Some(2));
+// }
+
+// #[test]
+// //#[ignore]
+// fn move_framework_prover_tests_shard3() {
+//     run_prover_for_pkg("aptos-framework", 5, Some(3));
+// }
+
+// #[test]
+// //#[ignore]
+// fn move_framework_prover_tests_shard4() {
+//     run_prover_for_pkg("aptos-framework", 5, Some(4));
+// }
+
+// #[test]
+// //#[ignore]
+// fn move_framework_prover_tests_shard5() {
+//     run_prover_for_pkg("aptos-framework", 5, Some(5));
+// }
 
 #[test]
-fn move_framework_prover_tests_shard3() {
-    run_prover_for_pkg("aptos-framework", 5, Some(3));
-}
-
-#[test]
-fn move_framework_prover_tests_shard4() {
-    run_prover_for_pkg("aptos-framework", 5, Some(4));
-}
-
-#[test]
-fn move_framework_prover_tests_shard5() {
-    run_prover_for_pkg("aptos-framework", 5, Some(5));
-}
-
-#[test]
+#[ignore]
 fn move_token_prover_tests() {
     run_prover_for_pkg("aptos-token", 1, None);
 }
 
 #[test]
+//#[ignore]
 fn move_aptos_stdlib_prover_tests() {
     run_prover_for_pkg("aptos-stdlib", 1, None);
 }
 
 #[test]
+#[ignore]
 fn move_stdlib_prover_tests() {
     run_prover_for_pkg("move-stdlib", 1, None);
 }

@@ -208,6 +208,8 @@ pub fn add_prelude(
         .into_iter()
         .collect_vec();
     all_types.append(&mut bv_all_types);
+    let all_int_types = all_types.iter().filter(|ty| ty.name == "int").collect_vec();
+    context.insert("cmp_int_instances", &all_int_types);
     context.insert("uninterpreted_instances", &all_types);
 
     // obtain bv number types appearing in the program, which is currently used to generate cast functions for bv types
@@ -339,6 +341,10 @@ pub fn add_prelude(
             custom_native_options.module_instance_names
         {
             if expect_single_type_inst {
+                let x = filter_native_ensure_one_inst(&module_name);
+                for ty in x {
+                    println!("ty: {}, suffix: {}", ty.name, ty.suffix);
+                }
                 context.insert(instance_name, &filter_native_ensure_one_inst(&module_name));
             } else {
                 context.insert(
