@@ -81,6 +81,8 @@ impl AptosValidatorInterface for DBDebuggerInterface {
                 HashMap<(AccountAddress, String), PackageMetadata>,
             ),
         >,
+        _handled_function_vec: &mut Vec<(AccountAddress, String)>,
+        _sampling: u32,
     ) -> Result<
         Vec<(
             u64,
