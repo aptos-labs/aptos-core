@@ -159,7 +159,10 @@ fn vector_funs_name_propogate_to_srcs(callee_name: &str) -> bool {
 }
 
 fn table_funs_name_propogate_to_srcs(callee_name: &str) -> bool {
-    callee_name == "add" || callee_name == "borrow_mut_with_default" || callee_name == "upsert"
+    callee_name == "add"
+        || callee_name == "borrow_mut_with_default"
+        || callee_name == "borrow_with_default"
+        || callee_name == "upsert"
 }
 
 impl NumberOperationAnalysis<'_> {
@@ -227,7 +230,24 @@ impl NumberOperationAnalysis<'_> {
                     // Update num_oper for the node for the temporary variable
                     global_state.update_node_oper(*id, *oper, true);
                 },
-                ExpData::Block(id, _, _, exp) => {
+                ExpData::Block(id, pattern, opt_exp, exp) => {
+                    // Assume that the pattern is a single variable because spec does not support
+                    // tuple or function that returns a tuple for now
+                    if let move_model::ast::Pattern::Var(pid, _) = pattern {
+                        if let Some(exp) = opt_exp {
+                            let source_ty = self.func_target.global_env().get_node_type(*pid);
+                            if matches!(source_ty, Type::Primitive(PrimitiveType::Num)) {
+                                self.func_target.global_env().update_node_type(
+                                    *pid,
+                                    self.func_target
+                                        .global_env()
+                                        .get_node_type(exp.node_id())
+                                        .skip_reference()
+                                        .clone(),
+                                );
+                            }
+                        }
+                    }
                     let exp_oper = global_state.get_node_num_oper(exp.node_id());
                     global_state.update_node_oper(*id, exp_oper, true);
                 },
@@ -240,7 +260,10 @@ impl NumberOperationAnalysis<'_> {
                             CONFLICT_ERROR_MSG,
                         );
                     }
-                    global_state.update_node_oper(*id, true_oper.merge(&false_oper), true);
+                    let merged = true_oper.merge(&false_oper);
+                    global_state.update_node_oper(true_exp.node_id(), merged, true);
+                    global_state.update_node_oper(false_exp.node_id(), merged, true);
+                    global_state.update_node_oper(*id, merged, true);
                 },
                 ExpData::Call(id, oper, args) => {
                     let mut arg_oper = vec![];
@@ -1167,61 +1190,52 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 };
                             if !srcs.is_empty() {
                                 // First element
-                                let first_oper = global_state
+                                let first_oper = *global_state
                                     .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
                                     .unwrap();
                                 // Bitwise is specified explicitly in the fun or struct spec
-                                if vector_table_funs_name_propogate_to_dest(&callee_name) {
-                                    if *first_oper == Bitwise {
-                                        // Do not consider the method remove_return_key where the first return value is k
-                                        for dest in dests.iter() {
-                                            check_and_update_bitwise(
-                                                dest,
-                                                &mut global_state,
-                                                state,
-                                            );
-                                        }
+                                if vector_table_funs_name_propogate_to_dest(&callee_name)
+                                    && first_oper == Bitwise
+                                {
+                                    // Do not consider the method remove_return_key where the first return value is k
+                                    for dest in dests.iter() {
+                                        check_and_update_bitwise(dest, &mut global_state, state);
                                     }
-                                } else {
-                                    let mut second_oper = first_oper;
-                                    let mut src_idx = 0;
-                                    if module_env.is_std_vector()
-                                        && vector_funs_name_propogate_to_srcs(&callee_name)
-                                    {
-                                        assert!(srcs.len() > 1);
-                                        second_oper = global_state
-                                            .get_temp_index_oper(
-                                                cur_mid,
-                                                cur_fid,
-                                                srcs[1],
-                                                baseline_flag,
-                                            )
-                                            .unwrap();
-                                        src_idx = 1;
-                                    } else if table_funs_name_propogate_to_srcs(&callee_name) {
-                                        assert!(srcs.len() > 2);
-                                        second_oper = global_state
-                                            .get_temp_index_oper(
-                                                cur_mid,
-                                                cur_fid,
-                                                srcs[2],
-                                                baseline_flag,
-                                            )
-                                            .unwrap();
-                                        src_idx = 2;
-                                    }
-                                    if *first_oper == Bitwise || *second_oper == Bitwise {
-                                        check_and_update_bitwise(
-                                            &srcs[0],
-                                            &mut global_state,
-                                            state,
-                                        );
-                                        check_and_update_bitwise(
-                                            &srcs[src_idx],
-                                            &mut global_state,
-                                            state,
-                                        );
-                                    }
+                                }
+                                let mut second_oper = first_oper;
+                                let mut src_idx = 0;
+                                if module_env.is_std_vector()
+                                    && vector_funs_name_propogate_to_srcs(&callee_name)
+                                {
+                                    assert!(srcs.len() > 1);
+                                    second_oper = *global_state
+                                        .get_temp_index_oper(
+                                            cur_mid,
+                                            cur_fid,
+                                            srcs[1],
+                                            baseline_flag,
+                                        )
+                                        .unwrap();
+                                    src_idx = 1;
+                                } else if table_funs_name_propogate_to_srcs(&callee_name) {
+                                    assert!(srcs.len() > 2);
+                                    second_oper = *global_state
+                                        .get_temp_index_oper(
+                                            cur_mid,
+                                            cur_fid,
+                                            srcs[2],
+                                            baseline_flag,
+                                        )
+                                        .unwrap();
+                                    src_idx = 2;
+                                }
+                                if first_oper == Bitwise || second_oper == Bitwise {
+                                    check_and_update_bitwise(&srcs[0], &mut global_state, state);
+                                    check_and_update_bitwise(
+                                        &srcs[src_idx],
+                                        &mut global_state,
+                                        state,
+                                    );
                                 }
                             } // empty, do nothing
                         }

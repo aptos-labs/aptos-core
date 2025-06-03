@@ -3,8 +3,13 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [7.4.0]
+- UTF-8 characters are now allowed in Move source code comments (and thus error codes).
+- Additional compiler warnings on inline functions based on their visibility.
+- Various compiler bug fixes.
 - Add flag `--file-path <FILE_PATH>...` to `aptos move fmt`, which allows to specify individual files to format.
-- Fixed bug where `aptos move fmt` would format current directory if invalid `--package-path` was provided
+- Fixed bug where `aptos move fmt` would format current directory if invalid `--package-path` was provided.
 
 ## [7.3.0]
 

@@ -1,1 +1,22 @@
-processed 3 tasks
+processed 2 tasks
+
+task 0 'publish'. lines 1-11:
+Error: compilation errors:
+ error: cannot pass `&mut || has copy + drop` to a function which expects argument of type `&mut || has drop`
+  ┌─ TEMPFILE:8:11
+  │
+8 │         f(&mut x);
+  │           ^^^^^^
+
+
+
+task 1 'run'. lines 13-13:
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::Test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
