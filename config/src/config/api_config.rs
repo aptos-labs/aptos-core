@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::transaction_filter_type::{Filter, Matcher};
 use crate::{
     config::{
         config_sanitizer::ConfigSanitizer, gas_estimation_config::GasEstimationConfig,
@@ -10,6 +9,7 @@ use crate::{
     },
     utils,
 };
+use aptos_transactions_filter::transaction_matcher::{Filter, Matcher};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;

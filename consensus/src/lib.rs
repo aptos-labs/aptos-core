@@ -61,7 +61,6 @@ mod execution_pipeline;
 pub mod network_interface;
 mod payload_manager;
 mod transaction_deduper;
-mod transaction_filter;
 mod transaction_shuffler;
 #[cfg(feature = "fuzzing")]
 pub use transaction_shuffler::transaction_shuffler_fuzzing;
