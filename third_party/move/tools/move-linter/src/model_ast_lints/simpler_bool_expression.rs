@@ -36,12 +36,12 @@ fn get_text_from_expr(env: &GlobalEnv, exp_data: &ExpData) -> Option<String> {
     None
 }
 
-struct SimplifiablePattern {
+struct SimplerBoolPattern {
     original_expr: String,
     simplified_expr: String,
 }
 
-impl SimplifiablePattern {
+impl SimplerBoolPattern {
     fn new(env: &GlobalEnv, original: &ExpData, simplified: &ExpData) -> Self {
         Self {
             original_expr: get_text_from_expr(env, original).unwrap_or_default(),
@@ -65,15 +65,23 @@ impl SimplifiablePattern {
 }
 
 #[derive(Default)]
-pub struct SimplifiableBooleanExpression;
+pub struct SimplerBoolExpression;
 
-impl SimplifiableBooleanExpression {
+impl SimplerBoolExpression {
     /// Check if two expressions are structurally equal
     fn is_expression_equal(&self, expr1: &ExpData, expr2: &ExpData) -> bool {
         match (expr1, expr2) {
             (ExpData::LocalVar(_, s1), ExpData::LocalVar(_, s2)) => s1 == s2,
             (ExpData::Value(_, v1), ExpData::Value(_, v2)) => v1 == v2,
             (ExpData::Temporary(_, t1), ExpData::Temporary(_, t2)) => t1 == t2,
+            (ExpData::Call(_, op1, args1), ExpData::Call(_, op2, args2)) => {
+                op1 == op2
+                    && args1.len() == args2.len()
+                    && args1
+                        .iter()
+                        .zip(args2.iter())
+                        .all(|(a1, a2)| self.is_expression_equal(a1, a2))
+            },
             _ => false,
         }
     }
@@ -85,7 +93,7 @@ impl SimplifiableBooleanExpression {
         expr: &ExpData,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplifiablePattern> {
+    ) -> Option<SimplerBoolPattern> {
         let check_pattern = |left: &ExpData, right: &ExpData| {
             if let ExpData::Call(_, And, and_args) = left {
                 if and_args.len() == 2 {
@@ -98,10 +106,10 @@ impl SimplifiableBooleanExpression {
 
         if check_pattern(left, right) {
             // Pattern 1: (a && b) || a  →  a
-            Some(SimplifiablePattern::new(env, expr, right))
+            Some(SimplerBoolPattern::new(env, expr, right))
         } else if check_pattern(right, left) {
             // Pattern 2: a || (a && b)  →  a
-            Some(SimplifiablePattern::new(env, expr, left))
+            Some(SimplerBoolPattern::new(env, expr, left))
         } else {
             None
         }
@@ -114,9 +122,9 @@ impl SimplifiableBooleanExpression {
         expr: &ExpData,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplifiablePattern> {
+    ) -> Option<SimplerBoolPattern> {
         if self.is_expression_equal(left, right) {
-            return Some(SimplifiablePattern::new(env, expr, left));
+            return Some(SimplerBoolPattern::new(env, expr, left));
         }
         None
     }
@@ -129,7 +137,7 @@ impl SimplifiableBooleanExpression {
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplifiablePattern> {
+    ) -> Option<SimplerBoolPattern> {
         let is_negation_pair = |expr1: &ExpData, expr2: &ExpData| -> bool {
             matches!(expr2, ExpData::Call(_, Not, not_args)
                 if not_args.len() == 1 && self.is_expression_equal(expr1, not_args[0].as_ref()))
@@ -138,7 +146,7 @@ impl SimplifiableBooleanExpression {
         if is_negation_pair(left, right) || is_negation_pair(right, left) {
             let result_value = matches!(op, Or);
             let result_expr = ExpData::Value(env.new_node_id(), Value::Bool(result_value));
-            Some(SimplifiablePattern::new(env, expr, &result_expr))
+            Some(SimplerBoolPattern::new(env, expr, &result_expr))
         } else {
             None
         }
@@ -152,12 +160,12 @@ impl SimplifiableBooleanExpression {
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplifiablePattern> {
+    ) -> Option<SimplerBoolPattern> {
         let try_distribute = |outer_op: Operation,
                               inner_op: Operation,
                               left_args: &[Exp],
                               right_args: &[Exp]|
-         -> Option<SimplifiablePattern> {
+         -> Option<SimplerBoolPattern> {
             if left_args.len() != 2 || right_args.len() != 2 {
                 return None;
             }
@@ -189,7 +197,7 @@ impl SimplifiableBooleanExpression {
                                 common_text, outer_op_str, left_text, inner_op_str, right_text
                             );
 
-                            return Some(SimplifiablePattern::new_with_text(
+                            return Some(SimplerBoolPattern::new_with_text(
                                 env,
                                 expr,
                                 simplified_text,
@@ -213,9 +221,9 @@ impl SimplifiableBooleanExpression {
     }
 }
 
-impl ExpChecker for SimplifiableBooleanExpression {
+impl ExpChecker for SimplerBoolExpression {
     fn get_name(&self) -> String {
-        "simplifiable_boolean_expression".to_string()
+        "simpler_bool_expression".to_string()
     }
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
