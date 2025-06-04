@@ -14,21 +14,14 @@ B0:
 	1: Pack[0](S)
 	2: StLoc[0](s: S)
 	3: LdTrue
-	4: MutBorrowLoc[0](s: S)
+	4: ImmBorrowLoc[0](s: S)
 	5: ImmBorrowField[0](S.x: bool)
-	6: StLoc[1]($t5: bool)
-	7: MutBorrowLoc[1]($t5: bool)
-	8: WriteRef
-	9: MoveLoc[0](s: S)
-	10: Ret
+	6: ReadRef
+	7: StLoc[1]($t5: bool)
+	8: MutBorrowLoc[1]($t5: bool)
+	9: WriteRef
+	10: MoveLoc[0](s: S)
+	11: Ret
 }
 }
-============ bytecode verification failed ========
-
-Diagnostics:
-bug: bytecode verification failed with unexpected status code `STLOC_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
-Error message: none
-  ┌─ tests/file-format-generator/bug_14817.move:7:16
-  │
-7 │         *&mut {s.x} = true;
-  │                ^^^
+============ bytecode verification succeeded ========
