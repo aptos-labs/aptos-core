@@ -18,49 +18,29 @@
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Value},
+    ast::{Exp, ExpData, Operation},
     model::GlobalEnv,
 };
 use ExpData::Call;
 use Operation::{And, Not, Or};
 
-fn get_text_from_expr(env: &GlobalEnv, exp_data: &ExpData) -> Option<String> {
-    let loc = env.get_node_loc(exp_data.node_id());
-    let file_id = loc.file_id();
-    let source = env.get_file_source(file_id);
-    let start = loc.span().start().to_usize();
-    let end = loc.span().end().to_usize();
-    if start <= end && end <= source.len() {
-        return Some(source[start..end].to_string());
-    }
-    None
+enum SimplerBoolPatternType {
+    AbsorptionLaw,
+    Idempotence,
+    Contradiction,
+    Tautology,
+    DistributiveLaw,
 }
 
-struct SimplerBoolPattern {
-    original_expr: String,
-    simplified_expr: String,
-}
-
-impl SimplerBoolPattern {
-    fn new(env: &GlobalEnv, original: &ExpData, simplified: &ExpData) -> Self {
-        Self {
-            original_expr: get_text_from_expr(env, original).unwrap_or_default(),
-            simplified_expr: get_text_from_expr(env, simplified).unwrap_or_default(),
+impl SimplerBoolPatternType {
+    fn to_message(&self) -> &str {
+        match self {
+            SimplerBoolPatternType::AbsorptionLaw => "This boolean expression can be simplified using absorption law. The expression `a && b || a` is equivalent to just `a`.",
+            SimplerBoolPatternType::Idempotence => "This boolean expression can be simplified using idempotence. The expression `a && a` is equivalent to just `a`.",
+            SimplerBoolPatternType::Contradiction => "This boolean expression can be simplified using contradiction. The expression `a && !a` is equivalent to just `false`.",
+            SimplerBoolPatternType::Tautology => "This boolean expression can be simplified using tautology. The expression `a || !a` is equivalent to just `true`.",
+            SimplerBoolPatternType::DistributiveLaw => "This boolean expression can be simplified using distributive law. The expression `(a && b) || (a && c)` is equivalent to `a && (b || c)`.",
         }
-    }
-
-    fn new_with_text(env: &GlobalEnv, original: &ExpData, simplified_text: String) -> Self {
-        Self {
-            original_expr: get_text_from_expr(env, original).unwrap_or_default(),
-            simplified_expr: simplified_text,
-        }
-    }
-
-    fn to_message(&self) -> String {
-        format!(
-            "This boolean expression can be simplified. The expression `{}` is equivalent to just `{}`. Consider replacing with the simpler form.",
-            self.original_expr, self.simplified_expr
-        )
     }
 }
 
@@ -89,11 +69,9 @@ impl SimplerBoolExpression {
     /// Check for absorption law patterns: `a && b || a` or `a || a && b`
     fn check_absorption_law(
         &self,
-        env: &GlobalEnv,
-        expr: &ExpData,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplerBoolPattern> {
+    ) -> Option<SimplerBoolPatternType> {
         let check_pattern = |left: &ExpData, right: &ExpData| {
             if let ExpData::Call(_, And, and_args) = left {
                 if and_args.len() == 2 {
@@ -106,25 +84,19 @@ impl SimplerBoolExpression {
 
         if check_pattern(left, right) {
             // Pattern 1: (a && b) || a  →  a
-            Some(SimplerBoolPattern::new(env, expr, right))
+            Some(SimplerBoolPatternType::AbsorptionLaw)
         } else if check_pattern(right, left) {
             // Pattern 2: a || (a && b)  →  a
-            Some(SimplerBoolPattern::new(env, expr, left))
+            Some(SimplerBoolPatternType::AbsorptionLaw)
         } else {
             None
         }
     }
 
     /// Check for idempotence patterns: `a && a` or `a || a`
-    fn check_idempotence(
-        &self,
-        env: &GlobalEnv,
-        expr: &ExpData,
-        left: &ExpData,
-        right: &ExpData,
-    ) -> Option<SimplerBoolPattern> {
+    fn check_idempotence(&self, left: &ExpData, right: &ExpData) -> Option<SimplerBoolPatternType> {
         if self.is_expression_equal(left, right) {
-            return Some(SimplerBoolPattern::new(env, expr, left));
+            return Some(SimplerBoolPatternType::Idempotence);
         }
         None
     }
@@ -132,12 +104,10 @@ impl SimplerBoolExpression {
     /// Check for contradiction and tautology patterns: `a && !a` or `a || !a`
     fn check_contradiction_tautology(
         &self,
-        env: &GlobalEnv,
-        expr: &ExpData,
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplerBoolPattern> {
+    ) -> Option<SimplerBoolPatternType> {
         let is_negation_pair = |expr1: &ExpData, expr2: &ExpData| -> bool {
             matches!(expr2, ExpData::Call(_, Not, not_args)
                 if not_args.len() == 1 && self.is_expression_equal(expr1, not_args[0].as_ref()))
@@ -145,8 +115,11 @@ impl SimplerBoolExpression {
 
         if is_negation_pair(left, right) || is_negation_pair(right, left) {
             let result_value = matches!(op, Or);
-            let result_expr = ExpData::Value(env.new_node_id(), Value::Bool(result_value));
-            Some(SimplerBoolPattern::new(env, expr, &result_expr))
+            Some(if result_value {
+                SimplerBoolPatternType::Tautology
+            } else {
+                SimplerBoolPatternType::Contradiction
+            })
         } else {
             None
         }
@@ -155,66 +128,30 @@ impl SimplerBoolExpression {
     /// Check for distributive law patterns: `(a && b) || (a && c)` or `(a || b) && (a || c)`
     fn check_distributive_law(
         &self,
-        env: &GlobalEnv,
-        expr: &ExpData,
         op: &Operation,
         left: &ExpData,
         right: &ExpData,
-    ) -> Option<SimplerBoolPattern> {
-        let try_distribute = |outer_op: Operation,
-                              inner_op: Operation,
-                              left_args: &[Exp],
-                              right_args: &[Exp]|
-         -> Option<SimplerBoolPattern> {
-            if left_args.len() != 2 || right_args.len() != 2 {
-                return None;
-            }
+    ) -> Option<SimplerBoolPatternType> {
+        let try_distribute =
+            |left_args: &[Exp], right_args: &[Exp]| -> Option<SimplerBoolPatternType> {
+                if left_args.len() != 2 || right_args.len() != 2 {
+                    return None;
+                }
 
-            for (i, left_elem) in left_args.iter().enumerate() {
-                for (j, right_elem) in right_args.iter().enumerate() {
-                    if self.is_expression_equal(left_elem.as_ref(), right_elem.as_ref()) {
-                        let other_left = &left_args[1 - i];
-                        let other_right = &right_args[1 - j];
-
-                        if let (Some(common_text), Some(left_text), Some(right_text)) = (
-                            get_text_from_expr(env, left_elem.as_ref()),
-                            get_text_from_expr(env, other_left.as_ref()),
-                            get_text_from_expr(env, other_right.as_ref()),
-                        ) {
-                            let inner_op_str = match inner_op {
-                                And => " && ",
-                                Or => " || ",
-                                _ => return None,
-                            };
-                            let outer_op_str = match outer_op {
-                                And => " && ",
-                                Or => " || ",
-                                _ => return None,
-                            };
-
-                            let simplified_text = format!(
-                                "{}{}({}{}{})",
-                                common_text, outer_op_str, left_text, inner_op_str, right_text
-                            );
-
-                            return Some(SimplerBoolPattern::new_with_text(
-                                env,
-                                expr,
-                                simplified_text,
-                            ));
+                for left_elem in left_args.iter() {
+                    for right_elem in right_args.iter() {
+                        if self.is_expression_equal(left_elem.as_ref(), right_elem.as_ref()) {
+                            return Some(SimplerBoolPatternType::DistributiveLaw);
                         }
                     }
                 }
-            }
-            None
-        };
+                None
+            };
 
         match (op, left, right) {
-            (Or, ExpData::Call(_, And, left_args), ExpData::Call(_, And, right_args)) => {
-                try_distribute(And, Or, left_args, right_args)
-            },
-            (And, ExpData::Call(_, Or, left_args), ExpData::Call(_, Or, right_args)) => {
-                try_distribute(Or, And, left_args, right_args)
+            (Or, ExpData::Call(_, And, left_args), ExpData::Call(_, And, right_args))
+            | (And, ExpData::Call(_, Or, left_args), ExpData::Call(_, Or, right_args)) => {
+                try_distribute(left_args, right_args)
             },
             _ => None,
         }
@@ -235,21 +172,21 @@ impl ExpChecker for SimplerBoolExpression {
 
                 // For Or operations, try absorption law first
                 let absorption = if matches!(op, Or) {
-                    self.check_absorption_law(env, expr, left, right)
+                    self.check_absorption_law(left, right)
                 } else {
                     None
                 };
 
                 absorption
-                    .or_else(|| self.check_idempotence(env, expr, left, right))
-                    .or_else(|| self.check_contradiction_tautology(env, expr, op, left, right))
-                    .or_else(|| self.check_distributive_law(env, expr, op, left, right))
+                    .or_else(|| self.check_idempotence(left, right))
+                    .or_else(|| self.check_contradiction_tautology(op, left, right))
+                    .or_else(|| self.check_distributive_law(op, left, right))
             },
             _ => None,
         };
 
         if let Some(pattern) = pattern {
-            self.report(env, &env.get_node_loc(*id), &pattern.to_message());
+            self.report(env, &env.get_node_loc(*id), pattern.to_message());
         }
     }
 }
