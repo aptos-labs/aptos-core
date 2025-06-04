@@ -46,7 +46,7 @@ pub struct VersionedGroupData<K, T, V> {
     // such as get, where only & of the key is needed.
     values: VersionedData<(K, T), V>,
     // TODO: Once AggregatorV1 is deprecated (no V: TransactionWrite trait bound),
-    // switch to VersionedVersionedData<K, ResourceGroupSize>.
+    // switch to VersionedData<K, ResourceGroupSize>.
     // If an entry exists for a group key in Dashmap, the group is considered initialized.
     group_sizes: DashMap<K, VersionedGroupSize>,
 
@@ -65,7 +65,7 @@ pub struct VersionedGroupData<K, T, V> {
 impl<
         K: Hash + Clone + Debug + Eq,
         T: Hash + Clone + Debug + Eq + Serialize,
-        V: TransactionWrite,
+        V: TransactionWrite + PartialEq,
     > VersionedGroupData<K, T, V>
 {
     pub(crate) fn empty() -> Self {
