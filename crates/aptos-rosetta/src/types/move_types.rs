@@ -33,6 +33,7 @@ pub const STAKING_GROUP_UPDATE_COMMISSION_RESOURCE: &str = "StakingGroupUpdateCo
 pub const VESTING_RESOURCE: &str = "Vesting";
 pub const DELEGATION_POOL_RESOURCE: &str = "DelegationPool";
 pub const WITHDRAW_STAKE_EVENT: &str = "WithdrawStakeEvent";
+pub const WITHDRAW_STAKE: &str = "WithdrawStake";
 pub const OBJECT_CORE_RESOURCE: &str = "ObjectCore";
 
 pub const OBJECT_RESOURCE_GROUP: &str = "ObjectGroup";
