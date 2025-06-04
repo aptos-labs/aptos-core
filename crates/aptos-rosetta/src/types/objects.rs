@@ -2048,14 +2048,35 @@ fn parse_coinstore_changes(
         address,
         &coin_type,
     ));
+
+    // Check if this is a staking reward event
+    let is_staking_reward = events.iter().any(|event| {
+        let event_type = event.type_tag().to_string();
+        if version > 2812906220 {
+            event_type == "0x1::stake::DistributeRewards"
+        } else {
+            event_type == "0x1::stake::DistributeRewardsEvent"
+        }
+    });
+
     for amount in deposit_amounts {
-        operations.push(Operation::deposit(
-            operation_index,
-            Some(OperationStatusType::Success),
-            AccountIdentifier::base_account(address),
-            currency.clone(),
-            amount,
-        ));
+        if is_staking_reward {
+            operations.push(Operation::staking_reward(
+                operation_index,
+                Some(OperationStatusType::Success),
+                AccountIdentifier::base_account(address),
+                currency.clone(),
+                amount,
+            ));
+        } else {
+            operations.push(Operation::deposit(
+                operation_index,
+                Some(OperationStatusType::Success),
+                AccountIdentifier::base_account(address),
+                currency.clone(),
+                amount,
+            ));
+        }
         operation_index += 1;
     }
 
