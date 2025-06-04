@@ -1,0 +1,12 @@
+[package]
+name = "voting"
+version = "0.0.0"
+
+[addresses]
+voting = "_"
+
+[dev-addresses]
+voting = "0x123"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
