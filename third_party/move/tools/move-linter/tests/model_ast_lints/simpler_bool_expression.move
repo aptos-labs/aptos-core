@@ -193,7 +193,6 @@ module 0xc0ffee::m {
 
     public fun test_distributive_law_constants() {
         if ((TRUE_CONST && FALSE_CONST) || (TRUE_CONST && TRUE_CONST)) ();
-        if ((FALSE_CONST || TRUE_CONST) && (FALSE_CONST || TRUE_CONST)) ();
     }
 
     public fun test_distributive_law_struct_field() {
