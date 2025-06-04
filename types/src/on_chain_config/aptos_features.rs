@@ -140,6 +140,9 @@ pub enum FeatureFlag {
     ORDERLESS_TRANSACTIONS = 94,
     // TODO(lazy-loading): Add link to AIP and its number + brief description.
     ENABLE_LAZY_LOADING = 95,
+
+    CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
+    DISTRIBUTE_TRANSACTION_FEE = 97,
 }
 
 impl FeatureFlag {
@@ -236,6 +239,9 @@ impl FeatureFlag {
             FeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
             FeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::ORDERLESS_TRANSACTIONS,
+            // TODO(grao): Enable priority fee feature flags.
+            // FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
+            // FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
         ]
     }
 }
@@ -410,6 +416,14 @@ impl Features {
 
     pub fn is_orderless_txns_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ORDERLESS_TRANSACTIONS)
+    }
+
+    pub fn is_calculate_transaction_fee_for_distribution_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION)
+    }
+
+    pub fn is_distribute_transaction_fee_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DISTRIBUTE_TRANSACTION_FEE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

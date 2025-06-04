@@ -3602,6 +3602,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_table(&self) -> bool {
         self.is_module_in_std("table")
             || self.is_module_in_std("table_with_length")
+            || self.is_module_in_std("smart_table")
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
     }
