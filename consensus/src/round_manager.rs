@@ -1084,7 +1084,7 @@ impl RoundManager {
                 BlockType::ProposalExt(_)
             ) || matches!(
                 proposal.block_data().block_type(),
-                BlockType::OptProposal(_)
+                BlockType::OptimisticProposal(_)
             ))
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();

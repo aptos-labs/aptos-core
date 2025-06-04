@@ -349,7 +349,7 @@ impl Block {
                 validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
-            BlockType::OptProposal(p) => {
+            BlockType::OptimisticProposal(p) => {
                 // Note: Optimistic proposal is not signed by proposer unlike normal proposal
                 p.grandparent_qc().verify(validator)?;
                 self.quorum_cert().verify(validator)
@@ -465,7 +465,7 @@ impl Block {
     fn previous_bitvec(&self) -> BitVec {
         match self.block_data.block_type() {
             BlockType::DAGBlock { parents_bitvec, .. } => parents_bitvec.clone(),
-            BlockType::OptProposal(p) => {
+            BlockType::OptimisticProposal(p) => {
                 p.grandparent_qc().ledger_info().get_voters_bitvec().clone()
             },
             _ => self.quorum_cert().ledger_info().get_voters_bitvec().clone(),

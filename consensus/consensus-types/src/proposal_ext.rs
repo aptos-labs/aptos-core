@@ -9,7 +9,7 @@ use aptos_types::validator_txn::ValidatorTransaction;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub enum OptProposalBody {
+pub enum OptBlockBody {
     V0 {
         validator_txns: Vec<ValidatorTransaction>,
         // T of the block (e.g. one or more transaction(s)
@@ -21,28 +21,28 @@ pub enum OptProposalBody {
     },
 }
 
-impl OptProposalBody {
+impl OptBlockBody {
     pub fn author(&self) -> &Author {
         match self {
-            OptProposalBody::V0 { author, .. } => author,
+            OptBlockBody::V0 { author, .. } => author,
         }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match self {
-            OptProposalBody::V0 { validator_txns, .. } => Some(validator_txns),
+            OptBlockBody::V0 { validator_txns, .. } => Some(validator_txns),
         }
     }
 
     pub fn payload(&self) -> &Payload {
         match self {
-            OptProposalBody::V0 { payload, .. } => payload,
+            OptBlockBody::V0 { payload, .. } => payload,
         }
     }
 
     pub fn grandparent_qc(&self) -> &QuorumCert {
         match self {
-            OptProposalBody::V0 { grandparent_qc, .. } => &grandparent_qc,
+            OptBlockBody::V0 { grandparent_qc, .. } => &grandparent_qc,
         }
     }
 }
