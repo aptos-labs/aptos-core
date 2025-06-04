@@ -1079,16 +1079,13 @@ impl RoundManager {
             .expect("Proposal should be verified having an author");
 
         if !self.vtxn_config.enabled()
-            && (matches!(
+            && matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)
-            ) || matches!(
-                proposal.block_data().block_type(),
-                BlockType::OptProposal(_)
-            ))
+            )
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
-            bail!("validator txns unexpected while the feature is disabled.");
+            bail!("ProposalExt unexpected while the vtxn feature is disabled.");
         }
 
         if let Some(vtxns) = proposal.validator_txns() {

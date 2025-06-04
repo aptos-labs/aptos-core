@@ -5,7 +5,7 @@
 use crate::{
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
-    proposal_ext::{OptProposalBody, ProposalExt},
+    proposal_ext::{OptBlockBody, ProposalExt},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -55,7 +55,7 @@ pub enum BlockType {
     ProposalExt(ProposalExt),
 
     /// Optimistic proposal.
-    OptProposal(OptProposalBody),
+    OptimisticProposal(OptBlockBody),
 
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
@@ -142,7 +142,7 @@ impl BlockData {
                 Some(*author)
             },
             BlockType::ProposalExt(p) => Some(*p.author()),
-            BlockType::OptProposal(p) => Some(*p.author()),
+            BlockType::OptimisticProposal(p) => Some(*p.author()),
             _ => None,
         }
     }
@@ -172,7 +172,7 @@ impl BlockData {
                 Some(payload)
             },
             BlockType::ProposalExt(p) => p.payload(),
-            BlockType::OptProposal(p) => Some(p.payload()),
+            BlockType::OptimisticProposal(p) => Some(p.payload()),
             _ => None,
         }
     }
@@ -180,7 +180,7 @@ impl BlockData {
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match &self.block_type {
             BlockType::ProposalExt(p) => p.validator_txns(),
-            BlockType::OptProposal(p) => p.validator_txns(),
+            BlockType::OptimisticProposal(p) => p.validator_txns(),
             BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
             BlockType::DAGBlock { validator_txns, .. } => Some(validator_txns),
         }
@@ -219,7 +219,7 @@ impl BlockData {
     }
 
     pub fn is_opt_block(&self) -> bool {
-        matches!(self.block_type, BlockType::OptProposal { .. })
+        matches!(self.block_type, BlockType::OptimisticProposal { .. })
     }
 
     /// the list of consecutive proposers from the immediately preceeding
@@ -230,7 +230,7 @@ impl BlockData {
             | BlockType::NilBlock { failed_authors, .. }
             | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
             BlockType::ProposalExt(p) => Some(p.failed_authors()),
-            BlockType::OptProposal(_) | BlockType::Genesis => None,
+            BlockType::OptimisticProposal(_) | BlockType::Genesis => None,
         }
     }
 
@@ -408,7 +408,7 @@ impl BlockData {
             epoch,
             round,
             timestamp_usecs,
-            proposal_body,
+            block_body: proposal_body,
             ..
         } = opt_block_data;
         Self {
@@ -416,7 +416,7 @@ impl BlockData {
             round,
             timestamp_usecs,
             quorum_cert,
-            block_type: BlockType::OptProposal(proposal_body),
+            block_type: BlockType::OptimisticProposal(proposal_body),
         }
     }
 

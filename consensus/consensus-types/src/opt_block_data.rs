@@ -4,7 +4,7 @@
 
 use crate::{
     common::{Author, Payload, Round},
-    proposal_ext::OptProposalBody,
+    proposal_ext::OptBlockBody,
     quorum_cert::QuorumCert,
 };
 use anyhow::{ensure, Result};
@@ -26,7 +26,7 @@ pub struct OptBlockData {
     pub round: Round,
     pub timestamp_usecs: u64,
     pub parent: BlockInfo,
-    pub proposal_body: OptProposalBody,
+    pub block_body: OptBlockBody,
 }
 
 impl OptBlockData {
@@ -45,7 +45,7 @@ impl OptBlockData {
             round,
             timestamp_usecs,
             parent,
-            proposal_body: OptProposalBody::V0 {
+            block_body: OptBlockBody::V0 {
                 validator_txns,
                 payload,
                 author,
@@ -119,10 +119,10 @@ impl OptBlockData {
 }
 
 impl Deref for OptBlockData {
-    type Target = OptProposalBody;
+    type Target = OptBlockBody;
 
     fn deref(&self) -> &Self::Target {
-        &self.proposal_body
+        &self.block_body
     }
 }
 
