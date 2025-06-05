@@ -29,8 +29,8 @@ const EARGS_MISMATCH: u64 = 1;
 const EINVALID_FORMAT: u64 = 2;
 const EUNABLE_TO_FORMAT_DELAYED_FIELD: u64 = 3;
 
-struct FormatContext<'a, 'b, 'c, 'd> {
-    context: &'d mut SafeNativeContext<'a, 'b, 'c>,
+struct FormatContext<'a, 'b, 'c, 'd, 'e> {
+    context: &'e mut SafeNativeContext<'a, 'b, 'c, 'd>,
     should_charge_gas: bool,
     max_depth: usize,
     max_len: usize,
