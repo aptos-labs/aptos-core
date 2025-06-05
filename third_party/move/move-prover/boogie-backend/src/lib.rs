@@ -216,7 +216,7 @@ pub fn add_prelude(
         .iter()
         .filter(|ty| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num)))
         .map(|ty| {
-            boogie_num_type_base(ty)
+            boogie_num_type_base(env, None, ty)
                 .parse::<usize>()
                 .expect("parse error")
         })

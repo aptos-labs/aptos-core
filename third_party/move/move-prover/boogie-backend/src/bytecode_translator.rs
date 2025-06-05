@@ -1589,7 +1589,11 @@ impl FunctionTranslator<'_> {
                                     if srcs_1_bv_flag {
                                         args_src_1_str = format!(
                                             "$bv2int.{}({})",
-                                            boogie_num_type_base(&local_ty_srcs_1),
+                                            boogie_num_type_base(
+                                                self.parent.env,
+                                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                                &local_ty_srcs_1
+                                            ),
                                             args_src_1_str
                                         );
                                     }
@@ -1636,7 +1640,11 @@ impl FunctionTranslator<'_> {
                                             writer,
                                             "call {} := $int2bv{}({}({}));",
                                             dest_str,
-                                            boogie_num_type_base(&local_ty),
+                                            boogie_num_type_base(
+                                                self.parent.env,
+                                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                                &local_ty
+                                            ),
                                             fun_name,
                                             args_str
                                         );
@@ -1675,7 +1683,11 @@ impl FunctionTranslator<'_> {
                                             writer,
                                             "call {} := $int2bv{}({}({}));",
                                             dest_str,
-                                            boogie_num_type_base(&local_ty),
+                                            boogie_num_type_base(
+                                                self.parent.env,
+                                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                                &local_ty
+                                            ),
                                             fun_name,
                                             args_str
                                         );
@@ -1993,7 +2005,11 @@ impl FunctionTranslator<'_> {
                             let bv_flag = self.bv_flag(num_oper);
                             if bv_flag {
                                 let src_type = self.get_local_type(src);
-                                let base = boogie_num_type_base(&src_type);
+                                let base = boogie_num_type_base(
+                                    self.parent.env,
+                                    Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                    &src_type,
+                                );
                                 emitln!(
                                     writer,
                                     "call {} := $CastBv{}to{}({});",
@@ -2302,7 +2318,11 @@ impl FunctionTranslator<'_> {
                                 | Type::Error
                                 | Type::Var(_) => unreachable!(),
                             };
-                            let src_type = boogie_num_type_base(&self.get_local_type(op2));
+                            let src_type = boogie_num_type_base(
+                                self.parent.env,
+                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                &self.get_local_type(op2),
+                            );
                             emitln!(
                                 writer,
                                 "call {} := ${}{}From{}({}, {});",
@@ -2480,7 +2500,11 @@ impl FunctionTranslator<'_> {
                                 let op1_str = if !op1_bv_flag {
                                     format!(
                                         "$int2bv.{}({})",
-                                        boogie_num_type_base(op1_ty),
+                                        boogie_num_type_base(
+                                            self.parent.env,
+                                            Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                            op1_ty
+                                        ),
                                         str_local(op1)
                                     )
                                 } else {
@@ -2489,7 +2513,11 @@ impl FunctionTranslator<'_> {
                                 let op2_str = if !op2_bv_flag {
                                     format!(
                                         "$int2bv.{}({})",
-                                        boogie_num_type_base(op2_ty),
+                                        boogie_num_type_base(
+                                            self.parent.env,
+                                            Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                            op2_ty
+                                        ),
                                         str_local(op2)
                                     )
                                 } else {
@@ -2574,7 +2602,11 @@ impl FunctionTranslator<'_> {
                     let bv2int_str = if *num_oper_code == Bitwise {
                         format!(
                             "$int2bv.{}($abort_code)",
-                            boogie_num_type_base(&self.get_local_type(*code))
+                            boogie_num_type_base(
+                                self.parent.env,
+                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                &self.get_local_type(*code)
+                            )
                         )
                     } else {
                         "$abort_code".to_string()
@@ -2594,7 +2626,11 @@ impl FunctionTranslator<'_> {
                 let int2bv_str = if *num_oper_code == Bitwise {
                     format!(
                         "$bv2int.{}({})",
-                        boogie_num_type_base(&self.get_local_type(*src)),
+                        boogie_num_type_base(
+                            self.parent.env,
+                            Some(self.fun_target.get_bytecode_loc(attr_id)),
+                            &self.get_local_type(*src)
+                        ),
                         str_local(*src)
                     )
                 } else {
