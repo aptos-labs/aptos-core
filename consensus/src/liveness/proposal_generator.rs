@@ -457,6 +457,10 @@ impl ProposalGenerator {
         self.author
     }
 
+    pub fn can_propose_in_round(&self, round: Round) -> bool {
+        *self.last_round_generated.lock() < round
+    }
+
     /// Creates a NIL block proposal extending the highest certified block from the block store.
     pub fn generate_nil_block(
         &self,
