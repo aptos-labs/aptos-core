@@ -87,11 +87,8 @@ module aptos_framework::ethereum_derivable_account {
     fun deserialize_abstract_signature(abstract_signature: &vector<u8>): SIWEAbstractSignature {
         let stream = bcs_stream::new(*abstract_signature);
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
-        if (signature_type == 0x00) {
-            let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::MessageV1 { issued_at: string::utf8(issued_at), signature }
-        } else if (signature_type == 0x01) {
+        // MessageV2 signature type is 0x01
+        if (signature_type == 0x01) {
             let scheme = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
