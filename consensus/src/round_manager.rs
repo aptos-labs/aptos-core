@@ -249,8 +249,8 @@ pub enum VerifiedEvent {
 }
 
 #[cfg(test)]
-#[path = "round_manager_test.rs"]
-mod round_manager_test;
+#[path = "round_manager_tests/mod.rs"]
+mod round_manager_tests;
 
 #[cfg(feature = "fuzzing")]
 #[path = "round_manager_fuzzing.rs"]
@@ -437,7 +437,11 @@ impl RoundManager {
         }
 
         // If the current proposer is the leading, try to propose a regular block if not opt proposed already
-        if is_current_proposer {
+        if is_current_proposer
+            && self
+                .proposal_generator
+                .can_propose_in_round(new_round_event.round)
+        {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
             let sync_info = self.block_store.sync_info();
@@ -778,6 +782,7 @@ impl RoundManager {
             .await?;
 
         if self.round_state.current_round() == proposal_msg.round() {
+            info!("proposal inserted into loopback");
             self.opt_proposal_loopback_tx
                 .send(proposal_msg.take_block_data())
                 .await
@@ -793,6 +798,7 @@ impl RoundManager {
                 proposal_msg.round(),
                 proposal_msg.proposer()
             );
+            info!("proposal queued: {:?}", proposal_msg);
             self.pending_opt_proposals
                 .insert(proposal_msg.round(), proposal_msg.take_block_data());
         }
@@ -802,7 +808,7 @@ impl RoundManager {
 
     /// Process the optimistic proposal:
     /// 1. Ensure the highest quorum cert certifies the parent block of the opt block
-    /// 2. Create a regular proposal by adding QC and failed_authors to the opt block
+    /// 2. Create a regular proposal by adding QC to the opt block
     /// 3. Process the proposal using exsiting logic
     async fn process_opt_proposal(&mut self, opt_block_data: OptBlockData) -> anyhow::Result<()> {
         if self
@@ -811,6 +817,7 @@ impl RoundManager {
             .is_some()
         {
             // ignore the opt proposal if we have already received the proposal
+            warn!("ignoring duplicate opt proposal: {}", opt_block_data);
             return Ok(());
         }
         let hqc = self.block_store.highest_quorum_cert().as_ref().clone();
@@ -1073,7 +1080,7 @@ impl RoundManager {
     /// 3. Try to vote for it following the safety rules.
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
     /// round.
-    async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
+    pub async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let author = proposal
             .author()
             .expect("Proposal should be verified having an author");
@@ -1082,9 +1089,6 @@ impl RoundManager {
             && (matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)
-            ) || matches!(
-                proposal.block_data().block_type(),
-                BlockType::OptimisticProposal(_)
             ))
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
