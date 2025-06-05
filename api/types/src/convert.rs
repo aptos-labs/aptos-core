@@ -390,6 +390,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 entry_function_payload,
                             ))
                         },
+                        aptos_types::transaction::MultisigTransactionPayload::Script(script) => {
+                            let script_payload = try_into_script_payload(script)?;
+                            Some(MultisigTransactionPayload::ScriptPayload(script_payload))
+                        },
                     }
                 } else {
                     None
@@ -919,6 +923,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             ) => Executable::EntryFunction(try_into_entry_function(
                                 entry_func_payload,
                             )?),
+                            MultisigTransactionPayload::ScriptPayload(script) => {
+                                Executable::Script(try_into_script_payload(script)?)
+                            },
                         }
                     } else {
                         Executable::Empty
@@ -943,6 +950,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 Some(
                                     aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
                                         entry_function,
+                                    ),
+                                )
+                            },
+                            MultisigTransactionPayload::ScriptPayload(script) => {
+                                let script = try_into_script_payload(script)?;
+                                Some(
+                                    aptos_types::transaction::MultisigTransactionPayload::Script(
+                                        script,
                                     ),
                                 )
                             },
