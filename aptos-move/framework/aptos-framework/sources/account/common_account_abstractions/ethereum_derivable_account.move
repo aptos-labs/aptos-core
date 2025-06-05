@@ -238,6 +238,12 @@ module aptos_framework::ethereum_derivable_account {
         bcs::to_bytes(&abstract_signature)
     }
 
+    #[test_only]
+    fun create_raw_signature_message_v1(issued_at: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWEAbstractSignature::MessageV1 { issued_at, signature };
+        bcs::to_bytes(&abstract_signature)
+    }
+
     #[test]
     fun test_deserialize_abstract_public_key() {
         let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
@@ -260,17 +266,9 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_signature = create_raw_signature(utf8(b"https"), utf8(b"2025-01-01T00:00:00.000Z"), signature_bytes);
         let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
         assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV2);
-        match (siwe_abstract_signature) {
-            SIWEAbstractSignature::MessageV1 { signature, issued_at } => {
-                assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
-                assert!(signature == signature_bytes);
-            },
-            SIWEAbstractSignature::MessageV2 { signature, issued_at, scheme } => {
-                assert!(scheme == utf8(b"https"));
-                assert!(issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
-                assert!(signature == signature_bytes);
-            },
-        };
+        assert!(siwe_abstract_signature.scheme == utf8(b"https"));
+        assert!(siwe_abstract_signature.issued_at == utf8(b"2025-01-01T00:00:00.000Z"));
+        assert!(siwe_abstract_signature.signature == signature_bytes);
     }
 
     #[test]
@@ -285,17 +283,23 @@ module aptos_framework::ethereum_derivable_account {
         let abstract_signature = create_raw_signature(utf8(b"http"), utf8(b"2025-05-08T23:39:00.000Z"), signature_bytes);
         let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
         assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV2);
-        match (siwe_abstract_signature) {
-            SIWEAbstractSignature::MessageV1 { signature, issued_at } => {
-                assert!(issued_at == utf8(b"2025-05-08T23:39:00.000Z"));
-                assert!(signature == signature_bytes);
-            },
-            SIWEAbstractSignature::MessageV2 { signature, issued_at, scheme } => {
-                assert!(scheme == utf8(b"http"));
-                assert!(issued_at == utf8(b"2025-05-08T23:39:00.000Z"));
-                assert!(signature == signature_bytes);
-            },
-        };
+        assert!(siwe_abstract_signature.scheme == utf8(b"http"));
+        assert!(siwe_abstract_signature.issued_at == utf8(b"2025-05-08T23:39:00.000Z"));
+        assert!(siwe_abstract_signature.signature == signature_bytes);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_SIGNATURE_TYPE)]
+    fun test_deserialize_abstract_signature_failure() {
+        let signature_bytes = vector[
+            1, 252, 18, 58, 243, 10, 152, 94, 33, 5, 76, 133, 39, 188, 25, 92,
+            242, 39, 32, 84, 181, 94, 231, 9, 49, 141, 131, 20, 108, 93, 76, 144,
+            47, 20, 83, 177, 107, 22, 148, 93, 191, 165, 86, 42, 181, 226, 116, 136,
+            133, 84, 35, 222, 24, 36, 176, 143, 15, 14, 182, 135, 153, 141, 238, 238,
+            28
+            ];
+        let abstract_signature = create_raw_signature_message_v1(utf8(b"2025-05-08T23:39:00.000Z"), signature_bytes);
+        deserialize_abstract_signature(&abstract_signature);
     }
 
     #[test(framework = @0x1)]
