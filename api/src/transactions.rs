@@ -1237,13 +1237,6 @@ impl TransactionsApi {
                     }) => match executable {
                         TransactionExecutable::Script(script) => {
                             TransactionsApi::validate_script(ledger_info, script)?;
-                            if extra_config.is_multisig() {
-                                return Err(SubmitTransactionError::bad_request_with_code(
-                                    "Script transaction payload must not be a multisig transaction",
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                ));
-                            }
                         },
                         TransactionExecutable::EntryFunction(entry_function) => {
                             TransactionsApi::validate_entry_function_payload_format(
