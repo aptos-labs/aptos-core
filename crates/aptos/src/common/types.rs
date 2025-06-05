@@ -1967,7 +1967,7 @@ impl MultisigAccountWithSequenceNumber {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 pub struct TypeArgVec {
     /// TypeTag arguments separated by spaces.
     ///
@@ -2075,7 +2075,7 @@ impl TryInto<Vec<serde_json::Value>> for ArgWithTypeVec {
 }
 
 /// Common options for constructing an entry function transaction payload.
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 pub struct EntryFunctionArguments {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
