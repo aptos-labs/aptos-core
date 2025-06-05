@@ -44,9 +44,10 @@ pub(crate) fn native_dispatch(
     check_visited(module_name.address(), module_name.name())
         .map_err(|_| SafeNativeError::Abort { abort_code: 4 })?;
 
+    context.charge(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE)?;
+
     // Use Error to instruct the VM to perform a function call dispatch.
     Err(SafeNativeError::FunctionDispatch {
-        cost: context.eval_gas(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE),
         module_name,
         func_name,
         ty_args,

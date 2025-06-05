@@ -15,8 +15,6 @@ rust-version = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-types = { workspace = true }
-bcs = { workspace = true }
-bytes = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
