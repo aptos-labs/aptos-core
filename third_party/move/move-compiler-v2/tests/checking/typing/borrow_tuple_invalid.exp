@@ -112,8 +112,26 @@ error: cannot borrow a tuple
 45 │         &mut spec {};
    │         ^^^^^^^^^^^^
 
+error: reference to a tuple is not allowed
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:48:33
+   │
+48 │     fun return_borrow_tuple() : &(u64, u64) {
+   │                                 ^^^^^^^^^^^
+
 error: cannot borrow a tuple
    ┌─ tests/checking/typing/borrow_tuple_invalid.move:49:16
    │
 49 │         return &(1, 2)
    │                ^^^^^^^
+
+error: reference to a tuple is not allowed
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:52:32
+   │
+52 │     fun return_borrow_unit() : &() {
+   │                                ^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/borrow_tuple_invalid.move:53:16
+   │
+53 │         return &()
+   │                ^^^
