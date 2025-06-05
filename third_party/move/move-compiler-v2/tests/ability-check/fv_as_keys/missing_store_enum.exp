@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: type `|&mut u64|u64 has copy` is missing required ability `store`
+   ┌─ tests/ability-check/fv_as_keys/missing_store_enum.move:12:29
+   │
+12 │         let v1 = FV::V1{v1: f1};
+   │                             ^^

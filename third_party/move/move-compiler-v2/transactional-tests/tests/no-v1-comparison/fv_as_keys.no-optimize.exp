@@ -1,0 +1,78 @@
+processed 23 tasks
+
+task 6 'run'. lines 102-102:
+Error: Function execution failed with VMError: {
+    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x99::test_struct,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 8 'run'. lines 107-107:
+Error: Function execution failed with VMError: {
+    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x99::test_struct,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 10 'run'. lines 112-115:
+Error: Function execution failed with VMError: {
+    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x99::test_struct,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 13 'run'. lines 230-230:
+Error: Function execution failed with VMError: {
+    message: Failed to move resource into 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: RESOURCE_ALREADY_EXISTS,
+    sub_status: None,
+    location: 0x99::test_enum,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 7)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 18 'run'. lines 241-241:
+Error: Function execution failed with VMError: {
+    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x99::test_enum,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 20 'run'. lines 246-246:
+Error: Function execution failed with VMError: {
+    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x99::test_enum,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 22 'run'. lines 251-251:
+Error: Function execution failed with VMError: {
+    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x99::test_enum,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(9), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
