@@ -5925,6 +5925,9 @@ impl serde::Serialize for MultisigTransactionPayload {
                 multisig_transaction_payload::Payload::EntryFunctionPayload(v) => {
                     struct_ser.serialize_field("entryFunctionPayload", v)?;
                 }
+                multisig_transaction_payload::Payload::ScriptPayload(v) => {
+                    struct_ser.serialize_field("scriptPayload", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -6025,6 +6028,7 @@ impl serde::Serialize for multisig_transaction_payload::Type {
         let variant = match self {
             Self::Unspecified => "TYPE_UNSPECIFIED",
             Self::EntryFunctionPayload => "TYPE_ENTRY_FUNCTION_PAYLOAD",
+            Self::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }

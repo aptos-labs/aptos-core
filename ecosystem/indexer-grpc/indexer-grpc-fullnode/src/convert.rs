@@ -530,6 +530,16 @@ pub fn convert_multisig_payload(
                     ),
                 }
             },
+            MultisigTransactionPayload::ScriptPayload(script_payload) => {
+                transaction::MultisigTransactionPayload {
+                    r#type: transaction::multisig_transaction_payload::Type::ScriptPayload as i32,
+                    payload: Some(
+                        transaction::multisig_transaction_payload::Payload::ScriptPayload(
+                            convert_script_payload(script_payload),
+                        ),
+                    ),
+                }
+            },
         });
     transaction::MultisigPayload {
         multisig_address: multisig_payload.multisig_address.to_string(),
