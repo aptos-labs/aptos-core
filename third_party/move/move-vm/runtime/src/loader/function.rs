@@ -386,6 +386,16 @@ impl LoadedFunction {
         self.function.is_public()
     }
 
+    /// Returns true if the loaded function has friend visibility.
+    pub fn is_friend(&self) -> bool {
+        self.function.is_friend()
+    }
+
+    /// Returns true if the loaded function has private visibility.
+    pub fn is_private(&self) -> bool {
+        self.function.is_private()
+    }
+
     /// Returns an error if the loaded function is **NOT** an entry function.
     pub fn is_entry_or_err(&self) -> VMResult<()> {
         if !self.function.is_entry() {
