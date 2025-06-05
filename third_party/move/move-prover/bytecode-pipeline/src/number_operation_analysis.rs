@@ -35,7 +35,7 @@ use std::{
     str,
 };
 
-static CONFLICT_ERROR_MSG: &str = "cannot appear in both arithmetic and bitwise operation";
+static CONFLICT_ERROR_MSG: &str = "cannot appear in both arithmetic and bitwise operation, please refer to https://aptos.dev/en/build/smart-contracts/prover/spec-lang#bitwise-operators for more information";
 
 pub struct NumberOperationProcessor {}
 
@@ -60,22 +60,11 @@ impl NumberOperationProcessor {
     fn analyze<'a>(&self, env: &'a GlobalEnv, targets: &'a FunctionTargetsHolder) {
         self.create_initial_exp_oper_state(env);
         let fun_env_vec = FunctionTargetPipeline::sort_in_reverse_topological_order(env, targets);
-        for item in &fun_env_vec {
-            match item {
-                Either::Left(fid) => {
-                    let func_env = env.get_function(*fid);
-                    if func_env.is_inline() {
-                        continue;
-                    }
-                    for (_, target) in targets.get_targets(&func_env) {
-                        if target.data.code.is_empty() {
-                            continue;
-                        }
-                        self.analyze_fun(env, target.clone());
-                    }
-                },
-                Either::Right(scc) => {
-                    for fid in scc {
+        // Heuristic: run twice to make sure number operation state is propagated to all functions
+        for _ in 0..2 {
+            for item in &fun_env_vec {
+                match item {
+                    Either::Left(fid) => {
                         let func_env = env.get_function(*fid);
                         if func_env.is_inline() {
                             continue;
@@ -86,8 +75,22 @@ impl NumberOperationProcessor {
                             }
                             self.analyze_fun(env, target.clone());
                         }
-                    }
-                },
+                    },
+                    Either::Right(scc) => {
+                        for fid in scc {
+                            let func_env = env.get_function(*fid);
+                            if func_env.is_inline() {
+                                continue;
+                            }
+                            for (_, target) in targets.get_targets(&func_env) {
+                                if target.data.code.is_empty() {
+                                    continue;
+                                }
+                                self.analyze_fun(env, target.clone());
+                            }
+                        }
+                    },
+                }
             }
         }
     }
@@ -452,25 +455,36 @@ impl NumberOperationAnalysis<'_> {
                         move_model::ast::Operation::WellFormed => {
                             global_state.update_node_oper(*id, arg_oper[0], true);
                         },
+                        move_model::ast::Operation::Pack(mid, sid, None) => {
+                            let struct_env = self
+                                .func_target
+                                .global_env()
+                                .get_module(*mid)
+                                .into_struct(*sid);
+                            for (i, field) in struct_env.get_fields().enumerate() {
+                                let field_oper =
+                                    global_state.get_num_operation_field(mid, sid, &field.get_id());
+                                let arg_oper = global_state.get_node_num_oper(args[i].node_id());
+                                if !allow_merge && field_oper.conflict(&arg_oper) {
+                                    self.func_target.global_env().error(
+                                        &self.func_target.get_bytecode_loc(attr_id),
+                                        CONFLICT_ERROR_MSG,
+                                    );
+                                }
+                                let merged = field_oper.merge(&arg_oper);
+                                global_state.update_node_oper(args[i].node_id(), merged, true);
+                                global_state
+                                    .struct_operation_map
+                                    .get_mut(&(*mid, *sid))
+                                    .unwrap()
+                                    .insert(field.get_id(), merged);
+                            }
+                        },
                         _ => {
                             // All args must have compatible number operations
                             // TODO(tengzhang): support converting int to bv
                             if opers_for_propagation(oper) {
                                 let mut merged = if bitwise_oper(oper) { Bitwise } else { Bottom };
-                                if bitwise_oper(oper) {
-                                    let ty =
-                                        self.func_target.global_env().get_node_type(exp.node_id());
-                                    if matches!(ty, Type::Primitive(PrimitiveType::Num)) {
-                                        self.func_target.global_env().update_node_type(
-                                            exp.node_id(),
-                                            self.func_target
-                                                .global_env()
-                                                .get_node_type(args[0].node_id())
-                                                .skip_reference()
-                                                .clone(),
-                                        );
-                                    }
-                                }
                                 for num_oper in &arg_oper {
                                     if !allow_merge && num_oper.conflict(&merged) {
                                         self.func_target.global_env().error(
@@ -480,7 +494,55 @@ impl NumberOperationAnalysis<'_> {
                                     }
                                     merged = num_oper.merge(&merged);
                                 }
-
+                                // If operation involve operands with bv type, check and update concrete integer type if possible
+                                if merged == Bitwise {
+                                    let exp_ty = self
+                                        .func_target
+                                        .global_env()
+                                        .get_node_type(exp.node_id())
+                                        .skip_reference()
+                                        .clone();
+                                    let concrete_num_ty_oper_0 = self
+                                        .func_target
+                                        .global_env()
+                                        .get_node_type(args[0].node_id());
+                                    let concrete_num_ty_oper_1 = self
+                                        .func_target
+                                        .global_env()
+                                        .get_node_type(args[1].node_id());
+                                    if concrete_num_ty_oper_0.is_number() {
+                                        let if_shift = matches!(
+                                            oper,
+                                            move_model::ast::Operation::Shl
+                                                | move_model::ast::Operation::Shr
+                                        );
+                                        // For shift operation, we don't need to check compatibility between the two operands
+                                        let (compatible_flag, concrete_num_ty) = if if_shift {
+                                            (true, concrete_num_ty_oper_0.clone())
+                                        } else {
+                                            concrete_num_ty_oper_0
+                                                .is_compatible_num_type(&concrete_num_ty_oper_1)
+                                        };
+                                        if !compatible_flag {
+                                            self.func_target.global_env().error(
+                                                    &self.func_target.global_env().get_node_loc(exp.node_id()),
+                                                    &format!("integer type mismatch between two operands, one has type `{}` while the other one has type `{}`, consider using explicit type cast",
+                                                    concrete_num_ty_oper_0.display(&
+                                                        self.func_target.global_env().get_type_display_ctx()),
+                                                    concrete_num_ty_oper_1.display(&
+                                                        self.func_target.global_env().get_type_display_ctx())),
+                                                );
+                                        }
+                                        if exp_ty == Type::Primitive(PrimitiveType::Num)
+                                            && concrete_num_ty
+                                                != Type::Primitive(PrimitiveType::Num)
+                                        {
+                                            self.func_target
+                                                .global_env()
+                                                .update_node_type(exp.node_id(), concrete_num_ty);
+                                        }
+                                    }
+                                }
                                 for (arg, arg_oper) in args.iter().zip(arg_oper.iter()) {
                                     if merged != *arg_oper {
                                         // need to update the num_oper type to avoid insertion of int2bv conversion

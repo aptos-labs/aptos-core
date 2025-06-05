@@ -1103,6 +1103,27 @@ impl Type {
         false
     }
 
+    /// Returns true if `self` and `ty` are compatible number types.
+    /// If compatible, returns the concrete integer type.
+    pub fn is_compatible_num_type(&self, ty: &Type) -> (bool, Type) {
+        let skip_reference_self = self.skip_reference();
+        let skip_reference_ty = ty.skip_reference();
+        if !skip_reference_self.is_number() || !skip_reference_ty.is_number() {
+            return (false, skip_reference_self.clone());
+        }
+        match (skip_reference_self, skip_reference_ty) {
+            (Type::Primitive(PrimitiveType::Num), Type::Primitive(PrimitiveType::Num)) => {
+                (true, Type::Primitive(PrimitiveType::Num))
+            },
+            (Type::Primitive(PrimitiveType::Num), _) => (true, skip_reference_ty.clone()),
+            (_, Type::Primitive(PrimitiveType::Num)) => (true, skip_reference_self.clone()),
+            _ => (
+                skip_reference_self == skip_reference_ty,
+                skip_reference_self.clone(),
+            ),
+        }
+    }
+
     /// Returns true if this is an address or signer type.
     pub fn is_signer_or_address(&self) -> bool {
         matches!(
