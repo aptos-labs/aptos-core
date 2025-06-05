@@ -4,6 +4,7 @@
 //! This module (and its submodules) contain various model-AST-based lint checks.
 
 mod almost_swapped;
+mod assert_const;
 mod blocks_in_conditions;
 mod needless_bool;
 mod needless_deref_ref;
@@ -33,5 +34,6 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
+        Box::<assert_const::AssertConst>::default(),
     ]
 }
