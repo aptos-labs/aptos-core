@@ -266,6 +266,51 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS),
 
+
+    # =============================== #
+    # Module loading benchmarks start #
+    # =============================== #
+
+    # A very long dependency chain that is never executed.
+    RunGroupConfig(key=RunGroupKey("dependency-chain8"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-chain64"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-chain256"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-chain512"), included_in=Flow.CONTINUOUS),
+
+    # A very long dependency chain buts its dependencies are partially used (64, 128, 256 or all modules).
+    RunGroupConfig(key=RunGroupKey("dependency-chain512-depth64"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-chain512-depth128"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-chain512-depth256"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-chain512-depth512"), included_in=Flow.CONTINUOUS),
+
+    # A tree that uses all its dependencies computing the sum.
+    RunGroupConfig(key=RunGroupKey("dependency-tree81-with3-children-per-leaf"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-tree585-with8-children-per-leaf"), included_in=Flow.CONTINUOUS),
+
+    # A dependency star (flat) with dependencies that are never executed.
+    RunGroupConfig(key=RunGroupKey("dependency-star32-width0"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-star512-width0"), included_in=Flow.CONTINUOUS),
+
+    # A dependency star (flat) with dependencies that are partially or fully executed.
+    RunGroupConfig(key=RunGroupKey("dependency-star512-width64"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-star512-width128"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-star512-width256"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-star512-width512"), included_in=Flow.CONTINUOUS),
+
+    # Random sparse DAGs.Dependencies are never executed.
+    RunGroupConfig(key=RunGroupKey("dependency-dag64-sparse"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-dag256-sparse"), included_in=Flow.CONTINUOUS),
+
+    # A quasi-clique: maximally fully-connected DAG (each node links to all subsequent nodes). Dependencies are never
+    # executed.
+    RunGroupConfig(key=RunGroupKey("dependency-dag64-dense"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("dependency-dag256-dense"), included_in=Flow.CONTINUOUS),
+
+    # ============================== #
+    # Module loading benchmarks end #
+    # ============================== #
+
+
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
@@ -276,24 +321,24 @@ TESTS = [
     RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET_LARGE_DB),
     # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
-] + [ 
+] + [
     # no-commit throughput of different executor, used on continuous flow
     RunGroupConfig(
         key=RunGroupKey(
             "no_commit_{}{}".format(
-                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
+                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer",
                 "_sharding" if executor_sharding else "",
             ),
             executor_type=executor_type
-        ), 
+        ),
         key_extra=RunGroupKeyExtra(
             transaction_type_override=transaction_type,
             sig_verify_num_threads_override=16,
             skip_commit_override=True,
             execution_sharding=executor_sharding,
             block_size_override=10000,
-        ), 
-        included_in=Flow.CONTINUOUS, 
+        ),
+        included_in=Flow.CONTINUOUS,
         waived=True,
     )
     for executor_sharding, executor_types in [
@@ -308,18 +353,18 @@ TESTS = [
         expected_tps=10000 if sequential else 30000,
         key=RunGroupKey(
             "{}_{}_by_stages".format(
-                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
+                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer",
                 "sequential" if sequential else "parallel"
-            ), 
+            ),
             executor_type=executor_type
-        ), 
+        ),
         key_extra=RunGroupKeyExtra(
             transaction_type_override=transaction_type,
             sig_verify_num_threads_override=1 if sequential else NUMBER_OF_EXECUTION_THREADS,
             execution_num_threads_override=1 if sequential else None,
             split_stages_override=True,
             single_block_dst_working_set=True,
-        ), 
+        ),
         included_in=Flow.EXECUTORS,
         waived=True,
     )
