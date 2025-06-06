@@ -63,7 +63,7 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
           node-version-file: .node-version
