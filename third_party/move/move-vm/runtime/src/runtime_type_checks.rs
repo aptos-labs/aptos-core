@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, LoadedFunction};
+use crate::{
+    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
+    reentrancy_checker::CallType, LoadedFunction,
+};
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
-    vm_status::StatusCode,
+    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
 
@@ -32,6 +35,56 @@ pub(crate) trait RuntimeTypeCheck {
 
     /// For any other checks are performed externally
     fn should_perform_checks() -> bool;
+
+    /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
+    /// including native dynamic dispatch or calling a closure.
+    fn check_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+        call_type: CallType,
+    ) -> PartialVMResult<()> {
+        match call_type {
+            CallType::Regular => {
+                // We only need to check cross-contract calls.
+                if caller.module_id() == callee.module_id() {
+                    return Ok(());
+                }
+                Self::check_regular_call_visibility(caller, callee)
+            },
+            CallType::ClosureDynamicDispatch => {
+                // In difference to regular calls, we skip visibility check. It is possible to call
+                // a private function of another module via a closure.
+                Ok(())
+            },
+            CallType::NativeDynamicDispatch => {
+                // Dynamic dispatch may fail at runtime and this is ok. Hence, these errors are not
+                // invariant violations as they cannot be checked at compile- or load-time.
+                //
+                // Note: native dispatch cannot call into the same module, otherwise the reentrancy
+                // check is broken. For more details, see AIP-73:
+                //   https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-73.md
+                if callee.is_friend_or_private() || callee.module_id() == caller.module_id() {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message(
+                            "Invoking private or friend function during dispatch".to_string(),
+                        ));
+                }
+
+                if callee.is_native() {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message("Invoking native function during dispatch".to_string()));
+                }
+                Ok(())
+            },
+        }
+    }
+
+    /// Performs a runtime check of the caller is allowed to call the callee. Applies only on
+    /// regular static calls (no dynamic dispatch!)
+    fn check_regular_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+    ) -> PartialVMResult<()>;
 }
 
 fn verify_pack<'a>(
@@ -172,6 +225,13 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     #[inline(always)]
     fn should_perform_checks() -> bool {
         false
+    }
+
+    fn check_regular_call_visibility(
+        _caller: &LoadedFunction,
+        _callee: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        Ok(())
     }
 }
 
@@ -783,5 +843,43 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     #[inline(always)]
     fn should_perform_checks() -> bool {
         true
+    }
+
+    fn check_regular_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        if callee.is_private() {
+            let msg = format!(
+                "Function {}::{} cannot be called because it is private",
+                callee.module_or_script_id(),
+                callee.name()
+            );
+            return Err(
+                PartialVMError::new_invariant_violation(msg).with_sub_status(EPARANOID_FAILURE)
+            );
+        }
+
+        if callee.is_friend() {
+            let callee_module = callee.owner_as_module().map_err(|err| err.to_partial())?;
+            if !caller
+                .module_id()
+                .is_some_and(|id| callee_module.friends.contains(id))
+            {
+                let msg = format!(
+                    "Function {}::{} cannot be called because it has friend visibility, but {} \
+                     is not {}'s friend",
+                    callee.module_or_script_id(),
+                    callee.name(),
+                    caller.module_or_script_id(),
+                    callee.module_or_script_id()
+                );
+                return Err(
+                    PartialVMError::new_invariant_violation(msg).with_sub_status(EPARANOID_FAILURE)
+                );
+            }
+        }
+
+        Ok(())
     }
 }
