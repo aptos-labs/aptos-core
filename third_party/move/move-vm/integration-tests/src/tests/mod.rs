@@ -10,7 +10,6 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     data_cache::TransactionDataCache,
-    module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, ModuleStorage,
@@ -88,15 +87,12 @@ fn execute_function_for_test(
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<SerializedReturnValues> {
-    let traversal_storage = TraversalStorage::new();
-
     let func = module_storage.load_function(module_id, function_name, ty_args)?;
     MoveVM::execute_loaded_function(
         func,
         args,
         &mut TransactionDataCache::empty(),
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
         &mut NativeContextExtensions::default(),
         module_storage,
         data_storage,
@@ -110,7 +106,6 @@ fn execute_script_impl(
     args: Vec<Vec<u8>>,
 ) -> VMResult<ChangeSet> {
     let code_storage = storage.as_unsync_code_storage();
-    let traversal_storage = TraversalStorage::new();
 
     let function = code_storage.load_script(script, ty_args)?;
     let mut data_cache = TransactionDataCache::empty();
@@ -120,7 +115,6 @@ fn execute_script_impl(
         args,
         &mut data_cache,
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
         &mut NativeContextExtensions::default(),
         &code_storage,
         storage,

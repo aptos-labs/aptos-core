@@ -61,10 +61,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
-};
+use move_vm_runtime::{ModuleStorage, RuntimeEnvironment, StagingModuleStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -381,7 +378,6 @@ fn exec_function(
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
 ) {
-    let storage = TraversalStorage::new();
     session
         .execute_function_bypass_visibility(
             &ModuleId::new(CORE_CODE_ADDRESS, Identifier::new(module_name).unwrap()),
@@ -389,7 +385,6 @@ fn exec_function(
             ty_args,
             args,
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&storage),
             module_storage,
         )
         .unwrap_or_else(|e| {

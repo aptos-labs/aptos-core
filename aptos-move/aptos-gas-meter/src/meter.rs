@@ -17,7 +17,6 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
-    identifier::IdentStr,
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
@@ -25,12 +24,14 @@ use move_vm_types::{
     gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
+use std::collections::BTreeSet;
 
 /// The official gas meter used inside the Aptos VM.
 /// It maintains an internal gas counter, measured in internal gas units, and carries an environment
 /// consisting all the gas parameters, which it can lookup when performing gas calculations.
 pub struct StandardGasMeter<A> {
     algebra: A,
+    metered_modules: BTreeSet<ModuleId>,
 }
 
 impl<A> StandardGasMeter<A>
@@ -38,7 +39,10 @@ where
     A: GasAlgebra,
 {
     pub fn new(algebra: A) -> Self {
-        Self { algebra }
+        Self {
+            algebra,
+            metered_modules: BTreeSet::new(),
+        }
     }
 
     pub fn feature_version(&self) -> u64 {
@@ -50,12 +54,13 @@ impl<A> DependencyGasMeter for StandardGasMeter<A>
 where
     A: GasAlgebra,
 {
-    #[inline]
-    fn charge_dependency(
+    fn is_existing_dependency_metered(&self, module_id: &ModuleId) -> bool {
+        self.metered_modules.contains(module_id)
+    }
+
+    fn charge_new_dependency(
         &mut self,
-        _is_new: bool,
-        addr: &AccountAddress,
-        _name: &IdentStr,
+        module_id: &ModuleId,
         size: NumBytes,
     ) -> PartialVMResult<()> {
         // Modules under special addresses are considered system modules that should always
@@ -64,11 +69,36 @@ where
         // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
         //       `.is_special()`. We should double check if this address still needs special
         //       treatment.
-        if self.feature_version() >= 15 && !addr.is_special() {
+        if self.feature_version() >= 15 && !module_id.address().is_special() {
             self.algebra
                 .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
             self.algebra.count_dependency(size)?;
         }
+        Ok(())
+    }
+
+    fn charge_existing_dependency(
+        &mut self,
+        module_id: &ModuleId,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Modules under special addresses are considered system modules that should always
+        // be loaded, and are therefore excluded from gas charging.
+        //
+        // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
+        //       `.is_special()`. We should double check if this address still needs special
+        //       treatment.
+        if self.feature_version() < 15
+            || module_id.address().is_special()
+            || self.metered_modules.contains(module_id)
+        {
+            return Ok(());
+        }
+
+        self.metered_modules.insert(module_id.clone());
+        self.algebra
+            .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
+        self.algebra.count_dependency(size)?;
         Ok(())
     }
 }

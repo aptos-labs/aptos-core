@@ -24,7 +24,6 @@ use move_core_types::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
         InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
     },
-    identifier::IdentStr,
     language_storage::ModuleId,
     u256,
     vm_status::StatusCode,
@@ -196,11 +195,21 @@ impl GasStatus {
 }
 
 impl DependencyGasMeter for GasStatus {
-    fn charge_dependency(
+    fn is_existing_dependency_metered(&self, _module_id: &ModuleId) -> bool {
+        true
+    }
+
+    fn charge_new_dependency(
         &mut self,
-        _is_new: bool,
-        _addr: &AccountAddress,
-        _name: &IdentStr,
+        _module_id: &ModuleId,
+        _size: NumBytes,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_existing_dependency(
+        &mut self,
+        _module_id: &ModuleId,
         _size: NumBytes,
     ) -> PartialVMResult<()> {
         Ok(())

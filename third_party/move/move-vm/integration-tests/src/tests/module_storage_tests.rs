@@ -9,7 +9,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::Identifier, language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, ModuleStorage};
@@ -52,20 +52,21 @@ fn add_module_bytes<'a>(
 #[test]
 fn test_module_does_not_exist() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
+    let id = ModuleId::new(AccountAddress::ZERO, Identifier::new("a").unwrap());
 
-    let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
+    let result = module_storage.check_module_exists(&id);
     assert!(!assert_ok!(result));
 
-    let result = module_storage.fetch_module_size_in_bytes(&AccountAddress::ZERO, ident_str!("a"));
+    let result = module_storage.fetch_module_size_in_bytes(&id);
     assert_none!(assert_ok!(result));
 
-    let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
+    let result = module_storage.fetch_module_metadata(&id);
     assert_none!(assert_ok!(result));
 
-    let result = module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a"));
+    let result = module_storage.fetch_deserialized_module(&id);
     assert_none!(assert_ok!(result));
 
-    let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
+    let result = module_storage.fetch_verified_module(&id);
     assert_none!(assert_ok!(result));
 }
 
@@ -77,9 +78,7 @@ fn test_module_exists() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    assert!(assert_ok!(
-        module_storage.check_module_exists(id.address(), id.name())
-    ));
+    assert!(assert_ok!(module_storage.check_module_exists(&id)));
     module_storage.assert_cached_state(vec![&id], vec![]);
 }
 
@@ -98,12 +97,12 @@ fn test_deserialized_caching() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    let result = module_storage.fetch_module_metadata(a_id.address(), a_id.name());
+    let result = module_storage.fetch_module_metadata(&a_id);
     let expected = make_module("a", vec!["b", "c"], vec![]).0.metadata;
     assert_eq!(assert_some!(assert_ok!(result)), expected);
     module_storage.assert_cached_state(vec![&a_id], vec![]);
 
-    let result = module_storage.fetch_deserialized_module(c_id.address(), c_id.name());
+    let result = module_storage.fetch_deserialized_module(&c_id);
     let expected = make_module("c", vec!["d", "e"], vec![]).0;
     assert_eq!(assert_some!(assert_ok!(result)).as_ref(), &expected);
     module_storage.assert_cached_state(vec![&a_id, &c_id], vec![]);
@@ -127,13 +126,13 @@ fn test_dependency_tree_traversal() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    assert_ok!(module_storage.fetch_verified_module(c_id.address(), c_id.name()));
+    assert_ok!(module_storage.fetch_verified_module(&c_id));
     module_storage.assert_cached_state(vec![], vec![&c_id, &d_id, &e_id]);
 
-    assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+    assert_ok!(module_storage.fetch_verified_module(&a_id));
     module_storage.assert_cached_state(vec![], vec![&a_id, &b_id, &c_id, &d_id, &e_id]);
 
-    assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+    assert_ok!(module_storage.fetch_verified_module(&a_id));
 }
 
 #[test]
@@ -158,14 +157,14 @@ fn test_dependency_dag_traversal() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    assert_ok!(module_storage.fetch_deserialized_module(a_id.address(), a_id.name()));
-    assert_ok!(module_storage.fetch_deserialized_module(c_id.address(), c_id.name()));
+    assert_ok!(module_storage.fetch_deserialized_module(&a_id));
+    assert_ok!(module_storage.fetch_deserialized_module(&c_id));
     module_storage.assert_cached_state(vec![&a_id, &c_id], vec![]);
 
-    assert_ok!(module_storage.fetch_verified_module(d_id.address(), d_id.name()));
+    assert_ok!(module_storage.fetch_verified_module(&d_id));
     module_storage.assert_cached_state(vec![&a_id, &c_id], vec![&d_id, &e_id, &f_id, &g_id]);
 
-    assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+    assert_ok!(module_storage.fetch_verified_module(&a_id));
     module_storage.assert_cached_state(vec![], vec![
         &a_id, &b_id, &c_id, &d_id, &e_id, &f_id, &g_id,
     ]);
@@ -183,7 +182,7 @@ fn test_cyclic_dependencies_traversal_fails() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    let result = module_storage.fetch_verified_module(c_id.address(), c_id.name());
+    let result = module_storage.fetch_verified_module(&c_id);
     assert_eq!(
         assert_err!(result).major_status(),
         StatusCode::CYCLIC_MODULE_DEPENDENCY
@@ -202,7 +201,7 @@ fn test_cyclic_friends_are_allowed() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    let result = module_storage.fetch_verified_module(c_id.address(), c_id.name());
+    let result = module_storage.fetch_verified_module(&c_id);
     assert_ok!(result);
 
     // Since `c` has no dependencies, only it gets deserialized and verified.
@@ -224,7 +223,7 @@ fn test_transitive_friends_are_allowed_to_be_transitive_dependencies() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
+    assert_ok!(module_storage.fetch_verified_module(&a_id));
     module_storage.assert_cached_state(vec![], vec![&a_id, &b_id, &c_id]);
 }
 

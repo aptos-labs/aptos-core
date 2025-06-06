@@ -16,7 +16,6 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -143,7 +142,7 @@ where
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
+        let bytes = match self.ctx.fetch_module_bytes(key)? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };

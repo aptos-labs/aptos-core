@@ -490,7 +490,7 @@ impl Frame {
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
         let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+            .fetch_function_definition(module_id, function_name)
             .map_err(|_| {
                 // Note: legacy loader implementation used this error, so we need to remap.
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(

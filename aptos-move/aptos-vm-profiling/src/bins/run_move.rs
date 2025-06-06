@@ -13,9 +13,9 @@ use move_core_types::{
 };
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVM,
-    native_extensions::NativeContextExtensions, native_functions::NativeFunction,
-    AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
+    data_cache::TransactionDataCache, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction, AsUnsyncCodeStorage, CodeStorage, ModuleStorage,
+    RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -186,7 +186,6 @@ fn main() -> Result<()> {
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &storage));
 
-    let traversal_storage = TraversalStorage::new();
     let code_storage = storage.as_unsync_code_storage();
 
     let func = match &entrypoint {
@@ -202,7 +201,6 @@ fn main() -> Result<()> {
         args,
         &mut TransactionDataCache::empty(),
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
         &mut extensions,
         &code_storage,
         &storage,

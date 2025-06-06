@@ -22,7 +22,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
@@ -156,32 +156,56 @@ where
 
         (cost, res)
     }
-}
 
-impl<G> DependencyGasMeter for GasProfiler<G>
-where
-    G: AptosGasMeter,
-{
     fn charge_dependency(
         &mut self,
         is_new: bool,
-        addr: &AccountAddress,
-        name: &IdentStr,
+        id: &ModuleId,
         size: NumBytes,
     ) -> PartialVMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
+        let (cost, res) = self.delegate_charge(|base| {
+            if is_new {
+                base.charge_new_dependency(id, size)
+            } else {
+                base.charge_existing_dependency(id, size)
+            }
+        });
 
         if !cost.is_zero() {
             self.dependencies.push(Dependency {
                 is_new,
-                id: ModuleId::new(*addr, name.to_owned()),
+                id: id.clone(),
                 size,
                 cost,
             });
         }
 
         res
+    }
+}
+
+impl<G> DependencyGasMeter for GasProfiler<G>
+where
+    G: AptosGasMeter,
+{
+    delegate! {
+        fn is_existing_dependency_metered(&self, module_id: &ModuleId) -> bool;
+    }
+
+    fn charge_new_dependency(
+        &mut self,
+        module_id: &ModuleId,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.charge_dependency(true, module_id, size)
+    }
+
+    fn charge_existing_dependency(
+        &mut self,
+        module_id: &ModuleId,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.charge_dependency(false, module_id, size)
     }
 }
 

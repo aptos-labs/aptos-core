@@ -5,7 +5,6 @@
 use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
     AsFunctionValueExtension, LoadedFunction, ModuleStorage,
@@ -56,7 +55,6 @@ impl MoveVM {
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_cache: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
@@ -87,7 +85,6 @@ impl MoveVM {
                 module_storage,
                 resource_resolver,
                 gas_meter,
-                traversal_context,
                 extensions,
             )?
         };
