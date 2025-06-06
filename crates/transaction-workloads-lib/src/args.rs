@@ -99,6 +99,46 @@ pub enum TransactionTypeArg {
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    /// Dependency chain of 8 modules. Only top-level module is used.
+    DependencyChain8,
+    /// Dependency chain of 64 modules. Only top-level module is used.
+    DependencyChain64,
+    /// Dependency chain of 256 modules. Only top-level module is used.
+    DependencyChain256,
+    /// Dependency chain of 512 modules. Only top-level module is used.
+    DependencyChain512,
+    /// Dependency chain of 512 modules. First 64 modules are used.
+    DependencyChain512Depth64,
+    /// Dependency chain of 512 modules. First 128 modules are used.
+    DependencyChain512Depth128,
+    /// Dependency chain of 512 modules. First 256 modules are used.
+    DependencyChain512Depth256,
+    /// Dependency chain of 512 modules. All modules are used.
+    DependencyChain512Depth512,
+    /// Tree of dependencies (81 nodes), with all modules being used. Each node has 3 children.
+    DependencyTree81With3ChildrenPerLeaf,
+    /// Tree of dependencies (585 nodes), with all modules being used. Each node has 8 children.
+    DependencyTree585With8ChildrenPerLeaf,
+    /// Star graph with 32 leafs. Only top-level module is used.
+    DependencyStar32Width0,
+    /// Star graph with 512 leafs. Only top-level module is used.
+    DependencyStar512Width0,
+    /// Star graph with 512 leafs. Only 64 modules are used.
+    DependencyStar512Width64,
+    /// Star graph with 512 leafs. Only 128 modules are used.
+    DependencyStar512Width128,
+    /// Star graph with 512 leafs. Only 256 modules are used.
+    DependencyStar512Width256,
+    /// Star graph with 512 leafs. All modules are used.
+    DependencyStar512Width512,
+    /// Random sparse DAG on 64 nodes. Only top-level module is used.
+    DependencyDag64Sparse,
+    /// Random sparse DAG on 256 nodes. Only top-level module is used.
+    DependencyDag256Sparse,
+    /// Quasi-clique on 64 nodes. Only top-level module is used.
+    DependencyDag64Dense,
+    /// Quasi-clique on 256 nodes. Only top-level module is used.
+    DependencyDag256Dense,
 }
 
 impl TransactionTypeArg {
@@ -443,6 +483,66 @@ impl TransactionTypeArg {
                     max_sell_size: 50,
                     max_buy_size: 950,
                 })
+            },
+            TransactionTypeArg::DependencyChain8 => {
+                call_custom_module(EntryPoints::DependencyChain8 { depth: 1 })
+            },
+            TransactionTypeArg::DependencyChain64 => {
+                call_custom_module(EntryPoints::DependencyChain64 { depth: 1 })
+            },
+            TransactionTypeArg::DependencyChain256 => {
+                call_custom_module(EntryPoints::DependencyChain256 { depth: 1 })
+            },
+            TransactionTypeArg::DependencyChain512 => {
+                call_custom_module(EntryPoints::DependencyChain512 { depth: 1 })
+            },
+            TransactionTypeArg::DependencyChain512Depth64 => {
+                call_custom_module(EntryPoints::DependencyChain512 { depth: 64 })
+            },
+            TransactionTypeArg::DependencyChain512Depth128 => {
+                call_custom_module(EntryPoints::DependencyChain512 { depth: 128 })
+            },
+            TransactionTypeArg::DependencyChain512Depth256 => {
+                call_custom_module(EntryPoints::DependencyChain512 { depth: 256 })
+            },
+            TransactionTypeArg::DependencyChain512Depth512 => {
+                call_custom_module(EntryPoints::DependencyChain512 { depth: 512 })
+            },
+            TransactionTypeArg::DependencyTree81With3ChildrenPerLeaf => {
+                call_custom_module(EntryPoints::DependencyTree81With3ChildrenPerLeaf)
+            },
+            TransactionTypeArg::DependencyTree585With8ChildrenPerLeaf => {
+                call_custom_module(EntryPoints::DependencyTree585With8ChildrenPerLeaf)
+            },
+            TransactionTypeArg::DependencyStar32Width0 => {
+                call_custom_module(EntryPoints::DependencyStar32 { width: 0 })
+            },
+            TransactionTypeArg::DependencyStar512Width0 => {
+                call_custom_module(EntryPoints::DependencyStar512 { width: 0 })
+            },
+            TransactionTypeArg::DependencyStar512Width64 => {
+                call_custom_module(EntryPoints::DependencyStar512 { width: 64 })
+            },
+            TransactionTypeArg::DependencyStar512Width128 => {
+                call_custom_module(EntryPoints::DependencyStar512 { width: 128 })
+            },
+            TransactionTypeArg::DependencyStar512Width256 => {
+                call_custom_module(EntryPoints::DependencyStar512 { width: 256 })
+            },
+            TransactionTypeArg::DependencyStar512Width512 => {
+                call_custom_module(EntryPoints::DependencyStar512 { width: 512 })
+            },
+            TransactionTypeArg::DependencyDag64Sparse => {
+                call_custom_module(EntryPoints::DependencyDag64Sparse)
+            },
+            TransactionTypeArg::DependencyDag256Sparse => {
+                call_custom_module(EntryPoints::DependencyDag256Sparse)
+            },
+            TransactionTypeArg::DependencyDag256Dense => {
+                call_custom_module(EntryPoints::DependencyDag256Dense)
+            },
+            TransactionTypeArg::DependencyDag64Dense => {
+                call_custom_module(EntryPoints::DependencyDag64Dense)
             },
         }
     }

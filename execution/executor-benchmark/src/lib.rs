@@ -971,6 +971,25 @@ mod tests {
     }
 
     #[test]
+    fn test_benchmark_dependency_workloads() {
+        AptosVM::set_num_shards_once(4);
+        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
+        NativeConfig::set_concurrency_level_once(4);
+
+        let workloads = [
+            TransactionTypeArg::DependencyChain512,
+            TransactionTypeArg::DependencyTree585With8ChildrenPerLeaf,
+            TransactionTypeArg::DependencyStar512Width512,
+            TransactionTypeArg::DependencyDag256Dense,
+        ];
+
+        for workload in workloads {
+            test_generic_benchmark::<AptosVMBlockExecutor>(Some(workload), true);
+        }
+    }
+
+    #[test]
     fn test_benchmark_transaction() {
         AptosVM::set_num_shards_once(4);
         AptosVM::set_concurrency_level_once(4);
