@@ -602,7 +602,7 @@ impl InterpreterImpl<'_> {
                     // Resolve the function. This may lead to loading the code related
                     // to this function.
                     let callee = lazy_function
-                        .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                        .as_resolved(module_storage)
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     RTTCheck::check_call_visibility(
