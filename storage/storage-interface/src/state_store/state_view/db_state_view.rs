@@ -60,6 +60,10 @@ impl TStateView for DbStateView {
     fn next_version(&self) -> Version {
         self.version.map_or(0, |v| v + 1)
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
+    }
 }
 
 pub trait LatestDbStateCheckpointView {

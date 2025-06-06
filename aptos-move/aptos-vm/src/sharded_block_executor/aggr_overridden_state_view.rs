@@ -52,4 +52,8 @@ impl<S: StateView + Sync + Send> TStateView for AggregatorOverriddenStateView<'_
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.base_view.get_usage()
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
+    }
 }

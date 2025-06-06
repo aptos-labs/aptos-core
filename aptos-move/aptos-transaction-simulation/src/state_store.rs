@@ -249,6 +249,10 @@ impl TStateView for EmptyStateView {
     fn contains_state_value(&self, _state_key: &Self::Key) -> StateViewResult<bool> {
         Ok(false)
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
+    }
 }
 
 /***************************************************************************************************
@@ -317,6 +321,13 @@ where
             Self::Right(r) => r.next_version(),
         }
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        match self {
+            Self::Left(l) => l.get_keys_to_evict(),
+            Self::Right(r) => r.get_keys_to_evict(),
+        }
+    }
 }
 
 /***************************************************************************************************
@@ -357,6 +368,10 @@ where
         }
 
         self.base.contains_state_value(state_key)
+    }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
     }
 }
 
