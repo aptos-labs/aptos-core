@@ -27,10 +27,12 @@ pub(crate) fn native_dispatch(
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
 
     // Check that the module is already properly charged in this transaction.
-    context
-        .traversal_context()
-        .check_is_special_or_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::Abort { abort_code: 4 })?;
+    if !context
+        .gas_meter()
+        .is_existing_dependency_metered(&module_name)
+    {
+        return Err(SafeNativeError::Abort { abort_code: 4 });
+    }
 
     context.charge(DISPATCHABLE_AUTHENTICATE_DISPATCH_BASE)?;
 

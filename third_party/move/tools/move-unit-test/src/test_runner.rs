@@ -28,12 +28,9 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
-    module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::MoveVM,
-    native_extensions::NativeContextExtensions,
-    native_functions::NativeFunctionTable,
-    AsFunctionValueExtension, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
+    data_cache::TransactionDataCache, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    native_functions::NativeFunctionTable, AsFunctionValueExtension, AsUnsyncModuleStorage,
+    ModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -254,8 +251,6 @@ impl SharedTestingConfig {
 
         let mut extensions = extensions::new_extensions();
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
-        let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut data_cache = TransactionDataCache::empty();
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
@@ -275,7 +270,6 @@ impl SharedTestingConfig {
                     args,
                     &mut data_cache,
                     &mut gas_meter,
-                    &mut traversal_context,
                     &mut extensions,
                     &module_storage,
                     &self.starting_storage_state,

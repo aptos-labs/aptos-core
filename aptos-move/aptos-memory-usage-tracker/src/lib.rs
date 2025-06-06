@@ -13,10 +13,7 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
 };
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::{
     gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
@@ -98,8 +95,14 @@ impl<G> DependencyGasMeter for MemoryTrackedGasMeter<G>
 where
     G: AptosGasMeter,
 {
+    delegate! {
+        fn is_existing_dependency_metered(&self, module_id: &ModuleId) -> bool;
+    }
+
     delegate_mut! {
-        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
+        fn charge_new_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()>;
+
+        fn charge_existing_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()>;
     }
 }
 

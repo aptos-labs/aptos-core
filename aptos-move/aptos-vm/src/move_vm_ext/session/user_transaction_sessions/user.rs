@@ -25,10 +25,7 @@ use move_binary_format::{compatibility::Compatibility, errors::Location, Compile
 use move_core_types::{
     account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
 };
-use move_vm_runtime::{
-    module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, ModuleStorage,
-    StagingModuleStorage,
-};
+use move_vm_runtime::{LoadedFunction, LoadedFunctionOwner, ModuleStorage, StagingModuleStorage};
 
 #[derive(Deref, DerefMut)]
 pub struct UserSession<'r> {
@@ -82,7 +79,6 @@ impl<'r> UserSession<'r> {
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext,
         features: &Features,
         gas_feature_version: u64,
         change_set_configs: &ChangeSetConfigs,
@@ -102,14 +98,15 @@ impl<'r> UserSession<'r> {
 
         let init_func_name = ident_str!("init_module");
         for module in modules {
+            let module_id = module.self_id();
+
             // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            if module_storage.check_module_exists(&module_id)? {
                 continue;
             }
 
             self.session.execute(|session| {
                 if gas_feature_version <= RELEASE_V1_30 {
-                    let module_id = module.self_id();
                     let init_function_exists = staging_module_storage
                         .load_function(&module_id, init_func_name, &[])
                         .is_ok();
@@ -127,13 +124,12 @@ impl<'r> UserSession<'r> {
                                 .simple_serialize()
                                 .expect("Signer is always serializable")],
                             gas_meter,
-                            traversal_context,
                             &staging_module_storage,
                         )?;
                     }
                 } else {
-                    let module = staging_module_storage
-                        .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
+                    let module =
+                        staging_module_storage.fetch_existing_verified_module(&module_id)?;
                     if let Ok(function) = module.get_function(init_func_name) {
                         verifier::module_init::verify_init_module_function(&function)?;
 
@@ -148,7 +144,6 @@ impl<'r> UserSession<'r> {
                                 .simple_serialize()
                                 .expect("Signer is always serializable")],
                             gas_meter,
-                            traversal_context,
                             &staging_module_storage,
                         )?;
                     }

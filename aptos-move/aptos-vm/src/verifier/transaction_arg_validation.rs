@@ -24,10 +24,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunction, LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment,
-};
+use move_vm_runtime::{LoadedFunction, LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment};
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
     loaded_data::runtime_types::{Type, TypeParamMap},
@@ -483,14 +480,8 @@ fn validate_and_construct(
         )?;
         args.push(arg);
     }
-    let storage = TraversalStorage::new();
-    let serialized_result = session.execute_loaded_function(
-        function,
-        args,
-        gas_meter,
-        &mut TraversalContext::new(&storage),
-        module_storage,
-    )?;
+    let serialized_result =
+        session.execute_loaded_function(function, args, gas_meter, module_storage)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     Ok(ret_vals
@@ -573,11 +564,7 @@ fn load_constructor_function(
             .finish(Location::Undefined);
         return Err(err);
     }
-    let (module, function) = module_storage.fetch_function_definition(
-        module_id.address(),
-        module_id.name(),
-        function_name,
-    )?;
+    let (module, function) = module_storage.fetch_function_definition(module_id, function_name)?;
 
     if function.return_tys().len() != 1 {
         // For functions that are marked constructor this should not happen.

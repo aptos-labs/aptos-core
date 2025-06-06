@@ -20,7 +20,6 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
@@ -61,15 +60,11 @@ where
     S: StateView,
     E: WithRuntimeEnvironment,
 {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        let state_key = StateKey::module(address, module_name);
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>> {
+        let state_key = StateKey::module_id(module_id);
         self.state_view
             .get_state_value_bytes(&state_key)
-            .map_err(|e| module_storage_error!(address, module_name, e))
+            .map_err(|e| module_storage_error!(module_id.address(), module_id.name(), e))
     }
 }
 
@@ -161,17 +156,18 @@ impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
 {
     fn fetch_state_value_metadata(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let state_key = StateKey::module(address, module_name);
+        let state_key = StateKey::module_id(module_id);
         Ok(self
             .storage
             .module_storage()
             .byte_storage()
             .state_view
             .get_state_value(&state_key)
-            .map_err(|err| module_storage_error!(address, module_name, err).to_partial())?
+            .map_err(|err| {
+                module_storage_error!(module_id.address(), module_id.name(), err).to_partial()
+            })?
             .map(|state_value| state_value.into_metadata()))
     }
 }

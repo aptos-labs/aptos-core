@@ -16,7 +16,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
-use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage};
+use move_vm_runtime::ModuleStorage;
 use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
@@ -39,8 +39,6 @@ pub(crate) fn validate_module_events(
     _features: &Features,
     _gas_feature_version: u64,
     module_storage: &impl ModuleStorage,
-    // TODO(lazy-loading): add a check that the old module has been visited.
-    _traversal_context: &TraversalContext,
     new_modules: &[CompiledModule],
 ) -> VMResult<()> {
     for new_module in new_modules {
@@ -53,7 +51,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, new_module)?;
 
         let old_module_metadata_if_exists = module_storage
-            .fetch_deserialized_module(new_module.address(), new_module.name())?
+            .fetch_deserialized_module(&new_module.self_id())?
             .and_then(|module| {
                 // TODO(loader_v2): We can optimize this to fetch metadata directly.
                 get_metadata_from_compiled_code(module.as_ref())

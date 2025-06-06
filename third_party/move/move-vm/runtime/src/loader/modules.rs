@@ -157,10 +157,7 @@ impl Module {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
-        let friends = module
-            .immediate_friends_iter()
-            .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
-            .collect::<BTreeSet<_>>();
+        let friends = module.immediate_friends_iter().collect::<BTreeSet<_>>();
 
         let mut structs = vec![];
         let mut struct_instantiations = vec![];
