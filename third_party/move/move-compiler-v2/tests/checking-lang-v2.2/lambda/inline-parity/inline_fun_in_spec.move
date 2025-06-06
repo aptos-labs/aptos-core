@@ -12,6 +12,7 @@ module 0x42::m {
     }
     spec function_spec_block {
         ensures result == exec(|x| x + 1, x);
+        ensures result == exec(|x| x + 1, x);
     }
 
     // Function code spec block
