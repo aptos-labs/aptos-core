@@ -41,6 +41,7 @@ pub const OBJECT_RESOURCE_GROUP: &str = "ObjectGroup";
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
 pub const TRANSFER_COINS_FUNCTION: &str = "transfer_coins";
+pub const TRANSFER_FUNGIBLE_ASSETS_FUNCTION: &str = "transfer_fungible_assets";
 pub const BALANCE_FUNCTION: &str = "balance";
 
 // Staking Contract

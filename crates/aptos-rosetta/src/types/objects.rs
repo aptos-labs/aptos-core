@@ -1079,7 +1079,8 @@ fn parse_failed_operations_from_txn_payload(
                     operation_index,
                 )
             },
-            (AccountAddress::ONE, PRIMARY_FUNGIBLE_STORE_MODULE, TRANSFER_FUNCTION) => {
+            (AccountAddress::ONE, PRIMARY_FUNGIBLE_STORE_MODULE, TRANSFER_FUNCTION)
+            | (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNGIBLE_ASSETS_FUNCTION) => {
                 // Primary transfer has the same interface as coin transfer, but it's a metadata address instead of a coin type generic
                 let maybe_metadata_address = inner
                     .args()
