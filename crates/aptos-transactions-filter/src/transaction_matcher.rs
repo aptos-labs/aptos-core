@@ -33,24 +33,32 @@ pub enum Matcher {
 impl Matcher {
     fn matches(
         &self,
-        block_id: HashValue,
-        block_epoch: u64,
-        block_timestamp: u64,
+        block_id: Option<HashValue>,
+        block_epoch: Option<u64>,
+        block_timestamp: Option<u64>,
         txn: &SignedTransaction,
     ) -> bool {
         match self {
             Matcher::All => true,
-            Matcher::BlockId(id) => block_id == *id,
-            Matcher::BlockTimeStampGreaterThan(timestamp) => block_timestamp > *timestamp,
-            Matcher::BlockTimeStampLessThan(timestamp) => block_timestamp < *timestamp,
+            Matcher::BlockId(target_block_id) => matches_block_id(block_id, target_block_id),
+            Matcher::BlockTimeStampGreaterThan(target_timestamp) => {
+                matches_timestamp_greater_than(block_timestamp, target_timestamp)
+            },
+            Matcher::BlockTimeStampLessThan(target_timestamp) => {
+                matches_timestamp_less_than(block_timestamp, target_timestamp)
+            },
             Matcher::TransactionId(id) => txn.committed_hash() == *id,
             Matcher::Sender(sender) => matches_sender_address(txn, sender),
             Matcher::ModuleAddress(address) => matches_entry_function_module_address(txn, address),
             Matcher::EntryFunction(address, module_name, function) => {
                 matches_entry_function(txn, address, module_name, function)
             },
-            Matcher::BlockEpochGreaterThan(epoch) => block_epoch > *epoch,
-            Matcher::BlockEpochLessThan(epoch) => block_epoch < *epoch,
+            Matcher::BlockEpochGreaterThan(target_epoch) => {
+                matches_epoch_greater_than(block_epoch, target_epoch)
+            },
+            Matcher::BlockEpochLessThan(target_epoch) => {
+                matches_epoch_less_than(block_epoch, target_epoch)
+            },
             Matcher::MatchesAllOf(matchers) => matchers
                 .iter()
                 .all(|matcher| matcher.matches(block_id, block_epoch, block_timestamp, txn)),
@@ -180,6 +188,15 @@ fn matches_any_public_key_address(any_public_key: &AnyPublicKey, address: &Accou
     }
 }
 
+/// Returns true iff the block ID matches the target block ID.
+/// Note that a missing block ID is NOT considered a match.
+fn matches_block_id(block_id: Option<HashValue>, target_block_id: &HashValue) -> bool {
+    match block_id {
+        Some(block_id) => block_id == *target_block_id,
+        None => false,
+    }
+}
+
 /// Returns true iff the transaction's entry function matches the given account address, module name, and function name
 fn matches_entry_function(
     signed_transaction: &SignedTransaction,
@@ -244,6 +261,24 @@ fn matches_entry_function_module_address(
     }
 }
 
+/// Returns true iff the block epoch is greater than the target epoch.
+/// Note that a missing block epoch is NOT considered a match.
+fn matches_epoch_greater_than(block_epoch: Option<u64>, target_epoch: &u64) -> bool {
+    match block_epoch {
+        Some(block_epoch) => block_epoch > *target_epoch,
+        None => false,
+    }
+}
+
+/// Returns true iff the block epoch is less than the target epoch.
+/// Note that a missing block epoch is NOT considered a match.
+fn matches_epoch_less_than(block_epoch: Option<u64>, target_epoch: &u64) -> bool {
+    match block_epoch {
+        Some(block_epoch) => block_epoch < *target_epoch,
+        None => false,
+    }
+}
+
 /// Returns true iff the transaction's multisig address matches the given account address
 fn matches_multisig_address(
     signed_transaction: &SignedTransaction,
@@ -294,6 +329,24 @@ fn matches_script_argument_address(
 /// Returns true iff the transaction's sender matches the given account address
 fn matches_sender_address(signed_transaction: &SignedTransaction, sender: &AccountAddress) -> bool {
     signed_transaction.sender() == *sender
+}
+
+/// Returns true iff the block timestamp is greater than the target timestamp.
+/// Note that a missing block timestamp is NOT considered a match.
+fn matches_timestamp_greater_than(block_timestamp: Option<u64>, target_timestamp: &u64) -> bool {
+    match block_timestamp {
+        Some(block_timestamp) => block_timestamp > *target_timestamp,
+        None => false,
+    }
+}
+
+/// Returns true iff the block timestamp is less than the target timestamp.
+/// Note that a missing block timestamp is NOT considered a match.
+fn matches_timestamp_less_than(block_timestamp: Option<u64>, target_timestamp: &u64) -> bool {
+    match block_timestamp {
+        Some(block_timestamp) => block_timestamp < *target_timestamp,
+        None => false,
+    }
 }
 
 /// Returns true iff the transaction's authenticator contains the given account address
@@ -404,9 +457,9 @@ enum EvalResult {
 impl Rule {
     fn eval(
         &self,
-        block_id: HashValue,
-        block_epoch: u64,
-        block_timestamp: u64,
+        block_id: Option<HashValue>,
+        block_epoch: Option<u64>,
+        block_timestamp: Option<u64>,
         txn: &SignedTransaction,
     ) -> EvalResult {
         match self {
@@ -556,20 +609,39 @@ impl Filter {
         self.add_match_rule(allow, matcher)
     }
 
-    pub fn rules(&self) -> &[Rule] {
-        &self.rules
+    /// Determines if the filter allows a transaction (unassociated with any block)
+    pub fn allows(&self, txn: &SignedTransaction) -> bool {
+        self.evaluate_rules(None, None, None, txn)
     }
 
-    pub fn allows(
+    /// Determines if the filter allows a transaction (associated with
+    /// a specific block ID, epoch, and timestamp).
+    pub fn allows_in_block(
         &self,
         block_id: HashValue,
         block_epoch: u64,
         block_timestamp: u64,
         txn: &SignedTransaction,
     ) -> bool {
+        self.evaluate_rules(
+            Some(block_id),
+            Some(block_epoch),
+            Some(block_timestamp),
+            txn,
+        )
+    }
+
+    /// Determines if the filter allows a transaction by evaluating the rule
+    /// set. Rules are applied in order and the first rule that matches is
+    /// used. If no rule matches, the transaction is allowed.
+    fn evaluate_rules(
+        &self,
+        block_id: Option<HashValue>,
+        block_epoch: Option<u64>,
+        block_timestamp: Option<u64>,
+        txn: &SignedTransaction,
+    ) -> bool {
         for rule in &self.rules {
-            // Rules are evaluated in the order and the first rule that matches is used. If no rule
-            // matches, the transaction is allowed.
             match rule.eval(block_id, block_epoch, block_timestamp, txn) {
                 EvalResult::Allow => return true,
                 EvalResult::Deny => return false,
@@ -693,6 +765,94 @@ mod test {
 
         // Verify that the public key matches the target address
         verify_matches_public_key_address(&public_key, &target_address, true);
+    }
+
+    #[test]
+    fn test_matches_block_id() {
+        // Create a block ID
+        let block_id = HashValue::random();
+
+        // Verify that the block ID matches itself
+        verify_matches_block_id(Some(block_id), &block_id, true);
+
+        // Verify that a different block ID does not match
+        let different_block_id = HashValue::random();
+        verify_matches_block_id(Some(block_id), &different_block_id, false);
+
+        // Verify that a missing block ID does not match
+        verify_matches_block_id(None, &block_id, false);
+    }
+
+    #[test]
+    fn test_matches_epoch_greater_than() {
+        // Create an epoch
+        let epoch = 10;
+
+        // Verify that a greater epoch matches
+        verify_matches_epoch_greater_than(Some(epoch + 1), &epoch, true);
+
+        // Verify that an equal epoch does not match
+        verify_matches_epoch_greater_than(Some(epoch), &epoch, false);
+
+        // Verify that a lesser epoch does not match
+        verify_matches_epoch_greater_than(Some(epoch - 1), &epoch, false);
+
+        // Verify that a missing epoch does not match
+        verify_matches_epoch_greater_than(None, &epoch, false);
+    }
+
+    #[test]
+    fn test_matches_epoch_less_than() {
+        // Create an epoch
+        let epoch = 10;
+
+        // Verify that a lesser epoch matches
+        verify_matches_epoch_less_than(Some(epoch - 1), &epoch, true);
+
+        // Verify that an equal epoch does not match
+        verify_matches_epoch_less_than(Some(epoch), &epoch, false);
+
+        // Verify that a greater epoch does not match
+        verify_matches_epoch_less_than(Some(epoch + 1), &epoch, false);
+
+        // Verify that a missing epoch does not match
+        verify_matches_epoch_less_than(None, &epoch, false);
+    }
+
+    #[test]
+    fn test_matches_timestamp_greater_than() {
+        // Create a timestamp
+        let timestamp = 100;
+
+        // Verify that a greater timestamp matches
+        verify_matches_timestamp_greater_than(Some(timestamp + 1), &timestamp, true);
+
+        // Verify that an equal timestamp does not match
+        verify_matches_timestamp_greater_than(Some(timestamp), &timestamp, false);
+
+        // Verify that a lesser timestamp does not match
+        verify_matches_timestamp_greater_than(Some(timestamp - 1), &timestamp, false);
+
+        // Verify that a missing timestamp does not match
+        verify_matches_timestamp_greater_than(None, &timestamp, false);
+    }
+
+    #[test]
+    fn test_matches_timestamp_less_than() {
+        // Create a timestamp
+        let timestamp = 100;
+
+        // Verify that a lesser timestamp matches
+        verify_matches_timestamp_less_than(Some(timestamp - 1), &timestamp, true);
+
+        // Verify that an equal timestamp does not match
+        verify_matches_timestamp_less_than(Some(timestamp), &timestamp, false);
+
+        // Verify that a greater timestamp does not match
+        verify_matches_timestamp_less_than(Some(timestamp + 1), &timestamp, false);
+
+        // Verify that a missing timestamp does not match
+        verify_matches_timestamp_less_than(None, &timestamp, false);
     }
 
     #[test]
@@ -973,12 +1133,53 @@ mod test {
         assert_eq!(matches, result);
     }
 
+    fn verify_matches_block_id(
+        block_id: Option<HashValue>,
+        target_block_id: &HashValue,
+        matches: bool,
+    ) {
+        let result = matches_block_id(block_id, target_block_id);
+        assert_eq!(matches, result);
+    }
+
+    fn verify_matches_epoch_greater_than(
+        block_epoch: Option<u64>,
+        target_epoch: &u64,
+        matches: bool,
+    ) {
+        let result = matches_epoch_greater_than(block_epoch, target_epoch);
+        assert_eq!(matches, result);
+    }
+
+    fn verify_matches_epoch_less_than(block_epoch: Option<u64>, target_epoch: &u64, matches: bool) {
+        let result = matches_epoch_less_than(block_epoch, target_epoch);
+        assert_eq!(matches, result);
+    }
+
     fn verify_matches_public_key_address(
         any_public_key: &AnyPublicKey,
         address: &AccountAddress,
         matches: bool,
     ) {
         let result = matches_any_public_key_address(any_public_key, address);
+        assert_eq!(matches, result);
+    }
+
+    fn verify_matches_timestamp_greater_than(
+        block_timestamp: Option<u64>,
+        target_timestamp: &u64,
+        matches: bool,
+    ) {
+        let result = matches_timestamp_greater_than(block_timestamp, target_timestamp);
+        assert_eq!(matches, result);
+    }
+
+    fn verify_matches_timestamp_less_than(
+        block_timestamp: Option<u64>,
+        target_timestamp: &u64,
+        matches: bool,
+    ) {
+        let result = matches_timestamp_less_than(block_timestamp, target_timestamp);
         assert_eq!(matches, result);
     }
 

@@ -20,7 +20,6 @@ use crate::{
     quorum_store::quorum_store_db::QuorumStoreDB,
     rand::rand_gen::storage::db::RandDb,
     state_computer::ExecutionProxy,
-    transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
@@ -35,6 +34,7 @@ use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_time_service::TimeService;
+use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use futures::channel::mpsc;
