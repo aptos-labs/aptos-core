@@ -1,0 +1,5 @@
+[package]
+name = "star_512"
+version = "0.0.0"
+
+[dependencies]
