@@ -161,6 +161,9 @@ pub enum AptosTapErrorCode {
     /// The server has hit its max concurrent requests limit.
     ServerOverloaded = 57,
 
+    /// Unexpected internal problem.
+    InternalError = 58,
+
     /// Error from the web framework.
     WebFrameworkError = 60,
 }
@@ -180,7 +183,8 @@ impl AptosTapErrorCode {
             | AptosTapErrorCode::SerializationError
             | AptosTapErrorCode::BypasserError
             | AptosTapErrorCode::CheckerError
-            | AptosTapErrorCode::StorageError => StatusCode::INTERNAL_SERVER_ERROR,
+            | AptosTapErrorCode::StorageError
+            | AptosTapErrorCode::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             AptosTapErrorCode::ServerOverloaded | AptosTapErrorCode::FunderAccountProblem => {
                 StatusCode::SERVICE_UNAVAILABLE
             },

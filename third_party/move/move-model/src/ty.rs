@@ -2538,7 +2538,14 @@ impl Substitution {
                 }
             },
             (Type::Reference(k1, ty1), Type::Reference(k2, ty2)) => {
-                // For references, allow variance to be passed down, and not use sub-variance
+                let variance = if matches!((k1, k2), (ReferenceKind::Mutable, ReferenceKind::Mutable))
+                {
+                    // For both being mutable references, use no variance.
+                    Variance::NoVariance
+                } else {
+                    // For other cases of references, allow variance to be passed down, and not use sub-variance
+                    variance
+                };
                 let ty = self
                     .unify(context, variance, order, ty1, ty2)
                     .map_err(TypeUnificationError::lift(order, t1, t2))?;

@@ -75,6 +75,9 @@ pub trait TStateView {
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
         self.get_state_value(state_key).map(|opt| opt.is_some())
     }
+
+    /// Returns a list of keys that should be evicted for the hot state to remain small.
+    fn get_keys_to_evict(&self) -> Vec<StateKey>;
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
@@ -125,6 +128,10 @@ where
 
     fn get_state_value(&self, state_key: &K) -> StateViewResult<Option<StateValue>> {
         self.deref().get_state_value(state_key)
+    }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        self.deref().get_keys_to_evict()
     }
 }
 

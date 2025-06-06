@@ -84,6 +84,10 @@ impl<S: StateView + Sync + Send> TStateView for CrossShardStateView<'_, S> {
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         Ok(StateStorageUsage::new_untracked())
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
+    }
 }
 
 #[cfg(test)]

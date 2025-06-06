@@ -62,4 +62,8 @@ impl TStateView for GenesisStateView {
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::zero())
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
+    }
 }

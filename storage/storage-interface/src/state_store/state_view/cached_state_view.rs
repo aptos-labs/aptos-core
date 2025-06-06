@@ -281,6 +281,10 @@ impl TStateView for CachedStateView {
     fn next_version(&self) -> Version {
         self.speculative.next_version()
     }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
+    }
 }
 
 pub struct CachedDbStateView {
@@ -325,5 +329,9 @@ impl TStateView for CachedDbStateView {
 
     fn next_version(&self) -> Version {
         self.db_state_view.next_version()
+    }
+
+    fn get_keys_to_evict(&self) -> Vec<StateKey> {
+        Vec::new()
     }
 }

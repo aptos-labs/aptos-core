@@ -271,6 +271,8 @@ impl RunConfig {
             funder_config: FunderConfig::MintFunder(MintFunderConfig {
                 api_connection_config: ApiConnectionConfig::new(
                     api_url,
+                    None,
+                    None,
                     key_file_path,
                     key,
                     chain_id.unwrap_or_else(ChainId::test),

@@ -48,4 +48,8 @@ module 0x8675309::M {
     fun return_borrow_tuple() : &(u64, u64) {
         return &(1, 2)
     }
+
+    fun return_borrow_unit() : &() {
+        return &()
+    }
 }

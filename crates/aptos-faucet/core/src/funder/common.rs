@@ -25,6 +25,7 @@ use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     path::PathBuf,
     str::FromStr,
     sync::{
@@ -52,6 +53,15 @@ pub struct ApiConnectionConfig {
     #[clap(long, default_value = "https://fullnode.testnet.aptoslabs.com/")]
     pub node_url: Url,
 
+    /// API key for talking to the node API.
+    #[clap(long)]
+    pub api_key: Option<String>,
+
+    /// Any additional headers to send with the request. We don't accept this on the
+    /// CLI.
+    #[clap(skip)]
+    pub additional_headers: Option<HashMap<String, String>>,
+
     /// Path to the private key for creating test account and minting coins in
     /// the MintFunder case, or for transferring coins in the TransferFunder case.
     /// To keep Testnet simple, we used one private key for aptos root account
@@ -76,12 +86,16 @@ pub struct ApiConnectionConfig {
 impl ApiConnectionConfig {
     pub fn new(
         node_url: Url,
+        api_key: Option<String>,
+        additional_headers: Option<HashMap<String, String>>,
         key_file_path: PathBuf,
         key: Option<ConfigKey<Ed25519PrivateKey>>,
         chain_id: ChainId,
     ) -> Self {
         Self {
             node_url,
+            api_key,
+            additional_headers,
             key_file_path,
             key,
             chain_id,

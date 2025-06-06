@@ -23,7 +23,6 @@ use self_update::{
     cargo_crate_version,
     update::ReleaseUpdate,
 };
-use std::process::Command;
 
 /// Update the CLI itself
 ///
@@ -122,40 +121,10 @@ impl BinaryUpdater for AptosUpdateTool {
         // happen to build. We figure this out based on what system the CLI was built on.
         let build_info = cli_build_information();
         let target = match build_info.get(BUILD_OS).context("Failed to determine build info of current CLI")?.as_str() {
-            "linux-x86_64" => {
-                // In the case of Linux, which build to use depends on the OpenSSL
-                // library on the host machine. So we try to determine that here.
-                // This code below parses the output of the `openssl version` command,
-                // where the version string is the 1th (0-indexing) item in the string
-                // when split by whitespace.
-                let output = Command::new("openssl")
-                .args(["version"])
-                .output();
-                let version = match output {
-                    Ok(output) => {
-                        let stdout = String::from_utf8(output.stdout).unwrap();
-                        stdout.split_whitespace().collect::<Vec<&str>>()[1].to_string()
-                    },
-                    Err(e) => {
-                        println!("Failed to determine OpenSSL version, assuming an older version: {:#}", e);
-                        "1.0.0".to_string()
-                    }
-                };
-                // On Ubuntu < 22.04 the bundled OpenSSL is version 1.x.x, whereas on
-                // 22.04+ it is 3.x.x. Unfortunately if you build the CLI on a system
-                // with one major version of OpenSSL, you cannot use it on a system
-                // with a different version. Accordingly, if the current system uses
-                // OpenSSL 3.x.x, we use the version of the CLI built on a system with
-                // OpenSSL 3.x.x, meaning Ubuntu 22.04. Otherwise we use the one built
-                // on 20.04.
-                if version.starts_with('3') {
-                    "Linux-x86_64"
-                } else {
-                    eprintln!("Warning: OpenSSL 1.x.x is deprecated, and so is the CLI associated.  It may not work or have future updates");
-                    "Ubuntu-x86_64"
-                }
-            },
-            "macos-x86_64" => "MacOSX-x86_64",
+            "linux-x86_64" => "Linux-x86_64",
+            "linux-aarch64" => "Linux-aarch64",
+            "macos-x86_64" => "macOS-x86_64",
+            "macos-aarch64" => "macOS-arm64",
             "windows-x86_64" => "Windows-x86_64",
             wildcard => return Err(anyhow!("Self-updating is not supported on your OS ({}) right now, please download the binary manually", wildcard)),
         };

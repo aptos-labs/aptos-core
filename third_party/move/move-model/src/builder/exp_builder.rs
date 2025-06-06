@@ -1049,6 +1049,9 @@ impl ExpTranslator<'_, '_, '_> {
                 if inner.is_reference() {
                     self.error(loc, "reference to a reference is not allowed");
                 }
+                if inner.is_tuple() {
+                    self.error(loc, "reference to a tuple is not allowed");
+                }
                 Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(inner))
             },
             Fun(args, result, abilities) => {
