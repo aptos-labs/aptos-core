@@ -32,6 +32,7 @@ use move_core_types::{
     metadata::Metadata,
     transaction_argument::TransactionArgument,
 };
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -137,11 +138,12 @@ impl TransactionComposer {
     pub async fn load_module(
         &mut self,
         api_url: String,
+        api_key: String,
         module_name: String,
     ) -> Result<(), JsValue> {
         let module_id = ModuleId::from_str(&module_name)
             .map_err(|err| JsValue::from(format!("Invalid module name: {:?}", err)))?;
-        self.load_module_impl(api_url.as_str(), module_id)
+        self.load_module_impl(api_url.as_str(), api_key.as_str(), module_id)
             .await
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
@@ -150,11 +152,12 @@ impl TransactionComposer {
     pub async fn load_type_tag(
         &mut self,
         api_url: String,
+        api_key: String,
         type_tag: String,
     ) -> Result<(), JsValue> {
         let type_tag = TypeTag::from_str(&type_tag)
             .map_err(|err| JsValue::from(format!("Invalid type name: {:?}", err)))?;
-        self.load_type_tag_impl(api_url.as_str(), &type_tag)
+        self.load_type_tag_impl(api_url.as_str(), api_key.as_str() , &type_tag)
             .await
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
@@ -448,12 +451,23 @@ impl TransactionComposer {
         .unwrap())
     }
 
-    async fn load_module_impl(&mut self, api_url: &str, module_id: ModuleId) -> anyhow::Result<()> {
+    async fn load_module_impl(&mut self, api_url: &str, api_key: &str, module_id: ModuleId) -> anyhow::Result<()> {
         let url = format!(
             "{}/{}/{}/{}/{}",
             api_url, "accounts", &module_id.address, "module", &module_id.name
         );
-        let response = reqwest::get(url).await?;
+       
+       let response = if api_key.is_empty() {
+            reqwest::get(url).await?
+        }else{
+            let client = reqwest::Client::new();
+            client
+                .get(url)
+                .header("Authorization", format!("Bearer {}", api_key))
+                .send()
+                .await?
+        };
+
         let result = if response.status().is_success() {
             Ok(response.text().await?)
         } else {
@@ -485,17 +499,18 @@ impl TransactionComposer {
     async fn load_type_tag_impl(
         &mut self,
         api_url: &str,
+        api_key: &str,
         type_tag: &TypeTag,
     ) -> anyhow::Result<()> {
         match type_tag {
             TypeTag::Struct(s) => {
-                self.load_module_impl(api_url, s.module_id()).await?;
+                self.load_module_impl(api_url, api_key, s.module_id()).await?;
                 for ty in s.type_args.iter() {
-                    Box::pin(self.load_type_tag_impl(api_url, ty)).await?;
+                    Box::pin(self.load_type_tag_impl(api_url, api_key,ty)).await?;
                 }
                 Ok(())
             },
-            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, v)).await,
+            TypeTag::Vector(v) => Box::pin(self.load_type_tag_impl(api_url, api_key,v)).await,
             _ => Ok(()),
         }
     }
