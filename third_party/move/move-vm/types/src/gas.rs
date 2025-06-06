@@ -8,7 +8,6 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes, NumTypeNodes},
-    identifier::IdentStr,
     language_storage::ModuleId,
 };
 
@@ -141,11 +140,17 @@ impl SimpleInstruction {
 /// Metering API for module or script dependencies. Defined as a stand-alone trait so it can be
 /// used in native context.
 pub trait DependencyGasMeter {
-    fn charge_dependency(
+    fn is_existing_dependency_metered(&self, module_id: &ModuleId) -> bool;
+
+    fn charge_new_dependency(
         &mut self,
-        is_new: bool,
-        addr: &AccountAddress,
-        name: &IdentStr,
+        module_id: &ModuleId,
+        size: NumBytes,
+    ) -> PartialVMResult<()>;
+
+    fn charge_existing_dependency(
+        &mut self,
+        module_id: &ModuleId,
         size: NumBytes,
     ) -> PartialVMResult<()>;
 }
@@ -362,11 +367,21 @@ pub trait GasMeter: NativeGasMeter {
 pub struct UnmeteredGasMeter;
 
 impl DependencyGasMeter for UnmeteredGasMeter {
-    fn charge_dependency(
+    fn is_existing_dependency_metered(&self, _module_id: &ModuleId) -> bool {
+        true
+    }
+
+    fn charge_new_dependency(
         &mut self,
-        _is_new: bool,
-        _addr: &AccountAddress,
-        _name: &IdentStr,
+        _module_id: &ModuleId,
+        _size: NumBytes,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_existing_dependency(
+        &mut self,
+        _module_id: &ModuleId,
         _size: NumBytes,
     ) -> PartialVMResult<()> {
         Ok(())

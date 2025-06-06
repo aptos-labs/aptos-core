@@ -75,7 +75,6 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -83,10 +82,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
-};
+use move_vm_runtime::ModuleStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1091,13 +1087,9 @@ impl FakeExecutor {
         };
 
         let env = AptosEnvironment::new(&self.state_store);
+        let module_storage = self.state_store.as_aptos_code_storage(&env);
         let resolver = self.state_store.as_move_resolver();
         let vm = MoveVmExt::new(&env);
-
-        // Create module storage, and ensure the module for the function we want to execute is
-        // cached.
-        let module_storage = self.state_store.as_aptos_code_storage(&env);
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -1155,7 +1147,6 @@ impl FakeExecutor {
             };
 
             let start = Instant::now();
-            let storage = TraversalStorage::new();
             // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
             let result = match gas_meter_type {
                 GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
@@ -1164,7 +1155,6 @@ impl FakeExecutor {
                     ty,
                     arg,
                     regular.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
                     &module_storage,
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
@@ -1173,7 +1163,6 @@ impl FakeExecutor {
                     ty,
                     arg,
                     unmetered.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
                     &module_storage,
                 ),
             };
@@ -1245,7 +1234,6 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
-            let storage = TraversalStorage::new();
             let result = session.execute_function_bypass_visibility(
                 module,
                 &fun_name,
@@ -1262,7 +1250,6 @@ impl FakeExecutor {
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
-                &mut TraversalContext::new(&storage),
                 &module_storage,
             );
             if let Err(err) = result {
@@ -1302,7 +1289,6 @@ impl FakeExecutor {
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
-            let storage = TraversalStorage::new();
             session
                 .execute_function_bypass_visibility(
                     &module_id,
@@ -1311,7 +1297,6 @@ impl FakeExecutor {
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
-                    &mut TraversalContext::new(&storage),
                     &module_storage,
                 )
                 .unwrap_or_else(|e| {
@@ -1346,7 +1331,6 @@ impl FakeExecutor {
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
-        let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -1355,7 +1339,6 @@ impl FakeExecutor {
                 args,
                 // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
             )
             .map_err(|e| e.into_vm_status())?;

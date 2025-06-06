@@ -42,11 +42,7 @@ impl BlankStorage {
 }
 
 impl ModuleBytesStorage for BlankStorage {
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
+    fn fetch_module_bytes(&self, _module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -92,15 +88,11 @@ pub struct InMemoryStorage {
 }
 
 impl ModuleBytesStorage for InMemoryStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         Ok(self
             .accounts
-            .get(address)
-            .and_then(|account_storage| account_storage.modules.get(module_name).cloned()))
+            .get(module_id.address())
+            .and_then(|account_storage| account_storage.modules.get(module_id.name()).cloned()))
     }
 }
 impl WithRuntimeEnvironment for InMemoryStorage {
@@ -113,7 +105,7 @@ impl CompiledModuleView for InMemoryStorage {
     type Item = CompiledModule;
 
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        Ok(match self.fetch_module_bytes(id.address(), id.name())? {
+        Ok(match self.fetch_module_bytes(id)? {
             Some(bytes) => {
                 let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
                 Some(CompiledModule::deserialize_with_config(&bytes, &config)?)

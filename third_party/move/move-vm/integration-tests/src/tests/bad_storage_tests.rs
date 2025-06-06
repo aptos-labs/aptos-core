@@ -15,7 +15,7 @@ use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMRe
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::{serialize_values, MoveTypeLayout, MoveValue},
@@ -468,11 +468,7 @@ impl WithRuntimeEnvironment for BogusModuleStorage {
 }
 
 impl ModuleBytesStorage for BogusModuleStorage {
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
+    fn fetch_module_bytes(&self, _module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }

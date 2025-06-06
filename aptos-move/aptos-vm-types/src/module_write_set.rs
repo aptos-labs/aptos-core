@@ -7,10 +7,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::ModuleStorage;
 use std::collections::BTreeMap;
 
@@ -27,14 +24,9 @@ impl<V: TransactionWrite> ModuleWrite<V> {
         Self { id, write_op }
     }
 
-    /// Returns the address of the module written.
-    pub fn module_address(&self) -> &AccountAddress {
-        self.id.address()
-    }
-
-    /// Returns the name of the module written.
-    pub fn module_name(&self) -> &IdentStr {
-        self.id.name()
+    /// Returns the module identifier for the write.
+    pub fn module_id(&self) -> &ModuleId {
+        &self.id
     }
 
     /// Returns the mutable reference to the write for the published module.
@@ -99,7 +91,7 @@ impl ModuleWriteSet {
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.writes.iter_mut().map(move |(key, write)| {
             let prev_size = module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .fetch_module_size_in_bytes(write.module_id())
                 .map_err(|e| e.to_partial())?
                 .unwrap_or(0) as u64;
             Ok(WriteOpInfo {

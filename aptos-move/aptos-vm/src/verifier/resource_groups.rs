@@ -13,7 +13,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
-use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage};
+use move_vm_runtime::ModuleStorage;
 use move_vm_types::gas::GasMeter;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -36,8 +36,6 @@ fn metadata_validation_error(msg: &str) -> VMError {
 pub(crate) fn validate_resource_groups(
     features: &Features,
     module_storage: &impl ModuleStorage,
-    // TODO(lazy-loading): add a check that the old module has been visited + charge for metadata.
-    _traversal_context: &TraversalContext,
     _gas_meter: &mut impl GasMeter,
     new_modules: &[CompiledModule],
 ) -> Result<(), VMError> {
@@ -56,10 +54,8 @@ pub(crate) fn validate_resource_groups(
             let group_module_id = group_tag.module_id();
             if !groups.contains_key(&group_module_id) {
                 // Note: module must exist for the group member to refer to it!
-                let old_module = module_storage.fetch_existing_deserialized_module(
-                    group_module_id.address(),
-                    group_module_id.name(),
-                )?;
+                let old_module =
+                    module_storage.fetch_existing_deserialized_module(&group_module_id)?;
 
                 let (inner_groups, _, _) =
                     extract_resource_group_metadata_from_module(&old_module)?;
@@ -103,7 +99,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
         };
 
     let (original_groups, original_members, mut structs) = module_storage
-        .fetch_deserialized_module(new_module.address(), new_module.name())?
+        .fetch_deserialized_module(&new_module.self_id())?
         .map_or_else(
             || Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new())),
             |old_module| extract_resource_group_metadata_from_module(&old_module),
