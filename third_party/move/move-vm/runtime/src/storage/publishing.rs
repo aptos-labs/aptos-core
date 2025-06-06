@@ -1,6 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::duplicated_attributes)]
+
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, loader::Function,
     AsUnsyncModuleStorage, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment,
@@ -58,13 +60,13 @@ struct StagingModuleBytesStorage<'a, M> {
     module_storage: &'a M,
 }
 
-impl<'a, M> WithRuntimeEnvironment for StagingModuleBytesStorage<'a, M> {
+impl<M> WithRuntimeEnvironment for StagingModuleBytesStorage<'_, M> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         &self.staged_runtime_environment
     }
 }
 
-impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
+impl<M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,
@@ -122,9 +124,10 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         // using this new module storage with changes, global caches are not accessed. Only when
         // the published module is committed, and its structs are accessed, their information will
         // be cached in the global runtime environment.
-        // TODO(loader_v2):
-        //   Avoid clone and instead stage runtime environment so that higher order indices are
-        //   resolved through some temporary data structure.
+        //
+        // Note: cloning the environment is relatively cheap because it only stores global caches
+        // that cannot be invalidated by module upgrades using a shared pointer, so it is not a
+        // deep copy. See implementation of Clone for this struct for more details.
         let staged_runtime_environment = existing_module_storage.runtime_environment().clone();
         let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
 

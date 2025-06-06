@@ -17,7 +17,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     errors::{Location, VMResult},
     file_format::CompiledScript,
-    file_format_common, CompiledModule,
+    CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -28,7 +28,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::MoveValue,
+    value::{MoveTypeLayout, MoveValue},
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
@@ -40,14 +40,14 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage, LoadedFunction, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage,
+    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
+    LoadedFunction, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
-use move_vm_types::resolver::ResourceResolver;
+use move_vm_types::{resolver::ResourceResolver, value_serde::ValueSerDeContext, values::Value};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -138,9 +138,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             named_address_mapping.insert(name, addr);
         }
 
-        let vm_config = vm_config();
+        let vm_config = match &run_config {
+            TestRunConfig::CompilerV2 { vm_config, .. } => vm_config.clone(),
+        };
         let runtime_environment = create_runtime_environment(vm_config);
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
+        let max_binary_format_version = storage.max_binary_format_version();
 
         let mut adapter = Self {
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps_v2, None),
@@ -166,7 +169,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 let mut module_bytes = vec![];
                 tmod.named_module
                     .module
-                    .serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)
+                    .serialize_for_version(Some(max_binary_format_version), &mut module_bytes)
                     .unwrap();
                 module_bytes.into()
             })
@@ -211,7 +214,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let module_storage = self.storage.clone().into_unsync_module_storage();
 
         let mut module_bytes = vec![];
-        module.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)?;
+        module.serialize_for_version(
+            Some(self.storage.max_binary_format_version()),
+            &mut module_bytes,
+        )?;
 
         let id = module.self_id();
         let sender = *id.address();
@@ -266,7 +272,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
 
         let mut script_bytes = vec![];
-        script.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut script_bytes)?;
+        script.serialize_for_version(
+            Some(self.storage.max_binary_format_version()),
+            &mut script_bytes,
+        )?;
 
         let args = txn_args
             .iter()
@@ -364,9 +373,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
         unreachable!()
     }
+
+    fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+        let module_storage = self.storage.as_unsync_module_storage();
+        ValueSerDeContext::new()
+            .with_func_args_deserialization(&module_storage.as_function_value_extension())
+            .deserialize(bytes, layout)
+    }
 }
 
-impl<'a> SimpleVMTestAdapter<'a> {
+impl SimpleVMTestAdapter<'_> {
     fn execute_loaded_function(
         &mut self,
         function: LoadedFunction,
@@ -400,14 +416,6 @@ impl<'a> SimpleVMTestAdapter<'a> {
             .map_err(|err| err.finish(Location::Undefined))?;
         self.storage.apply(change_set).unwrap();
         Ok(return_values)
-    }
-}
-
-fn vm_config() -> VMConfig {
-    VMConfig {
-        verifier_config: VerifierConfig::production(),
-        paranoid_type_checks: true,
-        ..VMConfig::default()
     }
 }
 
@@ -482,21 +490,38 @@ static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| 
     PrecompiledFilesModules::new(move_stdlib::move_stdlib_files(), modules)
 });
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRunConfig {
     CompilerV2 {
         language_version: LanguageVersion,
         /// List of experiments and whether to enable them or not.
         experiments: Vec<(String, bool)>,
+        /// Configuration for the VM that runs tests.
+        vm_config: VMConfig,
     },
+}
+
+impl TestRunConfig {
+    /// Returns compiler V2 config with default VM config.
+    pub fn compiler_v2(
+        language_version: LanguageVersion,
+        experiments: Vec<(String, bool)>,
+    ) -> Self {
+        Self::CompilerV2 {
+            language_version,
+            experiments,
+            vm_config: VMConfig {
+                verifier_config: VerifierConfig::production(),
+                paranoid_type_checks: true,
+                ..VMConfig::default()
+            },
+        }
+    }
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_test_with_config(
-        TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            experiments: vec![],
-        },
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![]),
         path,
     )
 }

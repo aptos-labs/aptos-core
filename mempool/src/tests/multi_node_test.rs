@@ -28,7 +28,10 @@ use aptos_network::{
     },
     ProtocolId,
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{
+    transaction::{ReplayProtector, SignedTransaction},
+    PeerId,
+};
 use maplit::btreemap;
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;
@@ -502,7 +505,7 @@ impl TestHarness {
 fn test_transactions(start: u64, num: u64) -> Vec<TestTransaction> {
     let mut txns = vec![];
     for seq_num in start..start.checked_add(num).unwrap() {
-        txns.push(test_transaction(seq_num))
+        txns.push(test_transaction(ReplayProtector::SequenceNumber(seq_num)))
     }
     txns
 }
@@ -517,7 +520,7 @@ fn test_transactions_with_byte_limit(
 
     // Continue to add transactions to the batch until we hit the byte limit
     loop {
-        let transaction = test_transaction(sequence_number);
+        let transaction = test_transaction(ReplayProtector::SequenceNumber(sequence_number));
         let transaction_bytes = bcs::serialized_size(&transaction).unwrap();
         if (byte_count + transaction_bytes) < byte_limit {
             transactions.push(transaction);
@@ -529,8 +532,8 @@ fn test_transactions_with_byte_limit(
     }
 }
 
-fn test_transaction(seq_num: u64) -> TestTransaction {
-    TestTransaction::new(1, seq_num, 1)
+fn test_transaction(replay_protector: ReplayProtector) -> TestTransaction {
+    TestTransaction::new(1, replay_protector, 1)
 }
 
 #[test]

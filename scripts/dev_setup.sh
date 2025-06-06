@@ -492,7 +492,7 @@ function install_rustup_components_and_nightly {
 
 function install_cargo_sort {
   if ! command -v cargo-sort &>/dev/null; then
-    cargo install cargo-sort --locked
+    cargo install cargo-sort --locked --version 1.0.7
   fi
 }
 

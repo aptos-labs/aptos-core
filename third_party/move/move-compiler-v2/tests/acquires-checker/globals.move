@@ -15,7 +15,7 @@ module 0x42::globals {
         r.f
     }
 
-    fun write(a: address, x: u64): u64 {
+    fun write(a: address): u64 {
         let r = borrow_global_mut<R>(a);
         r.f = 2;
         9

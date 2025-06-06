@@ -8,8 +8,8 @@ use crate::{
     failpoint::fail_point_poem,
     page::determine_limit,
     response::{
-        resource_not_found, struct_field_not_found, BadRequestError, BasicErrorWith404,
-        BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+        account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
+        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
     },
     ApiTags,
 };
@@ -278,7 +278,28 @@ impl Account {
                 })?;
             account_resource
         } else {
-            AccountResource::new_stateless(*self.address.inner())
+            let stateless_account_enabled = self
+                .context
+                .feature_enabled(
+                    aptos_types::on_chain_config::FeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+                )
+                .context("Failed to check if stateless account is enabled")
+                .map_err(|_| {
+                    BasicErrorWith404::internal_with_code(
+                        "Failed to check if stateless account is enabled",
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                })?;
+            if stateless_account_enabled {
+                AccountResource::new_stateless(*self.address.inner())
+            } else {
+                Err(account_not_found(
+                    self.address,
+                    self.ledger_version,
+                    &self.latest_ledger_info,
+                ))?
+            }
         };
 
         // Convert the AccountResource into the summary object AccountData
@@ -403,7 +424,8 @@ impl Account {
         }
     }
 
-    pub fn get_account_resource(&self) -> Result<Option<Vec<u8>>, BasicErrorWith404> {
+    /// Retrieves the account resource for the associated account
+    fn get_account_resource(&self) -> Result<Option<Vec<u8>>, BasicErrorWith404> {
         let state_key =
             StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
                 BasicErrorWith404::internal_with_code(

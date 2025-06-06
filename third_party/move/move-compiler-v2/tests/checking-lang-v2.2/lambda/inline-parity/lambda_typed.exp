@@ -1,12 +1,15 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::LambdaTest1 {
     public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
         (f)(b)
     }
     public inline fun inline_apply1(f: |u64|u64,b: u64): u64 {
         {
-          let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>((f)(b), 1), 12);
-          Mul<u64>(a, 12)
+          let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>((f)(b), 1), {
+            let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+            Mul<u64>(a, b)
+          });
+          Mul<u64>(a, b)
         }
     }
     public inline fun inline_mul(a: u64,b: u64): u64 {
@@ -33,46 +36,85 @@ module 0x42::LambdaTest2 {
     public inline fun inline_apply2(g: |u64|u64,c: u64): u64 {
         Add<u64>({
           let (b: u64): (u64) = Tuple((g)({
-            let (a: u64, b: u64): (u64, u64) = Tuple(c, 3);
-            Mul<u64>(a, 3)
+            let (a: u64, b: u64): (u64, u64) = Tuple(c, {
+              let (b: u64): (u64) = Tuple(3);
+              {
+                let (x: u64): (u64) = Tuple(b);
+                x
+              }
+            });
+            Mul<u64>(a, b)
           }));
           {
             let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
               let (z: u64): (u64) = Tuple(b);
               z
-            }, 1), 12);
-            Mul<u64>(a, 12)
+            }, 1), {
+              let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+              Mul<u64>(a, b)
+            });
+            Mul<u64>(a, b)
           }
         }, 2)
     }
-    public inline fun inline_apply3(g: |u64|u64,c: u64): u64 {
-        Add<u64>(LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x: u64| LambdaTest1::inline_apply(|y: u64| y, x), 3))), 4)
+    public inline fun inline_apply3(c: u64): u64 {
+        Add<u64>({
+          let (b: u64): (u64) = Tuple({
+            let (a: u64, b: u64): (u64, u64) = Tuple(c, {
+              let (b: u64): (u64) = Tuple(3);
+              {
+                let (x: u64): (u64) = Tuple(b);
+                {
+                  let (b: u64): (u64) = Tuple(x);
+                  {
+                    let (y: u64): (u64) = Tuple(b);
+                    y
+                  }
+                }
+              }
+            });
+            Mul<u64>(a, b)
+          });
+          {
+            let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+              let (x: u64): (u64) = Tuple(b);
+              Add<u64>(x, 1)
+            }, 1), {
+              let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+              Mul<u64>(a, b)
+            });
+            Mul<u64>(a, b)
+          }
+        }, 4)
     }
     public fun test_inline_lambda() {
         {
-          let product: u64 = 1;
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
           {
-            let (v: &vector<u64>): (&vector<u64>) = Tuple(Borrow(Immutable)([Number(1), Number(2), Number(3)]));
+            let product: u64 = 1;
             {
-              let i: u64 = 0;
-              loop {
-                if Lt<u64>(i, vector::length<u64>(v)) {
-                  {
-                    let (e: &u64): (&u64) = Tuple(vector::borrow<u64>(v, i));
-                    product: u64 = {
-                      let (a: u64, b: u64): (u64, u64) = Tuple(product, Deref(e));
-                      Mul<u64>(a, b)
-                    }
-                  };
-                  i: u64 = Add<u64>(i, 1);
-                  Tuple()
-                } else {
-                  break
+              let (v: &vector<u64>): (&vector<u64>) = Tuple(Borrow(Immutable)(v));
+              {
+                let i: u64 = 0;
+                loop {
+                  if Lt<u64>(i, vector::length<u64>(v)) {
+                    {
+                      let (e: &u64): (&u64) = Tuple(vector::borrow<u64>(v, i));
+                      product: u64 = {
+                        let (a: u64, b: u64): (u64, u64) = Tuple(product, Deref(e));
+                        Mul<u64>(a, b)
+                      }
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  } else {
+                    break
+                  }
                 }
               }
-            }
-          };
-          Tuple()
+            };
+            Tuple()
+          }
         }
     }
 } // end 0x42::LambdaTest2
@@ -82,26 +124,155 @@ module 0x42::LambdaTest {
         (f)(b)
     }
     public inline fun inline_apply_test(): u64 {
-        1120
+        Add<u64>({
+          let (c: u64): (u64) = Tuple(3);
+          Add<u64>({
+            let (b: u64): (u64) = Tuple({
+              let (x: u64): (u64) = Tuple({
+                let (a: u64, b: u64): (u64, u64) = Tuple(c, {
+                  let (b: u64): (u64) = Tuple(3);
+                  {
+                    let (x: u64): (u64) = Tuple(b);
+                    x
+                  }
+                });
+                Mul<u64>(a, b)
+              });
+              Add<u64>(x, 1)
+            });
+            {
+              let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+                let (z: u64): (u64) = Tuple(b);
+                z
+              }, 1), {
+                let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+                Mul<u64>(a, b)
+              });
+              Mul<u64>(a, b)
+            }
+          }, 2)
+        }, {
+          let (c: u64): (u64) = Tuple({
+            let (b: u64): (u64) = Tuple(3);
+            {
+              let (y: u64): (u64) = Tuple(b);
+              y
+            }
+          });
+          Add<u64>({
+            let (b: u64): (u64) = Tuple({
+              let (x: u64): (u64) = Tuple({
+                let (a: u64, b: u64): (u64, u64) = Tuple(c, {
+                  let (b: u64): (u64) = Tuple(3);
+                  {
+                    let (x: u64): (u64) = Tuple(b);
+                    x
+                  }
+                });
+                Mul<u64>(a, b)
+              });
+              Mul<u64>(x, x)
+            });
+            {
+              let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+                let (z: u64): (u64) = Tuple(b);
+                z
+              }, 1), {
+                let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+                Mul<u64>(a, b)
+              });
+              Mul<u64>(a, b)
+            }
+          }, 2)
+        })
     }
     private fun test_lambda() {
-        if false {
+        {
+          let a: u64 = {
+            let (): ();
+            Add<u64>({
+              let (c: u64): (u64) = Tuple(3);
+              Add<u64>({
+                let (b: u64): (u64) = Tuple({
+                  let (x: u64): (u64) = Tuple({
+                    let (a: u64, b: u64): (u64, u64) = Tuple(c, {
+                      let (b: u64): (u64) = Tuple(3);
+                      {
+                        let (x: u64): (u64) = Tuple(b);
+                        x
+                      }
+                    });
+                    Mul<u64>(a, b)
+                  });
+                  Add<u64>(x, 1)
+                });
+                {
+                  let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+                    let (z: u64): (u64) = Tuple(b);
+                    z
+                  }, 1), {
+                    let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+                    Mul<u64>(a, b)
+                  });
+                  Mul<u64>(a, b)
+                }
+              }, 2)
+            }, {
+              let (c: u64): (u64) = Tuple({
+                let (b: u64): (u64) = Tuple(3);
+                {
+                  let (y: u64): (u64) = Tuple(b);
+                  y
+                }
+              });
+              Add<u64>({
+                let (b: u64): (u64) = Tuple({
+                  let (x: u64): (u64) = Tuple({
+                    let (a: u64, b: u64): (u64, u64) = Tuple(c, {
+                      let (b: u64): (u64) = Tuple(3);
+                      {
+                        let (x: u64): (u64) = Tuple(b);
+                        x
+                      }
+                    });
+                    Mul<u64>(a, b)
+                  });
+                  Mul<u64>(x, x)
+                });
+                {
+                  let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+                    let (z: u64): (u64) = Tuple(b);
+                    z
+                  }, 1), {
+                    let (a: u64, b: u64): (u64, u64) = Tuple(3, 4);
+                    Mul<u64>(a, b)
+                  });
+                  Mul<u64>(a, b)
+                }
+              }, 2)
+            })
+          };
+          if Eq<u64>(a, 1) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
           Tuple()
-        } else {
-          Abort(0)
-        };
-        Tuple()
+        }
     }
 } // end 0x42::LambdaTest
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::LambdaTest1 {
     public inline fun inline_apply(f: |u64|u64, b: u64): u64 {
         f(b)
     }
     public inline fun inline_apply1(f: |u64|u64, b: u64): u64 {
-        let (a,b) = (f(b) + 1, 12);
-        a * 12
+        let (a,b) = (f(b) + 1, {
+            let (a,b) = (3, 4);
+            a * b
+        });
+        a * b
     }
     public inline fun inline_mul(a: u64, b: u64): u64 {
         a * b
@@ -119,23 +290,50 @@ module 0x42::LambdaTest2 {
     public inline fun inline_apply2(g: |u64|u64, c: u64): u64 {
         {
             let (b) = (g({
-                let (a,b) = (c, 3);
-                a * 3
+                let (a,b) = (c, {
+                    let (b) = (3);
+                    let (x) = (b);
+                    x
+                });
+                a * b
             }));
             let (a,b) = ({
                 let (z) = (b);
                 z
-            } + 1, 12);
-            a * 12
+            } + 1, {
+                let (a,b) = (3, 4);
+                a * b
+            });
+            a * b
         } + 2
     }
-    public inline fun inline_apply3(g: |u64|u64, c: u64): u64 {
-        LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x| LambdaTest1::inline_apply(|y| y, x), 3))) + 4
+    public inline fun inline_apply3(c: u64): u64 {
+        {
+            let (b) = ({
+                let (a,b) = (c, {
+                    let (b) = (3);
+                    let (x) = (b);
+                    let (b) = (x);
+                    let (y) = (b);
+                    y
+                });
+                a * b
+            });
+            let (a,b) = ({
+                let (x) = (b);
+                x + 1
+            } + 1, {
+                let (a,b) = (3, 4);
+                a * b
+            });
+            a * b
+        } + 4
     }
     public fun test_inline_lambda() {
+        let v = vector[1, 2, 3];
         let product = 1;
         {
-            let (v) = (&vector[1, 2, 3]);
+            let (v) = (&v);
             let i = 0;
             while (i < 0x1::vector::length<u64>(v)) {
                 {
@@ -156,9 +354,113 @@ module 0x42::LambdaTest {
         f(b)
     }
     public inline fun inline_apply_test(): u64 {
-        1120
+        {
+            let (c) = (3);
+            {
+                let (b) = ({
+                    let (x) = ({
+                        let (a,b) = (c, {
+                            let (b) = (3);
+                            let (x) = (b);
+                            x
+                        });
+                        a * b
+                    });
+                    x + 1
+                });
+                let (a,b) = ({
+                    let (z) = (b);
+                    z
+                } + 1, {
+                    let (a,b) = (3, 4);
+                    a * b
+                });
+                a * b
+            } + 2
+        } + {
+            let (c) = ({
+                let (b) = (3);
+                let (y) = (b);
+                y
+            });
+            {
+                let (b) = ({
+                    let (x) = ({
+                        let (a,b) = (c, {
+                            let (b) = (3);
+                            let (x) = (b);
+                            x
+                        });
+                        a * b
+                    });
+                    x * x
+                });
+                let (a,b) = ({
+                    let (z) = (b);
+                    z
+                } + 1, {
+                    let (a,b) = (3, 4);
+                    a * b
+                });
+                a * b
+            } + 2
+        }
     }
     fun test_lambda() {
-        if (false) () else abort 0;
+        let a = {
+            let ();
+            {
+                let (c) = (3);
+                {
+                    let (b) = ({
+                        let (x) = ({
+                            let (a,b) = (c, {
+                                let (b) = (3);
+                                let (x) = (b);
+                                x
+                            });
+                            a * b
+                        });
+                        x + 1
+                    });
+                    let (a,b) = ({
+                        let (z) = (b);
+                        z
+                    } + 1, {
+                        let (a,b) = (3, 4);
+                        a * b
+                    });
+                    a * b
+                } + 2
+            } + {
+                let (c) = ({
+                    let (b) = (3);
+                    let (y) = (b);
+                    y
+                });
+                {
+                    let (b) = ({
+                        let (x) = ({
+                            let (a,b) = (c, {
+                                let (b) = (3);
+                                let (x) = (b);
+                                x
+                            });
+                            a * b
+                        });
+                        x * x
+                    });
+                    let (a,b) = ({
+                        let (z) = (b);
+                        z
+                    } + 1, {
+                        let (a,b) = (3, 4);
+                        a * b
+                    });
+                    a * b
+                } + 2
+            }
+        };
+        if (a == 1) () else abort 0;
     }
 }

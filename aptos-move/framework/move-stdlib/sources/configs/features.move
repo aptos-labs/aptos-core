@@ -704,6 +704,34 @@ module std::features {
         is_enabled(JWK_CONSENSUS_PER_KEY_MODE)
     }
 
+    /// Whether orderless transactions are enabled.
+    /// Lifetime: transient
+    const ORDERLESS_TRANSACTIONS: u64 = 94;
+
+    public fun get_orderless_transactions_feature(): u64 { ORDERLESS_TRANSACTIONS }
+
+    public fun orderless_transactions_enabled(): bool acquires Features {
+        is_enabled(ORDERLESS_TRANSACTIONS)
+    }
+
+    /// Whether to calculate the transaction fee for distribution.
+    const CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION: u64 = 96;
+
+    public fun get_calculate_transaction_fee_for_distribution_feature(): u64 { CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION }
+
+    public fun is_calculate_transaction_fee_for_distribution_enabled(): bool acquires Features {
+        is_enabled(CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION)
+    }
+
+    /// Whether to distribute transaction fee to validators.
+    const DISTRIBUTE_TRANSACTION_FEE: u64 = 97;
+
+    public fun get_distribute_transaction_fee_feature(): u64 { DISTRIBUTE_TRANSACTION_FEE }
+
+    public fun is_distribute_transaction_fee_enabled(): bool acquires Features {
+        is_enabled(DISTRIBUTE_TRANSACTION_FEE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

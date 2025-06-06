@@ -1,26 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, LoadedFunction,
-    ModuleStorage,
-};
+use crate::{frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, LoadedFunction};
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
     vm_status::StatusCode,
 };
-use move_vm_types::{
-    gas::UnmeteredGasMeter,
-    loaded_data::runtime_types::{Type, TypeBuilder},
-};
+use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
     fn pre_execution_type_stack_transition(
         frame: &Frame,
-        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -29,7 +22,6 @@ pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform after instruction execution.
     fn post_execution_type_stack_transition(
         frame: &Frame,
-        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -157,7 +149,6 @@ pub(crate) struct FullRuntimeTypeCheck;
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         _frame: &Frame,
-        _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
         _instruction: &Bytecode,
         _ty_cache: &mut FrameTypeCache,
@@ -167,7 +158,6 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
 
     fn post_execution_type_stack_transition(
         _frame: &Frame,
-        _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
         _instruction: &Bytecode,
         _ty_cache: &mut FrameTypeCache,
@@ -190,7 +180,6 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
     fn pre_execution_type_stack_transition(
         frame: &Frame,
-        _module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -322,7 +311,6 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// mode.
     fn post_execution_type_stack_transition(
         frame: &Frame,
-        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -455,25 +443,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::PackClosure(fh_idx, mask) => {
-                let function = frame.build_loaded_function_from_handle_and_ty_args(
-                    module_storage,
-                    *fh_idx,
-                    vec![],
-                )?;
-                verify_pack_closure(ty_builder, operand_stack, &function, *mask)?;
-            },
-            Bytecode::PackClosureGeneric(fh_idx, mask) => {
-                let ty_args = frame.instantiate_generic_function(
-                    Option::<&mut UnmeteredGasMeter>::None, // don't charge for paranoid mode
-                    *fh_idx,
-                )?;
-                let function = frame.build_loaded_function_from_instantiation_and_ty_args(
-                    module_storage,
-                    *fh_idx,
-                    ty_args,
-                )?;
-                verify_pack_closure(ty_builder, operand_stack, &function, *mask)?;
+            Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
+                // Skip: runtime checks are implemented in interpreter loop!
             },
 
             Bytecode::Pack(idx) => {

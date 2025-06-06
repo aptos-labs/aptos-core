@@ -266,7 +266,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             accumulator_root_hash: accumulator_root_hash.into(),
             // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
             changes: write_set
-                .into_iter()
+                .into_write_op_iter()
                 .filter_map(|(sk, wo)| self.try_into_write_set_changes(sk, wo).ok())
                 .flatten()
                 .collect(),
@@ -356,7 +356,55 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     transaction_payload,
                 })
             },
-
+            Payload(aptos_types::transaction::TransactionPayloadInner::V1 {
+                executable,
+                extra_config,
+            }) => match extra_config {
+                aptos_types::transaction::TransactionExtraConfig::V1 {
+                    multisig_address,
+                    replay_protection_nonce: _,
+                } => {
+                    if let Some(multisig_address) = multisig_address {
+                        match executable {
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) => TransactionPayload::MultisigPayload(MultisigPayload {
+                                multisig_address: multisig_address.into(),
+                                transaction_payload: Some(
+                                    MultisigTransactionPayload::EntryFunctionPayload(
+                                        try_into_entry_function_payload(entry_function)?,
+                                    ),
+                                ),
+                            }),
+                            aptos_types::transaction::TransactionExecutable::Script(_) => {
+                                bail!(
+                                    "Script executable is not supported for multisig transactions"
+                                )
+                            },
+                            aptos_types::transaction::TransactionExecutable::Empty => {
+                                TransactionPayload::MultisigPayload(MultisigPayload {
+                                    multisig_address: multisig_address.into(),
+                                    transaction_payload: None,
+                                })
+                            },
+                        }
+                    } else {
+                        match executable {
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) => TransactionPayload::EntryFunctionPayload(
+                                try_into_entry_function_payload(entry_function)?,
+                            ),
+                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                                TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
+                            },
+                            aptos_types::transaction::TransactionExecutable::Empty => {
+                                bail!("Empty executable is not supported for non-multisig transactions")
+                            },
+                        }
+                    }
+                },
+            },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
         };
@@ -378,7 +426,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Direct(d) => {
                 let (write_set, events) = d.into_inner();
                 let nested_writeset_changes: Vec<Vec<WriteSetChange>> = write_set
-                    .into_iter()
+                    .into_write_op_iter()
                     .map(|(state_key, op)| self.try_into_write_set_changes(state_key, op))
                     .collect::<Result<Vec<Vec<_>>>>()?;
                 WriteSetPayload {
@@ -608,12 +656,23 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             gas_unit_price,
             expiration_timestamp_secs,
             payload,
+            replay_protection_nonce,
         } = user_transaction_request;
         Ok(RawTransaction::new(
             sender.into(),
-            sequence_number.into(),
-            self.try_into_aptos_core_transaction_payload(payload)
-                .context("Failed to parse transaction payload")?,
+            // The `sequence_number` field is not used for processing orderless transactions.
+            // However, the `SignedTransaction` strucut has a mandatory sequence_number field.
+            // So, for orderless transactions, we chose to set the sequence_number to u64::MAX.
+            if replay_protection_nonce.is_none() {
+                sequence_number.into()
+            } else {
+                u64::MAX
+            },
+            self.try_into_aptos_core_transaction_payload(
+                payload,
+                replay_protection_nonce.map(|nonce| nonce.into()),
+            )
+            .context("Failed to parse transaction payload")?,
             max_gas_amount.into(),
             gas_unit_price.into(),
             expiration_timestamp_secs.into(),
@@ -624,8 +683,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     pub fn try_into_aptos_core_transaction_payload(
         &self,
         payload: TransactionPayload,
+        nonce: Option<u64>,
     ) -> Result<aptos_types::transaction::TransactionPayload> {
-        use aptos_types::transaction::TransactionPayload as Target;
+        use aptos_types::transaction::{
+            TransactionExecutable as Executable, TransactionExtraConfig as ExtraConfig,
+            TransactionPayload as Target, TransactionPayloadInner as TargetInner,
+        };
 
         let try_into_entry_function =
             |entry_func_payload: EntryFunctionPayload| -> Result<EntryFunction> {
@@ -692,34 +755,79 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         // TODO[Orderless]: After the new TransactionPayload format is fully deployed, output the TransactionPayload in V2 format here.
         let ret = match payload {
             TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
-                Target::EntryFunction(try_into_entry_function(entry_func_payload)?)
+                if let Some(nonce) = nonce {
+                    Target::Payload(TargetInner::V1 {
+                        executable: Executable::EntryFunction(try_into_entry_function(
+                            entry_func_payload,
+                        )?),
+                        extra_config: ExtraConfig::V1 {
+                            multisig_address: None,
+                            replay_protection_nonce: Some(nonce),
+                        },
+                    })
+                } else {
+                    Target::EntryFunction(try_into_entry_function(entry_func_payload)?)
+                }
             },
             TransactionPayload::ScriptPayload(script) => {
-                Target::Script(try_into_script_payload(script)?)
+                if let Some(nonce) = nonce {
+                    Target::Payload(TargetInner::V1 {
+                        executable: Executable::Script(try_into_script_payload(script)?),
+                        extra_config: ExtraConfig::V1 {
+                            multisig_address: None,
+                            replay_protection_nonce: Some(nonce),
+                        },
+                    })
+                } else {
+                    Target::Script(try_into_script_payload(script)?)
+                }
             },
 
             TransactionPayload::MultisigPayload(multisig) => {
-                let transaction_payload: Option<
-                    aptos_types::transaction::MultisigTransactionPayload,
-                > = if let Some(payload) = multisig.transaction_payload {
-                    match payload {
-                        MultisigTransactionPayload::EntryFunctionPayload(entry_func_payload) => {
-                            let entry_function: EntryFunction =
-                                try_into_entry_function(entry_func_payload)?;
-                            Some(
-                                aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
-                                    entry_function,
-                                ),
-                            )
+                if let Some(nonce) = nonce {
+                    let executable = if let Some(payload) = multisig.transaction_payload {
+                        match payload {
+                            MultisigTransactionPayload::EntryFunctionPayload(
+                                entry_func_payload,
+                            ) => Executable::EntryFunction(try_into_entry_function(
+                                entry_func_payload,
+                            )?),
+                        }
+                    } else {
+                        Executable::Empty
+                    };
+                    Target::Payload(TargetInner::V1 {
+                        executable,
+                        extra_config: ExtraConfig::V1 {
+                            multisig_address: Some(multisig.multisig_address.into()),
+                            replay_protection_nonce: Some(nonce),
                         },
-                    }
+                    })
                 } else {
-                    None
-                };
-                Target::Multisig(Multisig {
-                    multisig_address: multisig.multisig_address.into(),
-                    transaction_payload,
-                })
+                    let transaction_payload: Option<
+                        aptos_types::transaction::MultisigTransactionPayload,
+                    > = if let Some(payload) = multisig.transaction_payload {
+                        match payload {
+                            MultisigTransactionPayload::EntryFunctionPayload(
+                                entry_func_payload,
+                            ) => {
+                                let entry_function: EntryFunction =
+                                    try_into_entry_function(entry_func_payload)?;
+                                Some(
+                                    aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+                                        entry_function,
+                                    ),
+                                )
+                            },
+                        }
+                    } else {
+                        None
+                    };
+                    Target::Multisig(Multisig {
+                        multisig_address: multisig.multisig_address.into(),
+                        transaction_payload,
+                    })
+                }
             },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
@@ -819,7 +927,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
-            MoveTypeLayout::Function(..) => {
+            MoveTypeLayout::Function => {
                 // TODO(#15664): do we actually need this? It appears the code here is dead and
                 //   nowhere used
                 bail!("unexpected move type {:?} for value {:?}", layout, val)

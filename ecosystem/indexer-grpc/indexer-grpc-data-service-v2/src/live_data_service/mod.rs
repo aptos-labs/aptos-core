@@ -21,12 +21,12 @@ use tracing::info;
 use uuid::Uuid;
 
 const MAX_BYTES_PER_BATCH: usize = 20 * (1 << 20);
-const MAX_FILTER_SIZE: usize = 1000;
 
 pub struct LiveDataService<'a> {
     chain_id: u64,
     in_memory_cache: InMemoryCache<'a>,
     connection_manager: Arc<ConnectionManager>,
+    max_transaction_filter_size_bytes: usize,
 }
 
 impl<'a> LiveDataService<'a> {
@@ -34,6 +34,7 @@ impl<'a> LiveDataService<'a> {
         chain_id: u64,
         config: LiveDataServiceConfig,
         connection_manager: Arc<ConnectionManager>,
+        max_transaction_filter_size_bytes: usize,
     ) -> Self {
         let known_latest_version = connection_manager.known_latest_version();
         Self {
@@ -45,6 +46,7 @@ impl<'a> LiveDataService<'a> {
                 config.num_slots,
                 config.size_limit_bytes,
             ),
+            max_transaction_filter_size_bytes,
         }
     }
 
@@ -90,7 +92,7 @@ impl<'a> LiveDataService<'a> {
                 let filter = if let Some(proto_filter) = request.transaction_filter {
                     match BooleanTransactionFilter::new_from_proto(
                         proto_filter,
-                        Some(MAX_FILTER_SIZE),
+                        Some(self.max_transaction_filter_size_bytes),
                     ) {
                         Ok(filter) => Some(filter),
                         Err(e) => {

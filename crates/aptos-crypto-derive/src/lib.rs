@@ -96,8 +96,6 @@
 //! }
 //! ```
 
-#![forbid(unsafe_code)]
-
 extern crate proc_macro;
 
 mod hasher;

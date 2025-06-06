@@ -1,4 +1,31 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0xcafe::Ristretto {
+    public fun test() {
+        {
+          let non_canonical_highbit: vector<u8> = Vector<u8>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128);
+          {
+            let non_canonical_highbit_hex: vector<u8> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];
+            if Eq<vector<u8>>(non_canonical_highbit, non_canonical_highbit_hex) {
+              Tuple()
+            } else {
+              Abort(1)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0xcafe::Ristretto
+
+// -- Sourcified model before first bytecode pipeline
+module 0xcafe::Ristretto {
+    public fun test() {
+        let non_canonical_highbit = vector[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 128u8];
+        let non_canonical_highbit_hex = vector[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 128u8];
+        if (non_canonical_highbit == non_canonical_highbit_hex) () else abort 1;
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0xcafe::Ristretto {
     public fun test() {
         if true {
@@ -9,13 +36,6 @@ module 0xcafe::Ristretto {
         Tuple()
     }
 } // end 0xcafe::Ristretto
-
-// -- Sourcified model before bytecode pipeline
-module 0xcafe::Ristretto {
-    public fun test() {
-        if (true) () else abort 1;
-    }
-}
 
 
 ============ bytecode verification succeeded ========

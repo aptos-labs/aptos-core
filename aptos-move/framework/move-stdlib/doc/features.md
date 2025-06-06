@@ -149,6 +149,12 @@ return true.
 -  [Function `is_default_account_resource_enabled`](#0x1_features_is_default_account_resource_enabled)
 -  [Function `get_jwk_consensus_per_key_mode_feature`](#0x1_features_get_jwk_consensus_per_key_mode_feature)
 -  [Function `is_jwk_consensus_per_key_mode_enabled`](#0x1_features_is_jwk_consensus_per_key_mode_enabled)
+-  [Function `get_orderless_transactions_feature`](#0x1_features_get_orderless_transactions_feature)
+-  [Function `orderless_transactions_enabled`](#0x1_features_orderless_transactions_enabled)
+-  [Function `get_calculate_transaction_fee_for_distribution_feature`](#0x1_features_get_calculate_transaction_fee_for_distribution_feature)
+-  [Function `is_calculate_transaction_fee_for_distribution_enabled`](#0x1_features_is_calculate_transaction_fee_for_distribution_enabled)
+-  [Function `get_distribute_transaction_fee_feature`](#0x1_features_get_distribute_transaction_fee_feature)
+-  [Function `is_distribute_transaction_fee_enabled`](#0x1_features_is_distribute_transaction_fee_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -360,6 +366,16 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION"></a>
+
+Whether to calculate the transaction fee for distribution.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION">CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION</a>: u64 = 96;
+</code></pre>
+
+
+
 <a id="0x1_features_CHARGE_INVARIANT_VIOLATION"></a>
 
 Charge invariant violation error.
@@ -536,6 +552,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>: u64 = 63;
+</code></pre>
+
+
+
+<a id="0x1_features_DISTRIBUTE_TRANSACTION_FEE"></a>
+
+Whether to distribute transaction fee to validators.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DISTRIBUTE_TRANSACTION_FEE">DISTRIBUTE_TRANSACTION_FEE</a>: u64 = 97;
 </code></pre>
 
 
@@ -828,6 +854,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>: u64 = 39;
+</code></pre>
+
+
+
+<a id="0x1_features_ORDERLESS_TRANSACTIONS"></a>
+
+Whether orderless transactions are enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a>: u64 = 94;
 </code></pre>
 
 
@@ -3772,6 +3809,144 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_jwk_consensus_per_key_mode_enabled">is_jwk_consensus_per_key_mode_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_JWK_CONSENSUS_PER_KEY_MODE">JWK_CONSENSUS_PER_KEY_MODE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_orderless_transactions_feature"></a>
+
+## Function `get_orderless_transactions_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_orderless_transactions_feature">get_orderless_transactions_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_orderless_transactions_feature">get_orderless_transactions_feature</a>(): u64 { <a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_orderless_transactions_enabled"></a>
+
+## Function `orderless_transactions_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_orderless_transactions_enabled">orderless_transactions_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_orderless_transactions_enabled">orderless_transactions_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_calculate_transaction_fee_for_distribution_feature"></a>
+
+## Function `get_calculate_transaction_fee_for_distribution_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_calculate_transaction_fee_for_distribution_feature">get_calculate_transaction_fee_for_distribution_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_calculate_transaction_fee_for_distribution_feature">get_calculate_transaction_fee_for_distribution_feature</a>(): u64 { <a href="features.md#0x1_features_CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION">CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_calculate_transaction_fee_for_distribution_enabled"></a>
+
+## Function `is_calculate_transaction_fee_for_distribution_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_calculate_transaction_fee_for_distribution_enabled">is_calculate_transaction_fee_for_distribution_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_calculate_transaction_fee_for_distribution_enabled">is_calculate_transaction_fee_for_distribution_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION">CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_distribute_transaction_fee_feature"></a>
+
+## Function `get_distribute_transaction_fee_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_distribute_transaction_fee_feature">get_distribute_transaction_fee_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_distribute_transaction_fee_feature">get_distribute_transaction_fee_feature</a>(): u64 { <a href="features.md#0x1_features_DISTRIBUTE_TRANSACTION_FEE">DISTRIBUTE_TRANSACTION_FEE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_distribute_transaction_fee_enabled"></a>
+
+## Function `is_distribute_transaction_fee_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_distribute_transaction_fee_enabled">is_distribute_transaction_fee_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_distribute_transaction_fee_enabled">is_distribute_transaction_fee_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISTRIBUTE_TRANSACTION_FEE">DISTRIBUTE_TRANSACTION_FEE</a>)
 }
 </code></pre>
 

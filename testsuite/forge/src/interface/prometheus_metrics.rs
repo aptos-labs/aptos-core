@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Swarm;
+use anyhow::Error;
 use prometheus_http_query::response::Sample;
 use std::{collections::BTreeMap, fmt, sync::Arc};
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct MetricSamples(Vec<Sample>);
@@ -64,23 +66,37 @@ impl SystemMetrics {
     }
 }
 
-pub async fn fetch_error_metrics(
+pub async fn fetch_fullnode_failures(
     swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
 ) -> anyhow::Result<i64> {
-    let error_query = r#"aptos_error_log_count{role=~"validator"}"#;
+    let consensus_observer_failure_query =
+        r#"consensus_observer_state_sync_fallback_counter{role=~"validator|fullnode"}"#;
+    fetch_metric_counter(swarm, consensus_observer_failure_query).await
+}
 
+async fn fetch_metric_counter(
+    swarm: Arc<RwLock<Box<dyn Swarm>>>,
+    metric_query: &str,
+) -> Result<i64, Error> {
     let result = swarm
         .read()
         .await
-        .query_metrics(error_query, None, None)
+        .query_metrics(metric_query, None, None)
         .await?;
-    let error_samples = result.as_instant().unwrap_or(&[]);
+    let samples = result.as_instant().unwrap_or(&[]);
 
-    Ok(error_samples
+    Ok(samples
         .iter()
         .map(|s| s.sample().value().round() as i64)
         .max()
         .unwrap_or(0))
+}
+
+pub async fn fetch_validator_error_metrics(
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+) -> anyhow::Result<i64> {
+    let error_query = r#"aptos_error_log_count{role=~"validator"}"#;
+    fetch_metric_counter(swarm, error_query).await
 }
 
 pub async fn fetch_system_metrics(

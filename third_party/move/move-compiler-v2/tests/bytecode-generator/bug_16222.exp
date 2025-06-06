@@ -1,0 +1,47 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy {
+        0: || has drop,
+    }
+    public fun make_lazy(): Lazy {
+        pack m::Lazy(closure#0m::__lambda__1__make_lazy())
+    }
+    private fun __lambda__1__make_lazy() {
+        Tuple()
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    public fun test() {
+        {
+          let l: 0xc0ffee::m::Lazy = m::make_lazy();
+          (l)();
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy has drop {
+        0: || has drop,
+    }
+    public fun make_lazy(): Lazy {
+        Lazy(|()| __lambda__1__make_lazy())
+    }
+    fun __lambda__1__make_lazy() {
+    }
+}
+module 0xc0ffee::n {
+    public fun test() {
+        let l = 0xc0ffee::m::make_lazy();
+        l();
+    }
+}
+
+
+Diagnostics:
+error: cannot unpack a wrapper struct `m::Lazy` (defined in a different module `0xc0ffee::m`) and invoke the wrapped function value
+   ┌─ tests/bytecode-generator/bug_16222.move:13:9
+   │
+13 │         l();
+   │         ^^^

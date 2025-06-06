@@ -48,7 +48,7 @@ impl<S> Namespaced<S> {
     }
 }
 
-impl<'a, S> Namespaced<&'a S>
+impl<S> Namespaced<&S>
 where
     S: KVStorage,
 {

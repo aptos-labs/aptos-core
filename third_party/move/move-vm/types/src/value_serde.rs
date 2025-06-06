@@ -43,7 +43,7 @@ pub(crate) struct DelayedFieldsExtension<'a> {
     pub(crate) mapping: Option<&'a dyn ValueToIdentifierMapping>,
 }
 
-impl<'a> DelayedFieldsExtension<'a> {
+impl DelayedFieldsExtension<'_> {
     // Temporarily limit the number of delayed fields per resource, until proper charges are
     // implemented.
     // TODO[agg_v2](clean):
@@ -62,11 +62,42 @@ impl<'a> DelayedFieldsExtension<'a> {
     }
 }
 
+/// Contains information on how to resolve function values.
+#[derive(Clone)]
+pub(crate) struct FunctionValueExtensionWithContext<'a> {
+    extension: &'a dyn FunctionValueExtension,
+    /// Marker to indicate that function value serialization failed. Used to ensure we propagate
+    /// error status code correctly, as otherwise any serialization failure is treated as an
+    /// invariant violation.
+    function_value_serialization_error: RefCell<Option<PartialVMError>>,
+}
+
+impl<'a> FunctionValueExtensionWithContext<'a> {
+    /// Returns serialized function data.
+    pub(crate) fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        self.extension
+            .get_serialization_data(fun)
+            .inspect_err(|err| {
+                *self.function_value_serialization_error.borrow_mut() = Some(err.clone());
+            })
+    }
+
+    /// Creates a function from serialized data.
+    pub(crate) fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        self.extension.create_from_serialization_data(data)
+    }
+}
+
 /// A (de)serializer context for a single Move [Value], containing optional extensions. If
 /// extension is not provided, but required at (de)serialization time, (de)serialization fails.
 pub struct ValueSerDeContext<'a> {
-    #[allow(dead_code)]
-    pub(crate) function_extension: Option<&'a dyn FunctionValueExtension>,
+    pub(crate) function_extension: Option<FunctionValueExtensionWithContext<'a>>,
     pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
     pub(crate) legacy_signer: bool,
 }
@@ -92,14 +123,19 @@ impl<'a> ValueSerDeContext<'a> {
     /// function value deserialization.
     pub fn with_func_args_deserialization(
         mut self,
-        function_extension: &'a dyn FunctionValueExtension,
+        extension: &'a dyn FunctionValueExtension,
     ) -> Self {
-        self.function_extension = Some(function_extension);
+        self.function_extension = Some(FunctionValueExtensionWithContext {
+            extension,
+            function_value_serialization_error: RefCell::new(None),
+        });
         self
     }
 
-    pub fn required_function_extension(&self) -> PartialVMResult<&dyn FunctionValueExtension> {
-        self.function_extension.ok_or_else(|| {
+    pub(crate) fn required_function_extension(
+        &self,
+    ) -> PartialVMResult<&FunctionValueExtensionWithContext<'a>> {
+        self.function_extension.as_ref().ok_or_else(|| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                 "require function extension context for serialization of closures".to_string(),
             )
@@ -109,7 +145,7 @@ impl<'a> ValueSerDeContext<'a> {
     /// Returns the same extension but without allowing the delayed fields.
     pub(crate) fn clone_without_delayed_fields(&self) -> Self {
         Self {
-            function_extension: self.function_extension,
+            function_extension: self.function_extension.clone(),
             delayed_fields_extension: None,
             legacy_signer: self.legacy_signer,
         }
@@ -170,6 +206,17 @@ impl<'a> ValueSerDeContext<'a> {
                             ));
                     }
                 }
+
+                // Check if the error is because of function value serialization.
+                if let Some(function_extension) = self.function_extension {
+                    if let Some(err) = function_extension
+                        .function_value_serialization_error
+                        .into_inner()
+                    {
+                        return Err(err);
+                    }
+                }
+
                 Ok(None)
             },
         }

@@ -24,25 +24,33 @@ warning: Unused local variable `f`. Consider removing or prefixing with an under
 7 │         let (x, b, R{f}): (u64, bool, R);
   │                      ^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0() {
         {
-          let (x: u64, b: bool, M::R{ f }): (u64, bool, R);
-          Tuple()
+          let (): ();
+          {
+            let x: u64;
+            {
+              let (x: u64, b: bool, M::R{ f }): (u64, bool, R);
+              Tuple()
+            }
+          }
         }
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     fun t0() {
+        let ();
+        let x;
         let (x,b,R{f: f});
     }
 }

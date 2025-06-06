@@ -469,10 +469,10 @@ fn parse_requested_balance(
 }
 
 fn parse_lockup_expiration(lockup_secs_result: Vec<serde_json::Value>) -> u64 {
-    return lockup_secs_result
+    lockup_secs_result
         .first()
         .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
-        .unwrap_or(0);
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
