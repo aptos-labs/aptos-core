@@ -585,6 +585,7 @@ impl TransactionsApi {
             // simulation filters. See the ConfigSanitizer for ApiConfig.
             if !context.node_config.api.simulation_filter.allows(
                 aptos_crypto::HashValue::zero(),
+                ledger_info.epoch(),
                 ledger_info.timestamp(),
                 &signed_transaction,
             ) {

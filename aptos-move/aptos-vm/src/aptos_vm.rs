@@ -2606,6 +2606,9 @@ impl AptosVM {
             },
             Transaction::BlockEpilogue(_) => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                // TODO(HotState): generate an output according to the block end info in the
+                //   transaction. (maybe resort to the move resolver, but for simplicity I would
+                //   just include the full slot in both the transaction and the output).
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output)
             },
@@ -2645,7 +2648,7 @@ impl AptosVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
             Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2693,7 +2696,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 concurrency_level: AptosVM::get_concurrency_level(),

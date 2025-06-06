@@ -34,6 +34,7 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
+derive_more = { workspace = true }
 fixed = { workspace = true }
 fxhash = { workspace = true }
 hashbrown = { workspace = true }
@@ -58,6 +59,7 @@ proptest-derive = { workspace = true, optional = true }
 quick_cache = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+ref-cast = { workspace = true }
 ring = { workspace = true }
 rsa = { workspace = true }
 serde = { workspace = true }

@@ -41,7 +41,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
-        TransactionOutput, TransactionStatus, WriteSetPayload,
+        TransactionStatus, WriteSetPayload,
     },
     write_set::WriteOp,
     AptosCoinType,
@@ -90,7 +90,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput, VMStatus> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,

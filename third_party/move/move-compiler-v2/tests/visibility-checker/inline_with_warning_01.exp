@@ -1,0 +1,93 @@
+
+Diagnostics:
+warning: public inline function `outer` cannot be called from all locations it is accessible
+   ┌─ tests/visibility-checker/inline_with_warning_01.move:14:23
+   │
+ 7 │         secret() + secret()
+   │         -------- inline expansion calls private function that may not be accessible in all locations that `m::outer` can be called
+   ·
+14 │     public inline fun outer(): u64 {
+   │                       ^^^^^ if called from a location where `m::secret` is not accessible
+15 │         inner() + inner() + some_what_inner()
+   │         ------- from a call inlined at this callsite
+
+warning: public inline function `outer` cannot be called from all locations it is accessible
+   ┌─ tests/visibility-checker/inline_with_warning_01.move:14:23
+   │
+14 │     public inline fun outer(): u64 {
+   │                       ^^^^^ if called from a location where `m::some_what_inner` is not accessible
+15 │         inner() + inner() + some_what_inner()
+   │                             ----------------- inline expansion calls friend function that may not be accessible in all locations that `m::outer` can be called
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private inline fun inner(): u64 {
+        Add<u64>(m::secret(), m::secret())
+    }
+    public inline fun outer(): u64 {
+        Add<u64>(Add<u64>({
+          let (): ();
+          Add<u64>(m::secret(), m::secret())
+        }, {
+          let (): ();
+          Add<u64>(m::secret(), m::secret())
+        }), m::some_what_inner())
+    }
+    private fun secret(): u64 {
+        42
+    }
+    friend fun some_what_inner(): u64 {
+        Add<u64>(m::secret(), m::secret())
+    }
+    private fun test() {
+        if Eq<u64>({
+          let (): ();
+          Add<u64>(Add<u64>({
+            let (): ();
+            Add<u64>(m::secret(), m::secret())
+          }, {
+            let (): ();
+            Add<u64>(m::secret(), m::secret())
+          }), m::some_what_inner())
+        }, 168) {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        };
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    inline fun inner(): u64 {
+        secret() + secret()
+    }
+    public inline fun outer(): u64 {
+        {
+            let ();
+            secret() + secret()
+        } + {
+            let ();
+            secret() + secret()
+        } + some_what_inner()
+    }
+    fun secret(): u64 {
+        42
+    }
+    friend fun some_what_inner(): u64 {
+        secret() + secret()
+    }
+    fun test() {
+        if ({
+            let ();
+            {
+                let ();
+                secret() + secret()
+            } + {
+                let ();
+                secret() + secret()
+            } + some_what_inner()
+        } == 168) () else abort 14566554180833181696;
+    }
+}

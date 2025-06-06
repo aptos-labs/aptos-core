@@ -64,6 +64,11 @@ impl FullnodeData for FullnodeDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let ending_version = if let Some(count) = r.transactions_count {
+            starting_version.saturating_add(count)
+        } else {
+            u64::MAX
+        };
 
         // Some node metadata
         let context = self.service_context.context.clone();
@@ -81,6 +86,7 @@ impl FullnodeData for FullnodeDataService {
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
                 starting_version,
+                ending_version,
                 processor_task_count,
                 processor_batch_size,
                 output_batch_size,
@@ -103,7 +109,7 @@ impl FullnodeData for FullnodeDataService {
                 },
             }
             let mut base: u64 = 0;
-            loop {
+            while coordinator.current_version < coordinator.end_version {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
