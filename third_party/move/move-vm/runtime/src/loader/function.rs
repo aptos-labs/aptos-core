@@ -5,7 +5,6 @@
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
     ModuleStorage, RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -23,7 +22,6 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -190,17 +188,15 @@ impl LazyLoadedFunction {
         }
     }
 
-    /// Executed an action with the resolved loaded function. If the function hasn't been
-    /// loaded yet, it will be loaded now.
-    #[allow(unused)]
-    pub(crate) fn with_resolved_function<T>(
+    /// If the function hasn't been resolved (loaded) yet, loads it. The gas is also charged for
+    /// function loading and any other module accesses.
+    pub(crate) fn as_resolved(
         &self,
-        storage: &dyn ModuleStorage,
-        action: impl FnOnce(Rc<LoadedFunction>) -> PartialVMResult<T>,
-    ) -> PartialVMResult<T> {
+        module_storage: &impl ModuleStorage,
+    ) -> PartialVMResult<Rc<LoadedFunction>> {
         let mut state = self.0.borrow_mut();
-        match &mut *state {
-            LazyLoadedFunctionState::Resolved { fun, .. } => action(fun.clone()),
+        Ok(match &mut *state {
+            LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
@@ -209,82 +205,21 @@ impl LazyLoadedFunction {
                         fun_id,
                         ty_args,
                         mask,
-                        captured_layouts,
+                        captured_layouts: _,
                     },
             } => {
-                let fun =
-                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
-                let result = action(fun.clone());
+                let fun = module_storage
+                    .load_function(module_id, fun_id, ty_args)
+                    .map(Rc::new)
+                    .map_err(|err| err.to_partial())?;
                 *state = LazyLoadedFunctionState::Resolved {
-                    fun,
+                    fun: fun.clone(),
                     ty_args: ty_args.clone(),
                     mask: *mask,
                 };
-                result
+                fun
             },
-        }
-    }
-
-    /// Resolves a function into a loaded function. This verifies existence of the named
-    /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve(
-        module_storage: &dyn ModuleStorage,
-        module_id: &ModuleId,
-        fun_id: &IdentStr,
-        ty_args: &[TypeTag],
-        mask: ClosureMask,
-        captured_layouts: &[MoveTypeLayout],
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = module_storage
-            .load_function(module_id, fun_id, ty_args)
-            .map_err(|err| err.to_partial())?;
-
-        // Verify that the function argument types match the layouts used for deserialization.
-        // This is only done in paranoid mode. Since integrity of storage
-        // and guarantee of public function, this should not able to fail.
-        if module_storage
-            .runtime_environment()
-            .vm_config()
-            .paranoid_type_checks
-        {
-            // TODO(#15664): Determine whether we need to charge gas here.
-            let captured_arg_types = mask.extract(function.param_tys(), true);
-            let converter = StorageLayoutConverter::new(module_storage);
-            if captured_arg_types.len() != captured_layouts.len() {
-                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(
-                        "captured argument count does not match declared parameters".to_string(),
-                    ));
-            }
-
-            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
-            for (actual_arg_ty, serialized_layout) in
-                captured_arg_types.into_iter().zip(captured_layouts)
-            {
-                // We do not allow function values to capture any delayed fields, for now. Note
-                // that this is enforced at serialization time. Here we cannot enforce it because
-                // function value could have stored an old version of an enum without an aggregator
-                // but the new layout has the new variant with the aggregator. In any case, the
-                // serializer will fail on this resolved closure if there is an attempt to put it
-                // back into storage.
-                let actual_arg_layout = if function.ty_args().is_empty() {
-                    converter.type_to_type_layout(actual_arg_ty)?
-                } else {
-                    let actual_arg_ty =
-                        ty_builder.create_ty_with_subst(actual_arg_ty, function.ty_args())?;
-                    converter.type_to_type_layout(&actual_arg_ty)?
-                };
-
-                if !serialized_layout.is_compatible_with(&actual_arg_layout) {
-                    return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                        .with_message(
-                            "stored captured argument layout does not match declared parameters"
-                                .to_string(),
-                        ));
-                }
-            }
-        }
-        Ok(Rc::new(function))
+        })
     }
 }
 
