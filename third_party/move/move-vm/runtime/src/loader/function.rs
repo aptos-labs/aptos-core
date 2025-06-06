@@ -18,7 +18,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
-    ability::{Ability, AbilitySet},
+    ability::AbilitySet,
     function::ClosureMask,
     identifier::{IdentStr, Identifier},
     language_storage,
@@ -346,10 +346,6 @@ impl LoadedFunction {
         &self.ty_args
     }
 
-    pub fn abilities(&self) -> AbilitySet {
-        self.function.abilities()
-    }
-
     /// Returns the corresponding module id of this function, i.e., its address and module name.
     pub fn module_id(&self) -> Option<&ModuleId> {
         match &self.owner {
@@ -574,28 +570,6 @@ impl Function {
 
     pub fn has_module_lock(&self) -> bool {
         self.has_module_reentrancy_lock
-    }
-
-    /// Creates the function type instance for this function. This requires cloning
-    /// the parameter and result types.
-    pub fn create_function_type(&self) -> Type {
-        Type::Function {
-            args: self.param_tys.clone(),
-            results: self.return_tys.clone(),
-            abilities: self.abilities(),
-        }
-    }
-
-    /// Returns the abilities associated with this function, without consideration of any captured
-    /// closure arguments. By default, this is copy and drop, and if the function signature cannot
-    /// be changed (i.e., the function has `#[persistent]` attribute or is public), also store.
-    pub fn abilities(&self) -> AbilitySet {
-        let result = AbilitySet::singleton(Ability::Copy).add(Ability::Drop);
-        if self.is_persistent() {
-            result.add(Ability::Store)
-        } else {
-            result
-        }
     }
 
     pub fn is_native(&self) -> bool {
