@@ -265,6 +265,31 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+
+    DependencyChain8 {
+        depth: u64,
+    },
+    DependencyChain64 {
+        depth: u64,
+    },
+    DependencyChain256 {
+        depth: u64,
+    },
+    DependencyChain512 {
+        depth: u64,
+    },
+    DependencyTree81With3ChildrenPerLeaf,
+    DependencyTree585With8ChildrenPerLeaf,
+    DependencyStar32 {
+        width: u64,
+    },
+    DependencyStar512 {
+        width: u64,
+    },
+    DependencyDag64Sparse,
+    DependencyDag64Dense,
+    DependencyDag256Sparse,
+    DependencyDag256Dense,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -334,6 +359,18 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::DependencyChain8 { .. } => "chain_8",
+            EntryPoints::DependencyChain64 { .. } => "chain_64",
+            EntryPoints::DependencyChain256 { .. } => "chain_256",
+            EntryPoints::DependencyChain512 { .. } => "chain_512",
+            EntryPoints::DependencyTree81With3ChildrenPerLeaf => "tree_81",
+            EntryPoints::DependencyTree585With8ChildrenPerLeaf => "tree_585",
+            EntryPoints::DependencyStar32 { .. } => "star_33",
+            EntryPoints::DependencyStar512 { .. } => "star_513",
+            EntryPoints::DependencyDag64Sparse => "dag_64_sparse",
+            EntryPoints::DependencyDag64Dense => "dag_64_dense",
+            EntryPoints::DependencyDag256Sparse => "dag_256_sparse",
+            EntryPoints::DependencyDag256Dense => "dag_256_dense",
         }
     }
 
@@ -402,6 +439,18 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::DependencyChain8 { .. } => "C0",
+            EntryPoints::DependencyChain64 { .. } => "D0",
+            EntryPoints::DependencyChain256 { .. } => "E0",
+            EntryPoints::DependencyChain512 { .. } => "F0",
+            EntryPoints::DependencyTree81With3ChildrenPerLeaf => "A0",
+            EntryPoints::DependencyTree585With8ChildrenPerLeaf => "B0",
+            EntryPoints::DependencyStar32 { .. } => "L0",
+            EntryPoints::DependencyStar512 { .. } => "M0",
+            EntryPoints::DependencyDag64Sparse => "X0",
+            EntryPoints::DependencyDag64Dense => "Y0",
+            EntryPoints::DependencyDag256Sparse => "Z0",
+            EntryPoints::DependencyDag256Dense => "P0",
         }
     }
 
@@ -866,6 +915,76 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_buy).unwrap(), // is_buy
                 ])
             },
+            EntryPoints::DependencyChain8 { depth } => {
+                assert!(*depth <= 8);
+                get_payload(
+                    module_id,
+                    ident_str!("call").to_owned(),
+                    vec![
+                        bcs::to_bytes(depth).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::DependencyChain64 { depth } => {
+                assert!(*depth <= 64);
+                get_payload(
+                    module_id,
+                    ident_str!("call").to_owned(),
+                    vec![
+                        bcs::to_bytes(depth).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::DependencyChain256 { depth } => {
+                assert!(*depth <= 256);
+                get_payload(
+                    module_id,
+                    ident_str!("call").to_owned(),
+                    vec![
+                        bcs::to_bytes(depth).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::DependencyChain512 { depth } => {
+                assert!(*depth <= 512);
+                get_payload(
+                    module_id,
+                    ident_str!("call").to_owned(),
+                    vec![
+                        bcs::to_bytes(depth).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::DependencyTree81With3ChildrenPerLeaf
+            | EntryPoints::DependencyTree585With8ChildrenPerLeaf => {
+                get_payload_void(module_id, ident_str!("call").to_owned())
+            },
+            EntryPoints::DependencyStar32 { width } => {
+                assert!(*width <= 64);
+                get_payload(
+                    module_id,
+                    ident_str!("call").to_owned(),
+                    vec![
+                        bcs::to_bytes(width).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::DependencyStar512 { width } => {
+                assert!(*width <= 512);
+                get_payload(
+                    module_id,
+                    ident_str!("call").to_owned(),
+                    vec![
+                        bcs::to_bytes(width).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::DependencyDag64Sparse
+            | EntryPoints::DependencyDag64Dense
+            | EntryPoints::DependencyDag256Sparse
+            | EntryPoints::DependencyDag256Dense => {
+                get_payload_void(module_id, ident_str!("call").to_owned())
+            },
         }
     }
 
@@ -987,6 +1106,18 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::DependencyChain8 { .. }
+            | EntryPoints::DependencyChain64 { .. }
+            | EntryPoints::DependencyChain256 { .. }
+            | EntryPoints::DependencyChain512 { .. }
+            | EntryPoints::DependencyTree81With3ChildrenPerLeaf
+            | EntryPoints::DependencyTree585With8ChildrenPerLeaf
+            | EntryPoints::DependencyStar32 { .. }
+            | EntryPoints::DependencyStar512 { .. }
+            | EntryPoints::DependencyDag64Sparse
+            | EntryPoints::DependencyDag64Dense
+            | EntryPoints::DependencyDag256Sparse
+            | EntryPoints::DependencyDag256Dense => AutomaticArgs::Signer,
         }
     }
 }

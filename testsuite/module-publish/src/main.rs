@@ -20,6 +20,34 @@ struct Args {
 fn additional_packages() -> Vec<(&'static str, &'static str, bool)> {
     // Pairs of (package_name, package_path)
     vec![
+        ("chain_8", "src/packages/dependencies/chain-8", false),
+        ("chain_64", "src/packages/dependencies/chain-64", false),
+        ("chain_256", "src/packages/dependencies/chain-256", false),
+        ("chain_512", "src/packages/dependencies/chain-512", false),
+        (
+            "dag_64_dense",
+            "src/packages/dependencies/dag-64-dense",
+            false,
+        ),
+        (
+            "dag_64_sparse",
+            "src/packages/dependencies/dag-64-sparse",
+            false,
+        ),
+        (
+            "dag_256_dense",
+            "src/packages/dependencies/dag-256-dense",
+            false,
+        ),
+        (
+            "dag_256_sparse",
+            "src/packages/dependencies/dag-256-sparse",
+            false,
+        ),
+        ("star_33", "src/packages/dependencies/star-33", false),
+        ("star_513", "src/packages/dependencies/star-513", false),
+        ("tree_81", "src/packages/dependencies/tree-81", false),
+        ("tree_585", "src/packages/dependencies/tree-585", false),
         ("simple", "src/packages/simple", false),
         (
             "framework_usecases",
