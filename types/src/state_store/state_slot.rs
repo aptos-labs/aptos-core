@@ -154,3 +154,10 @@ impl StateSlot {
         }
     }
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HotStateEntry {
+    pub slot: StateSlot,
+    pub prev: StateKey,
+    pub next: StateKey,
+}

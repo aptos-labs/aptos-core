@@ -10,7 +10,11 @@ use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
 use aptos_types::{
-    state_store::{state_key::StateKey, state_slot::StateSlot, StateViewResult},
+    state_store::{
+        state_key::StateKey,
+        state_slot::{HotStateEntry, StateSlot},
+        StateViewResult,
+    },
     transaction::Version,
 };
 use dashmap::DashMap;
@@ -34,7 +38,7 @@ pub struct HotStateBase {
     /// No item is accepted to `inner` if the size of the value exceeds this number
     max_single_value_bytes: usize,
 
-    inner: DashMap<StateKey, StateSlot>,
+    inner: DashMap<StateKey, HotStateEntry>,
 }
 
 impl HotStateBase {
@@ -48,7 +52,7 @@ impl HotStateBase {
     }
 
     fn get(&self, key: &StateKey) -> Option<StateSlot> {
-        self.inner.get(key).map(|val| val.clone())
+        self.inner.get(key).map(|val| val.slot.clone())
     }
 }
 
