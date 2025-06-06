@@ -566,8 +566,15 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         },
         E::Lambda(ll, e, _capture_kind, spec_opt) => {
             use crate::expansion::ast::TypedLValue_;
-            let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
-            lvalues(context, mapped);
+            let mapped = ll
+                .value
+                .iter()
+                .map(|sp!(_, TypedLValue_(lv, _opt_ty))| (lv, _opt_ty))
+                .collect::<Vec<_>>();
+            for (lv, opt_ty) in mapped.iter() {
+                lvalue(context, lv);
+                type_opt(context, opt_ty);
+            }
             if let Some(spec) = spec_opt {
                 exp(context, spec);
             }

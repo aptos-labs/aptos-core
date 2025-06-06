@@ -30,47 +30,23 @@ warning: Unused local variable `g`. Consider removing or prefixing with an under
 13 │         let S{ f, g }: S;
    │                   ^
 
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking/typing/unused_local.move:25:22
-   │
-25 │     fun unused_param(x: u64) {
-   │                      ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking/typing/unused_local.move:28:20
-   │
-28 │     fun two_unused(x: u64, y: bool) {
-   │                    ^
-
-warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/checking/typing/unused_local.move:28:28
-   │
-28 │     fun two_unused(x: u64, y: bool) {
-   │                            ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/checking/typing/unused_local.move:31:35
-   │
-31 │     fun unused_param1_used_param2(x: u64, y: bool): bool {
-   │                                   ^
-
-warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/checking/typing/unused_local.move:35:43
-   │
-35 │     fun unused_param2_used_param1(x: u64, y: bool): u64 {
-   │                                           ^
-
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
         g: bool,
     }
     private fun t0() {
-        Tuple()
+        {
+          let x: u64;
+          Tuple()
+        }
     }
     private fun t1() {
-        Tuple()
+        {
+          let (x: u64, y: u64): (u64, u64);
+          Tuple()
+        }
     }
     private fun t2() {
         {
@@ -82,10 +58,16 @@ module 0x8675309::M {
         Tuple()
     }
     private fun unused_local_suppressed1() {
-        Tuple()
+        {
+          let _x: u64;
+          Tuple()
+        }
     }
     private fun unused_local_suppressed2() {
-        Tuple()
+        {
+          let _: u64;
+          Tuple()
+        }
     }
     private native fun unused_native_ok(x: u64,y: bool);
     private fun unused_param(x: u64) {
@@ -105,15 +87,17 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
         g: bool,
     }
     fun t0() {
+        let x;
     }
     fun t1() {
+        let (x,y);
     }
     fun t2() {
         let S{f: f,g: g};
@@ -121,8 +105,10 @@ module 0x8675309::M {
     fun two_unused(x: u64, y: bool) {
     }
     fun unused_local_suppressed1() {
+        let _x;
     }
     fun unused_local_suppressed2() {
+        let _;
     }
     native fun unused_native_ok(x: u64, y: bool);
     fun unused_param(x: u64) {

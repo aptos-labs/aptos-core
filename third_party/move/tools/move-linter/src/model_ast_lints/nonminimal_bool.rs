@@ -20,7 +20,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Operation, Value},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 
 #[derive(Default)]
@@ -81,7 +81,7 @@ impl ExpChecker for NonminimalBool {
         "nonminimal_bool".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::{Call, Value as ExpValue};
         use Operation::*;
         use Value::Bool;
@@ -100,7 +100,7 @@ impl ExpChecker for NonminimalBool {
             },
             Not => match args[0].as_ref() {
                 ExpValue(_, Bool(b)) => {
-                    Some(format!("The inner expression evaluates to `{}`. Recall that the expression `! {}` is logically equivalent to `{}`. Consider simplifying.", b, b, !b))
+                    Some(format!("This expression evaluates to `{}`. Recall that the expression `!{}` is logically equivalent to `{}`. Consider simplifying.", !b, b, !b))
                 },
                 _ => None,
             },
@@ -108,6 +108,7 @@ impl ExpChecker for NonminimalBool {
         };
 
         if let Some(msg) = msg {
+            let env = function.env();
             self.report(env, &env.get_node_loc(expr.node_id()), &msg);
         }
     }

@@ -43,7 +43,7 @@ fn check_function(
     module_lint_skips: &BTreeSet<String>,
     known_checker_names: &BTreeSet<String>,
 ) {
-    let env = function.module_env.env;
+    let env = function.env();
     let function_lint_skips =
         lint_skips_from_attributes(env, function.get_attributes(), known_checker_names);
     let mut lint_skips = BTreeSet::from_iter(function_lint_skips);
@@ -53,11 +53,11 @@ fn check_function(
         let mut visitor = |post: bool, e: &ExpData| {
             if !post {
                 for exp_lint in expression_linters.iter_mut() {
-                    exp_lint.visit_expr_pre(env, e);
+                    exp_lint.visit_expr_pre(function, e);
                 }
             } else {
                 for exp_lint in expression_linters.iter_mut() {
-                    exp_lint.visit_expr_post(env, e);
+                    exp_lint.visit_expr_post(function, e);
                 }
             }
             true

@@ -161,12 +161,11 @@ impl BlockTree {
 
     /// fetch all the quorum certs with non-empty commit info
     pub fn get_all_quorum_certs_with_commit_info(&self) -> Vec<QuorumCert> {
-        return self
-            .id_to_quorum_cert
+        self.id_to_quorum_cert
             .values()
             .filter(|qc| qc.commit_info() != &BlockInfo::empty())
             .map(|qc| (**qc).clone())
-            .collect::<Vec<QuorumCert>>();
+            .collect::<Vec<QuorumCert>>()
     }
 
     fn linkable_window_root(&self) -> &LinkableBlock {
@@ -348,6 +347,7 @@ impl BlockTree {
         }
     }
 
+    #[allow(unexpected_cfgs)]
     pub(super) fn insert_quorum_cert(&mut self, qc: QuorumCert) -> anyhow::Result<()> {
         let block_id = qc.certified_block().id();
         let qc = Arc::new(qc);
@@ -574,15 +574,19 @@ impl BlockTree {
         commit_decision: LedgerInfoWithSignatures,
         window_size: Option<u64>,
     ) {
-        let commit_proof = finality_proof
-            .create_merged_with_executed_state(commit_decision)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
         update_counters_for_committed_blocks(blocks_to_commit);
 
         let last_block = blocks_to_commit.last().expect("pipeline is empty").clone();
         let (block_id, block_round) = (last_block.id(), last_block.round());
 
-        self.commit_callback(storage, block_id, block_round, commit_proof, window_size);
+        self.commit_callback(
+            storage,
+            block_id,
+            block_round,
+            finality_proof,
+            commit_decision,
+            window_size,
+        );
     }
 
     pub fn commit_callback(
@@ -590,11 +594,15 @@ impl BlockTree {
         storage: Arc<dyn PersistentLivenessStorage>,
         block_id: HashValue,
         block_round: Round,
-        commit_proof: WrappedLedgerInfo,
+        finality_proof: WrappedLedgerInfo,
+        commit_decision: LedgerInfoWithSignatures,
         window_size: Option<u64>,
     ) {
         let current_round = self.commit_root().round();
         let committed_round = block_round;
+        let commit_proof = finality_proof
+            .create_merged_with_executed_state(commit_decision)
+            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
 
         debug!(
             LogSchema::new(LogEvent::CommitViaBlock).round(current_round),

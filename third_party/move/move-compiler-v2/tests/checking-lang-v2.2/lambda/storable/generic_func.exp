@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::mod2 {
     struct Registry<F> {
         func: F,
@@ -36,27 +36,27 @@ module 0x42::mod3 {
         {
           let struct1: MyStruct1 = pack mod3::MyStruct1(3);
           {
-            let f1: |address|bool with copy+drop+store = closure#0mod2::item_exists<MyStruct1>();
+            let f1: |address|bool has copy + drop + store = closure#0mod2::item_exists<MyStruct1>();
             {
-              let f2: |address|bool with copy+drop+store = closure#0mod2::item_exists<MyStruct2>();
+              let f2: |address|bool has copy + drop + store = closure#0mod2::item_exists<MyStruct2>();
               {
                 let addr: address = signer::address_of(Borrow(Immutable)(owner));
                 mod2::save_item<MyStruct1>(Borrow(Immutable)(owner), struct1);
                 MoveTo<MyStruct1>(Borrow(Immutable)(owner), struct1);
                 if use_1 {
-                  mod2::save_item<|address|bool with copy+drop+store>(Borrow(Immutable)(owner), f1);
+                  mod2::save_item<|address|bool has copy + drop + store>(Borrow(Immutable)(owner), f1);
                   Tuple()
                 } else {
-                  mod2::save_item<|address|bool with copy+drop+store>(Borrow(Immutable)(owner), f2);
+                  mod2::save_item<|address|bool has copy + drop + store>(Borrow(Immutable)(owner), f2);
                   Tuple()
                 };
-                if mod2::item_exists<|address|bool with copy+store>(addr) {
+                if mod2::item_exists<|address|bool has copy + store>(addr) {
                   Tuple()
                 } else {
                   Abort(14566554180833181696)
                 };
                 {
-                  let found_f: |address|bool with copy+store = mod2::get_item<|address|bool with copy+store>(addr);
+                  let found_f: |address|bool has copy + store = mod2::get_item<|address|bool has copy + store>(addr);
                   if Eq<bool>(use_1, (found_f)(addr)) {
                     Tuple()
                   } else {
@@ -71,7 +71,7 @@ module 0x42::mod3 {
     }
 } // end 0x42::mod3
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::mod2 {
     struct Registry<F: copy + store> has store, key {
         func: F,
@@ -109,12 +109,12 @@ module 0x42::mod3 {
         0x42::mod2::save_item<MyStruct1>(&owner, struct1);
         move_to<MyStruct1>(&owner, struct1);
         if (use_1) {
-            0x42::mod2::save_item<|address|bool with copy+drop+store>(&owner, f1);
+            0x42::mod2::save_item<|address|bool has copy + drop + store>(&owner, f1);
         } else {
-            0x42::mod2::save_item<|address|bool with copy+drop+store>(&owner, f2);
+            0x42::mod2::save_item<|address|bool has copy + drop + store>(&owner, f2);
         };
-        if (0x42::mod2::item_exists<|address|bool with copy+store>(addr)) () else abort 14566554180833181696;
-        let found_f = 0x42::mod2::get_item<|address|bool with copy+store>(addr);
+        if (0x42::mod2::item_exists<|address|bool has copy + store>(addr)) () else abort 14566554180833181696;
+        let found_f = 0x42::mod2::get_item<|address|bool has copy + store>(addr);
         if (use_1 == found_f(addr)) () else abort 14566554180833181696;
     }
 }

@@ -317,11 +317,11 @@ impl DeltaHistory {
             && self.min_achieved_negative_delta >= other.min_achieved_negative_delta
             && other.min_overflow_positive_delta.map_or(true, |other_v| {
                 self.min_overflow_positive_delta
-                    .map_or(false, |self_v| self_v <= other_v)
+                    .is_some_and(|self_v| self_v <= other_v)
             })
             && other.max_underflow_negative_delta.map_or(true, |other_v| {
                 self.max_underflow_negative_delta
-                    .map_or(false, |self_v| self_v <= other_v)
+                    .is_some_and(|self_v| self_v <= other_v)
             })
     }
 }

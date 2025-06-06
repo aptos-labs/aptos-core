@@ -144,29 +144,29 @@ warning: [lint] The left-hand side of `==>` evaluates to `false`. Recall that th
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
-warning: [lint] The inner expression evaluates to `true`. Recall that the expression `! true` is logically equivalent to `false`. Consider simplifying.
+warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:36:13
    │
-36 │         if (! true) ();
-   │             ^^^^^^
+36 │         if (!true) ();
+   │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
-warning: [lint] The inner expression evaluates to `false`. Recall that the expression `! false` is logically equivalent to `true`. Consider simplifying.
+warning: [lint] This expression evaluates to `true`. Recall that the expression `!false` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:37:13
    │
-37 │         if (! false) ();
-   │             ^^^^^^^
+37 │         if (!false) ();
+   │             ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
-warning: [lint] The inner expression evaluates to `true`. Recall that the expression `! true` is logically equivalent to `false`. Consider simplifying.
+warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:42:13
    │
-42 │         if (! true && false || true) ();
-   │             ^^^^^^
+42 │         if (!true && false || true) ();
+   │             ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
@@ -174,8 +174,8 @@ warning: [lint] The inner expression evaluates to `true`. Recall that the expres
 warning: [lint] The right-hand side of `&&` evaluates to `false`. Recall that the expression `bexpr && false` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:42:13
    │
-42 │         if (! true && false || true) ();
-   │             ^^^^^^^^^^^^^^^
+42 │         if (!true && false || true) ();
+   │             ^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
@@ -183,8 +183,8 @@ warning: [lint] The right-hand side of `&&` evaluates to `false`. Recall that th
 warning: [lint] The right-hand side of `||` evaluates to `true`. Recall that the expression `bexpr || true` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:42:13
    │
-42 │         if (! true && false || true) ();
-   │             ^^^^^^^^^^^^^^^^^^^^^^^
+42 │         if (!true && false || true) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.

@@ -13,8 +13,8 @@ use crate::{
 };
 use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo, ResourceGroup,
-    TransactionOnChainData,
+    transaction::ReplayProtector, AptosErrorCode, AsConverter, BcsBlock, GasEstimation, LedgerInfo,
+    ResourceGroup, TransactionOnChainData, TransactionSummary,
 };
 use aptos_config::config::{GasEstimationConfig, NodeConfig, RoleType};
 use aptos_crypto::HashValue;
@@ -36,7 +36,9 @@ use aptos_types::{
     event::EventKey,
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig,
+    },
     state_store::{
         state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
@@ -45,7 +47,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo,
         use_case::{UseCaseAwareTransaction, UseCaseKey},
-        SignedTransaction, Transaction, TransactionWithProof, Version,
+        IndexedTransactionSummary, SignedTransaction, Transaction, TransactionWithProof, Version,
     },
 };
 use futures::{channel::oneshot, SinkExt};
@@ -164,6 +166,13 @@ impl Context {
             .latest_state_checkpoint_view()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn feature_enabled(&self, feature: FeatureFlag) -> Result<bool> {
+        let state_view = self.latest_state_view()?;
+        let features = Features::fetch_config(&state_view)
+            .ok_or_else(|| anyhow::anyhow!("Failed to fetch features from state view"))?;
+        Ok(features.is_enabled(feature))
     }
 
     pub fn state_view<E: StdApiError>(
@@ -786,6 +795,40 @@ impl Context {
         Ok(txns)
     }
 
+    pub fn render_transaction_summaries<E: InternalError>(
+        &self,
+        ledger_info: &LedgerInfo,
+        data: Vec<IndexedTransactionSummary>,
+    ) -> Result<Vec<aptos_api_types::TransactionSummary>, E> {
+        if data.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let txn_summaries: Vec<aptos_api_types::TransactionSummary> = data
+            .into_iter()
+            .map(|t| {
+                Ok(TransactionSummary {
+                    sender: t.sender().into(),
+                    version: t.version().into(),
+                    transaction_hash: t.transaction_hash().into(),
+                    replay_protector: match t.replay_protector() {
+                        aptos_types::transaction::ReplayProtector::Nonce(nonce) => {
+                            ReplayProtector::Nonce(nonce.into())
+                        },
+                        aptos_types::transaction::ReplayProtector::SequenceNumber(seq_num) => {
+                            ReplayProtector::SequenceNumber(seq_num.into())
+                        },
+                    },
+                })
+            })
+            .collect::<Result<_, anyhow::Error>>()
+            .context("Failed to convert transaction summary data from storage")
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+            })?;
+        Ok(txn_summaries)
+    }
+
     pub fn get_transactions(
         &self,
         start_version: u64,
@@ -844,12 +887,13 @@ impl Context {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
         } else {
-            self.expect_resource_poem::<AccountResource, E>(
+            self.get_resource_poem::<AccountResource, E>(
                 address,
                 ledger_info.version(),
                 ledger_info,
             )?
-            .sequence_number()
+            .map(|r| r.sequence_number())
+            .unwrap_or(0)
             .saturating_sub(limit as u64)
         };
 
@@ -890,6 +934,27 @@ impl Context {
             })
             .collect::<Result<Vec<_>>>()
             .context("Failed to parse account transactions")
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn get_account_transaction_summaries<E: NotFoundError + InternalError>(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u16,
+        ledger_version: u64,
+        ledger_info: &LedgerInfo,
+    ) -> Result<Vec<IndexedTransactionSummary>, E> {
+        self.db
+            .get_account_transaction_summaries(
+                address,
+                start_version,
+                end_version,
+                limit as u64,
+                ledger_version,
+            )
+            .context("Failed to retrieve account transaction summaries")
             .map_err(|err| E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info))
     }
 
@@ -989,7 +1054,7 @@ impl Context {
                         v1.sequence_number() + count,
                         v1.type_tag().clone(),
                         v1.event_data().to_vec(),
-                    );
+                    )?;
                     *event = ContractEvent::V1(v1_adjusted);
                     count_map.insert(*v1.key(), count + 1);
                 }
@@ -1180,7 +1245,7 @@ impl Context {
         ) {
             Ok((prices_and_used, block_end_infos, majority_use_case_fraction)) => {
                 let is_full_block =
-                    if majority_use_case_fraction.map_or(false, |fraction| fraction > 0.5) {
+                    if majority_use_case_fraction.is_some_and(|fraction| fraction > 0.5) {
                         // If majority use case is above half of transactions, UseCaseAware block reordering
                         // will allow other transactions to get in the block (AIP-68)
                         false

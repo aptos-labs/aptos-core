@@ -12,7 +12,10 @@ use crate::{
 use aptos_config::config::MempoolConfig;
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_types::{transaction::Transaction, vm_status::DiscardedVMStatus};
+use aptos_types::{
+    transaction::{ReplayProtector, Transaction},
+    vm_status::DiscardedVMStatus,
+};
 use futures::{channel::oneshot, sink::SinkExt};
 use tokio::time::timeout;
 
@@ -24,9 +27,12 @@ async fn test_consensus_events_rejected_txns() {
     // Txn 1: rejected during execution
     // Txn 2: not committed with different address
     // Txn 3: not committed with same address
-    let rejected_txn = TestTransaction::new(0, 0, 1).make_signed_transaction();
-    let kept_txn_1 = TestTransaction::new(1, 0, 1).make_signed_transaction();
-    let kept_txn_2 = TestTransaction::new(0, 1, 1).make_signed_transaction();
+    let rejected_txn =
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 1).make_signed_transaction();
+    let kept_txn_1 =
+        TestTransaction::new(1, ReplayProtector::SequenceNumber(0), 1).make_signed_transaction();
+    let kept_txn_2 =
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 1).make_signed_transaction();
     let txns = vec![rejected_txn.clone(), kept_txn_1.clone(), kept_txn_2.clone()];
     let sender_bucket_1 = sender_bucket(
         &kept_txn_1.sender(),
@@ -44,7 +50,7 @@ async fn test_consensus_events_rejected_txns() {
 
     let transactions = vec![RejectedTransactionSummary {
         sender: rejected_txn.sender(),
-        sequence_number: rejected_txn.sequence_number(),
+        replay_protector: rejected_txn.replay_protector(),
         hash: rejected_txn.committed_hash(),
         reason: DiscardedVMStatus::MALFORMED,
     }];
@@ -100,12 +106,14 @@ async fn test_mempool_notify_committed_txns() {
     // Txn 1: committed successfully
     // Txn 2: not committed but older than gc block timestamp
     // Txn 3: not committed and newer than block timestamp
-    let committed_txn =
-        TestTransaction::new(0, 0, 1).make_signed_transaction_with_expiration_time(0);
-    let kept_txn = TestTransaction::new(1, 0, 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
+    let committed_txn = TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 1)
+        .make_signed_transaction_with_expiration_time(0);
+    let kept_txn =
+        TestTransaction::new(1, ReplayProtector::SequenceNumber(0), 1).make_signed_transaction(); // not committed or cleaned out by block timestamp gc
     let txns = vec![
         committed_txn.clone(),
-        TestTransaction::new(0, 1, 1).make_signed_transaction_with_expiration_time(0),
+        TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 1)
+            .make_signed_transaction_with_expiration_time(0),
         kept_txn.clone(),
     ];
     let sender_bucket = sender_bucket(

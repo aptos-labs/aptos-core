@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct G<T> {
         f: T,
@@ -10,14 +10,14 @@ module 0x8675309::M {
         u: u64,
     }
     private fun t0(r: &R,r_mut: &mut R,s: S,s_ref: &S,s_mut: &mut S) {
-        true;
-        true;
-        true;
-        true;
-        true;
+        Neq<u64>(0, 1);
+        Neq<u8>(0, 1);
+        Neq<u8>(0, 1);
+        Neq<u128>(0, 1);
+        Neq<u128>(0, 1);
         Neq<u64>(Borrow(Immutable)(0), Borrow(Immutable)(1));
-        true;
-        true;
+        Neq<bool>(true, false);
+        Neq<u64>(0, 1);
         Neq<S>(Borrow(Immutable)(s), s_ref);
         Neq<S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
         Neq<S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
@@ -35,7 +35,7 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct G<T> has drop {
         f: T,
@@ -47,14 +47,14 @@ module 0x8675309::M {
         u: u64,
     }
     fun t0(r: &R, r_mut: &mut R, s: S, s_ref: &S, s_mut: &mut S) {
-        true;
-        true;
-        true;
-        true;
-        true;
+        0 != 1;
+        0u8 != 1u8;
+        0u8 != 1u8;
+        0u128 != 1u128;
+        0u128 != 1u128;
         &0 != &1;
-        true;
-        true;
+        true != false;
+        0 != 1;
         &s != s_ref;
         /*freeze*/&mut s != s_ref;
         /*freeze*/&mut s != /*freeze*/s_mut;

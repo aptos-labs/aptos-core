@@ -33,17 +33,17 @@ module 0xc0ffee::m {
     }
 
     public fun test_warn_not() {
-        if (! true) ();
-        if (! false) ();
+        if (!true) ();
+        if (!false) ();
     }
 
 
     public fun combo() {
-        if (! true && false || true) ();
+        if (!true && false || true) ();
     }
 
     #[lint::skip(nonminimal_bool)]
     fun test_no_warn(): bool {
-        ! true
+        !true
     }
 }

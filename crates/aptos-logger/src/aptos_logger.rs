@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unexpected_cfgs)]
+
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
@@ -163,7 +165,7 @@ impl LogEntry {
 
         struct JsonVisitor<'a>(&'a mut BTreeMap<Key, serde_json::Value>);
 
-        impl<'a> Visitor for JsonVisitor<'a> {
+        impl Visitor for JsonVisitor<'_> {
             fn visit_pair(&mut self, key: Key, value: Value<'_>) {
                 let v = match value {
                     Value::Debug(d) => serde_json::Value::String(

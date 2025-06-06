@@ -1985,10 +1985,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let token = context.tokens.peek();
     let exp = match token {
         Tok::Move | Tok::Copy
-            if matches!(
-                context.tokens.lookahead_with_start_loc(),
-                Ok((Tok::Pipe | Tok::PipePipe, _))
-            ) =>
+            if matches!(context.tokens.lookahead(), Ok(Tok::Pipe | Tok::PipePipe)) =>
         {
             let _ = require_move_version_and_advance(
                 LanguageVersion::V2_2,
@@ -2604,7 +2601,7 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
 fn is_start_of_type(context: &mut Context) -> bool {
     matches!(
         context.tokens.peek(),
-        Tok::LParen | Tok::Amp | Tok::AmpMut | Tok::Pipe | Tok::Identifier
+        Tok::LParen | Tok::Amp | Tok::AmpMut | Tok::Pipe | Tok::PipePipe | Tok::Identifier
     )
 }
 
@@ -3509,6 +3506,18 @@ fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Box<Diagnostic
     })
 }
 
+// Check the token after `friend` to decide whether it is a friend declaration
+fn is_friend_declaration(context: &mut Context) -> bool {
+    if context.tokens.peek() == Tok::Friend {
+        if let Ok((tok, content)) = context.tokens.lookahead_content() {
+            if ![Tok::Fun, Tok::Inline, Tok::Native].contains(&tok) && content != ENTRY_MODIFIER {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 // Parse a module:
 //      Module =
 //          <DocComments> ( "spec" | "module") (<LeadingNameAccess>::)?<ModuleName> "{"
@@ -3590,35 +3599,35 @@ fn parse_module(
                 },
                 // Regular move constructs
                 Tok::Use => ModuleMember::Use(parse_use_decl(attributes, context)?),
-                Tok::Friend if context.tokens.lookahead()? != Tok::Fun => {
-                    // Only interpret as module friend declaration if not directly
-                    // followed by fun keyword. This is invalid syntax in v1, so
-                    // we can re-interpret it for Move 2.
-                    ModuleMember::Friend(parse_friend_decl(attributes, context)?)
-                },
                 _ => {
-                    context.tokens.match_doc_comments();
-                    let start_loc = context.tokens.start_loc();
-                    let modifiers = parse_module_member_modifiers(context)?;
-                    match context.tokens.peek() {
-                        Tok::Const => ModuleMember::Constant(parse_constant_decl(
-                            attributes, start_loc, modifiers, context,
-                        )?),
-                        Tok::Fun | Tok::Inline => ModuleMember::Function(parse_function_decl(
-                            attributes, start_loc, modifiers, context,
-                        )?),
-                        Tok::Struct => ModuleMember::Struct(parse_struct_decl(
-                            false, attributes, start_loc, modifiers, context,
-                        )?),
-                        Tok::Identifier if context.tokens.content() == "enum" => {
-                            ModuleMember::Struct(parse_struct_decl(
-                                true, attributes, start_loc, modifiers, context,
-                            )?)
-                        },
-                        _ => {
-                            return Err(unexpected_token_error(
-                                context.tokens,
-                                &format!(
+                    if is_friend_declaration(context) {
+                        // Only interpret as module friend declaration if not directly
+                        // followed by fun, inline, native, entry keyword. This is invalid syntax in v1, so
+                        // we can re-interpret it for Move 2.
+                        ModuleMember::Friend(parse_friend_decl(attributes, context)?)
+                    } else {
+                        context.tokens.match_doc_comments();
+                        let start_loc = context.tokens.start_loc();
+                        let modifiers = parse_module_member_modifiers(context)?;
+                        match context.tokens.peek() {
+                            Tok::Const => ModuleMember::Constant(parse_constant_decl(
+                                attributes, start_loc, modifiers, context,
+                            )?),
+                            Tok::Fun | Tok::Inline => ModuleMember::Function(parse_function_decl(
+                                attributes, start_loc, modifiers, context,
+                            )?),
+                            Tok::Struct => ModuleMember::Struct(parse_struct_decl(
+                                false, attributes, start_loc, modifiers, context,
+                            )?),
+                            Tok::Identifier if context.tokens.content() == "enum" => {
+                                ModuleMember::Struct(parse_struct_decl(
+                                    true, attributes, start_loc, modifiers, context,
+                                )?)
+                            },
+                            _ => {
+                                return Err(unexpected_token_error(
+                                    context.tokens,
+                                    &format!(
                                     "a module member: '{}', '{}', '{}', '{}', '{}', '{}', or '{}'",
                                     Tok::Spec,
                                     Tok::Use,
@@ -3628,8 +3637,9 @@ fn parse_module(
                                     Tok::Inline,
                                     Tok::Struct
                                 ),
-                            ))
-                        },
+                                ))
+                            },
+                        }
                     }
                 },
             }

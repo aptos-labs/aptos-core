@@ -68,6 +68,15 @@ static COIN_WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
 static COIN_DEPOSIT_TYPE_TAG: Lazy<TypeTag> =
     Lazy::new(|| parse_type_tag("0x1::coin::CoinDeposit").unwrap());
 
+static SET_OPERATOR_EVENT_TAG: Lazy<TypeTag> =
+    Lazy::new(|| parse_type_tag("0x1::stake::SetOperator").unwrap());
+static UPDATE_VOTER_EVENT_TAG: Lazy<TypeTag> =
+    Lazy::new(|| parse_type_tag("0x1::staking_contract::UpdateVoter").unwrap());
+static DISTRIBUTE_STAKING_REWARDS_TAG: Lazy<TypeTag> =
+    Lazy::new(|| parse_type_tag("0x1::stake::DistributeRewards").unwrap());
+static UPDATE_COMMISSION_TAG: Lazy<TypeTag> =
+    Lazy::new(|| parse_type_tag("0x1::staking_contract::UpdateCommission").unwrap());
+
 /// A description of all types used by the Rosetta implementation.
 ///
 /// This is used to verify correctness of the implementation and to check things like
@@ -934,7 +943,7 @@ impl Transaction {
             let mut store_to_currency = HashMap::new();
             let mut framework_changes = vec![];
             // Not the most efficient, parse all store owners, and assets associated with stores
-            for (state_key, write_op) in &txn.changes {
+            for (state_key, write_op) in txn.changes.write_op_iter() {
                 let new_changes = preprocess_write_set(
                     server_context,
                     state_key,
@@ -1425,10 +1434,7 @@ fn parse_write_set<'a>(
         },
     };
 
-    let bytes = match write_op.bytes() {
-        Some(bytes) => bytes,
-        None => return None,
-    };
+    let bytes = write_op.bytes()?;
 
     Some((struct_tag, address, bytes))
 }
@@ -1769,7 +1775,7 @@ async fn parse_staking_contract_resource_changes(
     if let Ok(store) = bcs::from_bytes::<Store>(data) {
         // Collect all the stake pools that were created
         let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
-            .iter()
+            .write_op_iter()
             .filter_map(|(state_key, write_op)| {
                 let data = write_op.bytes();
 
@@ -1821,8 +1827,21 @@ async fn parse_staking_contract_resource_changes(
                         }
                     },
                 );
+                let set_operator_events_v2 =
+                    filter_v2_events(&SET_OPERATOR_EVENT_TAG, events, |event| {
+                        if let Ok(event) = bcs::from_bytes::<SetOperatorEvent>(event.event_data()) {
+                            Some(event)
+                        } else {
+                            // If we can't parse the withdraw event, then there's nothing
+                            warn!("Failed to parse set operator event!  Skipping",);
+                            None
+                        }
+                    });
 
-                for event in set_operator_events.iter() {
+                for event in set_operator_events
+                    .into_iter()
+                    .chain(set_operator_events_v2)
+                {
                     set_operator_operations.push(Operation::set_operator(
                         operation_index,
                         Some(OperationStatusType::Success),
@@ -1854,9 +1873,18 @@ async fn parse_staking_contract_resource_changes(
                 }
             },
         );
+        let set_voter_events_v2 = filter_v2_events(&UPDATE_VOTER_EVENT_TAG, events, |event| {
+            if let Ok(event) = bcs::from_bytes::<UpdateVoterEvent>(event.event_data()) {
+                Some(event)
+            } else {
+                // If we can't parse the withdraw event, then there's nothing
+                warn!("Failed to parse update_voter event!  Skipping",);
+                None
+            }
+        });
 
         // Parse all set voter events
-        for event in set_voter_events {
+        for event in set_voter_events.into_iter().chain(set_voter_events_v2) {
             operations.push(Operation::set_voter(
                 operation_index,
                 Some(OperationStatusType::Success),
@@ -1890,9 +1918,22 @@ async fn parse_staking_contract_resource_changes(
                     None
                 }
             });
+        let distribute_staking_rewards_events_v2 =
+            filter_v2_events(&DISTRIBUTE_STAKING_REWARDS_TAG, events, |event| {
+                if let Ok(event) = bcs::from_bytes::<DistributeEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!("Failed to parse distribute_rewards event!  Skipping");
+                    None
+                }
+            });
 
         // For every distribute events, add staking reward operation
-        for event in distribute_staking_rewards_events {
+        for event in distribute_staking_rewards_events
+            .into_iter()
+            .chain(distribute_staking_rewards_events_v2)
+        {
             operations.push(Operation::staking_reward(
                 operation_index,
                 Some(OperationStatusType::Success),
@@ -1938,8 +1979,22 @@ async fn parse_update_commission(
             },
         );
 
+        let update_commission_events_v2 =
+            filter_v2_events(&UPDATE_COMMISSION_TAG, events, |event| {
+                if let Ok(event) = bcs::from_bytes::<UpdateCommissionEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!("Failed to parse update commission event!  Skipping",);
+                    None
+                }
+            });
+
         // For every distribute events, add staking reward operation
-        for event in update_commission_events {
+        for event in update_commission_events
+            .into_iter()
+            .chain(update_commission_events_v2)
+        {
             operations.push(Operation::update_commission(
                 operation_index,
                 Some(OperationStatusType::Success),
@@ -1974,7 +2029,8 @@ async fn parse_delegation_pool_resource_changes(
             struct_tag.module.as_str(),
             struct_tag.name.as_str(),
         ) {
-            (AccountAddress::ONE, DELEGATION_POOL_MODULE, WITHDRAW_STAKE_EVENT) => {
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, WITHDRAW_STAKE_EVENT)
+            | (AccountAddress::ONE, DELEGATION_POOL_MODULE, WITHDRAW_STAKE) => {
                 let event: WithdrawUndelegatedEvent =
                     if let Ok(event) = bcs::from_bytes(e.event_data()) {
                         event

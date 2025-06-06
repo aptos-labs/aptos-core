@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use aptos_logger::info;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
-    rest_client::Client,
+    rest_client::{AptosBaseUrl, Client},
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
@@ -22,6 +22,7 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 static MINTER_SCRIPT: &[u8] = include_bytes!(
@@ -66,6 +67,8 @@ impl MintFunderConfig {
 
         let mut minter = MintFunder::new(
             self.api_connection_config.node_url.clone(),
+            self.api_connection_config.api_key.clone(),
+            self.api_connection_config.additional_headers.clone(),
             self.api_connection_config.chain_id,
             self.transaction_submission_config,
             faucet_account,
@@ -85,6 +88,8 @@ impl MintFunderConfig {
 pub struct MintFunder {
     /// URL of an Aptos node API.
     node_url: Url,
+    node_api_key: Option<String>,
+    node_additional_headers: Option<HashMap<String, String>>,
 
     txn_config: TransactionSubmissionConfig,
 
@@ -102,6 +107,8 @@ pub struct MintFunder {
 impl MintFunder {
     pub fn new(
         node_url: Url,
+        node_api_key: Option<String>,
+        node_additional_headers: Option<HashMap<String, String>>,
         chain_id: ChainId,
         txn_config: TransactionSubmissionConfig,
         faucet_account: LocalAccount,
@@ -113,6 +120,8 @@ impl MintFunder {
             .with_transaction_expiration_time(txn_config.transaction_expiration_secs);
         Self {
             node_url,
+            node_api_key,
+            node_additional_headers,
             txn_config,
             faucet_account: RwLock::new(faucet_account),
             transaction_factory,
@@ -203,7 +212,19 @@ impl MintFunder {
     /// the entire time because it uses cookies, ensuring we're talking to the same
     /// node behind the LB every time.
     pub fn get_api_client(&self) -> Client {
-        Client::new(self.node_url.clone())
+        let mut builder = Client::builder(AptosBaseUrl::Custom(self.node_url.clone()));
+
+        if let Some(api_key) = self.node_api_key.clone() {
+            builder = builder.api_key(&api_key).expect("Failed to set API key");
+        }
+
+        if let Some(additional_headers) = &self.node_additional_headers {
+            for (key, value) in additional_headers {
+                builder = builder.header(key, value).expect("Failed to set header");
+            }
+        }
+
+        builder.build()
     }
 
     pub async fn process(
@@ -294,11 +315,8 @@ impl FunderTrait for MintFunder {
     /// Assert the funder account actually exists.
     async fn is_healthy(&self) -> FunderHealthMessage {
         let account_address = self.faucet_account.read().await.address();
-        match self
-            .get_api_client()
-            .get_account_bcs(account_address)
-            .await
-        {
+        let client = self.get_api_client();
+        match client.get_account_bcs(account_address).await {
             Ok(_) => FunderHealthMessage {
                 can_process_requests: true,
                 message: None,

@@ -38,9 +38,13 @@
 //!   `Lambda`.
 
 use super::lambda_lifter::{LambdaLifter, LambdaLiftingOptions};
-use crate::env_pipeline::{
-    rewrite_target::{RewriteState, RewriteTarget, RewriteTargets, RewritingScope},
-    spec_rewriter::run_spec_rewriter_inline,
+use crate::{
+    env_pipeline::{
+        rewrite_target::{RewriteState, RewriteTarget, RewriteTargets, RewritingScope},
+        spec_rewriter::run_spec_rewriter_inline,
+    },
+    experiments::Experiment,
+    options::Options,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -77,10 +81,10 @@ pub fn run_inlining(
     keep_inline_functions: bool,
     lift_inline_funs: bool,
 ) {
-    // Get non-inline function roots for running inlining.
-    // Also generate an error for any target inline functions lacking a body to inline.
+    // Get function roots for running inlining.
+    // Also generate errors for any invalid target inline functions.
     let mut targets = RewriteTargets::create(env, scope);
-    filter_targets(env, &mut targets);
+    check_and_maybe_filter_targets(env, &mut targets);
     let mut todo: BTreeSet<_> = targets.keys().collect();
 
     // Only look for inlining sites if we have targets to inline into.
@@ -151,10 +155,13 @@ pub fn run_inlining(
     }
 }
 
-/// Filter out inline functions from targets since we only process them when they are
-/// called from other functions. While we're iterating, produce an error
-/// on every inline function lacking a body to inline.
-fn filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets) {
+/// Check that inline functions are (1) not native, (2) have a body (3) are not in a script.
+/// Filter out inline functions from the targets if `Experiment::SKIP_INLINING_INLINE_FUNS` is on.
+fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets) {
+    let keep_inline_functions = !env
+        .get_extension::<Options>()
+        .unwrap_or_default()
+        .experiment_on(Experiment::SKIP_INLINING_INLINE_FUNS);
     targets.filter(|target: &RewriteTarget, _| {
         if let RewriteTarget::MoveFun(fnid) = target {
             let func = env.get_function(*fnid);
@@ -173,11 +180,19 @@ fn filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets) {
                         env.diag(Severity::Bug, &func_loc, &msg);
                     }
                 }
-                false
+                if func.module_env.is_script_module() {
+                    env.error(
+                        &func.get_id_loc(),
+                        "inline function cannot be defined in a script",
+                    );
+                }
+                keep_inline_functions
             } else {
+                // not an inline function
                 true
             }
         } else {
+            // not a move function
             true
         }
     });
@@ -480,7 +495,7 @@ impl<'env, 'inliner> OuterInlinerRewriter<'env, 'inliner> {
     }
 }
 
-impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inliner> {
+impl ExpRewriterFunctions for OuterInlinerRewriter<'_, '_> {
     /// recognize call to inline function and rewrite it using `InlinedRewriter::inline_call`
     fn rewrite_call(&mut self, call_id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if let Operation::MoveFunction(module_id, fun_id) = oper {
@@ -1164,7 +1179,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     }
 }
 
-impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> {
+impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
     /// Override default implementation to flag an error on an disallowed Return,
     /// as well as Break and Continue expressions outside of loops.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
@@ -1258,6 +1273,15 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         if idx < self.inlined_formal_params.len() {
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
+            if self.lambda_param_map.contains_key(&sym) {
+                // lambda parameter `sym` is used as a temp apart from a call
+                // which is currently not supported
+                let msg = format!("parameter `{}` with function type cannot be used as a local variable in an inline function",
+                   sym.display(self.env.symbol_pool()));
+                let call_details = vec![(loc.clone(), "being used here".to_string())];
+                self.env
+                    .diag_with_labels(Severity::Error, &param.2, &msg, call_details);
+            }
             let param_type = &param.1;
             let instantiated_param_type = param_type.instantiate(self.type_args);
             let new_node_id = self.env.new_node(loc, instantiated_param_type);

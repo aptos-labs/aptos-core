@@ -243,10 +243,9 @@ impl ForgeConfig {
             helm_values["validator"]["config"]["consensus"]["quorum_store"]
                 ["enable_opt_quorum_store"] = true.into();
 
-            helm_values["validator"]["config"]["consensus"]["enable_pipeline"] = true.into();
-            helm_values["validator"]["config"]["consensus"]["enable_pre_commit"] = true.into();
-            helm_values["fullnode"]["config"]["consensus_observer"]["enable_pipeline"] =
-                true.into();
+            // override consensus observer refresh latency
+            helm_values["fullnode"]["config"]["consensus_observer"]
+                ["subscription_peer_change_interval_ms"] = 5_000.into();
         }))
     }
 

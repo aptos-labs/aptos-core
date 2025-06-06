@@ -4,6 +4,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.4.0]
+- UTF-8 characters are now allowed in Move source code comments (and thus error codes).
+- Additional compiler warnings on inline functions based on their visibility.
+- Various compiler bug fixes.
+- Add flag `--file-path <FILE_PATH>...` to `aptos move fmt`, which allows to specify individual files to format.
+- Fixed bug where `aptos move fmt` would format current directory if invalid `--package-path` was provided.
+
 ## [7.3.0]
 
 - Update boogie from 3.2.4 to 3.5.1.

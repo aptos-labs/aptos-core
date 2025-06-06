@@ -148,10 +148,13 @@ pub mod errors;
 pub mod executor;
 mod executor_utilities;
 pub mod explicit_sync_wrapper;
+pub mod hot_state_op_accumulator;
 mod limit_processor;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;
+mod scheduler_status;
+mod scheduler_v2;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;

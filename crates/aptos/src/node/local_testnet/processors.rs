@@ -40,6 +40,7 @@ pub struct ProcessorArgs {
         long,
         value_enum,
         default_values_t = vec![
+            ProcessorName::AccountRestorationProcessor,
             ProcessorName::AccountTransactionsProcessor,
             ProcessorName::DefaultProcessor,
             ProcessorName::EventsProcessor,

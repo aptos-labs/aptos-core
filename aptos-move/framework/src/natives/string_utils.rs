@@ -358,7 +358,7 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Function(_) => {
+        MoveTypeLayout::Function => {
             // Notice that we print the undecorated value representation,
             // avoiding potential loading of the function to get full
             // decorated type information.

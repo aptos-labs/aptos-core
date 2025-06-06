@@ -12,6 +12,6 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
-[dependencies]
-aptos-protos ={ workspace = true }
+[dev-dependencies]
+aptos-protos = { workspace = true }
 serde_json = { workspace = true }

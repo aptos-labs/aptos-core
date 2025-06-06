@@ -60,6 +60,12 @@ error: expected `(bool, u64)` but found a value of type `u64`
 16 │         (*&mut s_mut.f: (bool, u64));
    │                ^^^^^^^
 
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/derefrence_invalid.move:16:11
+   │
+16 │         (*&mut s_mut.f: (bool, u64));
+   │           ^^^^^^^^^^^^
+
 error: expected `&u64` but found a value of type `u64`
    ┌─ tests/checking/typing/derefrence_invalid.move:17:10
    │
@@ -72,8 +78,20 @@ error: expected `(X, S)` but found a value of type `X`
 18 │         (*&s_mut.x: (X, S));
    │            ^^^^^^^
 
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/derefrence_invalid.move:18:11
+   │
+18 │         (*&s_mut.x: (X, S));
+   │           ^^^^^^^^
+
 error: expected expression with no value but found `X`
    ┌─ tests/checking/typing/derefrence_invalid.move:19:16
    │
 19 │         (*&mut s_mut.x: ());
    │                ^^^^^^^
+
+error: cannot borrow a tuple
+   ┌─ tests/checking/typing/derefrence_invalid.move:19:11
+   │
+19 │         (*&mut s_mut.x: ());
+   │           ^^^^^^^^^^^^
