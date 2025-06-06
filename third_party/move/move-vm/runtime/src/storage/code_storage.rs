@@ -111,9 +111,9 @@ where
         // Verify the script is correct w.r.t. its dependencies.
         let immediate_dependencies = locally_verified_script
             .immediate_dependencies_iter()
-            .map(|(addr, name)| {
+            .map(|id| {
                 // Since module is stored on-chain, we should not see any verification errors here.
-                self.fetch_existing_verified_module(addr, name)
+                self.fetch_existing_verified_module(&id)
             })
             .collect::<VMResult<Vec<_>>>()?;
         let verified_script = self

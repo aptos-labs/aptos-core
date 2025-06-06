@@ -39,7 +39,6 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
@@ -125,7 +124,6 @@ where
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         let func = module_storage.load_function(module_id, function_name, &ty_args)?;
@@ -134,7 +132,6 @@ where
             args,
             &mut self.data_cache,
             gas_meter,
-            traversal_context,
             &mut self.extensions,
             module_storage,
             self.resolver,
@@ -146,7 +143,6 @@ where
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function(
@@ -154,7 +150,6 @@ where
             args,
             &mut self.data_cache,
             gas_meter,
-            traversal_context,
             &mut self.extensions,
             module_storage,
             self.resolver,
@@ -358,7 +353,7 @@ where
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = {
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .fetch_existing_module_metadata(&struct_tag.module_id())
                         .map_err(|e| e.to_partial())?;
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 };

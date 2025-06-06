@@ -20,9 +20,7 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-};
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
@@ -184,12 +182,10 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
 impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'_, T, S> {
     fn fetch_state_value_metadata(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         let state_value_metadata = self
-            .get_module_or_build_with(&id, self)
+            .get_module_or_build_with(module_id, self)
             .map_err(|err| err.to_partial())?
             .map(|(module, _)| module.extension().state_value_metadata().clone());
         Ok(state_value_metadata)

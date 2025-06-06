@@ -31,9 +31,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::{
-    logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
-};
+use move_vm_runtime::{logging::expect_no_verification_errors, ModuleStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 
@@ -111,7 +109,6 @@ pub(crate) fn run_script_prologue(
     txn_data: &TransactionMetadata,
     features: &Features,
     log_context: &AdapterLogSchema,
-    traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
     let txn_replay_protector = txn_data.replay_protector();
@@ -237,7 +234,6 @@ pub(crate) fn run_script_prologue(
                 vec![],
                 serialized_args,
                 &mut gas_meter,
-                traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -381,7 +377,6 @@ pub(crate) fn run_script_prologue(
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -403,7 +398,6 @@ pub(crate) fn run_multisig_prologue(
     multisig_address: AccountAddress,
     features: &Features,
     log_context: &AdapterLogSchema,
-    traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
     // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
@@ -439,7 +433,6 @@ pub(crate) fn run_multisig_prologue(
                 MoveValue::vector_u8(provided_payload),
             ]),
             &mut UnmeteredGasMeter,
-            traversal_context,
             module_storage,
         )
         .map(|_return_vals| ())
@@ -455,7 +448,6 @@ fn run_epilogue(
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
     features: &Features,
-    traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
@@ -501,7 +493,6 @@ fn run_epilogue(
             vec![],
             serialize_args,
             &mut UnmeteredGasMeter,
-            traversal_context,
             module_storage,
         )
     } else {
@@ -544,7 +535,6 @@ fn run_epilogue(
                 vec![],
                 serialize_values(&args),
                 &mut UnmeteredGasMeter,
-                traversal_context,
                 module_storage,
             )
         } else {
@@ -580,7 +570,6 @@ fn run_epilogue(
                 vec![],
                 serialize_values(&args),
                 &mut UnmeteredGasMeter,
-                traversal_context,
                 module_storage,
             )
         }
@@ -589,7 +578,7 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
+        emit_fee_statement(session, module_storage, fee_statement)?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -601,7 +590,6 @@ fn emit_fee_statement(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
-    traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
     session.execute_function_bypass_visibility(
         &TRANSACTION_FEE_MODULE,
@@ -609,7 +597,6 @@ fn emit_fee_statement(
         vec![],
         vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
         &mut UnmeteredGasMeter,
-        traversal_context,
         module_storage,
     )?;
     Ok(())
@@ -626,7 +613,6 @@ pub(crate) fn run_success_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
@@ -644,7 +630,6 @@ pub(crate) fn run_success_epilogue(
         fee_statement,
         txn_data,
         features,
-        traversal_context,
         is_simulation,
     )
     .or_else(|err| convert_epilogue_error(err, log_context))
@@ -661,7 +646,6 @@ pub(crate) fn run_failure_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
     run_epilogue(
@@ -672,7 +656,6 @@ pub(crate) fn run_failure_epilogue(
         fee_statement,
         txn_data,
         features,
-        traversal_context,
         is_simulation,
     )
     .or_else(|err| {

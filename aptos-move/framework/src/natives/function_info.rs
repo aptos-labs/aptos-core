@@ -85,22 +85,26 @@ fn native_check_dispatch_type_compatibility_impl(
     let (rhs, rhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
 
-        let check_visited = |a, n| {
+        let mut is_visited = |module_id: &ModuleId| {
             let special_addresses_considered_visited =
                 context.get_feature_flags().is_account_abstraction_enabled()
                     || context
                         .get_feature_flags()
                         .is_derivable_account_abstraction_enabled();
             if special_addresses_considered_visited {
-                context
-                    .traversal_context()
-                    .check_is_special_or_visited(a, n)
+                module_id.address().is_special()
+                    || context
+                        .gas_meter()
+                        .is_existing_dependency_metered(module_id)
             } else {
-                context.traversal_context().legacy_check_visited(a, n)
+                context
+                    .gas_meter()
+                    .is_existing_dependency_metered(module_id)
             }
         };
-        check_visited(module.address(), module.name())
-            .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?;
+        if !is_visited(&module) {
+            return Err(SafeNativeError::Abort { abort_code: 2 });
+        }
 
         (
             context

@@ -147,10 +147,7 @@ impl TransactionDataCache {
 
         let (data, bytes_loaded) = {
             let metadata = module_storage
-                .fetch_existing_module_metadata(
-                    &struct_tag.address,
-                    struct_tag.module.as_ident_str(),
-                )
+                .fetch_existing_module_metadata(&struct_tag.module_id())
                 .map_err(|err| err.to_partial())?;
 
             // If we need to process delayed fields, we pass type layout to remote storage. Remote

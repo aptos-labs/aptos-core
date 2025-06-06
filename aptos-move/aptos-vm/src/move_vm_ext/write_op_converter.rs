@@ -82,11 +82,8 @@ impl<'r> WriteOpConverter<'r> {
     ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
         let mut writes = BTreeMap::new();
         for (module_id, bytes) in verified_module_bundle {
-            let addr = module_id.address();
-            let name = module_id.name();
-
             // If state value metadata exists, this is a modification.
-            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let state_value_metadata = module_storage.fetch_state_value_metadata(&module_id)?;
             let op = if state_value_metadata.is_some() {
                 Op::Modify(bytes)
             } else {
@@ -112,7 +109,9 @@ impl<'r> WriteOpConverter<'r> {
             self.remote.read_state_value(&state_key).map_err(|err| {
                 let msg = format!(
                     "Error when enforcing read-before-write for module {}::{}: {:?}",
-                    addr, name, err
+                    module_id.address(),
+                    module_id.name(),
+                    err
                 );
                 PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
             })?;

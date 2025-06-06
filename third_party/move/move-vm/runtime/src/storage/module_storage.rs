@@ -17,7 +17,6 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
     function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -43,45 +42,25 @@ use std::sync::Arc;
 pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool>;
+    fn check_module_exists(&self, module_id: &ModuleId) -> VMResult<bool>;
 
     /// Returns module bytes if module exists, or [None] otherwise. An error is returned if there
     /// is a storage error.
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>>;
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>>;
 
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>>;
+    fn fetch_module_size_in_bytes(&self, module_id: &ModuleId) -> VMResult<Option<usize>>;
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>>;
+    fn fetch_module_metadata(&self, module_id: &ModuleId) -> VMResult<Option<Vec<Metadata>>>;
 
     /// Returns the metadata in the module. An error is returned if there is a storage error,
     /// module fails deserialization, or does not exist.
-    fn fetch_existing_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
-        self.fetch_module_metadata(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+    fn fetch_existing_module_metadata(&self, module_id: &ModuleId) -> VMResult<Vec<Metadata>> {
+        self.fetch_module_metadata(module_id)?
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
@@ -89,8 +68,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   2. there is an error from the underlying storage.
     fn fetch_deserialized_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Option<Arc<CompiledModule>>>;
 
     /// Returns the deserialized module. An error is returned if:
@@ -99,55 +77,42 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   3. module does not exist.
     fn fetch_existing_deserialized_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.fetch_deserialized_module(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+        self.fetch_deserialized_module(module_id)?
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 
     /// Returns the verified module if it exists, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module and verify it.
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>>;
+    fn fetch_verified_module(&self, module_id: &ModuleId) -> VMResult<Option<Arc<Module>>>;
 
     /// Returns the verified module. If it does not exist, a linker error is returned. All other
     /// errors are mapped using [expect_no_verification_errors] - since on-chain code should not
     /// fail bytecode verification.
-    fn fetch_existing_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
-        self.fetch_verified_module(address, module_name)
+    fn fetch_existing_verified_module(&self, module_id: &ModuleId) -> VMResult<Arc<Module>> {
+        self.fetch_verified_module(module_id)
             .map_err(expect_no_verification_errors)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 
     /// Returns the module without verification, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
     /// if the storage fails to fetch the deserialized module.
     #[cfg(fuzzing)]
-    fn fetch_module_skip_verification(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>>;
+    fn fetch_module_skip_verification(&self, module_id: &ModuleId)
+        -> VMResult<Option<Arc<Module>>>;
 
     /// Returns a struct type corresponding to the specified name. The module containing the struct
     /// will be fetched and cached beforehand.
     fn fetch_struct_ty(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
         struct_name: &IdentStr,
     ) -> PartialVMResult<Arc<StructType>> {
         let module = self
-            .fetch_existing_verified_module(address, module_name)
+            .fetch_existing_verified_module(module_id)
             .map_err(|err| err.to_partial())?;
         module
             .get_struct(struct_name)
@@ -160,11 +125,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
 
-        self.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
+        self.fetch_struct_ty(&struct_name.module, struct_name.name.as_ident_str())
     }
 
     /// Returns a runtime type corresponding to the specified type tag (file format type
@@ -178,12 +139,8 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .vm_config()
             .ty_builder
             .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
-                    &st.address,
-                    st.module.as_ident_str(),
-                    st.name.as_ident_str(),
-                )
-                .map_err(|err| err.finish(Location::Undefined))
+                self.fetch_struct_ty(&st.module_id(), st.name.as_ident_str())
+                    .map_err(|err| err.finish(Location::Undefined))
             })
             .map_err(|err| err.to_partial())
     }
@@ -193,11 +150,10 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// types and its signature. The returned module is verified.
     fn fetch_function_definition(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let module = self.fetch_existing_verified_module(address, module_name)?;
+        let module = self.fetch_existing_verified_module(module_id)?;
         let function = module.get_function(function_name)?;
         Ok((module, function))
     }
@@ -210,8 +166,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ) -> VMResult<LoadedFunction> {
         let _timer = VM_TIMER.timer_with_label("Loader::load_function");
 
-        let (module, function) =
-            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+        let (module, function) = self.fetch_function_definition(module_id, function_name)?;
 
         let ty_args = ty_args
             .iter()
@@ -254,69 +209,41 @@ where
     E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-        Ok(self.get_module_or_build_with(&id, self)?.is_some())
+    fn check_module_exists(&self, module_id: &ModuleId) -> VMResult<bool> {
+        Ok(self.get_module_or_build_with(module_id, self)?.is_some())
     }
 
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_bytes(&self, module_id: &ModuleId) -> VMResult<Option<Bytes>> {
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_size_in_bytes(&self, module_id: &ModuleId) -> VMResult<Option<usize>> {
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
+    fn fetch_module_metadata(&self, module_id: &ModuleId) -> VMResult<Option<Vec<Metadata>>> {
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
     fn fetch_deserialized_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
-            .get_module_or_build_with(&id, self)?
+            .get_module_or_build_with(module_id, self)?
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Arc<Module>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-
+    fn fetch_verified_module(&self, module_id: &ModuleId) -> VMResult<Option<Arc<Module>>> {
         // Look up the verified module in cache, if it is not there, or if the module is not yet
         // verified, we need to load & verify its transitive dependencies.
-        let (module, version) = match self.get_module_or_build_with(&id, self)? {
+        let (module, version) = match self.get_module_or_build_with(module_id, self)? {
             Some(module_and_version) => module_and_version,
             None => return Ok(None),
         };
@@ -328,9 +255,9 @@ where
         let _timer = VM_TIMER.timer_with_label("ModuleStorage::fetch_verified_module [cache miss]");
 
         let mut visited = HashSet::new();
-        visited.insert(id.clone());
+        visited.insert(module_id.clone());
         Ok(Some(visit_dependencies_and_verify(
-            id,
+            module_id,
             module,
             version,
             &mut visited,
@@ -341,13 +268,10 @@ where
     #[cfg(fuzzing)]
     fn fetch_module_skip_verification(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
+        module_id: &ModuleId,
     ) -> VMResult<Option<Arc<Module>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-
         // Look up the module in cache, if it is not there, we need to load it
-        let (module, version) = match self.get_module_or_build_with(&id, self)? {
+        let (module, version) = match self.get_module_or_build_with(module_id, self)? {
             Some(module_and_version) => module_and_version,
             None => return Ok(None),
         };
@@ -359,9 +283,9 @@ where
 
         // Otherwise, load the module and its dependencies without verification
         let mut visited = HashSet::new();
-        visited.insert(id.clone());
+        visited.insert(module_id.clone());
         Ok(Some(visit_dependencies_and_skip_verification(
-            id,
+            module_id,
             module,
             version,
             &mut visited,
@@ -384,7 +308,7 @@ where
 ///   detection of such corner cases only possible if **all existing modules are checked**, which
 ///   is clearly infeasible.
 fn visit_dependencies_and_verify<T, E, V>(
-    module_id: ModuleId,
+    module_id: &ModuleId,
     module: Arc<ModuleCode<CompiledModule, Module, E>>,
     version: V,
     visited: &mut HashSet<ModuleId>,
@@ -424,12 +348,10 @@ where
     // Step 2: Traverse and collect all verified immediate dependencies so that we can verify
     // non-local properties of the module.
     let mut verified_dependencies = vec![];
-    for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
-        let dependency_id = ModuleId::new(*addr, name.to_owned());
-
+    for dependency_id in locally_verified_code.immediate_dependencies_iter() {
         let (dependency, dependency_version) = module_cache_with_context
             .get_module_or_build_with(&dependency_id, module_cache_with_context)?
-            .ok_or_else(|| module_linker_error!(addr, name))?;
+            .ok_or_else(|| module_linker_error!(dependency_id.address(), dependency_id.name()))?;
 
         // Dependency is already verified!
         if dependency.code().is_verified() {
@@ -440,7 +362,7 @@ where
         if visited.insert(dependency_id.clone()) {
             // Dependency is not verified, and we have not visited it yet.
             let verified_dependency = visit_dependencies_and_verify(
-                dependency_id.clone(),
+                &dependency_id,
                 dependency,
                 dependency_version,
                 visited,
@@ -459,7 +381,7 @@ where
     let verified_code =
         runtime_environment.build_verified_module(locally_verified_code, &verified_dependencies)?;
     let module = module_cache_with_context.insert_verified_module(
-        module_id,
+        module_id.clone(),
         verified_code,
         module.extension().clone(),
         version,
@@ -471,7 +393,7 @@ where
 /// an error is returned.
 #[cfg(fuzzing)]
 fn visit_dependencies_and_skip_verification<T, E, V>(
-    module_id: ModuleId,
+    module_id: &ModuleId,
     module: Arc<ModuleCode<CompiledModule, Module, E>>,
     version: V,
     visited: &mut HashSet<ModuleId>,
@@ -498,12 +420,10 @@ where
 
     // Step 2: Traverse and collect all immediate dependencies
     let mut loaded_dependencies = vec![];
-    for (addr, name) in module.code().deserialized().immediate_dependencies_iter() {
-        let dependency_id = ModuleId::new(*addr, name.to_owned());
-
+    for dependency_id in module.code().deserialized().immediate_dependencies_iter() {
         let (dependency, dependency_version) = module_cache_with_context
             .get_module_or_build_with(&dependency_id, module_cache_with_context)?
-            .ok_or_else(|| module_linker_error!(addr, name))?;
+            .ok_or_else(|| module_linker_error!(dependency_id.address(), dependency_id.name()))?;
 
         // If dependency is already loaded, use it
         if dependency.code().is_verified() {
@@ -514,7 +434,7 @@ where
         if visited.insert(dependency_id.clone()) {
             // Dependency is not loaded, and we have not visited it yet
             let loaded_dependency = visit_dependencies_and_skip_verification(
-                dependency_id.clone(),
+                &dependency_id,
                 dependency,
                 dependency_version,
                 visited,
@@ -540,7 +460,7 @@ where
     .map_err(|e| e.finish(Location::Undefined))?;
 
     let verified_module = module_cache_with_context.insert_verified_module(
-        module_id,
+        module_id.clone(),
         code,
         module.extension().clone(),
         version,
