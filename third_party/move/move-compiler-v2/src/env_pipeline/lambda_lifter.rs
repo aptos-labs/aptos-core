@@ -52,6 +52,7 @@ use move_model::{
     well_known,
 };
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, BTreeSet},
     mem,
 };
@@ -101,7 +102,21 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 new_funs.append(&mut lifter.lifted);
                 updated_funs.insert(fun.get_id(), new_def);
             }
+            // Lift lambda in function level specs
+            // TODO(#16256): add support for module level specs and spec funs
+            let mut spec_mut_ref = fun.get_mut_spec();
+            let fun_spec = spec_mut_ref.borrow_mut();
+            for cond in &mut fun_spec.conditions {
+                for expr in cond.all_exps_mut() {
+                    let new_def = lifter.rewrite_exp(expr.clone());
+                    if expr != &new_def {
+                        *expr = new_def;
+                    }
+                }
+            }
+            new_funs.append(&mut lifter.lifted);
         }
+
         // Now that we have processed all functions and released
         // all references to the env, mutate it.
         for (fun_id, new_def) in updated_funs {
