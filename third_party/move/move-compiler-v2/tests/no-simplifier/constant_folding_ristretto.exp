@@ -5,7 +5,7 @@ module 0xcafe::Ristretto {
           let non_canonical_highbit: vector<u8> = Vector<u8>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128);
           {
             let non_canonical_highbit_hex: vector<u8> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];
-            if Eq<vector<u8>>(non_canonical_highbit, non_canonical_highbit_hex) {
+            if Eq<vector<u8>>(Borrow(Immutable)(non_canonical_highbit), Borrow(Immutable)(non_canonical_highbit_hex)) {
               Tuple()
             } else {
               Abort(1)
@@ -21,7 +21,7 @@ module 0xcafe::Ristretto {
     public fun test() {
         let non_canonical_highbit = vector[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 128u8];
         let non_canonical_highbit_hex = vector[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 128u8];
-        if (non_canonical_highbit == non_canonical_highbit_hex) () else abort 1;
+        if (&non_canonical_highbit == &non_canonical_highbit_hex) () else abort 1;
     }
 }
 
@@ -32,7 +32,7 @@ module 0xcafe::Ristretto {
           let non_canonical_highbit: vector<u8> = Vector<u8>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128);
           {
             let non_canonical_highbit_hex: vector<u8> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];
-            if Eq<vector<u8>>(non_canonical_highbit, non_canonical_highbit_hex) {
+            if Eq<vector<u8>>(Borrow(Immutable)(non_canonical_highbit), Borrow(Immutable)(non_canonical_highbit_hex)) {
               Tuple()
             } else {
               Abort(1)
