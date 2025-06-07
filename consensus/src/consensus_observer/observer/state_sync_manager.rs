@@ -97,6 +97,17 @@ impl StateSyncManager {
         self.fallback_sync_handle = None;
     }
 
+    /// Determines the fallback duration based on the critical error flag
+    fn determine_fallback_duration(&self, critical_error: bool) -> Duration {
+        let duration_ms = if critical_error {
+            self.consensus_observer_config
+                .observer_fallback_critical_duration_ms
+        } else {
+            self.consensus_observer_config.observer_fallback_duration_ms
+        };
+        Duration::from_millis(duration_ms)
+    }
+
     /// Returns true iff state sync is currently executing in fallback mode
     pub fn in_fallback_mode(&self) -> bool {
         self.fallback_sync_handle.is_some()
@@ -114,12 +125,15 @@ impl StateSyncManager {
     }
 
     /// Invokes state sync to synchronize in fallback mode
-    pub fn sync_for_fallback(&mut self) {
+    pub fn sync_for_fallback(&mut self, critical_error: bool) {
+        // Determine the fallback duration
+        let fallback_duration = self.determine_fallback_duration(critical_error);
+
         // Log that we're starting to sync in fallback mode
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Started syncing in fallback mode! Syncing duration: {:?} ms!",
-                self.consensus_observer_config.observer_fallback_duration_ms
+                "Started syncing in fallback mode! Critical error: {}. Syncing duration: {:?} ms!",
+                critical_error, fallback_duration
             ))
         );
 
@@ -127,9 +141,15 @@ impl StateSyncManager {
         metrics::increment_counter_without_labels(&metrics::OBSERVER_STATE_SYNC_FALLBACK_COUNTER);
 
         // Clone the required components for the state sync task
-        let consensus_observer_config = self.consensus_observer_config;
         let execution_client = self.execution_client.clone();
         let sync_notification_sender = self.state_sync_notification_sender.clone();
+
+        // Determine the fallback metric to update
+        let fallback_metric = if critical_error {
+            metrics::STATE_SYNCING_FOR_CRITICAL_FALLBACK
+        } else {
+            metrics::STATE_SYNCING_FOR_FALLBACK
+        };
 
         // Spawn a task to sync for the fallback
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -138,13 +158,9 @@ impl StateSyncManager {
                 // Update the state sync metrics now that we're syncing for the fallback
                 metrics::set_gauge_with_label(
                     &metrics::OBSERVER_STATE_SYNC_EXECUTING,
-                    metrics::STATE_SYNCING_FOR_FALLBACK,
+                    fallback_metric,
                     1, // We're syncing for the fallback
                 );
-
-                // Get the fallback duration
-                let fallback_duration =
-                    Duration::from_millis(consensus_observer_config.observer_fallback_duration_ms);
 
                 // Sync for the fallback duration
                 let latest_synced_ledger_info = match execution_client
@@ -175,7 +191,7 @@ impl StateSyncManager {
                 // Clear the state sync metrics now that we're done syncing
                 metrics::set_gauge_with_label(
                     &metrics::OBSERVER_STATE_SYNC_EXECUTING,
-                    metrics::STATE_SYNCING_FOR_FALLBACK,
+                    fallback_metric,
                     0, // We're no longer syncing for the fallback
                 );
             },
@@ -292,7 +308,7 @@ mod test {
         assert!(!state_sync_manager.is_syncing_to_commit());
 
         // Sync for the fallback and verify that the active sync handle is set
-        state_sync_manager.sync_for_fallback();
+        state_sync_manager.sync_for_fallback(false);
         assert!(state_sync_manager.in_fallback_mode());
 
         // Clear the active sync handle and verify that it's reset
@@ -343,7 +359,7 @@ mod test {
         assert!(!state_sync_manager.is_syncing_through_epoch());
 
         // Sync for the fallback and verify that we're not syncing through an epoch
-        state_sync_manager.sync_for_fallback();
+        state_sync_manager.sync_for_fallback(false);
         assert!(!state_sync_manager.is_syncing_through_epoch());
     }
 }
