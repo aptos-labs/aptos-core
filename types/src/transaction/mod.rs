@@ -2603,7 +2603,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    type Value: Send + Sync + Debug + Clone + TransactionWrite;
+    type Value: Send + Sync + Debug + Clone + Eq + PartialEq + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise

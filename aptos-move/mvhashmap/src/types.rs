@@ -6,6 +6,7 @@ use aptos_types::{
     error::PanicOr,
     write_set::{TransactionWrite, WriteOpKind},
 };
+use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
 
@@ -158,6 +159,7 @@ impl<V: TransactionWrite> ValueWithLayout<V> {
     }
 
     pub fn bytes_len(&self) -> Option<usize> {
+        fail_point!("value_with_layout_bytes_len", |_| { Some(10) });
         match self {
             ValueWithLayout::RawFromStorage(value) | ValueWithLayout::Exchanged(value, _) => {
                 value.bytes().map(|b| b.len())
