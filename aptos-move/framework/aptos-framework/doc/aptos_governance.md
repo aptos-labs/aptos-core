@@ -413,7 +413,7 @@ Event emitted when a proposal is created.
 
 ## Struct `VoteEvent`
 
-Event emitted when there's a vote on a proposa;
+Event emitted when there's a vote on a proposal;
 
 
 <pre><code><b>struct</b> <a href="aptos_governance.md#0x1_aptos_governance_VoteEvent">VoteEvent</a> <b>has</b> drop, store
@@ -558,7 +558,7 @@ Event emitted when a proposal is created.
 
 ## Struct `Vote`
 
-Event emitted when there's a vote on a proposa;
+Event emitted when there's a vote on a proposal;
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
@@ -1428,7 +1428,7 @@ Return proposal_id when a proposal is successfully created.
 
     // We want <b>to</b> allow early resolution of proposals <b>if</b> more than 50% of the total supply of the network coins
     // <b>has</b> voted. This doesn't take into subsequent inflation/deflation (rewards are issued every epoch and gas fees
-    // are burnt after every transaction), but inflation/delation is very unlikely <b>to</b> have a major impact on total
+    // are burnt after every transaction), but inflation/deflation is very unlikely <b>to</b> have a major impact on total
     // supply during the <a href="voting.md#0x1_voting">voting</a> period.
     <b>let</b> total_voting_token_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;();
     <b>let</b> early_resolution_vote_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u128&gt;();
