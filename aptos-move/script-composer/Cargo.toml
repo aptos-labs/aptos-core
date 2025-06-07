@@ -1,7 +1,7 @@
 [package]
 name = "aptos-dynamic-transaction-composer"
 description = "Generating Move Script from a batched Move calls"
-version = "0.1.3-beta.2"
+version = "0.1.3-beta.3"
 
 # Workspace inherited keys
 authors = { workspace = true }
