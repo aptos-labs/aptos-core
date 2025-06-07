@@ -4,13 +4,13 @@ spec aptos_std::i128 {
     }
 
     /// Interprets the I128 `bits` field as a signed integer.
-    spec fun to_num(i: I128): num {
+    spec fun to_num(self: I128): num {
         // Compare to 2^127: if gte, value is negative
-        if (i.bits >= BITS_MIN_I128) {
+        if (self.bits >= BITS_MIN_I128) {
             // Interpret bits as two's complement negative number
-            (i.bits as num) - TWO_POW_U128
+            (self.bits as num) - TWO_POW_U128
         } else {
-            (i.bits as num)
+            (self.bits as num)
         }
     }
 
@@ -21,26 +21,26 @@ spec aptos_std::i128 {
     spec neg_from {
         aborts_if v > BITS_MIN_I128 with EOVERFLOW;
 
-        // neg_from(v) == twos_complement(v)
+        // neg_from(s) == twos_complement(v)
         ensures result.bits == twos_complement(v);
     }
 
     spec neg {
         // Abort if neg_from would overflow
-        aborts_if !is_neg(v) && v.bits > BITS_MIN_I128 with EOVERFLOW;
+        aborts_if !self.is_neg() && self.bits > BITS_MIN_I128 with EOVERFLOW;
 
-        // Abort if abs(v) would overflow (MIN_I128 cannot be negated)
-        aborts_if is_neg(v) && v.bits == BITS_MIN_I128 with EOVERFLOW;
+        // Abort if abs(self) would overflow (MIN_I128 cannot be negated)
+        aborts_if self.is_neg() && self.bits == BITS_MIN_I128 with EOVERFLOW;
 
         // Mathematical behavior
-        ensures eq(result, mul(v, neg_from(1)));
+        ensures result.eq(self.mul(neg_from(1)));
 
         // Involution: neg(neg(v)) == v (if both directions do not abort)
-        ensures eq(neg(result), v);
+        ensures result.neg().eq(self);
     }
 
     spec wrapping_add {
-        ensures result.bits == (num1.bits + num2.bits) % TWO_POW_U128;
+        ensures result.bits == (self.bits + num2.bits) % TWO_POW_U128;
     }
 
     spec add {
@@ -48,99 +48,103 @@ spec aptos_std::i128 {
 
         // Abort conditions
         // Overflow when: two positives yield negative, or two negatives yield positive
-        aborts_if !is_neg(num1) && !is_neg(num2) && is_neg(wrapping_add(num1, num2)) with EOVERFLOW;
-        aborts_if is_neg(num1) && is_neg(num2) && !is_neg(wrapping_add(num1, num2)) with EOVERFLOW;
+        aborts_if !self.is_neg() && !num2.is_neg() && self.wrapping_add(num2).is_neg() with EOVERFLOW;
+        aborts_if self.is_neg() && num2.is_neg() && !self.wrapping_add(num2).is_neg() with EOVERFLOW;
 
         // Inverse property
         // add(a, -a) = 0
-        ensures eq(abs(num1), abs(num2)) && sign(num1) != sign(num2) ==> is_zero(result);
+        ensures self.abs().eq(num2.abs()) && self.sign() != num2.sign() ==> result.is_zero();
 
         // Identity properties
-        ensures is_zero(num2) ==> eq(result, num1);
-        ensures is_zero(num1) ==> eq(result, num2);
+        ensures num2.is_zero() ==> result.eq(self);
+        ensures self.is_zero() ==> result.eq(num2);
 
-        ensures to_num(result) == to_num(num1) + to_num(num2);
+        ensures to_num(result) == to_num(self) + to_num(num2);
 
-        ensures result == wrapping_add(num1, num2);
+        ensures result == self.wrapping_add(num2);
     }
 
     spec wrapping_sub {
-        ensures result.bits == (num1.bits + twos_complement(num2.bits)) % TWO_POW_U128;
+        ensures result.bits == (self.bits + twos_complement(num2.bits)) % TWO_POW_U128;
     }
 
     spec sub {
         pragma opaque;
         // Function aborts if subtraction would overflow
-        aborts_if !is_neg(num1) && !is_neg(from(twos_complement(num2.bits))) && is_neg(wrapping_add(num1, from(twos_complement(num2.bits)))) with EOVERFLOW;
-        aborts_if is_neg(num1) &&  is_neg(from(twos_complement(num2.bits))) && !is_neg(wrapping_add(num1, from(twos_complement(num2.bits)))) with EOVERFLOW;
+        aborts_if !self.is_neg() && !from(twos_complement(num2.bits)).is_neg() && self.wrapping_add(
+            from(twos_complement(num2.bits))
+        ).is_neg() with EOVERFLOW;
+        aborts_if self.is_neg() && from(twos_complement(num2.bits)).is_neg() && !self.wrapping_add(
+            from(twos_complement(num2.bits))
+        ).is_neg() with EOVERFLOW;
 
         // Subtracting zero returns the original number
-        ensures is_zero(num1) ==> result.bits == twos_complement(num2.bits);
-        ensures is_zero(num2) ==> eq(result, num1);
+        ensures self.is_zero() ==> result.bits == twos_complement(num2.bits);
+        ensures num2.is_zero() ==> result.eq(self);
 
         // Subtracting a number from itself gives zero
-        ensures eq(num1, num2) ==> is_zero(result);
+        ensures self.eq(num2) ==> result.is_zero();
 
         // Subtraction behaves like adding the negative in num space
-        ensures to_num(result) == to_num(num1) + to_num(from(twos_complement(num2.bits)));
+        ensures to_num(result) == to_num(self) + to_num(from(twos_complement(num2.bits)));
 
-        ensures result == wrapping_sub(num1,  num2);
+        ensures result == self.wrapping_sub(num2);
     }
 
     spec mul {
         // Abort conditions
         // If result should be negative (opposite signs), must not exceed abs(MIN_I128)
-        aborts_if sign(num1) != sign(num2) &&
-            (abs_u128(num1) as u256) * (abs_u128(num2) as u256) > (BITS_MIN_I128 as u256)
+        aborts_if self.sign() != num2.sign() &&
+            (self.abs_u128() as u256) * (num2.abs_u128() as u256) > (BITS_MIN_I128 as u256)
             with EOVERFLOW;
 
         // If result should be positive (same signs), must not exceed MAX_I64
-        aborts_if sign(num1) == sign(num2) &&
-            (abs_u128(num1) as u256) * (abs_u128(num2) as u256) > (BITS_MAX_I128 as u256)
+        aborts_if self.sign() == num2.sign() &&
+            (self.abs_u128() as u256) * (num2.abs_u128() as u256) > (BITS_MAX_I128 as u256)
             with EOVERFLOW;
 
-        // result is positive, sign(num1) == sign(num2)
-        ensures !is_neg(result) && !is_zero(result) ==> sign(num1) == sign(num2);
+        // result is positive, sign(self) == sign(num2)
+        ensures !result.is_neg() && !result.is_zero() ==> self.sign() == num2.sign();
 
-        // result is negative, sign(num1) != sign(num2)
-        ensures is_neg(result) && !is_zero(result) ==> sign(num1) != sign(num2);
+        // result is negative, sign(self) != sign(num2)
+        ensures result.is_neg() && !result.is_zero() ==> self.sign() != num2.sign();
 
-        // result is 0, num1 is zero or num2 is zero
-        ensures is_zero(result) ==> is_zero(num1) || is_zero(num2);
+        // result is 0, self is zero or num2 is zero
+        ensures result.is_zero() ==> self.is_zero() || num2.is_zero();
 
         // Behavior guarantees
-        ensures eq(result, mul(num2, num1));
-        ensures to_num(result) == to_num(num1) * to_num(num2);
+        ensures result.eq(num2.mul(self));
+        ensures to_num(result) == to_num(self) * to_num(num2);
     }
 
     spec div {
         // Abort conditions
-        aborts_if is_zero(num2) with EDIVISION_BY_ZERO;
+        aborts_if num2.is_zero() with EDIVISION_BY_ZERO;
 
         // MIN_I64 / -1 = MAX_I64 + 1, which is too big to fit in an I64
-        aborts_if sign(num1) == sign(num2) && abs_u128(num1) / abs_u128(num2) > BITS_MAX_I128 with EOVERFLOW;
-        aborts_if sign(num1) != sign(num2) && abs_u128(num1) / abs_u128(num2) > BITS_MIN_I128 with EOVERFLOW;
+        aborts_if self.sign() == num2.sign() && self.abs_u128() / num2.abs_u128() > BITS_MAX_I128 with EOVERFLOW;
+        aborts_if self.sign() != num2.sign() && self.abs_u128() / num2.abs_u128() > BITS_MIN_I128 with EOVERFLOW;
 
         // Behavior guarantees
         // Division result always rounds toward zero.
-        // The result multiplied back gives the truncated part of num1
-        ensures !is_zero(num2) ==>
-            to_num(num1) == to_num(result) * to_num(num2) + to_num(mod(num1, num2));
+        // The result multiplied back gives the truncated part of self
+        ensures !num2.is_zero() ==>
+            to_num(self) == to_num(result) * to_num(num2) + to_num(self.mod(num2));
 
         // Zero divided by anything is zero
-        ensures is_zero(num1) ==> is_zero(result);
+        ensures self.is_zero() ==> result.is_zero();
 
         // Sign correctness
-        // result is positive, sign(num1) == sign(num2)
-        ensures !is_neg(result) && !is_zero(result) ==> sign(num1) == sign(num2);
-        // result is negative, sign(num1) != sign(num2)
-        ensures is_neg(result) && !is_zero(result) ==> sign(num1) != sign(num2);
+        // result is positive, sign(self) == sign(num2)
+        ensures !result.is_neg() && !result.is_zero() ==> self.sign() == num2.sign();
+        // result is negative, sign(self) != sign(num2)
+        ensures result.is_neg() && !result.is_zero() ==> self.sign() != num2.sign();
 
         // Always round down
-        // if num1 is positive, mul(num2, result) <= num1
-        ensures !is_neg(num1) ==> lte(mul(num2, result), num1);
-        // if num1 is negative, mul(num2, result) >= num1
-        ensures is_neg(num1) ==> gte(mul(num2, result), num1);
+        // if self is positive, mul(num2, result) <= self
+        ensures !self.is_neg() ==> num2.mul(result).lte(self);
+        // if self is negative, mul(num2, result) >= self
+        ensures self.is_neg() ==> num2.mul(result).gte(self);
     }
 
     spec mod {
@@ -150,37 +154,37 @@ spec aptos_std::i128 {
         aborts_with EDIVISION_BY_ZERO, EOVERFLOW;
 
         // Fundamental identity of mod: a mod b = a - b * (a / b)
-        ensures result == wrapping_sub(num1, mul(num2, div(num1, num2)));
+        ensures result == self.wrapping_sub(num2.mul(self.div(num2)));
 
         // Result has the same sign as the dividend (Solidity-style behavior)
-        ensures is_zero(result) || sign(result) == sign(num1);
+        ensures result.is_zero() || result.sign() == self.sign();
     }
 
     spec abs {
-        aborts_if is_neg(v) && v.bits <= BITS_MIN_I128 with EOVERFLOW;
+        aborts_if self.is_neg() && self.bits <= BITS_MIN_I128 with EOVERFLOW;
 
-        ensures is_neg(v) ==> is_zero(wrapping_add(abs(v), v));
-        ensures is_neg(v) ==> abs(v).bits == twos_complement(v.bits);
-        ensures !is_neg(v) ==> abs(v).bits == v.bits;
+        ensures self.is_neg() ==> self.abs().wrapping_add(self).is_zero();
+        ensures self.is_neg() ==> self.abs().bits == twos_complement(self.bits);
+        ensures !self.is_neg() ==> self.abs().bits == self.bits;
 
-        ensures !is_neg(v) ==> eq(abs(v), v);
+        ensures !self.is_neg() ==> self.abs().eq(self);
     }
 
     spec abs_u128 {
-        aborts_if is_neg(v) && v.bits < BITS_MIN_I128 with EOVERFLOW;
+        aborts_if self.is_neg() && self.bits < BITS_MIN_I128 with EOVERFLOW;
 
-        ensures is_neg(v) ==> result == twos_complement(v.bits);
-        ensures !is_neg(v) ==> result == v.bits;
+        ensures self.is_neg() ==> result == twos_complement(self.bits);
+        ensures !self.is_neg() ==> result == self.bits;
     }
 
     spec min {
-        ensures to_num(a) <= to_num(b) ==> to_num(result) == to_num(a);
-        ensures to_num(a) > to_num(b) ==> to_num(result) == to_num(b);
+        ensures to_num(self) <= to_num(b) ==> to_num(result) == to_num(self);
+        ensures to_num(self) > to_num(b) ==> to_num(result) == to_num(b);
     }
 
     spec max {
-        ensures to_num(a) >= to_num(b) ==> to_num(result) == to_num(a);
-        ensures to_num(a) < to_num(b) ==> to_num(result) == to_num(b);
+        ensures to_num(self) >= to_num(b) ==> to_num(result) == to_num(self);
+        ensures to_num(self) < to_num(b) ==> to_num(result) == to_num(b);
     }
 
     // ref: https://github.com/aptos-labs/aptos-core/blob/9927f302155040cc5d4efc8d16ef53f554e66a14/third_party/move/move-prover/tests/sources/functional/math8.move#L74
@@ -195,27 +199,27 @@ spec aptos_std::i128 {
         aborts_with EOVERFLOW;
 
         // Final result relationship
-        ensures result == spec_pow(base, exponent);
+        ensures result == spec_pow(self, exponent);
     }
 
-    spec fun spec_pow(n: I128, e: u64): I128 {
+    spec fun spec_pow(self: I128, e: u64): I128 {
         if (e == 0) {
             from(1)
         }
         else {
             if (e == 1) {
-                n
+                self
             }
             else {
                 if (e == 2) {
-                    mul(n, n)
+                    self.mul(self)
                 }
                 else {
                     if (e == 3) {
-                        mul(n, mul(n, n))
+                        self.mul(self.mul(self))
                     }
                     else {
-                        mul(n, mul(n, mul(n, n)))
+                        self.mul(self.mul(self.mul(self)))
                     }
                 }
             }
@@ -227,47 +231,47 @@ spec aptos_std::i128 {
         ensures result == 0 || result == 1;
 
         // If the number is negative, sign is 1
-        ensures is_neg(v) ==> result == 1;
+        ensures self.is_neg() ==> result == 1;
 
         // If the number is non-negative, sign is 0
-        ensures !is_neg(v) ==> result == 0;
+        ensures !self.is_neg() ==> result == 0;
     }
 
     spec zero {
         // The result must have zero bits
-        ensures is_zero(result);
+        ensures result.is_zero();
 
         // The result is not negative
-        ensures !is_neg(result);
+        ensures !result.is_neg();
 
         // The result is equal to itself by to_num
         ensures to_num(result) == 0;
 
         // Negative zero is zero
-        ensures eq(neg_from(0), zero());
-        ensures eq(neg(zero()), zero());
+        ensures neg_from(0).eq(zero());
+        ensures zero().neg().eq(zero());
     }
 
     spec is_zero {
         // Returns true iff the bit representation is 0
-        ensures result == (v.bits == 0);
+        ensures result == (self.bits == 0);
 
         // If the number is zero, to_num is 0
-        ensures result ==> to_num(v) == 0;
+        ensures result ==> to_num(self) == 0;
 
         // If the number is not zero, to_num is non-zero
-        ensures !result ==> to_num(v) != 0;
+        ensures !result ==> to_num(self) != 0;
     }
 
     spec is_neg {
         // Directly linked to the sign function
-        ensures result == (sign(v) == 1);
+        ensures result == (self.sign() == 1);
 
         // If result is true, the number is negative in two's complement
-        ensures result ==> v.bits >= BITS_MIN_I128;
+        ensures result ==> self.bits >= BITS_MIN_I128;
 
         // If result is false, the number is non-negative
-        ensures !result ==> v.bits < BITS_MIN_I128;
+        ensures !result ==> self.bits < BITS_MIN_I128;
     }
 
     spec cmp {
@@ -275,70 +279,70 @@ spec aptos_std::i128 {
         ensures result == LT || result == EQ || result == GT;
 
         // Equality case
-        ensures num1.bits == num2.bits ==> result == EQ;
+        ensures self.bits == num2.bits ==> result == EQ;
 
         // Negative vs positive
-        ensures sign(num1) > sign(num2) ==> result == LT;
-        ensures sign(num1) < sign(num2) ==> result == GT;
+        ensures self.sign() > num2.sign() ==> result == LT;
+        ensures self.sign() < num2.sign() ==> result == GT;
 
         // Same sign, different magnitude
-        ensures sign(num1) == sign(num2) && num1.bits > num2.bits ==> result == GT;
-        ensures sign(num1) == sign(num2) && num1.bits < num2.bits ==> result == LT;
+        ensures self.sign() == num2.sign() && self.bits > num2.bits ==> result == GT;
+        ensures self.sign() == num2.sign() && self.bits < num2.bits ==> result == LT;
     }
 
     spec eq {
         // Result is true iff both are bitwise equal
-        ensures result == (num1.bits == num2.bits);
+        ensures result == (self.bits == num2.bits);
 
         // Equivalence with cmp
-        ensures result == (cmp(num1, num2) == EQ);
+        ensures result == (self.cmp(num2) == EQ);
 
         // If a = b, then b = a
-        ensures eq(num1, num2) ==> eq(num2, num1);
+        ensures self.eq(num2) ==> num2.eq(self);
     }
 
     spec gt {
         // Result is true iff cmp returns GT
-        ensures result == (cmp(num1, num2) == GT);
+        ensures result == (self.cmp(num2) == GT);
 
         // If gt is true, then not equal
-        ensures result ==> !eq(num1, num2);
+        ensures result ==> !self.eq(num2);
 
         // If gt is true, then lt is false
-        ensures gt(num1, num2) ==> lt(num2, num1);
+        ensures self.gt(num2) ==> num2.lt(self);
     }
 
     spec gte {
         // Only returns true if num1 is equal to or greater than num2
-        ensures result == (cmp(num1, num2) == EQ || cmp(num1, num2) == GT);
+        ensures result == (self.cmp(num2) == EQ || self.cmp(num2) == GT);
 
-        // Never returns true if num1 < num2
-        ensures cmp(num1, num2) == LT ==> result == false;
+        // Never returns true if self < num2
+        ensures self.cmp(num2) == LT ==> result == false;
 
         // If a >= b, then b <= a
-        ensures gte(num1, num2) ==> lte(num2, num1);
+        ensures self.gte(num2) ==> num2.lte(self);
     }
 
     spec lt {
         // Only returns true if num1 is strictly less than num2
-        ensures result == (cmp(num1, num2) == LT);
+        ensures result == (self.cmp(num2) == LT);
 
-        // Never returns true if num1 >= num2
-        ensures (cmp(num1, num2) == EQ || cmp(num1, num2) == GT) ==> result == false;
+        // Never returns true if self >= num2
+        ensures (self.cmp(num2) == EQ || self.cmp(num2) == GT) ==> result == false;
 
         // If a < b, then b > a
-        ensures lt(num1, num2) ==> gt(num2, num1);
+        ensures self.lt(num2) ==> num2.gt(self);
     }
 
     spec lte {
         // Only returns true if num1 is equal to or less than num2
-        ensures result == (cmp(num1, num2) == EQ || cmp(num1, num2) == LT);
+        ensures result == (self.cmp(num2) == EQ || self.cmp(num2) == LT);
 
-        // Never returns true if num1 > num2
-        ensures cmp(num1, num2) == GT ==> result == false;
+        // Never returns true if self > num2
+        ensures self.cmp(num2) == GT ==> result == false;
 
         // If a < b, then b > a
-        ensures lte(num1, num2) ==> gte(num2, num1);
+        ensures self.lte(num2) ==> num2.gte(self);
     }
 
     spec twos_complement {
