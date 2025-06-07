@@ -85,6 +85,13 @@ jobs:
             core.setOutput("newVersion", newVersion);
             core.setOutput("releaseBranch", branch);
             core.setOutput("currentVersion", currentVersion);
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Update Cargo.lock
+        run: |
+          cargo update -p aptos-node
+
       - name: Create Pull Request
         id: create-pr
         uses: peter-evans/create-pull-request@v7
@@ -95,7 +102,7 @@ jobs:
           title: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
           body: "This PR bumps the aptos-node version to ${{ steps.determine-version.outputs.newVersion }} in ${{ steps.determine-version.outputs.releaseBranch }}."
           commit-message: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
-          add-paths: "aptos-node/Cargo.toml"
+          add-paths: "aptos-node/Cargo.toml, Cargo.lock"
       - name: Log PR URL
         if: ${{ steps.create-pr.outputs.pull-request-number }}
         run: |
