@@ -376,6 +376,43 @@ impl Module {
         })
     }
 
+    /// Creates a new Module instance for testing purposes.
+    /// This method creates a minimal Module with empty contents.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_for_test(module_id: ModuleId) -> Self {
+        use move_binary_format::file_format::empty_module;
+
+        // Start with an empty module
+        let mut empty_module = empty_module();
+
+        // Update the module ID
+        empty_module.identifiers[0] = module_id.name().to_owned();
+        empty_module.address_identifiers[0] = *module_id.address();
+
+        // Create necessary empty collections
+        let module_arc = Arc::new(empty_module);
+
+        Self {
+            id: module_id,
+            size: 0,
+            module: module_arc,
+            structs: vec![],
+            struct_instantiations: vec![],
+            struct_variant_infos: vec![],
+            struct_variant_instantiation_infos: vec![],
+            function_refs: vec![],
+            function_defs: vec![],
+            function_instantiations: vec![],
+            field_handles: vec![],
+            field_instantiations: vec![],
+            variant_field_infos: vec![],
+            variant_field_instantiation_infos: vec![],
+            function_map: HashMap::new(),
+            struct_map: HashMap::new(),
+            single_signature_token_map: BTreeMap::new(),
+        }
+    }
+
     fn make_struct_type(
         module: &CompiledModule,
         struct_def: &StructDefinition,

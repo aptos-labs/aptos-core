@@ -32,6 +32,10 @@ impl<V: TransactionWrite> ModuleWrite<V> {
         self.id.address()
     }
 
+    pub fn module_id(&self) -> &ModuleId {
+        &self.id
+    }
+
     /// Returns the name of the module written.
     pub fn module_name(&self) -> &IdentStr {
         self.id.name()
