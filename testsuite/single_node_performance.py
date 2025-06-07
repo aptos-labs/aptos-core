@@ -35,6 +35,8 @@ class Flow(Flag):
     EXECUTORS = auto()
     # Test Order Book
     ORDER_BOOK = auto()
+    # Test Scheduled Transactions
+    SCHEDULED_TXNS = auto()
     # For when testing locally, quick inclusion of specific cases
     ADHOC = auto()
 
@@ -260,6 +262,13 @@ TESTS = [
 
     RunGroupConfig(key=RunGroupKey("vector-trim-append-len3000-size1"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("vector-remove-insert-len3000-size1"), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(
+        key=RunGroupKey("schedule-txns-insert-perf"),
+        included_in=Flow.SCHEDULED_TXNS,
+        expected_tps=1000,  # estimated TPS value
+        waived=True        # waived since it's not calibrated
+    ),
 
     RunGroupConfig(key=RunGroupKey("order-book-no-matches"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches25-pct"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS),
