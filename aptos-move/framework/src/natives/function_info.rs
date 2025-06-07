@@ -182,7 +182,13 @@ fn native_load_function_impl(
     context.charge(FUNCTION_INFO_LOAD_FUNCTION_BASE)?;
     let (module_name, _) = extract_function_info(&mut arguments)?;
 
-    Err(SafeNativeError::LoadModule { module_name })
+    if context.has_direct_gas_meter_access_in_native_context() {
+        context.charge_gas_for_dependencies(module_name)?;
+        Ok(smallvec![])
+    } else {
+        // Legacy flow, VM will charge gas for module loading.
+        Err(SafeNativeError::LoadModule { module_name })
+    }
 }
 
 /***************************************************************************************************

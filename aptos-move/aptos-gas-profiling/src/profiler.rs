@@ -26,7 +26,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
-    gas::{GasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -155,6 +155,62 @@ where
         let cost = old.checked_sub(new).expect("gas cost must be non-negative");
 
         (cost, res)
+    }
+}
+
+impl<G> DependencyGasMeter for GasProfiler<G>
+where
+    G: AptosGasMeter,
+{
+    fn charge_dependency(
+        &mut self,
+        is_new: bool,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
+
+        if !cost.is_zero() {
+            self.dependencies.push(Dependency {
+                is_new,
+                id: ModuleId::new(*addr, name.to_owned()),
+                size,
+                cost,
+            });
+        }
+
+        res
+    }
+}
+
+impl<G> NativeGasMeter for GasProfiler<G>
+where
+    G: AptosGasMeter,
+{
+    delegate! {
+        fn legacy_gas_budget_in_native_context(&self) -> InternalGas;
+    }
+
+    fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.use_heap_memory_in_native_context(amount));
+        assert_eq!(
+            cost,
+            0.into(),
+            "Using heap memory does not incur any gas costs"
+        );
+        res
+    }
+
+    fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        self.frames
+            .last_mut()
+            .expect("Native function must have recorded the frame")
+            .native_gas += amount;
+
+        self.base.charge_native_execution(amount)
     }
 }
 
@@ -321,9 +377,6 @@ where
         amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_native_function(amount, ret_vals));
-
         // Whenever a function gets called, the VM will notify the gas profiler
         // via `charge_call/charge_call_generic`.
         //
@@ -332,8 +385,14 @@ where
         //
         // Later when it realizes the function is native, it will transform the original frame
         // into a native-specific event that does not contain recursive structures.
-        let cur = self.frames.pop().expect("frame must exist");
-        let (module_id, name, ty_args) = match cur.name {
+        let frame = self.frames.pop().expect("frame must exist");
+
+        // Add native gas accumulated per frame.
+        let (mut cost, res) =
+            self.delegate_charge(|base| base.charge_native_function(amount, ret_vals));
+        cost += frame.native_gas;
+
+        let (module_id, name, ty_args) = match frame.name {
             FrameName::Function {
                 module_id,
                 name,
@@ -341,11 +400,12 @@ where
             } => (module_id, name, ty_args),
             FrameName::Script => unreachable!(),
         };
+
         // The following line of code is needed for correctness.
         //
         // This is because additional gas events may be produced after the frame has been
         // created and these events need to be preserved.
-        self.active_event_stream().extend(cur.events);
+        self.active_event_stream().extend(frame.events);
 
         self.record_gas_event(ExecutionGasEvent::CallNative {
             module_id,
@@ -481,32 +541,6 @@ where
         self.record_gas_event(ExecutionGasEvent::CreateTy { cost });
 
         res
-    }
-
-    fn charge_dependency(
-        &mut self,
-        is_new: bool,
-        addr: &AccountAddress,
-        name: &IdentStr,
-        size: NumBytes,
-    ) -> PartialVMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
-
-        if !cost.is_zero() {
-            self.dependencies.push(Dependency {
-                is_new,
-                id: ModuleId::new(*addr, name.to_owned()),
-                size,
-                cost,
-            });
-        }
-
-        res
-    }
-
-    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
-        self.base.charge_heap_memory(amount)
     }
 }
 

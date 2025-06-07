@@ -863,15 +863,6 @@ impl InterpreterImpl<'_> {
             }
         }
 
-        let mut native_context = NativeContext::new(
-            self,
-            data_cache,
-            resource_resolver,
-            module_storage,
-            extensions,
-            gas_meter.balance_internal(),
-            traversal_context,
-        );
         let native_function = function.get_native()?;
 
         gas_meter.charge_native_function_before_execution(
@@ -882,9 +873,22 @@ impl InterpreterImpl<'_> {
             args.iter(),
         )?;
 
-        let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
+        let (result, legacy_heap_memory_usage) = {
+            let mut native_context = NativeContext::new(
+                self,
+                data_cache,
+                resource_resolver,
+                module_storage,
+                extensions,
+                gas_meter,
+                traversal_context,
+            );
+            let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
+            let legacy_heap_memory_usage = native_context.legacy_heap_memory_usage();
+            (result, legacy_heap_memory_usage)
+        };
 
-        gas_meter.charge_heap_memory(native_context.heap_memory_usage())?;
+        gas_meter.use_heap_memory_in_native_context(legacy_heap_memory_usage)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!

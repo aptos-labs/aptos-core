@@ -3148,8 +3148,6 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-types",
- "bcs 0.1.4",
- "bytes",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
