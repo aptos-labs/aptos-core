@@ -9,7 +9,7 @@ use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::StatusType;
 mod utils;
-use utils::vm::RunnableState;
+use fuzzer::RunnableState;
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation
