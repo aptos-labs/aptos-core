@@ -451,6 +451,11 @@ impl TransactionComposer {
     }
 
     async fn load_module_impl(&mut self, api_url: &str, api_key: &str, module_id: ModuleId) -> anyhow::Result<()> {
+        // check if stored in local cache
+        if LOADED_MODULES.with(|modules| modules.borrow().get(&module_id).is_some()) {
+            return Ok(());
+        };
+
         let url = format!(
             "{}/{}/{}/{}/{}",
             api_url, "accounts", &module_id.address, "module", &module_id.name
