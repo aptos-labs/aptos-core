@@ -93,6 +93,25 @@ pub enum TransactionTypeArg {
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct,
+    // Different workloads to exercise loader and dependency charging.
+    DependencyChain8,
+    DependencyChain64,
+    DependencyChain256,
+    DependencyChain512,
+    DependencyChain256Depth128,
+    DependencyChain256Depth256,
+    DependencyTree81With3ChildrenPerLeaf,
+    DependencyTree585With8ChildrenPerLeaf,
+    DependencyStar64Width1,
+    DependencyStar64Width64,
+    DependencyStar512Width64,
+    DependencyStar512Width128,
+    DependencyStar512Width256,
+    DependencyStar512Width512,
+    DependencyDag64Sparse,
+    DependencyDag64Dense,
+    DependencyDag256Sparse,
+    DependencyDag256Dense,
 }
 
 impl TransactionTypeArg {
@@ -406,6 +425,24 @@ impl TransactionTypeArg {
                     max_buy_size: 950,
                 })
             },
+            TransactionTypeArg::DependencyChain8 => call_custom_module(EntryPoints::DependencyChain8 { depth: 1 }),
+            TransactionTypeArg::DependencyChain64 => call_custom_module(EntryPoints::DependencyChain64 { depth: 1 }),
+            TransactionTypeArg::DependencyChain256 => call_custom_module(EntryPoints::DependencyChain256 { depth: 1 }),
+            TransactionTypeArg::DependencyChain512 => call_custom_module(EntryPoints::DependencyChain512 { depth: 1 }),
+            TransactionTypeArg::DependencyChain256Depth128 => call_custom_module(EntryPoints::DependencyChain256 { depth: 128 }),
+            TransactionTypeArg::DependencyChain256Depth256 => call_custom_module(EntryPoints::DependencyChain256 { depth: 256 }),
+            TransactionTypeArg::DependencyTree81With3ChildrenPerLeaf => call_custom_module(EntryPoints::DependencyTree81With3ChildrenPerLeaf),
+            TransactionTypeArg::DependencyTree585With8ChildrenPerLeaf => call_custom_module(EntryPoints::DependencyTree585With8ChildrenPerLeaf),
+            TransactionTypeArg::DependencyStar64Width1 => call_custom_module(EntryPoints::DependencyStar32 { width: 1 }),
+            TransactionTypeArg::DependencyStar64Width64 => call_custom_module(EntryPoints::DependencyStar32 { width: 64 }),
+            TransactionTypeArg::DependencyStar512Width64 => call_custom_module(EntryPoints::DependencyStar512 { width: 64 }),
+            TransactionTypeArg::DependencyStar512Width128 => call_custom_module(EntryPoints::DependencyStar512 { width: 128 }),
+            TransactionTypeArg::DependencyStar512Width256 => call_custom_module(EntryPoints::DependencyStar512 { width: 256 }),
+            TransactionTypeArg::DependencyStar512Width512 => call_custom_module(EntryPoints::DependencyStar512 { width: 512 }),
+            TransactionTypeArg::DependencyDag64Sparse => call_custom_module(EntryPoints::DependencyDag64Sparse),
+            TransactionTypeArg::DependencyDag64Dense => call_custom_module(EntryPoints::DependencyDag64Dense),
+            TransactionTypeArg::DependencyDag256Sparse => call_custom_module(EntryPoints::DependencyDag256Sparse),
+            TransactionTypeArg::DependencyDag256Dense => call_custom_module(EntryPoints::DependencyDag256Dense),
         }
     }
 
