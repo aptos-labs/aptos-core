@@ -10,7 +10,8 @@ use crate::{
     },
     code_cache_global::GlobalModuleCache,
     counters,
-    scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
+    scheduler::{DependencyResult, DependencyStatus, TWaitForDependency},
+    scheduler_wrapper::SchedulerWrapper,
     value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
@@ -223,7 +224,7 @@ trait ResourceGroupState<T: Transaction> {
 
 pub(crate) struct ParallelState<'a, T: Transaction> {
     pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-    scheduler: &'a Scheduler,
+    scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
     pub(crate) captured_reads:
@@ -368,6 +369,7 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         inner_aggregator_value: base_aggregator_value,
     }))
 }
+
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
@@ -511,7 +513,7 @@ fn wait_for_dependency(
 impl<'a, T: Transaction> ParallelState<'a, T> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        shared_scheduler: &'a Scheduler,
+        shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
     ) -> Self {
@@ -568,7 +570,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
@@ -657,7 +659,7 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
                     return Ok(ReadResult::Uninitialized);
                 },
                 Err(Dependency(dep_idx)) => {
-                    match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                    match wait_for_dependency(&self.scheduler, txn_idx, dep_idx) {
                         Err(e) => {
                             error!("Error {:?} in wait for dependency", e);
                             self.captured_reads.borrow_mut().mark_incorrect_use();
@@ -789,7 +791,7 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                     ));
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
                         return Err(PartialVMError::new(
@@ -1726,7 +1728,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestVi
             ViewState::Sync(state) => get_delayed_field_value_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                &state.scheduler,
                 id,
                 self.txn_idx,
             ),
@@ -1750,7 +1752,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestVi
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                &state.scheduler,
                 id,
                 base_delta,
                 delta,
@@ -1899,7 +1901,11 @@ mod test {
         },
         values::{Struct, Value},
     };
-    use std::{cell::RefCell, collections::HashMap, sync::atomic::AtomicU32};
+    use std::{
+        cell::RefCell,
+        collections::HashMap,
+        sync::atomic::{AtomicBool, AtomicU32},
+    };
     use test_case::test_case;
 
     #[derive(Default)]
@@ -2799,6 +2805,7 @@ mod test {
         empty_global_module_cache:
             GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
         runtime_environment: RuntimeEnvironment,
+        skip_module_validation: AtomicBool,
     }
 
     impl Holder {
@@ -2807,12 +2814,15 @@ mod test {
             let counter = RefCell::new(start_counter);
             let base_view = MockStateView::new(data);
             let runtime_environment = RuntimeEnvironment::new(vec![]);
+            let skip_module_validation = AtomicBool::new(true);
+
             Self {
                 unsync_map,
                 counter,
                 base_view,
                 empty_global_module_cache: GlobalModuleCache::empty(),
                 runtime_environment,
+                skip_module_validation,
             }
         }
     }
@@ -2871,7 +2881,7 @@ mod test {
                     &self.runtime_environment,
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,
-                        &self.scheduler,
+                        SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
                         self.start_counter,
                         &self.counter,
                     )),
