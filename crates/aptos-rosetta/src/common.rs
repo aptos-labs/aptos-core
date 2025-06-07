@@ -156,7 +156,7 @@ pub fn native_coin() -> Currency {
         symbol: APT_SYMBOL.to_string(),
         decimals: APT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: Some(native_coin_tag().to_string()),
+            move_type: Some(native_coin_tag().to_canonical_string()),
             fa_address: None,
         }),
     }
@@ -213,7 +213,7 @@ pub fn find_coin_currency(currencies: &HashSet<Currency>, type_tag: &TypeTag) ->
                 fa_address: _,
             }) = currency.metadata
             {
-                move_type == &type_tag.to_string()
+                move_type == &type_tag.to_canonical_string()
             } else {
                 false
             }
@@ -394,7 +394,7 @@ pub fn parse_coin_currency(
             .as_ref()
             .and_then(|inner| inner.move_type.as_ref())
         {
-            struct_tag.to_string() == *move_type
+            struct_tag.to_canonical_string() == *move_type
         } else {
             false
         }
@@ -403,7 +403,7 @@ pub fn parse_coin_currency(
     } else {
         Err(ApiError::TransactionParseError(Some(format!(
             "Invalid coin for transfer {}",
-            struct_tag
+            struct_tag.to_canonical_string()
         ))))
     }
 }

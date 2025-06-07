@@ -51,7 +51,7 @@ async fn get_on_chain_resource_at_version<T: OnChainConfig>(
     let maybe_response = rest_client
         .get_account_resource_at_version_bcs::<T>(
             CORE_CODE_ADDRESS,
-            T::struct_tag().to_string().as_str(),
+            T::struct_tag().to_canonical_string().as_str(),
             version,
         )
         .await;

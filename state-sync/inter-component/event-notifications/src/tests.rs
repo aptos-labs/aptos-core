@@ -122,7 +122,7 @@ fn test_dynamic_subscribers() {
     // Add another subscriber for event_key_1 and the reconfig_event_key
     let mut event_listener_2 = event_service
         .subscribe_to_events(vec![event_key_1], vec![
-            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_string()
+            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_canonical_string()
         ])
         .unwrap();
 
@@ -170,7 +170,9 @@ fn test_event_and_reconfig_subscribers() {
         .subscribe_to_events(vec![event_key_1, event_key_2], vec![])
         .unwrap();
     let mut event_listener_3 = event_service
-        .subscribe_to_events(vec![], vec![NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_string()])
+        .subscribe_to_events(vec![], vec![
+            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_canonical_string()
+        ])
         .unwrap();
 
     // Create reconfiguration subscribers

@@ -89,10 +89,10 @@ impl fmt::Display for Path {
                 write!(f, "Code({})", module_id)
             },
             Path::Resource(struct_tag) => {
-                write!(f, "Resource({})", struct_tag)
+                write!(f, "Resource({})", struct_tag.to_canonical_string())
             },
             Path::ResourceGroup(struct_tag) => {
-                write!(f, "ResourceGroup({})", struct_tag)
+                write!(f, "ResourceGroup({})", struct_tag.to_canonical_string())
             },
         }
     }

@@ -267,7 +267,7 @@ impl CoinActivity {
             event_creation_number: BURN_GAS_EVENT_CREATION_NUM,
             event_sequence_number: user_transaction_request.sequence_number.0 as i64,
             owner_address: standardize_address(&user_transaction_request.sender.to_string()),
-            coin_type: AptosCoinType::type_tag().to_string(),
+            coin_type: AptosCoinType::type_tag().to_canonical_string(),
             amount: aptos_coin_burned,
             activity_type: GAS_FEE_EVENT.to_string(),
             is_gas_fee: true,

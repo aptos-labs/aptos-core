@@ -21,9 +21,9 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
     let mut name = struct_tag.name.to_string();
     if let Some(first_ty) = struct_tag.type_args.first() {
         write!(name, "<")?;
-        write!(name, "{}", first_ty)?;
+        write!(name, "{}", first_ty.to_canonical_string())?;
         for ty in struct_tag.type_args.iter().skip(1) {
-            write!(name, ", {}", ty)?;
+            write!(name, ", {}", ty.to_canonical_string())?;
         }
         write!(name, ">")?;
     }
@@ -57,7 +57,7 @@ fn native_type_of(
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
 
     if context.eval_gas(TYPE_INFO_TYPE_OF_PER_BYTE_IN_STR) > 0.into() {
-        let type_tag_str = type_tag.to_string();
+        let type_tag_str = type_tag.to_canonical_string();
         // Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
         // But there are other limits in place that prevent this native from being called with too much work.
         context
@@ -92,7 +92,7 @@ fn native_type_name(
     context.charge(TYPE_INFO_TYPE_NAME_BASE)?;
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
-    let type_name = type_tag.to_string();
+    let type_name = type_tag.to_canonical_string();
 
     // TODO: Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
     context.charge(TYPE_INFO_TYPE_NAME_PER_BYTE_IN_STR * NumBytes::new(type_name.len() as u64))?;
@@ -159,7 +159,7 @@ mod tests {
             type_args: vec![TypeTag::Vector(Box::new(TypeTag::U8))],
         };
 
-        let dummy_as_strings = dummy_st.to_string();
+        let dummy_as_strings = dummy_st.to_canonical_string();
         let mut dummy_as_strings = dummy_as_strings.split("::");
         let dummy_as_type_of = type_of_internal(&dummy_st).unwrap().pop().unwrap();
         let dummy_as_type_of: Struct = dummy_as_type_of.cast().unwrap();

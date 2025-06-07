@@ -285,7 +285,7 @@ impl TransactionGasLog {
                     .iter()
                     .map(|event| {
                         json!({
-                            "name":  format!("{}", event.ty),
+                            "name":  format!("{}", event.ty.to_canonical_string()),
                             "cost": fmt_storage_fee(event.cost),
                             "cost-percentage": fmt_storage_fee_percentage(event.cost),
                         })

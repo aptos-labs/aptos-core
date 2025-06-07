@@ -573,9 +573,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
         Ok(Some(DecodedTableData {
             key: key.json().unwrap(),
-            key_type: table_info.key_type.to_string(),
+            key_type: table_info.key_type.to_canonical_string(),
             value: value.json().unwrap(),
-            value_type: table_info.value_type.to_string(),
+            value_type: table_info.value_type.to_canonical_string(),
         }))
     }
 
@@ -596,7 +596,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
         Ok(Some(DeletedTableData {
             key: key.json().unwrap(),
-            key_type: table_info.key_type.to_string(),
+            key_type: table_info.key_type.to_canonical_string(),
         }))
     }
 

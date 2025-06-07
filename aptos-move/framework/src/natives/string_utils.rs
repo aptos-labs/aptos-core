@@ -279,7 +279,7 @@ fn native_format_impl(
                 return Ok(());
             }
             if context.type_tag {
-                write!(out, "{} {{", TypeTag::from(type_.clone())).unwrap();
+                write!(out, "{} {{", type_.to_canonical_string()).unwrap();
             } else {
                 write!(out, "{} {{", type_.name.as_str()).unwrap();
             };
@@ -367,7 +367,7 @@ fn native_format_impl(
                 .context
                 .function_value_extension()
                 .get_serialization_data(fun.as_ref())?;
-            out.push_str(&fun.to_stable_string());
+            out.push_str(&fun.to_canonical_string());
             format_vector(
                 context,
                 data.captured_layouts.iter(),

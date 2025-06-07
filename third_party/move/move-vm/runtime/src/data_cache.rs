@@ -175,8 +175,11 @@ impl TransactionDataCache {
                     .with_delayed_fields_serde()
                     .deserialize(&blob, &layout)
                     .ok_or_else(|| {
-                        let msg =
-                            format!("Failed to deserialize resource {} at {}!", struct_tag, addr);
+                        let msg = format!(
+                            "Failed to deserialize resource {} at {}!",
+                            struct_tag.to_canonical_string(),
+                            addr
+                        );
                         PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
                             .with_message(msg)
                     })?;
