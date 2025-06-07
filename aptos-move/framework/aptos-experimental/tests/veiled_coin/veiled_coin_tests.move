@@ -324,7 +324,7 @@ module aptos_experimental::veiled_coin_tests {
         // TODO: This throws an invariant violation (INTERNAL_TYPE_ERROR (code 2009))
         //print(&recipient);
 
-        // Encrypt the transfered amount `v` under the `recipient`'s PK
+        // Encrypt the transferred amount `v` under the `recipient`'s PK
         let deposit_ct = elgamal::new_ciphertext_with_basepoint(
             &amount_val, &amount_rand, &recipient_pk);
 
