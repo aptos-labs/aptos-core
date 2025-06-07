@@ -65,4 +65,9 @@ module aptos_framework::guid {
     public fun eq_id(guid: &GUID, id: &ID): bool {
         &guid.id == id
     }
+
+    #[test_only]
+    public fun create_guid_for_test(addr: address, creation_num: u64): GUID {
+        create(addr, &mut creation_num)
+    }
 }
