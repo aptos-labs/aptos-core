@@ -3807,7 +3807,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a> {
     vesting_contract_address: <b>address</b>;
-    <b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
+    <b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>{contract_address: vesting_contract_address};
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
     <b>let</b> staker = vesting_contract_address;
     <b>let</b> operator = vesting_contract.staking.operator;
@@ -3881,7 +3881,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>{contract_address: vesting_contract_address};
 </code></pre>
 
 
@@ -3908,7 +3908,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> opaque;
-<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
+<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>{contract_address: vesting_contract_address};
 <b>ensures</b> [abstract] result == <a href="vesting.md#0x1_vesting_spec_shareholder">spec_shareholder</a>(vesting_contract_address, shareholder_or_beneficiary);
 </code></pre>
 
@@ -4062,7 +4062,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;;
+<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>include</b> <a href="vesting.md#0x1_vesting_WithdrawStakeAbortsIf">WithdrawStakeAbortsIf</a> { vesting_contract };
 </code></pre>
@@ -4098,7 +4098,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;;
+<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>include</b> <a href="vesting.md#0x1_vesting_WithdrawStakeAbortsIf">WithdrawStakeAbortsIf</a> { vesting_contract };
 </code></pre>
@@ -4475,7 +4475,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;;
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>;
 </code></pre>
 
 
@@ -4635,7 +4635,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <a id="0x1_vesting_ActiveVestingContractAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt; {
+<pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a> {
     contract_address: <b>address</b>;
     // This enforces <a id="high-level-spec-5" href="#high-level-req">high-level requirement 5</a>:
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);

@@ -171,7 +171,7 @@ spec aptos_framework::vesting {
         vesting_contract_address: address;
 
 
-        include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
+        include ActiveVestingContractAbortsIf{contract_address: vesting_contract_address};
         let vesting_contract = global<VestingContract>(vesting_contract_address);
 
         let staker = vesting_contract_address;
@@ -228,14 +228,14 @@ spec aptos_framework::vesting {
     }
 
     spec shareholders(vesting_contract_address: address): vector<address> {
-        include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
+        include ActiveVestingContractAbortsIf{contract_address: vesting_contract_address};
     }
 
     spec fun spec_shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address;
 
     spec shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address {
         pragma opaque;
-        include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
+        include ActiveVestingContractAbortsIf{contract_address: vesting_contract_address};
         ensures [abstract] result == spec_shareholder(vesting_contract_address, shareholder_or_beneficiary);
     }
 
@@ -314,7 +314,7 @@ spec aptos_framework::vesting {
     spec distribute(contract_address: address) {
         // TODO: Can't handle abort in loop.
         pragma verify = false;
-        include ActiveVestingContractAbortsIf<VestingContract>;
+        include ActiveVestingContractAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
         include WithdrawStakeAbortsIf { vesting_contract };
@@ -329,7 +329,7 @@ spec aptos_framework::vesting {
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
         pragma verify = false;
-        include ActiveVestingContractAbortsIf<VestingContract>;
+        include ActiveVestingContractAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
         include WithdrawStakeAbortsIf { vesting_contract };
@@ -552,7 +552,7 @@ spec aptos_framework::vesting {
     }
 
     spec assert_active_vesting_contract(contract_address: address) {
-        include ActiveVestingContractAbortsIf<VestingContract>;
+        include ActiveVestingContractAbortsIf;
     }
 
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
@@ -649,7 +649,7 @@ spec aptos_framework::vesting {
         aborts_if signer::address_of(admin) != vesting_contract.admin;
     }
 
-    spec schema ActiveVestingContractAbortsIf<VestingContract> {
+    spec schema ActiveVestingContractAbortsIf {
         contract_address: address;
         /// [high-level-spec-5]
         aborts_if !exists<VestingContract>(contract_address);
