@@ -35,7 +35,7 @@ use std::{
     str,
 };
 
-static CONFLICT_ERROR_MSG: &str = "cannot appear in both arithmetic and bitwise operation";
+static CONFLICT_ERROR_MSG: &str = "cannot appear in both arithmetic and bitwise operation, please refer to https://aptos.dev/en/build/smart-contracts/prover/spec-lang#bitwise-operators for more information";
 
 pub struct NumberOperationProcessor {}
 
