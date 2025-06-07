@@ -26,6 +26,7 @@ use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
 };
+use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
@@ -35,12 +36,15 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction as Transaction, TBlockOutput,
+        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, FeeDistribution,
+        Transaction,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -82,7 +86,7 @@ pub struct BlockExecutor<T, E, S, L, TP> {
 
 impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
 where
-    T: Transaction,
+    T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
@@ -113,7 +117,7 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &TP,
+        txn: &T,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
@@ -128,7 +132,6 @@ where
         parallel_state: ParallelState<T>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let txn = signature_verified_block.get_txn(idx_to_execute);
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -546,7 +549,7 @@ where
                 let _needs_suffix_validation = Self::execute(
                     txn_idx,
                     incarnation + 1,
-                    block,
+                    block.get_txn(txn_idx),
                     last_input_output,
                     versioned_cache,
                     executor,
@@ -793,7 +796,7 @@ where
         >,
         runtime_environment: &RuntimeEnvironment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<bool, PanicError> {
         let parallel_state = ParallelState::<T>::new(
             versioned_cache,
             scheduler,
@@ -874,9 +877,19 @@ where
         }
 
         let mut final_results = final_results.acquire();
+
+        let mut end_block = false;
+
         match last_input_output.take_output(txn_idx)? {
-            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+            ExecutionStatus::Success(t) => {
                 final_results[txn_idx as usize] = t;
+                if txn_idx + 1 == scheduler.num_txns() {
+                    end_block = true;
+                }
+            },
+            ExecutionStatus::SkipRest(t) => {
+                final_results[txn_idx as usize] = t;
+                end_block = true;
             },
             ExecutionStatus::Abort(_) => (),
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
@@ -884,13 +897,15 @@ where
                 panic!("Cannot be materializing with {}", msg);
             },
         };
-        Ok(())
+        Ok(end_block)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn worker_loop(
         &self,
         environment: &AptosEnvironment,
         block: &TP,
+        transaction_slice_metadata: &TransactionSliceMetadata,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
@@ -906,6 +921,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
@@ -922,7 +938,7 @@ where
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                self.materialize_txn_commit(
+                let end_block = self.materialize_txn_commit(
                     txn_idx,
                     versioned_cache,
                     scheduler,
@@ -934,6 +950,65 @@ where
                     runtime_environment,
                     final_results,
                 )?;
+
+                if !end_block {
+                    continue;
+                }
+
+                if let Some(block_id) =
+                    transaction_slice_metadata.append_state_checkpoint_to_block()
+                {
+                    let mut outputs = final_results.acquire();
+                    let last_non_retry = outputs
+                        .iter()
+                        .rposition(|t| !t.committed_status().is_retry());
+                    let has_reconfig = if let Some(idx) = last_non_retry {
+                        outputs[idx].has_new_epoch_event()
+                    } else {
+                        false
+                    };
+
+                    if !has_reconfig {
+                        let txn = Self::gen_block_epilogue(
+                            block_id,
+                            block,
+                            outputs.dereference(),
+                            shared_commit_state.acquire().get_block_end_info(),
+                        );
+                        outputs.dereference_mut().push(E::Output::skip_output()); // placeholder
+                        if Self::execute(
+                            txn_idx + 1,
+                            0,
+                            &T::from_txn(txn.clone()),
+                            last_input_output,
+                            versioned_cache,
+                            &executor,
+                            base_view,
+                            global_module_cache,
+                            runtime_environment,
+                            ParallelState::new(
+                                versioned_cache,
+                                scheduler,
+                                start_shared_counter,
+                                shared_counter,
+                            ),
+                        ) != Ok(false)
+                        {
+                            return Err(code_invariant_error(
+                                "BlockEpilogue txn should not fail or need validation.",
+                            ));
+                        }
+
+                        Self::validate_and_commit_delayed_fields(
+                            txn_idx + 1,
+                            versioned_cache,
+                            last_input_output,
+                        )?;
+                        *block_epilogue_txn.acquire().dereference_mut() = Some(txn);
+
+                        scheduler.add_to_commit_queue(txn_idx + 1);
+                    }
+                }
             }
             Ok(())
         };
@@ -998,7 +1073,7 @@ where
                     let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
-                        block,
+                        block.get_txn(txn_idx),
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -1040,8 +1115,9 @@ where
         &self,
         signature_verified_block: &TP,
         base_view: &S,
+        transaction_slice_metadata: TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<TBlockOutput<E::Output, T::Key>, ()> {
+    ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1058,7 +1134,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(TBlockOutput::new(vec![], self.empty_block_end_info()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1067,11 +1143,11 @@ where
             base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
-            num_txns,
+            num_txns + 1,
         ));
         let shared_maybe_error = AtomicBool::new(false);
 
-        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
+        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns + 1));
 
         {
             final_results
@@ -1079,9 +1155,12 @@ where
                 .resize_with(num_txns, E::Output::skip_output);
         }
 
+        let block_epilogue_txn = ExplicitSyncWrapper::new(None);
+
         let num_txns = num_txns as u32;
 
-        let last_input_output = TxnLastInputOutput::new(num_txns);
+        // +1 for potential BlockEpilogue txn.
+        let last_input_output = TxnLastInputOutput::new(num_txns + 1);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
@@ -1091,6 +1170,7 @@ where
                     if let Err(err) = self.worker_loop(
                         module_cache_manager_guard.environment(),
                         signature_verified_block,
+                        &transaction_slice_metadata,
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
@@ -1100,6 +1180,7 @@ where
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
+                        &block_epilogue_txn,
                         num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:
@@ -1135,23 +1216,72 @@ where
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
 
+        if shared_maybe_error.load(Ordering::SeqCst) {
+            return Err(());
+        }
+
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let block_end_info = if self
-            .config
-            .onchain
-            .block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-        {
-            Some(shared_commit_state.into_inner().get_block_end_info())
-        } else {
-            None
-        };
+        Ok(BlockOutput::new(
+            final_results.into_inner(),
+            block_epilogue_txn.into_inner(),
+        ))
+    }
 
-        (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| TBlockOutput::new(final_results.into_inner(), block_end_info))
-            .ok_or(())
+    fn gen_block_epilogue(
+        block_id: HashValue,
+        signature_verified_block: &TP,
+        outputs: &[E::Output],
+        block_end_info: TBlockEndInfoExt<T::Key>,
+    ) -> Transaction {
+        // TODO(grao): Add onchain feature flag.
+        let collect_fee = true;
+        if collect_fee {
+            let mut amount = HashMap::new();
+
+            // TODO(HotState): there are three possible paths where the block epilogue
+            // output is passed to the DB:
+            //   1. a block from consensus is executed: the VM outputs the block end info
+            //      and the block epilogue transaction and output are generated here.
+            //   2. a chunk re-executed: The VM will see the block epilogue transaction and
+            //      should output the transaction output by looking at the block end info
+            //      embedded in the epilogue transaction (and maybe the state view).
+            //   3. a chunk replayed by transaction output: we get the transaction output
+            //      directly.
+            assert!(
+                outputs.len() == signature_verified_block.num_txns(),
+                "Output must have same size as input."
+            );
+
+            for (i, output) in outputs.iter().enumerate() {
+                let txn = signature_verified_block.get_txn(i as TxnIndex);
+                if let Some(user_txn) = txn.try_as_signed_user_txn() {
+                    if let Some(extra_info) = signature_verified_block.get_extra_info(i as TxnIndex)
+                    {
+                        let gas_price = user_txn.gas_unit_price();
+                        let proposer = extra_info.proposer;
+                        let fee_statement = output.fee_statement();
+                        let total_gas_unit = fee_statement.gas_used();
+                        let gas_unit_available_to_distribute = total_gas_unit
+                            .saturating_sub(fee_statement.storage_fee_used().div_ceil(gas_price));
+                        // TODO(grao): Put constants as onchain config.
+                        if gas_price > 100 && gas_unit_available_to_distribute > 0 {
+                            let fee_to_distribute =
+                                gas_unit_available_to_distribute * (gas_price - 100);
+                            *amount.entry(proposer).or_insert(0) += fee_to_distribute;
+                        }
+                    }
+                }
+            }
+            Transaction::block_epilogue_v1(
+                block_id,
+                block_end_info.to_persistent(),
+                FeeDistribution::new(amount),
+            )
+        } else {
+            Transaction::block_epilogue_v0(block_id, block_end_info.to_persistent())
+        }
     }
 
     /// Converts module write into cached module representation, and adds it to the module cache.
@@ -1297,10 +1427,16 @@ where
         &self,
         signature_verified_block: &TP,
         base_view: &S,
+        transaction_slice_metadata: TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<TBlockOutput<E::Output, T::Key>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
+
+        if num_txns == 0 {
+            return Ok(BlockOutput::new(vec![], None));
+        }
+
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
         let executor = E::init(environment, base_view);
@@ -1318,8 +1454,11 @@ where
             num_txns,
         );
 
-        for idx in 0..num_txns {
-            let txn = signature_verified_block.get_txn(idx as TxnIndex);
+        let mut idx = 0;
+        let mut txn = signature_verified_block.get_txn(idx as TxnIndex);
+        let mut block_epilogue_txn = None;
+        let mut block_epilogue_txn_to_execute;
+        loop {
             let latest_view = LatestView::<T, S>::new(
                 base_view,
                 module_cache_manager_guard.module_cache(),
@@ -1362,46 +1501,48 @@ where
                     ));
                 },
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                    // Calculating the accumulated gas costs of the committed txns.
-                    let fee_statement = output.fee_statement();
-
-                    let approx_output_size = self
-                        .config
-                        .onchain
-                        .block_gas_limit_type
-                        .block_output_limit()
-                        .map(|_| {
-                            output.output_approx_size()
-                                + if self
-                                    .config
-                                    .onchain
-                                    .block_gas_limit_type
-                                    .include_user_txn_size_in_block_output()
-                                {
-                                    txn.user_txn_bytes_len()
-                                } else {
-                                    0
-                                } as u64
-                        });
-
                     let sequential_reads = latest_view.take_sequential_reads();
-                    let read_write_summary = self
-                        .config
-                        .onchain
-                        .block_gas_limit_type
-                        .conflict_penalty_window()
-                        .map(|_| {
-                            ReadWriteSummary::new(
-                                sequential_reads.get_read_summary(),
-                                output.get_write_summary(),
-                            )
-                        });
+                    if idx != num_txns {
+                        // Calculating the accumulated gas costs of the committed txns.
+                        let fee_statement = output.fee_statement();
 
-                    block_limit_processor.accumulate_fee_statement(
-                        fee_statement,
-                        read_write_summary,
-                        approx_output_size,
-                    );
+                        let approx_output_size = self
+                            .config
+                            .onchain
+                            .block_gas_limit_type
+                            .block_output_limit()
+                            .map(|_| {
+                                output.output_approx_size()
+                                    + if self
+                                        .config
+                                        .onchain
+                                        .block_gas_limit_type
+                                        .include_user_txn_size_in_block_output()
+                                    {
+                                        txn.user_txn_bytes_len()
+                                    } else {
+                                        0
+                                    } as u64
+                            });
+
+                        let read_write_summary = self
+                            .config
+                            .onchain
+                            .block_gas_limit_type
+                            .conflict_penalty_window()
+                            .map(|_| {
+                                ReadWriteSummary::new(
+                                    sequential_reads.get_read_summary(),
+                                    output.get_write_summary(),
+                                )
+                            });
+
+                        block_limit_processor.accumulate_fee_statement(
+                            fee_statement,
+                            read_write_summary,
+                            approx_output_size,
+                        );
+                    }
 
                     output.materialize_agg_v1(&latest_view);
                     assert_eq!(
@@ -1575,65 +1716,70 @@ where
                     ret.push(output);
                 },
             };
-            // When the txn is a SkipRest txn, halt sequential execution.
-            if must_skip {
+
+            if idx == num_txns {
                 break;
             }
 
-            if idx < num_txns - 1 && block_limit_processor.should_end_block_sequential() {
-                break;
+            idx += 1;
+
+            if must_skip || block_limit_processor.should_end_block_sequential() {
+                ret.resize_with(num_txns, E::Output::skip_output);
+                idx = num_txns;
             }
+
+            if idx < num_txns {
+                txn = signature_verified_block.get_txn(idx as TxnIndex);
+                continue;
+            }
+
+            assert!(idx == num_txns);
+
+            block_limit_processor
+                .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
+
+            if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+                if !ret[idx - 1].has_new_epoch_event() {
+                    block_epilogue_txn = Some(Self::gen_block_epilogue(
+                        block_id,
+                        signature_verified_block,
+                        &ret,
+                        block_limit_processor.get_block_end_info(),
+                    ));
+                    block_epilogue_txn_to_execute =
+                        T::from_txn(block_epilogue_txn.clone().unwrap());
+                    txn = &block_epilogue_txn_to_execute;
+                    continue;
+                } else {
+                    info!("Reach epoch ending, do not append BlockEpilogue txn, block_id: {block_id:?}.");
+                }
+            }
+            break;
         }
 
-        block_limit_processor
-            .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
-
-        ret.resize_with(num_txns, E::Output::skip_output);
-
         counters::update_state_counters(unsync_map.stats(), false);
+
         module_cache_manager_guard
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        let block_end_info = if self
-            .config
-            .onchain
-            .block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-        {
-            Some(block_limit_processor.get_block_end_info())
-        } else {
-            None
-        };
-
-        Ok(TBlockOutput::new(ret, block_end_info))
-    }
-
-    fn empty_block_end_info(&self) -> Option<TBlockEndInfoExt<T::Key>> {
-        if self
-            .config
-            .onchain
-            .block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-        {
-            Some(TBlockEndInfoExt::new_empty())
-        } else {
-            None
-        }
+        Ok(BlockOutput::new(ret, block_epilogue_txn))
     }
 
     pub fn execute_block(
         &self,
         signature_verified_block: &TP,
         base_view: &S,
+        transaction_slice_metadata: TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<TBlockOutput<E::Output, T::Key>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
             let parallel_result = self.execute_transactions_parallel(
                 signature_verified_block,
                 base_view,
+                transaction_slice_metadata,
                 module_cache_manager_guard,
             );
 
@@ -1648,7 +1794,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.num_txns());
+            init_speculative_logs(signature_verified_block.num_txns() + 1);
 
             // Flush all caches to re-run from the "clean" state.
             module_cache_manager_guard
@@ -1664,6 +1810,7 @@ where
         let sequential_result = self.execute_transactions_sequential(
             signature_verified_block,
             base_view,
+            transaction_slice_metadata,
             module_cache_manager_guard,
             false,
         );
@@ -1687,6 +1834,7 @@ where
                 let sequential_result = self.execute_transactions_sequential(
                     signature_verified_block,
                     base_view,
+                    transaction_slice_metadata,
                     module_cache_manager_guard,
                     true,
                 );
@@ -1710,7 +1858,6 @@ where
         if self.config.local.discard_failed_blocks {
             // We cannot execute block, discard everything (including block metadata and validator transactions)
             // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
-            // StateCheckpoint will be added afterwards.
             let error_code = match sequential_error {
                 BlockExecutionError::FatalBlockExecutorError(_) => {
                     StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
@@ -1722,7 +1869,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(TBlockOutput::new(ret, self.empty_block_end_info()));
+            return Ok(BlockOutput::new(ret, None));
         }
 
         Err(sequential_error)

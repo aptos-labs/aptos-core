@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    account_address::AccountAddress,
     state_store::{state_key::StateKey, state_slot::StateSlot},
     transaction::TransactionOutput,
     write_set::{HotStateOp, WriteSet},
@@ -12,7 +13,10 @@ use derive_more::Deref;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Debug,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -21,13 +25,34 @@ pub enum BlockEpiloguePayload {
         block_id: HashValue,
         block_end_info: BlockEndInfo,
     },
+    V1 {
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    },
 }
 
 impl BlockEpiloguePayload {
     pub fn try_as_block_end_info(&self) -> Option<&BlockEndInfo> {
         match self {
             BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
+            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(block_end_info),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum FeeDistribution {
+    V0 {
+        // Address -> Octa
+        amount: HashMap<AccountAddress, u64>,
+    },
+}
+
+impl FeeDistribution {
+    pub fn new(amount: HashMap<AccountAddress, u64>) -> Self {
+        Self::V0 { amount }
     }
 }
 
