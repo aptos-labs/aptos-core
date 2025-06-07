@@ -40,7 +40,7 @@ pub fn output(
     };
 
     // Some functions have complex types which are not currently supported in bcs or in this
-    // generator. Disable those functiosn for now.
+    // generator. Disable those functions for now.
     let abis_vec = abis
         .iter()
         .filter(|abi| {
