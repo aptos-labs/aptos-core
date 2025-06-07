@@ -82,7 +82,7 @@
 
 <dl>
 <dt>
-<code>settle_trade_f: |(<b>address</b>, <b>address</b>, u64, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop</code>
+<code>settle_trade_f: |(<b>address</b>, <b>address</b>, u64, u64, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
 
@@ -177,7 +177,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <b>address</b>, u64, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, u64, bool, bool, u64, u64, M)|bool <b>has</b> <b>copy</b> + drop, place_maker_order_f: |(<b>address</b>, u64, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop, cleanup_order_f: |(<b>address</b>, u64, bool, u64)| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |(<b>address</b>, u64, bool, u64, u64)| <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <b>address</b>, u64, u64, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, u64, bool, bool, u64, u64, M)|bool <b>has</b> <b>copy</b> + drop, place_maker_order_f: |(<b>address</b>, u64, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop, cleanup_order_f: |(<b>address</b>, u64, bool, u64)| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |(<b>address</b>, u64, bool, u64, u64)| <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
 </code></pre>
 
 
@@ -187,8 +187,8 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    // settle_trade_f arguments: taker, maker, is_taker_long, price, size
-    settle_trade_f: |<b>address</b>, <b>address</b>, u64, u64, bool, u64, u64, M, M| <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> <b>has</b> drop + <b>copy</b>,
+    // settle_trade_f arguments: taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size
+    settle_trade_f: |<b>address</b>, <b>address</b>, u64, u64, u64, bool, u64, u64, M, M| <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> <b>has</b> drop + <b>copy</b>,
     // validate_settlement_update_f arguments: accoun, is_taker, is_long, price, size
     validate_order_placement_f: |<b>address</b>, u64, bool, bool, u64, u64, M| bool <b>has</b> drop + <b>copy</b>,
     place_maker_order_f: |<b>address</b>, u64, bool, u64, u64, M| <b>has</b> drop + <b>copy</b>,
@@ -287,7 +287,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_settle_trade">settle_trade</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, taker: <b>address</b>, maker: <b>address</b>, taker_order_id: u64, maker_order_id: u64, is_taker_long: bool, price: u64, size: u64, taker_metadata: M, maker_metadata: M): <a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_settle_trade">settle_trade</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, taker: <b>address</b>, maker: <b>address</b>, taker_order_id: u64, maker_order_id: u64, fill_id: u64, is_taker_long: bool, price: u64, size: u64, taker_metadata: M, maker_metadata: M): <a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>
 </code></pre>
 
 
@@ -302,12 +302,13 @@
     maker: <b>address</b>,
     taker_order_id: u64,
     maker_order_id:u64,
+    fill_id: u64,
     is_taker_long: bool,
     price: u64,
     size: u64,
     taker_metadata: M,
     maker_metadata: M): <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> {
-    (self.settle_trade_f)(taker, maker, taker_order_id, maker_order_id, is_taker_long, price, size, taker_metadata, maker_metadata)
+    (self.settle_trade_f)(taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size, taker_metadata, maker_metadata)
 }
 </code></pre>
 
