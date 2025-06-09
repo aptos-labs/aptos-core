@@ -5,7 +5,7 @@
 ///  - settle_trade(taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size): SettleTradeResult ->
 /// Called by the market when there is an match between taker and maker. The clearinghouse is expected to settle the trade
 /// and return the result. Please note that the clearing house settlment size might not be the same as the order match size and
-/// the settlement might also fail.
+/// the settlement might also fail. The fill_id is an incremental counter for matched orders and can be used to track specific fills
 ///  - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 ///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
 ///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
@@ -114,8 +114,8 @@ module aptos_experimental::market {
     struct MarketConfig has store {
         /// Weather to allow self matching orders
         allow_self_trade: bool,
-        /// Whether to block the sending of all events for the market
-        halt_events: bool
+        /// Whether to allow sending all events for the markett
+        allow_events_emission: bool
     }
 
     /// Order has been accepted by the engine.
@@ -227,9 +227,9 @@ module aptos_experimental::market {
     }
 
     public fun new_market_config(
-        allow_self_matching: bool, halt_events: bool
+        allow_self_matching: bool, allow_events_emission: bool
     ): MarketConfig {
-        MarketConfig { allow_self_trade: allow_self_matching, halt_events: halt_events }
+        MarketConfig { allow_self_trade: allow_self_matching, allow_events_emission: allow_events_emission }
     }
 
     public fun new_market<M: store + copy + drop>(
@@ -338,7 +338,7 @@ module aptos_experimental::market {
         self.last_order_id
     }
 
-    public fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
+    fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
         let next_fill_id = self.next_fill_id;
         self.next_fill_id += 1;
         next_fill_id
@@ -357,8 +357,8 @@ module aptos_experimental::market {
         status: u8,
         details: &String
     ) {
-        //Final check whether event sending is enabled
-        if (!self.config.halt_events) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
             event::emit(
                 OrderEvent {
                     parent: self.parent,
@@ -984,7 +984,7 @@ module aptos_experimental::market {
             config,
             order_book
         } = self;
-        let MarketConfig { allow_self_trade: _, halt_events: _ } = config;
+        let MarketConfig { allow_self_trade: _, allow_events_emission: _ } = config;
         order_book.destroy_order_book()
     }
 
