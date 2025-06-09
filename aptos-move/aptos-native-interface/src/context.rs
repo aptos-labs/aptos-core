@@ -100,7 +100,7 @@ impl SafeNativeContext<'_, '_, '_, '_> {
     /// Returns true if native functions have access to gas meter and cah charge gas. Otherwise,
     /// only VM's interpreter needs to charge gas.
     pub fn has_direct_gas_meter_access_in_native_context(&self) -> bool {
-        self.gas_feature_version >= RELEASE_V1_32
+        true
     }
 
     /// Charges gas for transitive dependencies of the specified module. Used for native dynamic
