@@ -17,6 +17,7 @@ use crate::{
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
@@ -29,7 +30,6 @@ use aptos_executor_types::{
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
-use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
@@ -80,7 +80,7 @@ pub struct ExecutionProxy {
     pre_commit_notifier: aptos_channels::Sender<NotificationType>,
     commit_notifier: aptos_channels::Sender<NotificationType>,
     write_mutex: AsyncMutex<LogicalTime>,
-    transaction_filter: Arc<TransactionFilter>,
+    txn_filter_config: Arc<BlockTransactionFilterConfig>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
     enable_pre_commit: bool,
@@ -92,7 +92,7 @@ impl ExecutionProxy {
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
-        txn_filter: TransactionFilter,
+        txn_filter_config: BlockTransactionFilterConfig,
         enable_pre_commit: bool,
     ) -> Self {
         let pre_commit_notifier = Self::spawn_future_runner(
@@ -112,7 +112,7 @@ impl ExecutionProxy {
             pre_commit_notifier,
             commit_notifier,
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
-            transaction_filter: Arc::new(txn_filter),
+            txn_filter_config: Arc::new(txn_filter_config),
             execution_pipeline,
             state: RwLock::new(None),
             enable_pre_commit,
@@ -205,7 +205,7 @@ impl ExecutionProxy {
 
         let block_preparer = Arc::new(BlockPreparer::new(
             payload_manager.clone(),
-            self.transaction_filter.clone(),
+            self.txn_filter_config.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
         ));
@@ -261,7 +261,7 @@ impl StateComputer for ExecutionProxy {
         let txn_notifier = self.txn_notifier.clone();
         let transaction_generator = BlockPreparer::new(
             payload_manager,
-            self.transaction_filter.clone(),
+            self.txn_filter_config.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
         );
@@ -524,7 +524,6 @@ async fn test_commit_sync_race() {
     };
     use aptos_consensus_notifications::Error;
     use aptos_infallible::Mutex;
-    use aptos_transactions_filter::transaction_matcher::Filter;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_executor::partitioner::ExecutableBlock,
@@ -656,7 +655,7 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
-        TransactionFilter::new(Filter::empty()),
+        BlockTransactionFilterConfig::default(),
         true,
     );
 

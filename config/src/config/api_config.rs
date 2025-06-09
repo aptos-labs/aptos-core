@@ -9,7 +9,6 @@ use crate::{
     },
     utils,
 };
-use aptos_transactions_filter::transaction_matcher::Filter;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -80,8 +79,6 @@ pub struct ApiConfig {
     pub gas_estimation: GasEstimationConfig,
     /// Periodically call gas estimation
     pub periodic_gas_estimation_ms: Option<u64>,
-    /// Configuration to filter simulation requests.
-    pub simulation_filter: Filter,
     /// Configuration to filter view function requests.
     pub view_filter: ViewFilter,
     /// Periodically log stats for view function and simulate transaction usage
@@ -139,7 +136,6 @@ impl Default for ApiConfig {
             runtime_worker_multiplier: 2,
             gas_estimation: GasEstimationConfig::default(),
             periodic_gas_estimation_ms: Some(30_000),
-            simulation_filter: Filter::default(),
             view_filter: ViewFilter::default(),
             periodic_function_stats_sec: Some(60),
             wait_by_hash_timeout_ms: 1_000,
