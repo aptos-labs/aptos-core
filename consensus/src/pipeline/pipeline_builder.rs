@@ -1041,25 +1041,25 @@ impl PipelineBuilder {
 mod tests {
     use super::*;
     use aptos_types::{
-        transaction::{
-            RawTransaction, Script, SignedTransaction, scheduled_txn::ScheduledTransactionInfoWithKey,
-        },
         account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::{
+            authenticator::{AccountAuthenticator, TransactionAuthenticator},
+            scheduled_txn::{ScheduleMapKey, ScheduledTransactionInfoWithKey},
+            RawTransaction, Script, SignedTransaction,
+        },
     };
-    use aptos_types::chain_id::ChainId;
-    use aptos_types::transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator};
-    use aptos_types::transaction::scheduled_txn::ScheduleMapKey;
 
     fn create_user_txn(gas_unit_price: u64) -> SignatureVerifiedTransaction {
         let sender = AccountAddress::random();
         let raw_txn = RawTransaction::new_script(
             sender,
-            0,                      // sequence_number
+            0, // sequence_number
             Script::new(vec![], vec![], vec![]),
-            100,                    // max_gas_amount
+            100, // max_gas_amount
             gas_unit_price,
-            0,                      // expiration_timestamp_secs
-            ChainId::new(1),       // test chain id
+            0,               // expiration_timestamp_secs
+            ChainId::new(1), // test chain id
         );
 
         let signed_txn = SignedTransaction::new_signed_transaction(
@@ -1093,18 +1093,17 @@ mod tests {
             create_user_txn(200),
             create_user_txn(300),
         ];
-        let merged = PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns.clone());
+        let merged =
+            PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns.clone());
         assert_eq!(merged.len(), user_txns.len());
     }
 
     #[test]
     fn test_empty_user_txns() {
-        let scheduled_txns = vec![
-            create_scheduled_txn(100),
-            create_scheduled_txn(200),
-        ];
+        let scheduled_txns = vec![create_scheduled_txn(100), create_scheduled_txn(200)];
         let user_txns = vec![];
-        let merged = PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
+        let merged =
+            PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
         assert_eq!(merged.len(), 2);
     }
 
@@ -1121,7 +1120,8 @@ mod tests {
             create_user_txn(250),
         ];
 
-        let merged = PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
+        let merged =
+            PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
         let gas_prices: Vec<u64> = merged
             .iter()
             .map(|txn| match txn.get_transaction().unwrap() {

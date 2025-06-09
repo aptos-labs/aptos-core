@@ -51,6 +51,7 @@ where
         partition_time: Duration,
         executable_block: ExecutableBlock,
         stage: usize,
+        timer_label: &str,
     ) {
         let execution_start_time = Instant::now();
         if self.maybe_first_block_start_time.is_none() {
@@ -63,7 +64,7 @@ where
         );
         let num_input_txns = executable_block.transactions.num_transactions();
         {
-            let _timer = TIMER.with_label_values(&["execute"]).start_timer();
+            let _timer = TIMER.with_label_values(&[timer_label]).start_timer();
             self.executor
                 .execute_and_update_state(
                     executable_block,

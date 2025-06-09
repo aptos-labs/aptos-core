@@ -19,6 +19,7 @@
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_scheduled_txns_initialize)
 -  [Function `shutdown`](#0x1_scheduled_txns_shutdown)
+-  [Function `set_expiry_delta`](#0x1_scheduled_txns_set_expiry_delta)
 -  [Function `new_scheduled_transaction`](#0x1_scheduled_txns_new_scheduled_transaction)
 -  [Function `insert`](#0x1_scheduled_txns_insert)
 -  [Function `cancel`](#0x1_scheduled_txns_cancel)
@@ -262,6 +263,12 @@ Signer for the store for gas fee deposits
 </dt>
 <dd>
 
+</dd>
+<dt>
+<code>expiry_delta: u64</code>
+</dt>
+<dd>
+ If we cannot schedule in expiry_delta * time granularity(100ms), we will abort the txn
 </dd>
 </dl>
 
@@ -563,12 +570,12 @@ Scheduling is stopped
 
 
 
-<a id="0x1_scheduled_txns_EXPIRY_DELTA"></a>
+<a id="0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT"></a>
 
 If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will abort the txn
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA">EXPIRY_DELTA</a>: u64 = 100;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a>: u64 = 100;
 </code></pre>
 
 
@@ -599,17 +606,6 @@ Conversion factor between our time granularity (100ms) and milliseconds
 
 
 <pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>: u64 = 100;
-</code></pre>
-
-
-
-<a id="0x1_scheduled_txns_REMOVE_LIMIT"></a>
-
-The maximum number of transactions that are removed from the queue in a block
-Even if there is a backlog of things to be removed, this will eventually catch-up.
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_REMOVE_LIMIT">REMOVE_LIMIT</a>: u64 = 200;
 </code></pre>
 
 
@@ -693,7 +689,7 @@ Can be called only by the framework
     );
 
     // Store the <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>
-    <b>move_to</b>(framework, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: <b>false</b> });
+    <b>move_to</b>(framework, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: <b>false</b>, expiry_delta: <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a> });
 
     // Initialize queue
     <b>let</b> queue = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
@@ -799,11 +795,41 @@ Stop, remove and refund all scheduled txns; can be called only by the framework
 
 </details>
 
+<a id="0x1_scheduled_txns_set_expiry_delta"></a>
+
+## Function `set_expiry_delta`
+
+todo: Do we need a function to pause/unpause without issuing refund of deposit ???
+Change the expiry delta for scheduled transactions; can be called only by the framework
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_set_expiry_delta">set_expiry_delta</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_expiry_delta: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_set_expiry_delta">set_expiry_delta</a>(
+    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_expiry_delta: u64
+) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <b>let</b> aux_data = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(framework));
+    aux_data.expiry_delta = new_expiry_delta;
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_scheduled_txns_new_scheduled_transaction"></a>
 
 ## Function `new_scheduled_transaction`
 
-todo: Do we need a function to pause/unpause without issuing refund of deposit ???
 Constructor
 
 
@@ -1059,8 +1085,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
             key: *key,
         };
 
-        <b>if</b> (key.time + <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA">EXPIRY_DELTA</a> &lt; block_time) {
-            // Transaction <b>has</b> expired
+        <b>if</b> ((block_time - key.time) &gt; aux_data.expiry_delta) {
             <b>let</b> deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
             txns_to_expire.push_back(<a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a> {
                 key: *key,
@@ -1089,7 +1114,6 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
             cancelled_txn_code: CancelledTxnCode::Expired
         });
     };
-
     <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a>
 }
 </code></pre>
@@ -1170,7 +1194,7 @@ Remove the txns that are run
     <b>let</b> tbl_idx: u16 = 0;
 
     <b>let</b> remove_count = 0;
-    <b>while</b> (((tbl_idx <b>as</b> u64) &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) && (remove_count &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_REMOVE_LIMIT">REMOVE_LIMIT</a>)) {
+    <b>while</b> ((tbl_idx <b>as</b> u64) &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) {
         <b>if</b> (to_remove.remove_tbl.contains(tbl_idx)) {
             <b>let</b> keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
 
@@ -1180,9 +1204,6 @@ Remove the txns that are run
                     // Remove transaction from schedule_map
                     remove_count = remove_count + 1;
                     queue.schedule_map.remove(&key);
-                    <b>if</b> (remove_count &gt;= <a href="scheduled_txns.md#0x1_scheduled_txns_REMOVE_LIMIT">REMOVE_LIMIT</a>) {
-                        <b>break</b>;
-                    };
                 };
             };
         };

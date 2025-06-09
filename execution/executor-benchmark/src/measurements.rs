@@ -124,6 +124,7 @@ struct ExecutionTimeMeasurement {
     sig_verify_total_time: f64,
     partitioning_total_time: f64,
     execution_total_time: f64,
+    run_scheduled_total_time: f64,
     block_executor_total_time: f64,
     block_executor_inner_total_time: f64,
     by_other: HashMap<&'static str, f64>,
@@ -140,6 +141,7 @@ impl ExecutionTimeMeasurement {
         let sig_verify_total = TIMER.with_label_values(&["sig_verify"]).get_sample_sum();
         let partitioning_total = TIMER.with_label_values(&["partition"]).get_sample_sum();
         let execution_total = TIMER.with_label_values(&["execute"]).get_sample_sum();
+        let run_scheduled_total = TIMER.with_label_values(&["run_scheduled"]).get_sample_sum();
         let block_executor_total = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum();
         let block_executor_inner_total = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.get_sample_sum();
 
@@ -162,6 +164,7 @@ impl ExecutionTimeMeasurement {
             sig_verify_total_time: sig_verify_total,
             partitioning_total_time: partitioning_total,
             execution_total_time: execution_total,
+            run_scheduled_total_time: run_scheduled_total,
             block_executor_total_time: block_executor_total,
             block_executor_inner_total_time: block_executor_inner_total,
             by_other,
@@ -178,6 +181,7 @@ impl ExecutionTimeMeasurement {
             sig_verify_total_time: end.sig_verify_total_time - self.sig_verify_total_time,
             partitioning_total_time: end.partitioning_total_time - self.partitioning_total_time,
             execution_total_time: end.execution_total_time - self.execution_total_time,
+            run_scheduled_total_time: end.run_scheduled_total_time - self.run_scheduled_total_time,
             block_executor_total_time: end.block_executor_total_time
                 - self.block_executor_total_time,
             block_executor_inner_total_time: end.block_executor_inner_total_time
@@ -320,6 +324,13 @@ impl OverallMeasurement {
             self.prefix,
             self.delta_execution.execution_total_time / self.elapsed,
             num_txns / self.delta_execution.execution_total_time
+        );
+        info!(
+            "{} fraction of execution {:.4} in run scheduled (component TPS: {:.1})",
+            self.prefix,
+            self.delta_execution.run_scheduled_total_time
+                / self.delta_execution.execution_total_time,
+            num_txns / self.delta_execution.run_scheduled_total_time
         );
         info!(
             "{} fraction of execution {:.4} in get execution output by executing (component TPS: {:.1})",

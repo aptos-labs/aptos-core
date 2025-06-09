@@ -46,8 +46,11 @@ impl ScheduledTxnsHandler {
                     Vec::new()
                 }
             },
-            Err(_) => {
-                error!("[Scheduled txns] failed to execute get_ready_transactions()");
+            Err(err) => {
+                error!(
+                    "[Scheduled txns] failed to execute get_ready_transactions(): {:?}",
+                    err
+                );
                 Vec::new()
             },
         }

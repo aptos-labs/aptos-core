@@ -412,13 +412,18 @@ impl TransactionTypeArg {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                // Set sender_use_account_pool to true for unique senders
+                // Fixed timestamp for very far in the future (say 2075), so that we can insert
+                let future_time_ms = 4_000_000_000_000; // 2096-10-02
+                                                        // Note: Use the corresponding future time in execution benchmark, otherwise txns
+                                                        //       can expire
+                                                        // Set sender_use_account_pool to true for unique senders
+                assert!(future_time_ms > current_time_ms);
                 TransactionType::CallCustomModules {
                     entry_point: Box::new(EntryPoints::ScheduleTxnPerf {
-                        time_ms: current_time_ms + 10000,
+                        time_ms: future_time_ms,
                     }),
                     num_modules: module_working_set_size,
-                    use_account_pool: true,  // Force this to true to use unique senders
+                    use_account_pool: true, // Force this to true to use unique senders
                 }
             },
         }

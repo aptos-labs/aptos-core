@@ -872,11 +872,11 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_buy).unwrap(), // is_buy
                 ])
             },
-            EntryPoints::ScheduleTxnPerf { time_ms } => {
-                get_payload(module_id, ident_str!("test_insert_transactions").to_owned(), vec![
-                    bcs::to_bytes(time_ms).unwrap(),
-                ])
-            },
+            EntryPoints::ScheduleTxnPerf { time_ms } => get_payload(
+                module_id,
+                ident_str!("test_insert_transactions").to_owned(),
+                vec![bcs::to_bytes(time_ms).unwrap()],
+            ),
         }
     }
 
