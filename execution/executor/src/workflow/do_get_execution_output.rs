@@ -42,8 +42,8 @@ use aptos_types::{
         TStateView,
     },
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
-        TransactionOutput, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ExtraInfo,
+        Transaction, TransactionOutput, TransactionStatus, Version,
     },
     write_set::{TransactionWrite, WriteSet},
 };
@@ -57,6 +57,7 @@ impl DoGetExecutionOutput {
     pub fn by_transaction_execution<V: VMBlockExecutor>(
         executor: &V,
         transactions: ExecutableTransactions,
+        extra_info: Vec<ExtraInfo>,
         parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -67,6 +68,7 @@ impl DoGetExecutionOutput {
                 Self::by_transaction_execution_unsharded::<V>(
                     executor,
                     txns,
+                    extra_info,
                     parent_state,
                     state_view,
                     onchain_config,
@@ -100,12 +102,13 @@ impl DoGetExecutionOutput {
     fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
         executor: &V,
         transactions: Vec<SignatureVerifiedTransaction>,
+        extra_info: Vec<ExtraInfo>,
         parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
-        let txn_provider = DefaultTxnProvider::new(transactions);
+        let txn_provider = DefaultTxnProvider::new(transactions, extra_info);
         let block_output = Self::execute_block::<V>(
             executor,
             &txn_provider,

@@ -3,15 +3,23 @@
 
 use crate::txn_provider::TxnProvider;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
+use aptos_types::transaction::{BlockExecutableTransaction as Transaction, ExtraInfo};
 
 pub struct DefaultTxnProvider<T: Transaction> {
     pub txns: Vec<T>,
+    extra_info: Vec<ExtraInfo>,
 }
 
 impl<T: Transaction> DefaultTxnProvider<T> {
-    pub fn new(txns: Vec<T>) -> Self {
-        Self { txns }
+    pub fn new(txns: Vec<T>, extra_info: Vec<ExtraInfo>) -> Self {
+        Self { txns, extra_info }
+    }
+
+    pub fn new_without_info(txns: Vec<T>) -> Self {
+        let len = txns.len();
+        let mut extra_info = Vec::with_capacity(len);
+        extra_info.resize(len, ExtraInfo::new_empty());
+        Self { txns, extra_info }
     }
 
     pub fn get_txns(&self) -> &Vec<T> {
@@ -27,12 +35,8 @@ impl<T: Transaction> TxnProvider<T> for DefaultTxnProvider<T> {
     fn get_txn(&self, idx: TxnIndex) -> &T {
         &self.txns[idx as usize]
     }
-}
 
-impl<T: Transaction> Iterator for DefaultTxnProvider<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.txns.pop()
+    fn get_extra_info(&self, idx: TxnIndex) -> &ExtraInfo {
+        &self.extra_info[idx as usize]
     }
 }

@@ -288,6 +288,7 @@ impl StateComputer for ExecutionProxy {
                 self.pre_commit_hook(),
                 lifetime_guard,
                 transaction_shuffler,
+                validators,
             )
             .await;
         observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);

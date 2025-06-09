@@ -26,7 +26,8 @@ fn test_mock_vm_different_senders() {
         txns.push(encode_mint_transaction(gen_address(i), amount));
     }
 
-    let txn_provider = DefaultTxnProvider::new(into_signature_verified_block(txns.clone()));
+    let txn_provider =
+        DefaultTxnProvider::new_without_info(into_signature_verified_block(txns.clone()));
     let outputs = MockVM::new()
         .execute_block_no_limit(&txn_provider, &MockStateView::empty())
         .expect("MockVM should not fail to start");
@@ -64,7 +65,7 @@ fn test_mock_vm_same_sender() {
         txns.push(encode_mint_transaction(sender, amount));
     }
 
-    let txn_provider = DefaultTxnProvider::new(into_signature_verified_block(txns));
+    let txn_provider = DefaultTxnProvider::new_without_info(into_signature_verified_block(txns));
     let outputs = MockVM::new()
         .execute_block_no_limit(&txn_provider, &MockStateView::empty())
         .expect("MockVM should not fail to start");
@@ -100,7 +101,7 @@ fn test_mock_vm_payment() {
         encode_transfer_transaction(gen_address(0), gen_address(1), 50),
     ];
 
-    let txn_provider = DefaultTxnProvider::new(into_signature_verified_block(txns));
+    let txn_provider = DefaultTxnProvider::new_without_info(into_signature_verified_block(txns));
     let output = MockVM::new()
         .execute_block_no_limit(&txn_provider, &MockStateView::empty())
         .expect("MockVM should not fail to start");
