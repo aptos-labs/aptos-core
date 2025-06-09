@@ -41,7 +41,7 @@ impl From<TransactionBlock> for Workload {
             TransactionSliceMetadata::chunk(txn_block.begin_version, end);
 
         let signature_verified_txns = into_signature_verified_block(txn_block.transactions);
-        let txn_provider = DefaultTxnProvider::new(signature_verified_txns);
+        let txn_provider = DefaultTxnProvider::new_without_info(signature_verified_txns);
 
         Self {
             txn_provider,

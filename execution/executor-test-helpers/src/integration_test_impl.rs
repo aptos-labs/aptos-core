@@ -33,6 +33,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
+        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
         TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
@@ -163,7 +164,7 @@ pub fn test_execution_with_storage_impl_inner(
     let reconfig2 = core_resources_account.sign_with_transaction_builder(
         txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
     );
-    let block2 = vec![block2_meta, UserTransaction(reconfig2)];
+    let block2 = into_signature_verified_block(vec![block2_meta, UserTransaction(reconfig2)]);
 
     let block3_id = gen_block_id(3);
     let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
@@ -182,11 +183,16 @@ pub fn test_execution_with_storage_impl_inner(
             txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
-    let block3 = block(block3); // append state checkpoint txn
+    let block3 = block(block3);
 
     let output1 = executor
         .execute_block(
-            (block1_id, block1.clone()).into(),
+            (
+                block1_id,
+                block1.clone(),
+                gen_auxiliary_info_for_block(&block1),
+            )
+                .into(),
             parent_block_id,
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -298,7 +304,12 @@ pub fn test_execution_with_storage_impl_inner(
     // Execute block 2, 3, 4
     let output2 = executor
         .execute_block(
-            (block2_id, block2).into(),
+            (
+                block2_id,
+                block2.clone(),
+                gen_auxiliary_info_for_block(&block2),
+            )
+                .into(),
             epoch2_genesis_id,
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -319,7 +330,12 @@ pub fn test_execution_with_storage_impl_inner(
 
     let output3 = executor
         .execute_block(
-            (block3_id, block3.clone()).into(),
+            (
+                block3_id,
+                block3.clone(),
+                gen_auxiliary_info_for_block(&block3),
+            )
+                .into(),
             epoch3_genesis_id,
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -457,4 +473,21 @@ pub fn verify_committed_txn_status(
     );
 
     Ok(())
+}
+
+fn gen_auxiliary_info_for_block(block: &[SignatureVerifiedTransaction]) -> Vec<AuxiliaryInfo> {
+    block
+        .iter()
+        .map(|txn| {
+            txn.borrow_into_inner().try_as_signed_user_txn().map_or(
+                AuxiliaryInfo::new_empty(),
+                |_| {
+                    AuxiliaryInfo::new(
+                        PersistedAuxiliaryInfo::None,
+                        Some(EphemeralAuxiliaryInfo { proposer_index: 0 }),
+                    )
+                },
+            )
+        })
+        .collect()
 }
