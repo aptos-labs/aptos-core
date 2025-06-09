@@ -182,7 +182,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         };
         NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
 
-        let block = PipelinedBlock::new(
+        let block = Arc::new(PipelinedBlock::new(
             Block::new_for_dag(
                 epoch,
                 round,
@@ -197,7 +197,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             ),
             vec![],
             StateComputeResult::new_dummy(),
-        );
+        ));
         let block_info = block.block_info();
         let ledger_info_provider = self.ledger_info_provider.clone();
         let dag = self.dag.clone();
