@@ -11,6 +11,7 @@ use crate::{
     network_tests::{NetworkPlayground, TwinId},
     round_manager::round_manager_tests::{
         config_with_round_timeout_msg_disabled, start_replying_to_block_retreival, NodeSetup,
+        ProposalMsgType,
     },
     test_utils::{consensus_runtime, timed_block_on, TreeInserter},
 };
@@ -33,7 +34,7 @@ use aptos_network::{protocols::network::Event, ProtocolId};
 use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::validator_verifier::generate_validator_verifier;
-use futures::channel::oneshot;
+use futures::{channel::oneshot, StreamExt};
 use std::{sync::Arc, time::Duration};
 use tokio::{runtime::Runtime, time::timeout};
 
@@ -59,29 +60,72 @@ fn process_and_vote_on_proposal(
         info!("Waiting on next_proposal on node {}", node.identity_desc());
         if down_nodes.contains(&node.id) {
             // Drop the proposal on down nodes
-            timed_block_on(runtime, node.next_proposal());
+            timed_block_on(runtime, node.next_opt_or_normal_proposal());
             info!("Dropping proposal on down node {}", node.identity_desc());
         } else {
             // Proccess proposal on other nodes
-            let proposal_msg = timed_block_on(runtime, node.next_proposal());
-            info!("Processing proposal on {}", node.identity_desc());
+            let proposal_msg_type = timed_block_on(runtime, node.next_opt_or_normal_proposal());
+            match proposal_msg_type {
+                ProposalMsgType::Normal(proposal_msg) => {
+                    info!("Processing proposal on {}", node.identity_desc());
 
-            assert_eq!(proposal_msg.proposal().round(), expected_round);
-            assert_eq!(
-                proposal_msg.sync_info().highest_ordered_round(),
-                expected_qc_ordered_round
-            );
-            assert_eq!(
-                proposal_msg.sync_info().highest_commit_round(),
-                expected_qc_committed_round
-            );
+                    assert_eq!(proposal_msg.proposal().round(), expected_round);
+                    assert_eq!(
+                        proposal_msg.sync_info().highest_ordered_round(),
+                        expected_qc_ordered_round
+                    );
+                    assert_eq!(
+                        proposal_msg.sync_info().highest_commit_round(),
+                        expected_qc_committed_round
+                    );
 
-            timed_block_on(
-                runtime,
-                node.round_manager.process_proposal_msg(proposal_msg),
-            )
-            .unwrap();
-            info!("Finish process proposal on {}", node.identity_desc());
+                    timed_block_on(
+                        runtime,
+                        node.round_manager.process_proposal_msg(proposal_msg),
+                    )
+                    .unwrap();
+                    info!("Finish process proposal on {}", node.identity_desc());
+                },
+                ProposalMsgType::Optimistic(opt_proposal_msg) => {
+                    info!("Processing opt proposal on {}", node.identity_desc());
+
+                    assert_eq!(opt_proposal_msg.round(), expected_round);
+                    assert_eq!(
+                        opt_proposal_msg.sync_info().highest_ordered_round(),
+                        expected_qc_ordered_round.saturating_sub(1)
+                    );
+                    assert_eq!(
+                        opt_proposal_msg.sync_info().highest_commit_round(),
+                        expected_qc_committed_round
+                    );
+
+                    timed_block_on(
+                        runtime,
+                        node.round_manager
+                            .process_opt_proposal_msg(opt_proposal_msg),
+                    )
+                    .unwrap();
+                    info!("Finish process opt proposal on {}", node.identity_desc());
+
+                    info!(
+                        "Processing proposal (from opt proposal) on {}",
+                        node.identity_desc()
+                    );
+
+                    let opt_block_data =
+                        timed_block_on(runtime, node.processed_opt_proposal_rx.next()).unwrap();
+                    timed_block_on(
+                        runtime,
+                        node.round_manager.process_opt_proposal(opt_block_data),
+                    )
+                    .unwrap();
+
+                    info!(
+                        "Finish process proposal (from opt proposal) on {}",
+                        node.identity_desc()
+                    );
+                },
+            }
             num_votes += 1;
         }
     }
@@ -156,16 +200,30 @@ fn new_round_on_quorum_cert() {
             .process_proposal_msg(proposal_msg)
             .await
             .unwrap();
+
         let vote_msg = node.next_vote().await;
         // Adding vote to form a QC
         node.round_manager.process_vote_msg(vote_msg).await.unwrap();
 
         // round 2 should start
-        let proposal_msg = node.next_proposal().await;
-        let proposal = proposal_msg.proposal();
-        assert_eq!(proposal.round(), 2);
-        assert_eq!(proposal.parent_id(), b1_id);
-        assert_eq!(proposal.quorum_cert().certified_block().id(), b1_id);
+        let proposal_msg_type = node.next_opt_or_normal_proposal().await;
+        match proposal_msg_type {
+            ProposalMsgType::Normal(proposal_msg) => {
+                let proposal = proposal_msg.proposal();
+                assert_eq!(proposal.round(), 2);
+                assert_eq!(proposal.parent_id(), b1_id);
+                assert_eq!(proposal.quorum_cert().certified_block().id(), b1_id);
+            },
+            ProposalMsgType::Optimistic(opt_proposal_msg) => {
+                let proposal = opt_proposal_msg.block_data();
+                assert_eq!(proposal.round(), 2);
+                assert_eq!(proposal.parent_id(), b1_id);
+                assert_eq!(
+                    proposal.grandparent_qc().certified_block().id(),
+                    genesis.id()
+                );
+            },
+        }
     });
 }
 
@@ -240,9 +298,7 @@ fn delay_proposal_processing_in_sync_only() {
         node.next_proposal().await;
 
         // Set sync only to true so that new proposal processing is delayed.
-        node.round_manager
-            .block_store
-            .set_back_pressure_for_test(true);
+        node.block_store.set_back_pressure_for_test(true);
         let proposal = Block::new_proposal(
             Payload::empty(false, true),
             1,
@@ -264,9 +320,7 @@ fn delay_proposal_processing_in_sync_only() {
             .unwrap_err();
 
         // Clear the sync only mode and process verified proposal and ensure it is processed now
-        node.round_manager
-            .block_store
-            .set_back_pressure_for_test(false);
+        node.block_store.set_back_pressure_for_test(false);
 
         node.round_manager
             .process_verified_proposal(proposal)
@@ -1184,14 +1238,30 @@ fn safety_rules_crash() {
 
     timed_block_on(&runtime, async {
         for _ in 0..2 {
-            let proposal_msg = node.next_proposal().await;
+            let proposal_msg_type = node.next_opt_or_normal_proposal().await;
 
             reset_safety_rules(&mut node);
-            // construct_and_sign_vote
-            node.round_manager
-                .process_proposal_msg(proposal_msg)
-                .await
-                .unwrap();
+
+            match proposal_msg_type {
+                ProposalMsgType::Normal(proposal_msg) => {
+                    // construct_and_sign_vote
+                    node.round_manager
+                        .process_proposal_msg(proposal_msg)
+                        .await
+                        .unwrap();
+                },
+                ProposalMsgType::Optimistic(opt_proposal_msg) => {
+                    node.round_manager
+                        .process_opt_proposal_msg(opt_proposal_msg)
+                        .await
+                        .unwrap();
+                    let opt_block_data = node.processed_opt_proposal_rx.next().await.unwrap();
+                    node.round_manager
+                        .process_opt_proposal(opt_block_data)
+                        .await
+                        .unwrap();
+                },
+            }
 
             let vote_msg = node.next_vote().await;
 
@@ -1210,7 +1280,7 @@ fn safety_rules_crash() {
         }
 
         // verify the last sign proposal happened
-        node.next_proposal().await;
+        node.next_opt_or_normal_proposal().await;
     });
 }
 
@@ -1444,7 +1514,7 @@ fn block_retrieval_test() {
 
         // Drain the queue on other nodes
         for node in nodes.iter_mut() {
-            let _ = node.next_proposal().await;
+            let _ = node.next_opt_or_normal_proposal().await;
         }
 
         info!(
@@ -1452,12 +1522,23 @@ fn block_retrieval_test() {
             behind_node.identity_desc()
         );
         let handle = start_replying_to_block_retreival(nodes);
-        let proposal_msg = behind_node.next_proposal().await;
-        behind_node
-            .round_manager
-            .process_proposal_msg(proposal_msg)
-            .await
-            .unwrap();
+
+        let proposal_msg_type = behind_node.next_opt_or_normal_proposal().await;
+        info!("got proposal msg: {:?}", proposal_msg_type);
+        match proposal_msg_type {
+            ProposalMsgType::Normal(proposal_msg) => behind_node
+                .round_manager
+                .process_proposal_msg(proposal_msg)
+                .await
+                .unwrap(),
+            ProposalMsgType::Optimistic(opt_proposal_msg) => {
+                behind_node
+                    .round_manager
+                    .process_opt_proposal_msg(opt_proposal_msg)
+                    .await
+                    .unwrap();
+            },
+        }
 
         handle.join().await;
     });
@@ -1514,7 +1595,7 @@ fn block_retrieval_timeout_test() {
 
         // Drain the queue on other nodes
         for node in nodes.iter_mut() {
-            let _ = node.next_proposal().await;
+            let _ = node.next_opt_or_normal_proposal().await;
         }
 
         info!(
@@ -1522,12 +1603,23 @@ fn block_retrieval_timeout_test() {
             behind_node.identity_desc()
         );
 
-        let proposal_msg = behind_node.next_proposal().await;
-        behind_node
-            .round_manager
-            .process_proposal_msg(proposal_msg)
-            .await
-            .unwrap_err();
+        let proposal_msg_type = behind_node.next_opt_or_normal_proposal().await;
+        match proposal_msg_type {
+            ProposalMsgType::Normal(proposal_msg) => {
+                behind_node
+                    .round_manager
+                    .process_proposal_msg(proposal_msg)
+                    .await
+                    .unwrap_err();
+            },
+            ProposalMsgType::Optimistic(opt_proposal_msg) => {
+                behind_node
+                    .round_manager
+                    .process_opt_proposal_msg(opt_proposal_msg)
+                    .await
+                    .unwrap_err();
+            },
+        }
     });
 }
 
