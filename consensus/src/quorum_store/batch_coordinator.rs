@@ -14,6 +14,7 @@ use crate::{
     },
 };
 use anyhow::ensure;
+use aptos_config::config::TransactionFilterConfig;
 use aptos_consensus_types::payload::TDataInfo;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
@@ -42,6 +43,7 @@ pub struct BatchCoordinator {
     max_total_txns: u64,
     max_total_bytes: u64,
     batch_expiry_gap_when_init_usecs: u64,
+    transaction_filter_config: TransactionFilterConfig,
 }
 
 impl BatchCoordinator {
@@ -56,6 +58,7 @@ impl BatchCoordinator {
         max_total_txns: u64,
         max_total_bytes: u64,
         batch_expiry_gap_when_init_usecs: u64,
+        transaction_filter_config: TransactionFilterConfig,
     ) -> Self {
         Self {
             my_peer_id,
@@ -68,6 +71,7 @@ impl BatchCoordinator {
             max_total_txns,
             max_total_bytes,
             batch_expiry_gap_when_init_usecs,
+            transaction_filter_config,
         }
     }
 
@@ -145,7 +149,7 @@ impl BatchCoordinator {
         Ok(())
     }
 
-    async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
+    pub(crate) async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
         if let Err(e) = self.ensure_max_limits(&batches) {
             error!("Batch from {}: {}", author, e);
             counters::RECEIVED_BATCH_MAX_LIMIT_FAILED.inc();
@@ -156,6 +160,27 @@ impl BatchCoordinator {
             error!("Empty batch received from {}", author.short_str().as_str());
             return;
         };
+
+        // Filter the transactions in the batches. If any transaction is rejected,
+        // the message will be dropped, and all batches will be rejected.
+        if self.transaction_filter_config.enable_quorum_store_filter {
+            let transaction_filter = &self.transaction_filter_config.transaction_filter;
+            for batch in batches.iter() {
+                for transaction in batch.txns() {
+                    if !transaction_filter.allows(transaction) {
+                        error!(
+                            "Transaction {}, in batch {}, from {}, was rejected by the filter. Dropping {} batches!",
+                            transaction.committed_hash(),
+                            batch.batch_info().batch_id(),
+                            author.short_str().as_str(),
+                            batches.len()
+                        );
+                        counters::RECEIVED_BATCH_REJECTED_BY_FILTER.inc();
+                        return;
+                    }
+                }
+            }
+        }
 
         let approx_created_ts_usecs = batch
             .info()
