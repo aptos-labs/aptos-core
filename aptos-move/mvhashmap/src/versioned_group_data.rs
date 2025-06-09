@@ -9,7 +9,7 @@ use crate::{
     versioned_data::Entry as SizeEntry,
     VersionedData,
 };
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     write_set::{TransactionWrite, WriteOpKind},
@@ -336,7 +336,7 @@ impl<
         &self,
         group_key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Vec<(T, ValueWithLayout<V>)>, ResourceGroupSize)> {
+    ) -> Result<(Vec<(T, ValueWithLayout<V>)>, ResourceGroupSize), PanicError> {
         let superset_tags = self
             .group_tags
             .get(group_key)
@@ -350,19 +350,24 @@ impl<
                     Ok((_, value)) => Ok((value.write_op_kind() != WriteOpKind::Deletion)
                         .then(|| (tag, value.clone()))),
                     Err(MVGroupError::TagNotFound) => Ok(None),
-                    Err(e) => {
-                        bail!("Unexpected error in finalize group fetching value {:?}", e)
-                    },
+                    Err(e) => Err(code_invariant_error(format!(
+                        "Unexpected error in finalize group fetching value {:?}",
+                        e
+                    ))),
                 },
             )
-            .collect::<anyhow::Result<Vec<_>>>()?
+            .collect::<Result<Vec<_>, PanicError>>()?
             .into_iter()
             .flatten()
             .collect();
         Ok((
             committed_group,
-            self.get_group_size(group_key, txn_idx + 1)
-                .map_err(|e| anyhow!("Unexpected error in finalize group get size {:?}", e))?,
+            self.get_group_size(group_key, txn_idx + 1).map_err(|e| {
+                code_invariant_error(format!(
+                    "Unexpected error in finalize group get size {:?}",
+                    e
+                ))
+            })?,
         ))
     }
 }

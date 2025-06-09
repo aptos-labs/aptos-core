@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Fix auto-update CLI command to work with more OS's including Mac and Linux on ARM
 
 ## [7.4.0]
 - UTF-8 characters are now allowed in Move source code comments (and thus error codes).
