@@ -313,7 +313,8 @@ impl Verifier {
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
             .collect::<Vec<_>>();
-        let txns_provider = DefaultTxnProvider::new(txns);
+        // TODO(grao): Pass in persisted info.
+        let txns_provider = DefaultTxnProvider::new_without_info(txns);
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             &txns_provider,
             &self

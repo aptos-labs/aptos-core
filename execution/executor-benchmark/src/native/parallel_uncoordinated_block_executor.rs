@@ -112,7 +112,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
                 )
             })?;
 
-        let block_epilogue_txn = Transaction::block_epilogue(
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
                 .unwrap(),

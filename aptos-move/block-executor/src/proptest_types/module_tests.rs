@@ -101,7 +101,7 @@ fn execute_module_tests(
                 })
                 .collect();
 
-            let txn_provider = DefaultTxnProvider::new(transactions);
+            let txn_provider = DefaultTxnProvider::new_without_info(transactions);
             let state_view = MockStateView::empty();
 
             // Generate all potential module IDs that could be used in the tests

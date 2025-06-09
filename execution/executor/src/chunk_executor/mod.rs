@@ -39,7 +39,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, Transaction,
         TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
         TransactionOutputListWithProof, TransactionStatus, Version,
     },
@@ -595,10 +595,14 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
+        let mut auxiliary_info = Vec::new();
+        // TODO(grao): Pass in persisted auxiliary info.
+        auxiliary_info.resize(txns.len(), AuxiliaryInfo::new_empty());
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),
+            auxiliary_info,
             &parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

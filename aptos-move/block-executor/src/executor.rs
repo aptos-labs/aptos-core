@@ -1172,7 +1172,7 @@ where
         block_id: HashValue,
         block_end_info: TBlockEndInfoExt<T::Key>,
     ) -> Transaction {
-        Transaction::block_epilogue(block_id, block_end_info.to_persistent())
+        Transaction::block_epilogue_v0(block_id, block_end_info.to_persistent())
     }
 
     /// Converts module write into cached module representation, and adds it to the module cache.

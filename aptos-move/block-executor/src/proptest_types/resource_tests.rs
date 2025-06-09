@@ -218,7 +218,7 @@ pub(crate) fn run_transactions_resources(
                 *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest(0);
             }
 
-            let txn_provider = DefaultTxnProvider::new(transactions);
+            let txn_provider = DefaultTxnProvider::new_without_info(transactions);
             let state_view = MockStateView::empty();
             for _ in 0..num_executions {
                 let output = execute_block_parallel::<

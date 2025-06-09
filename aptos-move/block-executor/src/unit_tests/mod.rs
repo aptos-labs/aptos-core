@@ -99,7 +99,7 @@ fn test_resource_group_deletion() {
     );
 
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     assert_ok!(block_executor.execute_transactions_sequential(
         &txn_provider,
         &data_view,
@@ -176,7 +176,7 @@ fn resource_group_bcs_fallback() {
         None,
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     // Execute the block normally.
     let mut guard = AptosModuleCacheManagerGuard::none();
     let output = block_executor.execute_transactions_parallel(
@@ -269,7 +269,7 @@ fn resource_group_bcs_fallback() {
 #[test]
 fn interrupt_requested() {
     let transactions = Vec::from([MockTransaction::Abort, MockTransaction::InterruptRequested]);
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     let mut guard = AptosModuleCacheManagerGuard::none();
 
     let data_view = MockStateView::empty();
@@ -316,7 +316,7 @@ fn block_output_err_precedence() {
     );
     let txn = MockTransaction::from_behavior(incarnation);
     let transactions = Vec::from([txn.clone(), txn]);
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = MockStateView::empty();
     let executor_thread_pool = Arc::new(
@@ -359,7 +359,7 @@ fn skip_rest_gas_limit() {
     // The contents of the second txn does not matter, as the first should hit the gas limit and
     // also skip. But it ensures block is not finished at the first txn (different processing).
     let transactions = Vec::from([MockTransaction::SkipRest(10), MockTransaction::SkipRest(10)]);
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = MockStateView::empty();
     let executor_thread_pool = Arc::new(
@@ -404,7 +404,7 @@ where
     );
 
     let mut guard = AptosModuleCacheManagerGuard::none();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let output = if use_delta_data_view {
         let data_view = DeltaDataView::<K> {
