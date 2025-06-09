@@ -260,7 +260,7 @@ impl<
 
     /// Mark all entry from transaction 'txn_idx' at access path 'key' as an estimated write
     /// (for future incarnation). Will panic if the entry is not in the data-structure.
-    pub fn mark_estimate(&self, group_key: &K, txn_idx: TxnIndex, tags: HashSet<T>) {
+    pub fn mark_estimate(&self, group_key: &K, txn_idx: TxnIndex, tags: &HashSet<T>) {
         for tag in tags.iter() {
             // Use GroupKeyRef to avoid cloning the group_key
             let key_ref = GroupKeyRef { group_key, tag };
@@ -434,7 +434,7 @@ mod test {
 
         match test_idx {
             0 => {
-                map.mark_estimate(&ap, 1, HashSet::new());
+                map.mark_estimate(&ap, 1, &HashSet::new());
             },
             1 => {
                 map.remove(&ap, 2, HashSet::new());
@@ -712,7 +712,7 @@ mod test {
             )
         );
 
-        map.mark_estimate(&ap, 10, (1..3).collect());
+        map.mark_estimate(&ap, 10, &(1..3).collect());
         assert_matches!(map.fetch_tagged_data(&ap, &1, 12), Err(Dependency(10)));
         assert_matches!(map.fetch_tagged_data(&ap, &2, 12), Err(Dependency(10)));
         assert_matches!(map.fetch_tagged_data(&ap, &3, 12), Err(TagNotFound));
@@ -791,7 +791,7 @@ mod test {
         assert_ok_eq!(map.get_group_size(&ap, 6), idx_5_size);
 
         // Despite estimates, should still return size.
-        map.mark_estimate(&ap, 5, (0..2).collect());
+        map.mark_estimate(&ap, 5, &(0..2).collect());
         assert_ok_eq!(map.get_group_size(&ap, 12), idx_5_size);
         assert!(map.validate_group_size(&ap, 12, idx_5_size));
         assert!(!map.validate_group_size(&ap, 12, ResourceGroupSize::zero_combined()));
@@ -809,7 +809,7 @@ mod test {
             true
         );
         assert!(!map.group_sizes.get(&ap).unwrap().size_has_changed);
-        map.mark_estimate(&ap, 5, (0..2).collect());
+        map.mark_estimate(&ap, 5, &(0..2).collect());
         assert_ok_eq!(map.get_group_size(&ap, 12), idx_5_size);
         assert!(map.validate_group_size(&ap, 12, idx_5_size));
         assert!(!map.validate_group_size(&ap, 12, ResourceGroupSize::zero_concrete()));
@@ -835,7 +835,7 @@ mod test {
         assert!(!map.validate_group_size(&ap, 10, idx_5_size));
         assert_ok_eq!(map.get_group_size(&ap, 3), base_size);
 
-        map.mark_estimate(&ap, 5, (0..3).collect());
+        map.mark_estimate(&ap, 5, &(0..3).collect());
         assert_matches!(
             map.get_group_size(&ap, 12),
             Err(MVGroupError::Dependency(5))
