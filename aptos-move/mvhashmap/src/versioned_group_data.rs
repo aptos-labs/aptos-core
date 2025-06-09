@@ -260,7 +260,7 @@ impl<
 
     /// Mark all entry from transaction 'txn_idx' at access path 'key' as an estimated write
     /// (for future incarnation). Will panic if the entry is not in the data-structure.
-    pub fn mark_estimate(&self, group_key: &K, txn_idx: TxnIndex, tags: HashSet<T>) {
+    pub fn mark_estimate(&self, group_key: &K, txn_idx: TxnIndex, tags: &HashSet<T>) {
         for tag in tags.iter() {
             // Use GroupKeyRef to avoid cloning the group_key
             let key_ref = GroupKeyRef { group_key, tag };
@@ -434,7 +434,7 @@ mod test {
 
         match test_idx {
             0 => {
-                map.mark_estimate(&ap, 1, HashSet::new());
+                map.mark_estimate(&ap, 1, &HashSet::new());
             },
             1 => {
                 map.remove(&ap, 2, HashSet::new());
@@ -712,7 +712,7 @@ mod test {
             )
         );
 
-        map.mark_estimate(&ap, 10, (1..3).collect());
+        map.mark_estimate(&ap, 10, &(1..3).collect());
         assert_matches!(map.fetch_tagged_data(&ap, &1, 12), Err(Dependency(10)));
         assert_matches!(map.fetch_tagged_data(&ap, &2, 12), Err(Dependency(10)));
         assert_matches!(map.fetch_tagged_data(&ap, &3, 12), Err(TagNotFound));
@@ -791,7 +791,7 @@ mod test {
         assert_ok_eq!(map.get_group_size(&ap, 6), idx_5_size);
 
         // Despite estimates, should still return size.
-        map.mark_estimate(&ap, 5, (0..2).collect());
+        map.mark_estimate(&ap, 5, &(0..2).collect());
         assert_ok_eq!(map.get_group_size(&ap, 12), idx_5_size);
         assert!(map.validate_group_size(&ap, 12, idx_5_size));
         assert!(!map.validate_group_size(&ap, 12, ResourceGroupSize::zero_combined()));
@@ -809,7 +809,7 @@ mod test {
             true
         );
         assert!(!map.group_sizes.get(&ap).unwrap().size_has_changed);
-        map.mark_estimate(&ap, 5, (0..2).collect());
+        map.mark_estimate(&ap, 5, &(0..2).collect());
         assert_ok_eq!(map.get_group_size(&ap, 12), idx_5_size);
         assert!(map.validate_group_size(&ap, 12, idx_5_size));
         assert!(!map.validate_group_size(&ap, 12, ResourceGroupSize::zero_concrete()));
@@ -835,7 +835,7 @@ mod test {
         assert!(!map.validate_group_size(&ap, 10, idx_5_size));
         assert_ok_eq!(map.get_group_size(&ap, 3), base_size);
 
-        map.mark_estimate(&ap, 5, (0..3).collect());
+        map.mark_estimate(&ap, 5, &(0..3).collect());
         assert_matches!(
             map.get_group_size(&ap, 12),
             Err(MVGroupError::Dependency(5))
@@ -1095,5 +1095,111 @@ mod test {
                 ValueWithLayout::Exchanged(Arc::new(TestValue::creation_with_len(1)), None)
             )
         );
+    }
+
+    #[test]
+    fn group_key_ref_equivalence_and_hashing() {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let dashmap: DashMap<(u32, u32), String> = DashMap::new();
+
+        // Test with a range of keys and tags (1..50 x 1..50 = 2500 combinations)
+        for k in 1u32..50u32 {
+            for t in 1u32..50u32 {
+                let tuple_key = (k, t);
+                let ref_key = GroupKeyRef {
+                    group_key: &k,
+                    tag: &t,
+                };
+                let expected_value = format!("value_{}_{}", k, t);
+
+                // Test 1: Verify that (K, T) and GroupKeyRef hash to the same value
+                let mut hasher1 = DefaultHasher::new();
+                tuple_key.hash(&mut hasher1);
+                let tuple_hash = hasher1.finish();
+
+                let mut hasher2 = DefaultHasher::new();
+                ref_key.hash(&mut hasher2);
+                let ref_hash = hasher2.finish();
+
+                assert_eq!(
+                    tuple_hash, ref_hash,
+                    "Tuple ({}, {}) and GroupKeyRef should hash to the same value",
+                    k, t
+                );
+
+                // Test 2: Test equivalence trait directly
+                assert!(
+                    ref_key.equivalent(&tuple_key),
+                    "GroupKeyRef should be equivalent to corresponding tuple ({}, {})",
+                    k,
+                    t
+                );
+                // Test with different values to ensure non-equivalence
+                let different_tuple = (k, t + 1000);
+                assert!(
+                    !ref_key.equivalent(&different_tuple),
+                    "GroupKeyRef should not be equivalent to different tuple ({}, {})",
+                    k,
+                    t + 1000
+                );
+
+                // Test 3: Insert using tuple key
+                dashmap.insert(tuple_key, expected_value.clone());
+
+                // Test 4: Access using GroupKeyRef - should find the same entry
+                let retrieved = dashmap.get(&ref_key);
+                assert!(
+                    retrieved.is_some(),
+                    "Should be able to access entry ({}, {}) using GroupKeyRef",
+                    k,
+                    t
+                );
+                assert_eq!(
+                    retrieved.unwrap().as_str(),
+                    expected_value,
+                    "Retrieved value should match expected value for ({}, {})",
+                    k,
+                    t
+                );
+
+                // Test 5: Remove using GroupKeyRef and verify it's the correct entry
+                let removed = dashmap.remove(&ref_key);
+                assert!(
+                    removed.is_some(),
+                    "Should be able to remove entry ({}, {}) using GroupKeyRef",
+                    k,
+                    t
+                );
+                let (removed_key, removed_value) = removed.unwrap();
+                assert_eq!(
+                    removed_key, tuple_key,
+                    "Removed key should match original tuple key ({}, {})",
+                    k, t
+                );
+                assert_eq!(
+                    removed_value, expected_value,
+                    "Removed value should match expected value for ({}, {})",
+                    k, t
+                );
+
+                // Verify entry is actually removed
+                assert!(
+                    dashmap.get(&ref_key).is_none(),
+                    "Entry ({}, {}) should be removed and not accessible",
+                    k,
+                    t
+                );
+                assert!(
+                    dashmap.get(&tuple_key).is_none(),
+                    "Entry ({}, {}) should be removed and not accessible via tuple key",
+                    k,
+                    t
+                );
+            }
+        }
+
+        // Verify all entries are removed
+        assert_eq!(dashmap.len(), 0, "All entries should be removed");
     }
 }

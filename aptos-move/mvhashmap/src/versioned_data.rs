@@ -252,7 +252,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     /// only a reference is needed.
     pub fn mark_estimate<Q>(&self, key: &Q, txn_idx: TxnIndex)
     where
-        Q: Equivalent<K> + ?Sized + Hash,
+        Q: Equivalent<K> + Hash,
     {
         // Use dashmap's get method which accepts a reference when Borrow is implemented
         // The equivalent crate automatically implements the right traits.
@@ -267,7 +267,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     /// if the corresponding entry does not exist.
     pub fn remove<Q>(&self, key: &Q, txn_idx: TxnIndex)
     where
-        Q: Equivalent<K> + ?Sized + Hash,
+        Q: Equivalent<K> + Hash,
     {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
@@ -283,7 +283,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         txn_idx: TxnIndex,
     ) -> anyhow::Result<MVDataOutput<V>, MVDataError>
     where
-        Q: Equivalent<K> + ?Sized + Hash,
+        Q: Equivalent<K> + Hash,
     {
         self.values
             .get(key)

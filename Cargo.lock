@@ -754,11 +754,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.21",
  "criterion",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "itertools 0.13.0",
  "jemallocator",
  "move-core-types",
@@ -971,11 +967,7 @@ dependencies = [
  "chrono",
  "claims",
  "clap 4.5.21",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "enum_dispatch",
  "fail",
  "futures",
@@ -1163,11 +1155,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "claims",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "futures",
  "itertools 0.13.0",
  "maplit",
@@ -1239,11 +1227,7 @@ dependencies = [
  "claims",
  "clap 4.5.21",
  "crossbeam-channel",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "either",
  "hex",
  "indicatif 0.15.0",
@@ -1280,11 +1264,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
@@ -1567,11 +1547,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap 4.5.21",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "derivative",
  "indicatif 0.15.0",
  "itertools 0.13.0",
@@ -1611,11 +1587,7 @@ dependencies = [
  "clap 4.5.21",
  "crossbeam-channel",
  "ctrlc",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "itertools 0.13.0",
  "num_cpus",
  "once_cell",
@@ -2254,11 +2226,7 @@ dependencies = [
  "async-trait",
  "build_html",
  "clap 4.5.21",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "futures",
  "jemallocator",
  "once_cell",
@@ -2416,11 +2384,7 @@ dependencies = [
  "async-trait",
  "build_html",
  "clap 4.5.21",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "futures",
  "jemallocator",
  "once_cell",
@@ -2504,11 +2468,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cloud-storage",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "futures",
  "itertools 0.13.0",
  "lz4",
@@ -2842,11 +2802,7 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "bcs 0.1.4",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "firestore",
  "hex",
  "hyper 0.14.28",
@@ -3176,12 +3132,8 @@ dependencies = [
  "bytes",
  "claims",
  "crossbeam",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
  "equivalent",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -3988,11 +3940,7 @@ dependencies = [
  "aptos-vm",
  "bitvec 1.0.1",
  "criterion",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "itertools 0.13.0",
  "jemallocator",
  "once_cell",
@@ -4177,11 +4125,7 @@ dependencies = [
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "derive_more 0.99.17",
  "itertools 0.13.0",
  "once_cell",
@@ -4241,11 +4185,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "futures",
  "maplit",
  "mini-moka",
@@ -4705,11 +4645,7 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "derivative",
  "derive_more 0.99.17",
  "fixed",
@@ -7642,20 +7578,6 @@ dependencies = [
  "hashbrown 0.15.3",
  "lock_api",
  "parking_lot_core 0.9.10",
-]
-
-[[package]]
-name = "dashmap"
-version = "6.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
-dependencies = [
- "cfg-if",
- "crossbeam-utils",
- "hashbrown 0.14.3",
- "lock_api",
- "once_cell",
- "parking_lot_core 0.9.9",
 ]
 
 [[package]]
@@ -12783,11 +12705,7 @@ dependencies = [
  "bytes",
  "claims",
  "crossbeam",
-<<<<<<< HEAD
- "dashmap 6.1.0",
-=======
  "dashmap 7.0.0-rc2",
->>>>>>> 3ef6e52be3 (Upgrade DashMap, use equivalent for resource groups)
  "derivative",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
