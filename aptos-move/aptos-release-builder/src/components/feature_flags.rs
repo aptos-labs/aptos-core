@@ -123,7 +123,8 @@ pub enum FeatureFlag {
     AbortIfMultisigPayloadMismatch,
     SupraNativeAutomation,
     SupraEthTrie,
-    SupraAutomationPayloadGasCheck
+    SupraAutomationPayloadGasCheck,
+    PrivatePoll,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -322,6 +323,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SupraNativeAutomation => AptosFeatureFlag::SUPRA_NATIVE_AUTOMATION,
             FeatureFlag::SupraEthTrie => AptosFeatureFlag::SUPRA_ETH_TRIE,
             FeatureFlag::SupraAutomationPayloadGasCheck => AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK,
+            FeatureFlag::PrivatePoll => AptosFeatureFlag::PRIVATE_POLL
         }
     }
 }
@@ -448,7 +450,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::SUPRA_NATIVE_AUTOMATION => FeatureFlag::SupraNativeAutomation,
             AptosFeatureFlag::SUPRA_ETH_TRIE=> FeatureFlag::SupraEthTrie,
-            AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK => FeatureFlag::SupraAutomationPayloadGasCheck
+            AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK => FeatureFlag::SupraAutomationPayloadGasCheck,
+            AptosFeatureFlag::PRIVATE_POLL => FeatureFlag::PrivatePoll,
         }
     }
 }
