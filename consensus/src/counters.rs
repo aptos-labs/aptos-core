@@ -1321,7 +1321,7 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
     for block in blocks_to_commit {
         update_counters_for_block(block.block());
-        update_counters_for_compute_result(block.compute_result());
+        update_counters_for_compute_result(&block.compute_result());
     }
 }
 
