@@ -47,6 +47,7 @@ pub enum DataRequest {
     SubscribeTransactionOutputsWithProof(SubscribeTransactionOutputsWithProofRequest), // Subscribes to transaction outputs with a proof
     SubscribeTransactionsOrOutputsWithProof(SubscribeTransactionsOrOutputsWithProofRequest), // Subscribes to transactions or outputs with a proof
     SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest), // Subscribes to transactions with a proof
+    GetDataV2(GetDataRequest) // This is the v2 version for fetching transactions or outputs with proof.
 }
 
 impl DataRequest {
@@ -73,6 +74,9 @@ impl DataRequest {
                 "subscribe_transactions_or_outputs_with_proof"
             },
             Self::SubscribeTransactionsWithProof(_) => "subscribe_transactions_with_proof",
+            Self::GetDataV2(GetDataRequest::Transactions(_)) =>  "get_transactions_with_proof_v2",
+            Self::GetDataV2(GetDataRequest::Outputs(_)) =>  "get_transaction_outputs_with_proof_v2",
+            Self::GetDataV2(GetDataRequest::TransactionOrOutputs(_)) =>  "get_transactions_or_outputs_with_proof_v2",
         }
     }
 
@@ -202,4 +206,62 @@ pub struct SubscriptionStreamMetadata {
     pub known_version_at_stream_start: u64, // The highest known transaction version at stream start
     pub known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
     pub subscription_stream_id: u64,        // The unique id of the subscription stream
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum GetDataRequest {
+    Transactions(GetTransactionRequest),
+    Outputs(GetOutputRequest),
+    TransactionOrOutputs(GetTransactionOrOutputRequest)
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum GetTransactionRequest {
+    Regular {
+        proof_version: u64,   // The version the proof should be relative to
+        start_version: u64,   // The starting version of the transaction list
+        end_version: u64,     // The ending version of the transaction list (inclusive)
+        include_events: bool, // Whether or not to include events in the response
+        include_aux_infos: bool, // Include auxiliary info for each transaction in the response
+    },
+    Optimistic {
+        known_version: u64,   // The highest known transaction version
+        known_epoch: u64,     // The highest known epoch
+        include_events: bool, // Whether or not to include events in the response
+        include_aux_infos: bool, // Include auxiliary info for each transaction in the response
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum GetOutputRequest {
+    Regular {
+        proof_version: u64, // The version the proof should be relative to
+        start_version: u64, // The starting version of the transaction output list
+        end_version: u64,   // The ending version of the transaction output list (inclusive)
+        include_aux_infos: bool, // Include auxiliary info for each transaction in the response
+    },
+    Optimistic {
+        known_version: u64, // The highest known output version
+        known_epoch: u64,   // The highest known epoch
+        include_aux_infos: bool, // Include auxiliary info for each transaction in the response
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum GetTransactionOrOutputRequest {
+    Regular {
+        proof_version: u64,   // The version the proof should be relative to
+        start_version: u64,   // The starting version of the transaction/output list
+        end_version: u64,     // The ending version of the transaction/output list (inclusive)
+        include_events: bool, // Whether or not to include events (if transactions are returned)
+        max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
+        include_aux_infos: u64, // Include auxiliary info for each transaction in the response
+    },
+    Optimistic {
+        known_version: u64,             // The highest known version
+        known_epoch: u64,               // The highest known epoch
+        include_events: bool,           // Whether or not to include events in the response
+        max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
+        include_aux_infos: u64, // Include auxiliary info for each transaction in the response
+    },
 }

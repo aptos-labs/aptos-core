@@ -31,11 +31,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
-    },
-    contract_event::TransactionEvent,
-    executable::ModulePath,
-    state_store::{state_value::StateValueMetadata, MockStateView},
-    write_set::WriteOpKind,
+    }, contract_event::TransactionEvent, executable::ModulePath, state_store::{state_value::StateValueMetadata, MockStateView}, transaction::AuxiliaryInfo, write_set::WriteOpKind
 };
 use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
@@ -91,7 +87,8 @@ fn test_resource_group_deletion() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -169,7 +166,8 @@ fn resource_group_bcs_fallback() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,

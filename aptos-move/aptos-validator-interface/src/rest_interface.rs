@@ -16,8 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionExecutableRef,
-        TransactionInfo, TransactionPayload, Version,
+        EntryFunction, ExecutionStatus::MiscellaneousError, PersistedAuxiliaryInfo, Transaction, TransactionExecutableRef, TransactionInfo, TransactionPayload, Version
     },
 };
 use async_recursion::async_recursion;
@@ -222,10 +221,10 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>, Vec<PersistedAuxiliaryInfo>)> {
         let mut txns = Vec::with_capacity(limit as usize);
         let mut txn_infos = Vec::with_capacity(limit as usize);
-
+        let mut persisted_auxiliary_infos = Vec::with_capacity(limit as usize);
         while txns.len() < limit as usize {
             self.0
                 .get_transactions_bcs(
@@ -242,7 +241,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             println!("Got {}/{} txns from RestApi.", txns.len(), limit);
         }
 
-        Ok((txns, txn_infos))
+        Ok((txns, txn_infos, persisted_auxiliary_infos))
     }
 
     async fn get_and_filter_committed_transactions(
@@ -270,10 +269,10 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         )>,
     > {
         let mut txns = Vec::with_capacity(limit as usize);
-        let (tns, infos) = self.get_committed_transactions(start, limit).await?;
+        let (tns, txn_infos, _) = self.get_committed_transactions(start, limit).await?;
         let temp_txns = tns
             .iter()
-            .zip(infos)
+            .zip(txn_infos)
             .enumerate()
             .map(|(idx, (txn, txn_info))| {
                 let version = start + idx as u64;

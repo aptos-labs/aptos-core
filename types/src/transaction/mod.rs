@@ -1270,7 +1270,6 @@ impl IndexedTransactionSummary {
         }
     }
 }
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {
@@ -1886,7 +1885,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
-            None,
+            Some(HashValue::default()),
         )
     }
 
@@ -1899,7 +1898,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
-            None,
+            Some(HashValue::default()),
         )
     }
 }
@@ -2119,11 +2118,11 @@ impl TransactionToCommit {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.transaction_info.gas_used
+        self.transaction_info.gas_used()
     }
 
     pub fn status(&self) -> &ExecutionStatus {
-        &self.transaction_info.status
+        &self.transaction_info.status()
     }
 
     pub fn is_reconfig(&self) -> bool {
@@ -2238,6 +2237,145 @@ impl TransactionListWithProof {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct TransactionListWithProofV2 {
+    pub transactions: Vec<Transaction>,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+    pub events: Option<Vec<Vec<ContractEvent>>>,
+    pub first_transaction_version: Option<Version>,
+    pub proof: TransactionInfoListWithProof,
+}
+
+impl TransactionListWithProofV2 {
+    /// Constructor.
+    pub fn new(
+        transactions: Vec<Transaction>,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+        events: Option<Vec<Vec<ContractEvent>>>,
+        first_transaction_version: Option<Version>,
+        proof: TransactionInfoListWithProof,
+    ) -> Self {
+        Self {
+            transactions,
+            persisted_auxiliary_infos,
+            events,
+            first_transaction_version,
+            proof,
+        }
+    }
+
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::new(
+            vec![],
+            vec![],
+            None,
+            None,
+            TransactionInfoListWithProof::new_empty(),
+        )
+    }
+
+    /// Verifies the transaction list with proof using the given `ledger_info`.
+    /// This method will ensure:
+    /// 1. All transactions exist on the given `ledger_info`.
+    /// 2. All transactions in the list have consecutive versions.
+    /// 3. If `first_transaction_version` is None, the transaction list is empty.
+    ///    Otherwise, the transaction list starts at `first_transaction_version`.
+    /// 4. If events exist, they match the expected event root hashes in the proof.
+    /// 5. The auxiliary infos match the expected auxiliary info hashes in the proof.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_version: Option<Version>,
+    ) -> Result<()> {
+        // Verify the first transaction versions match
+        ensure!(
+            self.first_transaction_version == first_transaction_version,
+            "First transaction version ({:?}) doesn't match given version ({:?}).",
+            self.first_transaction_version,
+            first_transaction_version,
+        );
+
+        // Verify the lengths of the transactions, auxiliary infos, and transaction infos match
+        ensure!(
+            self.proof.transaction_infos.len() == self.transactions.len(),
+            "The number of TransactionInfo objects ({}) does not match the number of \
+             transactions ({}).",
+            self.proof.transaction_infos.len(),
+            self.transactions.len(),
+        );
+
+        ensure!(
+            self.persisted_auxiliary_infos.len() == self.transactions.len(),
+            "The number of auxiliary infos ({}) does not match the number of \
+             transactions ({}).",
+            self.persisted_auxiliary_infos.len(),
+            self.transactions.len(),
+        );
+
+        // Verify the transaction hashes and auxiliary info hashes match those of the transaction infos
+        self.transactions
+            .par_iter()
+            .zip_eq(self.persisted_auxiliary_infos.par_iter())
+            .zip_eq(self.proof.transaction_infos.par_iter())
+            .map(|((txn, persisted_auxiliary_info), txn_info)| {
+                let txn_hash = CryptoHash::hash(txn);
+                ensure!(
+                    txn_hash == txn_info.transaction_hash(),
+                    "The hash of transaction does not match the transaction info in proof. \
+                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
+                    txn_hash,
+                    txn_info.transaction_hash(),
+                );
+
+                // Verify auxiliary info hash if present
+                match &persisted_auxiliary_info {
+                    PersistedAuxiliaryInfo::V1 { .. } => {
+                        let aux_info_hash = CryptoHash::hash(persisted_auxiliary_info);
+                        ensure!(
+                            txn_info.auxiliary_info_hash() == Some(aux_info_hash),
+                            "The auxiliary info hash does not match the transaction info in proof. \
+                            Auxiliary info hash: {:x}. Auxiliary info hash in txn_info: {:?}.",
+                            aux_info_hash,
+                            txn_info.auxiliary_info_hash(),
+                        );
+                    }
+                    PersistedAuxiliaryInfo::None => {
+                        ensure!(
+                            txn_info.auxiliary_info_hash().is_none(),
+                            "Expected no auxiliary info hash in transaction info, but found: {:?}.",
+                            txn_info.auxiliary_info_hash(),
+                        );
+                    }
+                }
+
+                Ok(())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Verify the transaction infos are proven by the ledger info.
+        self.proof
+            .verify(ledger_info, self.first_transaction_version)?;
+
+        // Verify the events if they exist.
+        if let Some(event_lists) = &self.events {
+            ensure!(
+                event_lists.len() == self.transactions.len(),
+                "The length of event_lists ({}) does not match the number of transactions ({}).",
+                event_lists.len(),
+                self.transactions.len(),
+            );
+            event_lists
+                .into_par_iter()
+                .zip_eq(self.proof.transaction_infos.par_iter())
+                .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
+                .collect::<Result<Vec<_>>>()?;
+        }
+
+        Ok(())
+    }
+}
+
 /// This differs from TransactionListWithProof in that TransactionOutputs are
 /// stored (no transactions). Events are stored inside each TransactionOutput.
 ///
@@ -2312,11 +2450,11 @@ impl TransactionOutputListWithProof {
             // Verify the write set matches for both the transaction info and output
             let write_set_hash = CryptoHash::hash(&txn_output.write_set);
             ensure!(
-                txn_info.state_change_hash == write_set_hash,
+                txn_info.state_change_hash() == write_set_hash,
                 "The write set in transaction output does not match the transaction info \
                      in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
                 write_set_hash,
-                txn_info.state_change_hash,
+                txn_info.state_change_hash(),
             );
 
             // Verify the gas matches for both the transaction info and output
@@ -2346,6 +2484,158 @@ impl TransactionOutputListWithProof {
                 txn_hash,
                 txn_info.transaction_hash(),
             );
+            Ok(())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+        // Verify the transaction infos are proven by the ledger info.
+        self.proof
+            .verify(ledger_info, self.first_transaction_output_version)?;
+
+        Ok(())
+    }
+
+    /// Convert to TransactionOutputListWithProofV2 with auxiliary infos set as None
+    pub fn into(self) -> TransactionOutputListWithProofV2 {
+        let transactions_and_outputs = self
+            .transactions_and_outputs
+            .into_iter()
+            .map(|(txn, output)| (txn, output, PersistedAuxiliaryInfo::None))
+            .collect();
+        
+        TransactionOutputListWithProofV2 {
+            transactions_and_outputs,
+            first_transaction_output_version: self.first_transaction_output_version,
+            proof: self.proof,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct TransactionOutputListWithProofV2 {
+    pub transactions_and_outputs: Vec<(Transaction, TransactionOutput, PersistedAuxiliaryInfo)>,
+    pub first_transaction_output_version: Option<Version>,
+    pub proof: TransactionInfoListWithProof,
+}
+
+impl TransactionOutputListWithProofV2 {
+    pub fn new(
+        transactions_and_outputs: Vec<(Transaction, TransactionOutput, PersistedAuxiliaryInfo)>,
+        first_transaction_output_version: Option<Version>,
+        proof: TransactionInfoListWithProof,
+    ) -> Self {
+        Self {
+            transactions_and_outputs,
+            first_transaction_output_version,
+            proof,
+        }
+    }
+
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::new(vec![], None, TransactionInfoListWithProof::new_empty())
+    }
+
+    /// Verifies the transaction output list with proof using the given `ledger_info`.
+    /// This method will ensure:
+    /// 1. All transaction infos exist on the given `ledger_info`.
+    /// 2. If `first_transaction_output_version` is None, the transaction output list is empty.
+    ///    Otherwise, the list starts at `first_transaction_output_version`.
+    /// 3. Events, gas, status in each transaction output match the expected event root hashes,
+    ///    the gas used and the transaction execution status in the proof, respectively.
+    /// 4. The transaction hashes match those of the transaction infos.
+    /// 5. The auxiliary infos match the expected auxiliary info hashes in the proof.
+    ///
+    /// Note: the proof cannot verify the TransactionOutputs themselves. This
+    /// requires speculative execution of each TransactionOutput to verify that the
+    /// resulting state matches the expected state in the proof (for each version).
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        // Verify the first transaction/output versions match
+        ensure!(
+            self.first_transaction_output_version == first_transaction_output_version,
+            "First transaction and output version ({:?}) doesn't match given version ({:?}).",
+            self.first_transaction_output_version,
+            first_transaction_output_version,
+        );
+
+        // Verify the lengths of the transaction(output)s and transaction infos match
+        ensure!(
+            self.proof.transaction_infos.len() == self.transactions_and_outputs.len(),
+            "The number of TransactionInfo objects ({}) does not match the number of \
+             transactions and outputs ({}).",
+            self.proof.transaction_infos.len(),
+            self.transactions_and_outputs.len(),
+        );
+
+        // Verify the events, status, gas used, transaction hashes, and auxiliary info hashes.
+        self.transactions_and_outputs.par_iter().zip_eq(self.proof.transaction_infos.par_iter())
+        .map(|((txn, txn_output, persisted_auxiliary_info), txn_info)| {
+            // Check the events against the expected events root hash
+            verify_events_against_root_hash(&txn_output.events, txn_info)?;
+
+            // Verify the write set matches for both the transaction info and output
+            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+            ensure!(
+                txn_info.state_change_hash() == write_set_hash,
+                "The write set in transaction output does not match the transaction info \
+                     in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
+                write_set_hash,
+                txn_info.state_change_hash(),
+            );
+
+            // Verify the gas matches for both the transaction info and output
+            ensure!(
+                txn_output.gas_used() == txn_info.gas_used(),
+                "The gas used in transaction output does not match the transaction info \
+                     in proof. Gas used in transaction output: {}. Gas used in txn_info: {}.",
+                txn_output.gas_used(),
+                txn_info.gas_used(),
+            );
+
+            // Verify the execution status matches for both the transaction info and output.
+            ensure!(
+                *txn_output.status() == TransactionStatus::Keep(txn_info.status().clone()),
+                "The execution status of transaction output does not match the transaction \
+                     info in proof. Status in transaction output: {:?}. Status in txn_info: {:?}.",
+                txn_output.status(),
+                txn_info.status(),
+            );
+
+            // Verify the transaction hashes match those of the transaction infos
+            let txn_hash = txn.hash();
+            ensure!(
+                txn_hash == txn_info.transaction_hash(),
+                "The transaction hash does not match the hash in transaction info. \
+                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
+                txn_hash,
+                txn_info.transaction_hash(),
+            );
+
+            // Verify auxiliary info hash matches the transaction info
+            match &persisted_auxiliary_info {
+                PersistedAuxiliaryInfo::V1 { .. } => {
+                    let aux_info_hash = CryptoHash::hash(persisted_auxiliary_info);
+                    ensure!(
+                        txn_info.auxiliary_info_hash() == Some(aux_info_hash),
+                        "The auxiliary info hash does not match the transaction info in proof. \
+                        Auxiliary info hash: {:?}. Auxiliary info hash in txn_info: {:?}.",
+                        aux_info_hash,
+                        txn_info.auxiliary_info_hash(),
+                    );
+                }
+                PersistedAuxiliaryInfo::None => {
+                    ensure!(
+                        txn_info.auxiliary_info_hash().is_none(),
+                        "Expected no auxiliary info hash in transaction info, but found: {:?}.",
+                        txn_info.auxiliary_info_hash(),
+                    );
+                }
+            }
+
             Ok(())
         })
         .collect::<Result<Vec<_>>>()?;
@@ -2668,13 +2958,6 @@ impl AuxiliaryInfo {
         }
     }
 
-    pub fn new_empty() -> Self {
-        Self {
-            persisted_info: PersistedAuxiliaryInfo::None,
-            ephemeral_info: None,
-        }
-    }
-
     pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
         self.persisted_info
     }
@@ -2686,18 +2969,55 @@ impl AuxiliaryInfo {
     pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
         &self.ephemeral_info
     }
+
+    pub fn persisted_info_hash(&self) -> Option<HashValue> {
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { .. } => Some(self.persisted_info.hash()),
+            PersistedAuxiliaryInfo::None => None,
+        }
+    }
 }
 
-#[derive(
-    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
-)]
+impl AuxiliaryInfoTrait for AuxiliaryInfo {
+    fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    fn transaction_index(&self) -> Option<u32> {
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => Some(transaction_index),
+            PersistedAuxiliaryInfo::None => None,
+        }
+    }
+
+    fn proposer_index(&self) -> Option<u64> {
+        match self.ephemeral_info {
+            Some(EphemeralAuxiliaryInfo { proposer_index }) => Some(proposer_index),
+            None => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+
 pub enum PersistedAuxiliaryInfo {
     None,
     // The index of the transaction in a block (after shuffler, before execution).
     // Note that this would be slightly different from the index of transactions that get committed
     // onchain, as this considers transactions that may get discarded.
-    V1 { transaction_index: u32 },
+    V1 {
+        transaction_index: u32,
+    },
+}
+
+pub trait AuxiliaryInfoTrait: Clone {
+    fn transaction_index(&self) -> Option<u32>;
+    fn proposer_index(&self) -> Option<u64>;
+    fn new_empty() -> Self;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2705,4 +3025,34 @@ pub struct EphemeralAuxiliaryInfo {
     // TODO(grao): After execution pool is implemented we might want this information be persisted
     // onchain?
     pub proposer_index: u64,
+}
+
+impl From<TransactionOutputListWithProof> for TransactionOutputListWithProofV2 {
+    fn from(proof: TransactionOutputListWithProof) -> Self {
+        let transactions_and_outputs = proof
+            .transactions_and_outputs
+            .into_iter()
+            .map(|(txn, output)| (txn, output, PersistedAuxiliaryInfo::None))
+            .collect();
+        
+        Self {
+            transactions_and_outputs,
+            first_transaction_output_version: proof.first_transaction_output_version,
+            proof: proof.proof,
+        }
+    }
+}
+
+impl From<TransactionListWithProof> for TransactionListWithProofV2 {
+    fn from(proof: TransactionListWithProof) -> Self {
+        let persisted_auxiliary_infos = vec![PersistedAuxiliaryInfo::None; proof.transactions.len()];
+        
+        Self {
+            transactions: proof.transactions,
+            persisted_auxiliary_infos,
+            events: proof.events,
+            first_transaction_version: proof.first_transaction_version,
+            proof: proof.proof,
+        }
+    }
 }

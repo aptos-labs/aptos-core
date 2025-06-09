@@ -27,7 +27,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     waypoint::Waypoint,
 };
 use futures::channel::oneshot;
@@ -254,7 +254,7 @@ pub(crate) struct StateValueSyncer {
     next_state_index_to_process: u64,
 
     // The transaction output (inc. info and proof) for the version we're syncing
-    transaction_output_to_sync: Option<TransactionOutputListWithProof>,
+    transaction_output_to_sync: Option<TransactionOutputListWithProofV2>,
 }
 
 impl StateValueSyncer {
@@ -275,7 +275,7 @@ impl StateValueSyncer {
     /// Sets the transaction output to sync
     pub fn set_transaction_output_to_sync(
         &mut self,
-        transaction_output_to_sync: TransactionOutputListWithProof,
+        transaction_output_to_sync: TransactionOutputListWithProofV2,
     ) {
         self.transaction_output_to_sync = Some(transaction_output_to_sync);
     }
@@ -1114,8 +1114,8 @@ impl<
     async fn process_transaction_or_output_payload(
         &mut self,
         notification_metadata: NotificationMetadata,
-        transaction_list_with_proof: Option<TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify that we're expecting transaction or output payloads
@@ -1266,7 +1266,7 @@ impl<
     async fn verify_transaction_info_to_sync(
         &mut self,
         notification_id: NotificationId,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version
@@ -1368,8 +1368,8 @@ impl<
         &mut self,
         notification_id: NotificationId,
         payload_start_version: Version,
-        transaction_list_with_proof: Option<&TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<&TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<&TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<&TransactionOutputListWithProofV2>,
     ) -> Result<Option<LedgerInfoWithSignatures>, Error> {
         // Calculate the payload end version
         let num_versions = match self.get_bootstrapping_mode() {
@@ -1497,7 +1497,7 @@ impl<
     }
 
     /// Returns the transaction output to sync
-    fn get_transaction_output_to_sync(&mut self) -> Result<TransactionOutputListWithProof, Error> {
+    fn get_transaction_output_to_sync(&mut self) -> Result<TransactionOutputListWithProofV2, Error> {
         self.state_value_syncer
             .transaction_output_to_sync
             .clone()

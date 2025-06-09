@@ -48,6 +48,7 @@ pub struct CommittedStateSnapshot {
 /// A commit notification for new transactions
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommittedTransactions {
+    // Question[MI Counter]: Do we need to add persisted auxiliary info here?
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,
 }

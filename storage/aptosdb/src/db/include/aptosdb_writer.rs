@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::transaction::TransactionOutputListWithProofV2;
 use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
 use itertools::Itertools;
 
@@ -89,7 +90,7 @@ impl DbWriter for AptosDB {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         gauged_api("finalize_state_snapshot", || {
@@ -127,10 +128,12 @@ impl DbWriter for AptosDB {
             let mut sharded_kv_batch = self.state_kv_db.new_sharded_native_batches();
             let mut state_kv_metadata_batch = SchemaBatch::new();
             // Save the target transactions, outputs, infos and events
+            // TODO[MI counter]: Check if auxiliary info needs to be saved here.
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
                     .transactions_and_outputs
                     .into_iter()
+                    .map(|(txn, output, _)| (txn, output))
                     .unzip();
             let events = outputs
                 .clone()
@@ -262,7 +265,7 @@ impl AptosDB {
             s.spawn(|_| {
                 self.ledger_db
                     .persisted_auxiliary_info_db()
-                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_info)
+                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_auxiliary_infos)
                     .unwrap()
             });
             s.spawn(|_| {

@@ -11,7 +11,7 @@ use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction},
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -60,6 +60,9 @@ pub trait ExecutorTask {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
+    /// Type of auxiliary info.
+    type AuxiliaryInfo: AuxiliaryInfoTrait;
+
     /// The output of a transaction. This should contain the side effect of this transaction.
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
@@ -88,6 +91,7 @@ pub trait ExecutorTask {
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+        auxiliary_info: &Self::AuxiliaryInfo,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;

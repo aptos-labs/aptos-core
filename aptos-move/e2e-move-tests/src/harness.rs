@@ -385,7 +385,7 @@ impl MoveHarness {
         let txn = self.create_transaction_payload(account, payload);
         let (output, gas_log) = self
             .executor
-            .execute_transaction_with_gas_profiler(txn)
+            .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::new_empty())
             .unwrap();
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
@@ -701,7 +701,7 @@ impl MoveHarness {
         let txn = self.create_publish_package(account, path, None, |_| {});
         let (output, gas_log) = self
             .executor
-            .execute_transaction_with_gas_profiler(txn)
+            .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::new_empty())
             .unwrap();
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());

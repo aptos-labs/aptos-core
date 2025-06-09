@@ -50,14 +50,6 @@ pub(super) fn event_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
-pub(super) fn persisted_auxiliary_info_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        DB_METADATA_CF_NAME,
-        PERSISTED_AUXILIARY_INFO_CF_NAME,
-    ]
-}
-
 pub(super) fn transaction_accumulator_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -72,6 +64,14 @@ pub(super) fn transaction_auxiliary_data_db_column_families() -> Vec<ColumnFamil
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
         TRANSACTION_AUXILIARY_DATA_CF_NAME,
+    ]
+}
+
+pub(super) fn persisted_auxiliary_info_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        PERSISTED_AUXILIARY_INFO_CF_NAME,
     ]
 }
 
@@ -220,6 +220,7 @@ pub(super) fn gen_transaction_auxiliary_data_cfds(
     let cfs = transaction_auxiliary_data_db_column_families();
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
+
 pub(super) fn gen_transaction_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_db_column_families();
     gen_cfds(rocksdb_config, cfs, |_, _| {})

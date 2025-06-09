@@ -716,7 +716,7 @@ async fn test_save_states_completion() {
         .expect_finalize_state_snapshot()
         .withf(
             move |version: &Version,
-                  output_with_proof: &TransactionOutputListWithProof,
+                  output_with_proof: &TransactionOutputListWithProofV2,
                   ledger_infos: &[LedgerInfoWithSignatures]| {
                 version == &target_ledger_info_clone.ledger_info().version()
                     && output_with_proof == &output_list_with_proof_clone

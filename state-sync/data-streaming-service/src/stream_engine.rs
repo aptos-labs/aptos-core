@@ -2168,12 +2168,13 @@ fn create_data_notification(
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         },
+        // TODO[MI Counter]: After the monotonically increasing counter PR is deployed, change thse variants to also output 
         ResponsePayload::NewTransactionsWithProof((transactions_chunk, target_ledger_info)) => {
             match stream_engine {
                 StreamEngine::ContinuousTransactionStreamEngine(_) => {
                     DataPayload::ContinuousTransactionsWithProof(
                         target_ledger_info,
-                        transactions_chunk,
+                        transactions_chunk.into(),
                     )
                 },
                 _ => invalid_response_type!(client_response_type),
@@ -2186,7 +2187,7 @@ fn create_data_notification(
             StreamEngine::ContinuousTransactionStreamEngine(_) => {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     target_ledger_info,
-                    transactions_output_chunk,
+                    transactions_output_chunk.into(),
                 )
             },
             _ => invalid_response_type!(client_response_type),
@@ -2198,10 +2199,10 @@ fn create_data_notification(
                         "The target ledger info was not provided".into(),
                     )
                 })?;
-                DataPayload::ContinuousTransactionsWithProof(target_ledger_info, transactions_chunk)
+                DataPayload::ContinuousTransactionsWithProof(target_ledger_info, transactions_chunk.into())
             },
             StreamEngine::TransactionStreamEngine(_) => {
-                DataPayload::TransactionsWithProof(transactions_chunk)
+                DataPayload::TransactionsWithProof(transactions_chunk.into())
             },
             _ => invalid_response_type!(client_response_type),
         },
@@ -2215,14 +2216,29 @@ fn create_data_notification(
                     })?;
                     DataPayload::ContinuousTransactionOutputsWithProof(
                         target_ledger_info,
-                        transactions_output_chunk,
+                        transactions_output_chunk.into(),
                     )
                 },
                 StreamEngine::TransactionStreamEngine(_) => {
-                    DataPayload::TransactionOutputsWithProof(transactions_output_chunk)
+                    DataPayload::TransactionOutputsWithProof(transactions_output_chunk.into())
                 },
                 _ => invalid_response_type!(client_response_type),
             }
+        },
+        ResponsePayload::TransactionOutputsWithProofV2((
+            transactions_output_chunk,
+            target_ledger_info,
+        )) => match stream_engine {
+            StreamEngine::ContinuousTransactionStreamEngine(_) => {
+                DataPayload::ContinuousTransactionOutputsWithProofV2(target_ledger_info, transactions_output_chunk)
+            },
+            _ => invalid_response_type!(client_response_type),
+        },
+        ResponsePayload::TransactionsWithProofV2((transactions_chunk, target_ledger_info)) => match stream_engine {
+            StreamEngine::ContinuousTransactionStreamEngine(_) => {
+                DataPayload::ContinuousTransactionsWithProofV2(target_ledger_info, transactions_chunk)
+            },
+            _ => invalid_response_type!(client_response_type),
         },
         _ => invalid_response_type!(client_response_type),
     };
