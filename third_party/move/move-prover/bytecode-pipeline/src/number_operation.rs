@@ -213,7 +213,7 @@ impl GlobalNumberOperationState {
             if para_idx_vec.contains(&i) {
                 default_map.insert(i, Bitwise);
             } else {
-                // If not appearing in the pragma, mark it as Arithmetic or Bottom
+                // If not appearing in the pragma, mark it as Bottom
                 // Similar logic when populating ret_operation_map below
                 default_map.insert(i, Bottom);
             }

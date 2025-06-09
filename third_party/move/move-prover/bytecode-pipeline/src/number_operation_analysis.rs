@@ -6,12 +6,9 @@
 //
 // The result of this analysis will be used when generating the boogie code
 
-use crate::{
-    number_operation::{
-        GlobalNumberOperationState, NumOperation,
-        NumOperation::{Arithmetic, Bitwise, Bottom},
-    },
-    options::ProverOptions,
+use crate::number_operation::{
+    GlobalNumberOperationState, NumOperation,
+    NumOperation::{Arithmetic, Bitwise, Bottom},
 };
 use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
@@ -60,8 +57,12 @@ impl NumberOperationProcessor {
     fn analyze<'a>(&self, env: &'a GlobalEnv, targets: &'a FunctionTargetsHolder) {
         self.create_initial_exp_oper_state(env);
         let fun_env_vec = FunctionTargetPipeline::sort_in_reverse_topological_order(env, targets);
-        // Heuristic: run twice to make sure number operation state is propagated to all functions
-        for _ in 0..2 {
+        let init_state = env
+            .get_extension::<GlobalNumberOperationState>()
+            .unwrap_or_default();
+        let mut pre_state = init_state.clone();
+        // run until fixed point is reached
+        loop {
             for item in &fun_env_vec {
                 match item {
                     Either::Left(fid) => {
@@ -73,7 +74,7 @@ impl NumberOperationProcessor {
                             if target.data.code.is_empty() {
                                 continue;
                             }
-                            self.analyze_fun(env, target.clone());
+                            self.analyze_fun(target.clone());
                         }
                     },
                     Either::Right(scc) => {
@@ -86,21 +87,27 @@ impl NumberOperationProcessor {
                                 if target.data.code.is_empty() {
                                     continue;
                                 }
-                                self.analyze_fun(env, target.clone());
+                                self.analyze_fun(target.clone());
                             }
                         }
                     },
                 }
             }
+            let post_state = env
+                .get_extension::<GlobalNumberOperationState>()
+                .unwrap_or_default();
+            if pre_state == post_state {
+                break;
+            }
+            pre_state = post_state.clone();
         }
     }
 
-    fn analyze_fun(&self, env: &'_ GlobalEnv, target: FunctionTarget) {
+    fn analyze_fun(&self, target: FunctionTarget) {
         if !target.func_env.is_native_or_intrinsic() {
             let cfg = StacklessControlFlowGraph::one_block(target.get_bytecode());
             let analyzer = NumberOperationAnalysis {
                 func_target: target,
-                ban_int_2_bv_conversion: ProverOptions::get(env).ban_int_2_bv,
             };
             analyzer.analyze_function(
                 NumberOperationState::create_initial_state(),
@@ -127,7 +134,6 @@ impl FunctionTargetProcessor for NumberOperationProcessor {
 
 struct NumberOperationAnalysis<'a> {
     func_target: FunctionTarget<'a>,
-    ban_int_2_bv_conversion: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -517,13 +523,13 @@ impl NumberOperationAnalysis<'_> {
                                                 | move_model::ast::Operation::Shr
                                         );
                                         // For shift operation, we don't need to check compatibility between the two operands
-                                        let (compatible_flag, concrete_num_ty) = if if_shift {
-                                            (true, concrete_num_ty_oper_0.clone())
+                                        let concrete_num_ty = if if_shift {
+                                            Some(concrete_num_ty_oper_0.clone())
                                         } else {
                                             concrete_num_ty_oper_0
                                                 .is_compatible_num_type(&concrete_num_ty_oper_1)
                                         };
-                                        if !compatible_flag {
+                                        if concrete_num_ty.is_none() {
                                             self.func_target.global_env().error(
                                                     &self.func_target.global_env().get_node_loc(exp.node_id()),
                                                     &format!("integer type mismatch between two operands, one has type `{}` while the other one has type `{}`, consider using explicit type cast",
@@ -534,12 +540,14 @@ impl NumberOperationAnalysis<'_> {
                                                 );
                                         }
                                         if exp_ty == Type::Primitive(PrimitiveType::Num)
-                                            && concrete_num_ty
-                                                != Type::Primitive(PrimitiveType::Num)
+                                            && concrete_num_ty.as_ref().is_some_and(|ty| {
+                                                *ty != Type::Primitive(PrimitiveType::Num)
+                                            })
                                         {
-                                            self.func_target
-                                                .global_env()
-                                                .update_node_type(exp.node_id(), concrete_num_ty);
+                                            self.func_target.global_env().update_node_type(
+                                                exp.node_id(),
+                                                concrete_num_ty.unwrap(),
+                                            );
                                         }
                                     }
                                 }
@@ -593,38 +601,9 @@ impl NumberOperationAnalysis<'_> {
         e.visit_post_order(visitor);
     }
 
-    /// Check whether operations in s conflicting
-    fn check_conflict_set(&self, s: &BTreeSet<&NumOperation>) -> bool {
-        if self.ban_int_2_bv_conversion {
-            let mut arith_flag = false;
-            let mut bitwise_flag = false;
-            for &oper in s {
-                if *oper == Arithmetic {
-                    arith_flag = true;
-                }
-                if *oper == Bitwise {
-                    bitwise_flag = true;
-                }
-            }
-            arith_flag && bitwise_flag
-        } else {
-            false
-        }
-    }
-
-    /// Check whether oper_1 and oper_2 conflict
-    fn check_conflict(&self, oper_1: &NumOperation, oper_2: &NumOperation) -> bool {
-        if self.ban_int_2_bv_conversion {
-            oper_1.conflict(oper_2)
-        } else {
-            false
-        }
-    }
-
     /// Check whether operation of dest and src conflict, if not propagate the merged operation
     fn check_and_propagate(
         &self,
-        id: &AttrId,
         state: &mut NumberOperationState,
         dest: &TempIndex,
         src: &TempIndex,
@@ -640,30 +619,21 @@ impl NumberOperationAnalysis<'_> {
         let src_oper = global_state
             .get_temp_index_oper(mid, fid, *src, baseline_flag)
             .unwrap();
-        if self.check_conflict(dest_oper, src_oper) {
-            self.func_target
-                .func_env
-                .module_env
-                .env
-                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
-        } else {
-            let merged_oper = dest_oper.merge(src_oper);
-            if merged_oper != *dest_oper || merged_oper != *src_oper {
-                state.changed = true;
-            }
-            *global_state
-                .get_mut_temp_index_oper(mid, fid, *dest, baseline_flag)
-                .unwrap() = merged_oper;
-            *global_state
-                .get_mut_temp_index_oper(mid, fid, *src, baseline_flag)
-                .unwrap() = merged_oper;
+        let merged_oper = dest_oper.merge(src_oper);
+        if merged_oper != *dest_oper || merged_oper != *src_oper {
+            state.changed = true;
         }
+        *global_state
+            .get_mut_temp_index_oper(mid, fid, *dest, baseline_flag)
+            .unwrap() = merged_oper;
+        *global_state
+            .get_mut_temp_index_oper(mid, fid, *src, baseline_flag)
+            .unwrap() = merged_oper;
     }
 
     /// Update operation in dests and srcs using oper
     fn check_and_update_oper(
         &self,
-        id: &AttrId,
         state: &mut NumberOperationState,
         dests: &[TempIndex],
         srcs: &[TempIndex],
@@ -687,14 +657,6 @@ impl NumberOperationAnalysis<'_> {
         state_set.insert(op_srcs_0);
         state_set.insert(op_srcs_1);
         state_set.insert(op_dests_0);
-        if self.check_conflict_set(&state_set) {
-            self.func_target
-                .func_env
-                .module_env
-                .env
-                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
-            return;
-        }
         if oper != *op_srcs_0 || oper != *op_srcs_1 || oper != *op_dests_0 {
             state.changed = true;
         }
@@ -767,9 +729,8 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
         let cur_mid = self.func_target.func_env.module_env.get_id();
         let cur_fid = self.func_target.func_env.get_id();
         match instr {
-            Assign(id, dest, src, _) => {
+            Assign(_, dest, src, _) => {
                 self.check_and_propagate(
-                    id,
                     state,
                     dest,
                     src,
@@ -780,7 +741,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                 );
             },
             // Check and update operations of rets in temp_index_operation_map and operations in ret_operation_map
-            Ret(id, rets) => {
+            Ret(_, rets) => {
                 let ret_types = self.func_target.get_return_types();
                 for ((i, _), ret) in ret_types.iter().enumerate().zip(rets) {
                     let ret_oper = global_state
@@ -793,33 +754,24 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                         .get_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag)
                         .unwrap();
 
-                    if self.check_conflict(idx_oper, ret_oper) {
-                        self.func_target
-                            .func_env
-                            .module_env
-                            .env
-                            .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
-                    } else {
-                        let merged = idx_oper.merge(ret_oper);
-                        if merged != *idx_oper || merged != *ret_oper {
-                            state.changed = true;
-                        }
-                        *global_state
-                            .get_mut_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag)
-                            .unwrap() = merged;
-                        global_state
-                            .get_mut_ret_map()
-                            .get_mut(&(cur_mid, cur_fid))
-                            .unwrap()
-                            .insert(i, merged);
+                    let merged = idx_oper.merge(ret_oper);
+                    if merged != *idx_oper || merged != *ret_oper {
+                        state.changed = true;
                     }
+                    *global_state
+                        .get_mut_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag)
+                        .unwrap() = merged;
+                    global_state
+                        .get_mut_ret_map()
+                        .get_mut(&(cur_mid, cur_fid))
+                        .unwrap()
+                        .insert(i, merged);
                 }
             },
-            Call(id, dests, oper, srcs, _) => {
+            Call(_, dests, oper, srcs, _) => {
                 let handle_pack_unpack =
                     |msid: &ModuleId,
                      sid: &StructId,
-                     id: &AttrId,
                      i: usize,
                      field_id: FieldId,
                      state: &mut NumberOperationState,
@@ -830,32 +782,23 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                         let pack_oper = global_state
                             .get_temp_index_oper(cur_mid, cur_fid, temps[i], baseline_flag)
                             .unwrap();
-                        if self.check_conflict(current_field_oper, pack_oper) {
-                            self.func_target
-                                .func_env
-                                .module_env
-                                .env
-                                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
-                        } else {
-                            let merged = current_field_oper.merge(pack_oper);
-                            if merged != *current_field_oper || merged != *pack_oper {
-                                state.changed = true;
-                            }
-                            *global_state
-                                .get_mut_temp_index_oper(cur_mid, cur_fid, temps[i], baseline_flag)
-                                .unwrap() = merged;
-                            global_state
-                                .struct_operation_map
-                                .get_mut(&(*msid, *sid))
-                                .unwrap()
-                                .insert(field_id, merged);
+                        let merged = current_field_oper.merge(pack_oper);
+                        if merged != *current_field_oper || merged != *pack_oper {
+                            state.changed = true;
                         }
+                        *global_state
+                            .get_mut_temp_index_oper(cur_mid, cur_fid, temps[i], baseline_flag)
+                            .unwrap() = merged;
+                        global_state
+                            .struct_operation_map
+                            .get_mut(&(*msid, *sid))
+                            .unwrap()
+                            .insert(field_id, merged);
                     };
                 match oper {
                     BorrowLoc | ReadRef | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
                     | CastU256 => {
                         self.check_and_propagate(
-                            id,
                             state,
                             &dests[0],
                             &srcs[0],
@@ -867,7 +810,6 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                     },
                     WriteRef | Lt | Le | Gt | Ge | Eq | Neq => {
                         self.check_and_propagate(
-                            id,
                             state,
                             &srcs[0],
                             &srcs[1],
@@ -878,22 +820,18 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                         );
                     },
                     Add | Sub | Mul | Div | Mod => {
-                        let mut num_oper = Arithmetic;
-                        if !self.ban_int_2_bv_conversion {
-                            let op_srcs_0 = global_state
-                                .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
-                                .unwrap();
-                            let op_srcs_1 = global_state
-                                .get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag)
-                                .unwrap();
-                            let op_dests_0 = global_state
-                                .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
-                                .unwrap();
-                            // If there is conflict among operations, merged will not be used for updating
-                            num_oper = op_srcs_0.merge(op_srcs_1).merge(op_dests_0);
-                        }
+                        let op_srcs_0 = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
+                            .unwrap();
+                        let op_srcs_1 = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag)
+                            .unwrap();
+                        let op_dests_0 = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                            .unwrap();
+                        // If there is conflict among operations, merged will not be used for updating
+                        let num_oper = op_srcs_0.merge(op_srcs_1).merge(op_dests_0);
                         self.check_and_update_oper(
-                            id,
                             state,
                             dests,
                             srcs,
@@ -904,31 +842,15 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             baseline_flag,
                         );
                     },
-                    BitOr | BitAnd | Xor => {
-                        if self.ban_int_2_bv_conversion {
-                            self.check_and_update_oper(
-                                id,
-                                state,
-                                dests,
-                                srcs,
-                                Bitwise,
-                                cur_mid,
-                                cur_fid,
-                                &mut global_state,
-                                baseline_flag,
-                            );
-                        } else {
-                            self.check_and_update_oper_dest(
-                                state,
-                                dests,
-                                Bitwise,
-                                cur_mid,
-                                cur_fid,
-                                &mut global_state,
-                                baseline_flag,
-                            )
-                        }
-                    },
+                    BitOr | BitAnd | Xor => self.check_and_update_oper_dest(
+                        state,
+                        dests,
+                        Bitwise,
+                        cur_mid,
+                        cur_fid,
+                        &mut global_state,
+                        baseline_flag,
+                    ),
                     Shl | Shr => {
                         let op_srcs_0 = global_state
                             .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
@@ -942,7 +864,6 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                         // If there is conflict among operations, merged will not be used for updating
                         let merged = op_srcs_0.merge(op_srcs_1).merge(op_dests_0);
                         self.check_and_update_oper(
-                            id,
                             state,
                             dests,
                             srcs,
@@ -964,7 +885,6 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             handle_pack_unpack(
                                 msid,
                                 sid,
-                                id,
                                 i,
                                 field.get_id(),
                                 state,
@@ -991,7 +911,6 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 handle_pack_unpack(
                                     msid,
                                     sid,
-                                    id,
                                     i,
                                     new_field_id,
                                     state,
@@ -1012,7 +931,6 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             handle_pack_unpack(
                                 msid,
                                 sid,
-                                id,
                                 i,
                                 field.get_id(),
                                 state,
@@ -1039,7 +957,6 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 handle_pack_unpack(
                                     msid,
                                     sid,
-                                    id,
                                     i,
                                     new_field_id,
                                     state,
@@ -1062,34 +979,26 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             .get_id();
                         let field_oper = global_state.get_num_operation_field(msid, sid, field_id);
 
-                        if self.check_conflict(dests_oper, field_oper) {
-                            self.func_target
-                                .func_env
-                                .module_env
-                                .env
-                                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
-                        } else {
-                            let merged_oper = dests_oper.merge(field_oper);
-                            if merged_oper != *field_oper || merged_oper != *dests_oper {
-                                state.changed = true;
-                            }
-                            *global_state
-                                .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
-                                .unwrap() = merged_oper;
-                            global_state
-                                .struct_operation_map
-                                .get_mut(&(*msid, *sid))
-                                .unwrap()
-                                .insert(
-                                    self.func_target
-                                        .func_env
-                                        .module_env
-                                        .get_struct(*sid)
-                                        .get_field_by_offset(*offset)
-                                        .get_id(),
-                                    merged_oper,
-                                );
+                        let merged_oper = dests_oper.merge(field_oper);
+                        if merged_oper != *field_oper || merged_oper != *dests_oper {
+                            state.changed = true;
                         }
+                        *global_state
+                            .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                            .unwrap() = merged_oper;
+                        global_state
+                            .struct_operation_map
+                            .get_mut(&(*msid, *sid))
+                            .unwrap()
+                            .insert(
+                                self.func_target
+                                    .func_env
+                                    .module_env
+                                    .get_struct(*sid)
+                                    .get_field_by_offset(*offset)
+                                    .get_id(),
+                                merged_oper,
+                            );
                     },
                     GetVariantField(msid, sid, variants, _, offset)
                     | BorrowVariantField(msid, sid, variants, _, offset) => {
@@ -1117,39 +1026,31 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                         let field_oper =
                             global_state.get_num_operation_field(msid, sid, &new_field_id);
 
-                        if self.check_conflict(dests_oper, field_oper) {
-                            self.func_target
+                        let merged_oper = dests_oper.merge(field_oper);
+                        if merged_oper != *field_oper || merged_oper != *dests_oper {
+                            state.changed = true;
+                        }
+                        *global_state
+                            .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                            .unwrap() = merged_oper;
+                        for variant in variants {
+                            let field_name = &self
+                                .func_target
                                 .func_env
                                 .module_env
-                                .env
-                                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
-                        } else {
-                            let merged_oper = dests_oper.merge(field_oper);
-                            if merged_oper != *field_oper || merged_oper != *dests_oper {
-                                state.changed = true;
-                            }
-                            *global_state
-                                .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
-                                .unwrap() = merged_oper;
-                            for variant in variants {
-                                let field_name = &self
-                                    .func_target
-                                    .func_env
-                                    .module_env
-                                    .get_struct(*sid)
-                                    .get_field_by_offset_optional_variant(Some(*variant), *offset)
-                                    .get_name();
-                                let new_field_id =
-                                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
-                                        pool.string(*variant).as_str(),
-                                        pool.string(*field_name).as_str(),
-                                    )));
-                                global_state
-                                    .struct_operation_map
-                                    .get_mut(&(*msid, *sid))
-                                    .unwrap()
-                                    .insert(new_field_id, merged_oper);
-                            }
+                                .get_struct(*sid)
+                                .get_field_by_offset_optional_variant(Some(*variant), *offset)
+                                .get_name();
+                            let new_field_id =
+                                FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                                    pool.string(*variant).as_str(),
+                                    pool.string(*field_name).as_str(),
+                                )));
+                            global_state
+                                .struct_operation_map
+                                .get_mut(&(*msid, *sid))
+                                .unwrap()
+                                .insert(new_field_id, merged_oper);
                         }
                     },
                     Function(msid, fsid, _) => {
@@ -1164,28 +1065,16 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                     .get_temp_index_oper(*msid, *fsid, i, true)
                                     .unwrap();
 
-                                if self.check_conflict(cur_oper, callee_oper) {
-                                    self.func_target.func_env.module_env.env.error(
-                                        &self.func_target.get_bytecode_loc(*id),
-                                        CONFLICT_ERROR_MSG,
-                                    );
-                                } else {
-                                    let merged = cur_oper.merge(callee_oper);
-                                    if merged != *cur_oper || merged != *callee_oper {
-                                        state.changed = true;
-                                    }
-                                    *global_state
-                                        .get_mut_temp_index_oper(
-                                            cur_mid,
-                                            cur_fid,
-                                            *src,
-                                            baseline_flag,
-                                        )
-                                        .unwrap() = merged;
-                                    *global_state
-                                        .get_mut_temp_index_oper(*msid, *fsid, i, true)
-                                        .unwrap() = merged;
+                                let merged = cur_oper.merge(callee_oper);
+                                if merged != *cur_oper || merged != *callee_oper {
+                                    state.changed = true;
                                 }
+                                *global_state
+                                    .get_mut_temp_index_oper(cur_mid, cur_fid, *src, baseline_flag)
+                                    .unwrap() = merged;
+                                *global_state
+                                    .get_mut_temp_index_oper(*msid, *fsid, i, true)
+                                    .unwrap() = merged;
                             }
                             for (i, dest) in dests.iter().enumerate() {
                                 let cur_oper = global_state
@@ -1197,30 +1086,18 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                     .unwrap()
                                     .get(&i)
                                     .unwrap();
-                                if self.check_conflict(cur_oper, callee_oper) {
-                                    self.func_target.func_env.module_env.env.error(
-                                        &self.func_target.get_bytecode_loc(*id),
-                                        CONFLICT_ERROR_MSG,
-                                    );
-                                } else {
-                                    let merged = cur_oper.merge(callee_oper);
-                                    if merged != *cur_oper || merged != *callee_oper {
-                                        state.changed = true;
-                                    }
-                                    *global_state
-                                        .get_mut_temp_index_oper(
-                                            cur_mid,
-                                            cur_fid,
-                                            *dest,
-                                            baseline_flag,
-                                        )
-                                        .unwrap() = merged;
-                                    global_state
-                                        .get_mut_ret_map()
-                                        .get_mut(&(*msid, *fsid))
-                                        .unwrap()
-                                        .insert(i, merged);
+                                let merged = cur_oper.merge(callee_oper);
+                                if merged != *cur_oper || merged != *callee_oper {
+                                    state.changed = true;
                                 }
+                                *global_state
+                                    .get_mut_temp_index_oper(cur_mid, cur_fid, *dest, baseline_flag)
+                                    .unwrap() = merged;
+                                global_state
+                                    .get_mut_ret_map()
+                                    .get_mut(&(*msid, *fsid))
+                                    .unwrap()
+                                    .insert(i, merged);
                             }
                         } else {
                             let callee = module_env.get_function(*fsid);
@@ -1233,12 +1110,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                         .get_temp_index_oper(cur_mid, cur_fid, *idx, baseline_flag)
                                         .unwrap();
 
-                                    if self.check_conflict(cur_oper, &Bitwise) {
-                                        self.func_target.func_env.module_env.env.error(
-                                            &self.func_target.get_bytecode_loc(*id),
-                                            CONFLICT_ERROR_MSG,
-                                        );
-                                    } else if *cur_oper != Bitwise {
+                                    if *cur_oper != Bitwise {
                                         state.changed = true;
                                         *global_state
                                             .get_mut_temp_index_oper(
