@@ -46,6 +46,8 @@ LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 
 SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
 
+CARGO_ARGS = os.environ.get("CARGO_ARGS", "")
+
 print(f"Executing flow: {SELECTED_FLOW}")
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 SOURCE = os.environ.get("SOURCE", default="LOCAL")
@@ -102,6 +104,8 @@ else:
     BUILD_FLAG = "--release"
     BUILD_FOLDER = "target/release"
 
+BUILD_ARGS = f"{BUILD_FLAG} {CARGO_ARGS}"
+
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
 else:
@@ -141,6 +145,7 @@ class RunGroupKeyExtra:
     skip_commit_override: bool = field(default=False)
     single_block_dst_working_set: bool = field(default=False)
     execution_sharding: bool = field(default=False)
+    run_scheduled_txns: bool = field(default=False)
     block_size_override: Optional[float] = field(default=None)
 
 
@@ -267,6 +272,14 @@ TESTS = [
         key=RunGroupKey("schedule-txns-insert-perf"),
         included_in=Flow.SCHEDULED_TXNS,
         expected_tps=1000,  # estimated TPS value
+        waived=True        # waived since it's not calibrated
+    ),
+
+    RunGroupConfig(
+        key=RunGroupKey("schedule-txns-insert-perf"),
+        included_in=Flow.SCHEDULED_TXNS,
+        expected_tps=1005,  # estimated TPS value
+        key_extra=RunGroupKeyExtra(run_scheduled_txns=True),  # Enable scheduled txns
         waived=True        # waived since it's not calibrated
     ),
 
@@ -641,7 +654,7 @@ warnings = []
 with tempfile.TemporaryDirectory() as tmpdirname:
     move_e2e_benchmark_failed = False
     if not SKIP_MOVE_E2E:
-        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        execute_command(f"cargo build {BUILD_ARGS} --package aptos-move-e2e-benchmark")
         move_e2e_flags = (
             "--only-landblocking" if SELECTED_FLOW == Flow.LAND_BLOCKING else ""
         )
@@ -676,7 +689,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     }
     print(calibrated_expected_tps)
 
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
+    execute_command(f"cargo build {BUILD_ARGS} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
@@ -772,6 +785,8 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             pipeline_extra_args.append("--split-stages")
         if test.key_extra.skip_commit_override:
             pipeline_extra_args.append("--skip-commit")
+        if test.key_extra.run_scheduled_txns:  # Get it from test configuration
+            pipeline_extra_args.append("--run-scheduled-txns")
 
         pipeline_extra_args.append(
             test.key_extra.sharding_traffic_flags or "--transactions-per-sender 1"

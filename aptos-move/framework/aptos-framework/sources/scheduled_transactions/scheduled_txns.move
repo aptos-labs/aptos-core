@@ -50,17 +50,13 @@ module aptos_framework::scheduled_txns {
     const MILLI_CONVERSION_FACTOR: u64 = 100;
 
     /// If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will abort the txn
-    const EXPIRY_DELTA: u64 = 100;
+    const EXPIRY_DELTA_DEFAULT: u64 = 100;
 
     /// The maximum number of scheduled transactions that can be run in a block
     const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
 
     /// The maximum number of transactions that can be cancelled in a block during shutdown
     const SHUTDOWN_CANCEL_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
-
-    /// The maximum number of transactions that are removed from the queue in a block
-    /// Even if there is a backlog of things to be removed, this will eventually catch-up.
-    const REMOVE_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
 
     /// SHA3-256 produces 32 bytes
     const TXN_ID_SIZE: u16 = 32;
@@ -126,8 +122,8 @@ module aptos_framework::scheduled_txns {
         // todo: check if this is secure
         gas_fee_deposit_store_signer_cap: account::SignerCapability,
         stop_scheduling: bool,
-        // todo: check if we need to track if stop is progress before re-starting.
-        //       I assume, any restart means we start fresh with new queue and other persistent data
+        /// If we cannot schedule in expiry_delta * time granularity(100ms), we will abort the txn
+        expiry_delta: u64,
     }
 
     /// We want reduce the contention while scheduled txns are being executed
@@ -179,7 +175,7 @@ module aptos_framework::scheduled_txns {
         );
 
         // Store the capability
-        move_to(framework, AuxiliaryData { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: false });
+        move_to(framework, AuxiliaryData { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: false, expiry_delta: EXPIRY_DELTA_DEFAULT });
 
         // Initialize queue
         let queue = ScheduleQueue {
@@ -261,6 +257,16 @@ module aptos_framework::scheduled_txns {
     }
 
     /// todo: Do we need a function to pause/unpause without issuing refund of deposit ???
+
+    /// Change the expiry delta for scheduled transactions; can be called only by the framework
+    public fun set_expiry_delta(
+        framework: &signer,
+        new_expiry_delta: u64
+    ) acquires AuxiliaryData {
+        system_addresses::assert_aptos_framework(framework);
+        let aux_data = borrow_global_mut<AuxiliaryData>(signer::address_of(framework));
+        aux_data.expiry_delta = new_expiry_delta;
+    }
 
     /// Constructor
     public fun new_scheduled_transaction(
@@ -426,8 +432,7 @@ module aptos_framework::scheduled_txns {
                 key: *key,
             };
 
-            if (key.time + EXPIRY_DELTA < block_time) {
-                // Transaction has expired
+            if ((block_time - key.time) > aux_data.expiry_delta) {
                 let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
                 txns_to_expire.push_back(KeyAndTxnInfo {
                     key: *key,
@@ -456,7 +461,6 @@ module aptos_framework::scheduled_txns {
                 cancelled_txn_code: CancelledTxnCode::Expired
             });
         };
-
         scheduled_txns
     }
 
@@ -497,7 +501,7 @@ module aptos_framework::scheduled_txns {
         let tbl_idx: u16 = 0;
 
         let remove_count = 0;
-        while (((tbl_idx as u64) < TO_REMOVE_PARALLELISM) && (remove_count < REMOVE_LIMIT)) {
+        while ((tbl_idx as u64) < TO_REMOVE_PARALLELISM) {
             if (to_remove.remove_tbl.contains(tbl_idx)) {
                 let keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
 
@@ -507,9 +511,6 @@ module aptos_framework::scheduled_txns {
                         // Remove transaction from schedule_map
                         remove_count = remove_count + 1;
                         queue.schedule_map.remove(&key);
-                        if (remove_count >= REMOVE_LIMIT) {
-                            break;
-                        };
                     };
                 };
             };
@@ -742,7 +743,7 @@ module aptos_framework::scheduled_txns {
 
         // try expiring a txn by getting it late
         let expired_time =
-            schedule_time2 + EXPIRY_DELTA * MILLI_CONVERSION_FACTOR
+            schedule_time2 + EXPIRY_DELTA_DEFAULT * MILLI_CONVERSION_FACTOR
                 + 1000;
         assert!(
             get_ready_transactions(expired_time).length() == 0,
@@ -854,7 +855,6 @@ module aptos_framework::scheduled_txns {
         setup_test_env(fx, &user, curr_mock_time_micro_s);
 
         let total_txns = GET_READY_TRANSACTIONS_LIMIT * 5; // Exceeds both limits
-        let txn_keys = vector::empty<ScheduleMapKey>();
 
         // Insert more transactions than both limits
         let i = 0;
@@ -869,8 +869,7 @@ module aptos_framework::scheduled_txns {
                 false,
                 foo
             );
-            let key = insert(&user, txn);
-            txn_keys.push_back(key);
+            insert(&user, txn);
             i = i + 1;
         };
 
@@ -890,19 +889,6 @@ module aptos_framework::scheduled_txns {
             prev_time = txn.key.time;
             i = i + 1;
         };
-
-        // Mark more transactions than REMOVE_LIMIT for removal
-        i = 0;
-        while (i < txn_keys.length()) {
-            finish_execution(txn_keys[i]);
-            i = i + 1;
-        };
-
-        // Verify REMOVE_LIMIT behavior
-        let initial_count = get_num_txns();
-        remove_txns();
-        let removed_count = initial_count - get_num_txns();
-        assert!(removed_count == REMOVE_LIMIT, removed_count);
 
         // Verify SHUTDOWN_CANCEL_LIMIT behavior
         let pre_shutdown_count = get_num_txns();
