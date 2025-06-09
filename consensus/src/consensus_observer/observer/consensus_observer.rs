@@ -295,7 +295,7 @@ impl ConsensusObserver {
         if let Err(error) = self
             .execution_client
             .finalize_order(
-                ordered_block.blocks(),
+                ordered_block.blocks().clone(),
                 WrappedLedgerInfo::new(VoteData::dummy(), ordered_block.ordered_proof().clone()),
                 commit_callback,
             )
