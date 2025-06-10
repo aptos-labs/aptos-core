@@ -36,6 +36,7 @@ mod batch_transfer;
 mod bounded_batch_wrapper;
 pub mod call_custom_modules;
 pub mod entry_points;
+pub mod marketplace_generator;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;

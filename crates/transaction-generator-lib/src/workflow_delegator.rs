@@ -301,6 +301,7 @@ impl WorkflowTxnGeneratorCreator {
             AtomicUsize::new(num_accounts),
         ))];
 
+        // this is creating account for the first stage or shared 
         creators.push(Box::new(AccountGeneratorCreator::new(
             txn_factory.clone(),
             None,
