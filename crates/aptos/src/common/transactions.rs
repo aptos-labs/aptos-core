@@ -30,7 +30,26 @@ use aptos_vm_types::output::VMOutput;
 use clap::Parser;
 use move_core_types::vm_status::VMStatus;
 pub use move_package::*;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    fmt::Display,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, clap::ValueEnum)]
+pub enum ReplayProtectionType {
+    Turbo,
+    #[default]
+    Seqnum,
+}
+
+impl Display for ReplayProtectionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            ReplayProtectionType::Turbo => "turbo",
+            ReplayProtectionType::Seqnum => "seqnum",
+        })
+    }
+}
 
 /// Common options for simulating and running transactions
 ///
@@ -58,6 +77,13 @@ pub struct TxnOptions {
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
+    /// Replay protection mechanism to use when generating the transaction.
+    ///
+    /// When "turbo" is chosen, the transaction will contain a replay protection nonce.
+    ///
+    /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
+    #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
+    pub(crate) replay_protection_type: ReplayProtectionType,
 }
 
 impl TxnOptions {
@@ -171,12 +197,15 @@ impl TxnOptions {
         let transaction_factory =
             TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
-        let unsigned_transaction = transaction_factory
+        let mut txn_builder = transaction_factory
             .payload(payload.clone())
             .sender(sender_address)
             .sequence_number(sequence_number)
-            .expiration_timestamp_secs(expiration_time_secs)
-            .build();
+            .expiration_timestamp_secs(expiration_time_secs);
+        if self.replay_protection_type == ReplayProtectionType::Turbo {
+            txn_builder = txn_builder.upgrade_payload(true, true);
+        }
+        let unsigned_transaction = txn_builder.build();
 
         // TODO: Support other transaction authenticator types, like multi-agent and fee-payer
         let signed_transaction = SignedTransaction::new_signed_transaction(
@@ -200,7 +229,7 @@ impl TxnOptions {
             gas_unit_price: Some(user_txn.gas_unit_price()),
             pending: None,
             sender: Some(user_txn.sender()),
-            sequence_number: Some(user_txn.sequence_number()),
+            replay_protector: Some(user_txn.replay_protector()),
             success: Some(simulated_txn.info.status().is_success()),
             timestamp_us: None,
             version: Some(simulated_txn.version),
@@ -276,7 +305,7 @@ impl TxnOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
-            sequence_number: None, // The transaction is not committed so there is no new sequence number.
+            replay_protector: None, // The transaction is not committed so there is no new sequence number.
             success,
             timestamp_us: None,
             version: Some(version), // The transaction is not committed so there is no new version.
