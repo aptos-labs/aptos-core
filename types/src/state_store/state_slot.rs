@@ -154,3 +154,11 @@ impl StateSlot {
         }
     }
 }
+
+/// The hot-state LRU is backed by a doubly-linked list: `next` links to the slightly older entry,
+/// while `prev` links to the slightly newer one.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HotLRUEntry {
+    pub prev: StateKey,
+    pub next: StateKey,
+}
