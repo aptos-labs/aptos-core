@@ -30,8 +30,8 @@ warning: [lint] Cast operation will cause the program to abort because the value
 warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort_warn.move:15:9
    │
-15 │         70000u32 as u16
-   │         ^^^^^^^^^^^^^^^
+15 │         65_536u32 as u16
+   │         ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
@@ -39,8 +39,8 @@ warning: [lint] Cast operation will cause the program to abort because the value
 warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort_warn.move:19:9
    │
-19 │         4294967296u64 as u32
-   │         ^^^^^^^^^^^^^^^^^^^^
+19 │         4_294_967_296u64 as u32
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
@@ -48,8 +48,8 @@ warning: [lint] Cast operation will cause the program to abort because the value
 warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort_warn.move:23:9
    │
-23 │         18446744073709551616u128 as u64
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+23 │         18_446_744_073_709_551_616u128 as u64
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
@@ -57,8 +57,8 @@ warning: [lint] Cast operation will cause the program to abort because the value
 warning: [lint] Cast operation will cause the program to abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort_warn.move:27:9
    │
-27 │         340282366920938463463374607431768211456u256 as u128
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 │         340_282_366_920_938_463_463_374_607_431_768_211_456u256 as u128
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
