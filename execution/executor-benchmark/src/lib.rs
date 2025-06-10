@@ -998,4 +998,15 @@ mod tests {
             NativeParallelUncoordinatedBlockExecutor<NativeNoStorageRawTransactionExecutor>,
         >(Some(TransactionTypeArg::NoOp), false);
     }
+
+    #[test]
+    fn test_mint_and_marketplace_workflow() {
+        AptosVM::set_num_shards_once(4);
+        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::TokenV2MintAndPlaceListing),
+            true,
+        );
+    }
 }

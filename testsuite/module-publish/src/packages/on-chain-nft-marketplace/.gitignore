@@ -1,0 +1,4 @@
+.aptos/
+build/
+.DS_Store
+output.json
