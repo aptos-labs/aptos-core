@@ -2397,7 +2397,7 @@ impl CliCommand<TransactionSummary> for Replay {
             gas_unit_price: Some(txn.gas_unit_price()),
             pending: None,
             sender: Some(txn.sender()),
-            sequence_number: Some(txn.sequence_number()),
+            replay_protector: Some(txn.replay_protector()),
             success,
             timestamp_us: None,
             version: Some(self.txn_id),
