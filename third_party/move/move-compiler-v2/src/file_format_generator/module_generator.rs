@@ -995,8 +995,16 @@ impl ModuleContext<'_> {
     }
 
     /// Emits an internal error at the location.
-    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
-        self.env.diag(Severity::Bug, loc.as_ref(), msg.as_ref())
+    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str> + ToString) {
+        self.env.diag(
+            Severity::Bug,
+            loc.as_ref(),
+            format!(
+                "compiler internal error, please consider reporting this issue: {}",
+                msg.to_string()
+            )
+            .as_str(),
+        )
     }
 
     /// Check for a bound table index and report an error if its out of bound. All bounds

@@ -1,6 +1,6 @@
 
 Diagnostics:
-bug: file format generator: Inferred and Store AssignKind should be not appear here.
+bug: compiler internal error, please consider reporting this issue: file format generator: Inferred and Store AssignKind should be not appear here.
   ┌─ tests/bytecode-verify-failure/equality.move:2:7
   │
 2 │   fun equality<T>(x: T, y: T): bool {
