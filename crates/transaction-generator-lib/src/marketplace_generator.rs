@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter};
+//! Custom transaction generators for marketplace workflow that support cross-stage communication
+
+use super::{publishing::publish_util::Package, ReliableTransactionSubmitter};
 use crate::{
     call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, 
     RootAccountHandle
@@ -19,15 +21,28 @@ use async_trait::async_trait;
 use rand::{rngs::StdRng, Rng};
 use std::sync::{Arc, RwLock};
 
-// Stage 1: Mint NFT Transaction Generator
-// Only needs write access to the minted tokens pool
+/// Represents a minted token with its object address
+#[derive(Debug, Clone)]
+pub struct MintedTokenInfo {
+    pub token_address: AccountAddress,
+    pub owner_address: AccountAddress,
+}
+
+/// Represents a fee schedule with its object address
+#[derive(Debug, Clone)]
+pub struct FeeScheduleInfo {
+    pub fee_schedule_address: AccountAddress,
+    pub fee_metadata_address: AccountAddress, // APT metadata object
+}
+
+/// Transaction generator for Stage 0: Mint NFT tokens and store them in the pool
 pub struct MintNftTransactionGenerator {
-    pub minted_token_objects: Arc<RwLock<Vec<AccountAddress>>>,
+    minted_tokens: Arc<RwLock<Vec<MintedTokenInfo>>>,
 }
 
 impl MintNftTransactionGenerator {
-    pub fn new(minted_token_objects: Arc<RwLock<Vec<AccountAddress>>>) -> Self {
-        Self { minted_token_objects }
+    pub fn new(minted_tokens: Arc<RwLock<Vec<MintedTokenInfo>>>) -> Self {
+        Self { minted_tokens }
     }
 }
 
@@ -50,7 +65,7 @@ impl UserModuleTransactionGenerator for MintNftTransactionGenerator {
         _txn_executor: &dyn ReliableTransactionSubmitter,
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
-        let minted_token_objects = self.minted_token_objects.clone();
+        let minted_tokens = self.minted_tokens.clone();
 
         Arc::new(move |account, _package, publisher, txn_factory, rng| {
             // Create mint NFT transaction using the provided account as signer
@@ -73,10 +88,13 @@ impl UserModuleTransactionGenerator for MintNftTransactionGenerator {
 
             // Store the token object address for later stages
             // In a real implementation, this would be the actual token object address
-            let simulated_token_object = account.address(); // Simplified for now
+            let simulated_token_info = MintedTokenInfo {
+                token_address: account.address(),
+                owner_address: account.address(),
+            };
             
-            if let Ok(mut tokens) = minted_token_objects.write() {
-                tokens.push(simulated_token_object);
+            if let Ok(mut tokens) = minted_tokens.write() {
+                tokens.push(simulated_token_info);
             }
 
             Some(txn)
@@ -84,15 +102,14 @@ impl UserModuleTransactionGenerator for MintNftTransactionGenerator {
     }
 }
 
-// Stage 2: Create Fee Schedule Transaction Generator
-// Only needs write access to the fee schedules pool  
+/// Transaction generator for Stage 1: Create fee schedules and store them in the pool
 pub struct CreateFeeScheduleTransactionGenerator {
-    pub fee_schedule_objects: Arc<RwLock<Vec<AccountAddress>>>,
+    fee_schedules: Arc<RwLock<Vec<FeeScheduleInfo>>>,
 }
 
 impl CreateFeeScheduleTransactionGenerator {
-    pub fn new(fee_schedule_objects: Arc<RwLock<Vec<AccountAddress>>>) -> Self {
-        Self { fee_schedule_objects }
+    pub fn new(fee_schedules: Arc<RwLock<Vec<FeeScheduleInfo>>>) -> Self {
+        Self { fee_schedules }
     }
 }
 
@@ -115,7 +132,7 @@ impl UserModuleTransactionGenerator for CreateFeeScheduleTransactionGenerator {
         _txn_executor: &dyn ReliableTransactionSubmitter,
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
-        let fee_schedule_objects = self.fee_schedule_objects.clone();
+        let fee_schedules = self.fee_schedules.clone();
 
         Arc::new(move |account, _package, publisher, txn_factory, _rng| {
             // Create fee schedule transaction using the provided account as signer
@@ -131,10 +148,13 @@ impl UserModuleTransactionGenerator for CreateFeeScheduleTransactionGenerator {
 
             // Store the fee schedule object address for later stages
             // In a real implementation, this would be the actual fee schedule object address
-            let simulated_fee_schedule_object = account.address(); // Simplified for now
+            let simulated_fee_schedule_info = FeeScheduleInfo {
+                fee_schedule_address: account.address(),
+                fee_metadata_address: account.address(),
+            };
             
-            if let Ok(mut schedules) = fee_schedule_objects.write() {
-                schedules.push(simulated_fee_schedule_object);
+            if let Ok(mut schedules) = fee_schedules.write() {
+                schedules.push(simulated_fee_schedule_info);
             }
 
             Some(txn)
@@ -142,21 +162,20 @@ impl UserModuleTransactionGenerator for CreateFeeScheduleTransactionGenerator {
     }
 }
 
-// Stage 3: Place Listing Transaction Generator
-// Needs read access to both pools from previous stages
+/// Transaction generator for Stage 2: Place listings using tokens and fee schedules from pools
 pub struct PlaceListingTransactionGenerator {
-    pub minted_token_objects: Arc<RwLock<Vec<AccountAddress>>>,
-    pub fee_schedule_objects: Arc<RwLock<Vec<AccountAddress>>>,
+    minted_tokens: Arc<RwLock<Vec<MintedTokenInfo>>>,
+    fee_schedules: Arc<RwLock<Vec<FeeScheduleInfo>>>,
 }
 
 impl PlaceListingTransactionGenerator {
     pub fn new(
-        minted_token_objects: Arc<RwLock<Vec<AccountAddress>>>,
-        fee_schedule_objects: Arc<RwLock<Vec<AccountAddress>>>,
+        minted_tokens: Arc<RwLock<Vec<MintedTokenInfo>>>,
+        fee_schedules: Arc<RwLock<Vec<FeeScheduleInfo>>>,
     ) -> Self {
-        Self { 
-            minted_token_objects,
-            fee_schedule_objects,
+        Self {
+            minted_tokens,
+            fee_schedules,
         }
     }
 }
@@ -180,15 +199,15 @@ impl UserModuleTransactionGenerator for PlaceListingTransactionGenerator {
         _txn_executor: &dyn ReliableTransactionSubmitter,
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
-        let minted_token_objects = self.minted_token_objects.clone();
-        let fee_schedule_objects = self.fee_schedule_objects.clone();
+        let minted_tokens = self.minted_tokens.clone();
+        let fee_schedules = self.fee_schedules.clone();
 
         Arc::new(move |account, _package, publisher, txn_factory, rng| {
             // Get random objects from previous stages
-            let token_object = {
-                if let Ok(tokens) = minted_token_objects.read() {
+            let token_info = {
+                if let Ok(tokens) = minted_tokens.read() {
                     if !tokens.is_empty() {
-                        Some(tokens[rng.gen_range(0, tokens.len())])
+                        Some(tokens[rng.gen_range(0, tokens.len())].clone())
                     } else {
                         None
                     }
@@ -197,10 +216,10 @@ impl UserModuleTransactionGenerator for PlaceListingTransactionGenerator {
                 }
             };
 
-            let fee_schedule_object = {
-                if let Ok(schedules) = fee_schedule_objects.read() {
+            let fee_schedule_info = {
+                if let Ok(schedules) = fee_schedules.read() {
                     if !schedules.is_empty() {
-                        Some(schedules[rng.gen_range(0, schedules.len())])
+                        Some(schedules[rng.gen_range(0, schedules.len())].clone())
                     } else {
                         None
                     }
@@ -209,7 +228,7 @@ impl UserModuleTransactionGenerator for PlaceListingTransactionGenerator {
                 }
             };
 
-            if let (Some(token_addr), Some(fee_schedule_addr)) = (token_object, fee_schedule_object) {
+            if let (Some(token_info), Some(fee_schedule_info)) = (token_info, fee_schedule_info) {
                 // Create marketplace listing transaction using object addresses from previous stages
                 let listing_price = rng.gen_range(100, 10000u64);
                 
@@ -218,8 +237,9 @@ impl UserModuleTransactionGenerator for PlaceListingTransactionGenerator {
                     ident_str!("place_token_listing").to_owned(),
                     vec![],
                     vec![
-                        bcs::to_bytes(&token_addr).unwrap(),
-                        bcs::to_bytes(&fee_schedule_addr).unwrap(),
+                        bcs::to_bytes(&token_info.token_address).unwrap(),
+                        bcs::to_bytes(&fee_schedule_info.fee_schedule_address).unwrap(),
+                        bcs::to_bytes(&fee_schedule_info.fee_metadata_address).unwrap(),
                         bcs::to_bytes(&listing_price).unwrap(),
                     ],
                 ));

@@ -269,7 +269,12 @@ pub enum EntryPoints {
     /// Create a Fee Schedule for Marketplace
     CreateZeroFeeSchedule,
     /// Place an NFT listing on the marketplace
-    PlaceNftListingOnMarketplace,
+    PlaceNftListingOnMarketplace {
+        token_object_id: Option<u64>,
+        fee_schedule_id: Option<u64>,
+        fee_metadata_id: Option<u64>,
+        price: Option<u64>,
+    },
     // /// Buy an NFT listing on the marketplace
     // BuyNftListingOnMarketplace,
     // /// Cancel an NFT listing on the marketplace
@@ -343,9 +348,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
-            EntryPoints::CreateNftCollection => "on-chain-nft-marketplace",
-            EntryPoints::CreateZeroFeeSchedule => "on-chain-nft-marketplace",
-            EntryPoints::PlaceNftListingOnMarketplace => "on-chain-nft-marketplace",
+            EntryPoints::CreateNftCollection => "on_chain_nft_marketplace",
+            EntryPoints::CreateZeroFeeSchedule => "on_chain_nft_marketplace",
+            EntryPoints::PlaceNftListingOnMarketplace { .. } => "on_chain_nft_marketplace",
         }
     }
 
@@ -415,8 +420,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
             EntryPoints::CreateNftCollection => "create_nft",
-            EntryPoints::CreateZeroFeeSchedule => "fee_schedule",
-            EntryPoints::PlaceNftListingOnMarketplace => "open_marketplace",
+            EntryPoints::CreateZeroFeeSchedule => "open_marketplace",
+            EntryPoints::PlaceNftListingOnMarketplace { .. } => "open_marketplace",
         }
     }
 
@@ -895,16 +900,21 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&AccountAddress::random()).unwrap(), // fee receiver address
                 ])
             },
-            EntryPoints::PlaceNftListingOnMarketplace => {
+            EntryPoints::PlaceNftListingOnMarketplace {
+                token_object_id,
+                fee_schedule_id,
+                fee_metadata_id,
+                price,
+            } => {
                 // (seller: &signer, token_object: Object<ObjectCore>, fee_schedule: Object<FeeSchedule>, fee_metadata: Object<Metadata>, price: u64)
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
 
                 get_payload(module_id, ident_str!("place_listing").to_owned(), vec![
                     bcs::to_bytes(&other.expect("Must provide other")).unwrap(), // signer
-                    bcs::to_bytes(&1u64).unwrap(), // token_object from first workflow step
-                    bcs::to_bytes(&1u64).unwrap(), // fee_schedule from second workflow step
-                    bcs::to_bytes(&1u64).unwrap(), // 0xa
-                    bcs::to_bytes(&1u64).unwrap(), // r
+                    bcs::to_bytes(&token_object_id.unwrap_or_else(|| rng.gen_range(1u64, 1000u64))).unwrap(),
+                    bcs::to_bytes(&fee_schedule_id.unwrap_or_else(|| rng.gen_range(1u64, 1000u64))).unwrap(),
+                    bcs::to_bytes(&fee_metadata_id.unwrap_or_else(|| rng.gen_range(1u64, 1000u64))).unwrap(),
+                    bcs::to_bytes(&price.unwrap_or_else(|| rng.gen_range(1000u64, 10000u64))).unwrap(),
                 ])
             },
         }
@@ -937,6 +947,10 @@ impl EntryPointTrait for EntryPoints {
                 Some(Box::new(EntryPoints::CreateGlobalMilestoneAggV2 {
                     milestone_every: *milestone_every,
                 }))
+            },
+            EntryPoints::PlaceNftListingOnMarketplace { .. } => {
+                // Initialize with NFT collection creation first
+                Some(Box::new(EntryPoints::CreateNftCollection))
             },
             _ => None,
         }
@@ -1030,7 +1044,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
             EntryPoints::CreateNftCollection => AutomaticArgs::Signer,
             EntryPoints::CreateZeroFeeSchedule => AutomaticArgs::Signer,
-            EntryPoints::PlaceNftListingOnMarketplace => AutomaticArgs::Signer,
+            EntryPoints::PlaceNftListingOnMarketplace { .. } => AutomaticArgs::Signer,
         }
     }
 }

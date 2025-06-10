@@ -28,7 +28,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, AccountKey, LocalAccount},
 };
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
+    create_txn_generator_creator, AccountType, TransactionType, WorkflowProgress, SEND_AMOUNT,
 };
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
@@ -51,6 +51,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
+use aptos_transaction_workloads_lib::token_workflow::TokenWorkflowKind;
 
 // Max is 100k TPS for 3 hours
 const MAX_TXNS: u64 = 1_000_000_000;
@@ -211,7 +212,15 @@ impl Default for EmitJobRequest {
             mode: EmitJobMode::MaxLoad {
                 mempool_backlog: 3000,
             },
-            transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
+            transaction_mix_per_phase: vec![vec![(TransactionType::Workflow {
+                workflow_kind: Box::new(TokenWorkflowKind::MarketplaceWorkflow {
+                    count: 1000,
+                    creation_balance: 200000,
+                }),
+                num_modules: 1,
+                use_account_pool: false,
+                progress_type: WorkflowProgress::MoveByPhases,
+            }, 1)]],
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             init_max_gas_per_txn: None,

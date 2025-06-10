@@ -4453,6 +4453,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-workloads-lib",
  "aptos-types",
  "async-trait",
  "base64 0.13.1",

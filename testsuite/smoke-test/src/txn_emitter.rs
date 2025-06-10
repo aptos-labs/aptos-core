@@ -160,6 +160,8 @@ static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Laz
     ]
 });
 
+// TODO: Run this smoke test with the new workflow
+
 #[ignore]
 #[tokio::test]
 async fn test_txn_emmitter() {
