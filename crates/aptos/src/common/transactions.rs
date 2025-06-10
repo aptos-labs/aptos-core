@@ -23,7 +23,7 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        SignedTransaction, TransactionPayload, TransactionStatus,
+        ReplayProtector, SignedTransaction, TransactionPayload, TransactionStatus,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -37,7 +37,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, Default, Parser, PartialEq, clap::ValueEnum)]
 pub enum ReplayProtectionType {
-    Turbo,
+    Nonce,
     #[default]
     Seqnum,
 }
@@ -45,7 +45,7 @@ pub enum ReplayProtectionType {
 impl Display for ReplayProtectionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            ReplayProtectionType::Turbo => "turbo",
+            ReplayProtectionType::Nonce => "nonce",
             ReplayProtectionType::Seqnum => "seqnum",
         })
     }
@@ -79,7 +79,7 @@ pub struct TxnOptions {
     pub prompt_options: PromptOptions,
     /// Replay protection mechanism to use when generating the transaction.
     ///
-    /// When "turbo" is chosen, the transaction will contain a replay protection nonce.
+    /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
     ///
     /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
     #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
@@ -202,7 +202,7 @@ impl TxnOptions {
             .sender(sender_address)
             .sequence_number(sequence_number)
             .expiration_timestamp_secs(expiration_time_secs);
-        if self.replay_protection_type == ReplayProtectionType::Turbo {
+        if self.replay_protection_type == ReplayProtectionType::Nonce {
             txn_builder = txn_builder.upgrade_payload(true, true);
         }
         let unsigned_transaction = txn_builder.build();
@@ -230,6 +230,10 @@ impl TxnOptions {
             pending: None,
             sender: Some(user_txn.sender()),
             replay_protector: Some(user_txn.replay_protector()),
+            sequence_number: match user_txn.replay_protector() {
+                ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                _ => None,
+            },
             success: Some(simulated_txn.info.status().is_success()),
             timestamp_us: None,
             version: Some(simulated_txn.version),
@@ -305,6 +309,7 @@ impl TxnOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
+            sequence_number: None,
             replay_protector: None, // The transaction is not committed so there is no new sequence number.
             success,
             timestamp_us: None,

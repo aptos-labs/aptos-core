@@ -51,7 +51,9 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
-    transaction::{Transaction, TransactionArgument, TransactionPayload, TransactionStatus},
+    transaction::{
+        ReplayProtector, Transaction, TransactionArgument, TransactionPayload, TransactionStatus,
+    },
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use async_trait::async_trait;
@@ -2397,6 +2399,10 @@ impl CliCommand<TransactionSummary> for Replay {
             gas_unit_price: Some(txn.gas_unit_price()),
             pending: None,
             sender: Some(txn.sender()),
+            sequence_number: match txn.replay_protector() {
+                ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                _ => None,
+            },
             replay_protector: Some(txn.replay_protector()),
             success,
             timestamp_us: None,

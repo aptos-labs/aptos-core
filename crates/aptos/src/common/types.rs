@@ -1496,7 +1496,8 @@ pub struct TransactionSummary {
     pub pending: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sender: Option<AccountAddress>,
-    // Question[Orderless]: Is it backward compatible to replace sequence_number with replay_protector?
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replay_protector: Option<ReplayProtector>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1521,6 +1522,10 @@ impl From<&Transaction> for TransactionSummary {
                 transaction_hash: txn.hash,
                 pending: Some(true),
                 sender: Some(*txn.request.sender.inner()),
+                sequence_number: match txn.request.replay_protector() {
+                    ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                    _ => None,
+                },
                 replay_protector: Some(txn.request.replay_protector()),
                 gas_used: None,
                 gas_unit_price: None,
@@ -1537,6 +1542,10 @@ impl From<&Transaction> for TransactionSummary {
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
+                sequence_number: match txn.request.replay_protector() {
+                    ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                    _ => None,
+                },
                 replay_protector: Some(txn.request.replay_protector()),
                 timestamp_us: Some(txn.timestamp.0),
                 pending: None,
@@ -1550,6 +1559,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
+                sequence_number: None,
                 replay_protector: None,
                 timestamp_us: None,
             },
@@ -1563,6 +1573,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
+                sequence_number: None,
                 replay_protector: None,
             },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
@@ -1575,6 +1586,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
+                sequence_number: None,
                 replay_protector: None,
             },
             Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
@@ -1587,6 +1599,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
+                sequence_number: None,
                 replay_protector: None,
             },
             Transaction::ValidatorTransaction(txn) => TransactionSummary {
@@ -1595,6 +1608,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sender: None,
+                sequence_number: None,
                 replay_protector: None,
                 success: Some(txn.transaction_info().success),
                 timestamp_us: Some(txn.timestamp().0),
@@ -1787,7 +1801,7 @@ pub struct TransactionOptions {
 
     /// Replay protection mechanism to use when generating the transaction.
     ///
-    /// When "turbo" is chosen, the transaction will contain a replay protection nonce.
+    /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
     ///
     /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
     #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
@@ -1932,7 +1946,7 @@ impl TransactionOptions {
                 .sequence_number(sequence_number)
                 .expiration_timestamp_secs(expiration_time_secs);
 
-            let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Turbo
+            let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Nonce
             {
                 txn_builder.upgrade_payload(true, true).build()
             } else {
@@ -1990,7 +2004,7 @@ impl TransactionOptions {
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
                 let mut txn_builder = transaction_factory.payload(payload);
-                if self.replay_protection_type == ReplayProtectionType::Turbo {
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
                     txn_builder = txn_builder.upgrade_payload(true, true);
                 };
                 sender_account.sign_with_transaction_builder(txn_builder)
@@ -2007,7 +2021,7 @@ impl TransactionOptions {
                     sequence_number,
                 );
                 let mut txn_builder = transaction_factory.payload(payload);
-                if self.replay_protection_type == ReplayProtectionType::Turbo {
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
                     txn_builder = txn_builder.upgrade_payload(true, true);
                 };
                 sender_account.sign_with_transaction_builder(txn_builder)?
@@ -2124,6 +2138,7 @@ impl TransactionOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
+            sequence_number: None,
             replay_protector: None, // The transaction is not comitted so there is no new sequence number.
             success,
             timestamp_us: None,
