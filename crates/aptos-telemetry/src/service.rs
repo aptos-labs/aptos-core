@@ -136,9 +136,9 @@ async fn spawn_telemetry_service(
 ) {
     let telemetry_svc_url = env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| {
         if chain_id == ChainId::mainnet() {
-            MAINNET_TELEMETRY_SERVICE_URL.into()
+            DEFAULT_MAINNET_TELEMETRY_SERVICE_URL.into()
         } else {
-            TELEMETRY_SERVICE_URL.into()
+            DEFAULT_TELEMETRY_SERVICE_URL.into()
         }
     });
 
@@ -146,9 +146,9 @@ async fn spawn_telemetry_service(
         warn!(
             "Unable to parse telemetry service URL {}. Make sure {} is unset or is set properly: {}. Defaulting to {}.",
             telemetry_svc_url,
-            ENV_TELEMETRY_SERVICE_URL, err, TELEMETRY_SERVICE_URL
+            ENV_TELEMETRY_SERVICE_URL, err, DEFAULT_TELEMETRY_SERVICE_URL
         );
-            Url::parse(TELEMETRY_SERVICE_URL)
+            Url::parse(DEFAULT_TELEMETRY_SERVICE_URL)
                 .expect("unable to parse telemetry service default URL")
     });
 
