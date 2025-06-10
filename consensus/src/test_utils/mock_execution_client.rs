@@ -7,8 +7,10 @@ use crate::{
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
-        buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
-        pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
+        buffer_manager::{CriticalErrorNotification, OrderedBlocks},
+        execution_client::TExecutionClient,
+        pipeline_builder::PipelineBuilder,
+        signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::types::RandConfig,
     state_replication::StateComputerCommitCallBackType,
@@ -110,7 +112,8 @@ impl TExecutionClient for MockExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
         _new_pipeline_enabled: bool,
-    ) {
+    ) -> Option<futures_channel::mpsc::UnboundedReceiver<CriticalErrorNotification>> {
+        None
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
