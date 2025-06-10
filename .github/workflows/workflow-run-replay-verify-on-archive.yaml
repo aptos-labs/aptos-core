@@ -58,7 +58,7 @@ jobs:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           EXPORT_GCP_PROJECT_VARIABLES: "false"
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          GCP_AUTH_DURATION: "10800"
+          GCP_AUTH_DURATION: "18000"
 
       # Authenticate to Google Cloud the project is aptos-ci with credentails files generated
       - name: Authenticate to Google Cloud
