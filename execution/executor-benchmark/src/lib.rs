@@ -641,7 +641,7 @@ mod tests {
         pipeline::PipelineConfig,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::TransactionGenerator,
-        BenchmarkWorkload,
+        BenchmarkWorkload, SingleRunMode, run_single_with_default_params,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
@@ -649,8 +649,8 @@ mod tests {
     use aptos_executor_types::BlockExecutorTrait;
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::WorkflowProgress;
-    use aptos_transaction_workloads_lib::args::TransactionTypeArg;
+    use aptos_transaction_generator_lib::{WorkflowProgress, TransactionType};
+    use aptos_transaction_workloads_lib::{args::TransactionTypeArg};
     use aptos_types::{
         access_path::Path,
         account_address::AccountAddress,
@@ -882,6 +882,20 @@ mod tests {
     ) where
         E: VMBlockExecutor + 'static,
     {
+        test_generic_benchmark_with_config::<E>(
+            transaction_type,
+            verify_sequence_numbers,
+            PipelineConfig::default(),
+        )
+    }
+
+    fn test_generic_benchmark_with_config<E>(
+        transaction_type: Option<TransactionTypeArg>,
+        verify_sequence_numbers: bool,
+        pipeline_config: PipelineConfig,
+    ) where
+        E: VMBlockExecutor + 'static,
+    {
         aptos_logger::Logger::new().init();
 
         let storage_dir = TempPath::new();
@@ -933,7 +947,7 @@ mod tests {
             verify_sequence_numbers,
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
-            PipelineConfig::default(),
+            pipeline_config, // ← Use the provided config
             features,
             false,
         );
@@ -1004,9 +1018,30 @@ mod tests {
         AptosVM::set_num_shards_once(4);
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
+        
+        println!("=== Testing Mint + Marketplace Workflow ===");
+        
+        // Custom PipelineConfig that allows aborts/discards and enables verbose output
+        let debug_pipeline_config = PipelineConfig {
+            generate_then_execute: false,
+            split_stages: false,
+            skip_commit: false,
+            allow_aborts: true,        // ← Allow aborts to see them!
+            allow_discards: true,      // ← Allow discards to see them!
+            allow_retries: false,
+            num_executor_shards: 0,
+            num_generator_workers: 4,
+            partitioner_config: aptos_block_partitioner::v2::config::PartitionerV2Config::default(),
+            num_sig_verify_threads: 8,
+            print_transactions: true,  // ← Print transactions to see what's happening!
+        };
+        
         test_generic_benchmark::<AptosVMBlockExecutor>(
             Some(TransactionTypeArg::TokenV2MintAndPlaceListing),
             true,
+            // debug_pipeline_config,
         );
+        
+        println!("=== Workflow Test Completed ===");
     }
 }

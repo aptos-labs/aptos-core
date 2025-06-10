@@ -47,6 +47,11 @@ fn additional_packages() -> Vec<(&'static str, &'static str, bool)> {
             "../../aptos-move/move-examples/bcs-stream",
             false,
         ),
+        (
+            "on_chain_nft_marketplace",
+            "src/packages/on_chain_nft_marketplace",
+            false,
+        ),
     ]
 }
 

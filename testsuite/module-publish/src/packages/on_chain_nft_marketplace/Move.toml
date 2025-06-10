@@ -14,14 +14,9 @@ git = "https://github.com/aptos-labs/aptos-framework.git"
 rev = "mainnet"
 subdir = "aptos-framework"
 
-[dependencies.AptosTokenObjects]
-git = "https://github.com/aptos-labs/aptos-framework.git"
-rev = "mainnet"
-subdir = "aptos-token-objects"
+[dependencies]
 
-[dependencies.AptosToken]
-git = "https://github.com/aptos-labs/aptos-framework.git"
-rev = "mainnet"
-subdir = "aptos-token"
+AptosToken = { local = "../../../../../aptos-move/framework/aptos-token" }
+AptosTokenObjects = { local = "../../../../../aptos-move/framework/aptos-token-objects" }
 
 [dev-dependencies]
