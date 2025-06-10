@@ -1787,7 +1787,7 @@ pub struct TransactionOptions {
 
     /// Replay protection mechanism to use when generating the transaction.
     ///
-    /// When "turbo" is chosen, the transaction will contain a replay protection nonce.
+    /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
     ///
     /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
     #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
@@ -1932,7 +1932,7 @@ impl TransactionOptions {
                 .sequence_number(sequence_number)
                 .expiration_timestamp_secs(expiration_time_secs);
 
-            let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Turbo
+            let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Nonce
             {
                 txn_builder.upgrade_payload(true, true).build()
             } else {
@@ -1990,7 +1990,7 @@ impl TransactionOptions {
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
                 let mut txn_builder = transaction_factory.payload(payload);
-                if self.replay_protection_type == ReplayProtectionType::Turbo {
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
                     txn_builder = txn_builder.upgrade_payload(true, true);
                 };
                 sender_account.sign_with_transaction_builder(txn_builder)
@@ -2007,10 +2007,10 @@ impl TransactionOptions {
                     sequence_number,
                 );
                 let mut txn_builder = transaction_factory.payload(payload);
-                if self.replay_protection_type == ReplayProtectionType::Turbo {
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
                     txn_builder = txn_builder.upgrade_payload(true, true);
                 };
-                sender_account.sign_with_transaction_builder(txn_builder)?
+                sender_account.sign_with_transaction_builder(txn_builder)
             },
             Err(err) => return Err(err),
         };
