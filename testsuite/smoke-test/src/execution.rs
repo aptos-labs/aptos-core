@@ -135,7 +135,7 @@ async fn block_epilogue_upgrade_test() {
 
     assert_eq!(
         get_last_non_reconfig_block_ending_txn_name(&rest_client).await,
-        Some("block_epilogue")
+        Some("state_checkpoint")
     );
 
     for _ in 0..3 {
@@ -200,7 +200,7 @@ async fn block_epilogue_upgrade_test() {
 
         assert_eq!(
             get_last_non_reconfig_block_ending_txn_name(&rest_client).await,
-            Some("block_epilogue")
+            Some("state_checkpoint")
         );
     }
 }

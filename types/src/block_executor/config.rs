@@ -4,6 +4,8 @@
 use crate::on_chain_config::BlockGasLimitType;
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_GAS_PRICE_TO_BURN: u64 = 90;
+
 /// Local, per-node configurations for module cache. While caches can be persisted across multiple
 /// block executions, these configurations allow to specify cache sizes, etc.
 #[derive(Clone, Debug)]
@@ -65,14 +67,20 @@ pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
     enable_per_block_gas_limit: bool,
     per_block_gas_limit: Option<u64>,
+    gas_price_to_burn: Option<u64>,
 }
 
 impl BlockExecutorConfigFromOnchain {
-    pub fn new(block_gas_limit_type: BlockGasLimitType, enable_per_block_gas_limit: bool) -> Self {
+    pub fn new(
+        block_gas_limit_type: BlockGasLimitType,
+        enable_per_block_gas_limit: bool,
+        gas_price_to_burn: Option<u64>,
+    ) -> Self {
         Self {
             block_gas_limit_type,
             enable_per_block_gas_limit,
             per_block_gas_limit: None,
+            gas_price_to_burn,
         }
     }
 
@@ -81,6 +89,7 @@ impl BlockExecutorConfigFromOnchain {
             block_gas_limit_type: BlockGasLimitType::NoLimit,
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
+            gas_price_to_burn: None,
         }
     }
 
@@ -90,6 +99,7 @@ impl BlockExecutorConfigFromOnchain {
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
+            gas_price_to_burn: None,
         }
     }
 
@@ -105,11 +115,12 @@ impl BlockExecutorConfigFromOnchain {
                     conflict_penalty_window: 8,
                     use_module_publishing_block_conflict: true,
                     include_user_txn_size_in_block_output: true,
-                    add_block_limit_outcome_onchain: false,
+                    add_block_limit_outcome_onchain: true,
                     use_granular_resource_group_conflicts: false,
                 },
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
+            gas_price_to_burn: None,
         }
     }
 
@@ -118,6 +129,7 @@ impl BlockExecutorConfigFromOnchain {
             block_gas_limit_type: self.block_gas_limit_type,
             enable_per_block_gas_limit: self.enable_per_block_gas_limit,
             per_block_gas_limit: block_gas_limit_override,
+            gas_price_to_burn: self.gas_price_to_burn,
         }
     }
 
@@ -127,6 +139,10 @@ impl BlockExecutorConfigFromOnchain {
         } else {
             None
         }
+    }
+
+    pub fn gas_price_to_burn(&self) -> u64 {
+        self.gas_price_to_burn.unwrap_or(DEFAULT_GAS_PRICE_TO_BURN)
     }
 }
 
