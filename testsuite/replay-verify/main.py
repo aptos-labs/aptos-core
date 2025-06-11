@@ -97,13 +97,13 @@ class ReplayConfig:
             self.pvc_number = 5
             self.min_range_size = 10_000
             self.range_size = 5_000_000
-            self.timeout_secs = 900
+            self.timeout_secs = 2000
         else:
             self.concurrent_replayer = 18
             self.pvc_number = 8
             self.min_range_size = 10_000
             self.range_size = 2_000_000
-            self.timeout_secs = 400
+            self.timeout_secs = 1000
 
 
 class WorkerPod:
@@ -416,6 +416,9 @@ class ReplayScheduler:
 
         skips = self.sorted_ranges_to_skip()
 
+        range_size = self.range_size
+        heavy_range_size = int(range_size / 5)
+
         while current <= self.end_version:
             (skip_start, skip_end) = (
                 (INT64_MAX, INT64_MAX) if len(skips) == 0 else skips[0]
@@ -425,9 +428,19 @@ class ReplayScheduler:
                 current = skip_end + 1
                 continue
 
-            next_current = min(
-                current + self.range_size, self.end_version + 1, skip_start
-            )
+            # TODO(ibalajiarun): temporary hack to handle heavy ranges
+            if (
+                self.network == Network.TESTNET
+                and current >= 6700000000
+                and current < 6800000000
+            ):
+                next_current = min(
+                    current + heavy_range_size, self.end_version + 1, skip_start
+                )
+            else:
+                next_current = min(
+                    current + range_size, self.end_version + 1, skip_start
+                )
 
             # avoid having too many small tasks, simply skip the task
             range = (current, next_current - 1)
@@ -449,7 +462,7 @@ class ReplayScheduler:
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
         # run. However, for simplicity, we set the TTL to 3 hours.
-        pvc_ttl = 3 * 60 * 60  # 3 hours
+        pvc_ttl = 5 * 60 * 60  # 3 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,

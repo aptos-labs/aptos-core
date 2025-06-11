@@ -35,6 +35,7 @@ impl ArmedLock {
         }
     }
 
+    // try_lock succeeds when the lock is unlocked and armed (there is work to do).
     pub fn try_lock(&self) -> bool {
         self.locked
             .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
@@ -296,10 +297,6 @@ pub struct Scheduler {
 
     has_halted: CachePadded<AtomicBool>,
 
-    /// Set to true if we do not need to validate module reads. Most of the time this is the case,
-    /// unless modules are published.
-    skip_module_reads_validation: CachePadded<AtomicBool>,
-
     queueing_commits_lock: CachePadded<ArmedLock>,
 
     commit_queue: ConcurrentQueue<u32>,
@@ -329,14 +326,9 @@ impl Scheduler {
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
             has_halted: CachePadded::new(AtomicBool::new(false)),
-            skip_module_reads_validation: CachePadded::new(AtomicBool::new(true)),
             queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
-    }
-
-    pub fn num_txns(&self) -> TxnIndex {
-        self.num_txns
     }
 
     pub fn add_to_commit_queue(&self, txn_idx: u32) {
@@ -1024,17 +1016,6 @@ impl Scheduler {
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
     fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
-    }
-
-    /// Sets the flag to validate module reads.
-    pub(crate) fn validate_module_reads(&self) {
-        self.skip_module_reads_validation
-            .store(false, Ordering::Release);
-    }
-
-    /// Returns true if module validation can be skipped.
-    pub(crate) fn skip_module_reads_validation(&self) -> bool {
-        self.skip_module_reads_validation.load(Ordering::Acquire)
     }
 }
 

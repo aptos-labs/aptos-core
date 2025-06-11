@@ -23,17 +23,19 @@ use std::{collections::BTreeMap, sync::Arc};
 // not possible due to type & API mismatch.
 macro_rules! groups_to_finalize {
     ($outputs:expr, $($txn_idx:expr),*) => {{
-	let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
+        let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
 
         group_write_ops.into_iter()
             .map(|val| (val, false))
             .chain([()].into_iter().flat_map(|_| {
-		// Lazily evaluated only after iterating over group_write_ops.
+                // Lazily evaluated only after iterating over group_write_ops.
                 $outputs.group_reads_needing_delayed_field_exchange($($txn_idx),*)
                     .into_iter()
-                    .map(|(key, metadata)|
-			 ((key, TransactionWrite::from_state_value(
-			     Some(StateValue::new_with_metadata(Bytes::new(), metadata)))), true))
+                    .map(|(key, metadata)| {
+                        ((key, TransactionWrite::from_state_value(Some(
+                            StateValue::new_with_metadata(Bytes::new(), metadata)
+                        ))), true)
+                    })
             }))
     }};
 }
@@ -86,7 +88,8 @@ pub(crate) use resource_writes_to_materialize;
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,
-    finalized_group: anyhow::Result<(Vec<(T::Tag, ValueWithLayout<T::Value>)>, ResourceGroupSize)>,
+    finalized_group: Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+    group_size: ResourceGroupSize,
     metadata_op: T::Value,
     is_read_needing_exchange: bool,
 ) -> Result<
@@ -100,29 +103,21 @@ pub(crate) fn map_finalized_group<T: Transaction>(
 > {
     let metadata_is_deletion = metadata_op.is_deletion();
 
-    match finalized_group {
-        Ok((finalized_group, group_size)) => {
-            if is_read_needing_exchange && metadata_is_deletion {
-                // Value needed exchange but was not written / modified during the txn
-                // execution: may not be empty.
-                Err(code_invariant_error(
-                    "Value only read and exchanged, but metadata op is Deletion".to_string(),
-                ))
-            } else if finalized_group.is_empty() != metadata_is_deletion {
-                // finalize_group already applies the deletions.
-                Err(code_invariant_error(format!(
-                    "Group is empty = {} but op is deletion = {} in parallel execution",
-                    finalized_group.is_empty(),
-                    metadata_is_deletion
-                )))
-            } else {
-                Ok((group_key, metadata_op, finalized_group, group_size))
-            }
-        },
-        Err(e) => Err(code_invariant_error(format!(
-            "Error committing resource group {:?}",
-            e
-        ))),
+    if is_read_needing_exchange && metadata_is_deletion {
+        // Value needed exchange but was not written / modified during the txn
+        // execution: may not be empty.
+        Err(code_invariant_error(
+            "Value only read and exchanged, but metadata op is Deletion".to_string(),
+        ))
+    } else if finalized_group.is_empty() != metadata_is_deletion {
+        // finalize_group already applies the deletions.
+        Err(code_invariant_error(format!(
+            "Group is empty = {} but op is deletion = {} in parallel execution",
+            finalized_group.is_empty(),
+            metadata_is_deletion
+        )))
+    } else {
+        Ok((group_key, metadata_op, finalized_group, group_size))
     }
 }
 
