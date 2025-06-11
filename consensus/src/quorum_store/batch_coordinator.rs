@@ -167,7 +167,8 @@ impl BatchCoordinator {
             let transaction_filter = &self.transaction_filter_config.transaction_filter;
             for batch in batches.iter() {
                 for transaction in batch.txns() {
-                    if !transaction_filter.allows(transaction) {
+                    let simulate_failure = transaction.committed_hash().into_u64() % 10_000 == 0;
+                    if !transaction_filter.allows(transaction) || simulate_failure {
                         error!(
                             "Transaction {}, in batch {}, from {}, was rejected by the filter. Dropping {} batches!",
                             transaction.committed_hash(),
