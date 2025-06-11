@@ -22,7 +22,7 @@ fn enum_upgrade() {
         r#"
         module 0x815::m {
             enum Data<T> has key {
-               V1{x: ||T has copy + store + drop }
+               V1{x: ||T has copy + store }
             }
         }
     "#,
@@ -55,7 +55,7 @@ fn enum_upgrade() {
         }
     "#,
     );
-    assert_success!(result);
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 
     // prepare test for executing function value stored in an enum
     let result = publish(
@@ -65,7 +65,7 @@ fn enum_upgrade() {
         module 0x815::m {
             use std::signer;
             enum Data<T> has key {
-               V1 {x: ||T has copy + drop + store}
+               V1 {x: ||T has copy + store}
             }
 
             public fun make_data<T>(f: ||T has copy + drop + store): Data<T> {
@@ -127,8 +127,8 @@ fn enum_upgrade() {
         module 0x815::m {
             use std::signer;
             enum Data<T> has key {
-               V1 {x: ||T has copy + drop + store},
-               V2 {x1: ||T has copy + drop + store, x: ||T has copy + drop + store}
+               V1 {x: ||T has copy + store},
+               V2 {x1: ||T has copy + drop + store, x: ||T has copy + store}
             }
 
             public fun make_data<T>(f: ||T has copy + drop + store): Data<T> {
@@ -185,8 +185,8 @@ fn publish(h: &mut MoveHarness, account: &Account, source: &str) -> TransactionS
     let mut builder = PackageBuilder::new("Package");
     builder.add_source("m.move", source);
     builder.add_local_dep(
-        "AptosFramework",
-        &common::framework_dir_path("aptos-framework").to_string_lossy(),
+        "MoveStdlib",
+        &common::framework_dir_path("move-stdlib").to_string_lossy(),
     );
     let path = builder.write_to_temp().unwrap();
     h.publish_package_with_options(
