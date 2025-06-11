@@ -44,6 +44,7 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
+blake2-rfc = { workspace = true }
 diesel = { workspace = true, features = [
     "chrono",
     "postgres",
@@ -63,7 +64,6 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 walkdir = { workspace = true }
-blake2-rfc = { workspace = true }
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }
