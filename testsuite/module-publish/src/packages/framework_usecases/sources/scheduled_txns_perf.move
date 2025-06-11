@@ -27,7 +27,7 @@ module 0xABCD::scheduled_txns_perf {
             signer::address_of(user),
             current_time_ms,
             10000,
-            200,
+            150,
             false,
             foo1
         );

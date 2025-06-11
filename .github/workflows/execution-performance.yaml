@@ -15,6 +15,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-scheduled-test') ||
         github.event.pull_request.auto_merge != null
       )
     uses: ./.github/workflows/workflow-run-execution-performance.yaml
@@ -23,6 +24,6 @@ jobs:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       RUNNER_NAME: executor-benchmark-runner
        # Run all tests only on the scheduled cadence, or explicitly requested
-      FLOW: ${{ (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || 'LAND_BLOCKING' }}
+      FLOW: ${{ (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-scheduled-test') && 'SCHEDULED_TXNS' || 'LAND_BLOCKING' }}
       # Ignore target determination if on the scheduled cadence, or explicitly requested
       IGNORE_TARGET_DETERMINATION: ${{ github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}
