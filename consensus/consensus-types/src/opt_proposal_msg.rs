@@ -57,8 +57,8 @@ impl OptProposalMsg {
             .verify_well_formed()
             .context("Fail to verify OptProposalMsg's data")?;
         ensure!(
-            self.block_data.round() > 0,
-            "Proposal for {} has an incorrect round of 0",
+            self.block_data.round() > 1,
+            "Proposal for {} has round <= 1",
             self.block_data,
         );
         ensure!(

@@ -437,7 +437,11 @@ impl RoundManager {
         }
 
         // If the current proposer is the leading, try to propose a regular block if not opt proposed already
-        if is_current_proposer {
+        if is_current_proposer
+            && self
+                .proposal_generator
+                .can_propose_in_round(new_round_event.round)
+        {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
             let sync_info = self.block_store.sync_info();
@@ -1393,21 +1397,21 @@ impl RoundManager {
 
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
-        let expected_grandparent_round = parent
-            .round()
-            .checked_sub(1)
-            .ok_or_else(|| anyhow::anyhow!("Invalid parent round {}", parent.round()))?;
-        ensure!(
-            grandparent_qc.certified_block().round() == expected_grandparent_round,
-            "Cannot start Optimistic Round. Grandparent QC is not for round minus one: {} < {}",
-            grandparent_qc.certified_block().round(),
-            parent.round()
-        );
-
         if self
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
         {
+            let expected_grandparent_round = parent
+                .round()
+                .checked_sub(1)
+                .ok_or_else(|| anyhow::anyhow!("Invalid parent round {}", parent.round()))?;
+            ensure!(
+                grandparent_qc.certified_block().round() == expected_grandparent_round,
+                "Cannot start Optimistic Round. Grandparent QC is not for round minus one: {} < {}",
+                grandparent_qc.certified_block().round(),
+                parent.round()
+            );
+
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
             let sync_info = self.block_store.sync_info();

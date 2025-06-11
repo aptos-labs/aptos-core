@@ -474,6 +474,10 @@ impl ProposalGenerator {
         Ok(Block::new_nil(round, quorum_cert, failed_authors))
     }
 
+    pub fn can_propose_in_round(&self, round: Round) -> bool {
+        *self.last_round_generated.lock() < round
+    }
+
     /// The function generates a new proposal block: the returned future is fulfilled when the
     /// payload is delivered by the PayloadClient implementation.  At most one proposal can be
     /// generated per round (no proposal equivocation allowed).
