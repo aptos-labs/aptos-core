@@ -272,6 +272,7 @@ TESTS = [
         key=RunGroupKey("schedule-txns-insert-perf"),
         included_in=Flow.SCHEDULED_TXNS,
         expected_tps=1000,  # estimated TPS value
+        key_extra=RunGroupKeyExtra(block_size_override=1000),
         waived=True        # waived since it's not calibrated
     ),
 
@@ -279,7 +280,7 @@ TESTS = [
         key=RunGroupKey("schedule-txns-insert-perf"),
         included_in=Flow.SCHEDULED_TXNS,
         expected_tps=1005,  # estimated TPS value
-        key_extra=RunGroupKeyExtra(run_scheduled_txns=True),  # Enable scheduled txns
+        key_extra=RunGroupKeyExtra(run_scheduled_txns=True, block_size_override=1000),  # Enable scheduled txns
         waived=True        # waived since it's not calibrated
     ),
 

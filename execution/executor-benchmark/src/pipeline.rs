@@ -204,13 +204,12 @@ where
             prepare_ready_txns: &mut BlockPreparationStage,
             exe: &mut TransactionExecutor<V>,
             executor: &BlockExecutor<V>,
-            num_blocks: Option<usize>,
         ) -> u64 {
             info!(
                 "Running scheduled transactions: {} total scheduled transactions",
                 total_scheduled_txns
             );
-            let target_block_size = total_scheduled_txns / num_blocks.unwrap_or(1) as u64;
+            //let target_block_size = total_scheduled_txns / num_blocks.unwrap_or(1) as u64;
             let mut total_executed = 0;
             let mut stage_index = 0;
             let mut current_parent_id = parent_block_id;
@@ -221,26 +220,15 @@ where
             let overall_measuring = OverallMeasuring::start();
 
             while total_executed < total_scheduled_txns {
-                let mut current_block_txns = Vec::new();
+                let state_view = executor.state_view(current_parent_id).unwrap();
+                let mut current_block_txns =
+                    ScheduledTxnsHandler::get_ready_txns(&state_view, mock_block_time_ms + 1000)
+                        .into_iter()
+                        .map(Transaction::ScheduledTransaction)
+                        .collect::<Vec<Transaction>>();
 
-                // Keep getting ready transactions until we reach target_block_size
-                while (current_block_txns.len() as u64) < target_block_size {
-                    let state_view = executor.state_view(current_parent_id).unwrap();
-                    info!("Getting ready txns with state root hash: {:?}", state_view);
-                    // remove already run txns (simulate block metadata txn)
-                    let ready_txns = ScheduledTxnsHandler::get_ready_txns(
-                        &state_view,
-                        mock_block_time_ms + 1000,
-                    )
-                    .into_iter()
-                    .map(Transaction::ScheduledTransaction)
-                    .collect::<Vec<Transaction>>();
-
-                    if ready_txns.is_empty() {
-                        break; // No more ready transactions available
-                    }
-
-                    current_block_txns.extend(ready_txns);
+                if current_block_txns.is_empty() {
+                    break; // No more ready transactions available
                 }
 
                 // append a mock metadata transaction to the block
@@ -396,7 +384,6 @@ where
                         &mut prepare_ready_txns,
                         &mut exe,
                         executor_4.as_ref(),
-                        num_blocks,
                     );
                 }
                 start_ledger_update_tx.map(|tx| tx.send(()));
