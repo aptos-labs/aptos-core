@@ -17,6 +17,8 @@ mod common;
 mod constructor_args;
 mod dependencies;
 mod enum_upgrade;
+
+mod enum_upgrade_fv;
 mod enum_variant_count;
 mod error_map;
 mod events;
