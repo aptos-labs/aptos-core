@@ -3,15 +3,11 @@
 
 //! This module (and its submodules) contain various model-AST-based lint checks.
 
+mod aborting_overflow_checks;
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
-<<<<<<< HEAD
 mod equal_operands_in_bin_op;
-||||||| parent of b8abccb6b6 ([linter] Added aborting_overflow_checks lint)
-=======
-mod aborting_overflow_checks;
->>>>>>> b8abccb6b6 ([linter] Added aborting_overflow_checks lint)
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -45,7 +41,6 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
-        
     ];
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
     if checks_category == "strict" || checks_category == "experimental" {
