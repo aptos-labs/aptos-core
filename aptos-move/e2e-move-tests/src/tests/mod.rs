@@ -9,6 +9,7 @@ mod aggregator_v2_enums;
 mod aggregator_v2_events;
 mod aggregator_v2_function_values;
 mod aggregator_v2_runtime_checks;
+mod any;
 mod attributes;
 mod chain_id;
 mod code_publishing;
