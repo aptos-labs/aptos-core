@@ -382,38 +382,3 @@ mod serialization_tests {
         );
     }
 }
-
-//===========================================================================================
-
-impl fmt::Display for MoveClosure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let MoveClosure {
-            module_id,
-            fun_id,
-            ty_args,
-            mask,
-            captured,
-        } = self;
-        let captured_str = mask
-            .format_arguments(captured.iter().map(|v| v.1.to_string()).collect())
-            .join(", ");
-        let inst_str = if ty_args.is_empty() {
-            "".to_string()
-        } else {
-            format!(
-                "<{}>",
-                ty_args
-                    .iter()
-                    .map(|t| t.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            )
-        };
-        write!(
-            f,
-            // this will print `a::m::f<T>(a1,_,a2,_)`
-            "{}::{}{}({})",
-            module_id, fun_id, inst_str, captured_str
-        )
-    }
-}

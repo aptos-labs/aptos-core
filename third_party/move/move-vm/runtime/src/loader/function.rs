@@ -316,7 +316,7 @@ impl AbstractFunction for LazyLoadedFunction {
         Ok(Box::new(self.clone()))
     }
 
-    fn to_stable_string(&self) -> String {
+    fn to_canonical_string(&self) -> String {
         self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
             let prefix = if let Some(m) = module_id {
                 format!("0x{}::{}::", m.address(), m.name())
@@ -332,7 +332,7 @@ impl AbstractFunction for LazyLoadedFunction {
                         .iter()
                         .map(|t| t.to_canonical_string())
                         .collect::<Vec<_>>()
-                        .join(",")
+                        .join(", ")
                 )
             };
             format!("{}::{}{}", prefix, fun_id, ty_args_str)

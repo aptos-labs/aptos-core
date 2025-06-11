@@ -573,7 +573,7 @@ impl InterpreterImpl<'_> {
                                 //   to be able to let scripts use closures.
                                 let err = PartialVMError::new_invariant_violation(format!(
                                     "module id required to charge gas for function `{}`",
-                                    lazy_function.to_stable_string()
+                                    lazy_function.to_canonical_string()
                                 ));
                                 return Err(set_err_info!(current_frame, err));
                             };
@@ -1432,10 +1432,10 @@ impl InterpreterImpl<'_> {
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
             if let Some(tag) = it.next() {
-                debug_write!(buf, "{}", tag)?;
+                debug_write!(buf, "{}", tag.to_canonical_string())?;
                 for tag in it {
                     debug_write!(buf, ", ")?;
-                    debug_write!(buf, "{}", tag)?;
+                    debug_write!(buf, "{}", tag.to_canonical_string())?;
                 }
             }
             debug_write!(buf, ">")?;
