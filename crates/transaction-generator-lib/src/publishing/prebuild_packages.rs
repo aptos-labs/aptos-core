@@ -65,7 +65,6 @@ pub fn create_prebuilt_packages_rs_file(
     writeln!(
         string_buffer,
         "
-use aptos_transaction_generator_lib::entry_point_trait::PreBuiltPackages;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;",
     )
@@ -93,28 +92,6 @@ use std::collections::HashMap;",
     }
 
     write_accessors(&mut string_buffer, packages);
-
-    writeln!(
-        string_buffer,
-        "
-#[derive(Debug)]
-pub struct PreBuiltPackagesImpl;
-
-impl PreBuiltPackages for PreBuiltPackagesImpl {{
-    fn package_metadata(&self, package_name: &str) -> &[u8] {{
-        PACKAGE_TO_METADATA.get(package_name).expect(package_name)
-    }}
-
-    fn package_modules(&self, package_name: &str) -> &[Vec<u8>] {{
-        PACKAGE_TO_MODULES.get(package_name).expect(package_name)
-    }}
-
-    fn package_script(&self, package_name: &str) -> Option<&Vec<u8>> {{
-        PACKAGE_TO_SCRIPT.get(package_name)
-    }}
-}}",
-    )
-    .expect("PreBuiltPackages failed");
 
     let mut generic_mod = std::fs::File::create(output_file).unwrap();
     {
@@ -204,7 +181,7 @@ fn write_accessors(file: &mut String, packages: Vec<(String, bool)>) {
         file,
         "pub static PACKAGE_TO_METADATA: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {{ HashMap::from([",
     )
-    .expect("Lazy PACKAGE_TO_METADATA declaration failed");
+        .expect("Lazy PACKAGE_TO_METADATA declaration failed");
 
     for (package, _) in &packages {
         writeln!(
@@ -223,7 +200,7 @@ fn write_accessors(file: &mut String, packages: Vec<(String, bool)>) {
         file,
         "pub static PACKAGE_TO_MODULES: Lazy<HashMap<String, Vec<Vec<u8>>>> = Lazy::new(|| {{ HashMap::from([",
     )
-    .expect("Lazy PACKAGE_TO_MODULES declaration failed");
+        .expect("Lazy PACKAGE_TO_MODULES declaration failed");
 
     for (package, _) in &packages {
         writeln!(
@@ -242,7 +219,7 @@ fn write_accessors(file: &mut String, packages: Vec<(String, bool)>) {
         file,
         "pub static PACKAGE_TO_SCRIPT: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {{ HashMap::from([",
     )
-    .expect("Lazy PACKAGE_TO_SCRIPT declaration failed");
+        .expect("Lazy PACKAGE_TO_SCRIPT declaration failed");
 
     for (package, has_script) in &packages {
         if *has_script {
