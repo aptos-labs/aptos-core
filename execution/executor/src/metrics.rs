@@ -447,7 +447,7 @@ pub fn update_counters_for_processed_chunk<T>(
                 PROCESSED_USER_TXNS_BY_PAYLOAD
                     .with_label_values(&[
                         process_type,
-                        &(payload_type.to_string() + "_orderless"),
+                        &(payload_type.to_string() + "_turbo"),
                         state,
                     ])
                     .inc();

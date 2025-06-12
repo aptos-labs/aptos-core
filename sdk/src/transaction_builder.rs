@@ -83,12 +83,12 @@ impl TransactionBuilder {
     pub fn upgrade_payload(
         mut self,
         use_txn_payload_v2_format: bool,
-        use_orderless_transactions: bool,
+        use_turbo_transactions: bool,
     ) -> Self {
         self.payload = self
             .payload
-            .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
-        if use_orderless_transactions {
+            .upgrade_payload(use_txn_payload_v2_format, use_turbo_transactions);
+        if use_turbo_transactions {
             self.sequence_number = self.sequence_number.map(|_| u64::MAX);
         }
         self
@@ -173,7 +173,7 @@ impl TransactionFactory {
     }
 
     pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
-        // TODO[Orderless]: Change this to use TransactionPayload::Payload once it's available
+        // TODO[Turbo]: Change this to use TransactionPayload::Payload once it's available
         self.payload(TransactionPayload::EntryFunction(func))
     }
 
@@ -311,7 +311,7 @@ impl TransactionFactory {
     //
 
     pub fn script(&self, script: Script) -> TransactionBuilder {
-        // TODO[Orderless]: Change this to use TransactionPayload::Payload once it's available
+        // TODO[Turbo]: Change this to use TransactionPayload::Payload once it's available
         self.payload(TransactionPayload::Script(script))
     }
 

@@ -911,7 +911,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
         txn_data: &TransactionMetadata,
-        executable: TransactionExecutableRef<'a>, // TODO[Orderless]: Check what's the right lifetime to use here.
+        executable: TransactionExecutableRef<'a>, // TODO[Turbo]: Check what's the right lifetime to use here.
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -1088,7 +1088,7 @@ impl AptosVM {
         };
         let provided_payload = match executable {
             TransactionExecutableRef::EntryFunction(entry_func) => {
-                // TODO[Orderless]: For backward compatibility reasons, still using `MultisigTransactionPayload` here.
+                // TODO[Turbo]: For backward compatibility reasons, still using `MultisigTransactionPayload` here.
                 // Find a way to deprecate this.
                 bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
                     entry_func.clone(),
@@ -1704,11 +1704,11 @@ impl AptosVM {
             ));
         }
 
-        if !self.features().is_orderless_txns_enabled() {
+        if !self.features().is_turbo_txns_enabled() {
             if let ReplayProtector::Nonce(_) = transaction.replay_protector() {
                 return Err(VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
-                    Some("Orderless transactions are not yet supported".to_string()),
+                    Some("Turbo transactions are not yet supported".to_string()),
                 ));
             }
         }

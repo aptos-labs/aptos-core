@@ -31,8 +31,8 @@ module aptos_framework::nonce_validation {
     const ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1002;
 
 
-    // An orderless transaction is a transaction that doesn't have a sequence number.
-    // Orderless transactions instead contain a nonce to prevent replay attacks.
+    // An Turbo transaction is a transaction that doesn't have a sequence number.
+    // Turbo transactions instead contain a nonce to prevent replay attacks.
     // If the incoming transaction has the same (address, nonce) pair as a previous unexpired transaction, it is rejected.
     // The nonce history is used to store the list of (address, nonce, txn expiration time) values of all unexpired transactions.
     // The nonce history is used in the transaction validation process to check if the incoming transaction is valid.

@@ -309,14 +309,14 @@ impl TransactionsApi {
     /// Get account transactions
     ///
     /// Retrieves on-chain committed sequence-number based transactions from an account.
-    /// Does not retrieve orderless transactions sent from the account.
+    /// Does not retrieve turbo transactions sent from the account.
     /// If the start version is too far in the past, a 410 will be returned.
     ///
     /// If no start version is given, it will start at version 0.
     ///
     /// To retrieve a pending transaction, use /transactions/by_hash.
 
-    // Question[Orderless]: Can this operation id and function name be changed to "get_account_ordered_transactions"?
+    // Question[Turbo]: Can this operation id and function name be changed to "get_account_ordered_transactions"?
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
@@ -353,7 +353,7 @@ impl TransactionsApi {
     /// Get account transaction summaries
     ///
     /// Retrieves summaries of on-chain committed transactions (both sequence number based
-    /// and orderless transactions) from an account.
+    /// and turbo transactions) from an account.
     /// Each transaction summary contains the sender addresss, transaction hash, version, and replay protector.
     ///
     /// If start_version is provided, the output consists of transaction summaries starting form that version.
@@ -1580,8 +1580,8 @@ impl TransactionsApi {
                 if extra_config.is_multisig() {
                     stats_key += "Multisig::";
                 };
-                if extra_config.is_orderless() {
-                    stats_key += "Orderless::";
+                if extra_config.is_turbo() {
+                    stats_key += "Turbo::";
                 }
                 if let TransactionExecutable::Script(_) = executable {
                     stats_key += format!("Script::{}", txn.committed_hash()).as_str();

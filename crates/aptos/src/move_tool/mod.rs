@@ -1142,7 +1142,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         "CreateObjectAndPublishPackage"
     }
 
-    // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
+    // TODO[Turbo]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
 
@@ -1394,7 +1394,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         "DeployObject"
     }
 
-    // TODO[Ordereless]: Update this code to support stateless accounts that don't have a sequence number
+    // TODO[Turbo]: Update this code to support stateless accounts that don't have a sequence number
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
 

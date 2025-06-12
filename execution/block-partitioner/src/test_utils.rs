@@ -81,7 +81,7 @@ pub fn create_signed_p2p_transaction(
 ) -> Vec<AnalyzedTransaction> {
     let mut transactions = Vec::new();
     for receiver in receivers.iter() {
-        // TODO[Orderless]: Change this to Payload V2 format.
+        // TODO[Turbo]: Change this to Payload V2 format.
         let transaction_payload = TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
             Identifier::new("transfer").unwrap(),

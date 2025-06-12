@@ -660,9 +660,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         } = user_transaction_request;
         Ok(RawTransaction::new(
             sender.into(),
-            // The `sequence_number` field is not used for processing orderless transactions.
+            // The `sequence_number` field is not used for processing turbo transactions.
             // However, the `SignedTransaction` strucut has a mandatory sequence_number field.
-            // So, for orderless transactions, we chose to set the sequence_number to u64::MAX.
+            // So, for turbo transactions, we chose to set the sequence_number to u64::MAX.
             if replay_protection_nonce.is_none() {
                 sequence_number.into()
             } else {
@@ -752,7 +752,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 None => Err(anyhow::anyhow!("invalid transaction script bytecode")),
             }
         };
-        // TODO[Orderless]: After the new TransactionPayload format is fully deployed, output the TransactionPayload in V2 format here.
+        // TODO[Turbo]: After the new TransactionPayload format is fully deployed, output the TransactionPayload in V2 format here.
         let ret = match payload {
             TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
                 if let Some(nonce) = nonce {

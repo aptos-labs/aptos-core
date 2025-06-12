@@ -354,7 +354,7 @@ impl LocalAccount {
 
     pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
         let raw_txn = if builder.has_nonce() {
-            // Do not increment sequence number for orderless transactions.
+            // Do not increment sequence number for turbo transactions.
             builder
                 .sender(self.address())
                 .sequence_number(u64::MAX)
@@ -383,7 +383,7 @@ impl LocalAccount {
             .collect();
 
         let raw_txn = if builder.has_nonce() {
-            // Do not increment sequence number for orderless transactions.
+            // Do not increment sequence number for turbo transactions.
             builder
                 .sender(self.address())
                 .sequence_number(u64::MAX)
@@ -419,7 +419,7 @@ impl LocalAccount {
             .map(|signer| signer.private_key())
             .collect();
         let raw_txn = if builder.has_nonce() {
-            // Do not increment sequence number for orderless transactions.
+            // Do not increment sequence number for turbo transactions.
             builder
                 .sender(self.address())
                 .sequence_number(u64::MAX)
@@ -625,8 +625,8 @@ impl TransactionSigner for HardwareWalletAccount {
         let two_minutes = Duration::from_secs(2 * 60);
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH)? + two_minutes;
         let seconds = current_time.as_secs();
-        let orderless = builder.has_nonce();
-        let sequence_number = if orderless {
+        let turbo = builder.has_nonce();
+        let sequence_number = if turbo {
             u64::MAX
         } else {
             self.sequence_number()
@@ -637,7 +637,7 @@ impl TransactionSigner for HardwareWalletAccount {
             .expiration_timestamp_secs(seconds)
             .build();
 
-        if !orderless {
+        if !turbo {
             *self.sequence_number_mut() += 1;
         }
         self.sign_transaction(raw_txn)

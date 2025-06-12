@@ -80,7 +80,7 @@ impl TransactionStore {
         ))
     }
 
-    // TODO[Orderless]: Update this so that the user can specify even the range of chain timestamps
+    // TODO[Turbo]: Update this so that the user can specify even the range of chain timestamps
     pub fn get_account_transaction_summaries_iter(
         &self,
         address: AccountAddress,
@@ -89,7 +89,7 @@ impl TransactionStore {
         limit: u64,
         ledger_version: Version,
     ) -> Result<AccountTransactionSummariesIter> {
-        // Question[Orderless]: When start version is specified, we are current scanning forward from start version.
+        // Question[Turbo]: When start version is specified, we are current scanning forward from start version.
         // When start version is not specified we are scanning backward, so as to return the most recent transactions.
         // This doesn't seem to be a good design. Should we instead let the API take scan direction as input?
         if start_version.is_some() {
@@ -152,7 +152,7 @@ impl TransactionStore {
                     db_batch
                         .delete::<OrderedTransactionByAccountSchema>(&(txn.sender(), seq_num))?;
                 }
-                // TODO[Orderless]: Check where else transactions summaries need to be pruned
+                // TODO[Turbo]: Check where else transactions summaries need to be pruned
                 db_batch
                     .delete::<TransactionSummariesByAccountSchema>(&(txn.sender(), *version))?;
             }
