@@ -12,7 +12,6 @@ use crate::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
     },
     loader::LazyLoadedFunction,
-    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     reentrancy_checker::{CallType, ReentrancyChecker},
@@ -120,7 +119,6 @@ impl Interpreter {
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<Vec<Value>> {
         InterpreterImpl::entrypoint(
@@ -130,7 +128,6 @@ impl Interpreter {
             module_storage,
             resource_resolver,
             gas_meter,
-            traversal_context,
             extensions,
         )
     }
@@ -146,7 +143,6 @@ impl InterpreterImpl<'_> {
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<Vec<Value>> {
         let interpreter = InterpreterImpl {
@@ -166,7 +162,6 @@ impl InterpreterImpl<'_> {
                 resource_resolver,
                 module_storage,
                 gas_meter,
-                traversal_context,
                 extensions,
                 function,
                 args,
@@ -177,7 +172,6 @@ impl InterpreterImpl<'_> {
                 resource_resolver,
                 module_storage,
                 gas_meter,
-                traversal_context,
                 extensions,
                 function,
                 args,
@@ -224,7 +218,6 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
@@ -235,7 +228,6 @@ impl InterpreterImpl<'_> {
                 resource_resolver,
                 module_storage,
                 gas_meter,
-                traversal_context,
                 extensions,
                 function,
                 args,
@@ -246,7 +238,6 @@ impl InterpreterImpl<'_> {
                 resource_resolver,
                 module_storage,
                 gas_meter,
-                traversal_context,
                 extensions,
                 function,
                 args,
@@ -266,7 +257,6 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
@@ -423,7 +413,6 @@ impl InterpreterImpl<'_> {
                             resource_resolver,
                             module_storage,
                             gas_meter,
-                            traversal_context,
                             extensions,
                             &function,
                             ClosureMask::empty(),
@@ -532,7 +521,6 @@ impl InterpreterImpl<'_> {
                             resource_resolver,
                             module_storage,
                             gas_meter,
-                            traversal_context,
                             extensions,
                             &function,
                             ClosureMask::empty(),
@@ -578,21 +566,14 @@ impl InterpreterImpl<'_> {
                             };
 
                             // Charge gas for function code loading.
-                            let arena_id = traversal_context
-                                .referenced_module_ids
-                                .alloc(module_id.clone());
-                            check_dependencies_and_charge_gas(
-                                module_storage,
-                                gas_meter,
-                                traversal_context,
-                                [(arena_id.address(), arena_id.name())],
-                            )?;
+                            check_dependencies_and_charge_gas(module_storage, gas_meter, [
+                                module_id.clone(),
+                            ])?;
 
                             // Charge gas for code loading of modules used by type arguments.
                             check_type_tag_dependencies_and_charge_gas(
                                 module_storage,
                                 gas_meter,
-                                traversal_context,
                                 ty_arg_tags,
                             )?;
                             Ok(module_id.clone())
@@ -641,7 +622,6 @@ impl InterpreterImpl<'_> {
                             resource_resolver,
                             module_storage,
                             gas_meter,
-                            traversal_context,
                             extensions,
                             &callee,
                             mask,
@@ -779,7 +759,6 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: &LoadedFunction,
         mask: ClosureMask,
@@ -792,7 +771,6 @@ impl InterpreterImpl<'_> {
             resource_resolver,
             module_storage,
             gas_meter,
-            traversal_context,
             extensions,
             function,
             mask,
@@ -823,7 +801,6 @@ impl InterpreterImpl<'_> {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: &LoadedFunction,
         mask: ClosureMask,
@@ -882,7 +859,6 @@ impl InterpreterImpl<'_> {
             module_storage,
             extensions,
             gas_meter,
-            traversal_context,
         );
         let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
 
@@ -1006,20 +982,8 @@ impl InterpreterImpl<'_> {
                 .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
-                let arena_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(module_name.clone());
-                check_dependencies_and_charge_gas(
-                        module_storage,
-                        gas_meter,
-                        traversal_context,
-                        [(arena_id.address(), arena_id.name())],
-                    )
-                    .map_err(|err| err
-                        .to_partial()
-                        .append_message_with_separator('.',
-                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
-                        ))?;
+                check_dependencies_and_charge_gas(module_storage, gas_meter, [module_name])
+                    .map_err(|err| err.to_partial())?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())

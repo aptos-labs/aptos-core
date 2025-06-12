@@ -239,31 +239,21 @@ pub trait ModuleAccess: Sync {
     ///
     /// This is more efficient than `immediate_dependencies` as it does not make new
     /// copies of module ids on the heap.
-    fn immediate_dependencies_iter(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    fn immediate_dependencies_iter(&self) -> impl DoubleEndedIterator<Item = ModuleId> {
         self.module_handles()
             .iter()
             .filter(|&handle| handle != self.self_handle())
-            .map(|handle| {
-                let addr = self.address_identifier_at(handle.address);
-                let name = self.identifier_at(handle.name);
-                (addr, name)
-            })
+            .map(|handle| self.module_id_for_handle(handle))
     }
 
     /// Returns an iterator that iterates over all immediate friends of the module.
     ///
     /// This is more efficient than `immediate_dependencies` as it does not make new
     /// copies of module ids on the heap.
-    fn immediate_friends_iter(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
-        self.friend_decls().iter().map(|handle| {
-            let addr = self.address_identifier_at(handle.address);
-            let name = self.identifier_at(handle.name);
-            (addr, name)
-        })
+    fn immediate_friends_iter(&self) -> impl DoubleEndedIterator<Item = ModuleId> {
+        self.friend_decls()
+            .iter()
+            .map(|handle| self.module_id_for_handle(handle))
     }
 
     fn find_struct_def(&self, idx: StructHandleIndex) -> Option<&StructDefinition> {
@@ -357,29 +347,13 @@ pub trait ScriptAccess: Sync {
         &self.as_script().code
     }
 
-    fn immediate_dependencies(&self) -> Vec<ModuleId> {
-        self.module_handles()
-            .iter()
-            .map(|handle| {
-                ModuleId::new(
-                    *self.address_identifier_at(handle.address),
-                    self.identifier_at(handle.name).to_owned(),
-                )
-            })
-            .collect()
-    }
-
     /// Returns an iterator that iterates over all immediate dependencies of the module.
-    ///
-    /// This is more efficient than `immediate_dependencies` as it does not make new
-    /// copies of module ids on the heap.
-    fn immediate_dependencies_iter(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    fn immediate_dependencies_iter(&self) -> impl DoubleEndedIterator<Item = ModuleId> {
         self.module_handles().iter().map(|handle| {
-            let addr = self.address_identifier_at(handle.address);
-            let name = self.identifier_at(handle.name);
-            (addr, name)
+            ModuleId::new(
+                *self.address_identifier_at(handle.address),
+                self.identifier_at(handle.name).to_owned(),
+            )
         })
     }
 }

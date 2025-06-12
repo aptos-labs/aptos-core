@@ -78,7 +78,6 @@ impl AptosVM {
         gas_meter_balance: u64,
     ) -> (VMStatus, VMOutput) {
         use crate::gas::make_prod_gas_meter;
-        use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 
         let txn_data = TransactionMetadata::new(txn);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -110,7 +109,6 @@ impl AptosVM {
         let resolver = state_view.as_move_resolver();
         let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
 
-        let traversal_storage = TraversalStorage::new();
         self.failed_transaction_cleanup(
             SystemSessionChangeSet::empty(),
             error_vm_status,
@@ -124,7 +122,6 @@ impl AptosVM {
             ),
             &log_context,
             change_set_configs,
-            &mut TraversalContext::new(&traversal_storage),
         )
     }
 }

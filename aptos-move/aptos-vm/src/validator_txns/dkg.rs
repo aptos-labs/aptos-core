@@ -27,7 +27,6 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
 #[derive(Debug)]
@@ -115,7 +114,6 @@ impl AptosVM {
             dkg_node.transcript_bytes.as_move_value(),
         ];
 
-        let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &RECONFIGURATION_WITH_DKG_MODULE,
@@ -123,7 +121,6 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&traversal_storage),
                 module_storage,
             )
             .map_err(|e| {

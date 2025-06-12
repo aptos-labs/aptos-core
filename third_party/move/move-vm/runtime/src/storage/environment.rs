@@ -350,7 +350,7 @@ pub struct LocallyVerifiedModule(Arc<CompiledModule>, usize);
 impl LocallyVerifiedModule {
     pub fn immediate_dependencies_iter(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    ) -> impl DoubleEndedIterator<Item = ModuleId> + use<'_> {
         self.0.immediate_dependencies_iter()
     }
 }
@@ -361,7 +361,7 @@ pub struct LocallyVerifiedScript(Arc<CompiledScript>);
 impl LocallyVerifiedScript {
     pub fn immediate_dependencies_iter(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+    ) -> impl DoubleEndedIterator<Item = ModuleId> + use<'_> {
         self.0.immediate_dependencies_iter()
     }
 }

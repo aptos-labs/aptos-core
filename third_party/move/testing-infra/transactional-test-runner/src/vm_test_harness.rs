@@ -37,7 +37,6 @@ use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
-    module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
@@ -396,7 +395,6 @@ impl SimpleVMTestAdapter<'_> {
         )
         .unwrap();
 
-        let traversal_storage = TraversalStorage::new();
         let mut extensions = NativeContextExtensions::default();
 
         let mut data_cache = TransactionDataCache::empty();
@@ -405,7 +403,6 @@ impl SimpleVMTestAdapter<'_> {
             args,
             &mut data_cache,
             &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
             &mut extensions,
             module_storage,
             &self.storage,

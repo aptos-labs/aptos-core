@@ -6,7 +6,6 @@ use crate::{
     check_dependencies_and_charge_gas,
     data_cache::TransactionDataCache,
     interpreter::InterpreterDebugInterface,
-    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
         module_storage::FunctionValueExtensionAdapter,
@@ -99,17 +98,16 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b, 'c> {
+pub struct NativeContext<'a, 'b> {
     interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_meter: &'a mut dyn NativeGasMeter,
-    traversal_context: &'a mut TraversalContext<'c>,
 }
 
-impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
+impl<'a, 'b> NativeContext<'a, 'b> {
     pub(crate) fn new(
         interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
@@ -117,7 +115,6 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_meter: &'a mut dyn NativeGasMeter,
-        traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
             interpreter,
@@ -126,12 +123,11 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             module_storage,
             extensions,
             gas_meter,
-            traversal_context,
         }
     }
 }
 
-impl<'b, 'c> NativeContext<'_, 'b, 'c> {
+impl<'b> NativeContext<'_, 'b> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
@@ -212,20 +208,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     }
 
     pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> VMResult<()> {
-        let arena_id = self
-            .traversal_context
-            .referenced_module_ids
-            .alloc(module_id);
-        check_dependencies_and_charge_gas(
-            self.module_storage,
-            self.gas_meter,
-            self.traversal_context,
-            [(arena_id.address(), arena_id.name())],
-        )
-    }
-
-    pub fn traversal_context(&self) -> &TraversalContext<'c> {
-        self.traversal_context
+        check_dependencies_and_charge_gas(self.module_storage, self.gas_meter, [module_id])
     }
 
     pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {

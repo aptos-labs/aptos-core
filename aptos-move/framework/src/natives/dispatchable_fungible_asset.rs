@@ -6,11 +6,11 @@ use aptos_gas_schedule::gas_params::natives::aptos_framework::DISPATCHABLE_FUNGI
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::SmallVec;
 use std::collections::VecDeque;
-
 /***************************************************************************************************
  * native fun dispatchable_withdraw / dispatchable_deposit / dispatchable_derived_balance / dispatchable_derived_supply
  *
@@ -27,22 +27,26 @@ pub(crate) fn native_dispatch(
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
 
     // Check if the module is already properly charged in this transaction.
-    let check_visited = |a, n| {
+    let mut is_visited = |module_id: &ModuleId| {
         let special_addresses_considered_visited =
             context.get_feature_flags().is_account_abstraction_enabled()
                 || context
                     .get_feature_flags()
                     .is_derivable_account_abstraction_enabled();
         if special_addresses_considered_visited {
-            context
-                .traversal_context()
-                .check_is_special_or_visited(a, n)
+            module_id.address().is_special()
+                || context
+                    .gas_meter()
+                    .is_existing_dependency_metered(module_id)
         } else {
-            context.traversal_context().legacy_check_visited(a, n)
+            context
+                .gas_meter()
+                .is_existing_dependency_metered(module_id)
         }
     };
-    check_visited(module_name.address(), module_name.name())
-        .map_err(|_| SafeNativeError::Abort { abort_code: 4 })?;
+    if !is_visited(&module_name) {
+        return Err(SafeNativeError::Abort { abort_code: 4 });
+    }
 
     context.charge(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE)?;
 

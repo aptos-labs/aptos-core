@@ -28,15 +28,15 @@ use std::{
 /// Major features include incremental gas charging and less ambiguous error handling. For this
 /// reason, native functions should always use [`SafeNativeContext`] instead of [`NativeContext`].
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
-    pub(crate) inner: &'d mut NativeContext<'a, 'b, 'c>,
+pub struct SafeNativeContext<'a, 'b, 'c> {
+    pub(crate) inner: &'c mut NativeContext<'a, 'b>,
 
-    pub(crate) timed_features: &'d TimedFeatures,
-    pub(crate) features: &'d Features,
+    pub(crate) timed_features: &'c TimedFeatures,
+    pub(crate) features: &'c Features,
     pub(crate) gas_feature_version: u64,
 
-    pub(crate) native_gas_params: &'d NativeGasParameters,
-    pub(crate) misc_gas_params: &'d MiscGasParameters,
+    pub(crate) native_gas_params: &'c NativeGasParameters,
+    pub(crate) misc_gas_params: &'c MiscGasParameters,
 
     // The fields below were used when there was no access to gas meter in native context. This is
     // no longer the case, so these can be removed when the feature is stable.
@@ -44,24 +44,24 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     pub(crate) legacy_enable_incremental_gas_charging: bool,
     pub(crate) legacy_heap_memory_usage: u64,
 
-    pub(crate) gas_hook: Option<&'d (dyn Fn(DynamicExpression) + Send + Sync)>,
+    pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
-impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c, '_> {
-    type Target = NativeContext<'a, 'b, 'c>;
+impl<'a, 'b> Deref for SafeNativeContext<'a, 'b, '_> {
+    type Target = NativeContext<'a, 'b>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl DerefMut for SafeNativeContext<'_, '_, '_, '_> {
+impl DerefMut for SafeNativeContext<'_, '_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl SafeNativeContext<'_, '_, '_, '_> {
+impl SafeNativeContext<'_, '_, '_> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -181,11 +181,10 @@ impl SafeNativeContext<'_, '_, '_, '_> {
         module_id: &ModuleId,
         function_name: &Identifier,
     ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.inner.module_storage().fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
+        let (_, function) = self
+            .inner
+            .module_storage()
+            .fetch_function_definition(module_id, function_name)?;
         Ok(function)
     }
 }

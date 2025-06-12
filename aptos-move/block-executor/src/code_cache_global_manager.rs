@@ -286,18 +286,21 @@ fn prefetch_aptos_framework(
     guard: &mut AptosModuleCacheManagerGuard,
 ) -> Result<(), PanicError> {
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
+    let id = ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_validation").to_owned(),
+    );
 
     cfg_if! {
         if #[cfg(fuzzing)] {
             let maybe_loaded = code_storage.fetch_module_skip_verification(
-                &AccountAddress::ONE,
-                ident_str!("transaction_validation"),
+                &id
             ).map_err(|err| {
                 PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
             })?;
         } else {
             let maybe_loaded = code_storage
-                .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+                .fetch_verified_module(&id)
                 .map_err(|err| {
                     PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
                 })?;
