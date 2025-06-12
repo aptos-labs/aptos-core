@@ -1856,6 +1856,16 @@ The collection already exists
 
 
 
+<a id="0x3_token_ECOLLECTION_CREATION_DISABLED"></a>
+
+New token v1 collection creation is disabled
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_ECOLLECTION_CREATION_DISABLED">ECOLLECTION_CREATION_DISABLED</a>: u64 = 41;
+</code></pre>
+
+
+
 <a id="0x3_token_ECOLLECTION_NAME_TOO_LONG"></a>
 
 The collection name is too long
@@ -3558,6 +3568,7 @@ Create a new collection to hold tokens
     maximum: u64,
     mutate_setting: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;bool&gt;
 ) <b>acquires</b> <a href="token.md#0x3_token_Collections">Collections</a> {
+    <b>assert</b>!(!std::features::is_new_token_v1_collection_creation_disabled(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="token.md#0x3_token_ECOLLECTION_CREATION_DISABLED">ECOLLECTION_CREATION_DISABLED</a>));
     <b>assert</b>!(name.length() &lt;= <a href="token.md#0x3_token_MAX_COLLECTION_NAME_LENGTH">MAX_COLLECTION_NAME_LENGTH</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_ECOLLECTION_NAME_TOO_LONG">ECOLLECTION_NAME_TOO_LONG</a>));
     <b>assert</b>!(uri.length() &lt;= <a href="token.md#0x3_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EURI_TOO_LONG">EURI_TOO_LONG</a>));
     <b>let</b> account_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);

@@ -143,6 +143,7 @@ pub enum FeatureFlag {
 
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
+    DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION = 98,
 }
 
 impl FeatureFlag {
@@ -242,6 +243,7 @@ impl FeatureFlag {
             // TODO(grao): Enable priority fee feature flags.
             // FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
             // FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION,
         ]
     }
 }

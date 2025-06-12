@@ -152,6 +152,9 @@ module aptos_token::token {
     /// The property is reserved by token standard
     const EPROPERTY_RESERVED_BY_STANDARD: u64 = 40;
 
+    /// New token v1 collection creation is disabled
+    const ECOLLECTION_CREATION_DISABLED: u64 = 41;
+
     //
     // Core data structures for holding tokens
     //
@@ -1166,6 +1169,7 @@ module aptos_token::token {
         maximum: u64,
         mutate_setting: vector<bool>
     ) acquires Collections {
+        assert!(!std::features::is_new_token_v1_collection_creation_disabled(), error::invalid_state(ECOLLECTION_CREATION_DISABLED));
         assert!(name.length() <= MAX_COLLECTION_NAME_LENGTH, error::invalid_argument(ECOLLECTION_NAME_TOO_LONG));
         assert!(uri.length() <= MAX_URI_LENGTH, error::invalid_argument(EURI_TOO_LONG));
         let account_addr = signer::address_of(creator);
