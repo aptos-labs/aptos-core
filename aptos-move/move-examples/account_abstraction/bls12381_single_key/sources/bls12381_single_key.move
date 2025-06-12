@@ -1,4 +1,4 @@
-module aa::single_key {
+module aa::bls12381_single_key {
     use std::option;
     use std::signer;
     use aptos_std::bls12381::{Self, PublicKey};
