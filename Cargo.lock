@@ -11772,15 +11772,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "module-publish"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-transaction-generator-lib",
- "clap 4.5.21",
-]
-
-[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13419,6 +13410,17 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "package-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "move-package",
 ]
 
 [[package]]
