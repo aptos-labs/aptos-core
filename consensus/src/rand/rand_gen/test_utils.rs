@@ -48,7 +48,6 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
             LedgerInfo::mock_genesis(None),
             AggregateSignature::empty(),
         ),
-        callback: Box::new(move |_, _| {}),
     }
 }
 

@@ -144,11 +144,9 @@ pub fn prepare_buffer_manager(
         buffer_manager,
     ) = prepare_phases_and_buffer_manager(
         author,
-        mocked_execution_proxy,
         Arc::new(Mutex::new(safety_rules)),
         network,
         msg_rx,
-        state_computer,
         block_rx,
         buffer_reset_rx,
         Arc::new(EpochState {
@@ -162,7 +160,6 @@ pub fn prepare_buffer_manager(
         ConsensusObserverConfig::default(),
         None,
         100,
-        true,
     );
 
     (
@@ -326,7 +323,6 @@ fn buffer_manager_happy_path_test() {
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
                     ordered_proof: proofs[i].clone(),
-                    callback: Box::new(move |_, _| {}),
                 })
                 .await
                 .ok();
@@ -393,7 +389,6 @@ fn buffer_manager_sync_test() {
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
                     ordered_proof: proofs[i].clone(),
-                    callback: Box::new(move |_, _| {}),
                 })
                 .await
                 .ok();
@@ -423,7 +418,6 @@ fn buffer_manager_sync_test() {
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
                     ordered_proof: proofs[i].clone(),
-                    callback: Box::new(move |_, _| {}),
                 })
                 .await
                 .ok();

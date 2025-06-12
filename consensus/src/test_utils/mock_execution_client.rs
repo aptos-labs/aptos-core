@@ -11,7 +11,6 @@ use crate::{
         pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::types::RandConfig,
-    state_replication::StateComputerCommitCallBackType,
     test_utils::mock_storage::MockStorage,
 };
 use anyhow::{anyhow, format_err, Result};
@@ -64,7 +63,6 @@ impl MockExecutionClient {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
-            callback,
         } = blocks;
 
         self.consensus_db
@@ -85,8 +83,6 @@ impl MockExecutionClient {
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);
 
-        callback(&ordered_blocks, ordered_proof);
-
         Ok(())
     }
 }
@@ -106,7 +102,6 @@ impl TExecutionClient for MockExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
-        _new_pipeline_enabled: bool,
     ) {
     }
 
@@ -118,7 +113,6 @@ impl TExecutionClient for MockExecutionClient {
         &self,
         blocks: Vec<Arc<PipelinedBlock>>,
         finality_proof: WrappedLedgerInfo,
-        callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
         info!(
@@ -142,7 +136,6 @@ impl TExecutionClient for MockExecutionClient {
             .send(OrderedBlocks {
                 ordered_blocks: blocks,
                 ordered_proof: finality_proof.ledger_info().clone(),
-                callback,
             })
             .await
             .is_err()

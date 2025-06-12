@@ -5,7 +5,6 @@ use crate::error::QuorumStoreError;
 use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};
 #[cfg(test)]
 use aptos_types::transaction::SignedTransaction;
-use futures::future::BoxFuture;
 #[cfg(test)]
 use std::time::Duration;
 #[cfg(test)]
@@ -18,7 +17,6 @@ pub trait UserPayloadClient: Send + Sync {
     async fn pull(
         &self,
         params: PayloadPullParameters,
-        wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<Payload, QuorumStoreError>;
 }
 
@@ -41,7 +39,6 @@ impl UserPayloadClient for DummyClient {
     async fn pull(
         &self,
         mut params: PayloadPullParameters,
-        _wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         use aptos_consensus_types::utils::PayloadTxnsSize;
 

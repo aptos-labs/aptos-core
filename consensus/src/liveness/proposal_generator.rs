@@ -36,7 +36,6 @@ use aptos_infallible::Mutex;
 use aptos_logger::{error, sample, sample::SampleRate, warn};
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
-use futures::future::BoxFuture;
 use itertools::Itertools;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -485,7 +484,6 @@ impl ProposalGenerator {
         &self,
         round: Round,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-        wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
         {
             let mut last_round_generated = self.last_round_generated.lock();
@@ -608,7 +606,6 @@ impl ProposalGenerator {
                         block_timestamp: timestamp,
                     },
                     validator_txn_filter,
-                    wait_callback,
                 )
                 .await
                 .context("Fail to retrieve payload")?;

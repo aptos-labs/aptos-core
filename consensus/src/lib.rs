@@ -56,7 +56,6 @@ pub mod consensus_observer;
 pub mod consensus_provider;
 /// Required by the telemetry service
 pub mod counters;
-mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
