@@ -61,6 +61,7 @@ module 0xc0ffee::m {
         if (nested.flags.a || nested.flags.a && nested.enabled) ();
     }
 
+    // This test should not trigger the lint, since helper_function() might have side effects
     public fun test_absorption_law_mixed() {
         let x = true;
         let p = 20;
@@ -85,6 +86,7 @@ module 0xc0ffee::m {
         if (flag || flag) ();
     }
 
+    // This test should not trigger the lint, since it's already implemented in `nonminimal_bool`
     public fun test_idempotence_constants() {
         if (TRUE_CONST && TRUE_CONST) ();
         if (FALSE_CONST || FALSE_CONST) ();
@@ -107,6 +109,7 @@ module 0xc0ffee::m {
         if (nested.flags.b || nested.flags.b) ();
     }
 
+    // This test should not trigger the lint, since helper_function() might have side effects
     public fun test_idempotence_mixed() {
         let x = true;
 
@@ -136,6 +139,7 @@ module 0xc0ffee::m {
         if (!condition || condition) ();
     }
 
+    // This test should not trigger the lint, since it's already implemented in `nonminimal_bool`
     public fun test_contradiction_tautology_constants() {
         if (TRUE_CONST && !TRUE_CONST) ();
         if (!TRUE_CONST && TRUE_CONST) ();
@@ -164,6 +168,7 @@ module 0xc0ffee::m {
         if (!nested.flags.a || nested.flags.a) ();
     }
 
+    // This test should not trigger the lint, since helper_function() might have side effects
     public fun test_contradiction_tautology_mixed() {
         let x = true;
 
@@ -193,6 +198,7 @@ module 0xc0ffee::m {
 
     public fun test_distributive_law_constants() {
         if ((TRUE_CONST && FALSE_CONST) || (TRUE_CONST && TRUE_CONST)) ();
+        if ((FALSE_CONST || FALSE_CONST) && (FALSE_CONST || TRUE_CONST)) ();
     }
 
     public fun test_distributive_law_struct_field() {
@@ -213,14 +219,14 @@ module 0xc0ffee::m {
         if ((nested.flags.a || nested.enabled) && (nested.flags.a || nested.flags.c)) ();
     }
 
-
+    // This test should not trigger the lint, since helper_function() might have side effects
     public fun test_distributive_law_mixed() {
-        let x = helper_function();
         let y = 5;
 
-        if ((x && TRUE_CONST) || (x && (y > 10))) ();
-        if ((x || FALSE_CONST) && (x || (y > 10))) ();
+        if ((helper_function() && TRUE_CONST) || (helper_function() && (y > 10))) ();
+        if ((helper_function() || FALSE_CONST) && (helper_function() || (y > 10))) ();
     }
+
 
     // ===== LINT SKIP TESTS =====
 
