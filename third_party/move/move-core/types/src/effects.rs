@@ -138,7 +138,10 @@ impl<Resource> AccountChanges<Resource> {
         use btree_map::Entry::*;
 
         match self.resources.entry(struct_tag) {
-            Occupied(entry) => bail!("Resource {} already exists", entry.key()),
+            Occupied(entry) => bail!(
+                "Resource {} already exists",
+                entry.key().to_canonical_string()
+            ),
             Vacant(entry) => {
                 entry.insert(op);
             },

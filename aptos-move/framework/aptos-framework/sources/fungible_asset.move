@@ -1361,8 +1361,13 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleStore {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
+        let fungible_store_address = object::object_address(&store);
+        // be graceful if ConcurrentFungibleBalance already exists, but flag is off
+        if (exists<ConcurrentFungibleBalance>(fungible_store_address)) {
+            return
+        };
         assert!(allow_upgrade_to_concurrent_fungible_balance(), error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED));
-        ensure_store_upgraded_to_concurrent_internal(object::object_address(&store));
+        ensure_store_upgraded_to_concurrent_internal(fungible_store_address);
     }
 
     /// Ensure a known `FungibleStore` has `ConcurrentFungibleBalance`.
