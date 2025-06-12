@@ -22,6 +22,38 @@ module 0xc0ffee::m {
         BoolFlags { a: true, b: false, c: true }
     }
 
+    // ===== DOUBLE NEGATION LAW TESTS (should trigger lint) =====
+    // Pattern: !!a should simplify to just a
+
+    public fun test_double_negation_parameters(a: bool) {
+        if (!!a) ();
+    }
+
+    public fun test_double_negation_variables() {
+        let a = true;
+        let b = false;
+
+        if (!!a) ();
+        if (!(!b)) ();
+    }
+
+    public fun test_double_negation_struct_field() {
+        let flags = get_bool_flags();
+
+        if (!!flags.a) ();
+        if (!(!flags.b)) ();
+    }
+
+    public fun test_double_negation_nested_struct() {
+        let nested = NestedStruct {
+            flags: BoolFlags { a: true, b: false, c: true },
+            enabled: true
+        };
+
+        if (!!nested.flags.a) ();
+        if (!(!nested.enabled)) ();
+    }
+
     // ===== ABSORPTION LAW TESTS (should trigger lint) =====
     // Pattern: a && b || a should simplify to just a
     // Pattern: a || a && b should simplify to just a
@@ -75,6 +107,7 @@ module 0xc0ffee::m {
     // Pattern: a || a should simplify to just a
 
     public fun test_idempotence_parameters(a: bool) {
+        if (!!a && !a) ();
         if (a && a) ();
         if (a || a) ();
     }
