@@ -3,6 +3,7 @@
 
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
+    gas::ModuleTraversalContext,
     values::{
         AbstractFunction, DeserializationSeed, SerializationReadyValue, SerializedFunctionData,
         Value,
@@ -30,6 +31,7 @@ pub trait FunctionValueExtension {
     fn get_serialization_data(
         &self,
         fun: &dyn AbstractFunction,
+        traversal_context: &dyn ModuleTraversalContext,
     ) -> PartialVMResult<SerializedFunctionData>;
 }
 
@@ -62,10 +64,13 @@ impl DelayedFieldsExtension<'_> {
     }
 }
 
-/// Contains information on how to resolve function values.
+/// Contains information on how to resolve function values. In addition, stores all visited
+/// modules so that during (de)serialization one can check if module loading has been metered or
+/// not.
 #[derive(Clone)]
 pub(crate) struct FunctionValueExtensionWithContext<'a> {
     extension: &'a dyn FunctionValueExtension,
+    traversal_context: &'a dyn ModuleTraversalContext,
     /// Marker to indicate that function value serialization failed. Used to ensure we propagate
     /// error status code correctly, as otherwise any serialization failure is treated as an
     /// invariant violation.
@@ -79,7 +84,7 @@ impl<'a> FunctionValueExtensionWithContext<'a> {
         fun: &dyn AbstractFunction,
     ) -> PartialVMResult<SerializedFunctionData> {
         self.extension
-            .get_serialization_data(fun)
+            .get_serialization_data(fun, self.traversal_context)
             .inspect_err(|err| {
                 *self.function_value_serialization_error.borrow_mut() = Some(err.clone());
             })
@@ -119,14 +124,15 @@ impl<'a> ValueSerDeContext<'a> {
         self
     }
 
-    /// Custom (de)serializer such that supports lookup of the argument types of a function during
-    /// function value deserialization.
-    pub fn with_func_args_deserialization(
+    /// Custom (de)serializer such that supports lookup of serialized function data.
+    pub fn with_function_value_extension(
         mut self,
         extension: &'a dyn FunctionValueExtension,
+        traversal_context: &'a dyn ModuleTraversalContext,
     ) -> Self {
         self.function_extension = Some(FunctionValueExtensionWithContext {
             extension,
+            traversal_context,
             function_value_serialization_error: RefCell::new(None),
         });
         self

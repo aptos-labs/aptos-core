@@ -27,6 +27,7 @@ use move_core_types::{
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::{
+    gas::ModuleTraversalContext,
     loaded_data::runtime_types::Type,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Reference, StructRef, Value},
@@ -121,6 +122,7 @@ impl<'a> NativeTableContext<'a> {
     pub fn into_change_set(
         self,
         function_value_extension: &impl FunctionValueExtension,
+        traversal_context: &impl ModuleTraversalContext,
     ) -> PartialVMResult<TableChangeSet> {
         let NativeTableContext { table_data, .. } = self;
         let TableData {
@@ -148,6 +150,7 @@ impl<'a> NativeTableContext<'a> {
                             key,
                             Op::New(serialize_value(
                                 function_value_extension,
+                                traversal_context,
                                 &value_layout_info,
                                 &val,
                             )?),
@@ -158,6 +161,7 @@ impl<'a> NativeTableContext<'a> {
                             key,
                             Op::Modify(serialize_value(
                                 function_value_extension,
+                                traversal_context,
                                 &value_layout_info,
                                 &val,
                             )?),
@@ -222,6 +226,7 @@ impl Table {
     fn get_or_create_global_value(
         &mut self,
         function_value_extension: &dyn FunctionValueExtension,
+        traversal_context: &impl ModuleTraversalContext,
         table_context: &NativeTableContext,
         key: Vec<u8>,
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
@@ -245,6 +250,7 @@ impl Table {
                     Some(val_bytes) => {
                         let val = deserialize_value(
                             function_value_extension,
+                            traversal_context,
                             &val_bytes,
                             &self.value_layout_info,
                         )?;
@@ -375,11 +381,20 @@ fn native_add_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        context.traversal_context(),
+        &table.key_layout,
+        &key,
+    )?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        context.traversal_context(),
+        table_context,
+        key_bytes,
+    )?;
     let mem_usage = gv.view().map(|val| {
         u64::from(
             context
@@ -426,11 +441,20 @@ fn native_borrow_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        context.traversal_context(),
+        &table.key_layout,
+        &key,
+    )?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        context.traversal_context(),
+        table_context,
+        key_bytes,
+    )?;
     let mem_usage = gv.view().map(|val| {
         u64::from(
             context
@@ -477,11 +501,20 @@ fn native_contains_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        context.traversal_context(),
+        &table.key_layout,
+        &key,
+    )?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        context.traversal_context(),
+        table_context,
+        key_bytes,
+    )?;
     let mem_usage = gv.view().map(|val| {
         u64::from(
             context
@@ -522,11 +555,20 @@ fn native_remove_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize_key(
+        &function_value_extension,
+        context.traversal_context(),
+        &table.key_layout,
+        &key,
+    )?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        context.traversal_context(),
+        table_context,
+        key_bytes,
+    )?;
     let mem_usage = gv.view().map(|val| {
         u64::from(
             context
@@ -603,17 +645,19 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 
 fn serialize_key(
     function_value_extension: &dyn FunctionValueExtension,
+    traversal_context: &impl ModuleTraversalContext,
     layout: &MoveTypeLayout,
     key: &Value,
 ) -> PartialVMResult<Vec<u8>> {
     ValueSerDeContext::new()
-        .with_func_args_deserialization(function_value_extension)
+        .with_function_value_extension(function_value_extension, traversal_context)
         .serialize(key, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key"))
 }
 
 fn serialize_value(
     function_value_extension: &dyn FunctionValueExtension,
+    traversal_context: &impl ModuleTraversalContext,
     layout_info: &LayoutInfo,
     val: &Value,
 ) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
@@ -621,14 +665,14 @@ fn serialize_value(
         // Value contains delayed fields, so we should be able to serialize it.
         ValueSerDeContext::new()
             .with_delayed_fields_serde()
-            .with_func_args_deserialization(function_value_extension)
+            .with_function_value_extension(function_value_extension, traversal_context)
             .serialize(val, layout_info.layout.as_ref())?
             .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
     } else {
         // No delayed fields, make sure serialization fails if there are any
         // native values.
         ValueSerDeContext::new()
-            .with_func_args_deserialization(function_value_extension)
+            .with_function_value_extension(function_value_extension, traversal_context)
             .serialize(val, layout_info.layout.as_ref())?
             .map(|bytes| (bytes.into(), None))
     };
@@ -637,18 +681,19 @@ fn serialize_value(
 
 fn deserialize_value(
     function_value_extension: &dyn FunctionValueExtension,
+    traversal_context: &impl ModuleTraversalContext,
     bytes: &[u8],
     layout_info: &LayoutInfo,
 ) -> PartialVMResult<Value> {
     let layout = layout_info.layout.as_ref();
     let deserialization_result = if layout_info.has_identifier_mappings {
         ValueSerDeContext::new()
-            .with_func_args_deserialization(function_value_extension)
+            .with_function_value_extension(function_value_extension, traversal_context)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
     } else {
         ValueSerDeContext::new()
-            .with_func_args_deserialization(function_value_extension)
+            .with_function_value_extension(function_value_extension, traversal_context)
             .deserialize(bytes, layout)
     };
     deserialization_result.ok_or_else(|| partial_extension_error("cannot deserialize table value"))

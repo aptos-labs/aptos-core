@@ -27,6 +27,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
+    gas::{ImmutableTraversalContext, ModuleTraversalContext},
     loaded_data::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
@@ -581,6 +582,7 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
     fn get_serialization_data(
         &self,
         fun: &dyn AbstractFunction,
+        traversal_context: &dyn ModuleTraversalContext,
     ) -> PartialVMResult<SerializedFunctionData> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
@@ -592,6 +594,20 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                     .vm_config()
                     .ty_builder;
 
+                // Why is it safe to NOT meter possible module loading when constructing captured
+                // layout?
+                //
+                // INVARIANT(assertion):
+                //   Captured arguments from storage have their layouts already constructed,
+                //   therefore, the corresponding modules must be loaded.
+                //
+                // INVARIANT(assertion):
+                //    Captured arguments created during execution: by construction, their modules
+                //    also must have been loaded.
+                // TODO(lazy-loading):
+                //   Use the context to check the invariant that all modules for layout are indeed
+                //   loaded. Will be coupled with native loader (later PRs).
+                let _ctx = ImmutableTraversalContext::new(traversal_context);
                 let captured_layouts = mask
                     .extract(fun.param_tys(), true)
                     .into_iter()

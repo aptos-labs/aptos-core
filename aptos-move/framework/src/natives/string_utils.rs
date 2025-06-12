@@ -18,7 +18,6 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    value_serde::FunctionValueExtension,
     values::{Closure, Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -363,10 +362,7 @@ fn native_format_impl(
             // avoiding potential loading of the function to get full
             // decorated type information.
             let (fun, args) = val.value_as::<Closure>()?.unpack();
-            let data = context
-                .context
-                .function_value_extension()
-                .get_serialization_data(fun.as_ref())?;
+            let data = context.context.get_serialization_data(fun.as_ref())?;
             out.push_str(&fun.to_canonical_string());
             format_vector(
                 context,

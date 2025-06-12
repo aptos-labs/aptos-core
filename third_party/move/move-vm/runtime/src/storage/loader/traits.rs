@@ -1,10 +1,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{module_traversal::TraversalContext, WithRuntimeEnvironment};
+use crate::WithRuntimeEnvironment;
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::{
-    gas::GasMeter,
+    gas::{GasMeter, ModuleTraversalContext},
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
 };
 use std::sync::Arc;
@@ -17,7 +17,7 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
     fn load_struct_definition(
         &self,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
+        traversal_context: &mut impl ModuleTraversalContext,
         idx: &StructNameIndex,
     ) -> PartialVMResult<Arc<StructType>>;
 }
