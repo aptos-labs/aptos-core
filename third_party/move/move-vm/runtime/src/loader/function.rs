@@ -8,7 +8,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     runtime_type_checks::RuntimeTypeCheck,
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
-    ModuleStorage, RuntimeEnvironment,
+    RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -195,13 +195,17 @@ impl LazyLoadedFunction {
 
     /// If the function hasn't been resolved (loaded) yet, loads it. The gas is also charged for
     /// function loading and any other module accesses.
-    pub(crate) fn as_resolved<RTTCheck: RuntimeTypeCheck>(
+    pub(crate) fn as_resolved<LoaderImpl, RTTCheck>(
         &self,
-        module_storage: &impl ModuleStorage,
-        layout_converter: &LayoutConverter<impl Loader>,
+        loader: &LoaderImpl,
+        layout_converter: &LayoutConverter<LoaderImpl>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
+    ) -> PartialVMResult<Rc<LoadedFunction>>
+    where
+        LoaderImpl: Loader,
+        RTTCheck: RuntimeTypeCheck,
+    {
         let mut state = self.0.borrow_mut();
         Ok(match &mut *state {
             LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
@@ -216,15 +220,19 @@ impl LazyLoadedFunction {
                         captured_layouts,
                     },
             } => {
-                let fun = Self::resolve::<RTTCheck>(
-                    module_storage,
-                    layout_converter,
+                let fun = loader.load_closure(
                     gas_meter,
                     traversal_context,
                     module_id,
                     fun_id,
                     ty_args,
-                    *mask,
+                )?;
+                Self::check_layouts_compatible::<RTTCheck>(
+                    layout_converter,
+                    gas_meter,
+                    traversal_context,
+                    &fun,
+                    mask,
                     captured_layouts,
                 )?;
                 *state = LazyLoadedFunctionState::Resolved {
@@ -237,29 +245,19 @@ impl LazyLoadedFunction {
         })
     }
 
-    /// Resolves a function into a loaded function. This verifies existence of the named
-    /// function as well as whether it has the type used for deserializing the captured values.
-    fn resolve<RTTCheck: RuntimeTypeCheck>(
-        module_storage: &impl ModuleStorage,
+    /// Verifies that the function argument types match the layouts used for deserialization. This
+    /// is only done in paranoid mode. Because of integrity of storage and the guarantees of public
+    /// functions, these checks should not fail.
+    /// Note that because we need to charge gas for modules loaded during layout construction, the
+    /// only "paranoid" check is the comparison of layouts.
+    fn check_layouts_compatible<RTTCheck: RuntimeTypeCheck>(
         layout_converter: &LayoutConverter<impl Loader>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_id: &ModuleId,
-        fun_id: &IdentStr,
-        ty_args: &[TypeTag],
-        mask: ClosureMask,
+        function: &LoadedFunction,
+        mask: &ClosureMask,
         captured_layouts: &[Arc<MoveTypeLayout>],
-    ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let function = module_storage
-            .load_function(module_id, fun_id, ty_args)
-            .map_err(|err| err.to_partial())?;
-
-        // Verify that the function argument types match the layouts used for deserialization.
-        // This is only done in paranoid mode. Since integrity of storage and guarantee of public
-        // functions, these checks should not fail.
-        // Note that because we need to charge gas for modules loaded during layout construction,
-        // the only "paranoid" check is the comparison of layouts.
-
+    ) -> PartialVMResult<()> {
         let captured_arg_types = mask.extract(function.param_tys(), true);
         if captured_arg_types.len() != captured_layouts.len() {
             return Err(
@@ -269,7 +267,7 @@ impl LazyLoadedFunction {
             );
         }
 
-        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+        let ty_builder = &layout_converter.vm_config().ty_builder;
         for (actual_arg_ty, serialized_layout) in
             captured_arg_types.into_iter().zip(captured_layouts)
         {
@@ -308,7 +306,7 @@ impl LazyLoadedFunction {
             }
         }
 
-        Ok(Rc::new(function))
+        Ok(())
     }
 }
 

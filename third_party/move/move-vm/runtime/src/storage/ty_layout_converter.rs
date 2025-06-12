@@ -87,7 +87,7 @@ where
     }
 
     /// Returns the VM config used in the system.
-    fn vm_config(&self) -> &VMConfig {
+    pub(crate) fn vm_config(&self) -> &VMConfig {
         self.struct_definition_loader
             .runtime_environment()
             .vm_config()
