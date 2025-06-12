@@ -539,6 +539,7 @@ impl AptosVM {
     fn inject_abort_info_if_available(
         &self,
         module_storage: &impl AptosModuleStorage,
+        traversal_context: &TraversalContext,
         status: ExecutionStatus,
     ) -> ExecutionStatus {
         if let ExecutionStatus::MoveAbort {
@@ -547,12 +548,25 @@ impl AptosVM {
             ..
         } = status
         {
-            let info = module_storage
-                .fetch_module_metadata(module_id.address(), module_id.name())
-                .ok()
-                .flatten()
-                .and_then(|metadata| get_metadata(&metadata))
-                .and_then(|m| m.extract_abort_info(code));
+            let info = if self.features().is_lazy_loading_enabled()
+                && traversal_context
+                    .check_is_special_or_visited(module_id.address(), module_id.name())
+                    .is_err()
+            {
+                // This should never be the case if errors are set correctly. For safety, simply do
+                // not inject error information.
+                None
+            } else {
+                // MODULE METERING SAFETY:
+                //   The module have been visited and metered.
+                module_storage
+                    .unmetered_get_module_metadata(module_id.address(), module_id.name())
+                    .ok()
+                    .flatten()
+                    .and_then(|metadata| get_metadata(&metadata))
+                    .and_then(|m| m.extract_abort_info(code))
+            };
+
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module_id),
                 code,
@@ -682,7 +696,7 @@ impl AptosVM {
         // Also, do not move this after we run failure epilogue below, because this will load
         // module, which alters abort info. We have a transaction at version 596888095 which
         // relies on this specific behavior...
-        let status = self.inject_abort_info_if_available(module_storage, status);
+        let status = self.inject_abort_info_if_available(module_storage, traversal_context, status);
         epilogue_session.execute(|session| {
             transaction_validation::run_failure_epilogue(
                 session,
@@ -3013,8 +3027,12 @@ pub(crate) fn should_create_account_resource(
         && txn_data.replay_protector == ReplayProtector::SequenceNumber(0)
     {
         let account_tag = AccountResource::struct_tag();
+        assert!(account_tag.address.is_special());
+
+        // MODULE METERING SAFETY:
+        //   Account lives at a special address, so we should not be charging for it.
         let metadata = module_storage
-            .fetch_existing_module_metadata(&account_tag.address, &account_tag.module)?;
+            .unmetered_get_existing_module_metadata(&account_tag.address, &account_tag.module)?;
         let (maybe_bytes, _) = resolver
             .get_resource_bytes_with_metadata_and_layout(
                 &txn_data.sender(),
