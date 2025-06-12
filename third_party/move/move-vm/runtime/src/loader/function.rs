@@ -374,12 +374,22 @@ impl LoadedFunction {
 
     /// Returns true if the loaded function has friend or private visibility.
     pub fn is_friend_or_private(&self) -> bool {
-        self.function.is_friend() || self.function.is_private()
+        self.is_friend() || self.is_private()
     }
 
     /// Returns true if the loaded function has public visibility.
     pub fn is_public(&self) -> bool {
         self.function.is_public()
+    }
+
+    /// Returns true if the loaded function has friend visibility.
+    pub fn is_friend(&self) -> bool {
+        self.function.is_friend()
+    }
+
+    /// Returns true if the loaded function has private visibility.
+    pub fn is_private(&self) -> bool {
+        self.function.is_private()
     }
 
     /// Returns an error if the loaded function is **NOT** an entry function.
