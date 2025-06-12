@@ -17,9 +17,9 @@ pub struct TransactionFilterConfig {
 impl Default for TransactionFilterConfig {
     fn default() -> Self {
         Self {
-            enable_consensus_filter: false,    // Disable the consensus filter
-            enable_mempool_filter: false,      // Disable the mempool filter
-            enable_quorum_store_filter: false, // Disable the quorum store filter
+            enable_consensus_filter: false,   // Disable the consensus filter
+            enable_mempool_filter: false,     // Disable the mempool filter
+            enable_quorum_store_filter: true, // Disable the quorum store filter
             transaction_filter: Filter::default(),
         }
     }
