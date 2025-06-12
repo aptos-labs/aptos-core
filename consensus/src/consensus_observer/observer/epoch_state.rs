@@ -125,11 +125,6 @@ impl ObserverEpochState {
             randomness_config,
         )
     }
-
-    /// Returns whether the pipeline is enabled
-    pub fn pipeline_enabled(&self) -> bool {
-        self.node_config.consensus_observer.enable_pipeline
-    }
 }
 
 /// A simple helper function that extracts the on-chain configs from the reconfig events

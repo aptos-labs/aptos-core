@@ -19,7 +19,6 @@ impl BlockStage {
     pub const EPOCH_MANAGER_VERIFIED_OPT_PROPOSAL: &'static str =
         "epoch_manager_verified_opt_proposal";
     pub const EXECUTED: &'static str = "executed";
-    pub const EXECUTION_PIPELINE_INSERTED: &'static str = "execution_pipeline_inserted";
     pub const NETWORK_RECEIVED: &'static str = "network_received";
     pub const NETWORK_RECEIVED_OPT_PROPOSAL: &'static str = "network_received_opt_proposal";
     pub const OC_ADDED: &'static str = "ordered_cert_created";
