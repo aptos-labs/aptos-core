@@ -36,6 +36,7 @@ mod batch_transfer;
 mod bounded_batch_wrapper;
 pub mod call_custom_modules;
 pub mod entry_points;
+pub mod marketplace_generator;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
@@ -48,6 +49,7 @@ use self::{
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
 };
+
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
     batch_transfer::BatchTransferTransactionGeneratorCreator,
@@ -120,6 +122,15 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
+        // TransactionType::Workflow {
+        //     workflow_kind: Box::new(TokenWorkflowKind::CreateMintBurn {
+        //         count: 1000,
+        //         creation_balance: 200000,
+        //     }),
+        //     num_modules: 1,
+        //     use_account_pool: false,
+        //     progress_type: WorkflowProgress::MoveByPhases,
+        // }
         TransactionType::CoinTransfer {
             invalid_transaction_ratio: 0,
             sender_use_account_pool: false,

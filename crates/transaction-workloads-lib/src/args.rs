@@ -93,6 +93,7 @@ pub enum TransactionTypeArg {
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct,
+    TokenV2MintAndPlaceListing,
 }
 
 impl TransactionTypeArg {
@@ -406,6 +407,15 @@ impl TransactionTypeArg {
                     max_buy_size: 950,
                 })
             },
+            TransactionTypeArg::TokenV2MintAndPlaceListing => TransactionType::Workflow {
+                workflow_kind: Box::new(TokenWorkflowKind::MarketplaceWorkflow {
+                    count: 1000,
+                    creation_balance: 200000,
+                }),
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            }
         }
     }
 
