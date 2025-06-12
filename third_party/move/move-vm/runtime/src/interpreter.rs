@@ -97,6 +97,9 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     access_control: AccessControlState,
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
+    /// Loader to resolve functions and modules from remote storage. Ensures all module accesses
+    /// are metered.
+    loader: &'ctx LoaderImpl,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
     /// Converts runtime types ([Type]) to layouts for (de)serialization.
@@ -125,6 +128,7 @@ impl Interpreter {
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
@@ -140,6 +144,7 @@ impl Interpreter {
             args,
             data_cache,
             module_storage,
+            loader,
             ty_depth_checker,
             layout_converter,
             resource_resolver,
@@ -161,6 +166,7 @@ where
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
@@ -174,6 +180,7 @@ where
             vm_config: module_storage.runtime_environment().vm_config(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
+            loader,
             ty_depth_checker,
             layout_converter,
             native_layout_cache: NativeLayoutCache::default(),
@@ -1048,20 +1055,11 @@ where
                 Ok(())
             },
             NativeResult::LoadModule { module_name } => {
-                let arena_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(module_name.clone());
-                check_dependencies_and_charge_gas(
-                        module_storage,
-                        gas_meter,
-                        traversal_context,
-                        [(arena_id.address(), arena_id.name())],
-                    )
-                    .map_err(|err| err
-                        .to_partial()
-                        .append_message_with_separator('.',
-                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
-                        ))?;
+                self.loader.charge_native_result_load_module(
+                    gas_meter,
+                    traversal_context,
+                    &module_name,
+                )?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
