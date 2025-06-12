@@ -24,10 +24,10 @@ spec:
       resources:
         requests:
           memory: "180Gi"
-          cpu: "30"
+          cpu: "29"
         limits:
           memory: "180Gi"
-          cpu: "30"
+          cpu: "29"
   volumes:
     - name: archive
       persistentVolumeClaim:
