@@ -35,11 +35,11 @@ enum SimplerBoolPatternType {
 impl SimplerBoolPatternType {
     fn to_message(&self) -> &str {
         match self {
-            SimplerBoolPatternType::AbsorptionLaw => "This boolean expression can be simplified using absorption law. The expression `a && b || a` is equivalent to just `a`.",
-            SimplerBoolPatternType::Idempotence => "This boolean expression can be simplified using idempotence. The expression `a && a` is equivalent to just `a`.",
-            SimplerBoolPatternType::Contradiction => "This boolean expression can be simplified using contradiction. The expression `a && !a` is equivalent to just `false`.",
-            SimplerBoolPatternType::Tautology => "This boolean expression can be simplified using tautology. The expression `a || !a` is equivalent to just `true`.",
-            SimplerBoolPatternType::DistributiveLaw => "This boolean expression can be simplified using distributive law. The expression `(a && b) || (a && c)` is equivalent to `a && (b || c)`.",
+            SimplerBoolPatternType::AbsorptionLaw => "This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).",
+            SimplerBoolPatternType::Idempotence => "This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).",
+            SimplerBoolPatternType::Contradiction => "This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).",
+            SimplerBoolPatternType::Tautology => "This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).",
+            SimplerBoolPatternType::DistributiveLaw => "This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).",
         }
     }
 }
