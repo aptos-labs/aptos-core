@@ -40,8 +40,6 @@ mod rand;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;
-#[cfg(test)]
-mod state_computer_tests;
 mod state_replication;
 #[cfg(any(test, feature = "fuzzing"))]
 mod test_utils;
@@ -56,7 +54,6 @@ pub mod consensus_observer;
 pub mod consensus_provider;
 /// Required by the telemetry service
 pub mod counters;
-mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
