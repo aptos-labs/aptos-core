@@ -12,6 +12,8 @@ pub(crate) use function::{
 
 mod modules;
 pub use modules::Module;
+#[cfg(test)]
+pub(crate) use modules::StructDef;
 pub(crate) use modules::{StructVariantInfo, VariantFieldInfo};
 
 mod script;
