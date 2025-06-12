@@ -103,12 +103,24 @@ impl<'r> UserSession<'r> {
             compatability_checks,
             module_storage,
             bundle.into_bytes(),
+            traversal_context,
         )?;
 
         let init_func_name = ident_str!("init_module");
         for module in modules {
-            // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            // MODULE METERING SAFETY:
+            //   We have charged for the old version (if it exists) before when pre-processing the
+            //   module bundle.
+            if features.is_lazy_loading_enabled() {
+                traversal_context
+                    .check_is_special_or_visited(module.self_addr(), module.self_name())
+                    .map_err(|err| err.finish(Location::Undefined))?;
+            }
+
+            if module_storage
+                .unmetered_check_module_exists(module.self_addr(), module.self_name())?
+            {
+                // Module existed before, so do not run initialization.
                 continue;
             }
 
