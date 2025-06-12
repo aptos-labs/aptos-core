@@ -777,9 +777,9 @@ impl BatchProofQueue {
             count += batches
                 .iter()
                 .filter(|(sort_key, _)| {
-                    self.items.get(&sort_key.batch_key).map_or(false, |item| {
-                        item.proof.is_some() && item.txn_summaries.is_none()
-                    })
+                    self.items
+                        .get(&sort_key.batch_key)
+                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_none())
                 })
                 .count() as u64;
         });
@@ -794,9 +794,9 @@ impl BatchProofQueue {
             count += batches
                 .iter()
                 .filter(|(sort_key, _)| {
-                    self.items.get(&sort_key.batch_key).map_or(false, |item| {
-                        item.proof.is_some() && item.txn_summaries.is_some()
-                    })
+                    self.items
+                        .get(&sort_key.batch_key)
+                        .is_some_and(|item| item.proof.is_some() && item.txn_summaries.is_some())
                 })
                 .count() as u64;
         });

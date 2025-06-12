@@ -22,8 +22,8 @@ use aptos_types::{
     on_chain_config::{ConfigurationResource, ValidatorSet},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
         TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef, TransactionOutput,
         TransactionStatus, WriteSetPayload,
     },
@@ -71,7 +71,7 @@ impl VMBlockExecutor for MockVM {
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _transaction_slice_metadata: TransactionSliceMetadata,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
@@ -92,7 +92,10 @@ impl VMBlockExecutor for MockVM {
             }
 
             let txn = txn_provider.get_txn(idx as u32).expect_valid();
-            if matches!(txn, Transaction::StateCheckpoint(_)) {
+            if matches!(
+                txn,
+                Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_)
+            ) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),
                     vec![],
@@ -119,7 +122,8 @@ impl VMBlockExecutor for MockVM {
                     vec![ContractEvent::new_v2(
                         NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
                         bcs::to_bytes(&0).unwrap(),
-                    )],
+                    )
+                    .unwrap()],
                     0,
                     KEEP_STATUS.clone(),
                     TransactionAuxiliaryData::default(),
@@ -194,7 +198,17 @@ impl VMBlockExecutor for MockVM {
             }
         }
 
-        Ok(BlockOutput::new(outputs, None))
+        let mut block_epilogue_txn = None;
+        if !skip_rest {
+            if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+                block_epilogue_txn = Some(Transaction::block_epilogue(
+                    block_id,
+                    BlockEndInfo::new_empty(),
+                ));
+            }
+        }
+
+        Ok(BlockOutput::new(outputs, block_epilogue_txn))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
@@ -337,7 +351,8 @@ fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),
         b"event_data".to_vec(),
-    )]
+    )
+    .unwrap()]
 }
 
 pub fn encode_mint_program(amount: u64) -> Script {

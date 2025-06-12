@@ -193,6 +193,12 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 
+    /// Returns true iff the TransactionsStatus is Retry.
+    fn is_retry(&self) -> bool;
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool;
+
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.
     ///

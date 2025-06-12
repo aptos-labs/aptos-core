@@ -83,9 +83,10 @@ pub mod restore;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
 
-use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT};
+use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT, COUNTER};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_metrics_core::IntCounterHelper;
 use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
@@ -268,7 +269,7 @@ impl<'a, K> NibbleRangeIterator<'a, K> {
     }
 }
 
-impl<'a, K> std::iter::Iterator for NibbleRangeIterator<'a, K> {
+impl<K> std::iter::Iterator for NibbleRangeIterator<'_, K> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -366,9 +367,8 @@ where
     ) -> Result<(Node<K>, TreeUpdateBatch<K>)> {
         let deduped_and_sorted_kvs = value_set
             .into_iter()
-            .map(|kv| {
+            .inspect(|kv| {
                 assert!(kv.0.nibble(0) == shard_id);
-                kv
             })
             .collect::<BTreeMap<_, _>>()
             .into_iter()
@@ -891,7 +891,10 @@ where
     if let Some(cache) = hash_cache {
         match cache.get(node_key.nibble_path()) {
             Some(hash) => *hash,
-            None => unreachable!("{:?} can not be found in hash cache", node_key),
+            None => {
+                COUNTER.inc_with(&["get_hash_miss"]);
+                node.hash()
+            },
         }
     } else {
         node.hash()

@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{DataCacheEntry, TransactionDataCache},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -16,10 +16,12 @@ use crate::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     reentrancy_checker::{CallType, ReentrancyChecker},
-    runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
+    runtime_type_checks::{
+        verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
+    },
     storage::{
         dependencies_gas_charging::check_dependencies_and_charge_gas,
-        depth_formula_calculator::DepthFormulaCalculator, ty_tag_converter::TypeTagConverter,
+        depth_formula_calculator::DepthFormulaCalculator,
     },
     trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
 };
@@ -102,7 +104,7 @@ struct TypeWithRuntimeEnvironment<'a, 'b> {
     runtime_environment: &'b RuntimeEnvironment,
 }
 
-impl<'a, 'b> TypeView for TypeWithRuntimeEnvironment<'a, 'b> {
+impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
     fn to_type_tag(&self) -> TypeTag {
         self.runtime_environment.ty_to_ty_tag(self.ty).unwrap()
     }
@@ -114,7 +116,7 @@ impl Interpreter {
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
@@ -124,7 +126,7 @@ impl Interpreter {
         InterpreterImpl::entrypoint(
             function,
             args,
-            data_store,
+            data_cache,
             module_storage,
             resource_resolver,
             gas_meter,
@@ -140,7 +142,7 @@ impl InterpreterImpl<'_> {
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
@@ -160,7 +162,7 @@ impl InterpreterImpl<'_> {
         // with the static RuntimeTypeCheck trait
         if interpreter.vm_config.paranoid_type_checks {
             interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
-                data_store,
+                data_cache,
                 resource_resolver,
                 module_storage,
                 gas_meter,
@@ -171,7 +173,7 @@ impl InterpreterImpl<'_> {
             )
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
-                data_store,
+                data_cache,
                 resource_resolver,
                 module_storage,
                 gas_meter,
@@ -183,7 +185,10 @@ impl InterpreterImpl<'_> {
         }
     }
 
-    fn load_generic_function(
+    /// Loads a generic function with instantiated type arguments. Does not perform any checks if
+    /// the function is callable (i.e., visible to the caller). The visibility check should be done
+    /// at the call-site.
+    fn load_generic_function_no_visibility_checks(
         &mut self,
         module_storage: &impl ModuleStorage,
         current_frame: &Frame,
@@ -196,15 +201,12 @@ impl InterpreterImpl<'_> {
         let function = current_frame
             .build_loaded_function_from_instantiation_and_ty_args(module_storage, idx, ty_args)
             .map_err(|e| self.set_location(e))?;
-
-        if self.vm_config.paranoid_type_checks {
-            self.check_friend_or_private_call(&current_frame.function, &function)?;
-        }
-
         Ok(function)
     }
 
-    fn load_function(
+    /// Loads a non-generic function. Does not perform any checks if the function is callable
+    /// (i.e., visible to the caller). The visibility check should be done at the call-site.
+    fn load_function_no_visibility_checks(
         &mut self,
         module_storage: &impl ModuleStorage,
         current_frame: &Frame,
@@ -213,17 +215,12 @@ impl InterpreterImpl<'_> {
         let function = current_frame
             .build_loaded_function_from_handle_and_ty_args(module_storage, fh_idx, vec![])
             .map_err(|e| self.set_location(e))?;
-
-        if self.vm_config.paranoid_type_checks {
-            self.check_friend_or_private_call(&current_frame.function, &function)?;
-        }
-
         Ok(function)
     }
 
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
         self,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -234,7 +231,7 @@ impl InterpreterImpl<'_> {
     ) -> VMResult<Vec<Value>> {
         if self.vm_config.use_call_tree_and_instruction_cache {
             self.execute_main::<RTTCheck, AllRuntimeCaches>(
-                data_store,
+                data_cache,
                 resource_resolver,
                 module_storage,
                 gas_meter,
@@ -245,7 +242,7 @@ impl InterpreterImpl<'_> {
             )
         } else {
             self.execute_main::<RTTCheck, NoRuntimeCaches>(
-                data_store,
+                data_cache,
                 resource_resolver,
                 module_storage,
                 gas_meter,
@@ -265,7 +262,7 @@ impl InterpreterImpl<'_> {
     /// at the top of the stack (return). If the call stack is empty execution is completed.
     fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -310,7 +307,7 @@ impl InterpreterImpl<'_> {
             let exit_code = current_frame
                 .execute_code::<RTTCheck, RTCaches>(
                     &mut self,
-                    data_store,
+                    data_cache,
                     resource_resolver,
                     module_storage,
                     gas_meter,
@@ -370,11 +367,12 @@ impl InterpreterImpl<'_> {
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function = Rc::new(self.load_function(
-                                        module_storage,
-                                        &current_frame,
-                                        fh_idx,
-                                    )?);
+                                    let function =
+                                        Rc::new(self.load_function_no_visibility_checks(
+                                            module_storage,
+                                            &current_frame,
+                                            fh_idx,
+                                        )?);
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -390,7 +388,7 @@ impl InterpreterImpl<'_> {
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(self.load_function(
+                        let function = Rc::new(self.load_function_no_visibility_checks(
                             module_storage,
                             &current_frame,
                             fh_idx,
@@ -399,16 +397,17 @@ impl InterpreterImpl<'_> {
                         (function, frame_cache)
                     };
 
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &function,
+                        CallType::Regular,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas
-                    let module_id = function.module_id().ok_or_else(|| {
-                        let err = PartialVMError::new_invariant_violation(
-                            "Failed to get native function module id",
-                        );
-                        set_err_info!(current_frame, err)
-                    })?;
                     gas_meter
                         .charge_call(
-                            module_id,
+                            function.owner_as_module()?.self_id(),
                             function.name(),
                             self.operand_stack
                                 .last_n(function.param_tys().len())
@@ -420,7 +419,7 @@ impl InterpreterImpl<'_> {
                     if function.is_native() {
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -465,13 +464,14 @@ impl InterpreterImpl<'_> {
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::<LoadedFunction>::new(self.load_generic_function(
+                                    let function = Rc::<LoadedFunction>::new(
+                                        self.load_generic_function_no_visibility_checks(
                                             module_storage,
                                             &current_frame,
                                             gas_meter,
                                             idx,
-                                        )?);
+                                        )?,
+                                    );
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -487,28 +487,29 @@ impl InterpreterImpl<'_> {
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(self.load_generic_function(
-                            module_storage,
-                            &current_frame,
-                            gas_meter,
-                            idx,
-                        )?);
+                        let function = Rc::<LoadedFunction>::new(
+                            self.load_generic_function_no_visibility_checks(
+                                module_storage,
+                                &current_frame,
+                                gas_meter,
+                                idx,
+                            )?,
+                        );
                         let frame_cache = FrameTypeCache::make_rc();
                         (function, frame_cache)
                     };
 
-                    let module_id = function
-                        .module_id()
-                        .ok_or_else(|| {
-                            PartialVMError::new_invariant_violation(
-                                "Failed to get native function module id",
-                            )
-                        })
-                        .map_err(|e| set_err_info!(current_frame, e))?;
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &function,
+                        CallType::Regular,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas
                     gas_meter
                         .charge_call_generic(
-                            module_id,
+                            function.owner_as_module()?.self_id(),
                             function.name(),
                             function
                                 .ty_args()
@@ -527,7 +528,7 @@ impl InterpreterImpl<'_> {
                     if function.is_native() {
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -571,7 +572,7 @@ impl InterpreterImpl<'_> {
                                 //   to be able to let scripts use closures.
                                 let err = PartialVMError::new_invariant_violation(format!(
                                     "module id required to charge gas for function `{}`",
-                                    lazy_function.to_stable_string()
+                                    lazy_function.to_canonical_string()
                                 ));
                                 return Err(set_err_info!(current_frame, err));
                             };
@@ -604,6 +605,13 @@ impl InterpreterImpl<'_> {
                         .with_resolved_function(module_storage, |f| Ok(f.clone()))
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &callee,
+                        CallType::ClosureDynamicDispatch,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas for call and for the parameters. The current APIs
                     // require an ExactSizeIterator to be passed for charge_call, so
                     // some acrobatics is needed (sigh).
@@ -625,15 +633,11 @@ impl InterpreterImpl<'_> {
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    // In difference to regular calls, we skip visibility check.
-                    // It is possible to call a private function of another module via
-                    // a closure.
-
                     // Call function
                     if callee.is_native() {
                         self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -771,7 +775,7 @@ impl InterpreterImpl<'_> {
     fn call_native<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -784,7 +788,7 @@ impl InterpreterImpl<'_> {
         // Note: refactor if native functions push a frame on the stack
         self.call_native_impl::<RTTCheck, RTCaches>(
             current_frame,
-            data_store,
+            data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
@@ -815,7 +819,7 @@ impl InterpreterImpl<'_> {
     fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -861,15 +865,6 @@ impl InterpreterImpl<'_> {
             }
         }
 
-        let mut native_context = NativeContext::new(
-            self,
-            data_store,
-            resource_resolver,
-            module_storage,
-            extensions,
-            gas_meter.balance_internal(),
-            traversal_context,
-        );
         let native_function = function.get_native()?;
 
         gas_meter.charge_native_function_before_execution(
@@ -880,9 +875,16 @@ impl InterpreterImpl<'_> {
             args.iter(),
         )?;
 
+        let mut native_context = NativeContext::new(
+            self,
+            data_cache,
+            resource_resolver,
+            module_storage,
+            extensions,
+            gas_meter,
+            traversal_context,
+        );
         let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
-
-        gas_meter.charge_heap_memory(native_context.heap_memory_usage())?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -950,19 +952,11 @@ impl InterpreterImpl<'_> {
                     ty_args,
                 )?;
 
-                if target_func.is_friend_or_private()
-                    || target_func.module_id() == function.module_id()
-                {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message(
-                            "Invoking private or friend function during dispatch".to_string(),
-                        ));
-                }
-
-                if target_func.is_native() {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message("Invoking native function during dispatch".to_string()));
-                }
+                RTTCheck::check_call_visibility(
+                    function,
+                    &target_func,
+                    CallType::NativeDynamicDispatch,
+                )?;
 
                 // Checking type of the dispatch target function
                 //
@@ -1033,38 +1027,6 @@ impl InterpreterImpl<'_> {
         }
     }
 
-    /// Make sure only private/friend function can only be invoked by modules under the same address.
-    fn check_friend_or_private_call(
-        &self,
-        caller: &LoadedFunction,
-        callee: &LoadedFunction,
-    ) -> VMResult<()> {
-        if callee.is_friend_or_private() {
-            match (caller.module_id(), callee.module_id()) {
-                (Some(caller_id), Some(callee_id)) => {
-                    if caller_id.address() == callee_id.address() {
-                        Ok(())
-                    } else {
-                        Err(self.set_location(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(
-                                    format!("Private/Friend function invokation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
-                                )))
-                    }
-                },
-                _ => Err(self.set_location(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "Private/Friend function invokation error caller: {:?}, callee {:?}",
-                            caller.name(),
-                            callee.name()
-                        )),
-                )),
-            }
-        } else {
-            Ok(())
-        }
-    }
-
     /// Perform a binary operation to two values at the top of the stack.
     fn binop<F, T>(&mut self, f: F) -> PartialVMResult<()>
     where
@@ -1103,32 +1065,53 @@ impl InterpreterImpl<'_> {
         self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
     }
 
+    /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
+    /// of bytes loaded.
+    fn create_and_charge_data_cache_entry(
+        resource_resolver: &impl ResourceResolver,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<DataCacheEntry> {
+        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+            module_storage,
+            resource_resolver,
+            &addr,
+            ty,
+        )?;
+        gas_meter.charge_load_resource(
+            addr,
+            TypeWithRuntimeEnvironment {
+                ty,
+                runtime_environment: module_storage.runtime_environment(),
+            },
+            entry.value().view(),
+            bytes_loaded,
+        )?;
+        Ok(entry)
+    }
+
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
-        data_store: &'c mut TransactionDataCache,
+        data_cache: &'c mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        match data_store.load_resource(module_storage, resource_resolver, addr, ty) {
-            Ok((gv, load_res)) => {
-                if let Some(bytes_loaded) = load_res {
-                    gas_meter.charge_load_resource(
-                        addr,
-                        TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        },
-                        gv.view(),
-                        bytes_loaded,
-                    )?;
-                }
-                Ok(gv)
-            },
-            Err(e) => Err(e),
+        if !data_cache.contains_resource(&addr, ty) {
+            let entry = Self::create_and_charge_data_cache_entry(
+                resource_resolver,
+                module_storage,
+                gas_meter,
+                addr,
+                ty,
+            )?;
+            data_cache.insert_resource(addr, ty.clone(), entry)?;
         }
+        data_cache.get_resource_mut(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -1136,15 +1119,16 @@ impl InterpreterImpl<'_> {
         &mut self,
         is_mut: bool,
         is_generic: bool,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
+        let runtime_environment = module_storage.runtime_environment();
         let res = Self::load_resource(
-            data_store,
+            data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
@@ -1157,12 +1141,12 @@ impl InterpreterImpl<'_> {
             is_generic,
             TypeWithRuntimeEnvironment {
                 ty,
-                runtime_environment: module_storage.runtime_environment(),
+                runtime_environment,
             },
             res.is_ok(),
         )?;
         self.check_access(
-            module_storage,
+            runtime_environment,
             if is_mut {
                 AccessKind::Writes
             } else {
@@ -1179,7 +1163,7 @@ impl InterpreterImpl<'_> {
 
     fn check_access(
         &self,
-        module_storage: &impl ModuleStorage,
+        runtime_environment: &RuntimeEnvironment,
         kind: AccessKind,
         ty: &Type,
         addr: AccountAddress,
@@ -1194,8 +1178,7 @@ impl InterpreterImpl<'_> {
                 )
             },
         };
-        let struct_name = module_storage
-            .runtime_environment()
+        let struct_name = runtime_environment
             .struct_name_index_map()
             .idx_to_struct_name(struct_idx)?;
 
@@ -1214,15 +1197,16 @@ impl InterpreterImpl<'_> {
     fn exists(
         &mut self,
         is_generic: bool,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
+        let runtime_environment = module_storage.runtime_environment();
         let gv = Self::load_resource(
-            data_store,
+            data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
@@ -1234,11 +1218,11 @@ impl InterpreterImpl<'_> {
             is_generic,
             TypeWithRuntimeEnvironment {
                 ty,
-                runtime_environment: module_storage.runtime_environment(),
+                runtime_environment,
             },
             exists,
         )?;
-        self.check_access(module_storage, AccessKind::Reads, ty, addr)?;
+        self.check_access(runtime_environment, AccessKind::Reads, ty, addr)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
     }
@@ -1247,15 +1231,16 @@ impl InterpreterImpl<'_> {
     fn move_from(
         &mut self,
         is_generic: bool,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
+        let runtime_environment = module_storage.runtime_environment();
         let resource = match Self::load_resource(
-            data_store,
+            data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
@@ -1269,11 +1254,11 @@ impl InterpreterImpl<'_> {
                     is_generic,
                     TypeWithRuntimeEnvironment {
                         ty,
-                        runtime_environment: module_storage.runtime_environment(),
+                        runtime_environment,
                     },
                     Some(&resource),
                 )?;
-                self.check_access(module_storage, AccessKind::Writes, ty, addr)?;
+                self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
                 resource
             },
             Err(err) => {
@@ -1282,7 +1267,7 @@ impl InterpreterImpl<'_> {
                     is_generic,
                     TypeWithRuntimeEnvironment {
                         ty,
-                        runtime_environment: module_storage.runtime_environment(),
+                        runtime_environment,
                     },
                     val,
                 )?;
@@ -1297,7 +1282,7 @@ impl InterpreterImpl<'_> {
     fn move_to(
         &mut self,
         is_generic: bool,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1305,8 +1290,9 @@ impl InterpreterImpl<'_> {
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
+        let runtime_environment = module_storage.runtime_environment();
         let gv = Self::load_resource(
-            data_store,
+            data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
@@ -1321,12 +1307,12 @@ impl InterpreterImpl<'_> {
                     is_generic,
                     TypeWithRuntimeEnvironment {
                         ty,
-                        runtime_environment: module_storage.runtime_environment(),
+                        runtime_environment,
                     },
                     gv.view().unwrap(),
                     true,
                 )?;
-                self.check_access(module_storage, AccessKind::Writes, ty, addr)?;
+                self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
                 Ok(())
             },
             Err((err, resource)) => {
@@ -1334,7 +1320,7 @@ impl InterpreterImpl<'_> {
                     is_generic,
                     TypeWithRuntimeEnvironment {
                         ty,
-                        runtime_environment: module_storage.runtime_environment(),
+                        runtime_environment,
                     },
                     &resource,
                     false,
@@ -1406,10 +1392,10 @@ impl InterpreterImpl<'_> {
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
             if let Some(tag) = it.next() {
-                debug_write!(buf, "{}", tag)?;
+                debug_write!(buf, "{}", tag.to_canonical_string())?;
                 for tag in it {
                     debug_write!(buf, ", ")?;
-                    debug_write!(buf, "{}", tag)?;
+                    debug_write!(buf, "{}", tag.to_canonical_string())?;
                 }
             }
             debug_write!(buf, ">")?;
@@ -1483,14 +1469,7 @@ impl InterpreterImpl<'_> {
             }
             internal_state.push_str(format!("{}* {:?}\n", i, code[pc]).as_str());
         }
-        internal_state.push_str(
-            format!(
-                "Locals ({:x}):\n{}\n",
-                current_frame.locals.raw_address(),
-                current_frame.locals
-            )
-            .as_str(),
-        );
+        internal_state.push_str(format!("Locals:\n{}\n", current_frame.locals).as_str());
         internal_state.push_str("Operand Stack:\n");
         for value in &self.operand_stack.value {
             internal_state.push_str(format!("{}\n", value).as_str());
@@ -1804,14 +1783,14 @@ impl Frame {
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         interpreter: &mut InterpreterImpl,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl::<RTTCheck, RTCaches>(
             interpreter,
-            data_store,
+            data_cache,
             resource_resolver,
             module_storage,
             gas_meter,
@@ -1829,7 +1808,7 @@ impl Frame {
     fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         interpreter: &mut InterpreterImpl,
-        data_store: &mut TransactionDataCache,
+        data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1878,7 +1857,6 @@ impl Frame {
                 RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
                 RTTCheck::pre_execution_type_stack_transition(
                     self,
-                    module_storage,
                     &mut interpreter.operand_stack,
                     instruction,
                     frame_cache,
@@ -2322,38 +2300,60 @@ impl Frame {
                             .push(reference.test_variant(info.variant)?)?;
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
-                        let function = self.build_loaded_function_from_handle_and_ty_args(
-                            module_storage,
-                            *fh_idx,
-                            vec![],
-                        )?;
+                        let function = self
+                            .build_loaded_function_from_handle_and_ty_args(
+                                module_storage,
+                                *fh_idx,
+                                vec![],
+                            )
+                            .map(Rc::new)?;
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            &TypeTagConverter::new(module_storage.runtime_environment()),
-                            Rc::new(function),
+                            module_storage.runtime_environment(),
+                            function.clone(),
                             *mask,
                         )?;
                         interpreter
                             .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?
+                            .push(Value::closure(Box::new(lazy_function), captured))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack_closure(
+                                self.ty_builder(),
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        }
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
                         let ty_args =
                             self.instantiate_generic_function(Some(gas_meter), *fi_idx)?;
-                        let function = self.build_loaded_function_from_instantiation_and_ty_args(
-                            module_storage,
-                            *fi_idx,
-                            ty_args,
-                        )?;
+                        let function = self
+                            .build_loaded_function_from_instantiation_and_ty_args(
+                                module_storage,
+                                *fi_idx,
+                                ty_args,
+                            )
+                            .map(Rc::new)?;
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            &TypeTagConverter::new(module_storage.runtime_environment()),
-                            Rc::new(function),
+                            module_storage.runtime_environment(),
+                            function.clone(),
                             *mask,
                         )?;
                         interpreter
                             .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?
+                            .push(Value::closure(Box::new(lazy_function), captured))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack_closure(
+                                self.ty_builder(),
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        }
                     },
                     Bytecode::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
@@ -2517,7 +2517,7 @@ impl Frame {
                         interpreter.borrow_global(
                             is_mut,
                             false,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2534,7 +2534,7 @@ impl Frame {
                         interpreter.borrow_global(
                             is_mut,
                             true,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2547,7 +2547,7 @@ impl Frame {
                         let ty = self.get_struct_ty(*sd_idx);
                         interpreter.exists(
                             false,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2561,7 +2561,7 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.exists(
                             true,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2574,7 +2574,7 @@ impl Frame {
                         let ty = self.get_struct_ty(*sd_idx);
                         interpreter.move_from(
                             false,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2588,7 +2588,7 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.move_from(
                             true,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2607,7 +2607,7 @@ impl Frame {
                         let ty = self.get_struct_ty(*sd_idx);
                         interpreter.move_to(
                             false,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2628,7 +2628,7 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.move_to(
                             true,
-                            data_store,
+                            data_cache,
                             resource_resolver,
                             module_storage,
                             gas_meter,
@@ -2666,10 +2666,7 @@ impl Frame {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_len(TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        })?;
+                        gas_meter.charge_vec_len(make_ty!(ty))?;
                         let value = vec_ref.len(ty)?;
                         interpreter.operand_stack.push(value)?;
                     },
@@ -2734,7 +2731,6 @@ impl Frame {
 
                 RTTCheck::post_execution_type_stack_transition(
                     self,
-                    module_storage,
                     &mut interpreter.operand_stack,
                     instruction,
                     frame_cache,

@@ -1052,7 +1052,7 @@ fn emit_new_block_and_epoch_event(
 
 /// Verify the consistency of modules in the genesis write set.
 fn verify_genesis_module_write_set(write_set: &WriteSet) {
-    for (state_key, write_op) in write_set {
+    for (state_key, write_op) in write_set.expect_write_op_iter() {
         if state_key.is_module_path() {
             assert!(write_op.is_creation())
         }
@@ -1183,11 +1183,7 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
-        let stake_amount = if let Some(amount) = initial_stake {
-            amount
-        } else {
-            1
-        };
+        let stake_amount = initial_stake.unwrap_or(1);
         let data = Validator {
             owner_address,
             consensus_pubkey,
@@ -1340,10 +1336,8 @@ pub fn test_genesis_module_publishing() {
 #[test]
 pub fn test_mainnet_end_to_end() {
     use aptos_types::{
-        account_address,
-        on_chain_config::ValidatorSet,
-        state_store::state_key::StateKey,
-        write_set::{TransactionWrite, WriteSet},
+        account_address, on_chain_config::ValidatorSet, state_store::state_key::StateKey,
+        write_set::TransactionWrite,
     };
 
     let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
@@ -1544,7 +1538,7 @@ pub fn test_mainnet_end_to_end() {
         panic!("Invalid WriteSetPayload");
     };
 
-    let WriteSet::V0(writeset) = changeset.write_set();
+    let writeset = changeset.write_set().expect_v0();
 
     let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset

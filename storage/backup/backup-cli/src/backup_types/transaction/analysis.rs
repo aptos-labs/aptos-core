@@ -86,7 +86,7 @@ impl TransactionAnalysis {
         }
 
         let mut write_set_size = 0;
-        for (index, (key, op)) in write_set.iter().enumerate() {
+        for (index, (key, op)) in write_set.write_op_iter().enumerate() {
             let write_op_size = key.size() + op.as_state_value().map_or(0, |value| value.size());
             write_set_size += write_op_size;
 

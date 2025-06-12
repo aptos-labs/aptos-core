@@ -6,7 +6,7 @@ use crate::{
     diag, diagnostics::Diagnostic, parser::syntax::make_loc, shared::CompilationEnv,
     FileCommentMap, MatchedFileCommentMap,
 };
-use move_command_line_common::files::FileHash;
+use move_command_line_common::{character_sets::is_permitted_chars, files::FileHash};
 use move_ir_types::location::Loc;
 use std::fmt;
 
@@ -327,7 +327,7 @@ impl<'input> Lexer<'input> {
                 if is_doc {
                     let end = get_offset(text);
                     let mut comment = &self.text[(start + 3)..end];
-                    comment = comment.trim_end_matches(|c: char| c == '\r');
+                    comment = comment.trim_end_matches('\r');
 
                     self.doc_comments
                         .insert((start as u32, end as u32), comment.to_string());
@@ -342,19 +342,26 @@ impl<'input> Lexer<'input> {
         Ok(text)
     }
 
-    // Look ahead to the next token after the current one and return it, and its starting offset,
+    // Look ahead to the next token after the current one and return it, and its starting offset and length,
     // without advancing the state of the lexer.
-    pub fn lookahead_with_start_loc(&mut self) -> Result<(Tok, usize), Box<Diagnostic>> {
+    pub fn lookahead_with_span(&mut self) -> Result<(Tok, usize, usize), Box<Diagnostic>> {
         let text = self.trim_whitespace_and_comments(self.cur_end)?;
         let next_start = self.text.len() - text.len();
-        let (tok, _) = find_token(self.file_hash, text, next_start)?;
-        Ok((tok, next_start))
+        let (tok, length) = find_token(self.file_hash, text, next_start)?;
+        Ok((tok, next_start, length))
+    }
+
+    // Look ahead to the next token after the current one and return it, and the content of the token
+    // without advancing the state of the lexer.
+    pub fn lookahead_content(&mut self) -> Result<(Tok, String), Box<Diagnostic>> {
+        let (tok, next_start, length) = self.lookahead_with_span()?;
+        Ok((tok, self.text[next_start..next_start + length].to_string()))
     }
 
     // Look ahead to the next token after the current one and return it without advancing
     // the state of the lexer.
     pub fn lookahead(&mut self) -> Result<Tok, Box<Diagnostic>> {
-        Ok(self.lookahead_with_start_loc()?.0)
+        Ok(self.lookahead_with_span()?.0)
     }
 
     // Look ahead to the next two tokens after the current one and return them without advancing
@@ -534,7 +541,7 @@ fn find_token(
                     let loc = make_loc(file_hash, start_offset, start_offset);
                     return Err(Box::new(diag!(
                         Syntax::InvalidCharacter,
-                        (loc, format!("Invalid character: '{}'; string literal must begin with `b\"` and closing quote `\"` must appear on same line", c))
+                        (loc, format!("Invalid character: `{}`; string literal must begin with `b\"` and closing quote `\"` must appear on same line", c))
                     )));
                 },
             }
@@ -671,12 +678,30 @@ fn find_token(
             let loc = make_loc(file_hash, start_offset, start_offset);
             return Err(Box::new(diag!(
                 Syntax::InvalidCharacter,
-                (loc, format!("Invalid character: '{}'", c))
+                (loc, format!("Invalid character: `{}`", c))
             )));
         },
     };
 
-    Ok((tok, len))
+    if let Some(invalid_chr_idx) = find_invalid_char(text.as_bytes(), len) {
+        let loc = make_loc(
+            file_hash,
+            invalid_chr_idx + start_offset,
+            invalid_chr_idx + start_offset,
+        );
+        Err(Box::new(diag!(
+            Syntax::InvalidCharacter,
+            (
+                loc,
+                format!(
+                    "Invalid character: `{}`",
+                    text.chars().nth(invalid_chr_idx).unwrap()
+                )
+            )
+        )))
+    } else {
+        Ok((tok, len))
+    }
 }
 
 // Return the length of the substring matching [a-zA-Z0-9_]. Note that
@@ -728,13 +753,17 @@ fn get_string_len(text: &str) -> Option<usize> {
     while let Some(chr) = iter.next() {
         if chr == '\\' {
             // Skip over the escaped character (e.g., a quote or another backslash)
-            if iter.next().is_some() {
-                pos += 1;
+            if let Some(next_chr) = iter.next() {
+                // Count the number of bytes in the escaped character
+                // Utf-8 characters are accepted for now, which will be checked later by find_token
+                pos += next_chr.len_utf8();
             }
         } else if chr == '"' {
             return Some(pos);
         }
-        pos += 1;
+        // Count the number of bytes in the current character
+        // Utf-8 characters are accepted for now, which will be checked later by find_token
+        pos += chr.len_utf8();
     }
     None
 }
@@ -786,6 +815,19 @@ fn trim_start_whitespace(text: &str) -> &str {
     }
 
     &text[pos..]
+}
+
+// find if any invalid character exists in the token represented as text[0..len]
+fn find_invalid_char(text: &[u8], len: usize) -> Option<usize> {
+    let mut idx: usize = 0;
+    while idx < len {
+        if !is_permitted_chars(text, idx) {
+            return Some(idx);
+        }
+        // All characters shall have one byte until the first invalid one
+        idx += 1;
+    }
+    None
 }
 
 #[cfg(test)]

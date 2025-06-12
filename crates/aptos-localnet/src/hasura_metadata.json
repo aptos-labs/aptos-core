@@ -1081,6 +1081,27 @@
           },
           {
             "table": {
+              "name": "auth_key_account_addresses",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "auth_key",
+                    "account_address",
+                    "last_transaction_version",
+                    "is_auth_key_used"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "block_metadata_transactions",
               "schema": "public"
             },
@@ -2142,6 +2163,30 @@
                   "columns": [
                     "num_active_delegator",
                     "pool_address"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "public_key_auth_keys",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "public_key",
+                    "public_key_type",
+                    "auth_key",
+                    "account_public_key",
+                    "last_transaction_version",
+                    "is_public_key_used",
+                    "signature_type"
                   ],
                   "filter": {},
                   "limit": 100

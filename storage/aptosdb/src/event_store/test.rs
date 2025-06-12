@@ -217,7 +217,7 @@ prop_compose! {
                 seq,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
                 bcs::to_bytes(&new_block_event).unwrap(),
-            );
+            ).expect("Should always be able to create a new block event");
             seq += 1;
             (version, event)
         }).collect()
@@ -256,7 +256,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
         .get_last_version_before_timestamp(1000, *first_block_version)
         .is_err());
     assert!(store
-        .get_last_version_before_timestamp(first_block_ts, Version::max_value())
+        .get_last_version_before_timestamp(first_block_ts, Version::MAX)
         .is_err());
 
     let mut last_block_ts = first_block_ts;

@@ -28,8 +28,9 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ExecutionStatus,
-        TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
+        block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
+        BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
+        TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
@@ -47,7 +48,6 @@ use std::{
     collections::BTreeMap,
     hash::RandomState,
     sync::atomic::{AtomicU64, Ordering},
-    u64,
 };
 use thread_local::ThreadLocal;
 
@@ -84,7 +84,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _transaction_slice_metadata: TransactionSliceMetadata,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
@@ -112,7 +112,17 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
                 )
             })?;
 
-        Ok(BlockOutput::new(transaction_outputs, None))
+        let block_epilogue_txn = Transaction::block_epilogue(
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .unwrap(),
+            BlockEndInfo::new_empty(),
+        );
+
+        Ok(BlockOutput::new(
+            transaction_outputs,
+            Some(block_epilogue_txn),
+        ))
     }
 }
 
@@ -130,8 +140,11 @@ impl IncrementalOutput {
     }
 
     fn into_success_output(mut self, gas: u64) -> Result<TransactionOutput> {
-        self.events
-            .push(FeeStatement::new(gas, gas, 0, 0, 0).create_event_v2());
+        self.events.push(
+            FeeStatement::new(gas, gas, 0, 0, 0)
+                .create_event_v2()
+                .expect("Creating FeeStatement should always succeed"),
+        );
 
         Ok(TransactionOutput::new(
             WriteSetMut::new(self.write_set).freeze()?,
@@ -555,7 +568,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     store: sender_store_address,
                     amount: transfer_amount,
                 }
-                .create_event_v2(),
+                .create_event_v2()
+                .expect("Creating WithdrawFAEvent should always succeed"),
             );
         }
 
@@ -667,7 +681,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     store: recipient_store_address,
                     amount: transfer_amount,
                 }
-                .create_event_v2(),
+                .create_event_v2()
+                .expect("Creating DepositFAEvent should always succeed"),
             )
         }
 
@@ -692,7 +707,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                             account: AccountAddress::ONE,
                             type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()?,
                         }
-                        .create_event_v2(),
+                        .create_event_v2()
+                        .expect("Creating CoinRegister should always succeed"),
                     );
                     (
                         DbAccessUtil::new_apt_coin_store(0, recipient_address),

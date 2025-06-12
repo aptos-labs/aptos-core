@@ -1054,7 +1054,7 @@ impl Context {
                         v1.sequence_number() + count,
                         v1.type_tag().clone(),
                         v1.event_data().to_vec(),
-                    );
+                    )?;
                     *event = ContractEvent::V1(v1_adjusted);
                     count_map.insert(*v1.key(), count + 1);
                 }
@@ -1245,7 +1245,7 @@ impl Context {
         ) {
             Ok((prices_and_used, block_end_infos, majority_use_case_fraction)) => {
                 let is_full_block =
-                    if majority_use_case_fraction.map_or(false, |fraction| fraction > 0.5) {
+                    if majority_use_case_fraction.is_some_and(|fraction| fraction > 0.5) {
                         // If majority use case is above half of transactions, UseCaseAware block reordering
                         // will allow other transactions to get in the block (AIP-68)
                         false

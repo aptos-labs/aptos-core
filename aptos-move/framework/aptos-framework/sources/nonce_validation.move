@@ -4,8 +4,10 @@ module aptos_framework::nonce_validation {
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
     use aptos_std::aptos_hash::sip_hash_from_value;
     use aptos_std::error;
+    use aptos_framework::system_addresses;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_validation;
+
 
     const NUM_BUCKETS: u64 = 50000;
 
@@ -77,6 +79,7 @@ module aptos_framework::nonce_validation {
     }
 
     public entry fun initialize_nonce_table(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         if (!exists<NonceHistory>(@aptos_framework)) {
             let table = table::new();
             let nonce_history = NonceHistory {
@@ -130,7 +133,7 @@ module aptos_framework::nonce_validation {
     ): bool acquires NonceHistory {
         assert!(exists<NonceHistory>(@aptos_framework), error::invalid_state(E_NONCE_HISTORY_DOES_NOT_EXIST));
         // Check if the transaction expiration time is too far in the future.
-        assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS, error::invalid_state(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
+        assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS, error::invalid_argument(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
         let nonce_history = &mut NonceHistory[@aptos_framework];
         let nonce_key = NonceKey {
             sender_address,

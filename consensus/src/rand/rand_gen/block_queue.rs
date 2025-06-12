@@ -8,7 +8,10 @@ use crate::{
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::randomness::{FullRandMetadata, Randomness};
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 /// Maintain the ordered blocks received from consensus and corresponding randomness
 pub struct QueueItem {
@@ -78,11 +81,11 @@ impl QueueItem {
         }
     }
 
-    fn blocks(&self) -> &[PipelinedBlock] {
+    fn blocks(&self) -> &[Arc<PipelinedBlock>] {
         &self.ordered_blocks.ordered_blocks
     }
 
-    fn blocks_mut(&mut self) -> &mut [PipelinedBlock] {
+    fn blocks_mut(&mut self) -> &mut [Arc<PipelinedBlock>] {
         &mut self.ordered_blocks.ordered_blocks
     }
 }
@@ -199,7 +202,7 @@ mod tests {
             assert_eq!(
                 queue
                     .item_mut(round)
-                    .map_or(false, |item| item.offsets_by_round.contains_key(&round)),
+                    .is_some_and(|item| item.offsets_by_round.contains_key(&round)),
                 exists_rounds.contains(&round)
             );
         }

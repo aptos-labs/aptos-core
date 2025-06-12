@@ -719,7 +719,7 @@ pub enum TransactionExecutableRef<'a> {
     Empty,
 }
 
-impl<'a> TransactionExecutableRef<'a> {
+impl TransactionExecutableRef<'_> {
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Empty)
     }
@@ -1698,14 +1698,18 @@ impl TransactionOutput {
         }
     }
 
-    pub fn new_empty_success() -> Self {
+    pub fn new_success_with_write_set(write_set: WriteSet) -> Self {
         Self {
-            write_set: WriteSet::default(),
+            write_set,
             events: vec![],
             gas_used: 0,
             status: TransactionStatus::Keep(ExecutionStatus::Success),
             auxiliary_data: TransactionAuxiliaryData::None,
         }
+    }
+
+    pub fn new_empty_success() -> Self {
+        Self::new_success_with_write_set(WriteSet::default())
     }
 
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {

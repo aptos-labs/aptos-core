@@ -195,7 +195,7 @@ impl InternalIndexerDB {
         event_key: &EventKey,
     ) -> Result<Option<u64>> {
         let mut iter = self.db.iter::<EventByVersionSchema>()?;
-        iter.seek_for_prev(&(*event_key, ledger_version, u64::max_value()))?;
+        iter.seek_for_prev(&(*event_key, ledger_version, u64::MAX))?;
 
         Ok(iter.next().transpose()?.and_then(
             |((key, _version, seq), _idx)| if &key == event_key { Some(seq) } else { None },
@@ -487,7 +487,7 @@ impl DBIndexer {
             }
 
             if self.indexer_db.statekeys_enabled() {
-                writeset.iter().for_each(|(state_key, write_op)| {
+                writeset.write_op_iter().for_each(|(state_key, write_op)| {
                     if write_op.is_creation() || write_op.is_modification() {
                         batch
                             .put::<StateKeysSchema>(state_key, &())
@@ -654,7 +654,7 @@ impl DBIndexer {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-        let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
+        let get_latest = order == Order::Descending && start_seq_num == u64::MAX;
 
         let cursor = if get_latest {
             // Caller wants the latest, figure out the latest seq_num.

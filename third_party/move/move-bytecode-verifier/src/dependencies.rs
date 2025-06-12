@@ -110,7 +110,7 @@ impl<'a, 'b> Context<'a, 'b> {
                     Visibility::Public => true,
                     Visibility::Friend => self_module
                         .as_ref()
-                        .map_or(false, |self_id| friend_module_ids.contains(self_id)),
+                        .is_some_and(|self_id| friend_module_ids.contains(self_id)),
                     Visibility::Private => false,
                 };
                 if may_be_called {

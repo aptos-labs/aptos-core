@@ -218,7 +218,6 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
             .as_mut()
             .unwrap()
             .wait_for_async_commit()
-            .map_err(Into::into)
     }
 }
 

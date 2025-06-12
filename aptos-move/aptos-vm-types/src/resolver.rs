@@ -58,25 +58,16 @@ pub trait TResourceView {
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
 
+    // These methods should not be auto-implemented via get_resource_state_value, as they do not
+    // provide maybe_layout (and do not need know whether the resource contains delayed fields).
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        // For metadata, layouts are not important.
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
-    }
+    ) -> PartialVMResult<Option<StateValueMetadata>>;
 
-    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.map(|state_value| state_value.size() as u64))
-    }
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64>;
 
-    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        // For existence, layouts are not important.
-        self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.is_some())
-    }
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool>;
 }
 
 /// Metadata and exists queries for the resource group, determined by a key, must be resolved
@@ -125,11 +116,7 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<usize> {
-        Ok(self
-            .get_resource_from_group(group_key, resource_tag, None)?
-            .map_or(0, |bytes| bytes.len()))
-    }
+    ) -> PartialVMResult<usize>;
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
     /// groups, where the violation of the following invariant causes transaction failure:
@@ -145,10 +132,7 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<bool> {
-        self.get_resource_from_group(group_key, resource_tag, None)
-            .map(|maybe_bytes| maybe_bytes.is_some())
-    }
+    ) -> PartialVMResult<bool>;
 
     fn release_group_cache(
         &self,
@@ -227,13 +211,42 @@ where
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for resource at {:?}: {:?}",
-                state_key, e
-            ))
-        })
+        self.get_state_value(state_key)
+            .map_err(|e| map_storage_error(state_key, e))
     }
+
+    fn get_resource_state_value_metadata(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| Ok(maybe_state_value.map(StateValue::into_metadata)),
+        )
+    }
+
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| {
+                Ok(maybe_state_value.map_or(0, |state_value| state_value.size() as u64))
+            },
+        )
+    }
+
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
+        self.get_state_value(state_key).map_or_else(
+            |e| Err(map_storage_error(state_key, e)),
+            |maybe_state_value| Ok(maybe_state_value.is_some()),
+        )
+    }
+}
+
+fn map_storage_error<E: std::fmt::Debug>(state_key: &StateKey, e: E) -> PartialVMError {
+    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+        "Unexpected storage error for resource at {:?}: {:?}",
+        state_key, e
+    ))
 }
 
 impl<S> StateStorageView for S
@@ -252,7 +265,7 @@ where
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
-        self.get_usage().map_err(Into::into)
+        self.get_usage()
     }
 }
 

@@ -36,7 +36,7 @@ fn test_mock_vm_different_senders() {
         assert_eq!(
             output
                 .write_set()
-                .iter()
+                .write_op_iter()
                 .map(|(key, op)| (key.clone(), op.clone()))
                 .collect::<BTreeMap<_, _>>(),
             [
@@ -73,7 +73,7 @@ fn test_mock_vm_same_sender() {
         assert_eq!(
             output
                 .write_set()
-                .iter()
+                .write_op_iter()
                 .map(|(key, op)| (key.clone(), op.clone()))
                 .collect::<BTreeMap<_, _>>(),
             [
@@ -113,7 +113,7 @@ fn test_mock_vm_payment() {
             .next()
             .unwrap()
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect::<BTreeMap<_, _>>(),
         [

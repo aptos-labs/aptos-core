@@ -256,18 +256,7 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        // TODO @bchcho @hariria the sending of new ConsensusMsg::BlockRetrievalRequest must be
-        // phased over multiple releases to avoid `warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);`
-        // Uncomment and replace after release
-        // let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
-        let msg = match &retrieval_request {
-            BlockRetrievalRequest::V1(v1) => {
-                ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(v1.clone()))
-            },
-            BlockRetrievalRequest::V2(_) => {
-                panic!("Unexpected BlockRetrievalRequest::V2, should be using ConsensusMsg::DeprecatedBlockRetrievalRequest with BlockRetrievalRequestV1")
-            },
-        };
+        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -346,6 +335,18 @@ impl NetworkSender {
         let mut self_sender = self.self_sender.clone();
         if let Err(err) = self_sender.send(self_msg).await {
             error!("Error broadcasting to self: {:?}", err);
+        }
+
+        #[cfg(feature = "failpoints")]
+        {
+            let msg_ref = &msg;
+            fail_point!("consensus::send::broadcast_self_only", |maybe_msg_name| {
+                if let Some(msg_name) = maybe_msg_name {
+                    if msg_ref.name() != &msg_name {
+                        self.broadcast_without_self(msg_ref.clone());
+                    }
+                }
+            });
         }
 
         self.broadcast_without_self(msg);
@@ -519,6 +520,7 @@ impl QuorumStoreSender for NetworkSender {
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
+        fail_point!("consensus::send::request_batch", |_| Err(anyhow!("failed")));
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self.send_rpc(recipient, msg, timeout).await?;

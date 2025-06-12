@@ -663,7 +663,9 @@ pub fn resource_not_found<E: NotFoundError>(
         "Resource",
         format!(
             "Address({}), Struct tag({}) and Ledger version({})",
-            address, struct_tag, ledger_version
+            address,
+            struct_tag.to_canonical_string(),
+            ledger_version
         ),
         AptosErrorCode::ResourceNotFound,
         ledger_info,
@@ -698,7 +700,10 @@ pub fn struct_field_not_found<E: NotFoundError>(
         "Struct Field",
         format!(
             "Address({}), Struct tag({}), Field name({}) and Ledger version({})",
-            address, struct_tag, field_name, ledger_version
+            address,
+            struct_tag.to_canonical_string(),
+            field_name,
+            ledger_version
         ),
         AptosErrorCode::StructFieldNotFound,
         ledger_info,
