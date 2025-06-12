@@ -15,6 +15,7 @@
 //! 8. `!a || a` which can be simplified to just `true` (tautology)
 //! 9. `(a && b) || (a && c)` which can be simplified to `a && (b || c)` (distributive law)
 //! 10. `(a || b) && (a || c)` which can be simplified to `a || (b && c)` (distributive law)
+//! 11. `!!a` which can be simplified to just `a` (double negation law)
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
@@ -30,6 +31,7 @@ enum SimplerBoolPatternType {
     Contradiction,
     Tautology,
     DistributiveLaw,
+    DoubleNegation,
 }
 
 impl SimplerBoolPatternType {
@@ -40,6 +42,7 @@ impl SimplerBoolPatternType {
             SimplerBoolPatternType::Contradiction => "This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).",
             SimplerBoolPatternType::Tautology => "This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).",
             SimplerBoolPatternType::DistributiveLaw => "This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).",
+            SimplerBoolPatternType::DoubleNegation => "This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).",
         }
     }
 }
@@ -182,6 +185,24 @@ impl SimplerBoolExpression {
             _ => None,
         }
     }
+
+    /// Check for double negation pattern: `!!a`
+    fn check_double_negation(
+        &self,
+        op: &Operation,
+        args: &[Exp],
+    ) -> Option<SimplerBoolPatternType> {
+        if let Not = op {
+            if args.len() == 1 {
+                if let ExpData::Call(_, Not, inner_args) = args[0].as_ref() {
+                    if inner_args.len() == 1 {
+                        return Some(SimplerBoolPatternType::DoubleNegation);
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 impl ExpChecker for SimplerBoolExpression {
@@ -208,6 +229,7 @@ impl ExpChecker for SimplerBoolExpression {
                     .or_else(|| self.check_contradiction_tautology(op, left, right))
                     .or_else(|| self.check_distributive_law(op, left, right))
             },
+            Not => self.check_double_negation(op, args),
             _ => None,
         };
 
