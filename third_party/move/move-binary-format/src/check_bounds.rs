@@ -678,6 +678,9 @@ impl<'a> BoundsChecker<'a> {
         Ok(())
     }
 
+    /// Check `ty` for:
+    /// - struct handle bounds
+    /// - struct instantiations have the correct number of type parameters
     fn check_type(&self, ty: &SignatureToken) -> PartialVMResult<()> {
         use self::SignatureToken::*;
 
