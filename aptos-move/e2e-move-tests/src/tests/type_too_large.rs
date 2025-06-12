@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_abort, assert_success, tests::common, MoveHarness};
-use aptos_types::account_address::AccountAddress;
+use crate::{assert_success, tests::common, MoveHarness};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ExecutionStatus, TransactionStatus},
+};
+use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn type_too_large() {
@@ -22,7 +26,12 @@ fn type_too_large() {
         vec![],
     );
 
-    // The abort code is NFE_BCS_SERIALIZATION_FAILURE = 0x1c5, since the actual VM error
-    // for TOO_MANY_TYPE_NODES is hidden by the bcs serializer and turned into this generic error.
-    assert_abort!(result, 0x1C5);
+    // Layout construction errors with too many type nodes, but the actual error is remapped into a
+    // verification error.
+    assert!(matches!(
+        result,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::VERIFICATION_ERROR
+        )))
+    ));
 }
