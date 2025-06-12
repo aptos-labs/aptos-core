@@ -1,12 +1,5 @@
 // This is a generic module used by the transaction generator to produce
-// multiple module to publish and use.
-// The idea is that by running `cargo run --package module-publish`
-// in `testsuite/module-publish`
-// a rust file (`generic_module.rs`) gets generated in
-// `crates/transaction-emitter-lib/src/transaction_generator/publishing` which
-// contains a `CompiledModule` for the module below.
-// A helper file is provided to manipulate that file to generate
-// multiple, publishable module.
+// multiple modules to publish and use.
 module 0xABCD::simple {
     use std::error;
     use std::bcs;
