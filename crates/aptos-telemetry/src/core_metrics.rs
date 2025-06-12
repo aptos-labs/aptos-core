@@ -9,7 +9,7 @@ use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use once_cell::sync::Lazy;
 use prometheus::{
     core::{Collector, GenericGauge},
-    IntCounter, IntCounterVec,
+    Histogram, IntCounter, IntCounterVec,
 };
 use std::collections::BTreeMap;
 
@@ -23,10 +23,10 @@ const CONSENSUS_TIMEOUT_COUNT: &str = "consensus_timeout_count";
 const CONSENSUS_LAST_COMMITTED_VERSION: &str = "consensus_last_committed_version";
 const CONSENSUS_COMMITTED_BLOCKS_COUNT: &str = "consensus_committed_blocks_count";
 const CONSENSUS_COMMITTED_TXNS_COUNT: &str = "consensus_committed_txns_count";
-const CONSENSUS_ROUND_TIMEOUT_SECS: &str = "consensus_round_timeout_secs";
+const CONSENSUS_ROUND_TIMEOUT_MS: &str = "consensus_round_timeout_ms";
 const CONSENSUS_SYNC_INFO_MSG_SENT_COUNT: &str = "consensus_sync_info_msg_sent_count";
 const CONSENSUS_CURRENT_ROUND: &str = "consensus_current_round";
-const CONSENSUS_WAIT_DURATION_S: &str = "consensus_wait_duration_s";
+const CONSENSUS_WAIT_DURATION_MS: &str = "consensus_wait_duration_ms";
 const MEMPOOL_CORE_MEMPOOL_INDEX_SIZE: &str = "mempool_core_mempool_index_size";
 const REST_RESPONSE_COUNT: &str = "rest_response_count";
 const ROLE_TYPE: &str = "role_type";
@@ -94,6 +94,15 @@ fn collect_consensus_metrics(core_metrics: &mut BTreeMap<String, String>) {
         })
     };
 
+    // Helper function to safely get histogram values
+    let get_histogram_values = |metric: &'static Lazy<Histogram>| -> String {
+        Lazy::get(metric).map_or("0".to_string(), |histogram| {
+            let sum = histogram.get_sample_sum();
+            let count = histogram.get_sample_count();
+            format!("{} {}", sum, count) // Report sum and count for dashboard aggregation
+        })
+    };
+
     // Collect basic consensus metrics
     core_metrics.insert(
         CONSENSUS_PROPOSALS_COUNT.into(),
@@ -128,16 +137,22 @@ fn collect_consensus_metrics(core_metrics: &mut BTreeMap<String, String>) {
         get_gauge_metric(&aptos_consensus::counters::CURRENT_ROUND),
     );
     
-    // Get the round timeout seconds from the histogram
-    let round_timeout_ms = Lazy::get(&aptos_consensus::counters::ROUND_TIMEOUT_MS)
-        .map_or(0, |counter| counter.get());
-    let avg_round_timeout = round_timeout_ms as f64 / 1000.0; // Convert ms to seconds
-    core_metrics.insert(CONSENSUS_ROUND_TIMEOUT_SECS.into(), avg_round_timeout.to_string());
+    // Get the round timeout in milliseconds
+    core_metrics.insert(
+        CONSENSUS_ROUND_TIMEOUT_MS.into(),
+        get_gauge_metric(&aptos_consensus::counters::ROUND_TIMEOUT_MS),
+    );
     
     // Get sync info messages count
     core_metrics.insert(
         CONSENSUS_SYNC_INFO_MSG_SENT_COUNT.into(),
         get_counter_metric(&aptos_consensus::counters::SYNC_INFO_MSGS_SENT_COUNT),
+    );
+
+    // Get wait duration histogram values (sum and count)
+    core_metrics.insert(
+        CONSENSUS_WAIT_DURATION_MS.into(),
+        get_histogram_values(&aptos_consensus::counters::WAIT_DURATION_MS),
     );
 }
 
@@ -168,15 +183,19 @@ fn collect_mempool_metrics(core_metrics: &mut BTreeMap<String, String>) {
             .to_string(),
     );
     
-    // Get average transaction broadcast size
-    let broadcast_size_sum = aptos_mempool::counters::SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE
-        .with_label_values(&["success"])
-        .get_sample_sum();
-    let broadcast_size_count = aptos_mempool::counters::SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE
-        .with_label_values(&["success"])
-        .get_sample_count();
-    let avg_broadcast_size = if broadcast_size_count > 0 {
-        broadcast_size_sum / broadcast_size_count as f64
+    // Get average transaction broadcast size from HistogramVec
+    let broadcast_size = &aptos_mempool::counters::SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE;
+    let mut total_sum = 0.0;
+    let mut total_count = 0.0;
+    
+    // Sum up values across all label combinations
+    for label_values in broadcast_size.get_metric_with_label_values(&["success"]).iter() {
+        total_sum += label_values.get_sample_sum();
+        total_count += label_values.get_sample_count() as f64;
+    }
+    
+    let avg_broadcast_size = if total_count > 0.0 {
+        total_sum / total_count
     } else {
         0.0
     };
