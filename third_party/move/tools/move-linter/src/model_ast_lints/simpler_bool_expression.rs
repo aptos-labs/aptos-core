@@ -47,25 +47,41 @@ impl SimplerBoolPatternType {
 #[derive(Default)]
 pub struct SimplerBoolExpression;
 
-impl SimplerBoolExpression {
-    /// Check if two expressions are structurally equal
-    fn is_expression_equal(&self, expr1: &ExpData, expr2: &ExpData) -> bool {
-        match (expr1, expr2) {
-            (ExpData::LocalVar(_, s1), ExpData::LocalVar(_, s2)) => s1 == s2,
-            (ExpData::Value(_, v1), ExpData::Value(_, v2)) => v1 == v2,
-            (ExpData::Temporary(_, t1), ExpData::Temporary(_, t2)) => t1 == t2,
-            (ExpData::Call(_, op1, args1), ExpData::Call(_, op2, args2)) => {
-                op1 == op2
-                    && args1.len() == args2.len()
-                    && args1
-                        .iter()
-                        .zip(args2.iter())
-                        .all(|(a1, a2)| self.is_expression_equal(a1, a2))
-            },
-            _ => false,
-        }
-    }
+fn is_move_function(expr: &ExpData) -> bool {
+    matches!(expr, ExpData::Call(_, Operation::MoveFunction(_, _), _))
+}
 
+fn is_constant(expr: &ExpData) -> bool {
+    matches!(expr, ExpData::Value(_, _))
+}
+
+/// Check if two expressions are structurally equal
+fn is_expression_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
+    match (expr1, expr2) {
+        (ExpData::LocalVar(_, s1), ExpData::LocalVar(_, s2)) => s1 == s2,
+        (ExpData::Value(_, v1), ExpData::Value(_, v2)) => v1 == v2,
+        (ExpData::Temporary(_, t1), ExpData::Temporary(_, t2)) => t1 == t2,
+        (ExpData::Call(_, op1, args1), ExpData::Call(_, op2, args2)) => {
+            if is_move_function(expr1)
+                || is_move_function(expr2)
+                || args1.iter().any(|a| is_move_function(a))
+                || args2.iter().any(|a| is_move_function(a))
+            {
+                return false;
+            }
+
+            op1 == op2
+                && args1.len() == args2.len()
+                && args1
+                    .iter()
+                    .zip(args2.iter())
+                    .all(|(a1, a2)| is_expression_equal(a1, a2))
+        },
+        _ => false,
+    }
+}
+
+impl SimplerBoolExpression {
     /// Check for absorption law patterns: `a && b || a` or `a || a && b`
     fn check_absorption_law(
         &self,
@@ -75,8 +91,8 @@ impl SimplerBoolExpression {
         let check_pattern = |left: &ExpData, right: &ExpData| {
             if let ExpData::Call(_, And, and_args) = left {
                 if and_args.len() == 2 {
-                    return self.is_expression_equal(and_args[0].as_ref(), right)
-                        || self.is_expression_equal(and_args[1].as_ref(), right);
+                    return is_expression_equal(and_args[0].as_ref(), right)
+                        || is_expression_equal(and_args[1].as_ref(), right);
                 }
             }
             false
@@ -95,7 +111,12 @@ impl SimplerBoolExpression {
 
     /// Check for idempotence patterns: `a && a` or `a || a`
     fn check_idempotence(&self, left: &ExpData, right: &ExpData) -> Option<SimplerBoolPatternType> {
-        if self.is_expression_equal(left, right) {
+        // If left or right is a constant or known value, we ignore this since it's already implemented in `nonminimal_bool`
+        if is_constant(left) || is_constant(right) {
+            return None;
+        }
+
+        if is_expression_equal(left, right) {
             return Some(SimplerBoolPatternType::Idempotence);
         }
         None
@@ -110,8 +131,13 @@ impl SimplerBoolExpression {
     ) -> Option<SimplerBoolPatternType> {
         let is_negation_pair = |expr1: &ExpData, expr2: &ExpData| -> bool {
             matches!(expr2, ExpData::Call(_, Not, not_args)
-                if not_args.len() == 1 && self.is_expression_equal(expr1, not_args[0].as_ref()))
+                if not_args.len() == 1 && is_expression_equal(expr1, not_args[0].as_ref()))
         };
+
+        // If left or right is a constant or known value, we ignore this since it's already implemented in `nonminimal_bool`
+        if is_constant(left) || is_constant(right) {
+            return None;
+        }
 
         if is_negation_pair(left, right) || is_negation_pair(right, left) {
             let result_value = matches!(op, Or);
@@ -140,7 +166,7 @@ impl SimplerBoolExpression {
 
                 for left_elem in left_args.iter() {
                     for right_elem in right_args.iter() {
-                        if self.is_expression_equal(left_elem.as_ref(), right_elem.as_ref()) {
+                        if is_expression_equal(left_elem.as_ref(), right_elem.as_ref()) {
                             return Some(SimplerBoolPatternType::DistributiveLaw);
                         }
                     }
