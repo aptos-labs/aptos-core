@@ -1,14 +1,15 @@
 // Copyright (c) Supra Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow};
-use crate::chain_id::ChainId;
-
 use super::OnChainConfig;
+use crate::chain_id::ChainId;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainEvmConfig {
+    /// This value must be set if EVM must be paused.
+    None,
     V1(EvmConfigV1),
 }
 
@@ -27,13 +28,13 @@ impl OnChainEvmConfig {
         Self::V1(EvmConfigV1 { chain_id })
     }
 
-    pub fn chain_id(&self) -> u64 {
+    pub fn chain_id(&self) -> Option<u64> {
         match self {
-            Self::V1(config) => config.chain_id,
+            Self::None => None,
+            Self::V1(config) => Some(config.chain_id),
         }
     }
 }
-
 
 /// This onchain config does not exist from genesis, until it is added by the governance proposal.
 /// If the config is not found, Evm should not be enabled.
