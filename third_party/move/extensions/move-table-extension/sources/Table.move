@@ -26,6 +26,7 @@ module extensions::table {
     /// Destroy a table. The table must be empty to succeed.
     public fun destroy_empty<K: copy + drop, V>(table: Table<K, V>) {
         assert!(table.length == 0, errors::invalid_state(ENOT_EMPTY));
+        load_layouts<K, Box<V>>();
         destroy_empty_box<K, V, Box<V>>(&table);
         drop_unchecked_box<K, V, Box<V>>(table)
     }
@@ -34,6 +35,7 @@ module extensions::table {
     /// key already exists. The entry itself is not stored in the
     /// table, and cannot be discovered from it.
     public fun add<K: copy + drop, V>(table: &mut Table<K, V>, key: K, val: V) {
+        load_layouts<K, Box<V>>();
         add_box<K, V, Box<V>>(table, key, Box{val});
         table.length = table.length + 1
     }
@@ -41,12 +43,14 @@ module extensions::table {
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow<K: copy + drop, V>(table: &Table<K, V>, key: K): &V {
+        load_layouts<K, Box<V>>();
         &borrow_box<K, V, Box<V>>(table, key).val
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: copy + drop, V>(table: &mut Table<K, V>, key: K): &mut V {
+        load_layouts<K, Box<V>>();
         &mut borrow_box_mut<K, V, Box<V>>(table, key).val
     }
 
@@ -72,6 +76,7 @@ module extensions::table {
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(table: &mut Table<K, V>, key: K): V {
+        load_layouts<K, Box<V>>();
         let Box{val} = remove_box<K, V, Box<V>>(table, key);
         table.length = table.length - 1;
         val
@@ -79,6 +84,7 @@ module extensions::table {
 
     /// Returns true iff `table` contains an entry for `key`.
     public fun contains<K: copy + drop, V>(table: &Table<K, V>, key: K): bool {
+        load_layouts<K, Box<V>>();
         contains_box<K, V, Box<V>>(table, key)
     }
 
@@ -98,6 +104,7 @@ module extensions::table {
 
     // Primitives which take as an additional type parameter `Box<V>`, so the implementation
     // can use this to determine serialization layout.
+    native fun load_layouts<K, B>();
     native fun new_table_handle<K, V>(): address;
     native fun add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
     native fun borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;

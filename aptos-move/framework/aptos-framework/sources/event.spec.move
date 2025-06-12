@@ -62,6 +62,11 @@ spec aptos_framework::event {
         pragma opaque;
     }
 
+    spec native_load_layout<T>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
     spec guid {
         /// [high-level-req-5.1]
         aborts_if false;

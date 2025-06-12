@@ -22,16 +22,16 @@ use move_vm_types::{
 use std::sync::Arc;
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LayoutWithDelayedFields {
-    layout: MoveTypeLayout,
+    layout: Arc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
 impl LayoutWithDelayedFields {
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
-    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<MoveTypeLayout> {
+    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<Arc<MoveTypeLayout>> {
         (!self.contains_delayed_fields).then_some(self.layout)
     }
 
@@ -42,7 +42,7 @@ impl LayoutWithDelayedFields {
     }
 
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
-    pub fn unpack(self) -> (MoveTypeLayout, bool) {
+    pub fn unpack(self) -> (Arc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
     }
 }
@@ -158,7 +158,7 @@ where
             1,
         )?;
         Ok(LayoutWithDelayedFields {
-            layout,
+            layout: Arc::new(layout),
             contains_delayed_fields,
         })
     }
@@ -429,7 +429,7 @@ mod tests {
     fn test_layout_with_delayed_fields(contains_delayed_fields: bool) {
         let layout = LayoutWithDelayedFields {
             // Dummy layout.
-            layout: MoveTypeLayout::U8,
+            layout: Arc::new(MoveTypeLayout::U8),
             contains_delayed_fields,
         };
         assert_eq!(
@@ -493,7 +493,7 @@ mod tests {
             let layout = assert_ok!(result);
 
             assert!(!layout.contains_delayed_fields);
-            assert_eq!(&layout.layout, &expected_layout);
+            assert_eq!(layout.layout.as_ref(), &expected_layout);
         }
     }
 

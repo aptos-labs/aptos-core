@@ -92,6 +92,9 @@ pub enum SafeNativeError {
     ///
     /// Note: not used once metering in native context is enabled.
     LoadModule { module_name: ModuleId },
+
+    /// Converts types into layouts (annotated, if flag is set and runtime otherwise).
+    LoadLayouts { tys: Vec<Type>, annotated: bool },
 }
 
 // Allows us to keep using the `?` operator on function calls that return `PartialVMResult` inside safe natives.

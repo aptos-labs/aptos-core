@@ -2130,7 +2130,7 @@ impl AptosVM {
     }
 
     fn validate_waypoint_change_set(
-        events: &[(ContractEvent, Option<MoveTypeLayout>)],
+        events: &[(ContractEvent, Option<Arc<MoveTypeLayout>>)],
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let has_new_block_event = events
@@ -2493,7 +2493,9 @@ impl AptosVM {
         Ok(())
     }
 
-    pub fn should_restart_execution(events: &[(ContractEvent, Option<MoveTypeLayout>)]) -> bool {
+    pub fn should_restart_execution(
+        events: &[(ContractEvent, Option<Arc<MoveTypeLayout>>)],
+    ) -> bool {
         events.iter().any(|(event, _)| event.is_new_epoch_event())
     }
 
@@ -2981,8 +2983,8 @@ fn dispatchable_authenticate(
             );
             let (signer_data, signer_layout) = return_vals.return_values.pop().expect("Must exist");
             assert_eq!(
-                signer_layout,
-                MoveTypeLayout::Signer,
+                signer_layout.as_ref(),
+                &MoveTypeLayout::Signer,
                 "Abstraction authentication function returned non-signer."
             );
             signer_data

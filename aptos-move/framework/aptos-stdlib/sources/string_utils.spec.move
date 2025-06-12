@@ -39,6 +39,26 @@ spec aptos_std::string_utils {
         ensures result == spec_native_format_list(fmt, list4(a, b, c, d));
     }
 
+    spec native_load_annotated_layout1<T0>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec native_load_annotated_layout2<T0, T1>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec native_load_annotated_layout3<T0, T1, T2>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
+    spec native_load_annotated_layout4<T0, T1, T2, T3>() {
+        pragma opaque;
+        aborts_if [abstract] false;
+    }
+
     spec native_format<T>(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String {
         pragma opaque;
         aborts_if false;

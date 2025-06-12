@@ -29,8 +29,12 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
 -  [Function `to_bytes`](#0x1_from_bcs_to_bytes)
 -  [Function `to_string`](#0x1_from_bcs_to_string)
 -  [Function `from_bytes`](#0x1_from_bcs_from_bytes)
+-  [Function `native_load_layout`](#0x1_from_bcs_native_load_layout)
+-  [Function `native_from_bytes`](#0x1_from_bcs_native_from_bytes)
 -  [Specification](#@Specification_1)
     -  [Function `from_bytes`](#@Specification_1_from_bytes)
+    -  [Function `native_load_layout`](#@Specification_1_native_load_layout)
+    -  [Function `native_from_bytes`](#@Specification_1_native_from_bytes)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -318,7 +322,54 @@ Function would abort if T has signer in it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>friend</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+<pre><code><b>friend</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T {
+    <a href="from_bcs.md#0x1_from_bcs_native_load_layout">native_load_layout</a>&lt;T&gt;();
+    <a href="from_bcs.md#0x1_from_bcs_native_from_bytes">native_from_bytes</a>&lt;T&gt;(bytes)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_from_bcs_native_load_layout"></a>
+
+## Function `native_load_layout`
+
+
+
+<pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_native_load_layout">native_load_layout</a>&lt;T&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_native_load_layout">native_load_layout</a>&lt;T&gt;();
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_from_bcs_native_from_bytes"></a>
+
+## Function `native_from_bytes`
+
+
+
+<pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_native_from_bytes">native_from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_native_from_bytes">native_from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
 </code></pre>
 
 
@@ -359,6 +410,41 @@ Function would abort if T has signer in it.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes);
 <b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes);
+</code></pre>
+
+
+
+<a id="@Specification_1_native_load_layout"></a>
+
+### Function `native_load_layout`
+
+
+<pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_native_load_layout">native_load_layout</a>&lt;T&gt;()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_native_from_bytes"></a>
+
+### Function `native_from_bytes`
+
+
+<pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_native_from_bytes">native_from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] !<a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes);
+<b>ensures</b> [abstract] result == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes);
 </code></pre>
 
 

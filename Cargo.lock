@@ -4256,6 +4256,7 @@ name = "aptos-table-natives"
 version = "0.1.0"
 dependencies = [
  "aptos-gas-schedule",
+ "aptos-move-stdlib",
  "aptos-native-interface",
  "better_any",
  "bytes",

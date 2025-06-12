@@ -512,8 +512,8 @@ spec aptos_framework::vesting {
         pragma verify_duration_estimate = 300;
         let admin_addr = signer::address_of(admin);
         let admin_store = global<AdminStore>(admin_addr);
-        let seed = bcs::to_bytes(admin_addr);
-        let nonce = bcs::to_bytes(admin_store.nonce);
+        let seed = bcs::serialize(admin_addr);
+        let nonce = bcs::serialize(admin_store.nonce);
 
         let first = concat(seed, nonce);
         let second = concat(first, VESTING_POOL_SALT);
