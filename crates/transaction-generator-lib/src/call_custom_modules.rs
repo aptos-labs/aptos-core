@@ -160,7 +160,7 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Self {
-        let packages = Self::publish_package(
+        let packages: Vec<(Package, LocalAccount)> = Self::publish_package(
             init_txn_factory.clone(),
             root_account,
             txn_executor,
@@ -231,7 +231,8 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         publisher_balance: Option<u64>,
     ) -> Vec<(Package, LocalAccount)> {
-        let mut rng = StdRng::from_entropy();
+        // Use a fixed seed for deterministic account generation to have the same account addresses across runs
+        let mut rng = StdRng::seed_from_u64(42);
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut requests_publish = Vec::with_capacity(num_modules);
         let mut package_handler = PackageHandler::new(pre_built, package_name);
@@ -248,49 +249,63 @@ impl CustomModulesDelegationGeneratorCreator {
         for _i in 0..num_modules {
             let publisher = LocalAccount::generate(&mut rng);
             let publisher_address = publisher.address();
-            requests_create.push(create_account_transaction(
-                root_account.get_root_account().borrow(),
-                publisher_address,
-                &init_txn_factory,
-                publisher_balance,
-            ));
+            
+            // First check if package already exists at this address
+            let package_exists = match txn_executor.query_sequence_number(publisher_address).await {
+                Ok(seq) => seq > 0, // If sequence number > 0, account exists and might have package
+                Err(_) => false,    // If we can't query, assume it doesn't exist
+            };
 
-            let package = package_handler.pick_package(&mut rng, publisher.address());
-            for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
-                requests_publish.push(
-                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
-                );
-            }
+            let package = if !package_exists {
+                // Only generate new package if it doesn't exist
+                let new_package = package_handler.pick_package(&mut rng, publisher.address());
+                
+                // Create account and prepare publishing
+                requests_create.push(create_account_transaction(
+                    root_account.get_root_account().borrow(),
+                    publisher_address,
+                    &init_txn_factory,
+                    publisher_balance,
+                ));
+
+                for payload in new_package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
+                    requests_publish.push(
+                        publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
+                    );
+                }
+                
+                new_package
+            } else {
+                // If package exists, just pick it without generating new one
+                // This ensures we use the same package for the same publisher
+                package_handler.pick_package(&mut rng, publisher.address())
+            };
 
             packages.push((package, publisher));
         }
-        info!("Creating {} publisher accounts", requests_create.len());
-        // all publishers are created from root account, split it up.
-        for req_chunk in requests_create.chunks(100) {
-            txn_executor
-                .execute_transactions(req_chunk)
-                .await
-                .inspect_err(|err| {
-                    error!(
-                        "Failed to execute creation of publisher accounts: {:#}",
-                        err
-                    )
-                })
-                .unwrap();
+
+        if !requests_create.is_empty() {
+            info!("Creating {} publisher accounts", requests_create.len());
+            // all publishers are created from root account, split it up.
+            for req_chunk in requests_create.chunks(100) {
+                txn_executor
+                    .execute_transactions(req_chunk)
+                    .await
+                    .expect("Failed to create publisher accounts");
+            }
         }
 
-        info!(
-            "Publishing {} copies of package {}",
-            requests_publish.len(),
-            package_name
-        );
-        txn_executor
-            .execute_transactions(&requests_publish)
-            .await
-            .inspect_err(|err| error!("Failed to publish test package {}: {:#}", package_name, err))
-            .unwrap();
-
-        info!("Done publishing {} packages", packages.len());
+        if !requests_publish.is_empty() {
+            info!("Publishing {} packages", requests_publish.len());
+            for req_chunk in requests_publish.chunks(100) {
+                txn_executor
+                    .execute_transactions(req_chunk)
+                    .await
+                    .expect("Failed to publish packages");
+            }
+        } else {
+            info!("Skipping package publishing as packages already exist");
+        }
 
         packages
     }
