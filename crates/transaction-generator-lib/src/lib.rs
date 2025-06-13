@@ -122,15 +122,6 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        // TransactionType::Workflow {
-        //     workflow_kind: Box::new(TokenWorkflowKind::CreateMintBurn {
-        //         count: 1000,
-        //         creation_balance: 200000,
-        //     }),
-        //     num_modules: 1,
-        //     use_account_pool: false,
-        //     progress_type: WorkflowProgress::MoveByPhases,
-        // }
         TransactionType::CoinTransfer {
             invalid_transaction_ratio: 0,
             sender_use_account_pool: false,
