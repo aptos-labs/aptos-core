@@ -14,6 +14,7 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::coin;
     use aptos_framework::coin::ensure_paired_metadata;
     use aptos_framework::event;
+    use aptos_framework::fungible_asset::upgrade_store_to_concurrent;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -53,7 +54,7 @@ module aptos_framework::scheduled_txns {
     const EXPIRY_DELTA_DEFAULT: u64 = 100;
 
     /// The maximum number of scheduled transactions that can be run in a block
-    const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
+    const GET_READY_TRANSACTIONS_LIMIT: u64 = 1000;
 
     /// The maximum number of transactions that can be cancelled in a block during shutdown
     const SHUTDOWN_CANCEL_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
@@ -128,7 +129,7 @@ module aptos_framework::scheduled_txns {
 
     /// We want reduce the contention while scheduled txns are being executed
     // todo: check if 32 is a good number
-    const TO_REMOVE_PARALLELISM: u64 = 32;
+    const TO_REMOVE_PARALLELISM: u64 = 1024;
     struct ToRemoveTbl has key {
         remove_tbl: Table<u16, vector<ScheduleMapKey>>
     }
@@ -170,9 +171,10 @@ module aptos_framework::scheduled_txns {
 
         // Initialize fungible store for the owner
         let metadata = ensure_paired_metadata<AptosCoin>();
-        primary_fungible_store::ensure_primary_store_exists(
+        let deposit_store = primary_fungible_store::ensure_primary_store_exists(
             signer::address_of(&owner_signer), metadata
         );
+        upgrade_store_to_concurrent(&owner_signer, deposit_store);
 
         // Store the capability
         move_to(framework, AuxiliaryData { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: false, expiry_delta: EXPIRY_DELTA_DEFAULT });
@@ -471,14 +473,14 @@ module aptos_framework::scheduled_txns {
         let hash_bytes = key.txn_id;
         assert!(hash_bytes.length() == 32, hash_bytes.length()); // SHA3-256 produces 32 bytes
 
-        // Take first 8 bytes and convert to u64
-        let hash_first_8_bytes = vector::empty();
-        let idx = 0;
-        while (idx < 8) {
-            hash_first_8_bytes.push_back(hash_bytes[idx]);
+        // Take last 8 bytes and convert to u64
+        let hash_last_8_bytes = vector::empty();
+        let idx = hash_bytes.length() - 8;
+        while (idx < hash_bytes.length()) {
+            hash_last_8_bytes.push_back(hash_bytes[idx]);
             idx = idx + 1;
         };
-        let value = from_bcs::to_u64(hash_first_8_bytes);
+        let value = from_bcs::to_u64(hash_last_8_bytes);
 
         // Calculate table index using hash
         let tbl_idx = ((value % TO_REMOVE_PARALLELISM) as u16);
