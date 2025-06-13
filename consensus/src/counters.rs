@@ -547,10 +547,11 @@ pub static TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Round timeout in milliseconds
-pub static ROUND_TIMEOUT_MS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static ROUND_TIMEOUT_MS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "aptos_consensus_round_timeout_ms",
-        "Round timeout in milliseconds"
+        "Round timeout in milliseconds",
+        &["round"]
     )
     .unwrap()
 });

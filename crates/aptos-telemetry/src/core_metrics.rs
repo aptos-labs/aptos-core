@@ -140,7 +140,10 @@ fn collect_consensus_metrics(core_metrics: &mut BTreeMap<String, String>) {
     // Get the round timeout in milliseconds
     core_metrics.insert(
         CONSENSUS_ROUND_TIMEOUT_MS.into(),
-        get_gauge_metric(&aptos_consensus::counters::ROUND_TIMEOUT_MS),
+        aptos_consensus::counters::ROUND_TIMEOUT_MS
+            .with_label_values(&[&aptos_consensus::counters::CURRENT_ROUND.get().to_string()])
+            .get()
+            .to_string(),
     );
     
     // Get sync info messages count
