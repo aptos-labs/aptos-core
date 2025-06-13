@@ -1400,6 +1400,8 @@ impl RoundManager {
                 parent.round()
             );
 
+            observe_block(parent.timestamp_usecs(), "next_opt_proposal");
+
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
             let sync_info = self.block_store.sync_info();
