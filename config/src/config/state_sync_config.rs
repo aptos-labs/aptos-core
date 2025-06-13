@@ -371,9 +371,9 @@ impl Default for AptosDataMultiFetchConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosLatencyFilteringConfig {
-    /// The reduction factor for latency filtering when selecting peers
+    /// The reduction factor for latency filtering when selecting peers.
     pub latency_filtering_reduction_factor: u64,
-    /// Minimum peer ratio for latency filtering
+    /// Minimum peer ratio for latency filtering.
     pub min_peer_ratio_for_latency_filtering: u64,
     /// Minimum number of peers before latency filtering can occur
     pub min_peers_for_latency_filtering: u64,
