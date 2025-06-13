@@ -585,7 +585,7 @@ If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will a
 The maximum number of scheduled transactions that can be run in a block
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 100;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 1000;
 </code></pre>
 
 
@@ -624,7 +624,7 @@ Conversion factor between our time granularity (100ms) and milliseconds
 The maximum number of transactions that can be cancelled in a block during shutdown
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_SHUTDOWN_CANCEL_LIMIT">SHUTDOWN_CANCEL_LIMIT</a>: u64 = 200;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_SHUTDOWN_CANCEL_LIMIT">SHUTDOWN_CANCEL_LIMIT</a>: u64 = 2000;
 </code></pre>
 
 
@@ -634,7 +634,7 @@ The maximum number of transactions that can be cancelled in a block during shutd
 We want reduce the contention while scheduled txns are being executed
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>: u64 = 32;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>: u64 = 1024;
 </code></pre>
 
 
@@ -684,9 +684,10 @@ Can be called only by the framework
 
     // Initialize fungible store for the owner
     <b>let</b> metadata = ensure_paired_metadata&lt;AptosCoin&gt;();
-    <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(
+    <b>let</b> deposit_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(
         <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&owner_signer), metadata
     );
+    upgrade_store_to_concurrent(&owner_signer, deposit_store);
 
     // Store the <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>
     <b>move_to</b>(framework, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> { gas_fee_deposit_store_signer_cap: owner_cap, stop_scheduling: <b>false</b>, expiry_delta: <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a> });
@@ -1144,14 +1145,14 @@ IMP: Make sure this does not affect parallel execution of txns
     <b>let</b> hash_bytes = key.txn_id;
     <b>assert</b>!(hash_bytes.length() == 32, hash_bytes.length()); // SHA3-256 produces 32 bytes
 
-    // Take first 8 bytes and convert <b>to</b> u64
-    <b>let</b> hash_first_8_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>let</b> idx = 0;
-    <b>while</b> (idx &lt; 8) {
-        hash_first_8_bytes.push_back(hash_bytes[idx]);
+    // Take last 8 bytes and convert <b>to</b> u64
+    <b>let</b> hash_last_8_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> idx = hash_bytes.length() - 8;
+    <b>while</b> (idx &lt; hash_bytes.length()) {
+        hash_last_8_bytes.push_back(hash_bytes[idx]);
         idx = idx + 1;
     };
-    <b>let</b> value = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u64">from_bcs::to_u64</a>(hash_first_8_bytes);
+    <b>let</b> value = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u64">from_bcs::to_u64</a>(hash_last_8_bytes);
 
     // Calculate <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> index using <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
     <b>let</b> tbl_idx = ((value % <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) <b>as</b> u16);
