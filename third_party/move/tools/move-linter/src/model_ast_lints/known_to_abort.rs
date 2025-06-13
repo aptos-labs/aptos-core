@@ -12,24 +12,54 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{
+        Exp,
         ExpData::{self, Call, Value},
         Operation,
         Value::Number,
     },
     model::GlobalEnv,
-    ty::{PrimitiveType, Type},
+    ty::Type,
 };
 use num::BigInt;
 use Operation::*;
 
-const DIVISION_BY_ZERO_MSG: &str = "Division by zero will cause the program to abort";
-const MODULO_BY_ZERO_MSG: &str = "Modulo by zero will cause the program to abort";
+const DIVISION_BY_ZERO_MSG: &str = "Division by zero will abort";
+const MODULO_BY_ZERO_MSG: &str = "Modulo by zero will abort";
 const SHIFT_OVERFLOW_MSG: &str =
-    "Shift by amount greater than or equal to the type's bit width will cause the program to abort";
-const CAST_OVERFLOW_MSG: &str = "Cast operation will cause the program to abort because the value is outside the target type's range";
+    "Shift by amount greater than or equal to the type's bit width will abort";
+const CAST_OVERFLOW_MSG: &str =
+    "Cast operation will abort because the value is outside the target type's range";
 
 #[derive(Default)]
 pub struct KnownToAbort;
+
+fn get_constant_value(args: &Vec<Exp>, op: &Operation) -> Option<BigInt> {
+    let mut result = None;
+    for arg in args {
+        let value = match arg.as_ref() {
+            ExpData::Value(_, Number(n)) => Some(n.clone()),
+            ExpData::Call(_, inner_op @ (Add | Mul), inner_args) => {
+                get_constant_value(inner_args, inner_op)
+            },
+            _ => None,
+        };
+
+        match (result, value) {
+            (Some(current), Some(new_val)) => {
+                result = Some(match op {
+                    Add => current + new_val,
+                    Mul => current * new_val,
+                    _ => return None,
+                });
+            },
+            (None, Some(new_val)) => {
+                result = Some(new_val);
+            },
+            _ => return None,
+        }
+    }
+    result
+}
 
 impl ExpChecker for KnownToAbort {
     fn get_name(&self) -> String {
@@ -58,11 +88,28 @@ impl ExpChecker for KnownToAbort {
             },
             Call(id, Cast, args) if args.len() == 1 => {
                 // Check for cast operations: constant as type
-                if let Value(_, Number(constant_value)) = args[0].as_ref() {
-                    let target_type = env.get_node_type(expr.node_id());
-                    if self.check_cast_overflow(constant_value, &target_type) {
-                        self.report(env, &env.get_node_loc(*id), CAST_OVERFLOW_MSG);
-                    }
+                match args[0].as_ref() {
+                    Value(_, Number(constant_value)) => {
+                        let target_type = env.get_node_type(expr.node_id());
+                        if self.check_cast_overflow(constant_value, &target_type) {
+                            self.report(env, &env.get_node_loc(*id), CAST_OVERFLOW_MSG);
+                        }
+                    },
+                    Call(_, op, inner_args) => {
+                        let constant_value = if *op == Add || *op == Mul {
+                            get_constant_value(inner_args, op)
+                        } else {
+                            None
+                        };
+
+                        if let Some(constant_value) = constant_value {
+                            let target_type = env.get_node_type(expr.node_id());
+                            if self.check_cast_overflow(&constant_value, &target_type) {
+                                self.report(env, &env.get_node_loc(*id), CAST_OVERFLOW_MSG);
+                            }
+                        }
+                    },
+                    _ => {},
                 }
             },
             _ => {},
@@ -82,7 +129,7 @@ impl KnownToAbort {
             return None;
         };
 
-        let bit_width = get_bit_width(prim_ty)?;
+        let bit_width = prim_ty.get_num_bits()?;
 
         if shift_amount >= &BigInt::from(bit_width) {
             Some(SHIFT_OVERFLOW_MSG)
@@ -102,17 +149,5 @@ impl KnownToAbort {
         };
 
         value < &min_val || value > &max_val
-    }
-}
-
-fn get_bit_width(prim_ty: &PrimitiveType) -> Option<u32> {
-    match prim_ty {
-        PrimitiveType::U8 => Some(8),
-        PrimitiveType::U16 => Some(16),
-        PrimitiveType::U32 => Some(32),
-        PrimitiveType::U64 => Some(64),
-        PrimitiveType::U128 => Some(128),
-        PrimitiveType::U256 => Some(256),
-        _ => None,
     }
 }
