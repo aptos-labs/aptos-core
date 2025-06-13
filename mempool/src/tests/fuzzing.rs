@@ -82,10 +82,14 @@ pub fn test_mempool_process_incoming_transactions_impl(
         HashMap::new(),
         PeersAndMetadata::new(&[NetworkId::Validator]),
     );
+    let transaction_filter_config = config
+        .transaction_filters
+        .mempool_and_quorum_store_filter
+        .clone();
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
         Arc::new(Mutex::new(CoreMempool::new(&config))),
         config.mempool.clone(),
-        config.transaction_filter.clone(),
+        transaction_filter_config,
         network_client,
         Arc::new(mock_db),
         vm_validator,

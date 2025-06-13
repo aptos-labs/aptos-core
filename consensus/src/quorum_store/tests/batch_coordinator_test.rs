@@ -14,7 +14,7 @@ use aptos_config::config::TransactionFilterConfig;
 use aptos_consensus_types::{common::Author, proof_of_store::BatchId};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
 use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
-use aptos_transactions_filter::transaction_matcher::Filter;
+use aptos_transaction_filters::transaction_filter::TransactionFilter;
 use aptos_types::{
     chain_id::ChainId,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
@@ -37,12 +37,8 @@ async fn test_handle_batches_msg_filter_disabled() {
     let (sender_to_batch_generator, mut receiver_for_batch_generator) = channel(100);
 
     // Create a filtering config with filtering disabled
-    let transaction_filter = Filter::empty().add_all_filter(false);
-    let transaction_filter_config = TransactionFilterConfig {
-        enable_quorum_store_filter: false,
-        transaction_filter,
-        ..TransactionFilterConfig::default()
-    };
+    let transaction_filter = TransactionFilter::empty();
+    let transaction_filter_config = TransactionFilterConfig::new(false, transaction_filter);
 
     // Create a batch coordinator
     let mut batch_coordinator = create_batch_coordinator(
@@ -91,12 +87,9 @@ async fn test_handle_batches_msg_filter_enabled() {
 
     // Create a filtering config with filtering enabled (the first transaction sender is rejected)
     let transactions = create_signed_transactions(10);
-    let transaction_filter = Filter::empty().add_sender_filter(false, transactions[0].sender());
-    let transaction_filter_config = TransactionFilterConfig {
-        enable_quorum_store_filter: true,
-        transaction_filter,
-        ..TransactionFilterConfig::default()
-    };
+    let transaction_filter =
+        TransactionFilter::empty().add_sender_filter(false, transactions[0].sender());
+    let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
 
     // Create a batch coordinator
     let mut batch_coordinator = create_batch_coordinator(

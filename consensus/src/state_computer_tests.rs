@@ -6,6 +6,7 @@ use crate::{
     state_replication::StateComputer, transaction_deduper::NoOpDeduper,
     transaction_shuffler::NoOpShuffler, txn_notifier::TxnNotifier,
 };
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
 use aptos_consensus_types::{block::Block, block_data::BlockData};
 use aptos_crypto::HashValue;
@@ -13,9 +14,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_transactions_filter::{
-    transaction_filter::TransactionFilter, transaction_matcher::Filter,
-};
+use aptos_transaction_filters::block_transaction_filter::BlockTransactionFilter;
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
@@ -170,7 +169,7 @@ async fn should_see_and_notify_validator_txns() {
         Arc::new(DummyTxnNotifier {}),
         state_sync_notifier.clone(),
         &Handle::current(),
-        TransactionFilter::new(Filter::empty()),
+        BlockTransactionFilterConfig::new(false, BlockTransactionFilter::empty()),
         true,
     );
 

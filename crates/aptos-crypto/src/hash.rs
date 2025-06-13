@@ -282,13 +282,6 @@ impl HashValue {
         hash[Self::LENGTH - bytes.len()..].copy_from_slice(&bytes[..]);
         Self::new(hash)
     }
-
-    /// Converts the hash value into a u64 by taking the last 8 bytes of the hash.
-    pub fn into_u64(self) -> u64 {
-        let mut bytes = [0u8; 8];
-        bytes.copy_from_slice(&self.hash[Self::LENGTH - 8..]);
-        u64::from_be_bytes(bytes)
-    }
 }
 
 impl ser::Serialize for HashValue {

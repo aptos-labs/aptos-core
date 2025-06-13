@@ -199,7 +199,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
-        let transaction_filter_config = node_config.transaction_filter.clone();
+        let transaction_filter_config = node_config
+            .transaction_filters
+            .mempool_and_quorum_store_filter
+            .clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
