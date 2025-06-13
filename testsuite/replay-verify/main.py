@@ -234,6 +234,18 @@ class WorkerPod:
             "--block-cache-size",
             "10737418240",
         ]
+        # TODO(ibalajiarun): hack for heavy ranges. Increase memory for heavy ranges.
+        if (
+            self.network == Network.TESTNET
+            and self.start_version >= 6700000000
+            and self.end_version < 6800000000
+        ):
+            pod_manifest["spec"]["containers"][0]["resources"]["requests"][
+                "memory"
+            ] = "180Gi"
+            pod_manifest["spec"]["containers"][0]["resources"]["limits"][
+                "memory"
+            ] = "180Gi"
 
         if SHARDING_ENABLED:
             pod_manifest["spec"]["containers"][0]["command"].append(
@@ -443,9 +455,11 @@ class ReplayScheduler:
                 skips.pop(0)
                 current = skip_end + 1
                 continue
-            elif skip_start <= next_current <= skip_end:
+            elif skip_start <= next_current - 1 <= skip_end:
                 # If the next current is within the skip range, we need to adjust it
-                skips.pop(0)
+                next_current = skip_start
+            elif next_current > skip_start:
+                # If the next current is beyond the skip range, we need to adjust it
                 next_current = skip_start
 
             # avoid having too many small tasks, simply skip the task
