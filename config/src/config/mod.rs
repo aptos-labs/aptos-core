@@ -37,7 +37,7 @@ mod safety_rules_config;
 mod secure_backend_config;
 mod state_sync_config;
 mod storage_config;
-mod transaction_filter_config;
+mod transaction_filters_config;
 mod utils;
 
 // All public usage statements should be declared below
