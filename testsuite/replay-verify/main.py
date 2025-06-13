@@ -409,7 +409,7 @@ class ReplayScheduler:
                 current_skip[1] = max(current_skip[1], next_skip[1])
         ret.append(current_skip)
 
-        return sorted_skips
+        return ret
 
     def create_tasks(self) -> None:
         current = self.start_version
@@ -423,10 +423,6 @@ class ReplayScheduler:
             (skip_start, skip_end) = (
                 (INT64_MAX, INT64_MAX) if len(skips) == 0 else skips[0]
             )
-            if skip_start <= current:
-                skips.pop(0)
-                current = skip_end + 1
-                continue
 
             # TODO(ibalajiarun): temporary hack to handle heavy ranges
             if (
@@ -441,6 +437,16 @@ class ReplayScheduler:
                 next_current = min(
                     current + range_size, self.end_version + 1, skip_start
                 )
+
+            # Only skip if current is within the skip range
+            if skip_start <= current <= skip_end:
+                skips.pop(0)
+                current = skip_end + 1
+                continue
+            elif skip_start <= next_current <= skip_end:
+                # If the next current is within the skip range, we need to adjust it
+                skips.pop(0)
+                next_current = skip_start
 
             # avoid having too many small tasks, simply skip the task
             range = (current, next_current - 1)
