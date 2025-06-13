@@ -21,7 +21,7 @@ use crate::{
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     contract_event::TransactionEvent, state_store::state_value::StateValueMetadata,
-    transaction::TBlockOutput, write_set::TransactionWrite,
+    transaction::BlockOutput, write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
@@ -225,7 +225,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         }
     }
 
-    fn assert_success<E: Debug>(&self, block_output: &TBlockOutput<MockOutput<K, E>, K>) {
+    fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
         let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
         let mut group_world = HashMap::new();
         let mut group_metadata: HashMap<K, Option<StateValueMetadata>> = HashMap::new();
@@ -385,7 +385,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Debug>(
         &self,
-        results: &BlockExecutionResult<TBlockOutput<MockOutput<K, E>, K>, usize>,
+        results: &BlockExecutionResult<BlockOutput<MockOutput<K, E>>, usize>,
     ) {
         match results {
             Ok(block_output) => {
@@ -404,7 +404,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
     pub(crate) fn assert_parallel_output<E: Debug>(
         &self,
-        results: &Result<TBlockOutput<MockOutput<K, E>, K>, ()>,
+        results: &Result<BlockOutput<MockOutput<K, E>>, ()>,
     ) {
         match results {
             Ok(block_output) => {

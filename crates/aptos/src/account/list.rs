@@ -107,7 +107,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .into_iter()
                 .map(|resource| {
                     let mut map = serde_json::Map::new();
-                    map.insert(resource.resource_type.to_string(), resource.data);
+                    map.insert(resource.resource_type.to_canonical_string(), resource.data);
                     serde_json::Value::Object(map)
                 })
                 .collect::<Vec<serde_json::Value>>(),

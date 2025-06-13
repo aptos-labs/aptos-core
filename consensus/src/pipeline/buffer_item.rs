@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -62,12 +62,12 @@ pub struct OrderedItem {
     // from peers.
     pub commit_proof: Option<LedgerInfoWithSignatures>,
     pub callback: StateComputerCommitCallBackType,
-    pub ordered_blocks: Vec<PipelinedBlock>,
+    pub ordered_blocks: Vec<Arc<PipelinedBlock>>,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
 pub struct ExecutedItem {
-    pub executed_blocks: Vec<PipelinedBlock>,
+    pub executed_blocks: Vec<Arc<PipelinedBlock>>,
     pub partial_commit_proof: SignatureAggregator<LedgerInfo>,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
@@ -75,7 +75,7 @@ pub struct ExecutedItem {
 }
 
 pub struct SignedItem {
-    pub executed_blocks: Vec<PipelinedBlock>,
+    pub executed_blocks: Vec<Arc<PipelinedBlock>>,
     pub partial_commit_proof: SignatureAggregator<LedgerInfo>,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
@@ -83,7 +83,7 @@ pub struct SignedItem {
 }
 
 pub struct AggregatedItem {
-    pub executed_blocks: Vec<PipelinedBlock>,
+    pub executed_blocks: Vec<Arc<PipelinedBlock>>,
     pub commit_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
@@ -101,11 +101,11 @@ impl Hashable for BufferItem {
     }
 }
 
-pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<PipelinedBlock>>>;
+pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<Arc<PipelinedBlock>>>>;
 
 impl BufferItem {
     pub fn new_ordered(
-        ordered_blocks: Vec<PipelinedBlock>,
+        ordered_blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
         unverified_votes: HashMap<Author, CommitVote>,
@@ -122,7 +122,7 @@ impl BufferItem {
     // pipeline functions
     pub fn advance_to_executed_or_aggregated(
         self,
-        executed_blocks: Vec<PipelinedBlock>,
+        executed_blocks: Vec<Arc<PipelinedBlock>>,
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
@@ -369,7 +369,7 @@ impl BufferItem {
     }
 
     // generic functions
-    pub fn get_blocks(&self) -> &Vec<PipelinedBlock> {
+    pub fn get_blocks(&self) -> &Vec<Arc<PipelinedBlock>> {
         match self {
             Self::Ordered(ordered) => &ordered.ordered_blocks,
             Self::Executed(executed) => &executed.executed_blocks,
@@ -510,8 +510,8 @@ mod test {
         (validator_signers, validator_verifier)
     }
 
-    fn create_pipelined_block() -> PipelinedBlock {
-        PipelinedBlock::new(
+    fn create_pipelined_block() -> Arc<PipelinedBlock> {
+        Arc::new(PipelinedBlock::new(
             Block::new_for_testing(
                 HashValue::random(),
                 BlockData::dummy_with_validator_txns(vec![]),
@@ -519,7 +519,7 @@ mod test {
             ),
             vec![],
             StateComputeResult::new_dummy(),
-        )
+        ))
     }
 
     fn create_valid_commit_votes(

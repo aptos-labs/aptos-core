@@ -21,7 +21,7 @@ use std::{
 pub struct SigningRequest {
     pub ordered_ledger_info: LedgerInfoWithSignatures,
     pub commit_ledger_info: LedgerInfo,
-    pub blocks: Vec<PipelinedBlock>,
+    pub blocks: Vec<Arc<PipelinedBlock>>,
 }
 
 impl Debug for SigningRequest {

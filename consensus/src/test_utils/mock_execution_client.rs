@@ -85,10 +85,7 @@ impl MockExecutionClient {
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);
 
-        callback(
-            &ordered_blocks.into_iter().map(Arc::new).collect::<Vec<_>>(),
-            ordered_proof,
-        );
+        callback(&ordered_blocks, ordered_proof);
 
         Ok(())
     }
@@ -119,7 +116,7 @@ impl TExecutionClient for MockExecutionClient {
 
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         finality_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -129,7 +126,7 @@ impl TExecutionClient for MockExecutionClient {
             blocks.iter().map(|v| v.round()).collect::<Vec<_>>()
         );
 
-        for block in blocks {
+        for block in &blocks {
             self.block_cache.lock().insert(
                 block.id(),
                 block
@@ -143,10 +140,7 @@ impl TExecutionClient for MockExecutionClient {
             .executor_channel
             .clone()
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<PipelinedBlock>>(),
+                ordered_blocks: blocks,
                 ordered_proof: finality_proof.ledger_info().clone(),
                 callback,
             })

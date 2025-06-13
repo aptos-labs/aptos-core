@@ -185,7 +185,10 @@ impl InterpreterImpl<'_> {
         }
     }
 
-    fn load_generic_function(
+    /// Loads a generic function with instantiated type arguments. Does not perform any checks if
+    /// the function is callable (i.e., visible to the caller). The visibility check should be done
+    /// at the call-site.
+    fn load_generic_function_no_visibility_checks(
         &mut self,
         module_storage: &impl ModuleStorage,
         current_frame: &Frame,
@@ -198,15 +201,12 @@ impl InterpreterImpl<'_> {
         let function = current_frame
             .build_loaded_function_from_instantiation_and_ty_args(module_storage, idx, ty_args)
             .map_err(|e| self.set_location(e))?;
-
-        if self.vm_config.paranoid_type_checks {
-            self.check_friend_or_private_call(&current_frame.function, &function)?;
-        }
-
         Ok(function)
     }
 
-    fn load_function(
+    /// Loads a non-generic function. Does not perform any checks if the function is callable
+    /// (i.e., visible to the caller). The visibility check should be done at the call-site.
+    fn load_function_no_visibility_checks(
         &mut self,
         module_storage: &impl ModuleStorage,
         current_frame: &Frame,
@@ -215,11 +215,6 @@ impl InterpreterImpl<'_> {
         let function = current_frame
             .build_loaded_function_from_handle_and_ty_args(module_storage, fh_idx, vec![])
             .map_err(|e| self.set_location(e))?;
-
-        if self.vm_config.paranoid_type_checks {
-            self.check_friend_or_private_call(&current_frame.function, &function)?;
-        }
-
         Ok(function)
     }
 
@@ -372,11 +367,12 @@ impl InterpreterImpl<'_> {
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function = Rc::new(self.load_function(
-                                        module_storage,
-                                        &current_frame,
-                                        fh_idx,
-                                    )?);
+                                    let function =
+                                        Rc::new(self.load_function_no_visibility_checks(
+                                            module_storage,
+                                            &current_frame,
+                                            fh_idx,
+                                        )?);
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -392,7 +388,7 @@ impl InterpreterImpl<'_> {
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(self.load_function(
+                        let function = Rc::new(self.load_function_no_visibility_checks(
                             module_storage,
                             &current_frame,
                             fh_idx,
@@ -401,16 +397,17 @@ impl InterpreterImpl<'_> {
                         (function, frame_cache)
                     };
 
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &function,
+                        CallType::Regular,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas
-                    let module_id = function.module_id().ok_or_else(|| {
-                        let err = PartialVMError::new_invariant_violation(
-                            "Failed to get native function module id",
-                        );
-                        set_err_info!(current_frame, err)
-                    })?;
                     gas_meter
                         .charge_call(
-                            module_id,
+                            function.owner_as_module()?.self_id(),
                             function.name(),
                             self.operand_stack
                                 .last_n(function.param_tys().len())
@@ -467,13 +464,14 @@ impl InterpreterImpl<'_> {
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::<LoadedFunction>::new(self.load_generic_function(
+                                    let function = Rc::<LoadedFunction>::new(
+                                        self.load_generic_function_no_visibility_checks(
                                             module_storage,
                                             &current_frame,
                                             gas_meter,
                                             idx,
-                                        )?);
+                                        )?,
+                                    );
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -489,28 +487,29 @@ impl InterpreterImpl<'_> {
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(self.load_generic_function(
-                            module_storage,
-                            &current_frame,
-                            gas_meter,
-                            idx,
-                        )?);
+                        let function = Rc::<LoadedFunction>::new(
+                            self.load_generic_function_no_visibility_checks(
+                                module_storage,
+                                &current_frame,
+                                gas_meter,
+                                idx,
+                            )?,
+                        );
                         let frame_cache = FrameTypeCache::make_rc();
                         (function, frame_cache)
                     };
 
-                    let module_id = function
-                        .module_id()
-                        .ok_or_else(|| {
-                            PartialVMError::new_invariant_violation(
-                                "Failed to get native function module id",
-                            )
-                        })
-                        .map_err(|e| set_err_info!(current_frame, e))?;
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &function,
+                        CallType::Regular,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas
                     gas_meter
                         .charge_call_generic(
-                            module_id,
+                            function.owner_as_module()?.self_id(),
                             function.name(),
                             function
                                 .ty_args()
@@ -573,7 +572,7 @@ impl InterpreterImpl<'_> {
                                 //   to be able to let scripts use closures.
                                 let err = PartialVMError::new_invariant_violation(format!(
                                     "module id required to charge gas for function `{}`",
-                                    lazy_function.to_stable_string()
+                                    lazy_function.to_canonical_string()
                                 ));
                                 return Err(set_err_info!(current_frame, err));
                             };
@@ -606,6 +605,13 @@ impl InterpreterImpl<'_> {
                         .with_resolved_function(module_storage, |f| Ok(f.clone()))
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &callee,
+                        CallType::ClosureDynamicDispatch,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas for call and for the parameters. The current APIs
                     // require an ExactSizeIterator to be passed for charge_call, so
                     // some acrobatics is needed (sigh).
@@ -626,10 +632,6 @@ impl InterpreterImpl<'_> {
                             (callee.local_tys().len() as u64).into(),
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
-
-                    // In difference to regular calls, we skip visibility check.
-                    // It is possible to call a private function of another module via
-                    // a closure.
 
                     // Call function
                     if callee.is_native() {
@@ -863,15 +865,6 @@ impl InterpreterImpl<'_> {
             }
         }
 
-        let mut native_context = NativeContext::new(
-            self,
-            data_cache,
-            resource_resolver,
-            module_storage,
-            extensions,
-            gas_meter.balance_internal(),
-            traversal_context,
-        );
         let native_function = function.get_native()?;
 
         gas_meter.charge_native_function_before_execution(
@@ -882,9 +875,16 @@ impl InterpreterImpl<'_> {
             args.iter(),
         )?;
 
+        let mut native_context = NativeContext::new(
+            self,
+            data_cache,
+            resource_resolver,
+            module_storage,
+            extensions,
+            gas_meter,
+            traversal_context,
+        );
         let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
-
-        gas_meter.charge_heap_memory(native_context.heap_memory_usage())?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -952,19 +952,11 @@ impl InterpreterImpl<'_> {
                     ty_args,
                 )?;
 
-                if target_func.is_friend_or_private()
-                    || target_func.module_id() == function.module_id()
-                {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message(
-                            "Invoking private or friend function during dispatch".to_string(),
-                        ));
-                }
-
-                if target_func.is_native() {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message("Invoking native function during dispatch".to_string()));
-                }
+                RTTCheck::check_call_visibility(
+                    function,
+                    &target_func,
+                    CallType::NativeDynamicDispatch,
+                )?;
 
                 // Checking type of the dispatch target function
                 //
@@ -1032,38 +1024,6 @@ impl InterpreterImpl<'_> {
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
             },
-        }
-    }
-
-    /// Make sure only private/friend function can only be invoked by modules under the same address.
-    fn check_friend_or_private_call(
-        &self,
-        caller: &LoadedFunction,
-        callee: &LoadedFunction,
-    ) -> VMResult<()> {
-        if callee.is_friend_or_private() {
-            match (caller.module_id(), callee.module_id()) {
-                (Some(caller_id), Some(callee_id)) => {
-                    if caller_id.address() == callee_id.address() {
-                        Ok(())
-                    } else {
-                        Err(self.set_location(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(
-                                    format!("Private/Friend function invokation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
-                                )))
-                    }
-                },
-                _ => Err(self.set_location(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "Private/Friend function invokation error caller: {:?}, callee {:?}",
-                            caller.name(),
-                            callee.name()
-                        )),
-                )),
-            }
-        } else {
-            Ok(())
         }
     }
 
@@ -1432,10 +1392,10 @@ impl InterpreterImpl<'_> {
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
             if let Some(tag) = it.next() {
-                debug_write!(buf, "{}", tag)?;
+                debug_write!(buf, "{}", tag.to_canonical_string())?;
                 for tag in it {
                     debug_write!(buf, ", ")?;
-                    debug_write!(buf, "{}", tag)?;
+                    debug_write!(buf, "{}", tag.to_canonical_string())?;
                 }
             }
             debug_write!(buf, ">")?;

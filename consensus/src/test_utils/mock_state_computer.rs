@@ -43,7 +43,7 @@ impl EmptyStateComputer {
 impl StateComputer for EmptyStateComputer {
     async fn commit(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         commit: LedgerInfoWithSignatures,
         call_back: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -53,10 +53,7 @@ impl StateComputer for EmptyStateComputer {
             .executor_channel
             .clone()
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<PipelinedBlock>>(),
+                ordered_blocks: blocks,
                 ordered_proof: commit,
                 callback: call_back,
             })
@@ -150,7 +147,7 @@ impl StateComputer for RandomComputeResultStateComputer {
 
     async fn commit(
         &self,
-        _blocks: &[Arc<PipelinedBlock>],
+        _blocks: Vec<Arc<PipelinedBlock>>,
         _commit: LedgerInfoWithSignatures,
         _call_back: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {

@@ -279,7 +279,10 @@ pub async fn get_current_version(rest_client: &RestClient) -> u64 {
 
 pub async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {
     let maybe_response = rest_client
-        .get_account_resource_bcs::<T>(CORE_CODE_ADDRESS, T::struct_tag().to_string().as_str())
+        .get_account_resource_bcs::<T>(
+            CORE_CODE_ADDRESS,
+            T::struct_tag().to_canonical_string().as_str(),
+        )
         .await;
     let response = maybe_response.unwrap();
     response.into_inner()

@@ -94,7 +94,7 @@ impl StatelessPipeline for PersistingPhase {
         } else {
             let round = commit_ledger_info.ledger_info().round();
             self.persisting_handle
-                .commit(&blocks, commit_ledger_info.clone(), callback)
+                .commit(blocks, commit_ledger_info.clone(), callback)
                 .await
                 .map(|_| round)
         };

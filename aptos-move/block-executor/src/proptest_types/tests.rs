@@ -17,7 +17,10 @@ use crate::{
     txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
+    contract_event::TransactionEvent,
     state_store::MockStateView,
 };
 use claims::{assert_matches, assert_ok};
@@ -84,7 +87,12 @@ fn run_transactions<K, V, E>(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &state_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &state_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         if module_access.0 && module_access.1 {
             assert_matches!(output, Err(()));
@@ -222,7 +230,12 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -276,7 +289,12 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -387,7 +405,12 @@ fn publishing_fixed_params_with_block_gas_limit(
         executor_thread_pool,
         None,
     )
-    .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    .execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -435,7 +458,12 @@ fn publishing_fixed_params_with_block_gas_limit(
             executor_thread_pool.clone(),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         assert_matches!(output, Err(()));
     }
@@ -517,7 +545,12 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         BaselineOutput::generate(txn_provider.get_txns(), None).assert_parallel_output(&output);
     }
@@ -536,7 +569,13 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_sequential(&txn_provider, &data_view, &mut guard, false);
+        .execute_transactions_sequential(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+            false,
+        );
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(txn_provider.get_txns(), None).assert_output(&output.map_err(

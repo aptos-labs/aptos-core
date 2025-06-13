@@ -80,7 +80,7 @@ pub trait TExecutionClient: Send + Sync {
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;
@@ -368,7 +368,7 @@ impl TExecutionClient for ExecutionProxyClient {
 
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -381,7 +381,7 @@ impl TExecutionClient for ExecutionProxyClient {
             },
         };
 
-        for block in blocks {
+        for block in &blocks {
             block.set_insertion_time();
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
                 tx.order_proof_tx
@@ -392,10 +392,7 @@ impl TExecutionClient for ExecutionProxyClient {
 
         if execute_tx
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<PipelinedBlock>>(),
+                ordered_blocks: blocks,
                 ordered_proof: ordered_proof.ledger_info().clone(),
                 callback,
             })
@@ -558,7 +555,7 @@ impl TExecutionClient for DummyExecutionClient {
 
     async fn finalize_order(
         &self,
-        _: &[Arc<PipelinedBlock>],
+        _: Vec<Arc<PipelinedBlock>>,
         _: WrappedLedgerInfo,
         _: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {

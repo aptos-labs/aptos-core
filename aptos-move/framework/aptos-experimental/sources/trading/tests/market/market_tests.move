@@ -36,7 +36,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -57,54 +61,55 @@ module aptos_experimental::market_tests {
                 &test_market_callbacks()
             );
 
-
         // Order not filled yet, so size is 0
         assert!(get_position_size(maker_addr) == 0);
         assert!(get_position_size(taker_addr) == 0);
 
-        let taker_order_id = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            1000,
-            1000000,
-            false,
-            good_till_cancelled(),
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[2000000],
-            vector[2000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(),
-            &test_market_callbacks()
-        );
+        let taker_order_id =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[2000000],
+                vector[2000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
         assert!(get_position_size(maker_addr) == 1000000);
         assert!(get_position_size(taker_addr) == 1000000);
         assert!(clearinghouse_test::order_exists(maker_order_id));
         assert!(!clearinghouse_test::order_exists(taker_order_id));
 
-        let taker_order_id2 = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            1000,
-            1000000,
-            false,
-            good_till_cancelled(),
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[2000000],
-            vector[1000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(),
-            &test_market_callbacks()
-        );
+        let taker_order_id2 =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[2000000],
+                vector[1000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
 
         assert!(get_position_size(maker_addr) == 2000000);
         assert!(get_position_size(taker_addr) == 2000000);
@@ -124,7 +129,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -145,25 +154,26 @@ module aptos_experimental::market_tests {
                 &test_market_callbacks()
             );
 
-        let taker_order_id = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            1000,
-            2000000,
-            false,
-            good_till_cancelled(),
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[1000000],
-            vector[1000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(),
-            &test_market_callbacks()
-        );
+        let taker_order_id =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                1000,
+                2000000,
+                false,
+                good_till_cancelled(),
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[1000000],
+                vector[1000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
         assert!(get_position_size(maker_addr) == 1000000);
         assert!(get_position_size(taker_addr) == 1000000);
         assert!(clearinghouse_test::order_exists(taker_order_id));
@@ -181,7 +191,11 @@ module aptos_experimental::market_tests {
         maker2: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
         let maker2_addr = signer::address_of(maker2);
@@ -250,7 +264,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
 
@@ -313,7 +331,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -382,7 +404,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -451,7 +477,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -497,7 +527,8 @@ module aptos_experimental::market_tests {
         // The maker order should still be active
         assert!(clearinghouse_test::order_exists(maker_order_id));
         assert!(
-            market.get_remaining_size(signer::address_of(maker), maker_order_id) == 1000000
+            market.get_remaining_size(signer::address_of(maker), maker_order_id)
+                == 1000000
         );
         assert!(
             market.get_remaining_size(signer::address_of(taker), taker_order_id) == 0
@@ -515,7 +546,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -586,7 +621,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
         let maker_addr = signer::address_of(maker);
@@ -624,25 +663,26 @@ module aptos_experimental::market_tests {
         // Order not matched yet, so the balance should not change
         assert!(get_position_size(maker_addr) == 0);
         assert!(get_position_size(taker_addr) == 0);
-        let taker_order_id = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            990,
-            1000000,
-            false,
-            good_till_cancelled(),
-            expected_fill_sizes,
-            fill_prices,
-            maker_addr,
-            maker_order_ids,
-            maker_orig_sizes,
-            maker_orig_sizes,
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(),
-            &test_market_callbacks()
-        );
+        let taker_order_id =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                990,
+                1000000,
+                false,
+                good_till_cancelled(),
+                expected_fill_sizes,
+                fill_prices,
+                maker_addr,
+                maker_order_ids,
+                maker_orig_sizes,
+                maker_orig_sizes,
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
         assert!(get_position_size(maker_addr) == total_fill_size);
         assert!(get_position_size(taker_addr) == total_fill_size);
         // Ensure all maker orders are cleaned up
@@ -665,7 +705,11 @@ module aptos_experimental::market_tests {
         taker: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
@@ -690,25 +734,26 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker_addr) == 0);
         assert!(get_position_size(taker_addr) == 0);
 
-        let taker_order_id = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            1000,
-            1000000,
-            false,
-            good_till_cancelled(),
-            vector[500000], // Half of the taker order is filled and half is cancelled
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[2000000],
-            vector[2000000],
-            &mut event_store,
-            true,
-            option::none(),
-            new_test_order_metadata(),
-            &test_market_callbacks_with_taker_cancelled()
-        );
+        let taker_order_id =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                vector[500000], // Half of the taker order is filled and half is cancelled
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[2000000],
+                vector[2000000],
+                &mut event_store,
+                true,
+                option::none(),
+                new_test_order_metadata(),
+                &test_market_callbacks_with_taker_cancelled()
+            );
         // Make sure the maker order is reinserted
         assert!(market.get_remaining_size(maker_addr, maker_order_id) == 1500000);
         assert!(clearinghouse_test::order_exists(maker_order_id));
@@ -726,7 +771,11 @@ module aptos_experimental::market_tests {
         maker2: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(false));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
         let maker2_addr = signer::address_of(maker2);
@@ -824,7 +873,11 @@ module aptos_experimental::market_tests {
         maker2: &signer
     ) {
         // Setup accounts
-        let market = new_market(admin, market_signer, new_market_config(true));
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(true, true)
+        );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
         let event_store = event_utils::new_event_store();

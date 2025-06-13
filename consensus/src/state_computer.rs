@@ -341,7 +341,7 @@ impl StateComputer for ExecutionProxy {
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -352,7 +352,7 @@ impl StateComputer for ExecutionProxy {
         );
 
         // wait until all blocks are committed
-        for block in blocks {
+        for block in &blocks {
             block.take_pre_commit_fut().await?
         }
 
@@ -371,7 +371,7 @@ impl StateComputer for ExecutionProxy {
 
         self.commit_notifier
             .clone()
-            .send(self.commit_hook(blocks, callback, finality_proof))
+            .send(self.commit_hook(&blocks, callback, finality_proof))
             .await
             .expect("Failed to send commit notification");
 
@@ -670,11 +670,11 @@ async fn test_commit_sync_race() {
         false,
     );
     executor
-        .commit(&[], generate_li(1, 1), callback.clone())
+        .commit(vec![], generate_li(1, 1), callback.clone())
         .await
         .unwrap();
     executor
-        .commit(&[], generate_li(1, 10), callback)
+        .commit(vec![], generate_li(1, 10), callback)
         .await
         .unwrap();
     assert!(executor.sync_to_target(generate_li(1, 8)).await.is_ok());

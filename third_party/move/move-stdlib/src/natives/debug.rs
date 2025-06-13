@@ -460,8 +460,11 @@ mod testing {
                     )?;
                 }
             },
-            MoveValue::Closure(clos) => {
-                write!(out, "{}", clos).map_err(fmt_error_to_partial_vm_error)?;
+            MoveValue::Closure(_) => {
+                // Using non-Aptos Move stdlib with function values is not supported. In general,
+                // this debug implementation should be removed and replaced by the new one from
+                // Aptos Move.
+                return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED));
             },
             MoveValue::Struct(move_struct) => match move_struct {
                 MoveStruct::WithTypes {
@@ -512,7 +515,8 @@ mod testing {
                         let str = move_value_as_escaped_string(val)?;
                         write!(out, "\"{}\"", str).map_err(fmt_error_to_partial_vm_error)?
                     } else {
-                        write!(out, "{} ", type_tag).map_err(fmt_error_to_partial_vm_error)?;
+                        write!(out, "{} ", type_tag.to_canonical_string())
+                            .map_err(fmt_error_to_partial_vm_error)?;
                         write!(out, "{}", STRUCT_BEGIN).map_err(fmt_error_to_partial_vm_error)?;
 
                         // For each field, print its name and value (and type)

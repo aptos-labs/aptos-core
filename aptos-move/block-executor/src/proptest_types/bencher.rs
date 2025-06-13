@@ -15,7 +15,10 @@ use crate::{
     txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
+    contract_event::TransactionEvent,
     state_store::MockStateView,
 };
 use criterion::{BatchSize, Bencher as CBencher};
@@ -138,7 +141,12 @@ where
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>>,
         >::new(config, executor_thread_pool, None)
-        .execute_transactions_parallel(&self.txns_provider, &state_view, &mut guard);
+        .execute_transactions_parallel(
+            &self.txns_provider,
+            &state_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         self.baseline_output.assert_parallel_output(&output);
     }

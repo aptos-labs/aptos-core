@@ -728,10 +728,6 @@ impl Options {
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
         }
 
-        if matches.get_flag("ban-int-2-bv") {
-            options.prover.ban_int_2_bv = true;
-        }
-
         if matches.get_flag("aptos") {
             options.backend.custom_natives = Some(CustomNativeOptions {
                 template_bytes: include_bytes!(

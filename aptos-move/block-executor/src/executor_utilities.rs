@@ -49,37 +49,27 @@ macro_rules! groups_to_finalize {
 macro_rules! resource_writes_to_materialize {
     ($writes:expr, $outputs:expr, $data_source:expr, $($txn_idx:expr),*) => {{
 	$outputs
-            .reads_needing_delayed_field_exchange($($txn_idx),*)
-            .into_iter()
-	    .map(|(key, metadata, layout)| {
-		match $data_source.fetch_exchanged_data(&key, $($txn_idx),*) {
-		    Some((value, existing_layout)) => {
-			randomly_check_layout_matches(
-			    Some(&existing_layout),
-			    Some(layout.as_ref()),
-			)?;
-			let new_value = Arc::new(TransactionWrite::from_state_value(Some(
-			    StateValue::new_with_metadata(
-				value.bytes().cloned().unwrap_or_else(Bytes::new), metadata)
-			    )));
-			Ok((key, new_value, layout))
-		    },
-		    None => {
-			Err(code_invariant_error(
-			    "Read value needing exchange not in Exchanged format".to_string()
-			))
-		    }
-		}}).chain(
-		$writes.into_iter().filter_map(|(key, value, maybe_layout)| {
-		    // layout is Some(_) if it contains a delayed field
-		    if let Some(layout) = maybe_layout {
-			// No need to exchange anything if a resource with delayed field is deleted.
-			if !value.is_deletion() {
-			    return Some(Ok((key, value, layout)))
-			}
-		    }
-		    None
-		})).collect::<std::result::Result<Vec<_>, _>>()
+        .reads_needing_delayed_field_exchange($($txn_idx),*)
+        .into_iter()
+	    .map(|(key, metadata, layout)| -> Result<_, PanicError> {
+	        let (value, existing_layout) = $data_source.fetch_exchanged_data(&key, $($txn_idx),*)?;
+            randomly_check_layout_matches(Some(&existing_layout), Some(layout.as_ref()))?;
+            let new_value = Arc::new(TransactionWrite::from_state_value(Some(
+                StateValue::new_with_metadata(
+                    value.bytes().cloned().unwrap_or_else(Bytes::new),
+                    metadata,
+                ))
+            ));
+            Ok((key, new_value, layout))
+        })
+        .chain(
+	        $writes.into_iter().filter_map(|(key, value, maybe_layout)| {
+		        maybe_layout.map(|layout| {
+                    (!value.is_deletion()).then_some(Ok((key, value, layout)))
+                }).flatten()
+            })
+        )
+        .collect::<Result<Vec<_>, _>>()
     }};
 }
 

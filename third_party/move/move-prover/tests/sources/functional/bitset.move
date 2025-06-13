@@ -3,10 +3,6 @@ module 0x42::bitset128 {
         s: u128
     }
 
-    spec BitSet128 {
-        pragma bv=b"0";
-    }
-
     public fun empty(): BitSet128 {
         BitSet128 {
             s: 0

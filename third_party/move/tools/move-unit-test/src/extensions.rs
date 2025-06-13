@@ -84,7 +84,7 @@ fn print_table_extension<W: Write>(
                 "new tables {}",
                 cs.new_tables
                     .iter()
-                    .map(|(k, v)| format!("{}<{},{}>", k, v.key_type, v.value_type))
+                    .map(|(handle, table)| format!("({handle}: {table})"))
                     .join(", ")
             )
             .unwrap();

@@ -45,9 +45,9 @@ impl<'a> Display for Render<'a, (&'a ModuleId, &'a IdentStr, &'a [TypeTag])> {
                 self.0
                      .2
                     .iter()
-                    .map(|ty| format!("{}", ty))
+                    .map(|ty| ty.to_canonical_string())
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(", ")
             )?;
         }
         Ok(())
@@ -75,8 +75,8 @@ impl Display for Render<'_, Path> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             Path::Code(module_id) => write!(f, "{}", Render(module_id)),
-            Path::Resource(struct_ty) => write!(f, "{}", struct_ty),
-            Path::ResourceGroup(struct_ty) => write!(f, "{}", struct_ty),
+            Path::Resource(struct_ty) => write!(f, "{}", struct_ty.to_canonical_string()),
+            Path::ResourceGroup(struct_ty) => write!(f, "{}", struct_ty.to_canonical_string()),
         }
     }
 }
@@ -130,6 +130,6 @@ impl Display for Render<'_, WriteOpType> {
 
 impl Display for Render<'_, TypeTag> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.to_canonical_string())
     }
 }

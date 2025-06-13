@@ -13,7 +13,7 @@ use move_core_types::account_address::AccountAddress;
 use move_model::{
     ast::{Address, MemoryLabel, TempIndex, Value},
     model::{
-        FieldEnv, FieldId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedInstId, SpecFunId,
+        FieldEnv, FieldId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId, SpecFunId,
         StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
@@ -29,6 +29,7 @@ use num::BigUint;
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
+const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -347,7 +348,10 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
             Signer => "$signer".to_string(),
             Bool => "bool".to_string(),
             Range | EventStore => panic!("unexpected type"),
-            Num => "<<num is not unsupported here>>".to_string(),
+            Num => {
+                //TODO(tengzhang): add error message with accurate location info
+                "<<num is not unsupported here>>".to_string()
+            },
         },
         Vector(et) => format!("Vec ({})", boogie_bv_type(env, et)),
         Struct(mid, sid, inst) => {
@@ -359,6 +363,24 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
+}
+
+/// Return boogie BV type for a number type.
+pub fn boogie_num_type_base_bv(env: &GlobalEnv, loc: Option<Loc>, ty: &Type) -> String {
+    let base = match ty.skip_reference() {
+        Type::Primitive(PrimitiveType::U8) => "Bv8",
+        Type::Primitive(PrimitiveType::U16) => "Bv16",
+        Type::Primitive(PrimitiveType::U32) => "Bv32",
+        Type::Primitive(PrimitiveType::U64) => "Bv64",
+        Type::Primitive(PrimitiveType::U128) => "Bv128",
+        Type::Primitive(PrimitiveType::U256) => "Bv256",
+        Type::Primitive(PrimitiveType::Num) => {
+            env.error(&loc.unwrap_or_default(), NUM_TYPE_BASE_ERROR);
+            "<<num is not unsupported here>>"
+        },
+        _ => unreachable!(),
+    };
+    base.to_string()
 }
 
 pub fn boogie_type_param(_env: &GlobalEnv, idx: u16) -> String {
@@ -392,7 +414,7 @@ pub fn boogie_num_type_string_capital(num: &str, bv_flag: bool) -> String {
     [pre, num].join("")
 }
 
-pub fn boogie_num_type_base(ty: &Type) -> String {
+pub fn boogie_num_type_base(env: &GlobalEnv, loc: Option<Loc>, ty: &Type) -> String {
     use PrimitiveType::*;
     use Type::*;
     match ty {
@@ -403,7 +425,10 @@ pub fn boogie_num_type_base(ty: &Type) -> String {
             U64 => "64".to_string(),
             U128 => "128".to_string(),
             U256 => "256".to_string(),
-            Num => "<<num is not unsupported here>>".to_string(),
+            Num => {
+                env.error(&loc.unwrap_or_default(), NUM_TYPE_BASE_ERROR);
+                "<<num is not unsupported here>>".to_string()
+            },
             _ => format!("<<unsupported {:?}>>", ty),
         },
         _ => format!("<<unsupported {:?}>>", ty),
@@ -425,6 +450,7 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
             U256 => boogie_num_type_string("256", bv_flag),
             Num => {
                 if bv_flag {
+                    //TODO(tengzhang): add error message with accurate location info
                     "<<num is not unsupported here>>".to_string()
                 } else {
                     "num".to_string()

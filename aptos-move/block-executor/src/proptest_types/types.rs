@@ -1253,6 +1253,14 @@ where
         )
     }
 
+    fn is_retry(&self) -> bool {
+        self.skipped
+    }
+
+    fn has_new_epoch_event(&self) -> bool {
+        false
+    }
+
     fn output_approx_size(&self) -> u64 {
         // TODO add block output limit testing
         0

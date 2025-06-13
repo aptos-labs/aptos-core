@@ -664,7 +664,8 @@ impl Account {
             .find_resource(&state_view, self.address, resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
-                resource_type, self.address
+                resource_type.to_canonical_string(),
+                self.address
             ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(

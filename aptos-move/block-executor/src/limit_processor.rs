@@ -4,7 +4,7 @@
 use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
-use aptos_logger::{error, info};
+use aptos_logger::{info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
@@ -294,7 +294,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
             x.get_slots_to_make_hot()
         } else {
-            error!("BlockHotStateOpAccumulator is not set.");
+            warn!("BlockHotStateOpAccumulator is not set.");
             BTreeMap::new()
         };
 

@@ -53,6 +53,6 @@ fn test_token_creation_with_token_events_store() {
     let event = events.pop().unwrap();
     assert_eq!(
         "0x3::token_event_store::OptInTransfer".to_string(),
-        event.type_tag().to_string()
+        event.type_tag().to_canonical_string()
     );
 }

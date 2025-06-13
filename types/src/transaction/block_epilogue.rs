@@ -46,6 +46,15 @@ pub enum BlockEndInfo {
 }
 
 impl BlockEndInfo {
+    pub fn new_empty() -> Self {
+        Self::V0 {
+            block_gas_limit_reached: false,
+            block_output_limit_reached: false,
+            block_effective_block_gas_units: 0,
+            block_approx_output_size: 0,
+        }
+    }
+
     pub fn limit_reached(&self) -> bool {
         match self {
             BlockEndInfo::V0 {
@@ -86,12 +95,7 @@ pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
 impl<Key: Debug> TBlockEndInfoExt<Key> {
     pub fn new_empty() -> Self {
         Self {
-            inner: BlockEndInfo::V0 {
-                block_gas_limit_reached: false,
-                block_output_limit_reached: false,
-                block_effective_block_gas_units: 0,
-                block_approx_output_size: 0,
-            },
+            inner: BlockEndInfo::new_empty(),
             slots_to_make_hot: BTreeMap::new(),
         }
     }

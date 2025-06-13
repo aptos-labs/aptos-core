@@ -3,12 +3,11 @@
 
 use crate::{
     context::SafeNativeContext,
-    errors::{SafeNativeError, SafeNativeResult},
+    errors::{LimitExceededError, SafeNativeError, SafeNativeResult},
 };
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, ToOnChainGasSchedule};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
-use bytes::Bytes;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
@@ -60,15 +59,6 @@ impl SafeNativeBuilder {
         }
     }
 
-    /// Controls the default incremental gas charging behavior of the natives created from this builder.
-    ///
-    /// See [`SafeNativeContext::set_incremental_gas_charging()`] for details.
-    ///
-    /// Default: enabled.
-    pub fn set_incremental_gas_charging(&mut self, enable: bool) {
-        self.enable_incremental_gas_charging = enable;
-    }
-
     /// Convenience function that allows one to set the incremental gas charging behavior only for
     /// natives created within the given closure.
     ///
@@ -108,8 +98,6 @@ impl SafeNativeBuilder {
         let closure = move |context: &mut NativeContext, ty_args, args| {
             use SafeNativeError::*;
 
-            let gas_budget = context.gas_balance();
-
             let mut context = SafeNativeContext {
                 inner: context,
 
@@ -119,10 +107,9 @@ impl SafeNativeBuilder {
                 native_gas_params: &data.native_gas_params,
                 misc_gas_params: &data.misc_gas_params,
 
-                gas_budget,
-                gas_used: 0.into(),
-
-                enable_incremental_gas_charging,
+                legacy_gas_used: 0.into(),
+                legacy_enable_incremental_gas_charging: enable_incremental_gas_charging,
+                legacy_heap_memory_usage: 0,
 
                 gas_hook: hook.as_deref(),
             };
@@ -130,21 +117,45 @@ impl SafeNativeBuilder {
             let res: Result<SmallVec<[Value; 1]>, SafeNativeError> =
                 native(&mut context, ty_args, args);
 
+            // If enabled, metering and memory tracking must have been done in the native!
+            let legacy_heap_memory_usage = context.legacy_heap_memory_usage;
+            if context.has_direct_gas_meter_access_in_native_context() {
+                assert_eq!(context.legacy_gas_used, 0.into());
+                assert_eq!(legacy_heap_memory_usage, 0);
+            }
+            context
+                .inner
+                .gas_meter()
+                .use_heap_memory_in_native_context(legacy_heap_memory_usage)?;
+
             match res {
-                Ok(ret_vals) => Ok(NativeResult::ok(context.gas_used, ret_vals)),
+                Ok(ret_vals) => Ok(NativeResult::ok(context.legacy_gas_used, ret_vals)),
                 Err(err) => match err {
-                    Abort { abort_code } => Ok(NativeResult::err(context.gas_used, abort_code)),
-                    OutOfGas => Ok(NativeResult::out_of_gas(context.gas_used)),
+                    Abort { abort_code } => {
+                        Ok(NativeResult::err(context.legacy_gas_used, abort_code))
+                    },
+                    LimitExceeded(err) => match err {
+                        LimitExceededError::LegacyOutOfGas => {
+                            assert!(!context.has_direct_gas_meter_access_in_native_context());
+                            Ok(NativeResult::out_of_gas(context.legacy_gas_used))
+                        },
+                        LimitExceededError::LimitExceeded(err) => {
+                            // Return a VM error directly, so the native function returns early.
+                            // There is no need to charge gas in the end because it was charged
+                            // during the execution.
+                            assert!(context.has_direct_gas_meter_access_in_native_context());
+                            Err(err.unpack())
+                        },
+                    },
                     // TODO(Gas): Check if err is indeed an invariant violation.
                     InvariantViolation(err) => Err(err),
                     FunctionDispatch {
-                        cost,
                         module_name,
                         func_name,
                         ty_args,
                         args,
                     } => Ok(NativeResult::CallFunction {
-                        cost,
+                        cost: context.legacy_gas_used,
                         module_name,
                         func_name,
                         ty_args,
@@ -178,31 +189,5 @@ impl SafeNativeBuilder {
         natives
             .into_iter()
             .map(|(func_name, func)| (func_name.into(), self.make_native(func)))
-    }
-
-    pub fn id_bytes(&self) -> Bytes {
-        let Self {
-            data,
-            enable_incremental_gas_charging,
-            gas_hook: _gas_hook,
-        } = self;
-        let SharedData {
-            gas_feature_version,
-            native_gas_params,
-            misc_gas_params,
-            timed_features,
-            features,
-        } = data.as_ref();
-
-        bcs::to_bytes(&(
-            enable_incremental_gas_charging,
-            gas_feature_version,
-            native_gas_params.to_on_chain_gas_schedule(*gas_feature_version),
-            misc_gas_params.to_on_chain_gas_schedule(*gas_feature_version),
-            timed_features,
-            features,
-        ))
-        .expect("bcs::to_bytes() failed.")
-        .into()
     }
 }

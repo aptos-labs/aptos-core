@@ -12,7 +12,7 @@
 use anyhow::bail;
 use aptos_framework::{natives::code::PackageRegistry, BuildOptions, BuiltPackage};
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
-use aptos_logger::error;
+use aptos_logger::{error, warn};
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features, GasScheduleV2, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
@@ -74,8 +74,8 @@ impl OverrideConfig {
             bail!("Enabled and disabled feature flags cannot overlap")
         }
         if matches!(gas_feature_version, Some(v) if v > LATEST_GAS_FEATURE_VERSION) {
-            bail!(
-                "Gas feature version must be at most the latest one: {}",
+            warn!(
+                "Gas feature version is greater than the latest one: {}",
                 LATEST_GAS_FEATURE_VERSION
             );
         }

@@ -82,16 +82,9 @@ pub enum TypeTag {
 }
 
 impl TypeTag {
-    /// Return a canonical string representation of the type. All types are represented
-    /// using their source syntax:
-    /// "u8", "u64", "u128", "bool", "address", "vector", "signer" for ground types.
-    /// Struct types are represented as fully qualified type names; e.g.
-    /// `00000000000000000000000000000001::string::String` or
-    /// `0000000000000000000000000000000a::module_name1::type_name1<0000000000000000000000000000000a::module_name2::type_name2<u64>>`
-    /// Addresses are hex-encoded lowercase values of length ADDRESS_LENGTH (16, 20, or 32 depending on the Move platform)
-    /// Note: this function is guaranteed to be stable, and this is suitable for use inside
-    /// Move native functions or the VM. By contrast, the `Display` implementation is subject
-    /// to change and should not be used inside stable code.
+    /// Returns a canonical string representation of the type tag.
+    ///
+    /// INVARIANT: If two type tags are different, they must have different canonical strings.
     pub fn to_canonical_string(&self) -> String {
         use TypeTag::*;
 
@@ -107,25 +100,7 @@ impl TypeTag {
             Signer => "signer".to_owned(),
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
             Struct(s) => s.to_canonical_string(),
-            Function(f) => {
-                let fmt_list = |l: &[TypeTag]| -> String {
-                    l.iter()
-                        .map(|t| t.to_canonical_string())
-                        .collect::<Vec<_>>()
-                        .join(",")
-                };
-                let FunctionTag {
-                    args,
-                    results,
-                    abilities,
-                } = f.as_ref();
-                format!(
-                    "|{}|{}{}",
-                    fmt_list(args),
-                    fmt_list(results),
-                    abilities.display_postfix()
-                )
-            },
+            Function(f) => f.to_canonical_string(),
         }
     }
 
@@ -231,27 +206,33 @@ impl StructTag {
         ModuleId::new(self.address, self.module.to_owned())
     }
 
-    /// Return a canonical string representation of the struct.
-    /// Struct types are represented as fully qualified type names; e.g.
-    /// `00000000000000000000000000000001::string::String` or
-    /// `0000000000000000000000000000000a::module_name1::type_name1<0000000000000000000000000000000a::module_name2::type_name2<u64>>`
-    /// Addresses are hex-encoded lowercase values of length ADDRESS_LENGTH (16, 20, or 32 depending on the Move platform)
-    /// Note: this function is guaranteed to be stable, and this is suitable for use inside
-    /// Move native functions or the VM. By contrast, the `Display` implementation is subject
-    /// to change and should not be used inside stable code.
+    /// Returns a canonical string representation of the struct tag.
+    ///
+    /// Struct tags are represented as fully qualified type names; e.g., `0x1::string::String` or
+    /// `0x234::foo::Bar<0x123::bar::Foo<u64>>`. Addresses are hex-encoded lowercase values with
+    /// leading zeroes trimmed and prefixed with `0x`.
+    ///
+    /// INVARIANT: If two struct tags are different, they must have different canonical strings.
     pub fn to_canonical_string(&self) -> String {
-        let mut generics = String::new();
-        if let Some(first_ty) = self.type_args.first() {
-            generics.push('<');
-            generics.push_str(&first_ty.to_canonical_string());
-            for ty in self.type_args.iter().skip(1) {
-                generics.push_str(&ty.to_canonical_string())
-            }
-            generics.push('>');
-        }
+        let generics = if self.type_args.is_empty() {
+            "".to_string()
+        } else {
+            format!(
+                "<{}>",
+                self.type_args
+                    .iter()
+                    .map(|t| t.to_canonical_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
         format!(
-            "{}::{}::{}{}",
-            self.address.to_canonical_string(),
+            // Note:
+            //   For historical reasons, we convert addresses as strings using 0x... and trimming
+            //   leading zeroes. This cannot be changed easily because 0x1::any::Any relies on that
+            //   and may store bytes of these strings on-chain.
+            "0x{}::{}::{}{}",
+            self.address.short_str_lossless(),
             self.module,
             self.name,
             generics
@@ -280,27 +261,31 @@ pub struct FunctionTag {
     pub abilities: AbilitySet,
 }
 
-/// Represents the initial key into global storage where we first index by the address, and then
-/// the struct tag
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-pub struct ResourceKey {
-    pub address: AccountAddress,
-    pub type_: StructTag,
-}
-
-impl ResourceKey {
-    pub fn address(&self) -> AccountAddress {
-        self.address
-    }
-
-    pub fn type_(&self) -> &StructTag {
-        &self.type_
-    }
-}
-
-impl ResourceKey {
-    pub fn new(address: AccountAddress, type_: StructTag) -> Self {
-        ResourceKey { address, type_ }
+impl FunctionTag {
+    /// Returns a canonical string representation of the function tag.
+    ///
+    /// INVARIANT: If two function tags are different, they must have different canonical strings.
+    pub fn to_canonical_string(&self) -> String {
+        let fmt_list = |l: &[TypeTag]| -> String {
+            l.iter()
+                .map(|t| t.to_canonical_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        // Note that we put returns in parentheses. This ensures that when functions used as type
+        // arguments, there is no ambiguity in presence of multiple returns, e.g.,
+        //
+        //    0x1::a::A<||||>
+        //
+        // is ambiguous: is it a function that has zero arguments and returns a function ||, or is
+        // it a function that takes || argument and returns nothing? In order to disambiguate, we
+        // always add parentheses for returns.
+        format!(
+            "|{}|({}){}",
+            fmt_list(&self.args),
+            fmt_list(&self.results),
+            self.abilities.display_postfix()
+        )
     }
 }
 
@@ -397,58 +382,6 @@ impl ModuleId {
     }
 }
 
-impl Display for StructTag {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "0x{}::{}::{}",
-            self.address.short_str_lossless(),
-            self.module,
-            self.name
-        )?;
-        if let Some(first_ty) = self.type_args.first() {
-            write!(f, "<")?;
-            write!(f, "{}", first_ty)?;
-            for ty in self.type_args.iter().skip(1) {
-                write!(f, ", {}", ty)?;
-            }
-            write!(f, ">")?;
-        }
-        Ok(())
-    }
-}
-
-impl Display for TypeTag {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self {
-            TypeTag::Struct(s) => write!(f, "{}", s),
-            TypeTag::Function(_) => write!(f, "{}", self.to_canonical_string()),
-            TypeTag::Vector(ty) => write!(f, "vector<{}>", ty),
-            TypeTag::U8 => write!(f, "u8"),
-            TypeTag::U16 => write!(f, "u16"),
-            TypeTag::U32 => write!(f, "u32"),
-            TypeTag::U64 => write!(f, "u64"),
-            TypeTag::U128 => write!(f, "u128"),
-            TypeTag::U256 => write!(f, "u256"),
-            TypeTag::Address => write!(f, "address"),
-            TypeTag::Signer => write!(f, "signer"),
-            TypeTag::Bool => write!(f, "bool"),
-        }
-    }
-}
-
-impl Display for FunctionTag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        TypeTag::Function(Box::new(self.clone())).fmt(f)
-    }
-}
-
-impl Display for ResourceKey {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "0x{}/{}", self.address.short_str_lossless(), self.type_)
-    }
-}
-
 impl From<StructTag> for TypeTag {
     fn from(t: StructTag) -> TypeTag {
         TypeTag::Struct(Box::new(t))
@@ -457,21 +390,130 @@ impl From<StructTag> for TypeTag {
 
 #[cfg(test)]
 mod tests {
-    use super::TypeTag;
+    use super::*;
     use crate::{
+        ability::{Ability, AbilitySet},
         account_address::AccountAddress,
         identifier::Identifier,
         language_storage::{ModuleId, StructTag},
         safe_serialize::MAX_TYPE_TAG_NESTING,
     };
     use hashbrown::Equivalent;
-    use proptest::prelude::*;
+    use proptest::{collection::vec, prelude::*};
     use std::{
-        collections::hash_map::DefaultHasher,
+        collections::{hash_map::DefaultHasher, HashMap},
         hash::{Hash, Hasher},
         mem,
         str::FromStr,
     };
+
+    fn make_struct_tag(
+        address: AccountAddress,
+        module_name: &str,
+        name: &str,
+        type_args: Vec<TypeTag>,
+    ) -> TypeTag {
+        TypeTag::Struct(Box::new(StructTag {
+            address,
+            module: Identifier::new(module_name).unwrap(),
+            name: Identifier::new(name).unwrap(),
+            type_args,
+        }))
+    }
+
+    fn make_function_tag(
+        args: Vec<TypeTag>,
+        results: Vec<TypeTag>,
+        abilities: AbilitySet,
+    ) -> TypeTag {
+        TypeTag::Function(Box::new(FunctionTag {
+            args,
+            results,
+            abilities,
+        }))
+    }
+
+    #[test]
+    fn test_to_canonical_string() {
+        use TypeTag::*;
+
+        let data = [
+            (U8, "u8"),
+            (U16, "u16"),
+            (U32, "u32"),
+            (U64, "u64"),
+            (U128, "u128"),
+            (U256, "u256"),
+            (Bool, "bool"),
+            (Address, "address"),
+            (Signer, "signer"),
+            (Vector(Box::new(Vector(Box::new(U8)))), "vector<vector<u8>>"),
+            (
+                make_struct_tag(AccountAddress::ONE, "a", "A", vec![]),
+                "0x1::a::A",
+            ),
+            (
+                make_struct_tag(AccountAddress::ONE, "a", "A", vec![
+                    make_struct_tag(AccountAddress::from_str("0x123").unwrap(), "b", "B", vec![
+                        Bool,
+                        Vector(Box::new(U8)),
+                    ]),
+                    make_struct_tag(AccountAddress::from_str("0xFF").unwrap(), "c", "C", vec![
+                        U8,
+                    ]),
+                ]),
+                "0x1::a::A<0x123::b::B<bool, vector<u8>>, 0xff::c::C<u8>>",
+            ),
+            (make_function_tag(vec![], vec![], AbilitySet::EMPTY), "||()"),
+            (
+                make_function_tag(vec![], vec![U8, U64], AbilitySet::EMPTY),
+                "||(u8, u64)",
+            ),
+            (
+                make_function_tag(vec![U8, U64], vec![], AbilitySet::EMPTY),
+                "|u8, u64|()",
+            ),
+            (
+                make_struct_tag(AccountAddress::ONE, "a", "A", vec![make_function_tag(
+                    vec![make_function_tag(
+                        vec![make_function_tag(
+                            vec![],
+                            vec![],
+                            AbilitySet::singleton(Ability::Copy),
+                        )],
+                        vec![],
+                        AbilitySet::EMPTY,
+                    )],
+                    vec![make_function_tag(vec![], vec![], AbilitySet::ALL)],
+                    AbilitySet::EMPTY,
+                )]),
+                "0x1::a::A<||||() has copy|()|(||() has copy + drop + store + key)>",
+            ),
+        ];
+
+        for (tag, string) in data {
+            assert_eq!(string, tag.to_canonical_string().as_str());
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_to_canonical_string_is_unique(tags in vec(any::<TypeTag>(), 1..100)) {
+            let mut seen = HashMap::new();
+            for tag in &tags {
+                let s = tag.to_canonical_string();
+                if let Some(other_tag) = seen.insert(s.clone(), tag) {
+                    prop_assert!(
+                        other_tag == tag,
+                        "Collision for tags {:?} and {:?}: {}",
+                        other_tag,
+                        tag,
+                        s,
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_tag_iter() {

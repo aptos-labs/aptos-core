@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast
+   ┌─ tests/sources/functional/bitwise_error_2.move:20:37
+   │
+20 │         ensures s.s == (old(s.s) << x); // x needs to be an concrete integer type
+   │                                     ^
