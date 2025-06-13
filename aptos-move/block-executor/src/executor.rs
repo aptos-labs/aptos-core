@@ -82,7 +82,7 @@ pub struct BlockExecutor<T, E, S, L, TP> {
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, TP)>,
+    phantom: PhantomData<fn() -> (T, E, S, L, TP)>,
 }
 
 impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
@@ -824,7 +824,7 @@ where
         let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
-            versioned_cache.data(),
+            last_input_output,
             txn_idx
         )?;
         let materialized_resource_write_set =

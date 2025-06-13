@@ -1,0 +1,46 @@
+processed 13 tasks
+
+task 4 'run'. lines 72-72:
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x2::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+}
+
+task 7 'run'. lines 78-78:
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x2::c,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+}
+
+task 8 'run'. lines 80-80:
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: 0x2::c,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 0)],
+}
+
+task 10 'run'. lines 84-90:
+Error: Script execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+}
+
+task 11 'run'. lines 92-98:
+Error: Script execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+}

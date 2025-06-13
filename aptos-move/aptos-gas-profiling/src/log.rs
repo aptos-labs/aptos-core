@@ -58,6 +58,8 @@ pub enum FrameName {
 pub struct CallFrame {
     pub name: FrameName,
     pub events: Vec<ExecutionGasEvent>,
+    /// Accumulates gas charged by native functions. For frames of non-native functions, kept as 0.
+    pub native_gas: InternalGas,
 }
 
 /// The type of an operation performed on a storage item.
@@ -183,6 +185,7 @@ impl CallFrame {
                 ty_args,
             },
             events: vec![],
+            native_gas: 0.into(),
         }
     }
 
@@ -190,6 +193,7 @@ impl CallFrame {
         Self {
             name: FrameName::Script,
             events: vec![],
+            native_gas: 0.into(),
         }
     }
 }
