@@ -111,12 +111,12 @@ where
             .into_iter()
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
-        let txns_provider = DefaultTxnProvider::new(transactions.clone());
+        let txns_provider = DefaultTxnProvider::new_without_info(transactions.clone());
 
         let baseline_output = BaselineOutput::generate(txns_provider.get_txns(), None);
 
         Self {
-            txns_provider: DefaultTxnProvider::new(transactions),
+            txns_provider: DefaultTxnProvider::new_without_info(transactions),
             baseline_output,
         }
     }

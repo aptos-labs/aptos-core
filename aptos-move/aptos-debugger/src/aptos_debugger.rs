@@ -68,7 +68,8 @@ impl AptosDebugger {
     ) -> anyhow::Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
-        let txn_provider = DefaultTxnProvider::new(sig_verified_txns);
+        // TODO(grao): Pass in persisted info.
+        let txn_provider = DefaultTxnProvider::new_without_info(sig_verified_txns);
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
         print_transaction_stats(txn_provider.get_txns(), version);

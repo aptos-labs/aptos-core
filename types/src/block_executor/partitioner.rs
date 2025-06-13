@@ -3,8 +3,8 @@
 
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
-    signature_verified_transaction::{into_signature_verified_block, SignatureVerifiedTransaction},
-    Transaction,
+    signature_verified_transaction::SignatureVerifiedTransaction,
+    ExtraInfo, Transaction,
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
@@ -433,28 +433,49 @@ impl<T: Clone> TransactionWithDependencies<T> {
 pub struct ExecutableBlock {
     pub block_id: HashValue,
     pub transactions: ExecutableTransactions,
+    pub extra_info: Vec<ExtraInfo>,
 }
 
 impl ExecutableBlock {
-    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
+    pub fn new(
+        block_id: HashValue,
+        transactions: ExecutableTransactions,
+        extra_info: Vec<ExtraInfo>,
+    ) -> Self {
         Self {
             block_id,
             transactions,
+            extra_info,
         }
     }
 }
 
 impl From<(HashValue, Vec<SignatureVerifiedTransaction>)> for ExecutableBlock {
     fn from((block_id, transactions): (HashValue, Vec<SignatureVerifiedTransaction>)) -> Self {
-        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+        let extra_info = transactions
+            .iter()
+            .map(|_| ExtraInfo::new_empty())
+            .collect();
+        Self::new(
+            block_id,
+            ExecutableTransactions::Unsharded(transactions),
+            extra_info,
+        )
     }
 }
 
-impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
-    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
+impl From<(HashValue, Vec<SignatureVerifiedTransaction>, Vec<ExtraInfo>)> for ExecutableBlock {
+    fn from(
+        (block_id, transactions, extra_info): (
+            HashValue,
+            Vec<SignatureVerifiedTransaction>,
+            Vec<ExtraInfo>,
+        ),
+    ) -> Self {
         Self::new(
             block_id,
-            ExecutableTransactions::Unsharded(into_signature_verified_block(transactions)),
+            ExecutableTransactions::Unsharded(transactions),
+            extra_info,
         )
     }
 }
