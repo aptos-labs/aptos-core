@@ -619,7 +619,7 @@ impl TransactionsApi {
                 let (_, gas_params) = context.get_gas_schedule(&ledger_info)?;
                 let min_number_of_gas_units =
                     u64::from(gas_params.vm.txn.min_transaction_gas_units)
-                        / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+                        .div_ceil(u64::from(gas_params.vm.txn.gas_unit_scaling_factor));
                 let max_number_of_gas_units =
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
