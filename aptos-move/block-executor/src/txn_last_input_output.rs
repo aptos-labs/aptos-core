@@ -160,7 +160,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
-    /// Does a transaction at txn_idx have SkipRest or Abort status.
+    /// Does a transaction at txn_idx have SkipRest.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
             self.outputs[txn_idx as usize]

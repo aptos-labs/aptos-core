@@ -37,7 +37,7 @@ use aptos_types::{
     randomness::Randomness,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        SignedTransaction, Transaction,
+        EphemeralExtraInfo, ExtraInfo, PersistedExtraInfo, SignedTransaction, Transaction,
     },
     validator_signer::ValidatorSigner,
 };
@@ -564,11 +564,30 @@ impl PipelineBuilder {
             user_txns.as_ref().clone(),
         ]
         .concat();
+        let proposer_index = block
+            .author()
+            .and_then(|proposer| validator.iter().position(|&v| v == proposer));
+        let extra_info = txns
+            .iter()
+            .map(|txn| {
+                txn.borrow_into_inner().try_as_signed_user_txn().map_or(
+                    ExtraInfo::new_empty(),
+                    |_| {
+                        ExtraInfo::new(
+                            PersistedExtraInfo::None,
+                            proposer_index.map(|index| EphemeralExtraInfo {
+                                proposer_index: index as u64,
+                            }),
+                        )
+                    },
+                )
+            })
+            .collect();
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor
                 .execute_and_update_state(
-                    (block.id(), txns).into(),
+                    (block.id(), txns, extra_info).into(),
                     block.parent_id(),
                     onchain_execution_config,
                 )

@@ -11,7 +11,7 @@ use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{BlockExecutableTransaction as Transaction, TransactionStatus},
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;

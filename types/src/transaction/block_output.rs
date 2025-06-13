@@ -20,7 +20,12 @@ impl<Output: Debug> BlockOutput<Output> {
         }
     }
 
+    fn has_block_epilogue_txn(&self) -> bool {
+        self.block_epilogue_txn.is_some()
+    }
+
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
+        assert!(!self.has_block_epilogue_txn());
         self.transaction_outputs
     }
 
@@ -29,6 +34,7 @@ impl<Output: Debug> BlockOutput<Output> {
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
+        assert!(!self.has_block_epilogue_txn());
         &self.transaction_outputs
     }
 }
