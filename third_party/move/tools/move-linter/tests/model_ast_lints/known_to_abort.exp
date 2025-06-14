@@ -1,0 +1,10 @@
+Aborting with compilation errors:
+exiting with context checking errors
+error: duplicate declaration, item, or annotation
+    ┌─ tests/model_ast_lints/known_to_abort.move:151:16
+    │
+ 75 │     public fun test_complex_expr_1(flag: bool): u8 {
+    │                ------------------- Alias previously defined here
+    ·
+151 │     public fun test_complex_expr_1(x: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^ Duplicate module member or alias 'test_complex_expr_1'. Top level names in a namespace must be unique
