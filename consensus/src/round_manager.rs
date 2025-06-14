@@ -752,7 +752,7 @@ impl RoundManager {
         proposal_msg: OptProposalMsg,
     ) -> anyhow::Result<()> {
         ensure!(self.local_config.enable_optimistic_proposal_rx,
-            "Opt proposal is disabled, but received opt proposal msg of epoch {} round {} from peer {}", 
+            "Opt proposal is disabled, but received opt proposal msg of epoch {} round {} from peer {}",
             proposal_msg.block_data().epoch(), proposal_msg.round(), proposal_msg.proposer()
         );
 
