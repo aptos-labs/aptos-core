@@ -42,7 +42,7 @@ impl OptBlockBody {
 
     pub fn grandparent_qc(&self) -> &QuorumCert {
         match self {
-            OptBlockBody::V0 { grandparent_qc, .. } => &grandparent_qc,
+            OptBlockBody::V0 { grandparent_qc, .. } => grandparent_qc,
         }
     }
 }

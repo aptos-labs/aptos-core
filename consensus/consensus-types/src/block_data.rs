@@ -9,7 +9,6 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
-use anyhow::{bail, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
