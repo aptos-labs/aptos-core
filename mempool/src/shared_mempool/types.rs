@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_config::{
-    config::{MempoolConfig, NodeType},
+    config::{MempoolConfig, NodeType, TransactionFilterConfig},
     network_id::PeerNetworkId,
 };
 use aptos_consensus_types::common::{
@@ -56,6 +56,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
     pub use_case_history: Arc<Mutex<UseCaseHistory>>,
+    pub transaction_filter_config: TransactionFilterConfig,
 }
 
 impl<
@@ -66,6 +67,7 @@ impl<
     pub fn new(
         mempool: Arc<Mutex<CoreMempool>>,
         config: MempoolConfig,
+        transaction_filter_config: TransactionFilterConfig,
         network_client: NetworkClient,
         db: Arc<dyn DbReader>,
         validator: Arc<RwLock<TransactionValidator>>,
@@ -87,6 +89,7 @@ impl<
             subscribers,
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
             use_case_history: Arc::new(Mutex::new(use_case_history)),
+            transaction_filter_config,
         }
     }
 
