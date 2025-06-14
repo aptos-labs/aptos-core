@@ -332,7 +332,7 @@ mod tests {
 
     // --------------------------------------------------------------------------------------
     // VM Values
-  
+
     fn round_trip_vm_closure_value(
         fun: MockAbstractFunction,
         captured: Vec<Value>,

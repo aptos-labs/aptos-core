@@ -87,7 +87,7 @@ impl Debug for Closure {
         let mask = fun.closure_mask();
 
         f.debug_struct("Closure")
-            .field("function", fun.to_canonical_string())
+            .field("function", &fun.to_canonical_string())
             .field("closure_mask", &mask)
             .field("captured_count", &captured.len())
             .field("captured_values", captured)
@@ -283,7 +283,7 @@ pub(crate) mod mock {
             unimplemented!()
         }
 
-        fn to_stable_string(&self) -> String {
+        fn to_canonical_string(&self) -> String {
             // Needed for assertion failure printing
             let ty_args_str = if self.data.ty_args.is_empty() {
                 String::new()
