@@ -2,782 +2,787 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_gas_algebra::Gas;
-use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
+// Note[Orderless]: Done
 use aptos_language_e2e_tests::{
-    assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
-    current_function_name, executor::FakeExecutor, transaction_status_eq,
+    account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config,
-    chain_id::ChainId,
-    test_helpers::transaction_test_helpers,
-    transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
-    vm_status::StatusCode,
+    account_config::{DepositEvent, WithdrawEvent},
+    transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
 };
-use move_binary_format::file_format::CompiledModule;
-use move_core_types::{
-    gas_algebra::GasQuantity,
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
-};
-use move_ir_compiler::Compiler;
+use rstest::rstest;
+use std::{convert::TryFrom, time::Instant};
 
-pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
-
-#[test]
-fn verify_signature() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 10);
-    executor.add_account_data(&sender);
-    // Generate a new key pair to try and sign things with.
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let program = aptos_stdlib::aptos_coin_transfer(*sender.address(), 100);
-    let signed_txn = transaction_test_helpers::get_test_unchecked_txn(
-        *sender.address(),
-        0,
-        &private_key,
-        sender.account().pubkey.as_ed25519().unwrap(),
-        program,
-    );
-
-    assert_prologue_parity!(
-        executor.validate_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::INVALID_SIGNATURE
-    );
-}
-
-#[test]
-fn verify_multi_agent_invalid_sender_signature() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-
-    // Sign using the wrong key for the sender, and correct key for the secondary signer.
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address()],
-        10,
-        &private_key,
-        sender.account().pubkey.as_ed25519().unwrap(),
-        vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
-        None,
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::INVALID_SIGNATURE
-    );
-}
-
-#[test]
-fn verify_multi_agent_invalid_secondary_signature() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-
-    // Sign using the correct keys for the sender, but wrong keys for the secondary signer.
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.as_ed25519().unwrap(),
-        vec![&private_key],
-        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
-        None,
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::INVALID_SIGNATURE
-    );
-}
-
-#[test]
-fn verify_multi_agent_duplicate_secondary_signer() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-    let third_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-    executor.add_account_data(&third_signer);
-
-    // Duplicates in secondary signers.
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![
-            *secondary_signer.address(),
-            *third_signer.address(),
-            *secondary_signer.address(),
-        ],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.as_ed25519().unwrap(),
-        vec![
-            &secondary_signer.account().privkey,
-            &third_signer.account().privkey,
-            &secondary_signer.account().privkey,
-        ],
-        vec![
-            secondary_signer.account().pubkey.as_ed25519().unwrap(),
-            third_signer.account().pubkey.as_ed25519().unwrap(),
-            secondary_signer.account().pubkey.as_ed25519().unwrap(),
-        ],
-        None,
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::SIGNERS_CONTAIN_DUPLICATES
-    );
-}
-
-#[test]
-fn verify_reserved_sender() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 10);
-    executor.add_account_data(&sender);
-    // Generate a new key pair to try and sign things with.
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let program = aptos_stdlib::aptos_coin_transfer(*sender.address(), 100);
-    let signed_txn = transaction_test_helpers::get_test_signed_txn(
-        account_config::reserved_vm_address(),
-        0,
-        &private_key,
-        private_key.public_key(),
-        Some(program),
-    );
-
-    assert_prologue_parity!(
-        executor.validate_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::INVALID_AUTH_KEY
-    );
-}
-
-#[test]
-fn verify_simple_payment() {
+#[rstest(
+    sender_stateless_account,
+    receiver_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn single_peer_to_peer_with_event(
+    sender_stateless_account: bool,
+    receiver_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    ::aptos_logger::Logger::init_for_testing();
     let mut executor = FakeExecutor::from_head_genesis();
     // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
-    let sender = executor.create_raw_account_data(900_000, 10);
-    let receiver = executor.create_raw_account_data(100_000, 10);
+    let sender = executor.create_raw_account_data(
+        1_000_000,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let receiver = executor.create_raw_account_data(
+        100_000,
+        if receiver_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
-    // define the arguments to the peer to peer transaction
     let transfer_amount = 1_000;
-
-    let empty_script = &*EMPTY_SCRIPT;
-
-    // Create a new transaction that has the exact right sequence number.
-    let txn = sender
-        .account()
-        .transaction()
-        .payload(aptos_stdlib::aptos_coin_transfer(
-            *receiver.address(),
-            transfer_amount,
-        ))
-        .sequence_number(10)
-        .sign();
-    assert_eq!(executor.validate_transaction(txn).status(), None);
-
-    // Create a new transaction that has the bad auth key.
-    let txn = receiver
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .raw()
-        .sign(
-            &sender.account().privkey,
-            sender.account().pubkey.as_ed25519().unwrap(),
-        )
-        .unwrap()
-        .into_inner();
-
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::INVALID_AUTH_KEY
+    let txn = peer_to_peer_txn(
+        sender.account(),
+        receiver.account(),
+        Some(0),
+        transfer_amount,
+        0,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
     );
 
-    // Create a new transaction that has a old sequence number.
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(1)
-        .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::SEQUENCE_NUMBER_TOO_OLD
-    );
-
-    // Create a new transaction that has a too new sequence number.
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(11)
-        .sign();
-    assert_prologue_disparity!(
-        executor.validate_transaction(txn.clone()).status() => None,
-        executor.execute_transaction(txn).status() =>
-        TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
-    );
-
-    // Create a new transaction that doesn't have enough balance to pay for gas.
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(1_000_000)
-        .gas_unit_price(1)
-        .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
-    );
-
-    // Create a new transaction from a bogus account that doesn't exist
-    let bogus_account = executor.create_raw_account_data(100_000, 10);
-    let txn = bogus_account
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(0)
-        .sign();
-    assert_prologue_disparity!(
-        executor.validate_transaction(txn.clone()).status() => None,
-        executor.execute_transaction(txn).status() => TransactionStatus::Keep(ExecutionStatus::Success)
-    );
-
-    // The next couple tests test transaction size, and bounds on gas price and the number of
-    // gas units that can be submitted with a transaction.
-    //
-    // We test these in the reverse order that they appear in verify_transaction, and build up
-    // the errors one-by-one to make sure that we are both catching all of them, and
-    // that we are doing so in the specified order.
-    let txn_gas_params = TransactionGasParameters::initial();
-
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
-        .gas_unit_price((txn_gas_params.max_price_per_gas_unit + GasQuantity::one()).into())
-        .max_gas_amount(1_000_000)
-        .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND
-    );
-
-    // Test for a max_gas_amount that is insufficient to pay the minimum fee.
-    // Find the minimum transaction gas units and subtract 1.
-    let mut gas_limit: Gas =
-        (txn_gas_params.min_transaction_gas_units).to_unit_round_up_with_params(&txn_gas_params);
-
-    if gas_limit > 0.into() {
-        gas_limit = gas_limit.checked_sub(1.into()).unwrap();
-    }
-    // Calculate how many extra bytes of transaction arguments to add to ensure
-    // that the minimum transaction gas gets rounded up when scaling to the
-    // external gas units. (Ignore the size of the script itself for simplicity.)
-    let extra_txn_bytes = if u64::from(txn_gas_params.gas_unit_scaling_factor)
-        > u64::from(txn_gas_params.min_transaction_gas_units)
-    {
-        txn_gas_params.large_transaction_cutoff
-            + GasQuantity::from(
-                u64::from(txn_gas_params.gas_unit_scaling_factor)
-                    / u64::from(txn_gas_params.intrinsic_gas_per_byte),
-            )
-    } else {
-        0.into()
-    };
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(
-            empty_script.clone(),
-            vec![],
-            vec![TransactionArgument::U8(42); u64::from(extra_txn_bytes) as usize],
-        ))
-        .sequence_number(10)
-        .max_gas_amount(gas_limit.into())
-        .gas_unit_price(txn_gas_params.max_price_per_gas_unit.into())
-        .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
-    );
-
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + GasQuantity::one()).into())
-        .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
-        .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND
-    );
-
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(
-            empty_script.clone(),
-            vec![],
-            vec![TransactionArgument::U8(42); MAX_TRANSACTION_SIZE_IN_BYTES as usize],
-        ))
-        .sequence_number(10)
-        .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + GasQuantity::one()).into())
-        .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
-        .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE
-    );
-
-    // Create a new transaction with wrong argument.
-
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![
-            TransactionArgument::U8(42),
-        ]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
+    // execute transaction
     let output = executor.execute_transaction(txn);
     assert_eq!(
         output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH
-        )))
-    );
-}
-
-#[test]
-pub fn test_arbitrary_script_execution() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // create an empty transaction
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    // If CustomScripts is on, result should be Keep(DeserializationError). If it's off, the
-    // result should be Keep(UnknownScript)
-    let random_script = vec![];
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(random_script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    let status = executor.execute_transaction(txn).status().clone();
-    assert!(!status.is_discarded());
-    assert_eq!(
-        status.status(),
-        // StatusCode::CODE_DESERIALIZATION_ERROR
-        Ok(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::CODE_DESERIALIZATION_ERROR
-        )))
-    );
-}
-
-#[test]
-fn verify_expiration_time() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 0);
-    executor.add_account_data(&sender);
-    let private_key = &sender.account().privkey;
-    let txn = transaction_test_helpers::get_test_signed_transaction(
-        *sender.address(),
-        0, /* sequence_number */
-        private_key,
-        private_key.public_key(),
-        None, /* script */
-        0,    /* expiration_time */
-        0,    /* gas_unit_price */
-        None, /* max_gas_amount */
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::TRANSACTION_EXPIRED
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 
-    // 10 is picked to make sure that SEQUENCE_NUMBER_TOO_NEW will not override the
-    // TRANSACTION_EXPIRED error.
-    let txn = transaction_test_helpers::get_test_signed_transaction(
-        *sender.address(),
-        10, /* sequence_number */
-        private_key,
-        private_key.public_key(),
-        None, /* script */
-        0,    /* expiration_time */
-        0,    /* gas_unit_price */
-        None, /* max_gas_amount */
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::TRANSACTION_EXPIRED
-    );
-}
+    executor.apply_write_set(output.write_set());
 
-#[test]
-fn verify_chain_id() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, 0);
-    executor.add_account_data(&sender);
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let txn = transaction_test_helpers::get_test_txn_with_chain_id(
-        *sender.address(),
-        0,
-        &private_key,
-        private_key.public_key(),
-        // all tests use ChainId::test() for chain_id,so pick something different
-        ChainId::new(ChainId::test().id() + 1),
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::BAD_CHAIN_ID
-    );
-}
+    // check that numbers in stored DB are correct
+    let sender_balance = 1_000_000 - transfer_amount;
+    let receiver_balance = 100_000 + transfer_amount;
+    let updated_sender_balance = executor
+        .read_apt_fungible_store_resource(sender.account())
+        .expect("sender balance must exist");
+    let updated_receiver_balance = executor
+        .read_apt_fungible_store_resource(receiver.account())
+        .expect("receiver balance must exist");
+    assert_eq!(receiver_balance, updated_receiver_balance.coin());
+    assert_eq!(sender_balance, updated_sender_balance.coin());
 
-#[test]
-fn verify_max_sequence_number() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    let sender = executor.create_raw_account_data(900_000, u64::MAX);
-    executor.add_account_data(&sender);
-    let private_key = &sender.account().privkey;
-    let txn = transaction_test_helpers::get_test_signed_transaction(
-        *sender.address(),
-        u64::MAX, /* sequence_number */
-        private_key,
-        private_key.public_key(),
-        None,     /* script */
-        u64::MAX, /* expiration_time */
-        0,        /* gas_unit_price */
-        None,     /* max_gas_amount */
-    );
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::SEQUENCE_NUMBER_TOO_BIG
-    );
-}
+    if sender_stateless_account && use_orderless_transactions {
+        assert!(
+            executor.read_account_resource(sender.account()).is_none(),
+            "sender resource shouldn't be created with an orderless transaction"
+        );
+    } else {
+        let updated_sender = executor
+            .read_account_resource(sender.account())
+            .expect("sender must exist");
+        assert_eq!(
+            if use_orderless_transactions { 0 } else { 1 },
+            updated_sender.sequence_number()
+        );
+    }
+    if receiver_stateless_account {
+        assert!(
+            executor.read_account_resource(receiver.account()).is_none(),
+            "receiver resource shouldn't be created with an orderless transaction"
+        );
+    };
 
-fn bad_module() -> (CompiledModule, Vec<u8>) {
-    let bad_module_code = "
-    module 0x1.Test {
-        struct R1 { b: bool }
-        struct S1 has copy, drop { r1: Self.R1 }
-
-        public new_S1(): Self.S1 {
-            let s: Self.S1;
-            let r: Self.R1;
-        label b0:
-            r = R1 { b: true };
-            s = S1 { r1: move(r) };
-            return move(s);
+    let rec_ev_path = receiver.received_events_key();
+    let sent_ev_path = sender.sent_events_key();
+    for event in output.events() {
+        let event_key = event.event_key();
+        if let Some(event_key) = event_key {
+            assert!(rec_ev_path == event_key || sent_ev_path == event_key);
         }
     }
-    ";
-    let compiler = Compiler { deps: vec![] };
-    let module = compiler
-        .into_compiled_module(bad_module_code)
-        .expect("Failed to compile");
-    let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();
-    (module, bytes)
 }
 
-fn good_module_uses_bad(
-    address: AccountAddress,
-    bad_dep: CompiledModule,
-) -> (CompiledModule, Vec<u8>) {
-    let good_module_code = format!(
-        "
-    module 0x{}.Test2 {{
-        import 0x1.Test;
-        struct S {{ b: bool }}
+#[rstest(
+    sender_stateless_account,
+    receiver_stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, true, false, false),
+    case(true, true, true, false),
+    case(true, true, true, true),
+    case(true, false, false, false),
+    case(true, false, true, false),
+    case(true, false, true, true),
+    case(false, true, false, false),
+    case(false, true, true, false),
+    case(false, true, true, true),
+    case(false, false, false, false),
+    case(false, false, true, false),
+    case(false, false, true, true)
+)]
+fn few_peer_to_peer_with_event(
+    sender_stateless_account: bool,
+    receiver_stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut executor = FakeExecutor::from_head_genesis();
+    // create and publish a sender with 3_000_000 coins and a receiver with 3_000_000 coins
+    let sender = executor.create_raw_account_data(
+        3_000_000,
+        if sender_stateless_account {
+            None
+        } else {
+            Some(0)
+        },
+    );
+    let receiver = executor.create_raw_account_data(
+        3_000_000,
+        if receiver_stateless_account {
+            None
+        } else {
+            Some(10)
+        },
+    );
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
 
-        foo(): Test.S1 {{
-        label b0:
-            return Test.new_S1();
-        }}
-        public bar() {{
-        label b0:
-            return;
-        }}
-    }}
-    ",
-        address.to_hex(),
+    let transfer_amount = 1_000;
+
+    // execute transaction
+    let txns: Vec<SignedTransaction> = vec![
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(0),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        ),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(1),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        ),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(2),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        ),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(3),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        ),
+    ];
+    let output = executor.execute_block(txns).unwrap();
+    for (idx, txn_output) in output.iter().enumerate() {
+        assert_eq!(
+            txn_output.status(),
+            &TransactionStatus::Keep(ExecutionStatus::Success)
+        );
+
+        // check events
+        for event in txn_output.events() {
+            if let Ok(payload) = WithdrawEvent::try_from(event) {
+                assert_eq!(transfer_amount, payload.amount());
+            } else if let Ok(payload) = DepositEvent::try_from(event) {
+                if payload.amount() == 0 {
+                    continue;
+                }
+                assert_eq!(transfer_amount, payload.amount());
+            } else {
+                assert!(event.v2().is_ok());
+            }
+        }
+
+        let original_sender_balance = executor
+            .read_apt_fungible_store_resource(sender.account())
+            .expect("sender balance must exist");
+        let original_receiver_balance = executor
+            .read_apt_fungible_store_resource(receiver.account())
+            .expect("receiver balcne must exist");
+        executor.apply_write_set(txn_output.write_set());
+
+        // check that numbers in stored DB are correct
+        let sender_balance = original_sender_balance.balance() - transfer_amount;
+        let receiver_balance = original_receiver_balance.balance() + transfer_amount;
+        let updated_sender_balance = executor
+            .read_apt_fungible_store_resource(sender.account())
+            .expect("sender balance must exist");
+        let updated_receiver_balance = executor
+            .read_apt_fungible_store_resource(receiver.account())
+            .expect("receiver balance must exist");
+        assert_eq!(receiver_balance, updated_receiver_balance.coin());
+        assert_eq!(sender_balance, updated_sender_balance.coin());
+
+        if sender_stateless_account && use_orderless_transactions {
+            assert!(
+                executor.read_account_resource(sender.account()).is_none(),
+                "sender resource shouldn't be created with an orderless transaction"
+            );
+        } else {
+            let updated_sender = executor
+                .read_account_resource(sender.account())
+                .expect("sender must exist");
+            assert_eq!(
+                if use_orderless_transactions {
+                    0
+                } else {
+                    1 + idx
+                } as u64,
+                updated_sender.sequence_number()
+            );
+        }
+        if receiver_stateless_account {
+            assert!(
+                executor.read_account_resource(receiver.account()).is_none(),
+                "receiver resource shouldn't be created with an orderless transaction"
+            );
+        };
+    }
+}
+
+// Holder for transaction data; arguments to transactions.
+pub(crate) struct TxnInfo {
+    pub sender: Account,
+    pub receiver: Account,
+    pub transfer_amount: u64,
+    pub sender_stateless_account: bool,
+    pub orderless_transaction: bool,
+}
+
+impl TxnInfo {
+    fn new(
+        sender: &Account,
+        receiver: &Account,
+        transfer_amount: u64,
+        sender_stateless_account: bool,
+        orderless_transaction: bool,
+    ) -> Self {
+        TxnInfo {
+            sender: sender.clone(),
+            receiver: receiver.clone(),
+            transfer_amount,
+            sender_stateless_account,
+            orderless_transaction,
+        }
+    }
+}
+
+// Create a cyclic transfer around a slice of Accounts.
+// Each Account makes a transfer for the same amount to the next Account.
+pub(crate) fn create_cyclic_transfers(
+    executor: &FakeExecutor,
+    accounts: &[Account],
+    transfer_amount: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> (Vec<TxnInfo>, Vec<SignedTransaction>) {
+    let mut txns: Vec<SignedTransaction> = Vec::new();
+    let mut txns_info: Vec<TxnInfo> = Vec::new();
+    // loop through all transactions and let each transfer the same amount to the next one
+    let count = accounts.len();
+    for i in 0..count {
+        let sender = &accounts[i];
+        let sender_resource = executor.read_account_resource(sender);
+        let sender_stateless_account = sender_resource.is_none();
+        let seq_num = sender_resource.map_or(0, |resource| resource.sequence_number());
+        let receiver = &accounts[(i + 1) % count];
+
+        let txn = peer_to_peer_txn(
+            sender,
+            receiver,
+            Some(seq_num),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
+        txns.push(txn);
+        txns_info.push(TxnInfo::new(
+            sender,
+            receiver,
+            transfer_amount,
+            sender_stateless_account,
+            use_orderless_transactions,
+        ));
+    }
+    (txns_info, txns)
+}
+
+// Create a one to many transfer around a slice of Accounts.
+// The first account is the payer and all others are receivers.
+fn create_one_to_many_transfers(
+    executor: &FakeExecutor,
+    accounts: &[Account],
+    transfer_amount: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> (Vec<TxnInfo>, Vec<SignedTransaction>) {
+    let mut txns: Vec<SignedTransaction> = Vec::new();
+    let mut txns_info: Vec<TxnInfo> = Vec::new();
+    // grab account 0 as a sender
+    let sender = &accounts[0];
+    let sender_resource = executor.read_account_resource(sender);
+    let sender_stateless_account = sender_resource.is_none();
+    let seq_num = sender_resource.map_or(0, |resource| resource.sequence_number());
+    // loop through all transactions and let each transfer the same amount to the next one
+    let count = accounts.len();
+    for (i, receiver) in accounts.iter().enumerate().take(count).skip(1) {
+        // let receiver = &accounts[i];
+        let txn = peer_to_peer_txn(
+            sender,
+            receiver,
+            Some(seq_num + i as u64 - 1),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
+        txns.push(txn);
+        txns_info.push(TxnInfo::new(
+            sender,
+            receiver,
+            transfer_amount,
+            sender_stateless_account,
+            use_orderless_transactions,
+        ));
+    }
+    (txns_info, txns)
+}
+
+// Create a many to one transfer around a slice of Accounts.
+// The first account is the receiver and all others are payers.
+fn create_many_to_one_transfers(
+    executor: &FakeExecutor,
+    accounts: &[Account],
+    transfer_amount: u64,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> (Vec<TxnInfo>, Vec<SignedTransaction>) {
+    let mut txns: Vec<SignedTransaction> = Vec::new();
+    let mut txns_info: Vec<TxnInfo> = Vec::new();
+    // grab account 0 as a sender
+    let receiver = &accounts[0];
+    // loop through all transactions and let each transfer the same amount to the next one
+    let count = accounts.len();
+    for sender in accounts.iter().take(count).skip(1) {
+        //let sender = &accounts[i];
+        let sender_resource = executor.read_account_resource(sender);
+        let sender_stateless_account = sender_resource.is_none();
+        let seq_num = sender_resource.map_or(0, |resource| resource.sequence_number());
+        let txn = peer_to_peer_txn(
+            sender,
+            receiver,
+            Some(seq_num),
+            transfer_amount,
+            0,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
+        txns.push(txn);
+        txns_info.push(TxnInfo::new(
+            sender,
+            receiver,
+            transfer_amount,
+            sender_stateless_account,
+            use_orderless_transactions,
+        ));
+    }
+    (txns_info, txns)
+}
+
+// Verify a transfer output.
+// Checks that sender and receiver in a peer to peer transaction are in proper
+// state after a successful transfer.
+// The transaction arguments are provided in txn_args.
+// Apply the WriteSet to the data store.
+pub(crate) fn check_and_apply_transfer_output(
+    executor: &mut FakeExecutor,
+    txn_args: &[TxnInfo],
+    output: &[TransactionOutput],
+    use_orderless_transactions: bool,
+) {
+    let count = output.len();
+    for i in 0..count {
+        let txn_info = &txn_args[i];
+        let sender = &txn_info.sender;
+        let receiver = &txn_info.receiver;
+        let transfer_amount = txn_info.transfer_amount;
+        let sender_balance = executor
+            .read_apt_fungible_store_resource(sender)
+            .expect("sender balance must exist");
+        let sender_initial_balance = sender_balance.coin();
+
+        let sender_seq_num = executor
+            .read_account_resource(sender)
+            .map_or(0, |resource| resource.sequence_number());
+
+        let receiver_initial_balance = executor
+            .read_apt_fungible_store_resource(receiver)
+            .expect("receiver balance must exist")
+            .balance();
+
+        // apply single transaction to DB
+        let txn_output = &output[i];
+        executor.apply_write_set(txn_output.write_set());
+
+        // check that numbers stored in DB are correct
+        let sender_balance = sender_initial_balance - transfer_amount;
+        let receiver_balance = receiver_initial_balance + transfer_amount;
+        let updated_sender_balance = executor
+            .read_apt_fungible_store_resource(sender)
+            .expect("sender balance must exist");
+        let updated_receiver_balance = executor
+            .read_apt_fungible_store_resource(receiver)
+            .expect("receiver balance must exist");
+        assert_eq!(receiver_balance, updated_receiver_balance.coin());
+        assert_eq!(sender_balance, updated_sender_balance.coin());
+
+        if txn_info.sender_stateless_account && txn_info.orderless_transaction {
+            assert!(
+                executor.read_account_resource(sender).is_none(),
+                "sender resource shouldn't be created with an orderless transaction"
+            );
+        } else {
+            let updated_sender = executor
+                .read_account_resource(sender)
+                .expect("sender must exist");
+            assert_eq!(
+                if use_orderless_transactions {
+                    sender_seq_num
+                } else {
+                    sender_seq_num + 1
+                },
+                updated_sender.sequence_number()
+            );
+        }
+    }
+}
+
+// simple utility to print all account to visually inspect account data
+fn print_accounts(executor: &FakeExecutor, accounts: &[Account]) {
+    for account in accounts {
+        if let Some(resource) = executor.read_account_resource(account) {
+            println!("Address: {:?}, Resource: {:?}", account.address(), resource);
+        } else {
+            println!("Address: {:?} is stateless", account.address());
+        }
+    }
+}
+
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn cycle_peer_to_peer(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut executor = FakeExecutor::from_head_genesis();
+    let account_size = 100usize;
+    let initial_balance = 2_000_000u64;
+    let initial_seq_num = 0u64;
+    let accounts = executor.create_accounts(
+        account_size,
+        initial_balance,
+        if stateless_account {
+            None
+        } else {
+            Some(initial_seq_num)
+        },
     );
 
-    let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
-    let compiler = Compiler {
-        deps: framework_modules
-            .iter()
-            .chain(std::iter::once(&bad_dep))
-            .collect(),
-    };
-    let module = compiler
-        .into_compiled_module(good_module_code.as_str())
-        .expect("Failed to compile");
-    let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();
-    (module, bytes)
+    // set up the transactions
+    let transfer_amount = 1_000;
+    let (txns_info, txns) = create_cyclic_transfers(
+        &executor,
+        &accounts,
+        transfer_amount,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
+    // execute transaction
+    let mut execution_time = 0u128;
+    let now = Instant::now();
+    let output = executor.execute_block(txns).unwrap();
+    execution_time += now.elapsed().as_nanos();
+    println!("EXECUTION TIME: {}", execution_time);
+    for txn_output in &output {
+        assert_eq!(
+            txn_output.status(),
+            &TransactionStatus::Keep(ExecutionStatus::Success)
+        );
+    }
+    assert_eq!(accounts.len(), output.len());
+
+    check_and_apply_transfer_output(
+        &mut executor,
+        &txns_info,
+        &output,
+        use_orderless_transactions,
+    );
+    print_accounts(&executor, &accounts);
 }
 
-#[test]
-fn test_script_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn cycle_peer_to_peer_multi_block(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (module, bytes) = bad_module();
-    executor.add_module(&module.self_id(), bytes);
-
-    // Create a module that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let code = "
-    import 0x1.Test;
-
-    main() {
-        let x: Test.S1;
-    label b0:
-        x = Test.new_S1();
-        return;
-    }
-    ";
-
-    let compiler = Compiler {
-        deps: vec![&module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
+    let account_size = 100usize;
+    let initial_balance = 1_000_000u64;
+    let initial_seq_num = 0u64;
+    let accounts = executor.create_accounts(
+        account_size,
+        initial_balance,
+        if stateless_account {
+            None
+        } else {
+            Some(initial_seq_num)
         },
-        _ => panic!("Kept transaction with an invariant violation!"),
+    );
+
+    // set up the transactions
+    let transfer_amount = 1_000;
+    let block_count = 5u64;
+    let cycle = account_size / (block_count as usize);
+    let mut range_left = 0usize;
+    let mut execution_time = 0u128;
+    for _i in 0..block_count {
+        range_left = if range_left + cycle >= account_size {
+            account_size - cycle
+        } else {
+            range_left
+        };
+        let (txns_info, txns) = create_cyclic_transfers(
+            &executor,
+            &accounts[range_left..range_left + cycle],
+            transfer_amount,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
+
+        // execute transaction
+        let now = Instant::now();
+        let output = executor.execute_block(txns).unwrap();
+        execution_time += now.elapsed().as_nanos();
+        for txn_output in &output {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        }
+        assert_eq!(cycle, output.len());
+        check_and_apply_transfer_output(
+            &mut executor,
+            &txns_info,
+            &output,
+            use_orderless_transactions,
+        );
+        range_left = (range_left + cycle) % account_size;
     }
+    println!("EXECUTION TIME: {}", execution_time);
+    print_accounts(&executor, &accounts);
 }
 
-#[test]
-fn test_type_tag_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn one_to_many_peer_to_peer(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (module, bytes) = bad_module();
-    executor.add_module(&module.self_id(), bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let code = "
-    main<T>() {
-    label b0:
-        return;
-    }
-    ";
-
-    let compiler = Compiler {
-        deps: vec![&module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(
-            script,
-            vec![TypeTag::Struct(Box::new(StructTag {
-                address: account_config::CORE_CODE_ADDRESS,
-                module: Identifier::new("Test").unwrap(),
-                name: Identifier::new("S1").unwrap(),
-                type_args: vec![],
-            }))],
-            vec![],
-        ))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
+    let account_size = 100usize;
+    let initial_balance = 100_000_000u64;
+    let initial_seq_num = 0u64;
+    let accounts = executor.create_accounts(
+        account_size,
+        initial_balance,
+        if stateless_account {
+            None
+        } else {
+            Some(initial_seq_num)
         },
-        _ => panic!("Kept transaction with an invariant violation!"),
+    );
+
+    // set up the transactions
+    let transfer_amount = 1_000;
+    let block_count = 2u64;
+    let cycle = account_size / (block_count as usize);
+    let mut range_left = 0usize;
+    let mut execution_time = 0u128;
+    for _i in 0..block_count {
+        range_left = if range_left + cycle >= account_size {
+            account_size - cycle
+        } else {
+            range_left
+        };
+        let (txns_info, txns) = create_one_to_many_transfers(
+            &executor,
+            &accounts[range_left..range_left + cycle],
+            transfer_amount,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
+
+        // execute transaction
+        let now = Instant::now();
+        let output = executor.execute_block(txns).unwrap();
+        execution_time += now.elapsed().as_nanos();
+        for txn_output in &output {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        }
+        assert_eq!(cycle - 1, output.len());
+        check_and_apply_transfer_output(
+            &mut executor,
+            &txns_info,
+            &output,
+            use_orderless_transactions,
+        );
+        range_left = (range_left + cycle) % account_size;
     }
+    println!("EXECUTION TIME: {}", execution_time);
+    print_accounts(&executor, &accounts);
 }
 
-#[test]
-fn test_script_transitive_dependency_fails_verification() {
+#[rstest(
+    stateless_account,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(true, false, false),
+    case(true, true, false),
+    case(true, true, true),
+    case(false, false, false),
+    case(false, true, false),
+    case(false, true, true)
+)]
+fn many_to_one_peer_to_peer(
+    stateless_account: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a module that tries to use that module.
-    let (good_module, good_module_bytes) =
-        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, bad_module);
-    executor.add_module(&good_module.self_id(), good_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let code = "
-    import 0x1.Test2;
-
-    main() {
-    label b0:
-        Test2.bar();
-        return;
-    }
-    ";
-
-    let compiler = Compiler {
-        deps: vec![&good_module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
+    let account_size = 100usize;
+    let initial_balance = 1_000_000u64;
+    let initial_seq_num = 0u64;
+    let accounts = executor.create_accounts(
+        account_size,
+        initial_balance,
+        if stateless_account {
+            None
+        } else {
+            Some(initial_seq_num)
         },
-        _ => panic!("Kept transaction with an invariant violation!"),
+    );
+
+    // set up the transactions
+    let transfer_amount = 1_000;
+    let block_count = 2u64;
+    let cycle = account_size / (block_count as usize);
+    let mut range_left = 0usize;
+    let mut execution_time = 0u128;
+    for _i in 0..block_count {
+        range_left = if range_left + cycle >= account_size {
+            account_size - cycle
+        } else {
+            range_left
+        };
+        let (txns_info, txns) = create_many_to_one_transfers(
+            &executor,
+            &accounts[range_left..range_left + cycle],
+            transfer_amount,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
+
+        // execute transaction
+        let now = Instant::now();
+        let output = executor.execute_block(txns).unwrap();
+        execution_time += now.elapsed().as_nanos();
+        for txn_output in &output {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        }
+        assert_eq!(cycle - 1, output.len());
+        check_and_apply_transfer_output(
+            &mut executor,
+            &txns_info,
+            &output,
+            use_orderless_transactions,
+        );
+        range_left = (range_left + cycle) % account_size;
     }
-}
-
-#[test]
-fn test_type_tag_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a module that tries to use that module.
-    let (good_module, good_module_bytes) =
-        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, bad_module);
-    executor.add_module(&good_module.self_id(), good_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let code = "
-    main<T>() {
-    label b0:
-        return;
-    }
-    ";
-
-    let compiler = Compiler {
-        deps: vec![&good_module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(
-            script,
-            vec![TypeTag::Struct(Box::new(StructTag {
-                address: account_config::CORE_CODE_ADDRESS,
-                module: Identifier::new("Test2").unwrap(),
-                name: Identifier::new("S").unwrap(),
-                type_args: vec![],
-            }))],
-            vec![],
-        ))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
+    println!("EXECUTION TIME: {}", execution_time);
+    print_accounts(&executor, &accounts);
 }
