@@ -30,6 +30,8 @@ use aptos_executor_types::{
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
+#[allow(unused_imports)]
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
@@ -590,6 +592,10 @@ async fn test_commit_sync_race() {
         }
 
         fn finish(&self) {}
+
+        fn state_view(&self, _block_id: HashValue) -> ExecutorResult<CachedStateView> {
+            todo!()
+        }
     }
 
     #[async_trait::async_trait]

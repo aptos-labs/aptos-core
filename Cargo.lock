@@ -1515,6 +1515,7 @@ dependencies = [
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-config",
+ "aptos-consensus",
  "aptos-crypto",
  "aptos-db",
  "aptos-executor",
