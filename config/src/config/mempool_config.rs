@@ -100,7 +100,7 @@ pub struct MempoolConfig {
     /// up to 10 minutes (shared_mempool_priority_update_interval_secs) to enable the load balancing. If this flag is enabled,
     /// then the PFNs will always do load balancing irrespective of the load.
     pub enable_max_load_balancing_at_any_load: bool,
-    /// Maximum number of orderless transactions allowed in the Mempool per user
+    /// Maximum number of turbo transactions allowed in the Mempool per user
     pub orderless_txn_capacity_per_user: usize,
 }
 

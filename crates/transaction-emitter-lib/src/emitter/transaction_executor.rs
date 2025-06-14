@@ -171,7 +171,7 @@ async fn warn_detailed_error(
         if let Ok(account) = rest_client.get_account_bcs(sender).await {
             let inner = account.into_inner();
             (
-                // TODO[Orderless]: Fetch previous sequence numbers doesn't make sense for orderless transactions.
+                // TODO[Turbo]: Fetch previous sequence numbers doesn't make sense for turbo transactions.
                 // What's the alternative?
                 rest_client
                     .get_account_ordered_transactions_bcs(

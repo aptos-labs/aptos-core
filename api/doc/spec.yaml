@@ -8248,7 +8248,7 @@ paths:
       summary: Get account transactions
       description: |-
         Retrieves on-chain committed sequence-number based transactions from an account.
-        Does not retrieve orderless transactions sent from the account.
+        Does not retrieve turbo transactions sent from the account.
         If the start version is too far in the past, a 410 will be returned.
 
         If no start version is given, it will start at version 0.
@@ -8703,7 +8703,7 @@ paths:
       summary: Get account transaction summaries
       description: |-
         Retrieves summaries of on-chain committed transactions (both sequence number based
-        and orderless transactions) from an account.
+        and turbo transactions) from an account.
         Each transaction summary contains the sender addresss, transaction hash, version, and replay protector.
 
         If start_version is provided, the output consists of transaction summaries starting form that version.

@@ -3133,7 +3133,7 @@ Mutate the token_properties of one token.
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x3_token_create_royalty">create_royalty</a>(royalty_points_numerator: u64, royalty_points_denominator: u64, payee_address: <b>address</b>): <a href="token.md#0x3_token_Royalty">Royalty</a> {
     <b>assert</b>!(royalty_points_numerator &lt;= royalty_points_denominator, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EINVALID_ROYALTY_NUMERATOR_DENOMINATOR">EINVALID_ROYALTY_NUMERATOR_DENOMINATOR</a>));
-    // Question[Orderless]: Is it okay <b>to</b> remove this check <b>to</b> accommodate stateless accounts?
+    // Question[Turbo]: Is it okay <b>to</b> remove this check <b>to</b> accommodate stateless accounts?
     // <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account_exists_at">account::exists_at</a>(payee_address), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST">EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST</a>));
     <a href="token.md#0x3_token_Royalty">Royalty</a> {
         royalty_points_numerator,

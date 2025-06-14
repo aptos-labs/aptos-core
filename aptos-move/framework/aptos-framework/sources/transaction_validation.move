@@ -21,13 +21,13 @@ module aptos_framework::transaction_validation {
 
     friend aptos_framework::genesis;
 
-    // We will advertise to the community that max expiration time for orderless txns is 60 seconds.
+    // We will advertise to the community that max expiration time for turbo txns is 60 seconds.
     // Adding a 5 second slack here as the client's time and the blockchain's time may drift.
-    const MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 65;
+    const MAX_EXPIRATION_TIME_SECONDS_FOR_TURBO_TXNS: u64 = 65;
 
     // We need to ensure that a transaction can't be replayed.
     // There are two ways to prevent replay attacks:
-    // 1. Use a nonce. Orderless transactions use this.
+    // 1. Use a nonce. turbo transactions use this.
     // 2. Use a sequence number. Regular transactions use this.
     // A replay protector of a transaction signifies which of the above methods is used.
     enum ReplayProtector {
@@ -141,7 +141,7 @@ module aptos_framework::transaction_validation {
         );
         assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
 
-        // TODO[Orderless]: Here, we are maintaining the same order of validation steps as before orderless txns were introduced.
+        // TODO[Turbo]: Here, we are maintaining the same order of validation steps as before turbo txns were introduced.
         // Ideally, do the replay protection check in the end after the authentication key check and gas payment checks.
 
         // Check if the authentication key is valid
@@ -169,7 +169,7 @@ module aptos_framework::transaction_validation {
                 );
             },
             Nonce(nonce) => {
-                check_for_replay_protection_orderless_txn(
+                check_for_replay_protection_turbo_txn(
                     sender_address,
                     nonce,
                     txn_expiration_time,
@@ -242,14 +242,14 @@ module aptos_framework::transaction_validation {
         };
     }
 
-    fun check_for_replay_protection_orderless_txn(
+    fun check_for_replay_protection_turbo_txn(
         sender: address,
         nonce: u64,
         txn_expiration_time: u64,
     ) {
         // prologue_common already checks that the current_time > txn_expiration_time
         assert!(
-            txn_expiration_time <= timestamp::now_seconds() + MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS,
+            txn_expiration_time <= timestamp::now_seconds() + MAX_EXPIRATION_TIME_SECONDS_FOR_TURBO_TXNS,
             error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE),
         );
         assert!(nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_ENONCE_ALREADY_USED));
@@ -722,7 +722,7 @@ module aptos_framework::transaction_validation {
 
 
     ///////////////////////////////////////////////////////////
-    /// new set of functions to support txn payload v2 format and orderless transactions
+    /// new set of functions to support txn payload v2 format and turbo transactions
     ///////////////////////////////////////////////////////////
 
     fun unified_prologue_v2(
@@ -802,7 +802,7 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64,
         is_simulation: bool,
-        is_orderless_txn: bool,
+        is_turbo_txn: bool,
     ) {
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
@@ -851,7 +851,7 @@ module aptos_framework::transaction_validation {
             };
         };
 
-        if (!is_orderless_txn) {
+        if (!is_turbo_txn) {
             // Increment sequence number
             let addr = signer::address_of(&account);
             account::increment_sequence_number(addr);

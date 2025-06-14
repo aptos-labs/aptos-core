@@ -83,7 +83,7 @@ pub struct TransactionValidation {
     pub unified_prologue_fee_payer_name: Identifier,
     pub unified_epilogue_name: Identifier,
 
-    // Only these v2 functions support Txn Payload V2 format and Orderless transactions
+    // Only these v2 functions support Txn Payload V2 format and turbo transactions
     pub unified_prologue_v2_name: Identifier,
     pub unified_prologue_fee_payer_v2_name: Identifier,
     pub unified_epilogue_v2_name: Identifier,
@@ -142,7 +142,7 @@ pub(crate) fn run_script_prologue(
                     MoveValue::U64(seq_num).simple_serialize().unwrap()
                 },
                 ReplayProtector::Nonce(_) => {
-                    unreachable!("Orderless transactions are discarded already")
+                    unreachable!("Turbo transactions are discarded already")
                 },
             }
         };
@@ -244,7 +244,7 @@ pub(crate) fn run_script_prologue(
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     } else {
-        // Txn payload v2 format and orderless transactions are only supported with unified_prologue methods.
+        // Txn payload v2 format and turbo transactions are only supported with unified_prologue methods.
         // Old prologue functions do not support these features.
         let txn_sequence_number = match txn_replay_protector {
             ReplayProtector::SequenceNumber(seq_num) => seq_num,
@@ -252,7 +252,7 @@ pub(crate) fn run_script_prologue(
                 return Err(VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
                     Some(
-                        "Orderless transactions is not supported without unified_prologue methods"
+                        "Turbo transactions is not supported without unified_prologue methods"
                             .to_string(),
                     ),
                 ));
@@ -406,7 +406,7 @@ pub(crate) fn run_multisig_prologue(
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
-    // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
+    // Note[Turbo]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
     // So, converting the executable to this format.
     let provided_payload = match executable {
         TransactionExecutableRef::EntryFunction(entry_function) => bcs::to_bytes(
@@ -460,7 +460,7 @@ fn run_epilogue(
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
-    let is_orderless_txn = txn_data.is_orderless();
+    let is_turbo_txn = txn_data.is_turbo();
 
     if features.is_account_abstraction_enabled()
         || features.is_derivable_account_abstraction_enabled()
@@ -485,11 +485,7 @@ fn run_epilogue(
             MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
         ];
         if features.is_transaction_payload_v2_enabled() {
-            serialize_args.push(
-                MoveValue::Bool(is_orderless_txn)
-                    .simple_serialize()
-                    .unwrap(),
-            );
+            serialize_args.push(MoveValue::Bool(is_turbo_txn).simple_serialize().unwrap());
         }
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),

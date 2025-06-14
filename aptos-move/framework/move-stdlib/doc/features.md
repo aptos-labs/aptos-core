@@ -149,8 +149,8 @@ return true.
 -  [Function `is_default_account_resource_enabled`](#0x1_features_is_default_account_resource_enabled)
 -  [Function `get_jwk_consensus_per_key_mode_feature`](#0x1_features_get_jwk_consensus_per_key_mode_feature)
 -  [Function `is_jwk_consensus_per_key_mode_enabled`](#0x1_features_is_jwk_consensus_per_key_mode_enabled)
--  [Function `get_orderless_transactions_feature`](#0x1_features_get_orderless_transactions_feature)
--  [Function `orderless_transactions_enabled`](#0x1_features_orderless_transactions_enabled)
+-  [Function `get_turbo_transactions_feature`](#0x1_features_get_turbo_transactions_feature)
+-  [Function `turbo_transactions_enabled`](#0x1_features_turbo_transactions_enabled)
 -  [Function `get_calculate_transaction_fee_for_distribution_feature`](#0x1_features_get_calculate_transaction_fee_for_distribution_feature)
 -  [Function `is_calculate_transaction_fee_for_distribution_enabled`](#0x1_features_is_calculate_transaction_fee_for_distribution_enabled)
 -  [Function `get_distribute_transaction_fee_feature`](#0x1_features_get_distribute_transaction_fee_feature)
@@ -860,7 +860,7 @@ Lifetime: transient
 
 <a id="0x1_features_ORDERLESS_TRANSACTIONS"></a>
 
-Whether orderless transactions are enabled.
+Whether turbo transactions are enabled.
 Lifetime: transient
 
 
@@ -3816,13 +3816,13 @@ Deprecated feature
 
 </details>
 
-<a id="0x1_features_get_orderless_transactions_feature"></a>
+<a id="0x1_features_get_turbo_transactions_feature"></a>
 
-## Function `get_orderless_transactions_feature`
+## Function `get_turbo_transactions_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_orderless_transactions_feature">get_orderless_transactions_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_turbo_transactions_feature">get_turbo_transactions_feature</a>(): u64
 </code></pre>
 
 
@@ -3831,20 +3831,20 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_orderless_transactions_feature">get_orderless_transactions_feature</a>(): u64 { <a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_turbo_transactions_feature">get_turbo_transactions_feature</a>(): u64 { <a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_orderless_transactions_enabled"></a>
+<a id="0x1_features_turbo_transactions_enabled"></a>
 
-## Function `orderless_transactions_enabled`
+## Function `turbo_transactions_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_orderless_transactions_enabled">orderless_transactions_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_turbo_transactions_enabled">turbo_transactions_enabled</a>(): bool
 </code></pre>
 
 
@@ -3853,7 +3853,7 @@ Deprecated feature
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_orderless_transactions_enabled">orderless_transactions_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_turbo_transactions_enabled">turbo_transactions_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ORDERLESS_TRANSACTIONS">ORDERLESS_TRANSACTIONS</a>)
 }
 </code></pre>

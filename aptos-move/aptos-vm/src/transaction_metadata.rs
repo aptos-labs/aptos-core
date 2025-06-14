@@ -99,7 +99,7 @@ impl TransactionMetadata {
                     multisig_address: *multisig_address,
                     transaction_payload: match executable {
                         TransactionExecutable::EntryFunction(e) => {
-                            // TODO[Orderless]: How to avoid the clone operation here.
+                            // TODO[Turbo]: How to avoid the clone operation here.
                             Some(MultisigTransactionPayload::EntryFunction(e.clone()))
                         },
                         _ => None,
@@ -154,7 +154,7 @@ impl TransactionMetadata {
         self.replay_protector
     }
 
-    pub fn is_orderless(&self) -> bool {
+    pub fn is_turbo(&self) -> bool {
         match self.replay_protector {
             ReplayProtector::SequenceNumber(_) => false,
             ReplayProtector::Nonce(_) => true,
