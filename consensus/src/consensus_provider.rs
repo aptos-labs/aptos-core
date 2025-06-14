@@ -68,7 +68,6 @@ pub fn start_consensus(
         Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
-        runtime.handle(),
         TransactionFilter::new(node_config.execution.transaction_filter.clone()),
         node_config.consensus.enable_pre_commit,
     );
@@ -161,7 +160,6 @@ pub fn start_consensus_observer(
             Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db.clone())),
             txn_notifier,
             state_sync_notifier,
-            consensus_observer_runtime.handle(),
             TransactionFilter::new(node_config.execution.transaction_filter.clone()),
             node_config.consensus.enable_pre_commit,
         );

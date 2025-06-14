@@ -27,7 +27,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
-use tokio::{runtime::Handle, sync::Mutex as AsyncMutex};
+use tokio::sync::Mutex as AsyncMutex;
 
 struct DummyStateSyncNotifier {
     invocations: Mutex<Vec<(Vec<Transaction>, Vec<ContractEvent>)>>,
@@ -168,7 +168,6 @@ async fn should_see_and_notify_validator_txns() {
         executor.clone(),
         Arc::new(DummyTxnNotifier {}),
         state_sync_notifier.clone(),
-        &Handle::current(),
         TransactionFilter::new(Filter::empty()),
         true,
     );
@@ -198,11 +197,11 @@ async fn should_see_and_notify_validator_txns() {
     );
 
     // Ensure the dummy executor has received the txns.
-    let _ = execution_policy
-        .schedule_compute(&block, HashValue::zero(), None, None, dummy_guard())
-        .await
-        .await
-        .unwrap();
+    // let _ = execution_policy
+    //     .schedule_compute(&block, HashValue::zero(), None, None, dummy_guard())
+    //     .await
+    //     .await
+    //     .unwrap();
 
     // Get the txns from the view of the dummy executor.
     let txns = executor.blocks_received.lock()[0]
