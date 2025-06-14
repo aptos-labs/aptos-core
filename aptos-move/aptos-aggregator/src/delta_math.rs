@@ -151,7 +151,7 @@ impl DeltaHistory {
         max_value: u128,
     ) -> Result<(), DelayedFieldsSpeculativeError> {
         let math = BoundedMath::new(max_value);
-        // We need to make sure the following 4 conditions are satisified.
+        // We need to make sure the following 4 conditions are satisfied.
         //     base_value + max_achieved_positive_delta <= self.max_value
         //     base_value >= min_achieved_negative_delta
         //     base_value + min_overflow_positive_delta > self.max_value
