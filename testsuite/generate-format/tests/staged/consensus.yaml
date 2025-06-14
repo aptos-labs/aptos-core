@@ -345,6 +345,10 @@ BlockType:
       ProposalExt:
         NEWTYPE:
           TYPENAME: ProposalExt
+    4:
+      OptimisticProposal:
+        NEWTYPE:
+          TYPENAME: OptBlockBody
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -467,6 +471,10 @@ ConsensusMsg:
       BlockRetrievalRequest:
         NEWTYPE:
           TYPENAME: BlockRetrievalRequest
+    21:
+      OptProposalMsg:
+        NEWTYPE:
+          TYPENAME: OptProposalMsg
 ContractEvent:
   ENUM:
     0:
@@ -722,6 +730,35 @@ OpenIdSig:
         TYPENAME: Pepper
     - idc_aud_val:
         OPTION: STR
+OptBlockBody:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - validator_txns:
+              SEQ:
+                TYPENAME: ValidatorTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - grandparent_qc:
+              TYPENAME: QuorumCert
+OptBlockData:
+  STRUCT:
+    - epoch: U64
+    - round: U64
+    - timestamp_usecs: U64
+    - parent:
+        TYPENAME: BlockInfo
+    - block_body:
+        TYPENAME: OptBlockBody
+OptProposalMsg:
+  STRUCT:
+    - block_data:
+        TYPENAME: OptBlockData
+    - sync_info:
+        TYPENAME: SyncInfo
 OptQuorumStorePayload:
   ENUM:
     0:

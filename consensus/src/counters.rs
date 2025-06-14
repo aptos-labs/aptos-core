@@ -68,6 +68,15 @@ pub static LAST_COMMITTED_ROUND: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// The counter corresponds to the round of the highest committed opt block.
+pub static LAST_COMMITTED_OPT_BLOCK_ROUND: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_last_committed_opt_block_round",
+        "The counter corresponds to the round of the highest committed opt block."
+    )
+    .unwrap()
+});
+
 /// The counter corresponds to the version of the last committed ledger info.
 pub static LAST_COMMITTED_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -91,6 +100,15 @@ pub static COMMITTED_BLOCKS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_committed_blocks_count",
         "Count of the committed blocks since last restart."
+    )
+    .unwrap()
+});
+
+/// Count of the committed opt blocks since last restart.
+pub static COMMITTED_OPT_BLOCKS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_committed_opt_blocks_count",
+        "Count of the committed opt blocks since last restart."
     )
     .unwrap()
 });
@@ -1280,6 +1298,11 @@ pub fn update_counters_for_block(block: &Block) {
     NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
     COMMITTED_BLOCKS_COUNT.inc();
     LAST_COMMITTED_ROUND.set(block.round() as i64);
+    if block.is_opt_block() {
+        observe_block(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK);
+        COMMITTED_OPT_BLOCKS_COUNT.inc();
+        LAST_COMMITTED_OPT_BLOCK_ROUND.set(block.round() as i64);
+    }
     let failed_rounds = block
         .block_data()
         .failed_authors()
