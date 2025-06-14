@@ -5,13 +5,16 @@ use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, MultisigTransactionPayload},
+    transaction::{EntryFunction, MultisigTransactionPayload, Script},
 };
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    transaction_argument::TransactionArgument,
     value::{serialize_values, MoveValue},
 };
+
+const SCRIPT_HEX: &str = "a11ceb0b0700000a06010002030206050806070e20082e40106e1f010200010001000103060c050300083c53454c463e5f30087472616e736665720d6170746f735f6163636f756e74ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000114636f6d70696c6174696f6e5f6d65746164617461090003322e3003322e31000001050b000b010b02110002";
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_payload_succeeds() {
@@ -30,6 +33,42 @@ async fn test_multisig_transaction_with_payload_succeeds() {
     assert_eq!(1000, context.get_apt_balance(multisig_account).await);
 
     let multisig_payload = construct_multisig_txn_transfer_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+    // Owner 2 approves and owner 3 rejects. There are still 2 approvals total (owners 1 and 2) so
+    // the transaction can still be executed.
+    context
+        .approve_multisig_transaction(owner_account_2, multisig_account, 1)
+        .await;
+    context
+        .reject_multisig_transaction(owner_account_3, multisig_account, 1)
+        .await;
+    context
+        .execute_multisig_transaction(owner_account_1, multisig_account, 202)
+        .await;
+
+    // The multisig tx that transfers away 1000 APT should have succeeded.
+    assert_eq!(0, context.get_apt_balance(multisig_account).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_multisig_script_transaction_with_payload_succeeds() {
+    let mut context = new_test_context(current_function_name!());
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            2,    /* 2-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+    assert_eq!(1000, context.get_apt_balance(multisig_account).await);
+
+    let multisig_payload = construct_multisig_txn_script_payload(owner_account_1.address(), 1000);
     context
         .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
         .await;
@@ -706,5 +745,18 @@ fn construct_multisig_txn_transfer_payload(recipient: AccountAddress, amount: u6
             serialize_values(&vec![MoveValue::Address(recipient), MoveValue::U64(amount)]),
         ),
     ))
+    .unwrap()
+}
+
+fn construct_multisig_txn_script_payload(recipient: AccountAddress, amount: u64) -> Vec<u8> {
+    let script_bytes = hex::decode(SCRIPT_HEX).unwrap();
+    bcs::to_bytes(&MultisigTransactionPayload::Script(Script::new(
+        script_bytes,
+        vec![],
+        vec![
+            TransactionArgument::Address(recipient),
+            TransactionArgument::U64(amount),
+        ],
+    )))
     .unwrap()
 }
