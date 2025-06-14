@@ -10,7 +10,9 @@ use aptos_transaction_generator_lib::{
     publishing::publish_util::{Package, PackageHandler},
 };
 use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType, OrderBookState};
-use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,
+};
 use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
@@ -368,12 +370,9 @@ fn main() {
             PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
         let mut rng = StdRng::seed_from_u64(14);
         let package = package_handler.pick_package(&mut rng, *publisher.address());
-        execute_txn(
-            &mut executor,
-            &publisher,
-            0,
-            package.publish_transaction_payload(),
-        );
+        for payload in package.publish_transaction_payload(&ChainId::test()) {
+            execute_txn(&mut executor, &publisher, 0, payload);
+        }
         if let Some(init_entry_point) = entry_point.initialize_entry_point() {
             execute_txn(
                 &mut executor,

@@ -68,6 +68,7 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
+    order_vote_enabled: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -82,6 +83,7 @@ pub struct ExecutionProxy {
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
+    enable_pre_commit: bool,
 }
 
 impl ExecutionProxy {
@@ -113,6 +115,7 @@ impl ExecutionProxy {
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
             state: RwLock::new(None),
+            enable_pre_commit,
         }
     }
 
@@ -192,6 +195,7 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            order_vote_enabled,
         } = self
             .state
             .read()
@@ -215,6 +219,8 @@ impl ExecutionProxy {
             self.state_sync_notifier.clone(),
             payload_manager,
             self.txn_notifier.clone(),
+            self.enable_pre_commit,
+            order_vote_enabled,
         )
     }
 }
@@ -244,6 +250,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            ..
         } = self
             .state
             .read()
@@ -334,7 +341,7 @@ impl StateComputer for ExecutionProxy {
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -345,7 +352,7 @@ impl StateComputer for ExecutionProxy {
         );
 
         // wait until all blocks are committed
-        for block in blocks {
+        for block in &blocks {
             block.take_pre_commit_fut().await?
         }
 
@@ -364,7 +371,7 @@ impl StateComputer for ExecutionProxy {
 
         self.commit_notifier
             .clone()
-            .send(self.commit_hook(blocks, callback, finality_proof))
+            .send(self.commit_hook(&blocks, callback, finality_proof))
             .await
             .expect("Failed to send commit notification");
 
@@ -484,6 +491,7 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        order_vote_enabled: bool,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -496,6 +504,7 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
+            order_vote_enabled,
         });
     }
 
@@ -658,13 +667,14 @@ async fn test_commit_sync_race() {
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
         false,
+        false,
     );
     executor
-        .commit(&[], generate_li(1, 1), callback.clone())
+        .commit(vec![], generate_li(1, 1), callback.clone())
         .await
         .unwrap();
     executor
-        .commit(&[], generate_li(1, 10), callback)
+        .commit(vec![], generate_li(1, 10), callback)
         .await
         .unwrap();
     assert!(executor.sync_to_target(generate_li(1, 8)).await.is_ok());

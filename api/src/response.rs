@@ -637,6 +637,22 @@ pub fn version_pruned<E: GoneError>(ledger_version: u64, ledger_info: &LedgerInf
     )
 }
 
+pub fn account_not_found<E: NotFoundError>(
+    address: Address,
+    ledger_version: u64,
+    ledger_info: &LedgerInfo,
+) -> E {
+    build_not_found(
+        "Account",
+        format!(
+            "Address({}) and Ledger version({})",
+            address, ledger_version
+        ),
+        AptosErrorCode::AccountNotFound,
+        ledger_info,
+    )
+}
+
 pub fn resource_not_found<E: NotFoundError>(
     address: Address,
     struct_tag: &StructTag,
@@ -647,7 +663,9 @@ pub fn resource_not_found<E: NotFoundError>(
         "Resource",
         format!(
             "Address({}), Struct tag({}) and Ledger version({})",
-            address, struct_tag, ledger_version
+            address,
+            struct_tag.to_canonical_string(),
+            ledger_version
         ),
         AptosErrorCode::ResourceNotFound,
         ledger_info,
@@ -682,7 +700,10 @@ pub fn struct_field_not_found<E: NotFoundError>(
         "Struct Field",
         format!(
             "Address({}), Struct tag({}), Field name({}) and Ledger version({})",
-            address, struct_tag, field_name, ledger_version
+            address,
+            struct_tag.to_canonical_string(),
+            field_name,
+            ledger_version
         ),
         AptosErrorCode::StructFieldNotFound,
         ledger_info,

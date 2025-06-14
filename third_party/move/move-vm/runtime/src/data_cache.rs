@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    storage::{module_storage::FunctionValueExtensionAdapter, ty_tag_converter::TypeTagConverter},
-    LayoutConverter, ModuleStorage, StorageLayoutConverter,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    },
+    ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
@@ -12,7 +15,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    language_storage::TypeTag,
+    language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -22,19 +25,21 @@ use move_vm_types::{
     value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::BTreeMap;
+use std::collections::btree_map::{BTreeMap, Entry};
 
-pub struct AccountDataCache {
-    // The bool flag in the `data_map` indicates whether the resource contains
-    // an aggregator or snapshot.
-    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
+/// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
+/// information such as tag, layout, and a flag whether there are any delayed fields inside the
+/// resource.
+pub(crate) struct DataCacheEntry {
+    struct_tag: StructTag,
+    layout: MoveTypeLayout,
+    contains_delayed_fields: bool,
+    value: GlobalValue,
 }
 
-impl AccountDataCache {
-    fn new() -> Self {
-        Self {
-            data_map: BTreeMap::new(),
-        }
+impl DataCacheEntry {
+    pub(crate) fn value(&self) -> &GlobalValue {
+        &self.value
     }
 }
 
@@ -52,7 +57,7 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub struct TransactionDataCache {
-    account_map: BTreeMap<AccountAddress, AccountDataCache>,
+    account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
 }
 
 impl TransactionDataCache {
@@ -81,7 +86,7 @@ impl TransactionDataCache {
                             .with_message(format!("Error when serializing resource {}.", value))
                     })
             };
-        self.into_custom_effects(&resource_converter, module_storage)
+        self.into_custom_effects(&resource_converter)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
@@ -89,23 +94,22 @@ impl TransactionDataCache {
     pub fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Changes<Resource>> {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut resources = BTreeMap::new();
-            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
-                if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let ty_tag_builder =
-                        TypeTagConverter::new(module_storage.runtime_environment());
-                    let struct_tag = match ty_tag_builder.ty_to_ty_tag(&ty)? {
-                        TypeTag::Struct(struct_tag) => *struct_tag,
-                        _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
-                    };
+            for entry in account_data_cache.into_values() {
+                let DataCacheEntry {
+                    struct_tag,
+                    layout,
+                    contains_delayed_fields,
+                    value,
+                } = entry;
+                if let Some(op) = value.into_effect_with_layout(layout) {
                     resources.insert(
                         struct_tag,
                         op.and_then(|(value, layout)| {
-                            resource_converter(value, layout, has_aggregator_lifting)
+                            resource_converter(value, layout, contains_delayed_fields)
                         })?,
                     );
                 }
@@ -120,105 +124,123 @@ impl TransactionDataCache {
         Ok(change_set)
     }
 
-    fn get_mut_or_insert_with<'a, K, V, F>(map: &'a mut BTreeMap<K, V>, k: &K, gen: F) -> &'a mut V
-    where
-        F: FnOnce() -> (K, V),
-        K: Ord,
-    {
-        if !map.contains_key(k) {
-            let (k, v) = gen();
-            map.insert(k, v);
-        }
-        map.get_mut(k).unwrap()
-    }
-
-    // Retrieves data from the local cache or loads it from the remote cache into the local cache.
-    // All operations on the global data are based on this API and they all load the data
-    // into the cache.
-    pub(crate) fn load_resource(
-        &mut self,
+    /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
+    /// Also returns the size of the loaded resource in bytes. This method does not add the entry
+    /// to the cache - it is the caller's responsibility to add it there.
+    pub(crate) fn create_data_cache_entry(
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
-        addr: AccountAddress,
+        addr: &AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
-        let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
-            (addr, AccountDataCache::new())
-        });
+    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
+            TypeTag::Struct(struct_tag) => *struct_tag,
+            _ => {
+                // Since every resource is a struct, the tag must be also a struct tag.
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+            },
+        };
 
-        let mut load_res = None;
-        if !account_cache.data_map.contains_key(ty) {
-            let ty_tag_builder = TypeTagConverter::new(module_storage.runtime_environment());
-            let ty_tag = match ty_tag_builder.ty_to_ty_tag(ty)? {
-                TypeTag::Struct(s_tag) => s_tag,
-                _ =>
-                // non-struct top-level value; can't happen
-                {
-                    return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
+        // TODO(Gas): Shall we charge for this?
+        let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)?;
+
+        let (data, bytes_loaded) = {
+            let metadata = module_storage
+                .fetch_existing_module_metadata(
+                    &struct_tag.address,
+                    struct_tag.module.as_ident_str(),
+                )
+                .map_err(|err| err.to_partial())?;
+
+            // If we need to process delayed fields, we pass type layout to remote storage. Remote
+            // storage, in turn ensures that all delayed field values are pre-processed.
+            resource_resolver.get_resource_bytes_with_metadata_and_layout(
+                addr,
+                &struct_tag,
+                &metadata,
+                if contains_delayed_fields {
+                    Some(&layout)
+                } else {
+                    None
                 },
-            };
-            // TODO(Gas): Shall we charge for this?
-            let (ty_layout, has_aggregator_lifting) =
-                StorageLayoutConverter::new(module_storage)
-                    .type_to_type_layout_with_identifier_mappings(ty)?;
+            )?
+        };
 
-            let (data, bytes_loaded) = {
-                let metadata = module_storage
-                    .fetch_existing_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
-                    .map_err(|e| e.to_partial())?;
+        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        let value = match data {
+            Some(blob) => {
+                let val = ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_value_extension)
+                    .with_delayed_fields_serde()
+                    .deserialize(&blob, &layout)
+                    .ok_or_else(|| {
+                        let msg = format!(
+                            "Failed to deserialize resource {} at {}!",
+                            struct_tag.to_canonical_string(),
+                            addr
+                        );
+                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                            .with_message(msg)
+                    })?;
+                GlobalValue::cached(val)?
+            },
+            None => GlobalValue::none(),
+        };
 
-                // If we need to process aggregator lifting, we pass type layout to remote.
-                // Remote, in turn ensures that all aggregator values are lifted if the resolved
-                // resource comes from storage.
-                resource_resolver.get_resource_bytes_with_metadata_and_layout(
-                    &addr,
-                    &ty_tag,
-                    &metadata,
-                    if has_aggregator_lifting {
-                        Some(&ty_layout)
-                    } else {
-                        None
-                    },
-                )?
-            };
-            load_res = Some(NumBytes::new(bytes_loaded as u64));
+        let entry = DataCacheEntry {
+            struct_tag,
+            layout,
+            contains_delayed_fields,
+            value,
+        };
+        Ok((entry, NumBytes::new(bytes_loaded as u64)))
+    }
 
-            let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-            let gv = match data {
-                Some(blob) => {
-                    let val = match ValueSerDeContext::new()
-                        .with_func_args_deserialization(&function_value_extension)
-                        .with_delayed_fields_serde()
-                        .deserialize(&blob, &ty_layout)
-                    {
-                        Some(val) => val,
-                        None => {
-                            let msg =
-                                format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
-                            return Err(PartialVMError::new(
-                                StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
-                            )
-                            .with_message(msg));
-                        },
-                    };
+    /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
+    /// state of the cache does not chang when calling this function.
+    pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
+        self.account_map
+            .get(addr)
+            .is_some_and(|account_cache| account_cache.contains_key(ty))
+    }
 
-                    GlobalValue::cached(val)?
-                },
-                None => GlobalValue::none(),
-            };
+    /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
+    /// entry already for the specified address-type pair.
+    pub(crate) fn insert_resource(
+        &mut self,
+        addr: AccountAddress,
+        ty: Type,
+        data_cache_entry: DataCacheEntry,
+    ) -> PartialVMResult<()> {
+        match self.account_map.entry(addr).or_default().entry(ty.clone()) {
+            Entry::Vacant(entry) => entry.insert(data_cache_entry),
+            Entry::Occupied(_) => {
+                let msg = format!("Entry for {:?} at {} already exists", ty, addr);
+                let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg);
+                return Err(err);
+            },
+        };
+        Ok(())
+    }
 
-            account_cache
-                .data_map
-                .insert(ty.clone(), (ty_layout, gv, has_aggregator_lifting));
+    /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
+    /// not exist in cache), an error is returned.
+    pub(crate) fn get_resource_mut(
+        &mut self,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<&mut GlobalValue> {
+        if let Some(account_cache) = self.account_map.get_mut(addr) {
+            if let Some(entry) = account_cache.get_mut(ty) {
+                return Ok(&mut entry.value);
+            }
         }
 
-        Ok((
-            account_cache
-                .data_map
-                .get_mut(ty)
-                .map(|(_ty_layout, gv, _has_aggregator_lifting)| gv)
-                .expect("global value must exist"),
-            load_res,
-        ))
+        let msg = format!("Resource for {:?} at {} must exist", ty, addr);
+        let err =
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg);
+        Err(err)
     }
 }

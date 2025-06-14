@@ -79,7 +79,7 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for DescendantIterator<'a, K, V>
+impl<K, V> Iterator for DescendantIterator<'_, K, V>
 where
     K: ArcAsyncDrop + Clone,
     V: ArcAsyncDrop + Clone,

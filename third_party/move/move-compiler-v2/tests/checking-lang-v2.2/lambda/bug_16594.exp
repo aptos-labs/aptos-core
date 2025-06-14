@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: lambda lifting is not allowed in scripts
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16594.move:3:17
+  │
+3 │         let f = || {};
+  │                 ^^^^^
+  │
+  = lambda cannot be reduced to partial application of an existing function
+
+error: lambda lifting is not allowed in scripts
+  ┌─ tests/checking-lang-v2.2/lambda/bug_16594.move:4:17
+  │
+4 │         let g = |func| func();
+  │                 ^^^^^^^^^^^^^
+  │
+  = lambda cannot be reduced to partial application of an existing function

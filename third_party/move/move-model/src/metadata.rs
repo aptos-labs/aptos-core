@@ -179,7 +179,7 @@ impl CompilerVersion {
 /// Typically, a major version change is given with an addition of larger new language
 /// features. There are no breaking changes expected with major version changes,
 /// however, there maybe some isolated exceptions.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
     /// The version of Move at around the genesis of the Aptos network end
     /// of '22. This is the original Diem Move plus the extension of inline
@@ -202,6 +202,26 @@ impl Default for LanguageVersion {
     }
 }
 
+impl Serialize for LanguageVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for LanguageVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
 impl FromStr for LanguageVersion {
     type Err = anyhow::Error;
 
@@ -217,7 +237,7 @@ impl FromStr for LanguageVersion {
             "2.2" => Ok(Self::V2_2),
             "2.3" => Ok(Self::V2_3),
             _ => bail!(
-                "unrecognized language version `{}` (supported versions: `1`, `2`, `2.0-2.3`)",
+                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.3\")",
                 s
             ),
         }

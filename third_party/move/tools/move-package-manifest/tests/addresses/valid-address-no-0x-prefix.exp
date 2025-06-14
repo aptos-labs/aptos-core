@@ -1,0 +1,20 @@
+success
+
+PackageManifest {
+    package: PackageMetadata {
+        name: "some_package_name",
+        version: "0.1.2",
+        authors: [],
+        license: None,
+        upgrade_policy: None,
+    },
+    addresses: {
+        "addr1": Numerical(
+            0000000000000000000000000000000000000000000000000000000000001234,
+        ),
+    },
+    dev_addresses: {},
+    build: None,
+    dependencies: {},
+    dev_dependencies: {},
+}

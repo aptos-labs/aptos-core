@@ -24,7 +24,7 @@ use std::{
 /// the buffer manager and send them to the ExecutionPipeline.
 
 pub struct ExecutionRequest {
-    pub ordered_blocks: Vec<PipelinedBlock>,
+    pub ordered_blocks: Vec<Arc<PipelinedBlock>>,
     // Pass down a CountedRequest to the ExecutionPipeline stages in order to guarantee the executor
     // doesn't get reset with pending tasks stuck in the pipeline.
     pub lifetime_guard: CountedRequest<()>,
@@ -79,7 +79,6 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             for b in &ordered_blocks {
                 if let Some(tx) = b.pipeline_tx().lock().as_mut() {
                     tx.rand_tx.take().map(|tx| tx.send(b.randomness().cloned()));
-                    tx.order_proof_tx.take().map(|tx| tx.send(()));
                 }
             }
 
@@ -114,7 +113,8 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                 let mut results = vec![];
                 for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                     debug!("try to receive compute result for block {}", block.id());
-                    results.push(block.set_execution_result(fut.await?));
+                    block.set_execution_result(fut.await?);
+                    results.push(block);
                 }
                 Ok(results)
             })

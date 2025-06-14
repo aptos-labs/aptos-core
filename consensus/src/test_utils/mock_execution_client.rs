@@ -19,6 +19,7 @@ use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::{Payload, Round},
     pipelined_block::PipelinedBlock,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381::PrivateKey, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -84,10 +85,7 @@ impl MockExecutionClient {
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);
 
-        callback(
-            &ordered_blocks.into_iter().map(Arc::new).collect::<Vec<_>>(),
-            ordered_proof,
-        );
+        callback(&ordered_blocks, ordered_proof);
 
         Ok(())
     }
@@ -118,8 +116,8 @@ impl TExecutionClient for MockExecutionClient {
 
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
-        finality_proof: LedgerInfoWithSignatures,
+        blocks: Vec<Arc<PipelinedBlock>>,
+        finality_proof: WrappedLedgerInfo,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
@@ -128,7 +126,7 @@ impl TExecutionClient for MockExecutionClient {
             blocks.iter().map(|v| v.round()).collect::<Vec<_>>()
         );
 
-        for block in blocks {
+        for block in &blocks {
             self.block_cache.lock().insert(
                 block.id(),
                 block
@@ -142,11 +140,8 @@ impl TExecutionClient for MockExecutionClient {
             .executor_channel
             .clone()
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<PipelinedBlock>>(),
-                ordered_proof: finality_proof,
+                ordered_blocks: blocks,
+                ordered_proof: finality_proof.ledger_info().clone(),
                 callback,
             })
             .await

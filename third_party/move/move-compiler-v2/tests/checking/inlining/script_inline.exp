@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: inline function cannot be defined in a script
+  ┌─ tests/checking/inlining/script_inline.move:2:16
+  │
+2 │     inline fun outer() {
+  │                ^^^^^

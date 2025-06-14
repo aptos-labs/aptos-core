@@ -49,6 +49,7 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
         with:
           pyproject_directory: crates/aptos/e2e
+          poetry_version: 2.1.2
 
       # Run CLI tests against local testnet built from devnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2

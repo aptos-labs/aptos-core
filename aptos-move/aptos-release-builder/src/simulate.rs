@@ -30,7 +30,7 @@ use aptos_gas_profiling::GasProfiler;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::account::AccountData;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_rest_client::Client;
+use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
 use aptos_types::{
     account_address::AccountAddress,
@@ -365,6 +365,7 @@ pub async fn simulate_multistep_proposal(
     proposal_dir: &Path,
     proposal_scripts: &[PathBuf],
     profile_gas: bool,
+    node_api_key: Option<String>,
 ) -> Result<()> {
     println!("Simulating proposal at {}", proposal_dir.display());
 
@@ -397,7 +398,12 @@ pub async fn simulate_multistep_proposal(
     }
 
     // Set up the simulation state view.
-    let client = Client::new(remote_url);
+    let mut client_builder = Client::builder(AptosBaseUrl::Custom(remote_url));
+    if let Some(api_key) = node_api_key.clone() {
+        client_builder = client_builder.api_key(&api_key)?;
+    }
+    let client = client_builder.build();
+
     let debugger =
         AptosDebugger::rest_client(client.clone()).context("failed to create AptosDebugger")?;
     let state = client.get_ledger_information().await?.into_inner();
@@ -586,6 +592,7 @@ pub async fn simulate_all_proposals(
     remote_url: Url,
     output_dir: &Path,
     profile_gas: bool,
+    node_api_key: Option<String>,
 ) -> Result<()> {
     let proposals =
         collect_proposals(output_dir).context("failed to collect proposals for simulation")?;
@@ -616,6 +623,7 @@ pub async fn simulate_all_proposals(
             proposal_dir,
             proposal_scripts,
             profile_gas,
+            node_api_key.clone(),
         )
         .await
         .with_context(|| format!("failed to simulate proposal at {}", proposal_dir.display()))?;

@@ -1,0 +1,10 @@
+error: failed to parse manifest
+  |
+1 | [package]
+2 | name = "some_package_name"
+3 | version = "0.1.2"
+4 |
+5 | [dependencies]
+6 | a = { local = "../a", address = "0x123" }
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redundant field "address" -- only needed for "aptos" dependencies
+  |

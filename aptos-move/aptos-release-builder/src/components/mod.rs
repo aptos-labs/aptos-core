@@ -166,7 +166,7 @@ impl<'de> Deserialize<'de> for GasScheduleLocator {
     {
         struct GasScheduleLocatorVisitor;
 
-        impl<'de> Visitor<'de> for GasScheduleLocatorVisitor {
+        impl Visitor<'_> for GasScheduleLocatorVisitor {
             type Value = GasScheduleLocator;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

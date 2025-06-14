@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::M1 {
     struct S1<T> {
         a: u64,
@@ -19,7 +19,7 @@ module 0x42::M1 {
     }
 } // end 0x42::M1
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::M1 {
     struct S1<phantom T> {
         a: u64,

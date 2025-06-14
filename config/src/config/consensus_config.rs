@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unexpected_cfgs)]
+
 use super::DEFEAULT_MAX_BATCH_TXNS;
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
@@ -14,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 3000;
-const MAX_SENDING_BLOCK_TXNS: u64 = 7000;
+const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
+const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
 // stop reducing size at this point, so 1MB transactions can still go through
@@ -193,7 +195,7 @@ impl Default for ConsensusConfig {
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
-            round_initial_timeout_ms: 1500,
+            round_initial_timeout_ms: 1000,
             // 1.2^6 ~= 3
             // Timeout goes from initial_timeout to initial_timeout*3 in 6 steps
             round_timeout_backoff_exponent_base: 1.2,
@@ -220,21 +222,21 @@ impl Default for ConsensusConfig {
             execution_backpressure: Some(ExecutionBackpressureConfig {
                 txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
                     lookback_config: ExecutionBackpressureLookbackConfig {
-                        num_blocks_to_look_at: 12,
+                        num_blocks_to_look_at: 18,
                         min_block_time_ms_to_activate: 100,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Percentile(0.5),
-                        target_block_time_ms: 200,
+                        target_block_time_ms: 120,
                     },
                     min_calibrated_txns_per_block: 8,
                 }),
                 gas_limit: Some(ExecutionBackpressureGasLimitConfig {
                     lookback_config: ExecutionBackpressureLookbackConfig {
-                        num_blocks_to_look_at: 20,
+                        num_blocks_to_look_at: 30,
                         min_block_time_ms_to_activate: 10,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Mean,
-                        target_block_time_ms: 200,
+                        target_block_time_ms: 120,
                     },
                     block_execution_overhead_ms: 10,
                     min_calibrated_block_gas_limit: 2000,
@@ -357,11 +359,11 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
-            enable_pre_commit: false,
+            enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: true,
             enable_round_timeout_msg: true,
-            enable_pipeline: false,
+            enable_pipeline: true,
         }
     }
 }

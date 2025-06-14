@@ -1,0 +1,4 @@
+[package]
+name = "some_package_name"
+version = "0.1.2"
+license = "MIT"

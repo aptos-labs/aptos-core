@@ -1,42 +1,63 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters, types::ReadWriteSummary};
-use aptos_logger::info;
+use crate::{
+    counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
+};
+use aptos_logger::{info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
+    state_store::TStateView,
+    transaction::{
+        block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
+        BlockExecutableTransaction as Transaction,
+    },
 };
 use claims::{assert_le, assert_none};
-use std::time::Instant;
+use once_cell::sync::Lazy;
+use std::{collections::BTreeMap, env, time::Instant};
 
-pub struct BlockGasLimitProcessor<T: Transaction> {
+pub static PRINT_CONFLICTS_INFO: Lazy<bool> =
+    Lazy::new(|| env::var("PRINT_CONFLICTS_INFO").is_ok());
+
+pub struct BlockGasLimitProcessor<'s, T: Transaction, S> {
     block_gas_limit_type: BlockGasLimitType,
     block_gas_limit_override: Option<u64>,
+    accumulated_raw_block_gas: u64,
     accumulated_effective_block_gas: u64,
     accumulated_approx_output_size: u64,
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     start_time: Instant,
+    print_conflicts_info: bool,
+    hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<'s, T::Key, S>>,
 }
 
-impl<T: Transaction> BlockGasLimitProcessor<T> {
+impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s, T, S> {
     pub fn new(
+        base_view: &'s S,
         block_gas_limit_type: BlockGasLimitType,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
+        let hot_state_op_accumulator = block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+            .then(|| BlockHotStateOpAccumulator::new(base_view));
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
+            accumulated_raw_block_gas: 0,
             accumulated_effective_block_gas: 0,
             accumulated_approx_output_size: 0,
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
             start_time: Instant::now(),
+            // TODO: have a configuration for it.
+            print_conflicts_info: *PRINT_CONFLICTS_INFO,
+            hot_state_op_accumulator,
         }
     }
 
@@ -56,16 +77,21 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             let txn_read_write_summary = txn_read_write_summary.expect(
                 "txn_read_write_summary needs to be computed if conflict_penalty_window is set",
             );
-            self.txn_read_write_summaries.push(
-                if self
-                    .block_gas_limit_type
-                    .use_granular_resource_group_conflicts()
-                {
-                    txn_read_write_summary
-                } else {
-                    txn_read_write_summary.collapse_resource_group_conflicts()
-                },
-            );
+            if self.print_conflicts_info {
+                println!("{:?}", txn_read_write_summary);
+            }
+            let rw_summary = if self
+                .block_gas_limit_type
+                .use_granular_resource_group_conflicts()
+            {
+                txn_read_write_summary
+            } else {
+                txn_read_write_summary.collapse_resource_group_conflicts()
+            };
+            if let Some(x) = &mut self.hot_state_op_accumulator {
+                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+            }
+            self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
             assert_none!(txn_read_write_summary);
@@ -75,13 +101,13 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         // When the accumulated execution and io gas of the committed txns exceeds
         // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
         // the per block gas limit, as we measure execution related cost here.
-        self.accumulated_effective_block_gas += conflict_multiplier
-            * (fee_statement.execution_gas_used()
-                * self
-                    .block_gas_limit_type
-                    .execution_gas_effective_multiplier()
-                + fee_statement.io_gas_used()
-                    * self.block_gas_limit_type.io_gas_effective_multiplier());
+        let raw_gas_used = fee_statement.execution_gas_used()
+            * self
+                .block_gas_limit_type
+                .execution_gas_effective_multiplier()
+            + fee_statement.io_gas_used() * self.block_gas_limit_type.io_gas_effective_multiplier();
+        self.accumulated_raw_block_gas += raw_gas_used;
+        self.accumulated_effective_block_gas += conflict_multiplier * raw_gas_used;
 
         if self.block_gas_limit_type.block_output_limit().is_some() {
             self.accumulated_approx_output_size += approx_output_size
@@ -162,8 +188,20 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         let current = &self.txn_read_write_summaries[end];
         for prev in &self.txn_read_write_summaries[start..end] {
             if current.conflicts_with_previous(prev) {
+                if self.print_conflicts_info {
+                    println!(
+                        "Conflicts with previous: {:?}",
+                        current.find_conflicts(prev)
+                    );
+                }
                 conflict_count += 1;
             }
+        }
+        if self.print_conflicts_info {
+            println!(
+                "Number of conflicts: {} out of {}",
+                conflict_count, conflict_overlap_length
+            );
         }
         assert_le!(conflict_count + 1, conflict_overlap_length);
         (conflict_count + 1) as u64
@@ -178,6 +216,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     ) {
         let accumulated_effective_block_gas = self.get_effective_accumulated_block_gas();
         let accumulated_approx_output_size = self.get_accumulated_approx_output_size();
+        let accumulated_raw_block_gas = self.accumulated_raw_block_gas;
 
         counters::update_block_gas_counters(
             &self.accumulated_fee_statement,
@@ -190,17 +229,18 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
 
         info!(
             effective_block_gas = accumulated_effective_block_gas,
+            raw_block_gas = accumulated_raw_block_gas,
             block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
             block_gas_limit_override = self.block_gas_limit_override.unwrap_or(0),
             block_gas_limit_exceeded = self
                 .block_gas_limit()
-                .map_or(false, |limit| accumulated_effective_block_gas >= limit),
+                .is_some_and(|limit| accumulated_effective_block_gas >= limit),
             approx_output_size = accumulated_approx_output_size,
             block_output_limit = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
             block_output_limit_exceeded = self
                 .block_gas_limit_type
                 .block_output_limit()
-                .map_or(false, |limit| accumulated_approx_output_size >= limit),
+                .is_some_and(|limit| accumulated_approx_output_size >= limit),
             elapsed_ms = self.start_time.elapsed().as_millis(),
             num_committed = num_committed,
             num_total = num_total,
@@ -233,8 +273,8 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
-    pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {
-        BlockEndInfo::V0 {
+    pub(crate) fn get_block_end_info(&self) -> TBlockEndInfoExt<T::Key> {
+        let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
                 .block_gas_limit()
                 .map(|per_block_gas_limit| {
@@ -250,7 +290,15 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 .unwrap_or(false),
             block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
-        }
+        };
+        let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
+            x.get_slots_to_make_hot()
+        } else {
+            warn!("BlockHotStateOpAccumulator is not set.");
+            BTreeMap::new()
+        };
+
+        TBlockEndInfoExt::new(inner, slots_to_make_hot)
     }
 }
 
@@ -258,11 +306,16 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
 mod test {
     use super::*;
     use crate::{
-        proptest_types::types::{KeyType, MockEvent, MockTransaction},
+        proptest_types::{
+            mock_executor::MockEvent,
+            types::{KeyType, MockTransaction},
+        },
         types::InputOutputKey,
     };
+    use aptos_types::state_store::{
+        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewResult,
+    };
     use std::collections::HashSet;
-
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
 
     const DEFAULT_COMPLEX_LIMIT: BlockGasLimitType = BlockGasLimitType::ComplexLimitV1 {
@@ -279,9 +332,26 @@ mod test {
 
     type TestTxn = MockTransaction<KeyType<u64>, MockEvent>;
 
+    struct MockStateView;
+    const EMPTY_STATE_VIEW: MockStateView = MockStateView;
+
+    impl TStateView for MockStateView {
+        type Key = KeyType<u64>;
+
+        fn get_state_value(&self, _key: &Self::Key) -> StateViewResult<Option<StateValue>> {
+            Ok(None)
+        }
+
+        fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
+            Ok(StateStorageUsage::zero())
+        }
+    }
+
+    type TestProcessor<'s> = BlockGasLimitProcessor<'s, TestTxn, MockStateView>;
+
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(DEFAULT_COMPLEX_LIMIT, None, 10);
+        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, DEFAULT_COMPLEX_LIMIT, None, 10);
         // Assert passing none here doesn't panic.
         processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -305,7 +375,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -329,7 +399,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
         assert_eq!(processor.accumulated_approx_output_size, 10);
@@ -346,8 +416,8 @@ mod test {
         reads
             .iter()
             .map(|key| match key {
-                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k, false)),
-                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k, false), *t),
+                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k)),
+                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k), *t),
                 InputOutputKey::DelayedField(i) => InputOutputKey::DelayedField(*i),
             })
             .collect()
@@ -367,7 +437,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -429,7 +499,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(&EMPTY_STATE_VIEW, block_gas_limit, None, 10);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(

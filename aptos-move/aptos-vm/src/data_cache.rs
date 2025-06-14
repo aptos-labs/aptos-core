@@ -130,7 +130,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
+impl<E: ExecutorView> ResourceGroupResolver for StorageAdapter<'_, E> {
     fn release_resource_group_cache(
         &self,
     ) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
@@ -160,9 +160,9 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
+impl<E: ExecutorView> AptosMoveResolver for StorageAdapter<'_, E> {}
 
-impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
+impl<E: ExecutorView> ResourceResolver for StorageAdapter<'_, E> {
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
@@ -174,7 +174,7 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
+impl<E: ExecutorView> TableResolver for StorageAdapter<'_, E> {
     fn resolve_table_entry_bytes_with_layout(
         &self,
         handle: &TableHandle,
@@ -187,7 +187,7 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
+impl<E: ExecutorView> TAggregatorV1View for StorageAdapter<'_, E> {
     type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
@@ -198,7 +198,7 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
+impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
@@ -251,7 +251,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
+impl<E: ExecutorView> ConfigStorage for StorageAdapter<'_, E> {
     fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
         self.executor_view
             .get_resource_bytes(state_key, None)
@@ -278,7 +278,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
     }
 }
 
-impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
+impl<E: ExecutorView> StateStorageView for StorageAdapter<'_, E> {
     type Key = StateKey;
 
     fn id(&self) -> StateViewId {
@@ -295,14 +295,14 @@ impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
 }
 
 // Allows to extract the view from `StorageAdapter`.
-impl<'e, E: ExecutorView> AsExecutorView for StorageAdapter<'e, E> {
+impl<E: ExecutorView> AsExecutorView for StorageAdapter<'_, E> {
     fn as_executor_view(&self) -> &dyn ExecutorView {
         self.executor_view
     }
 }
 
 // Allows to extract the view from `StorageAdapter`.
-impl<'e, E> AsResourceGroupView for StorageAdapter<'e, E> {
+impl<E> AsResourceGroupView for StorageAdapter<'_, E> {
     fn as_resource_group_view(&self) -> &dyn ResourceGroupView {
         &self.resource_group_view
     }

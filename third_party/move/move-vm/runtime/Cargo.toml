@@ -49,3 +49,6 @@ failpoints = ["fail/failpoints"]
 debugging = []
 testing = []
 stacktrace = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

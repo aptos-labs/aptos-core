@@ -58,7 +58,7 @@ struct Context<'env, 'map> {
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
 }
-impl<'env, 'map> Context<'env, 'map> {
+impl<'env> Context<'env, '_> {
     fn new(
         compilation_env: &'env mut CompilationEnv,
         module_members: UniqueMap<ModuleIdent, ModuleMembers>,
@@ -516,7 +516,7 @@ fn module_(
     assert!(address.is_none());
     set_sender_address(context, &name, module_address);
     let _ = check_restricted_name_all_cases(context, NameCase::Module, &name.0);
-    if name.value().starts_with(|c| c == '_') {
+    if name.value().starts_with('_') {
         let msg = format!(
             "Invalid module name '{}'. Module names cannot start with '_'",
             name,
@@ -3618,7 +3618,7 @@ fn check_valid_module_member_name_impl(
     }
     match member {
         M::Function => {
-            if n.value.starts_with(|c| c == '_') {
+            if n.value.starts_with('_') {
                 let msg = format!(
                     "Invalid {} name '{}'. {} names cannot start with '_'",
                     case.name(),

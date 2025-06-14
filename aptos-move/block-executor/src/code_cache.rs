@@ -8,6 +8,8 @@ use crate::{
 };
 use ambassador::delegate_to_methods;
 use aptos_mvhashmap::types::TxnIndex;
+#[cfg(test)]
+use aptos_types::on_chain_config::CurrentTimeMicroseconds;
 use aptos_types::{
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
@@ -15,6 +17,8 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+#[cfg(test)]
+use fail::fail_point;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CompiledScript,
@@ -30,15 +34,13 @@ use move_vm_types::code::{
 };
 use std::sync::Arc;
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment
-    for LatestView<'a, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment for LatestView<'_, T, S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.runtime_environment
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'_, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -62,7 +64,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for Late
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -183,24 +185,35 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'a, T, S> {
-    fn fetch_state_value_metadata(
+impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'_, T, S> {
+    fn get_module_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         let id = ModuleId::new(*address, module_name.to_owned());
-        let state_value_metadata = self
+        let result = self
             .get_module_or_build_with(&id, self)
-            .map_err(|err| err.to_partial())?
-            .map(|(module, _)| module.extension().state_value_metadata().clone());
-        Ok(state_value_metadata)
+            .map_err(|err| err.to_partial())?;
+
+        // In order to test the module cache with combinatorial tests, we embed the version
+        // information into the state value metadata (execute_transaction has access via
+        // AptosModuleStorage trait only).
+        #[cfg(test)]
+        fail_point!("module_test", |_| {
+            Ok(result.clone().map(|(_, version)| {
+                let v = version.unwrap_or(u32::MAX) as u64;
+                StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
+            }))
+        });
+
+        Ok(result.map(|(module, _)| module.extension().state_value_metadata().clone()))
     }
 }
 
 #[delegate_to_methods]
 #[delegate(ScriptCache, target_ref = "as_script_cache")]
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
     /// Returns the script cache.
     fn as_script_cache(
         &self,

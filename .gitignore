@@ -141,3 +141,9 @@ genesis_antithesis_*/
 
 # ignore cursor rules
 .cursor/rules
+
+#ignore proptest regressions
+**/proptest_regressions/*
+
+# Ignore generated credentials from google-github-actions/auth
+gha-creds-*.json

@@ -16,7 +16,7 @@ use anyhow::{Context, Result};
 use aptos_logger::info;
 use aptos_sdk::{
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey},
-    rest_client::Client,
+    rest_client::{AptosBaseUrl, Client},
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
@@ -28,7 +28,7 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{str::FromStr, time::Duration};
+use std::{collections::HashMap, str::FromStr, time::Duration};
 use tokio::sync::RwLock;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -63,6 +63,8 @@ impl TransferFunderConfig {
             faucet_account,
             self.api_connection_config.chain_id,
             self.api_connection_config.node_url.clone(),
+            self.api_connection_config.api_key.clone(),
+            self.api_connection_config.additional_headers.clone(),
             self.minimum_funds,
             self.amount_to_fund,
             self.transaction_submission_config
@@ -87,6 +89,8 @@ pub struct TransferFunder {
 
     /// URL of an Aptos node API.
     node_url: Url,
+    node_api_key: Option<String>,
+    node_additional_headers: Option<HashMap<String, String>>,
 
     /// The minimum amount of funds the Funder should have to operate.
     minimum_funds: MinimumFunds,
@@ -117,6 +121,8 @@ impl TransferFunder {
         faucet_account: LocalAccount,
         chain_id: ChainId,
         node_url: Url,
+        node_api_key: Option<String>,
+        node_additional_headers: Option<HashMap<String, String>>,
         minimum_funds: MinimumFunds,
         amount_to_fund: AmountToFund,
         gas_unit_price_ttl_secs: Duration,
@@ -135,6 +141,8 @@ impl TransferFunder {
                 .with_max_gas_amount(max_gas_amount)
                 .with_transaction_expiration_time(transaction_expiration_secs),
             node_url,
+            node_api_key,
+            node_additional_headers,
             minimum_funds,
             amount_to_fund,
             gas_unit_price_manager,
@@ -149,7 +157,19 @@ impl TransferFunder {
     /// the entire time because it uses cookies, ensuring we're talking to the same
     /// node behind the LB every time.
     pub fn get_api_client(&self) -> Client {
-        Client::new(self.node_url.clone())
+        let mut builder = Client::builder(AptosBaseUrl::Custom(self.node_url.clone()));
+
+        if let Some(api_key) = self.node_api_key.clone() {
+            builder = builder.api_key(&api_key).expect("Failed to set API key");
+        }
+
+        if let Some(additional_headers) = &self.node_additional_headers {
+            for (key, value) in additional_headers {
+                builder = builder.header(key, value).expect("Failed to set header");
+            }
+        }
+
+        builder.build()
     }
 
     async fn get_gas_unit_price(&self) -> Result<u64, AptosTapError> {

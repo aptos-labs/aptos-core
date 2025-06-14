@@ -11,13 +11,14 @@ use collectors::{
 };
 use once_cell::sync::Lazy;
 use prometheus::core::Collector;
+use std::collections::BTreeMap;
 
 mod collectors;
 
 static IS_REGISTERED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
 
 /// Registers the node metrics collector with the default registry.
-pub fn register_node_metrics_collector() {
+pub fn register_node_metrics_collector(maybe_build_info: Option<&BTreeMap<String, String>>) {
     let mut registered = IS_REGISTERED.lock();
     if *registered {
         return;
@@ -31,7 +32,7 @@ pub fn register_node_metrics_collector() {
     register_collector(Box::<NetworkMetricsCollector>::default());
     register_collector(Box::<LoadAvgCollector>::default());
     register_collector(Box::<ProcessMetricsCollector>::default());
-    register_collector(Box::<BasicNodeInfoCollector>::default());
+    register_collector(Box::new(BasicNodeInfoCollector::new(maybe_build_info)));
     cfg_if! {
         if #[cfg(all(target_os="linux"))] {
             register_collector(Box::<collectors::LinuxCpuMetricsCollector>::default());

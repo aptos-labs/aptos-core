@@ -21,7 +21,7 @@ aptos-vm-environment = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"] }
 base64 = { workspace = true }
 bcs = { workspace = true }
-libfuzzer-sys = "0.4"
+libfuzzer-sys = "0.4.9"
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
@@ -93,5 +93,11 @@ doc = false
 [[bin]]
 name = "move_bytecode_verifier_compiled_modules"
 path = "fuzz_targets/move/bytecode_verifier_compiled_modules.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "type_tag_to_string"
+path = "fuzz_targets/move/type_tag_to_string.rs"
 test = false
 doc = false

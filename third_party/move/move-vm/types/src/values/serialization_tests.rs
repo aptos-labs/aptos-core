@@ -16,9 +16,7 @@ mod tests {
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{
-            ClosureMask, MoveClosure, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-        },
+        function::{ClosureMask, MoveClosure, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
         identifier::Identifier,
         language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
         u256,
@@ -208,12 +206,7 @@ mod tests {
     // Closures
 
     fn make_fun_layout() -> MoveTypeLayout {
-        // Currently, content of layout doesn't influence parsing, so can set anything here
-        MoveTypeLayout::Function(MoveFunctionLayout(
-            vec![],
-            vec![],
-            AbilitySet::PUBLIC_FUNCTIONS,
-        ))
+        MoveTypeLayout::Function
     }
 
     fn make_type_args() -> Vec<TypeTag> {
@@ -389,7 +382,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn to_stable_string(&self) -> String {
+        fn to_canonical_string(&self) -> String {
             // Needed for assertion failure printing
             "<some function>".to_string()
         }

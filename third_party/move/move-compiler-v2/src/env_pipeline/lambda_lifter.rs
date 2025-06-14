@@ -49,8 +49,10 @@ use move_model::{
     model::{FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known,
 };
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, BTreeSet},
     mem,
 };
@@ -100,7 +102,21 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 new_funs.append(&mut lifter.lifted);
                 updated_funs.insert(fun.get_id(), new_def);
             }
+            // Lift lambda in function level specs
+            // TODO(#16256): add support for module level specs and spec funs
+            let mut spec_mut_ref = fun.get_mut_spec();
+            let fun_spec = spec_mut_ref.borrow_mut();
+            for cond in &mut fun_spec.conditions {
+                for expr in cond.all_exps_mut() {
+                    let new_def = lifter.rewrite_exp(expr.clone());
+                    if expr != &new_def {
+                        *expr = new_def;
+                    }
+                }
+            }
+            new_funs.append(&mut lifter.lifted);
         }
+
         // Now that we have processed all functions and released
         // all references to the env, mutate it.
         for (fun_id, new_def) in updated_funs {
@@ -347,6 +363,17 @@ impl<'a> LambdaLifter<'a> {
                         None
                     },
                     Operation::MoveFunction(mid, fid) => {
+                        let env = self.fun_env.env();
+                        let qualified_fun_id = mid.qualified(*fid);
+                        let move_fun_env = env.get_function(qualified_fun_id);
+                        if move_fun_env.module_env.is_std_vector()
+                            && well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS
+                                .contains(&move_fun_env.get_name_str().as_str())
+                        {
+                            // Do not curry std::vector functions that are bytecode instructions
+                            return None;
+                        }
+
                         let lambda_bound = lambda_params
                             .iter()
                             .map(|Parameter(name, ..)| *name)
@@ -376,9 +403,12 @@ impl<'a> LambdaLifter<'a> {
                                 return None;
                             }
                         }
+                        // We must have curried all arguments to the lambda
+                        if lambda_param_pos < lambda_params.len() {
+                            return None;
+                        }
                         // Create a new node id. We inherit location and type from the lambda,
                         // but instantiation is taken from the call of the curried function.
-                        let env = self.fun_env.module_env.env;
                         let curry_id = env.new_node(env.get_node_loc(id), env.get_node_type(id));
                         if let Some(inst) = env.get_node_instantiation_opt(*call_id) {
                             env.set_node_instantiation(curry_id, inst)
@@ -434,7 +464,7 @@ impl<'a> LambdaLifter<'a> {
     }
 }
 
-impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
+impl ExpRewriterFunctions for LambdaLifter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Intercept descent and compute lambdas being exempted from lifting, currently
         // those passed as parameters to inline functions.
@@ -631,6 +661,16 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             if let RewriteTarget::Temporary(temp) = target {
                 let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
                 return Some(ExpData::Temporary(id, new_temp).into_exp());
+            }
+            None
+        };
+        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
+        let fun_id = FunId::new(fun_name);
+        // Spec rewriter needs to map parameters to temporary indices in the spec
+        let mut spec_replacer = |id: NodeId, target: RewriteTarget| {
+            if let RewriteTarget::Temporary(temp) = target {
+                let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
+                return Some(ExpData::Temporary(id, new_temp).into_exp());
             } else if let RewriteTarget::LocalVar(sym) = target {
                 for (i, par) in params.iter().enumerate() {
                     if sym == par.0 {
@@ -640,12 +680,10 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             }
             None
         };
-        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
-        let fun_id = FunId::new(fun_name);
         let spec = if let Some(spec_exp) = spec_opt {
             if let ExpData::SpecBlock(_, _) = spec_exp.as_ref() {
                 let new_spec_exp =
-                    ExpRewriter::new(env, &mut replacer).rewrite_exp(spec_exp.clone());
+                    ExpRewriter::new(env, &mut spec_replacer).rewrite_exp(spec_exp.clone());
                 if let ExpData::SpecBlock(_, new_spec) = new_spec_exp.as_ref() {
                     Some(new_spec.clone())
                 } else {

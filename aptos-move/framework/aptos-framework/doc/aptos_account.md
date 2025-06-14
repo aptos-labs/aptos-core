@@ -1200,7 +1200,6 @@ Check if the AptosCoin under the address existed.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(addr);
 </code></pre>
 
 

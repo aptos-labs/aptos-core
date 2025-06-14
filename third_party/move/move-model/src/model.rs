@@ -2044,6 +2044,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2109,6 +2110,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 
@@ -3131,7 +3133,8 @@ impl<'env> ModuleEnv<'env> {
             return deps;
         }
         for fun_env in self.get_functions() {
-            for used_fun in fun_env.get_used_functions().expect("used functions") {
+            // We need to traverse transitive inline functions because they will be expanded during inlining.
+            for used_fun in fun_env.get_used_functions_with_transitive_inline() {
                 let used_mod_id = used_fun.module_id;
                 if self.get_id() == used_mod_id {
                     // no need to friend self
@@ -3599,6 +3602,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_table(&self) -> bool {
         self.is_module_in_std("table")
             || self.is_module_in_std("table_with_length")
+            || self.is_module_in_std("smart_table")
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
     }
@@ -4044,7 +4048,7 @@ pub struct FieldEnv<'env> {
     data: &'env FieldData,
 }
 
-impl<'env> FieldEnv<'env> {
+impl FieldEnv<'_> {
     /// Gets the name of this field.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4149,7 +4153,7 @@ pub struct NamedConstantEnv<'env> {
     data: &'env NamedConstantData,
 }
 
-impl<'env> NamedConstantEnv<'env> {
+impl NamedConstantEnv<'_> {
     /// Returns the name of this constant
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4393,6 +4397,9 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the used functions.
     pub(crate) transitive_closure_of_used_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used functions including ones obtained by transitively traversing used inline functions.
+    pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 impl FunctionData {
@@ -4420,6 +4427,7 @@ impl FunctionData {
             used_funs: None,
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 }
@@ -4518,7 +4526,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.loc.id_loc.clone()
     }
 
-    /// Returns the location of the function identifier.
+    /// Returns the location of the function's return type.
     pub fn get_result_type_loc(&self) -> Loc {
         self.data.loc.result_type_loc.clone()
     }
@@ -4964,12 +4972,12 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns associated specification.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.data.spec.borrow()
     }
 
     /// Returns associated mutable reference to specification.
-    pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
+    pub fn get_mut_spec(&'env self) -> RefMut<'env, Spec> {
         self.data.spec.borrow_mut()
     }
 
@@ -5099,6 +5107,29 @@ impl<'env> FunctionEnv<'env> {
             }
         }
         *self.data.transitive_closure_of_used_funs.borrow_mut() = Some(set.clone());
+        set
+    }
+
+    /// Get used functions including ones obtained by transitively traversing used inline functions
+    pub fn get_used_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
+        if let Some(trans_used) = &*self.data.used_functions_with_transitive_inline.borrow() {
+            return trans_used.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) && f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
         set
     }
 
@@ -5294,7 +5325,7 @@ impl Loc {
     }
 }
 
-impl<'env> fmt::Display for LocDisplay<'env> {
+impl fmt::Display for LocDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
             match &self.mode {
@@ -5361,7 +5392,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5370,7 +5401,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedInstId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedInstId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5390,13 +5421,13 @@ where
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+impl fmt::Display for EnvDisplay<'_, Symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Parameter> {
+impl fmt::Display for EnvDisplay<'_, Parameter> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let p = self.val;
         write!(

@@ -1,4 +1,28 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    private fun const_addr(): address {
+        0x1234
+    }
+    private fun const_addr_let(): address {
+        {
+          let x: address = 0x1234;
+          x
+        }
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    fun const_addr(): address {
+        0x1234
+    }
+    fun const_addr_let(): address {
+        let x = 0x1234;
+        x
+    }
+}
+
+// -- Model dump before second bytecode pipeline
 module 0x8675309::M {
     private fun const_addr(): address {
         0x1234
@@ -7,16 +31,6 @@ module 0x8675309::M {
         0x1234
     }
 } // end 0x8675309::M
-
-// -- Sourcified model before bytecode pipeline
-module 0x8675309::M {
-    fun const_addr(): address {
-        0x1234
-    }
-    fun const_addr_let(): address {
-        0x1234
-    }
-}
 
 
 ============ bytecode verification succeeded ========

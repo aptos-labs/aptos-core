@@ -16,7 +16,10 @@ use crate::consensus_observer::{
     observer::{subscription::ConsensusObserverSubscription, subscription_utils},
     publisher::consensus_publisher::ConsensusPublisher,
 };
-use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::ConsensusObserverConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
@@ -24,6 +27,7 @@ use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
+use strum::IntoEnumIterator;
 use tokio::task::JoinHandle;
 
 /// The manager for consensus observer subscriptions
@@ -407,6 +411,12 @@ fn update_subscription_change_metrics(
 
 /// Updates the total subscription metrics (grouped by network ID)
 fn update_total_subscription_metrics(active_subscription_peers: &[PeerNetworkId]) {
+    // Reset the total subscription metrics for all network IDs
+    for network_id in NetworkId::iter() {
+        metrics::set_gauge(&metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS, &network_id, 0);
+    }
+
+    // Update the total subscription metrics for all connected network IDs
     for (network_id, active_subscription_peers) in &active_subscription_peers
         .iter()
         .chunk_by(|peer_network_id| peer_network_id.network_id())

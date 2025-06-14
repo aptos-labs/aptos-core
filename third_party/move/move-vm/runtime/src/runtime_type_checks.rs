@@ -2,25 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, LoadedFunction,
-    ModuleStorage,
+    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
+    reentrancy_checker::CallType, LoadedFunction,
 };
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
-    vm_status::StatusCode,
+    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::{
-    gas::UnmeteredGasMeter,
-    loaded_data::runtime_types::{Type, TypeBuilder},
-};
+use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
     fn pre_execution_type_stack_transition(
         frame: &Frame,
-        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -29,7 +25,6 @@ pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform after instruction execution.
     fn post_execution_type_stack_transition(
         frame: &Frame,
-        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -40,6 +35,57 @@ pub(crate) trait RuntimeTypeCheck {
 
     /// For any other checks are performed externally
     fn should_perform_checks() -> bool;
+
+    /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
+    /// including native dynamic dispatch or calling a closure.
+    fn check_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+        call_type: CallType,
+    ) -> PartialVMResult<()> {
+        match call_type {
+            CallType::Regular => {
+                // We only need to check cross-contract calls.
+                if caller.module_id() == callee.module_id() {
+                    return Ok(());
+                }
+                Self::check_cross_module_regular_call_visibility(caller, callee)
+            },
+            CallType::ClosureDynamicDispatch => {
+                // In difference to regular calls, we skip visibility check. It is possible to call
+                // a private function of another module via a closure.
+                Ok(())
+            },
+            CallType::NativeDynamicDispatch => {
+                // Dynamic dispatch may fail at runtime and this is ok. Hence, these errors are not
+                // invariant violations as they cannot be checked at compile- or load-time.
+                //
+                // Note: native dispatch cannot call into the same module, otherwise the reentrancy
+                // check is broken. For more details, see AIP-73:
+                //   https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-73.md
+                if callee.is_friend_or_private() || callee.module_id() == caller.module_id() {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message(
+                            "Invoking private or friend function during dispatch".to_string(),
+                        ));
+                }
+
+                if callee.is_native() {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message("Invoking native function during dispatch".to_string()));
+                }
+                Ok(())
+            },
+        }
+    }
+
+    /// Performs a runtime check of the caller is allowed to call a cross-module callee. Applies
+    /// only on regular static calls (no dynamic dispatch!), with caller and callee being coming
+    /// from different modules.
+    fn check_cross_module_regular_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+    ) -> PartialVMResult<()>;
 }
 
 fn verify_pack<'a>(
@@ -157,7 +203,6 @@ pub(crate) struct FullRuntimeTypeCheck;
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         _frame: &Frame,
-        _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
         _instruction: &Bytecode,
         _ty_cache: &mut FrameTypeCache,
@@ -167,7 +212,6 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
 
     fn post_execution_type_stack_transition(
         _frame: &Frame,
-        _module_storage: &impl ModuleStorage,
         _operand_stack: &mut Stack,
         _instruction: &Bytecode,
         _ty_cache: &mut FrameTypeCache,
@@ -183,6 +227,13 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn should_perform_checks() -> bool {
         false
     }
+
+    fn check_cross_module_regular_call_visibility(
+        _caller: &LoadedFunction,
+        _callee: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
 }
 
 impl RuntimeTypeCheck for FullRuntimeTypeCheck {
@@ -190,7 +241,6 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
     fn pre_execution_type_stack_transition(
         frame: &Frame,
-        _module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -322,7 +372,6 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// mode.
     fn post_execution_type_stack_transition(
         frame: &Frame,
-        module_storage: &impl ModuleStorage,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
@@ -455,25 +504,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::PackClosure(fh_idx, mask) => {
-                let function = frame.build_loaded_function_from_handle_and_ty_args(
-                    module_storage,
-                    *fh_idx,
-                    vec![],
-                )?;
-                verify_pack_closure(ty_builder, operand_stack, &function, *mask)?;
-            },
-            Bytecode::PackClosureGeneric(fh_idx, mask) => {
-                let ty_args = frame.instantiate_generic_function(
-                    Option::<&mut UnmeteredGasMeter>::None, // don't charge for paranoid mode
-                    *fh_idx,
-                )?;
-                let function = frame.build_loaded_function_from_instantiation_and_ty_args(
-                    module_storage,
-                    *fh_idx,
-                    ty_args,
-                )?;
-                verify_pack_closure(ty_builder, operand_stack, &function, *mask)?;
+            Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
+                // Skip: runtime checks are implemented in interpreter loop!
             },
 
             Bytecode::Pack(idx) => {
@@ -812,5 +844,43 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     #[inline(always)]
     fn should_perform_checks() -> bool {
         true
+    }
+
+    fn check_cross_module_regular_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        if callee.is_private() {
+            let msg = format!(
+                "Function {}::{} cannot be called because it is private",
+                callee.module_or_script_id(),
+                callee.name()
+            );
+            return Err(
+                PartialVMError::new_invariant_violation(msg).with_sub_status(EPARANOID_FAILURE)
+            );
+        }
+
+        if callee.is_friend() {
+            let callee_module = callee.owner_as_module().map_err(|err| err.to_partial())?;
+            if !caller
+                .module_id()
+                .is_some_and(|id| callee_module.friends.contains(id))
+            {
+                let msg = format!(
+                    "Function {}::{} cannot be called because it has friend visibility, but {} \
+                     is not {}'s friend",
+                    callee.module_or_script_id(),
+                    callee.name(),
+                    caller.module_or_script_id(),
+                    callee.module_or_script_id()
+                );
+                return Err(
+                    PartialVMError::new_invariant_violation(msg).with_sub_status(EPARANOID_FAILURE)
+                );
+            }
+        }
+
+        Ok(())
     }
 }

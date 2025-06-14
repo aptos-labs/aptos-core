@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     spec {
       invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), m::$exec<address, bool>(|a: address| Lt(select m::S.f<0x42::m::S>({
@@ -14,7 +14,7 @@ module 0x42::m {
       invariant m::$exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
     }
 
-    private fun exec<T,R>(f: |T|R with copy+drop,x: T): R {
+    private fun exec<T,R>(f: |T|R has copy + drop,x: T): R {
         {
           let r: R = (f)(x);
           spec {
@@ -35,7 +35,8 @@ module 0x42::m {
         Add<u64>(x, 1)
     }
     spec {
-      ensures Eq<u64>(result0(), m::$exec<num, num>(|x: num| Add(x, 1), $t0));
+      ensures Eq<u64>(result0(), m::$exec<num, num>(closure#0m::__lambda__1__function_spec_block(), $t0));
+      ensures Eq<u64>(result0(), m::$exec<num, num>(closure#0m::__lambda__2__function_spec_block(), $t0));
     }
 
     private inline fun get<R>(a: address): &R {
@@ -44,7 +45,13 @@ module 0x42::m {
     private fun __lambda__1__function_code_spec_block(y: num): bool {
         Gt(y, 0)
     }
-    spec fun $exec<T,R>(f: |#0|#1 with copy+drop,x: #0): #1 {
+    private fun __lambda__1__function_spec_block(x: num): num {
+        Add(x, 1)
+    }
+    private fun __lambda__2__function_spec_block(x: num): num {
+        Add(x, 1)
+    }
+    spec fun $exec<T,R>(f: |#0|#1 has copy + drop,x: #0): #1 {
         {
           let r: #1 = (f)(x);
           r
@@ -53,9 +60,15 @@ module 0x42::m {
     spec fun $__lambda__1__function_code_spec_block(y: num): bool {
         Gt(y, 0)
     }
+    spec fun $__lambda__1__function_spec_block(x: num): num {
+        Add(x, 1)
+    }
+    spec fun $__lambda__2__function_spec_block(x: num): num {
+        Add(x, 1)
+    }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     struct S has copy, drop, key {
         f: u64,
@@ -66,7 +79,7 @@ module 0x42::m {
     }
 
     */
-    fun exec<T: copy + drop, R>(f: |T|R with copy+drop, x: T): R {
+    fun exec<T: copy + drop, R>(f: |T|R has copy + drop, x: T): R {
         let r = f(x);
 
         /* spec {
@@ -93,5 +106,11 @@ module 0x42::m {
     }
     fun __lambda__1__function_code_spec_block(y: num): bool {
         y > 0u256
+    }
+    fun __lambda__1__function_spec_block(x: num): num {
+        x + 1u256
+    }
+    fun __lambda__2__function_spec_block(x: num): num {
+        x + 1u256
     }
 }

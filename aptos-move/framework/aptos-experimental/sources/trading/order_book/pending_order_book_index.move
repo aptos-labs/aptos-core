@@ -3,7 +3,12 @@ module aptos_experimental::pending_order_book_index {
     use std::vector;
     use aptos_framework::timestamp;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_experimental::order_book_types::{OrderIdType, UniqueIdxType, TriggerCondition, new_default_big_ordered_map};
+    use aptos_experimental::order_book_types::{
+        OrderIdType,
+        UniqueIdxType,
+        TriggerCondition,
+        new_default_big_ordered_map
+    };
 
     friend aptos_experimental::order_book;
 
@@ -28,9 +33,11 @@ module aptos_experimental::pending_order_book_index {
         PendingOrderBookIndex::V1 {
             price_move_up_index: new_default_big_ordered_map(),
             price_move_down_index: new_default_big_ordered_map(),
-            time_based_index: new_default_big_ordered_map(),
+            time_based_index: new_default_big_ordered_map()
         }
     }
+
+
 
     public(friend) fun cancel_pending_order(
         self: &mut PendingOrderBookIndex,
@@ -136,6 +143,20 @@ module aptos_experimental::pending_order_book_index {
     }
 
     #[test_only]
+    public(friend) fun destroy_pending_order_book_index(
+        self: PendingOrderBookIndex
+    ) {
+        let PendingOrderBookIndex::V1 {
+            price_move_up_index,
+            price_move_down_index,
+            time_based_index
+        } = self;
+        price_move_up_index.destroy(|_v| {});
+        price_move_down_index.destroy(|_v| {});
+        time_based_index.destroy(|_v| {});
+    }
+
+    #[test_only]
     public(friend) fun get_price_move_down_index(
         self: &PendingOrderBookIndex
     ): &BigOrderedMap<PendingOrderKey, OrderIdType> {
@@ -156,17 +177,5 @@ module aptos_experimental::pending_order_book_index {
         &self.time_based_index
     }
 
-    #[test_only]
-    public(friend) fun destroy_pending_order_book_index(
-        self: PendingOrderBookIndex
-    ) {
-        let PendingOrderBookIndex::V1 {
-            price_move_up_index,
-            price_move_down_index,
-            time_based_index
-        } = self;
-        price_move_up_index.destroy(|_v| {});
-        price_move_down_index.destroy(|_v| {});
-        time_based_index.destroy(|_v| {});
-    }
+
 }

@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: inline function cannot be used as a function value
+  ┌─ tests/bytecode-generator/bug_16678.move:7:10
+  │
+7 │         (function1)();
+  │          ^^^^^^^^^
+
+error: inline function cannot be used as a function value
+   ┌─ tests/bytecode-generator/bug_16678.move:19:17
+   │
+19 │         let f = foo;
+   │                 ^^^

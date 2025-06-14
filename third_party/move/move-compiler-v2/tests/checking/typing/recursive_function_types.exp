@@ -1,0 +1,199 @@
+
+Diagnostics:
+error: cyclic data
+  ┌─ tests/checking/typing/recursive_function_types.move:2:5
+  │
+2 │     struct S(|S|) has copy, drop;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │              │
+  │              invalid field `0` of `S` containing `S` itself
+
+error: cyclic data
+  ┌─ tests/checking/typing/recursive_function_types.move:6:5
+  │
+6 │     struct S1(|S2|) has copy, drop;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = field `0` of `S1` contains `S2`
+  = field `0` of `S2` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:11:5
+   │
+11 │     struct S1(|S2|) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `0` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:17:5
+   │
+17 │     struct S1(|S2|) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `0` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S4`
+   = field `0` of `S4` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:24:5
+   │
+24 │     struct S1(||S1) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │               │
+   │               invalid field `0` of `S1` containing `S1` itself
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:28:5
+   │
+28 │     struct S(||S) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │              │
+   │              invalid field `0` of `S` containing `S` itself
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:32:5
+   │
+32 │     struct S1(|S2|) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `0` of `S1` contains `S2`
+   = field `0` of `S2` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:37:5
+   │
+37 │     struct S1(|S2|) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `0` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:43:5
+   │
+43 │     struct S1(|S2|) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `0` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S4`
+   = field `0` of `S4` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:51:5
+   │
+51 │     struct S1(|S2|) has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `0` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S4`
+   = field `0` of `S4` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:58:5
+   │
+58 │     struct S1  { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:63:5
+   │
+63 │     struct S1  { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:69:5
+   │
+69 │     struct S1  { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S4`
+   = field `0` of `S4` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:76:5
+   │
+76 │     struct S1  { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:81:5
+   │
+81 │     struct S1  { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:87:5
+   │
+87 │     struct S1  { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `S3`
+   = field `0` of `S3` contains `S4`
+   = field `0` of `S4` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_function_types.move:94:5
+   │
+94 │     struct S1 { x: u64, y: u64, f : S2 } has copy, drop;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `0` of `S2` contains `E`
+   = field `s` of `E` contains `S1`, which forms a cycle.
+
+error: cyclic data
+    ┌─ tests/checking/typing/recursive_function_types.move:103:5
+    │
+103 │     struct S1 { x: u64, y: u64, f : S2 } has copy, drop;
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = field `f` of `S1` contains `S2`
+    = field `0` of `S2` contains `E`
+    = field `s` of `E` contains `S1`, which forms a cycle.
+
+error: cyclic data
+    ┌─ tests/checking/typing/recursive_function_types.move:112:5
+    │
+112 │     struct S1 { x: u64, y: u64, f : S2 } has copy, drop;
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = field `f` of `S1` contains `S2`
+    = field `0` of `S2` contains `S3`
+    = field `0` of `S3` contains `E`
+    = field `s` of `E` contains `S1`, which forms a cycle.
+
+error: cyclic data
+    ┌─ tests/checking/typing/recursive_function_types.move:122:5
+    │
+122 │     struct S1 { x: u64, y: u64, f : S2 } has copy, drop;
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = field `f` of `S1` contains `S2`
+    = field `0` of `S2` contains `S3`
+    = field `0` of `S3` contains `S4`
+    = field `0` of `S4` contains `E`
+    = field `s` of `E` contains `S1`, which forms a cycle.

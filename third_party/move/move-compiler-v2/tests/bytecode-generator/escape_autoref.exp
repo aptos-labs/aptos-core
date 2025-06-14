@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::m {
     struct Object {
         inner: address,
@@ -27,7 +27,7 @@ module 0x42::m {
     }
 } // end 0x42::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     struct Object has copy, drop {
         inner: address,
@@ -54,7 +54,97 @@ module 0x42::m {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::make(): 0x42::m::Object {
+     var $t0: 0x42::m::Object
+     var $t1: u64
+  0: $t1 := 0
+  1: abort($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun m::owner_correct($t0: 0x42::m::Object): address {
+     var $t1: address
+     var $t2: address
+     var $t3: &0x42::m::Object
+     var $t4: &address
+     var $t5: &0x42::m::ObjectCore
+     var $t6: &address
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_field<0x42::m::Object>.inner($t3)
+  2: $t2 := read_ref($t4)
+  3: $t5 := borrow_global<0x42::m::ObjectCore>($t2)
+  4: $t6 := borrow_field<0x42::m::ObjectCore>.owner($t5)
+  5: $t1 := read_ref($t6)
+  6: return $t1
+}
+
+
+[variant baseline]
+fun m::owner_read_ref_missing($t0: 0x42::m::Object): address {
+     var $t1: address
+     var $t2: &0x42::m::ObjectCore
+     var $t3: address
+     var $t4: &0x42::m::Object
+     var $t5: &address
+     var $t6: &address
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0x42::m::Object>.inner($t4)
+  2: $t3 := read_ref($t5)
+  3: $t2 := borrow_global<0x42::m::ObjectCore>($t3)
+  4: $t6 := borrow_field<0x42::m::ObjectCore>.owner($t2)
+  5: $t1 := read_ref($t6)
+  6: return $t1
+}
+
+
+[variant baseline]
+fun m::will_autoref(): address {
+     var $t0: address
+     var $t1: 0x42::m::Object
+     var $t2: &0x42::m::Object
+     var $t3: &address
+  0: $t1 := m::make()
+  1: $t2 := borrow_local($t1)
+  2: $t3 := borrow_field<0x42::m::Object>.inner($t2)
+  3: $t0 := read_ref($t3)
+  4: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::m {
+    struct Object {
+        inner: address,
+    }
+    struct ObjectCore {
+        owner: address,
+    }
+    private fun make(): Object {
+        Abort(0)
+    }
+    private fun owner_correct(o: Object): address
+        acquires ObjectCore(*)
+     {
+        {
+          let addr: address = select m::Object.inner<Object>(o);
+          select m::ObjectCore.owner<&ObjectCore>(BorrowGlobal(Immutable)<ObjectCore>(addr))
+        }
+    }
+    private fun owner_read_ref_missing(o: Object): address
+        acquires ObjectCore(*)
+     {
+        select m::ObjectCore.owner<&ObjectCore>(BorrowGlobal(Immutable)<ObjectCore>(select m::Object.inner<Object>(o)))
+    }
+    private fun will_autoref(): address {
+        select m::Object.inner<Object>(m::make())
+    }
+} // end 0x42::m
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::make(): 0x42::m::Object {

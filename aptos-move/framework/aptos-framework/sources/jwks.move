@@ -318,7 +318,7 @@ module aptos_framework::jwks {
         system_addresses::assert_aptos_framework(fx);
 
         let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            config_buffer::extract<SupportedOIDCProviders>()
+            config_buffer::extract_v2<SupportedOIDCProviders>()
         } else {
             *borrow_global<SupportedOIDCProviders>(@aptos_framework)
         };
@@ -353,7 +353,7 @@ module aptos_framework::jwks {
         system_addresses::assert_aptos_framework(fx);
 
         let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            config_buffer::extract<SupportedOIDCProviders>()
+            config_buffer::extract_v2<SupportedOIDCProviders>()
         } else {
             *borrow_global<SupportedOIDCProviders>(@aptos_framework)
         };
@@ -366,7 +366,7 @@ module aptos_framework::jwks {
     public(friend) fun on_new_epoch(framework: &signer) acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            let new_config = config_buffer::extract<SupportedOIDCProviders>();
+            let new_config = config_buffer::extract_v2<SupportedOIDCProviders>();
             if (exists<SupportedOIDCProviders>(@aptos_framework)) {
                 *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = new_config;
             } else {
@@ -478,9 +478,9 @@ module aptos_framework::jwks {
                 assert!(cur_issuer_jwks.version + 1 == proposed_provider_jwks.version, error::invalid_argument(EUNEXPECTED_VERSION));
                 vector::for_each(proposed_provider_jwks.jwks, |jwk|{
                     let variant_type_name = *string::bytes(copyable_any::type_name(&jwk.variant));
-                    let is_delete = if (variant_type_name == b"0x1::jwks::RSA_JWK") {
-                        let rsa_jwk = copyable_any::unpack<RSA_JWK>(jwk.variant);
-                        *string::bytes(&rsa_jwk.n) == DELETE_COMMAND_INDICATOR
+                    let is_delete = if (variant_type_name == b"0x1::jwks::UnsupportedJWK") {
+                        let repr = copyable_any::unpack<UnsupportedJWK>(jwk.variant);
+                        &repr.payload == &DELETE_COMMAND_INDICATOR
                     } else {
                         false
                     };
@@ -831,11 +831,9 @@ module aptos_framework::jwks {
         assert!(expected == borrow_global<PatchedJWKs>(@aptos_framework).jwks, 999);
 
         // Delete a key.
-        let delete_command = new_rsa_jwk(
-            utf8(b"kid123"),
-            utf8(b"RS256"),
-            utf8(b"AQAB"),
-            utf8(DELETE_COMMAND_INDICATOR),
+        let delete_command = new_unsupported_jwk(
+            b"kid123",
+            DELETE_COMMAND_INDICATOR,
         );
         let key_level_update_1 = ProviderJWKs {
             issuer: b"alice",
@@ -965,13 +963,20 @@ module aptos_framework::jwks {
     #[test(aptos_framework = @aptos_framework)]
     fun test_patched_jwks(aptos_framework: signer) acquires ObservedJWKs, PatchedJWKs, Patches {
         initialize_for_test(&aptos_framework);
+
+        features::change_feature_flags_for_testing(
+            &aptos_framework,
+            vector[],
+            vector[features::get_jwk_consensus_per_key_mode_feature()]
+        );
+
         let jwk_0 = new_unsupported_jwk(b"key_id_0", b"key_payload_0");
         let jwk_1 = new_unsupported_jwk(b"key_id_1", b"key_payload_1");
         let jwk_2 = new_unsupported_jwk(b"key_id_2", b"key_payload_2");
         let jwk_3 = new_unsupported_jwk(b"key_id_3", b"key_payload_3");
         let jwk_3b = new_unsupported_jwk(b"key_id_3", b"key_payload_3b");
 
-        // Fake observation from validators.
+        // Insert fake observation in per-issuer mode.
         upsert_into_observed_jwks(&aptos_framework, vector [
             ProviderJWKs {
                 issuer: b"alice",
