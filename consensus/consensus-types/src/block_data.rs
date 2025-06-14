@@ -108,17 +108,17 @@ impl CryptoHash for BlockData {
     type Hasher = BlockDataHasher;
 
     fn hash(&self) -> HashValue {
-        #[derive(Serialize)]
-        struct OptBlockDataForHash<'a> {
-            epoch: u64,
-            round: Round,
-            timestamp_usecs: u64,
-            quorum_cert_vote_data: &'a VoteData,
-            block_type: &'a BlockType,
-        }
-
         let mut state = Self::Hasher::default();
         if self.is_opt_block() {
+            #[derive(Serialize)]
+            struct OptBlockDataForHash<'a> {
+                epoch: u64,
+                round: Round,
+                timestamp_usecs: u64,
+                quorum_cert_vote_data: &'a VoteData,
+                block_type: &'a BlockType,
+            }
+
             let opt_block_data_for_hash = OptBlockDataForHash {
                 epoch: self.epoch,
                 round: self.round,

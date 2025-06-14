@@ -314,8 +314,8 @@ impl Block {
         }
     }
 
-    pub fn new_from_opt(block_data: OptBlockData, quorum_cert: QuorumCert) -> Self {
-        let block_data = BlockData::new_from_opt(block_data, quorum_cert);
+    pub fn new_from_opt(opt_block_data: OptBlockData, quorum_cert: QuorumCert) -> Self {
+        let block_data = BlockData::new_from_opt(opt_block_data, quorum_cert);
         Block {
             id: block_data.hash(),
             block_data,

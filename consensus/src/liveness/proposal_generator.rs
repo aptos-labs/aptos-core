@@ -698,8 +698,8 @@ impl ProposalGenerator {
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
         ensure!(
-            hqc.certified_block().round() + 1 < round,
-            "[OptProposal] Given round {} is no higher than hqc round {} + 1, should generate regular proposal instead of optimistic",
+            hqc.certified_block().round() + 2 == round,
+            "[OptProposal] Given round {} is not equal to hqc round {} + 2, should generate regular proposal instead of optimistic",
             round,
             hqc.certified_block().round()
         );
