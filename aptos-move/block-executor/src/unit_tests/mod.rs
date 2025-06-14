@@ -34,7 +34,7 @@ use aptos_types::{
     },
     contract_event::TransactionEvent,
     executable::ModulePath,
-    state_store::state_value::StateValueMetadata,
+    state_store::{state_value::StateValueMetadata, MockStateView},
     write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
@@ -272,9 +272,7 @@ fn interrupt_requested() {
     let txn_provider = DefaultTxnProvider::new(transactions);
     let mut guard = AptosModuleCacheManagerGuard::none();
 
-    let data_view = DeltaDataView::<KeyType<u32>> {
-        phantom: PhantomData,
-    };
+    let data_view = MockStateView::empty();
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -284,7 +282,7 @@ fn interrupt_requested() {
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
-        DeltaDataView<KeyType<u32>>,
+        MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
@@ -306,11 +304,11 @@ fn interrupt_requested() {
 #[test]
 fn block_output_err_precedence() {
     let incarnation: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
-        vec![(KeyType::<u32>(1), true)],
+        vec![(KeyType::<u32>(1), false)],
         vec![(
             KeyType::<u32>(2),
             ValueType::from_value(vec![5], true),
-            true,
+            false,
         )],
         vec![],
         vec![],
@@ -320,9 +318,7 @@ fn block_output_err_precedence() {
     let transactions = Vec::from([txn.clone(), txn]);
     let txn_provider = DefaultTxnProvider::new(transactions);
 
-    let data_view = DeltaDataView::<KeyType<u32>> {
-        phantom: PhantomData,
-    };
+    let data_view = MockStateView::empty();
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -332,7 +328,7 @@ fn block_output_err_precedence() {
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
-        DeltaDataView<KeyType<u32>>,
+        MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
@@ -365,9 +361,7 @@ fn skip_rest_gas_limit() {
     let transactions = Vec::from([MockTransaction::SkipRest(10), MockTransaction::SkipRest(10)]);
     let txn_provider = DefaultTxnProvider::new(transactions);
 
-    let data_view = DeltaDataView::<KeyType<u32>> {
-        phantom: PhantomData,
-    };
+    let data_view = MockStateView::empty();
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -377,7 +371,7 @@ fn skip_rest_gas_limit() {
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
-        DeltaDataView<KeyType<u32>>,
+        MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
         DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
     >::new(
@@ -397,15 +391,11 @@ fn skip_rest_gas_limit() {
 }
 
 // TODO: add unit test for block gas limit!
-fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
+fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>, use_delta_data_view: bool)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    let data_view = DeltaDataView::<K> {
-        phantom: PhantomData,
-    };
-
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -415,23 +405,49 @@ where
 
     let mut guard = AptosModuleCacheManagerGuard::none();
     let txn_provider = DefaultTxnProvider::new(transactions);
-    let output = BlockExecutor::<
-        MockTransaction<K, E>,
-        MockTask<K, E>,
-        DeltaDataView<K>,
-        NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
-        _,
-    >::new(
-        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-        executor_thread_pool,
-        None,
-    )
-    .execute_transactions_parallel(
-        &txn_provider,
-        &data_view,
-        &TransactionSliceMetadata::unknown(),
-        &mut guard,
-    );
+
+    let output = if use_delta_data_view {
+        let data_view = DeltaDataView::<K> {
+            phantom: PhantomData,
+        };
+
+        BlockExecutor::<
+            MockTransaction<K, E>,
+            MockTask<K, E>,
+            DeltaDataView<K>,
+            NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
+            _,
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool,
+            None,
+        )
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        )
+    } else {
+        let data_view = MockStateView::empty();
+        BlockExecutor::<
+            MockTransaction<K, E>,
+            MockTask<K, E>,
+            MockStateView<K>,
+            NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
+            _,
+        >::new(
+            BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            executor_thread_pool,
+            None,
+        )
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        )
+    };
 
     let baseline = BaselineOutput::generate(txn_provider.get_txns(), None);
     baseline.assert_parallel_output(&output);
@@ -448,7 +464,7 @@ fn random_value(delete_value: bool) -> ValueType {
 fn empty_block() {
     // This test checks that we do not trigger asserts due to an empty block, e.g. in the
     // scheduler. Instead, parallel execution should gracefully early return empty output.
-    run_and_assert::<KeyType<[u8; 32]>, MockEvent>(vec![]);
+    run_and_assert::<KeyType<[u8; 32]>, MockEvent>(vec![], false);
 }
 
 #[test]
@@ -467,43 +483,43 @@ fn delta_counters() {
     ))];
 
     for _ in 0..50 {
-        transactions.push(MockTransaction::from_behavior(MockIncarnation::<
-            KeyType<[u8; 32]>,
-            MockEvent,
-        >::new(
-            vec![(key, false)], // reads
-            vec![],
-            vec![(key, delta_add(5, u128::MAX), None)], // deltas
-            vec![],
-            1, // gas
-        )));
+        transactions.push(
+            MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
+                vec![(key, false)], // reads
+                vec![],
+                vec![(key, delta_add(5, u128::MAX), None)], // deltas
+                vec![],
+                1, // gas
+            ))
+            .with_aggregator_v1_testing(),
+        );
     }
 
-    transactions.push(MockTransaction::from_behavior(MockIncarnation::<
-        KeyType<[u8; 32]>,
-        MockEvent,
-    >::new(
-        vec![],
-        vec![(key, random_value(false), false)], // writes
-        vec![],
-        vec![],
-        1, // gas
-    )));
+    transactions.push(
+        MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
+            vec![],
+            vec![(key, random_value(false), false)], // writes
+            vec![],
+            vec![],
+            1, // gas
+        ))
+        .with_aggregator_v1_testing(),
+    );
 
     for _ in 0..50 {
-        transactions.push(MockTransaction::from_behavior(MockIncarnation::<
-            KeyType<[u8; 32]>,
-            MockEvent,
-        >::new(
-            vec![(key, false)], // reads
-            vec![],
-            vec![(key, delta_sub(2, u128::MAX), None)], // deltas
-            vec![],
-            1, // gas
-        )));
+        transactions.push(
+            MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, MockEvent>::new(
+                vec![(key, false)], // reads
+                vec![],
+                vec![(key, delta_sub(2, u128::MAX), None)], // deltas
+                vec![],
+                1, // gas
+            ))
+            .with_aggregator_v1_testing(),
+        );
     }
 
-    run_and_assert(transactions)
+    run_and_assert(transactions, true)
 }
 
 #[test]
@@ -541,11 +557,12 @@ fn delta_chains() {
                     .collect(), // deltas
                 vec![],
                 1, // gas
-            )),
+            ))
+            .with_aggregator_v1_testing(),
         );
     }
 
-    run_and_assert(transactions)
+    run_and_assert(transactions, true)
 }
 
 const TOTAL_KEY_NUM: u64 = 50;
@@ -563,15 +580,15 @@ fn cycle_transactions() {
                 KeyType<[u8; 32]>,
                 MockEvent,
             >::new(
-                vec![(KeyType(key), true)],                      // reads
-                vec![(KeyType(key), random_value(false), true)], // writes
+                vec![(KeyType(key), false)],                      // reads
+                vec![(KeyType(key), random_value(false), false)], // writes
                 vec![],
                 vec![],
                 1, // gas
             )));
         }
     }
-    run_and_assert(transactions)
+    run_and_assert(transactions, false)
 }
 
 const NUM_BLOCKS: u64 = 10;
@@ -589,8 +606,8 @@ fn one_reads_all_barrier() {
                 KeyType<[u8; 32]>,
                 MockEvent,
             >::new(
-                vec![(*key, true)],                      // reads
-                vec![(*key, random_value(false), true)], // writes
+                vec![(*key, false)],                      // reads
+                vec![(*key, random_value(false), false)], // writes
                 vec![],
                 vec![],
                 1, // gas
@@ -601,14 +618,14 @@ fn one_reads_all_barrier() {
             KeyType<[u8; 32]>,
             MockEvent,
         >::new(
-            keys.clone().into_iter().map(|k| (k, true)).collect(), //reads
+            keys.clone().into_iter().map(|k| (k, false)).collect(), // reads
             vec![],
             vec![],
             vec![],
             1, //gas
         )));
     }
-    run_and_assert(transactions)
+    run_and_assert(transactions, false)
 }
 
 #[test]
@@ -620,8 +637,8 @@ fn one_writes_all_barrier() {
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
             transactions.push(MockTransaction::from_behavior(MockIncarnation::new(
-                vec![(*key, true)],                      //reads
-                vec![(*key, random_value(false), true)], //writes
+                vec![(*key, false)],                      //reads
+                vec![(*key, random_value(false), false)], //writes
                 vec![],
                 vec![],
                 1, //gas
@@ -632,16 +649,16 @@ fn one_writes_all_barrier() {
             KeyType<[u8; 32]>,
             MockEvent,
         >::new(
-            keys.clone().into_iter().map(|k| (k, true)).collect(), // reads
+            keys.clone().into_iter().map(|k| (k, false)).collect(), // reads
             keys.iter()
-                .map(|key| (*key, random_value(false), true))
+                .map(|key| (*key, random_value(false), false))
                 .collect::<Vec<_>>(), //writes
             vec![],
             vec![],
             1, // gas
         )));
     }
-    run_and_assert(transactions)
+    run_and_assert(transactions, false)
 }
 
 #[test]
@@ -657,8 +674,8 @@ fn early_aborts() {
                 KeyType<[u8; 32]>,
                 MockEvent,
             >::new(
-                vec![(*key, true)],                      // reads
-                vec![(*key, random_value(false), true)], // writes
+                vec![(*key, false)],                      // reads
+                vec![(*key, random_value(false), false)], // writes
                 vec![],
                 vec![],
                 1, // gas
@@ -667,7 +684,7 @@ fn early_aborts() {
         // One transaction that triggers an abort
         transactions.push(MockTransaction::Abort)
     }
-    run_and_assert(transactions)
+    run_and_assert(transactions, false)
 }
 
 #[test]
@@ -683,8 +700,8 @@ fn early_skips() {
                 KeyType<[u8; 32]>,
                 MockEvent,
             >::new(
-                vec![(*key, true)],                      // reads
-                vec![(*key, random_value(false), true)], //writes
+                vec![(*key, false)],                      // reads
+                vec![(*key, random_value(false), false)], //writes
                 vec![],
                 vec![],
                 1, // gas
@@ -693,7 +710,7 @@ fn early_skips() {
         // One transaction that triggers an abort
         transactions.push(MockTransaction::SkipRest(0))
     }
-    run_and_assert(transactions)
+    run_and_assert(transactions, false)
 }
 
 #[test]

@@ -76,9 +76,9 @@ fn run_transactions_deltas(
     }
 }
 
-#[test_case(50, 1000, false, 10, 2 ; "basic deltas")]
+#[test_case(50, 1000, false, 10, 2 ; "deltas and writes")]
 #[test_case(10, 1000, false, 10, 2 ; "deltas with small universe")]
-#[test_case(50, 1000, true, 10, 2 ; "deltas with gas limit")]
+#[test_case(50, 1000, true, 10, 2 ; "deltas and writes with gas limit")]
 #[test_case(10, 1000, true, 10, 2 ; "deltas with small universe with gas limit")]
 fn deltas_transaction_tests(
     universe_size: usize,

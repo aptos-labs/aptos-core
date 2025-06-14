@@ -21,8 +21,7 @@ use crate::{
     txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::block_executor::{
-    config::BlockExecutorConfig,
-    transaction_slice_metadata::TransactionSliceMetadata,
+    config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
 };
 use num_cpus;
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};

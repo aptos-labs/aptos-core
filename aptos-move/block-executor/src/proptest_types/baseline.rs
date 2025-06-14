@@ -8,8 +8,8 @@ use crate::{
         mock_executor::MockOutput,
         types::{
             default_group_map, deserialize_to_delayed_field_id, deserialize_to_delayed_field_u128,
-            raw_metadata, serialize_from_delayed_field_u128, GroupSizeOrMetadata, MockIncarnation,
-            MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
+            raw_metadata, serialize_from_delayed_field_u128, DeltaTestKind, GroupSizeOrMetadata,
+            MockIncarnation, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
         },
     },
 };
@@ -52,7 +52,7 @@ use std::{
 /// in the future, but for now it provides two different ways of testing similar invariants,
 /// such as the handling of delayed fields and their IDs / values.
 ///
-/// Not yet tested or supported cases in the testing framework:
+/// TODO: Not yet tested or supported cases in the testing framework:
 /// - Delayed field deletions.
 /// - Writes & delta for the same resource.
 /// - Multiple delta applications, including failures.
@@ -65,9 +65,12 @@ enum BaselineValue {
     Aggregator(u128),
     // Expected value and expected version of the delayed field.
     DelayedField(u128, u32),
-    // If true, then baseline value (when non-empty), includes txn_idx serialized after
-    // STORAGE_AGGREGATOR_VALUE.
-    Empty(bool),
+    // If true, then baseline value (when non-empty), includes txn_idx
+    // serialized after STORAGE_AGGREGATOR_VALUE. This is used to test
+    // the delayed fields, as unlike AggregatorV1, the delayed fields
+    // exist within a larger resource, and the writer's index (for storage
+    // version max u32) is stored for testing in the same mock resource.
+    Empty(DeltaTestKind),
 }
 
 // The status of the baseline execution.
@@ -79,7 +82,8 @@ enum BaselineStatus {
     GasLimitExceeded,
 }
 
-// Update the GroupReadInfo struct to always set baseline_value (not maybe_baseline_value) and dispatch based on has_delayed_field. Simplify the comparison logic.
+// TODO: Update the GroupReadInfo struct to always set baseline value
+// and simplify the comparison logic.
 #[derive(Debug)]
 struct GroupReadInfo<K: Clone> {
     group_key: K,
@@ -223,9 +227,9 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     fn with_resource_reads(
         &mut self,
         reads: &[(K, bool)],
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
     ) -> &mut Self {
-        let base_value = BaselineValue::Empty(delayed_fields_or_aggregator_v1);
+        let base_value = BaselineValue::Empty(delta_test_kind);
 
         let result = Ok(reads
             .iter()
@@ -235,13 +239,14 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
                     .entry(k.clone())
                     .or_insert(base_value.clone());
 
-                let value = if delayed_fields_or_aggregator_v1 && *has_deltas {
+                let value = if delta_test_kind == DeltaTestKind::DelayedFields && *has_deltas {
                     match baseline_value {
                         BaselineValue::DelayedField(v, _) => {
                             self.txn_read_write_resolved_deltas.insert(k.clone(), *v);
                             baseline_value.clone()
                         },
-                        BaselineValue::Empty(_) => {
+                        BaselineValue::Empty(delta_test_kind) => {
+                            assert_eq!(*delta_test_kind, DeltaTestKind::DelayedFields);
                             self.txn_read_write_resolved_deltas
                                 .insert(k.clone(), STORAGE_AGGREGATOR_VALUE);
                             BaselineValue::DelayedField(STORAGE_AGGREGATOR_VALUE, u32::MAX)
@@ -267,25 +272,31 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     fn with_resource_deltas(
         &mut self,
         resolved_deltas: Vec<(K, u128, Option<u32>)>,
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
     ) -> &mut Self {
         let mut result: HashMap<K, u128> = resolved_deltas
             .into_iter()
             .map(|(k, v, delayed_field_last_write_version)| {
-                if !delayed_fields_or_aggregator_v1 {
-                    // In this case transaction did not fail due to delta application
-                    // errors, and thus we should update written_ and resolved_ worlds.
-                    self.current_world
-                        .insert(k.clone(), BaselineValue::Aggregator(v));
-                } else {
-                    self.current_world.insert(
-                        k.clone(),
-                        BaselineValue::DelayedField(
-                            v,
-                            delayed_field_last_write_version
-                                .expect("Must be set by delta pre-processing"),
-                        ),
-                    );
+                match delta_test_kind {
+                    DeltaTestKind::DelayedFields => {
+                        self.current_world.insert(
+                            k.clone(),
+                            BaselineValue::DelayedField(
+                                v,
+                                delayed_field_last_write_version
+                                    .expect("Must be set by delta pre-processing"),
+                            ),
+                        );
+                    },
+                    DeltaTestKind::AggregatorV1 => {
+                        // In this case transaction did not fail due to delta application
+                        // errors, and thus we should update written_ and resolved_ worlds.
+                        self.current_world
+                            .insert(k.clone(), BaselineValue::Aggregator(v));
+                    },
+                    DeltaTestKind::None => {
+                        unreachable!("None delta test kind should not be used for resource deltas");
+                    },
                 }
                 (k, v)
             })
@@ -302,18 +313,17 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     fn with_group_reads(
         &mut self,
         group_reads: &[(K, u32, bool)],
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
     ) -> &mut Self {
-        // For groups, we map so that has_deltas will imply that delayed field testing
-        // is in progress (since AggregatorV1 may not reside in a group).
         let result = Ok(group_reads
             .iter()
             .map(|(k, tag, has_delayed_field)| {
-                (
-                    k.clone(),
-                    *tag,
-                    *has_delayed_field && delayed_fields_or_aggregator_v1,
-                )
+                if *has_delayed_field {
+                    assert_eq!(*tag, RESERVED_TAG);
+                    assert_eq!(delta_test_kind, DeltaTestKind::DelayedFields);
+                }
+
+                (k.clone(), *tag, *has_delayed_field)
             })
             .collect());
         self.group_reads.push(result);
@@ -335,7 +345,7 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     fn with_resource_writes(
         &mut self,
         writes: &[(K, ValueType, bool)],
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
         txn_idx: usize,
     ) -> &mut Self {
         for (k, v, has_delta) in writes {
@@ -344,7 +354,7 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
             // performed during committed execution.
             self.current_world.insert(
                 k.clone(),
-                if delayed_fields_or_aggregator_v1 && *has_delta {
+                if delta_test_kind == DeltaTestKind::DelayedFields && *has_delta {
                     BaselineValue::DelayedField(
                         match self.current_world.get(k) {
                             Some(BaselineValue::DelayedField(value, _)) => {
@@ -374,78 +384,67 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
         self
     }
 
-    /// Process a single delta and return the appropriate result
+    /// Process a single delta and return the appropriate result.
     ///
-    /// If the delta has a tag, it's returned as a group delta
-    /// If the delta doesn't have a tag, it's processed as a resource delta
-    ///
-    /// Returns a tuple of (optional group delta, optional resource delta, txn failed flag)
-    /// If txn failed flag is true, the caller should mark the transaction as failed
+    /// Returns an optional resource delta, if None, the caller should
+    /// mark the transaction as failed.
     fn process_delta(
         &mut self,
         key: &K,
         delta: &DeltaOp,
-        maybe_tag: &Option<u32>,
-        delayed_fields_or_aggregator_v1: bool,
-    ) -> (Option<(K, DeltaOp)>, Option<(K, u128, Option<u32>)>, bool) {
-        if let Some(tag) = maybe_tag {
-            assert_eq!(*tag, RESERVED_TAG);
-            // This is a group delta
-            (Some((key.clone(), *delta)), None, false)
-        } else {
-            let base_value = BaselineValue::Empty(delayed_fields_or_aggregator_v1);
+        delta_test_kind: DeltaTestKind,
+    ) -> Option<(K, u128, Option<u32>)> {
+        let base_value = BaselineValue::Empty(delta_test_kind);
 
-            // Delayed field last write version is used for delayed field testing only, making
-            // sure the writer index in the read results are compared against the correct write.
-            let (base, delayed_field_last_write_version) =
-                match self.current_world.entry(key.clone()).or_insert(base_value) {
-                    BaselineValue::DelayedField(value, last_write_version) => {
-                        (*value, Some(*last_write_version))
-                    },
-                    // Get base value from the latest write.
-                    BaselineValue::GenericWrite(w_value) => {
-                        if delayed_fields_or_aggregator_v1 {
-                            let (value, last_write_version) = deserialize_to_delayed_field_u128(
-                                &w_value
-                                    .extract_raw_bytes()
-                                    .expect("Deleted delayed fields not supported"),
-                            )
-                            .expect("Must deserialize the delayed field base value");
-                            (value, Some(last_write_version))
-                        } else {
-                            (
-                                w_value
-                                    .as_u128()
-                                    .expect("Delta to a non-existent aggregator")
-                                    .expect("Must deserialize the aggregator base value"),
-                                None,
-                            )
-                        }
-                    },
-                    // Get base value from latest resolved aggregator value.
-                    BaselineValue::Aggregator(value) => (*value, None),
-                    // Storage always gets resolved to a default constant.
-                    BaselineValue::Empty(_) => (STORAGE_AGGREGATOR_VALUE, Some(u32::MAX)),
-                };
+        // Delayed field last write version is used for delayed field testing only, making
+        // sure the writer index in the read results are compared against the correct write.
+        let (base, delayed_field_last_write_version) =
+            match self.current_world.entry(key.clone()).or_insert(base_value) {
+                BaselineValue::DelayedField(value, last_write_version) => {
+                    (*value, Some(*last_write_version))
+                },
+                // Get base value from the latest write.
+                BaselineValue::GenericWrite(w_value) => {
+                    if delta_test_kind == DeltaTestKind::DelayedFields {
+                        let (value, last_write_version) = deserialize_to_delayed_field_u128(
+                            &w_value
+                                .extract_raw_bytes()
+                                .expect("Deleted delayed fields not supported"),
+                        )
+                        .expect("Must deserialize the delayed field base value");
+                        (value, Some(last_write_version))
+                    } else {
+                        (
+                            w_value
+                                .as_u128()
+                                .expect("Delta to a non-existent aggregator")
+                                .expect("Must deserialize the aggregator base value"),
+                            None,
+                        )
+                    }
+                },
+                // Get base value from latest resolved aggregator value.
+                BaselineValue::Aggregator(value) => (*value, None),
+                // Storage always gets resolved to a default constant.
+                BaselineValue::Empty(delta_test_kind) => (
+                    STORAGE_AGGREGATOR_VALUE,
+                    (*delta_test_kind == DeltaTestKind::DelayedFields).then_some(u32::MAX),
+                ),
+            };
 
-            match delta.apply_to(base) {
-                Err(_) => {
-                    // Transaction does not take effect and we record delta application failure.
-                    (None, None, true)
-                },
-                Ok(resolved_value) => {
-                    // Transaction succeeded, return the resolved delta
-                    (
-                        None,
-                        Some((
-                            key.clone(),
-                            resolved_value,
-                            delayed_field_last_write_version,
-                        )),
-                        false,
-                    )
-                },
-            }
+        match delta.apply_to(base) {
+            Err(_) => {
+                // Transaction does not take effect and we record delta application failure.
+                None
+            },
+            Ok(resolved_value) => {
+                // Transaction succeeded, return the resolved delta
+                Some((
+                    key.clone(),
+                    resolved_value,
+                    delayed_field_last_write_version,
+                ))
+            },
         }
     }
 
@@ -456,27 +455,24 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     fn process_transaction_deltas(
         &mut self,
         deltas: &[(K, DeltaOp, Option<u32>)],
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
     ) -> (bool, Vec<(K, DeltaOp)>, Vec<(K, u128, Option<u32>)>) {
         let mut group_deltas = Vec::new();
         let mut resource_deltas = Vec::new();
 
         for (k, delta, maybe_tag) in deltas {
-            let (group_delta, resource_delta, failed) =
-                self.process_delta(k, delta, maybe_tag, delayed_fields_or_aggregator_v1);
-
-            if failed {
-                // Mark transaction as failed and return early
-                self.with_transaction_failed();
-                return (false, Vec::new(), Vec::new());
-            }
-
-            if let Some(gd) = group_delta {
-                group_deltas.push(gd);
-            }
-
-            if let Some(rd) = resource_delta {
-                resource_deltas.push(rd);
+            if let Some(tag) = maybe_tag {
+                assert_eq!(*tag, RESERVED_TAG);
+                // This is a group delta
+                group_deltas.push((k.clone(), *delta));
+            } else {
+                match self.process_delta(k, delta, delta_test_kind) {
+                    Some(rd) => resource_deltas.push(rd),
+                    None => {
+                        self.with_transaction_failed();
+                        return (false, Vec::new(), Vec::new());
+                    },
+                }
             }
         }
 
@@ -489,26 +485,26 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
     fn process_transaction<E: Debug + Clone + TransactionEvent>(
         &mut self,
         behavior: &MockIncarnation<K, E>,
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
         txn_idx: usize,
         accumulated_gas: &mut u64,
         maybe_block_gas_limit: Option<u64>,
     ) -> bool {
         // Process all deltas first
         let (success, group_deltas, resource_deltas) =
-            self.process_transaction_deltas(&behavior.deltas, delayed_fields_or_aggregator_v1);
+            self.process_transaction_deltas(&behavior.deltas, delta_test_kind);
 
         if !success {
             return false; // Gas limit not exceeded, transaction failed
         }
 
         // All remaining operations can be chained since the transaction is known to succeed
-        self.with_resource_reads(&behavior.reads, delayed_fields_or_aggregator_v1)
+        self.with_resource_reads(&behavior.resource_reads, delta_test_kind)
             .with_module_reads(&behavior.module_reads)
-            .with_group_reads(&behavior.group_reads, delayed_fields_or_aggregator_v1)
+            .with_group_reads(&behavior.group_reads, delta_test_kind)
             .with_group_deltas(group_deltas)
-            .with_resource_writes(&behavior.writes, delayed_fields_or_aggregator_v1, txn_idx)
-            .with_resource_deltas(resource_deltas, delayed_fields_or_aggregator_v1)
+            .with_resource_writes(&behavior.resource_writes, delta_test_kind, txn_idx)
+            .with_resource_deltas(resource_deltas, delta_test_kind)
             .with_module_writes(&behavior.module_writes, txn_idx as TxnIndex);
 
         // Apply gas
@@ -557,7 +553,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 MockTransaction::Write {
                     incarnation_counter,
                     incarnation_behaviors,
-                    delayed_fields_or_aggregator_v1,
+                    delta_test_kind,
                 } => {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
@@ -574,7 +570,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     // Process the transaction
                     let gas_limit_exceeded = builder.process_transaction(
                         &incarnation_behaviors[last_incarnation],
-                        *delayed_fields_or_aggregator_v1,
+                        *delta_test_kind,
                         txn_idx,
                         &mut accumulated_gas,
                         maybe_block_gas_limit,
@@ -762,17 +758,20 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                         "Deleted or non-existent value from storage can't match aggregator value"
                     );
                 },
-                (BaselineValue::Empty(with_txn_idx), Some(bytes)) => {
-                    assert_eq!(
-                        if *with_txn_idx {
-                            serialize_from_delayed_field_u128(STORAGE_AGGREGATOR_VALUE, u32::MAX)
-                        } else {
-                            serialize(&STORAGE_AGGREGATOR_VALUE).into()
-                        },
-                        *bytes
-                    );
+                (BaselineValue::Empty(delta_test_kind), maybe_bytes) => match delta_test_kind {
+                    DeltaTestKind::DelayedFields => {
+                        assert_eq!(
+                            maybe_bytes.as_ref().unwrap(),
+                            &serialize_from_delayed_field_u128(STORAGE_AGGREGATOR_VALUE, u32::MAX)
+                        );
+                    },
+                    DeltaTestKind::AggregatorV1 => {
+                        assert_eq!(*maybe_bytes, Some(serialize(&STORAGE_AGGREGATOR_VALUE)));
+                    },
+                    DeltaTestKind::None => {
+                        assert_none!(maybe_bytes);
+                    },
                 },
-                (BaselineValue::Empty(_), None) => (), // No-op for this case
             }
         }
     }

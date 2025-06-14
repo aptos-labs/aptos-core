@@ -20,7 +20,10 @@ use aptos_types::{
 use aptos_vm_types::module_write_set::ModuleWrite;
 use bytes::Bytes;
 use claims::{assert_ge, assert_le};
-use move_core_types::{identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
+};
 use move_vm_runtime::Module;
 use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -316,14 +319,21 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
 /// first and also records the latest incarnations of each transaction (that is committed).
 /// Then we can generate the baseline by sequentially executing the behavior prescribed for
 /// those latest incarnations.
+///
+/// TODO(BlockSTMv2): Mock incarnation & behavior generation should also be separated out
+/// and refactored into e.g. a builder pattern. In particular, certain materialization methods
+/// transform generated resource reads and writes into group or module reads and writes.
+/// It would be more natural to maintain an internal builder state of the mock transaction
+/// generation process and then finalize it into the desired format. Additionally, the
+/// internal fields should contain structs instead of less readable tuples.
 #[derive(Clone, Debug)]
 pub(crate) struct MockIncarnation<K, E> {
     /// A vector of keys to be read during mock incarnation execution.
-    /// bool indicates that the path may contain deltas, i.e. AggregatorV1 or DelayedFields.
-    pub(crate) reads: Vec<(K, bool)>,
+    /// bool indicates that the path contains deltas, i.e. AggregatorV1 or DelayedFields.
+    pub(crate) resource_reads: Vec<(K, bool)>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
-    /// bool indicates that the path may contain deltas, i.e. AggregatorV1 or DelayedFields.
-    pub(crate) writes: Vec<(K, ValueType, bool)>,
+    /// bool indicates that the path contains deltas, i.e. AggregatorV1 or DelayedFields.
+    pub(crate) resource_writes: Vec<(K, ValueType, bool)>,
     pub(crate) group_reads: Vec<(K, u32, bool)>,
     pub(crate) group_writes: Vec<(K, StateValueMetadata, HashMap<u32, (ValueType, bool)>)>,
     // For testing get_module_or_build_with and insert_verified_module interfaces.
@@ -346,16 +356,16 @@ impl<K, E> MockIncarnation<K, E> {
     /// into another one with group_reads / group_writes / group_queries set. Hence, the constructor
     /// here always sets it to an empty vector.
     pub(crate) fn new_with_metadata_seeds(
-        reads: Vec<(K, bool)>,
-        writes: Vec<(K, ValueType, bool)>,
+        resource_reads: Vec<(K, bool)>,
+        resource_writes: Vec<(K, ValueType, bool)>,
         deltas: Vec<(K, DeltaOp, Option<u32>)>,
         events: Vec<E>,
         metadata_seeds: [u64; 3],
         gas: u64,
     ) -> Self {
         Self {
-            reads,
-            writes,
+            resource_reads,
+            resource_writes,
             group_reads: vec![],
             group_writes: vec![],
             group_queries: vec![],
@@ -369,15 +379,15 @@ impl<K, E> MockIncarnation<K, E> {
     }
 
     pub(crate) fn new(
-        reads: Vec<(K, bool)>,
-        writes: Vec<(K, ValueType, bool)>,
+        resource_reads: Vec<(K, bool)>,
+        resource_writes: Vec<(K, ValueType, bool)>,
         deltas: Vec<(K, DeltaOp, Option<u32>)>,
         events: Vec<E>,
         gas: u64,
     ) -> Self {
         Self {
-            reads,
-            writes,
+            resource_reads,
+            resource_writes,
             group_reads: vec![],
             group_writes: vec![],
             group_queries: vec![],
@@ -389,6 +399,13 @@ impl<K, E> MockIncarnation<K, E> {
             gas,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DeltaTestKind {
+    DelayedFields,
+    AggregatorV1,
+    None,
 }
 
 /// A mock transaction that could be used to test the correctness and throughput of the system.
@@ -408,7 +425,7 @@ pub(crate) enum MockTransaction<K, E> {
         /// round robin depending on the incarnation counter value).
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
         /// If we are testing with deltas, are we testing delayed_fields? (or AggregatorV1).
-        delayed_fields_or_aggregator_v1: bool,
+        delta_test_kind: DeltaTestKind,
     },
     /// Skip the execution of trailing transactions.
     SkipRest(u64),
@@ -421,7 +438,7 @@ impl<K, E> MockTransaction<K, E> {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
-            delayed_fields_or_aggregator_v1: false,
+            delta_test_kind: DeltaTestKind::None,
         }
     }
 
@@ -429,17 +446,26 @@ impl<K, E> MockTransaction<K, E> {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
-            delayed_fields_or_aggregator_v1: false,
+            delta_test_kind: DeltaTestKind::None,
         }
     }
 
     pub(crate) fn with_delayed_fields_testing(mut self) -> Self {
         if let Self::Write {
-            delayed_fields_or_aggregator_v1,
-            ..
+            delta_test_kind, ..
         } = &mut self
         {
-            *delayed_fields_or_aggregator_v1 = true;
+            *delta_test_kind = DeltaTestKind::DelayedFields;
+        }
+        self
+    }
+
+    pub(crate) fn with_aggregator_v1_testing(mut self) -> Self {
+        if let Self::Write {
+            delta_test_kind, ..
+        } = &mut self
+        {
+            *delta_test_kind = DeltaTestKind::AggregatorV1;
         }
         self
     }
@@ -513,7 +539,6 @@ impl Default for TransactionGenParams {
     }
 }
 
-/// TODO: move generation to separate file.
 /// A simple enum to represent either a write or a delta operation result
 enum WriteDeltaVariant<W, D> {
     Write(W),
@@ -724,7 +749,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         universe: &[K],
     ) -> MockTransaction<KeyType<K>, E> {
         let universe_len = universe.len();
-        assert_ge!(universe_len, 3, "Universe must have size >= 3");
 
         let mut behaviors = self
             .new_mock_write_txn(universe, false, None)
@@ -732,11 +756,11 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
         behaviors.iter_mut().for_each(|behavior| {
             // Handle writes
-            let (key_to_convert, mut value, _) = behavior.writes.pop().unwrap();
-            let module_id = key_to_module_id(&key_to_convert, universe_len);
+            let (key_to_convert, mut value, _) = behavior.resource_writes.pop().unwrap();
+            let module_id = key_to_mock_module_id(&key_to_convert, universe_len);
 
             // Serialize a module and store it in bytes so deserialization can succeed.
-            let mut serialized_bytes = Vec::new();
+            let mut serialized_bytes = vec![];
             Module::new_for_test(module_id.clone())
                 .serialize(&mut serialized_bytes)
                 .expect("Failed to serialize compiled module");
@@ -744,9 +768,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
             behavior.module_writes = vec![ModuleWrite::new(module_id, value)];
 
-            // Handle reads
-            let (key_to_convert, _) = behavior.reads.pop().unwrap();
-            behavior.module_reads = vec![key_to_module_id(&key_to_convert, universe_len)];
+            // Handle reads.
+            let (key_to_convert, _) = behavior.resource_reads.pop().unwrap();
+            behavior.module_reads = vec![key_to_mock_module_id(&key_to_convert, universe_len)];
         });
 
         MockTransaction::from_behaviors(behaviors)
@@ -788,7 +812,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         for (behavior_idx, behavior) in behaviors.iter_mut().enumerate() {
             let mut reads = vec![];
             let mut group_reads = vec![];
-            for (read_key, has_delayed_field) in behavior.reads.clone() {
+            for (read_key, contains_delta) in behavior.resource_reads.clone() {
                 assert!(read_key != KeyType(universe[universe_len - 1].clone()));
                 assert!(read_key != KeyType(universe[universe_len - 2].clone()));
                 assert!(read_key != KeyType(universe[universe_len - 3].clone()));
@@ -800,17 +824,17 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                             KeyType(universe[universe_len - 1 - idx].clone()),
                             tag,
                             // Reserved tag is configured to have delayed fields.
-                            has_delayed_field && tag == RESERVED_TAG,
+                            has_delayed_field && tag == RESERVED_TAG && delta_threshold.is_some(),
                         ))
                     },
-                    None => reads.push((read_key, has_delayed_field)),
+                    None => reads.push((read_key, contains_delta)),
                 }
             }
 
             let mut writes = vec![];
             let mut group_writes = vec![];
             let mut inner_ops = vec![HashMap::new(); 3];
-            for (write_key, value, has_delayed_field) in behavior.writes.clone() {
+            for (write_key, value, has_delayed_field) in behavior.resource_writes.clone() {
                 match key_to_group(&write_key) {
                     Some((key_idx, tag, has_delayed_field)) => {
                         // Same shadowing of has_delayed_field variable and logic as above.
@@ -837,8 +861,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             // Group test does not handle deltas for aggregator v1(different view, no default
             // storage value). However, it does handle deltas (added below) for delayed fields.
             assert!(delta_threshold.is_some() || behavior.deltas.is_empty());
-            behavior.reads = reads;
-            behavior.writes = writes;
+            behavior.resource_reads = reads;
+            behavior.resource_writes = writes;
             behavior.group_reads = group_reads;
             behavior.group_writes = group_writes;
 
@@ -913,6 +937,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     ) -> MockTransaction<KeyType<K>, E> {
         // Enable delta generation for this specific method
         self.new_mock_write_txn(universe, allow_deletes, Some(delta_threshold))
+            .with_aggregator_v1_testing()
     }
 }
 
@@ -926,8 +951,9 @@ pub(crate) enum GroupSizeOrMetadata {
     Metadata(Option<StateValueMetadata>),
 }
 
-// Utility function to convert a key to a module ID
-pub(crate) fn key_to_module_id<K: Clone + Hash + Debug + Ord>(
+// Utility function to convert a key to a mock module ID. It hashes the key
+// to compute a consistent mock account address, with a fixed "test" module name.
+pub(crate) fn key_to_mock_module_id<K: Clone + Hash + Debug + Ord>(
     key: &KeyType<K>,
     universe_len: usize,
 ) -> ModuleId {
@@ -937,10 +963,7 @@ pub(crate) fn key_to_module_id<K: Clone + Hash + Debug + Ord>(
     let mut addr = [0u8; AccountAddress::LENGTH];
     addr[AccountAddress::LENGTH - 1] = idx as u8;
     addr[AccountAddress::LENGTH - 2] = (idx >> 8) as u8;
-    ModuleId::new(
-        AccountAddress::new(addr),
-        IdentStr::new("test").unwrap().into(),
-    )
+    ModuleId::new(AccountAddress::new(addr), Identifier::new("test").unwrap())
 }
 
 // ID is just the unique index as u128.
@@ -957,7 +980,6 @@ pub(crate) fn serialize_from_delayed_field_id(
     serialize_delayed_field_tuple(&tuple)
 }
 
-/// Serializes a (u128, u32) tuple into Bytes using BCS serialization
 fn serialize_delayed_field_tuple(value: &(u128, u32)) -> Bytes {
     bcs::to_bytes(value)
         .expect("Failed to serialize (u128, u32) tuple")
@@ -990,8 +1012,7 @@ mod tests {
     fn test_serialize_deserialize_delayed_field_tuple(tuple: (u128, u32)) {
         // Serialize and then deserialize
         let serialized = serialize_delayed_field_tuple(&tuple);
-        let deserialized =
-            deserialize_to_delayed_field_u128(&serialized).expect("Deserialization failed");
+        let deserialized = deserialize_to_delayed_field_u128(&serialized).unwrap();
 
         assert_eq!(
             tuple, deserialized,

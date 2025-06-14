@@ -16,8 +16,7 @@ use crate::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfig,
-        transaction_slice_metadata::TransactionSliceMetadata,
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::{state_value::StateValue, MockStateView, TStateView},
     transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
@@ -243,7 +242,7 @@ pub(crate) fn run_transactions_resources(
 
 // Regular tests with 2 repetitions
 #[test_case(100, 4000, 0, 0, false, false, 2, 15; "no_early_termination")]
-#[test_case(100, 5000, 0, 0, true, false, 2, 15; "no_early_termination_with_block_gas_limit")]
+#[test_case(100, 4000, 0, 0, true, false, 2, 15; "no_early_termination_with_block_gas_limit")]
 #[test_case(100, 4000, 1000, 0, false, false, 2, 15; "abort_only")]
 #[test_case(100, 4000, 1000, 0, true, false, 2, 15; "abort_only_with_block_gas_limit")]
 #[test_case(80, 300, 0, 5, false, false, 2, 15; "skip_rest_only")]

@@ -682,7 +682,7 @@ where
     ) -> Result<(), PanicError> {
         for write in module_write_set {
             Self::add_module_write_to_module_cache(
-                write.clone(),
+                write,
                 txn_idx,
                 runtime_environment,
                 global_module_cache,
@@ -1210,7 +1210,6 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_overridden(&id);
         per_block_module_cache
             .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
@@ -1223,6 +1222,7 @@ where
                 );
                 PanicError::CodeInvariantError(msg)
             })?;
+        global_module_cache.mark_overridden(&id);
         Ok(())
     }
 

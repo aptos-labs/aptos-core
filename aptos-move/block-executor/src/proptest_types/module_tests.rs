@@ -9,7 +9,9 @@ use crate::{
         resource_tests::{
             create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants,
         },
-        types::{key_to_module_id, KeyType, MockTransaction, TransactionGen, TransactionGenParams},
+        types::{
+            key_to_mock_module_id, KeyType, MockTransaction, TransactionGen, TransactionGenParams,
+        },
     },
     task::ExecutorTask,
     txn_provider::default::DefaultTxnProvider,
@@ -21,11 +23,12 @@ use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::Te
 use test_case::test_case;
 
 enum ModuleTestType {
-    // All transactions and accesses are modules.
+    // All transactions publish modules, and all accesses are module reads.
     AllTransactionsAndAccesses,
-    // All transactions are modules, but some accesses are not.
+    // All transactions publish modules, but some accesses are not module reads.
     AllTransactionsMixedAccesses,
-    // Some transactions contain module accesses.
+    // Some transactions publish modules and contain module reads. Other
+    // transactions do not publish modules and do not contain module reads.
     MixedTransactionsMixedAccesses,
 }
 
@@ -130,7 +133,7 @@ fn execute_module_tests(
 fn generate_all_potential_module_ids(universe: &[[u8; 32]]) -> Vec<ModuleId> {
     universe
         .iter()
-        .map(|k| key_to_module_id(&KeyType(*k), universe.len()))
+        .map(|k| key_to_mock_module_id(&KeyType(*k), universe.len()))
         .collect()
 }
 
