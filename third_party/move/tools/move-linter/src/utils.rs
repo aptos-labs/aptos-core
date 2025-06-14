@@ -33,3 +33,40 @@ pub(crate) fn is_simple_access_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
         _ => false,
     }
 }
+
+/// Checks if two expressions are structurally equal.
+///
+/// This function performs a structural comparison of two expressions. It handles the following expression types:
+/// - Local variables: compared by symbol equality
+/// - Values: compared by value equality
+/// - Temporaries: compared by temporary ID equality
+/// - Function calls: compared by operation type and recursive argument comparison
+///
+/// # Arguments
+/// * `expr1` - The first expression to compare
+/// * `expr2` - The second expression to compare
+///
+/// # Returns
+/// * `true` if the expressions are structurally identical, `false` otherwise
+///
+/// # Note
+/// This function only handles a subset of expression types. For unsupported
+/// expression types, it will return `false` even if they might be equivalent.
+pub(crate) fn is_expression_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
+    use ExpData::*;
+
+    match (expr1, expr2) {
+        (LocalVar(_, s1), LocalVar(_, s2)) => s1 == s2,
+        (Value(_, v1), Value(_, v2)) => v1 == v2,
+        (Temporary(_, t1), Temporary(_, t2)) => t1 == t2,
+        (Call(_, op1, args1), Call(_, op2, args2)) => {
+            op1 == op2
+                && args1.len() == args2.len()
+                && args1
+                    .iter()
+                    .zip(args2.iter())
+                    .all(|(a1, a2)| is_expression_equal(a1, a2))
+        },
+        _ => false,
+    }
+}
