@@ -27,7 +27,7 @@ use aptos_types::{
     on_chain_config::ConfigurationResource,
     state_store::{state_key::StateKey, StateViewId, TStateView},
     timestamp::TimestampResource,
-    transaction::Transaction,
+    transaction::{AuxiliaryInfo, Transaction},
     waypoint::Waypoint,
 };
 use aptos_vm::VMBlockExecutor;
@@ -137,6 +137,9 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         &V::new(),
         vec![genesis_txn.clone().into()].into(),
+        // TODO(grao): Do we need any auxiliary info for hard fork? Not now, but maybe one day we
+        // will need it.
+        vec![AuxiliaryInfo::new_empty()],
         &ledger_summary.state,
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
