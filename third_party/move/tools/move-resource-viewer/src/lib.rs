@@ -756,7 +756,7 @@ fn pretty_print_struct(
     indent: u64,
 ) -> std::fmt::Result {
     pretty_print_ability_modifiers(f, value.abilities)?;
-    write!(f, "{}", value.ty_tag)?;
+    write!(f, "{}", value.ty_tag.to_canonical_string())?;
     if let Some((_, name)) = &value.variant_info {
         write!(f, "::{}", name)?;
     }
@@ -817,7 +817,7 @@ fn pretty_print_closure(
         for ty in ty_args {
             f.write_str(last_sep)?;
             last_sep = ", ";
-            write!(f, "{}", ty)?
+            write!(f, "{}", ty.to_canonical_string())?
         }
         write!(f, ">")?
     }

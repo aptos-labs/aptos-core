@@ -66,7 +66,7 @@ use crate::{
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
-pub use block_output::{BlockOutput, TBlockOutput};
+pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;

@@ -7,7 +7,10 @@ use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use async_trait::async_trait;
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    sync::Arc,
+};
 
 /// [ This class is used when consensus.decoupled = true ]
 /// ExecutionWaitPhase is a singleton that receives scheduled execution futures
@@ -32,7 +35,7 @@ impl Display for ExecutionWaitRequest {
 
 pub struct ExecutionResponse {
     pub block_id: HashValue,
-    pub inner: ExecutorResult<Vec<PipelinedBlock>>,
+    pub inner: ExecutorResult<Vec<Arc<PipelinedBlock>>>,
 }
 
 pub struct ExecutionWaitPhase;

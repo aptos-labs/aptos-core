@@ -347,7 +347,7 @@ impl BlockStore {
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(
-                &blocks_to_commit,
+                blocks_to_commit,
                 finality_proof.clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<PipelinedBlock>],

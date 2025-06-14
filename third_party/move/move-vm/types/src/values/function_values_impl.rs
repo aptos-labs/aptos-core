@@ -31,7 +31,7 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
     fn closure_mask(&self) -> ClosureMask;
     fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering>;
     fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>>;
-    fn to_stable_string(&self) -> String;
+    fn to_canonical_string(&self) -> String;
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
@@ -84,7 +84,7 @@ impl Closure {
 impl Debug for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(fun, captured) = self;
-        write!(f, "Closure({}, {:?})", fun.to_stable_string(), captured)
+        write!(f, "Closure({}, {:?})", fun.to_canonical_string(), captured)
     }
 }
 
@@ -94,7 +94,7 @@ impl Display for Closure {
         let captured = fun
             .closure_mask()
             .format_arguments(captured.iter().map(|v| v.to_string()).collect());
-        write!(f, "{}({})", fun.to_stable_string(), captured.join(", "))
+        write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
     }
 }
 

@@ -400,7 +400,7 @@ fn native_add_box(
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
     if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount);
+        context.use_heap_memory(amount)?;
     }
     charge_load_cost(context, loaded)?;
 
@@ -451,7 +451,7 @@ fn native_borrow_box(
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
     if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount);
+        context.use_heap_memory(amount)?;
     }
     charge_load_cost(context, loaded)?;
 
@@ -496,7 +496,7 @@ fn native_contains_box(
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
     if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount);
+        context.use_heap_memory(amount)?;
     }
     charge_load_cost(context, loaded)?;
 
@@ -547,7 +547,7 @@ fn native_remove_box(
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
     if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount);
+        context.use_heap_memory(amount)?;
     }
     charge_load_cost(context, loaded)?;
 

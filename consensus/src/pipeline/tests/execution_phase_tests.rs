@@ -90,11 +90,11 @@ fn add_execution_phase_test_cases(
     // happy path
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![PipelinedBlock::new(
+            ordered_blocks: vec![Arc::new(PipelinedBlock::new(
                 block,
                 vec![],
                 StateComputeResult::new_dummy(),
-            )],
+            ))],
             lifetime_guard: dummy_guard(),
         },
         Box::new(move |resp| {
@@ -130,11 +130,11 @@ fn add_execution_phase_test_cases(
     .unwrap();
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![PipelinedBlock::new(
+            ordered_blocks: vec![Arc::new(PipelinedBlock::new(
                 bad_block,
                 vec![],
                 StateComputeResult::new_dummy(),
-            )],
+            ))],
             lifetime_guard: dummy_guard(),
         },
         Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::BlockNotFound(_))))),

@@ -70,7 +70,7 @@ impl TryFrom<TypeTag> for Structure {
     type Error = ();
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
-        match value.to_string().as_str() {
+        match value.to_canonical_string().as_str() {
             "0x1::bls12381_algebra::Fr" => Ok(Structure::BLS12381Fr),
             "0x1::bls12381_algebra::Fq12" => Ok(Structure::BLS12381Fq12),
             "0x1::bls12381_algebra::G1" => Ok(Structure::BLS12381G1),
@@ -124,7 +124,7 @@ impl TryFrom<TypeTag> for SerializationFormat {
     type Error = ();
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
-        match value.to_string().as_str() {
+        match value.to_canonical_string().as_str() {
             "0x1::bls12381_algebra::FormatFq12LscLsb" => {
                 Ok(SerializationFormat::BLS12381Fq12LscLsb)
             },
@@ -166,7 +166,7 @@ impl TryFrom<TypeTag> for HashToStructureSuite {
     type Error = ();
 
     fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
-        match value.to_string().as_str() {
+        match value.to_canonical_string().as_str() {
             "0x1::bls12381_algebra::HashG1XmdSha256SswuRo" => {
                 Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)
             },

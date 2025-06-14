@@ -28,6 +28,7 @@ use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
 };
+use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{error, info};
 use aptos_mvhashmap::{
@@ -37,12 +38,14 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction as Transaction, TBlockOutput,
+        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, Transaction,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -79,12 +82,12 @@ pub struct BlockExecutor<T, E, S, L, TP> {
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, TP)>,
+    phantom: PhantomData<fn() -> (T, E, S, L, TP)>,
 }
 
 impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
 where
-    T: Transaction,
+    T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
@@ -667,7 +670,7 @@ where
 
     fn publish_module_writes(
         txn_idx: TxnIndex,
-        module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        module_write_set: Vec<ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -677,7 +680,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
-        for (_, write) in module_write_set {
+        for write in module_write_set {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
@@ -821,7 +824,7 @@ where
         let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
-            versioned_cache.data(),
+            last_input_output,
             txn_idx
         )?;
         let materialized_resource_write_set =
@@ -1043,8 +1046,9 @@ where
         &self,
         signature_verified_block: &TP,
         base_view: &S,
+        transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<TBlockOutput<E::Output, T::Key>, ()> {
+    ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1061,7 +1065,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(TBlockOutput::new(vec![], self.empty_block_end_info()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1143,20 +1147,32 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let block_end_info = if self
-            .config
-            .onchain
-            .block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-        {
-            Some(shared_commit_state.into_inner().get_block_end_info())
-        } else {
-            None
-        };
+        let block_end_info = shared_commit_state.into_inner().get_block_end_info();
+        let mut block_epilogue_txn = None;
+
+        let outputs = final_results.into_inner();
+
+        let has_reconfig = outputs
+            .iter()
+            .rposition(|t| !t.is_retry())
+            .map_or(false, |idx| outputs[idx].has_new_epoch_event());
+        if !has_reconfig {
+            if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+                block_epilogue_txn = Some(Self::gen_block_epilogue(block_id, block_end_info));
+                // TODO(grao): Call VM for block_epilogue_txn.
+            }
+        }
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| TBlockOutput::new(final_results.into_inner(), block_end_info))
+            .then(|| BlockOutput::new(outputs, block_epilogue_txn))
             .ok_or(())
+    }
+
+    fn gen_block_epilogue(
+        block_id: HashValue,
+        block_end_info: TBlockEndInfoExt<T::Key>,
+    ) -> Transaction {
+        Transaction::block_epilogue(block_id, block_end_info.to_persistent())
     }
 
     /// Converts module write into cached module representation, and adds it to the module cache.
@@ -1194,7 +1210,6 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_overridden(&id);
         per_block_module_cache
             .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
@@ -1207,6 +1222,7 @@ where
                 );
                 PanicError::CodeInvariantError(msg)
             })?;
+        global_module_cache.mark_overridden(&id);
         Ok(())
     }
 
@@ -1238,7 +1254,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (_, write) in output.module_write_set().into_iter() {
+        for write in output.module_write_set().into_iter() {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
@@ -1302,10 +1318,16 @@ where
         &self,
         signature_verified_block: &TP,
         base_view: &S,
+        transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<TBlockOutput<E::Output, T::Key>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
+
+        if num_txns == 0 {
+            return Ok(BlockOutput::new(vec![], None));
+        }
+
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
         let executor = E::init(environment, base_view);
@@ -1323,6 +1345,7 @@ where
             num_txns,
         );
 
+        let mut block_epilogue_txn = None;
         for idx in 0..num_txns {
             let txn = signature_verified_block.get_txn(idx as TxnIndex);
             let latest_view = LatestView::<T, S>::new(
@@ -1580,65 +1603,58 @@ where
                     ret.push(output);
                 },
             };
-            // When the txn is a SkipRest txn, halt sequential execution.
-            if must_skip {
-                break;
-            }
 
-            if idx < num_txns - 1 && block_limit_processor.should_end_block_sequential() {
+            if must_skip
+                || block_limit_processor.should_end_block_sequential()
+                || idx + 1 == num_txns
+            {
+                if let Some(block_id) =
+                    transaction_slice_metadata.append_state_checkpoint_to_block()
+                {
+                    let mut has_reconfig = false;
+                    if let Some(last_output) = ret.last() {
+                        if last_output.has_new_epoch_event() {
+                            has_reconfig = true;
+                        }
+                    }
+                    if !has_reconfig {
+                        block_epilogue_txn = Some(Self::gen_block_epilogue(
+                            block_id,
+                            block_limit_processor.get_block_end_info(),
+                        ));
+                    }
+                }
                 break;
             }
         }
 
+        ret.resize_with(num_txns, E::Output::skip_output);
+
         block_limit_processor
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
-
-        ret.resize_with(num_txns, E::Output::skip_output);
 
         counters::update_state_counters(unsync_map.stats(), false);
         module_cache_manager_guard
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        let block_end_info = if self
-            .config
-            .onchain
-            .block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-        {
-            Some(block_limit_processor.get_block_end_info())
-        } else {
-            None
-        };
-
-        Ok(TBlockOutput::new(ret, block_end_info))
-    }
-
-    fn empty_block_end_info(&self) -> Option<TBlockEndInfoExt<T::Key>> {
-        if self
-            .config
-            .onchain
-            .block_gas_limit_type
-            .add_block_limit_outcome_onchain()
-        {
-            Some(TBlockEndInfoExt::new_empty())
-        } else {
-            None
-        }
+        Ok(BlockOutput::new(ret, block_epilogue_txn))
     }
 
     pub fn execute_block(
         &self,
         signature_verified_block: &TP,
         base_view: &S,
+        transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<TBlockOutput<E::Output, T::Key>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
             let parallel_result = self.execute_transactions_parallel(
                 signature_verified_block,
                 base_view,
+                transaction_slice_metadata,
                 module_cache_manager_guard,
             );
 
@@ -1669,6 +1685,7 @@ where
         let sequential_result = self.execute_transactions_sequential(
             signature_verified_block,
             base_view,
+            transaction_slice_metadata,
             module_cache_manager_guard,
             false,
         );
@@ -1692,6 +1709,7 @@ where
                 let sequential_result = self.execute_transactions_sequential(
                     signature_verified_block,
                     base_view,
+                    transaction_slice_metadata,
                     module_cache_manager_guard,
                     true,
                 );
@@ -1715,7 +1733,6 @@ where
         if self.config.local.discard_failed_blocks {
             // We cannot execute block, discard everything (including block metadata and validator transactions)
             // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
-            // StateCheckpoint will be added afterwards.
             let error_code = match sequential_error {
                 BlockExecutionError::FatalBlockExecutorError(_) => {
                     StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
@@ -1727,7 +1744,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(TBlockOutput::new(ret, self.empty_block_end_info()));
+            return Ok(BlockOutput::new(ret, None));
         }
 
         Err(sequential_error)
