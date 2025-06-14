@@ -32,7 +32,7 @@ use move_vm_types::loaded_data::{
     struct_name_indexing::{StructNameIndex, StructNameIndexMap},
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fmt::Debug,
     ops::Deref,
     sync::Arc,
@@ -93,6 +93,10 @@ pub struct Module {
     // `VecMutBorrow(SignatureIndex)`, the `SignatureIndex` maps to a single `SignatureToken`, and
     // hence, a single type.
     pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, Type>,
+
+    // Friends of this module. Needed for re-entrancy visibility checks if lazy loading is enabled.
+    // Particularly, if a callee has friend visibility, the caller's module must be in this set.
+    pub(crate) friends: BTreeSet<ModuleId>,
 }
 
 #[derive(Clone, Debug)]
@@ -153,6 +157,10 @@ impl Module {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
+        let friends = module
+            .immediate_friends_iter()
+            .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
+            .collect::<BTreeSet<_>>();
 
         let mut structs = vec![];
         let mut struct_instantiations = vec![];
@@ -373,6 +381,7 @@ impl Module {
             function_map,
             struct_map,
             single_signature_token_map,
+            friends,
         })
     }
 

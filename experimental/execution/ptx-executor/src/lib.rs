@@ -56,7 +56,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
         let concurrency_level = AptosVM::get_concurrency_level();

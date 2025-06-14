@@ -18,7 +18,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter as MoveGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -94,7 +94,34 @@ macro_rules! delegate_mut {
     };
 }
 
-impl<G> MoveGasMeter for MemoryTrackedGasMeter<G>
+impl<G> DependencyGasMeter for MemoryTrackedGasMeter<G>
+where
+    G: AptosGasMeter,
+{
+    delegate_mut! {
+        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
+    }
+}
+
+impl<G> NativeGasMeter for MemoryTrackedGasMeter<G>
+where
+    G: AptosGasMeter,
+{
+    delegate! {
+        fn legacy_gas_budget_in_native_context(&self) -> InternalGas;
+    }
+
+    delegate_mut! {
+        fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+    }
+
+    #[inline]
+    fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.use_heap_memory(amount.into())
+    }
+}
+
+impl<G> GasMeter for MemoryTrackedGasMeter<G>
 where
     G: AptosGasMeter,
 {
@@ -164,8 +191,6 @@ where
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
-
-        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]
@@ -460,11 +485,6 @@ where
         }));
 
         self.base.charge_drop_frame(locals)
-    }
-
-    #[inline]
-    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
-        self.use_heap_memory(amount.into())
     }
 }
 

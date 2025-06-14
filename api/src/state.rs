@@ -291,7 +291,8 @@ impl StateApi {
             .find_resource(&state_view, address, &tag)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
-                tag, address
+                tag.to_canonical_string(),
+                address
             ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
