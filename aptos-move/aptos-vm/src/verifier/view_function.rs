@@ -5,10 +5,10 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt},
     verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
-use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
+use aptos_types::{vm::module_metadata::RuntimeModuleMetadataV1, vm_status::VMStatus};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
+use move_binary_format::errors::{Location, PartialVMError};
+use move_core_types::{identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::LoadedFunction;
 
 /// Based on the function attributes in the module metadata, determine whether a
@@ -34,16 +34,19 @@ pub(crate) fn validate_view_function(
     module_storage: &impl AptosModuleStorage,
     args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
+    module_id: ModuleId,
     func: &LoadedFunction,
     module_metadata: Option<&RuntimeModuleMetadataV1>,
     struct_constructors_feature: bool,
-) -> PartialVMResult<Vec<Vec<u8>>> {
+) -> Result<Vec<Vec<u8>>, VMStatus> {
     // Must be marked as view function.
     let is_view = determine_is_view(module_metadata, fun_name);
     if !is_view {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .with_message("function not marked as view function".to_string()),
+                .with_message("function not marked as view function".to_string())
+                .finish(Location::Module(module_id))
+                .into_vm_status(),
         );
     }
 
@@ -51,7 +54,9 @@ pub(crate) fn validate_view_function(
     if func.return_tys().is_empty() {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .with_message("view function must return values".to_string()),
+                .with_message("view function must return values".to_string())
+                .finish(Location::Module(module_id))
+                .into_vm_status(),
         );
     }
 
@@ -64,7 +69,6 @@ pub(crate) fn validate_view_function(
         func.ty_args(),
         allowed_structs,
         true,
-    )
-    .map_err(|e| PartialVMError::new(e.status_code()))?;
+    )?;
     Ok(args)
 }
