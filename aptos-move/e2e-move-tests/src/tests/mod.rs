@@ -26,6 +26,7 @@ mod function_values;
 mod fungible_asset;
 mod gas;
 mod generate_upgrade_script;
+mod generic_cmp;
 mod governance_updates;
 mod infinite_loop;
 mod init_module;
