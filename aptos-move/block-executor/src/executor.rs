@@ -670,7 +670,7 @@ where
 
     fn publish_module_writes(
         txn_idx: TxnIndex,
-        module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        module_write_set: Vec<ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -680,7 +680,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
-        for (_, write) in module_write_set {
+        for write in module_write_set {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
@@ -1210,7 +1210,6 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_overridden(&id);
         per_block_module_cache
             .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
@@ -1223,6 +1222,7 @@ where
                 );
                 PanicError::CodeInvariantError(msg)
             })?;
+        global_module_cache.mark_overridden(&id);
         Ok(())
     }
 
@@ -1254,7 +1254,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (_, write) in output.module_write_set().into_iter() {
+        for write in output.module_write_set().into_iter() {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
