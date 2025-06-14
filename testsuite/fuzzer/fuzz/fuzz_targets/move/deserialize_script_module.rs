@@ -6,7 +6,9 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 // mod utils;
 use move_binary_format::{
-    deserializer::DeserializerConfig, file_format::CompiledScript, CompiledModule,
+    deserializer::DeserializerConfig,
+    file_format::{CompiledModule, CompiledScript},
+    file_format_common::VERSION_MAX,
 };
 
 #[derive(Arbitrary, Debug)]
@@ -28,8 +30,11 @@ fn run_case(data: &ExecVariant) -> Corpus {
 
 fn run_case_module(module: &CompiledModule) -> Corpus {
     let mut module_code = vec![];
-    if module.serialize(&mut module_code).is_err() {
-        return Corpus::Reject;
+    if module
+        .serialize_for_version(Some(VERSION_MAX), &mut module_code)
+        .is_err()
+    {
+        return Corpus::Keep;
     }
     match CompiledModule::deserialize_with_config(&module_code, &DeserializerConfig::default()) {
         Ok(mut m) => {
@@ -37,14 +42,17 @@ fn run_case_module(module: &CompiledModule) -> Corpus {
             assert_eq!(*module, m);
             Corpus::Keep
         },
-        Err(_) => Corpus::Reject,
+        Err(_) => Corpus::Keep,
     }
 }
 
 fn run_case_script(script: &CompiledScript) -> Corpus {
     let mut script_code = vec![];
-    if script.serialize(&mut script_code).is_err() {
-        return Corpus::Reject;
+    if script
+        .serialize_for_version(Some(VERSION_MAX), &mut script_code)
+        .is_err()
+    {
+        return Corpus::Keep;
     }
     match CompiledScript::deserialize_with_config(&script_code, &DeserializerConfig::default()) {
         Ok(mut s) => {
@@ -52,7 +60,7 @@ fn run_case_script(script: &CompiledScript) -> Corpus {
             assert_eq!(*script, s);
             Corpus::Keep
         },
-        Err(_) => Corpus::Reject,
+        Err(_) => Corpus::Keep,
     }
 }
 
@@ -60,7 +68,8 @@ fn run_case_raw(raw_data: &Vec<u8>) -> Corpus {
     if let Ok(m) = CompiledModule::deserialize_with_config(raw_data, &DeserializerConfig::default())
     {
         let mut module_code = vec![];
-        m.serialize(&mut module_code).unwrap();
+        m.serialize_for_version(Some(VERSION_MAX), &mut module_code)
+            .unwrap();
         assert_eq!(*raw_data, module_code);
         return Corpus::Keep;
     }
@@ -68,7 +77,8 @@ fn run_case_raw(raw_data: &Vec<u8>) -> Corpus {
     if let Ok(s) = CompiledScript::deserialize_with_config(raw_data, &DeserializerConfig::default())
     {
         let mut script_code = vec![];
-        s.serialize(&mut script_code).unwrap();
+        s.serialize_for_version(Some(VERSION_MAX), &mut script_code)
+            .unwrap();
         assert_eq!(*raw_data, script_code);
         return Corpus::Keep;
     }
