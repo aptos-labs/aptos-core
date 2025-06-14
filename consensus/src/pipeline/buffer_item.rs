@@ -16,6 +16,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
+    account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::ValidatorVerifier,
@@ -247,6 +248,7 @@ impl BufferItem {
     pub fn try_advance_to_aggregated_with_ledger_info(
         self,
         commit_proof: LedgerInfoWithSignatures,
+        commit_msg_sender_address: Option<AccountAddress>,
     ) -> Self {
         match self {
             Self::Signed(signed_item) => {
@@ -258,7 +260,13 @@ impl BufferItem {
                 } = *signed_item;
                 assert_eq!(
                     local_commit_proof.data().commit_info(),
-                    commit_proof.commit_info()
+                    commit_proof.commit_info(),
+                    "Left: {:?}\n
+                    Right: {:?}\n
+                    Request sent by {:?}",
+                    local_commit_proof.data().commit_info(),
+                    commit_proof.commit_info(),
+                    commit_msg_sender_address,
                 );
                 debug!(
                     "{} advance to aggregated with commit decision",
