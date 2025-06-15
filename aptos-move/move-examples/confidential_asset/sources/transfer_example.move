@@ -62,9 +62,12 @@ module confidential_asset_example::transfer_example {
             // New balance is the balance after the transfer encrypted with the sender's encryption key.
             // It will be set as the new actual balance for the sender.
             new_balance,
+            // Transfer amount encrypted with the sender's encryption key.
+            // Used for indexing purposes only.
+            sender_amount,
             // Transfer amount encrypted with the recipient's encryption key.
             // It will be Homomorphically added to the recipient's pending balance.
-            transfer_amount,
+            recipient_amount,
             // Transfer amount encrypted with the auditors' encryption keys.
             // It won't be stored on-chain, but an auditor can decrypt the transfer amount with its dk.
             auditor_amounts
@@ -89,7 +92,8 @@ module confidential_asset_example::transfer_example {
             token,
             alice_addr,
             confidential_balance::balance_to_bytes(&new_balance),
-            confidential_balance::balance_to_bytes(&transfer_amount),
+            confidential_balance::balance_to_bytes(&sender_amount),
+            confidential_balance::balance_to_bytes(&recipient_amount),
             confidential_asset::serialize_auditor_eks(&auditor_eks),
             confidential_asset::serialize_auditor_amounts(&auditor_amounts),
             zkrp_new_balance,
