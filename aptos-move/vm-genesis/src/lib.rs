@@ -644,6 +644,20 @@ fn initialize_account_abstraction(
             "authenticate".to_string().as_move_value(),
         ]),
     );
+
+    exec_function(
+        session,
+        module_storage,
+        ACCOUNT_ABSTRACTION_MODULE_NAME,
+        "register_derivable_authentication_function",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Address(AccountAddress::ONE),
+            "sui_derivable_account".to_string().as_move_value(),
+            "authenticate".to_string().as_move_value(),
+        ]),
+    );
 }
 
 fn initialize_reconfiguration_state(
