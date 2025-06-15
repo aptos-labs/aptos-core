@@ -100,7 +100,7 @@ class ReplayConfig:
             self.timeout_secs = 2400
         else:
             self.concurrent_replayer = 20
-            self.pvc_number = 8
+            self.pvc_number = 7
             self.min_range_size = 10_000
             self.range_size = 2_000_000
             self.timeout_secs = 2400
