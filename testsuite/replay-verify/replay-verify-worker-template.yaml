@@ -40,4 +40,5 @@ spec:
               - key: cloud.google.com/machine-family
                 operator: In
                 values:
+                  - t2d
                   - c3d
