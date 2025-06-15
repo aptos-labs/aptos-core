@@ -23,10 +23,10 @@ spec:
           value: "info"
       resources:
         requests:
-          memory: "180Gi"
+          memory: "90Gi"
           cpu: "30"
         limits:
-          memory: "180Gi"
+          memory: "90Gi"
           cpu: "30"
   volumes:
     - name: archive
