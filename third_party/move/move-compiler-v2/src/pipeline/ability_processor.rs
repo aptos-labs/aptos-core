@@ -24,9 +24,12 @@
 //!
 //! Precondition: LiveVarAnnotation, LifetimeAnnotation, ExitStateAnnotation
 
-use crate::pipeline::{
-    exit_state_analysis::ExitStateAnnotation, livevar_analysis_processor::LiveVarAnnotation,
-    reference_safety::LifetimeAnnotation,
+use crate::{
+    pipeline::{
+        exit_state_analysis::ExitStateAnnotation, livevar_analysis_processor::LiveVarAnnotation,
+        reference_safety::LifetimeAnnotation,
+    },
+    Experiment, Options,
 };
 use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
@@ -103,6 +106,12 @@ impl FunctionTargetProcessor for AbilityProcessor {
             analyzer.state_per_instruction_with_default(state_map, &code, &cfg, |_, after| {
                 after.clone()
             });
+        let suppress_errors = !fun_env
+            .module_env
+            .env
+            .get_extension::<Options>()
+            .unwrap_or_default()
+            .experiment_on(Experiment::REPORT_ERRORS_ABILITY_SAFETY);
 
         // Run transformation
         let mut transformer = Transformer {
@@ -110,6 +119,7 @@ impl FunctionTargetProcessor for AbilityProcessor {
             live_var,
             lifetime,
             copy_drop,
+            suppress_errors,
         };
         transformer.run(code);
         // Clear annotations as code has changed
@@ -236,6 +246,8 @@ struct Transformer<'a> {
     lifetime: &'a LifetimeAnnotation,
     /// The result of the copy-drop analysis
     copy_drop: BTreeMap<CodeOffset, CopyDropState>,
+    /// If true, any errors generated during this analysis are suppressed.
+    suppress_errors: bool,
 }
 
 impl Transformer<'_> {
@@ -565,13 +577,15 @@ impl Transformer<'_> {
         primary: impl AsRef<str>,
         hints: impl Iterator<Item = (Loc, String)>,
     ) {
-        self.env().diag_with_primary_and_labels(
-            Severity::Error,
-            loc.as_ref(),
-            msg.as_ref(),
-            primary.as_ref(),
-            hints.collect(),
-        )
+        if !self.suppress_errors {
+            self.env().diag_with_primary_and_labels(
+                Severity::Error,
+                loc.as_ref(),
+                msg.as_ref(),
+                primary.as_ref(),
+                hints.collect(),
+            )
+        }
     }
 
     /// Create a display string for temps. If the temp is printable, this will be 'local `x`'. Otherwise
