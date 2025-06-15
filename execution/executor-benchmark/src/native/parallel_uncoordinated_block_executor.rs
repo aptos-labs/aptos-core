@@ -46,7 +46,6 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use std::{
     cell::Cell,
     collections::BTreeMap,
-    hash::RandomState,
     sync::atomic::{AtomicU64, Ordering},
 };
 use thread_local::ThreadLocal;
@@ -1023,7 +1022,7 @@ impl NativeValueCacheRawTransactionExecutor {
         &'a self,
         key: &StateKey,
         init_value: impl FnOnce(&StateKey) -> CachedResource,
-    ) -> Ref<'a, StateKey, CachedResource, RandomState> {
+    ) -> Ref<'a, StateKey, CachedResource> {
         // Data in cache is going to be the hot path, so short-circuit here to avoid cloning the key.
         if let Some(ref_mut) = self.cache.get(key) {
             return ref_mut;
@@ -1039,7 +1038,7 @@ impl NativeValueCacheRawTransactionExecutor {
         &'a self,
         key: &StateKey,
         init_value: impl FnOnce(&StateKey) -> CachedResource,
-    ) -> RefMut<'a, StateKey, CachedResource, RandomState> {
+    ) -> RefMut<'a, StateKey, CachedResource> {
         // Data in cache is going to be the hot path, so short-circuit here to avoid cloning the key.
         if let Some(ref_mut) = self.cache.get_mut(key) {
             return ref_mut;

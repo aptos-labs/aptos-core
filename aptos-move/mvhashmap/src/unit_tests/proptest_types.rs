@@ -253,7 +253,7 @@ where
                 )
                 .unwrap();
             map.group_data()
-                .mark_estimate(&key, idx, [5usize].into_iter().collect());
+                .mark_estimate(&key, idx, &[5usize].into_iter().collect());
         } else {
             map.data().write(key.clone(), idx, 0, Arc::new(value), None);
             map.data().mark_estimate(&key, idx);
