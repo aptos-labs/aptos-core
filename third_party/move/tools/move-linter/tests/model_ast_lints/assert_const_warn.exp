@@ -1,0 +1,43 @@
+
+Diagnostics:
+warning: [lint] This assert can be removed
+  ┌─ tests/model_ast_lints/assert_const_warn.move:3:9
+  │
+3 │         assert!(true);
+  │         ^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(assert_const)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#assert_const.
+
+warning: [lint] This assert can replaced with abort()
+  ┌─ tests/model_ast_lints/assert_const_warn.move:7:9
+  │
+7 │         assert!(false);
+  │         ^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(assert_const)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#assert_const.
+
+warning: [lint] This assert can be removed
+   ┌─ tests/model_ast_lints/assert_const_warn.move:11:9
+   │
+11 │ ╭         if (true){
+12 │ │         }else{
+13 │ │             abort(0)
+14 │ │         };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(assert_const)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#assert_const.
+
+warning: [lint] This assert can replaced with abort()
+   ┌─ tests/model_ast_lints/assert_const_warn.move:18:9
+   │
+18 │ ╭         if (false){
+19 │ │         }else{
+20 │ │             abort(0)
+21 │ │         };
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(assert_const)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#assert_const.
