@@ -44,6 +44,23 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
+    loader::{eager::EagerLoader, lazy::LazyLoader, traits::Loader},
     module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
 };
+
+#[macro_export]
+macro_rules! dispatch_loader {
+    ($module_storage:expr, $loader:ident, $dispatch:stmt) => {
+        if $crate::WithRuntimeEnvironment::runtime_environment($module_storage)
+            .vm_config()
+            .enable_lazy_loading
+        {
+            let $loader = $crate::LazyLoader::new($module_storage);
+            $dispatch
+        } else {
+            let $loader = $crate::EagerLoader::new($module_storage);
+            $dispatch
+        }
+    };
+}
