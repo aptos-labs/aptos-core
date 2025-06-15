@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod analyze;
+#[cfg(feature = "local-testnet")]
 pub mod local_testnet;
 
+#[cfg(feature = "local-testnet")]
 use self::local_testnet::RunLocalnet;
 use crate::{
     common::{
@@ -76,6 +78,7 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
+    #[cfg(feature = "local-testnet")]
     #[clap(aliases = &["run-local-testnet"])]
     RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
@@ -101,6 +104,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
+            #[cfg(feature = "local-testnet")]
             RunLocalnet(tool) => tool
                 .execute_serialized_without_logger()
                 .await
