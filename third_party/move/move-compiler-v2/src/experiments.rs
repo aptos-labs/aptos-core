@@ -97,6 +97,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::CMP_REWRITE.to_string(),
+            description: "Rewrite comparison operations".to_string(),
+            default: Given(true),
+        },
+        Experiment {
             name: Experiment::INLINING.to_string(),
             description: "Turns on or off inlining".to_string(),
             default: Given(true),
@@ -282,6 +287,7 @@ impl Experiment {
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
+    pub const CMP_REWRITE: &'static str = "cmp-rewrite";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
