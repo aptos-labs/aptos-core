@@ -41,4 +41,3 @@ spec:
                 operator: In
                 values:
                   - t2d
-                  - c3d
