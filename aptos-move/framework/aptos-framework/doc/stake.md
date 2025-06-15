@@ -459,7 +459,7 @@ Consensus information per validator, stored in ValidatorSet.
 
 Full ValidatorSet, stored in @aptos_framework.
 1. join_validator_set adds to pending_active queue.
-2. leave_valdiator_set moves from active to pending_inactive queue.
+2. leave_validator_set moves from active to pending_inactive queue.
 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
 
 
