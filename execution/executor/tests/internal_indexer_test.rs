@@ -353,6 +353,7 @@ fn test_db_indexer_data() {
         (false, "0x1::gas_schedule::GasScheduleV2"),
         (false, "0x1::jwks::SupportedOIDCProviders"),
         (false, "0x1::stake::AptosCoinCapabilities"),
+        (false, "0x1::stake::PendingTransactionFee"),
         (false, "0x1::reconfiguration_state::State"),
         (false, "0x1::version::SetVersionCapability"),
         (false, "0x1::storage_gas::StorageGasConfig"),
