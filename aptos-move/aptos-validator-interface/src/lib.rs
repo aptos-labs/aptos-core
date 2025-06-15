@@ -80,6 +80,30 @@ pub trait AptosValidatorInterface: Sync {
         account: AccountAddress,
         seq: u64,
     ) -> Result<Option<Version>>;
+
+    async fn get_full_committed_transactions_with_source_code(
+        &self,
+        start: Version,
+        limit: u64,
+        package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
+    ) -> Result<
+        Vec<(
+            u64,
+            Transaction,
+            Option<(
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            )>,
+        )>,
+    >;
 }
 
 pub struct DebuggerStateView {
