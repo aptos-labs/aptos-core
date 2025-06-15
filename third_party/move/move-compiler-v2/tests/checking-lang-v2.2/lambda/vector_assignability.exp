@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: type `||u64 has drop` is missing required ability `copy`
+   ┌─ tests/checking-lang-v2.2/lambda/vector_assignability.move:12:55
+   │
+12 │         let b: vector<||u64 has drop + copy> = vector[a];
+   │                                                       ^
+
+error: expected `vector<||u64 has drop>` but found a value of type `vector<||u64 has copy + drop>`
+   ┌─ tests/checking-lang-v2.2/lambda/vector_assignability.move:33:9
+   │
+33 │         v[0] = a;
+   │         ^
+
+error: type `||u64 has drop` is missing required ability `copy`
+   ┌─ tests/checking-lang-v2.2/lambda/vector_assignability.move:55:28
+   │
+55 │         replace(&mut v[0], a);
+   │                            ^
+
+error: expected `vector<||u64 has copy + drop>` but found a value of type `vector<||u64 has drop>`
+   ┌─ tests/checking-lang-v2.2/lambda/vector_assignability.move:66:9
+   │
+66 │         v[0] = a;
+   │         ^
+
+error: cannot pass `&mut ||u64 has drop` to a function which expects argument of type `&mut ||u64 has copy + drop`
+   ┌─ tests/checking-lang-v2.2/lambda/vector_assignability.move:80:22
+   │
+80 │         swap(&mut a, &mut b);
+   │                      ^^^^^^
