@@ -11052,7 +11052,7 @@
           "Transactions"
         ],
         "summary": "Get account transactions",
-        "description": "Retrieves on-chain committed sequence-number based transactions from an account.\nDoes not retrieve orderless transactions sent from the account.\nIf the start version is too far in the past, a 410 will be returned.\n\nIf no start version is given, it will start at version 0.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
+        "description": "Retrieves on-chain committed sequence-number based transactions from an account.\nDoes not retrieve turbo transactions sent from the account.\nIf the start version is too far in the past, a 410 will be returned.\n\nIf no start version is given, it will start at version 0.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
         "parameters": [
           {
             "name": "address",
@@ -11658,7 +11658,7 @@
           "Transactions"
         ],
         "summary": "Get account transaction summaries",
-        "description": "Retrieves summaries of on-chain committed transactions (both sequence number based\nand orderless transactions) from an account.\nEach transaction summary contains the sender addresss, transaction hash, version, and replay protector.\n\nIf start_version is provided, the output consists of transaction summaries starting form that version.\n\nIf start_version is not provided but the end_version is provided, the output consists of transaction summaries\nending at the end_version.\n\nIf both start_version and end_version are not provided, the output consists of the summaries of\nmost recent committed transaction from the account.\n\nThe output always consists of transaction summaries ordered in ascending order by version.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
+        "description": "Retrieves summaries of on-chain committed transactions (both sequence number based\nand turbo transactions) from an account.\nEach transaction summary contains the sender addresss, transaction hash, version, and replay protector.\n\nIf start_version is provided, the output consists of transaction summaries starting form that version.\n\nIf start_version is not provided but the end_version is provided, the output consists of transaction summaries\nending at the end_version.\n\nIf both start_version and end_version are not provided, the output consists of the summaries of\nmost recent committed transaction from the account.\n\nThe output always consists of transaction summaries ordered in ascending order by version.\n\nTo retrieve a pending transaction, use /transactions/by_hash.",
         "parameters": [
           {
             "name": "address",

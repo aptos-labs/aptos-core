@@ -75,7 +75,7 @@ pub struct TransactionStore {
     // This is the number of sender buckets.
     num_sender_buckets: MempoolSenderBucket,
     // Keeps track of "non-ready" txns (transactions that can't be included in next block).
-    // Orderless transactions (transactions with nonce replay protector) are always "ready", and are not
+    // Turbo transactions (transactions with nonce replay protector) are always "ready", and are not
     // stored in the parking lot.
     parking_lot_index: ParkingLotIndex,
     // Index for looking up transaction by hash.
@@ -92,7 +92,7 @@ pub struct TransactionStore {
     capacity_bytes: usize,
     // Maximum number of sequence number transactions allowed in the Mempool per user
     capacity_per_user: usize,
-    // Maximum number of orderless transactions allowed in the Mempool per user
+    // Maximum number of turbo transactions allowed in the Mempool per user
     orderless_txn_capacity_per_user: usize,
     max_batch_bytes: u64,
 
@@ -235,7 +235,7 @@ impl TransactionStore {
     pub(crate) fn insert(
         &mut self,
         txn: MempoolTransaction,
-        // For orderless transactions, account_sequence_number is None
+        // For turbo transactions, account_sequence_number is None
         // For sequence number transactions, account_sequence_number is Some(u64)
         account_sequence_number: Option<u64>,
     ) -> MempoolStatus {
@@ -333,11 +333,11 @@ impl TransactionStore {
                     }
                 },
                 ReplayProtector::Nonce(_) => {
-                    if txns.orderless_txns_len() >= self.orderless_txn_capacity_per_user {
+                    if txns.turbo_txns_len() >= self.orderless_txn_capacity_per_user {
                         return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
                             format!(
-                                "Mempool over capacity for account. Number of orderless transactions from account: {} Capacity per account: {}",
-                                txns.orderless_txns_len(),
+                                "Mempool over capacity for account. Number of turbo transactions from account: {} Capacity per account: {}",
+                                txns.turbo_txns_len(),
                                 self.orderless_txn_capacity_per_user,
                             ),
                         );
@@ -941,7 +941,7 @@ impl TransactionStore {
         while let Some(key) = gc_iter.next() {
             if let Some(txns) = self.transactions.get_mut(&key.address) {
                 // If a sequence number transaction is garbage collected, then its subsequent transactions are marked as non-ready.
-                // As orderless transactions (transactions with nonce) are always ready, they are not affected by this.
+                // As turbo transactions (transactions with nonce) are always ready, they are not affected by this.
                 if let ReplayProtector::SequenceNumber(seq_num) = key.replay_protector {
                     let park_range_start = Bound::Excluded(seq_num);
                     let park_range_end = gc_iter

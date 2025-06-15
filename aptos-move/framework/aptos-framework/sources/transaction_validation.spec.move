@@ -96,7 +96,7 @@ spec aptos_framework::transaction_validation {
         include PrologueCommonAbortsIf;
     }
 
-    spec check_for_replay_protection_orderless_txn(
+    spec check_for_replay_protection_turbo_txn(
         sender: address,
         nonce: u64,
         txn_expiration_time: u64,
@@ -436,7 +436,7 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64,
         is_simulation: bool,
-        is_orderless_txn: bool,
+        is_turbo_txn: bool,
     ) {
         // TODO: temporary mockup
         pragma verify = false;

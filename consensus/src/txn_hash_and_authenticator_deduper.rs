@@ -100,7 +100,7 @@ impl TxnHashAndAuthenticatorDeduper {
     }
 }
 
-// TODO[Orderless]: Update these tests also when generating transactions with nonce.
+// TODO[Turbo]: Update these tests also when generating transactions with nonce.
 #[cfg(test)]
 mod tests {
     use crate::{

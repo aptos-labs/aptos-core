@@ -1000,7 +1000,7 @@ module aptos_token::token {
 
     public fun create_royalty(royalty_points_numerator: u64, royalty_points_denominator: u64, payee_address: address): Royalty {
         assert!(royalty_points_numerator <= royalty_points_denominator, error::invalid_argument(EINVALID_ROYALTY_NUMERATOR_DENOMINATOR));
-        // Question[Orderless]: Is it okay to remove this check to accommodate stateless accounts?
+        // Question[Turbo]: Is it okay to remove this check to accommodate stateless accounts?
         // assert!(account::exists_at(payee_address), error::invalid_argument(EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST));
         Royalty {
             royalty_points_numerator,

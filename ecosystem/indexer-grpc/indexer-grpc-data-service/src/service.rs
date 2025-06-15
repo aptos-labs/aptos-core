@@ -1020,7 +1020,7 @@ mod tests {
         module_address: String,
         module_name: String,
         function_name: String,
-        is_orderless_txn: bool,
+        is_turbo_txn: bool,
     ) -> Transaction {
         Transaction {
             version: 1,
@@ -1041,7 +1041,7 @@ mod tests {
                         extra_config: Some(ExtraConfig::ExtraConfigV1({
                             ExtraConfigV1 {
                                 multisig_address: None,
-                                replay_protection_nonce: if is_orderless_txn {
+                                replay_protection_nonce: if is_turbo_txn {
                                     Some(12345678)
                                 } else {
                                     None
@@ -1161,13 +1161,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[rstest(is_orderless_txn, case(false), case(true))]
-    fn test_transactions_are_stripped_correctly_module_address(is_orderless_txn: bool) {
+    #[rstest(is_turbo_txn, case(false), case(true))]
+    fn test_transactions_are_stripped_correctly_module_address(is_turbo_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
-            is_orderless_txn,
+            is_turbo_txn,
         );
         // Testing filter with only address set
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
@@ -1203,13 +1203,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[rstest(is_orderless_txn, case(false), case(true))]
-    fn test_transactions_are_stripped_correctly_module_name(is_orderless_txn: bool) {
+    #[rstest(is_turbo_txn, case(false), case(true))]
+    fn test_transactions_are_stripped_correctly_module_name(is_turbo_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
-            is_orderless_txn,
+            is_turbo_txn,
         );
         // Testing filter with only module set
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
@@ -1245,13 +1245,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[rstest(is_orderless_txn, case(false), case(true))]
-    fn test_transactions_are_stripped_correctly_function_name(is_orderless_txn: bool) {
+    #[rstest(is_turbo_txn, case(false), case(true))]
+    fn test_transactions_are_stripped_correctly_function_name(is_turbo_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
-            is_orderless_txn,
+            is_turbo_txn,
         );
         // Testing filter with only function set
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(
@@ -1287,13 +1287,13 @@ mod tests {
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
 
-    #[rstest(is_orderless_txn, case(false), case(true))]
-    fn test_transactions_are_not_stripped(is_orderless_txn: bool) {
+    #[rstest(is_turbo_txn, case(false), case(true))]
+    fn test_transactions_are_not_stripped(is_turbo_txn: bool) {
         let txn = create_test_transaction(
             MODULE_ADDRESS.to_string(),
             MODULE_NAME.to_string(),
             FUNCTION_NAME.to_string(),
-            is_orderless_txn,
+            is_turbo_txn,
         );
         // Testing filter with wrong filter
         let filter = BooleanTransactionFilter::new_or(vec![BooleanTransactionFilter::from(

@@ -110,7 +110,7 @@ impl AccountTransactions {
             .chain(self.sequence_number_transactions.values())
     }
 
-    pub(crate) fn orderless_txns_len(&self) -> usize {
+    pub(crate) fn turbo_txns_len(&self) -> usize {
         self.nonce_transactions.len()
     }
 
@@ -546,7 +546,7 @@ impl ParkingLotIndex {
     }
 
     pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
-        // Orderless transactions are always in the "ready" state and are not stored in the parking lot.
+        // turbo transactions are always in the "ready" state and are not stored in the parking lot.
         match txn.get_replay_protector() {
             ReplayProtector::SequenceNumber(sequence_number) => {
                 if txn.insertion_info.park_time.is_none() {
@@ -589,7 +589,7 @@ impl ParkingLotIndex {
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
-        // Orderless transactions are always in the "ready" state and are not stored in the parking lot.
+        // turbo transactions are always in the "ready" state and are not stored in the parking lot.
         match txn.get_replay_protector() {
             ReplayProtector::SequenceNumber(sequence_number) => {
                 let sender = &txn.txn.sender();
@@ -623,7 +623,7 @@ impl ParkingLotIndex {
         replay_protector: ReplayProtector,
         hash: HashValue,
     ) -> bool {
-        // Orderless transactions are always in the "ready" state and are not stored in the parking lot.
+        // turbo transactions are always in the "ready" state and are not stored in the parking lot.
         match replay_protector {
             ReplayProtector::SequenceNumber(seq_num) => self
                 .account_indices

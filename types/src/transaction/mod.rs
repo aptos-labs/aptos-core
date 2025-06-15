@@ -222,7 +222,7 @@ impl RawTransaction {
         }
     }
 
-    // TODO[Orderless]: Deprecate this
+    // TODO[Turbo]: Deprecate this
     /// Create a new `RawTransaction` with a script.
     ///
     /// A script transaction contains only code to execute. No publishing is allowed in scripts.
@@ -246,7 +246,7 @@ impl RawTransaction {
         }
     }
 
-    // TODO[Orderless]: Deprecate this
+    // TODO[Turbo]: Deprecate this
     /// Create a new `RawTransaction` with an entry function.
     pub fn new_entry_function(
         sender: AccountAddress,
@@ -268,7 +268,7 @@ impl RawTransaction {
         }
     }
 
-    // TODO[Orderless]: Deprecate this
+    // TODO[Turbo]: Deprecate this
     /// Create a new `RawTransaction` of multisig type.
     pub fn new_multisig(
         sender: AccountAddress,
@@ -290,7 +290,7 @@ impl RawTransaction {
         }
     }
 
-    // TODO[Orderless]: After the new transaction format is fully adopted, make `new_txn` as the default
+    // TODO[Turbo]: After the new transaction format is fully adopted, make `new_txn` as the default
     // function to create new RawTransaction, and remove other `new_..` variants.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_txn(
@@ -738,7 +738,7 @@ pub enum TransactionExtraConfig {
     V1 {
         multisig_address: Option<AccountAddress>,
         // None for regular transactions
-        // Some(nonce) for orderless transactions
+        // Some(nonce) for turbo transactions
         replay_protection_nonce: Option<u64>,
     },
 }
@@ -844,14 +844,14 @@ impl TransactionPayload {
     pub fn upgrade_payload(
         self,
         use_txn_payload_v2_format: bool,
-        use_orderless_transactions: bool,
+        use_turbo_transactions: bool,
     ) -> Self {
         if use_txn_payload_v2_format {
             let executable = self
                 .executable()
                 .expect("ModuleBundle variant is deprecated");
             let mut extra_config = self.extra_config();
-            if use_orderless_transactions {
+            if use_turbo_transactions {
                 extra_config = match extra_config {
                     TransactionExtraConfig::V1 {
                         multisig_address,
@@ -889,7 +889,7 @@ impl TransactionExtraConfig {
         }
     }
 
-    pub fn is_orderless(&self) -> bool {
+    pub fn is_turbo(&self) -> bool {
         self.replay_protection_nonce().is_some()
     }
 

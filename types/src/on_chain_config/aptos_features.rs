@@ -414,7 +414,7 @@ impl Features {
         self.is_enabled(FeatureFlag::TRANSACTION_PAYLOAD_V2)
     }
 
-    pub fn is_orderless_txns_enabled(&self) -> bool {
+    pub fn is_turbo_txns_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ORDERLESS_TRANSACTIONS)
     }
 

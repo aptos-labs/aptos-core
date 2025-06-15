@@ -1998,7 +1998,7 @@ mod test {
         let mut transactions = vec![];
         for i in 0..num_transactions {
             // Create the raw transaction
-            // TODO[Orderless]: Change this to transaction payload v2 format
+            // TODO[Turbo]: Change this to transaction payload v2 format
             let transaction_payload =
                 TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
             let raw_transaction = RawTransaction::new(

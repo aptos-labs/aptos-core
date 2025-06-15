@@ -290,7 +290,7 @@ impl Mempool {
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,
-        // For orderless transactions, the sender's account_sequence_number is not fetched. account_sequence_number is None
+        // For turbo transactions, the sender's account_sequence_number is not fetched. account_sequence_number is None
         // For sequence number transactions, the sender's account_sequence_number is fetched. account_sequence_number is Some(u64)
         account_sequence_number: Option<u64>,
         timeline_state: TimelineState,
