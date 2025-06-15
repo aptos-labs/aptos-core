@@ -5,6 +5,7 @@
 
 mod almost_swapped;
 mod blocks_in_conditions;
+mod aborting_overflow_checks;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -33,5 +34,6 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
+        Box::<aborting_overflow_checks::AbortingOverflowChecks>::default(),
     ]
 }
