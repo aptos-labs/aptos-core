@@ -234,18 +234,6 @@ class WorkerPod:
             "--block-cache-size",
             "10737418240",
         ]
-        # TODO(ibalajiarun): hack for heavy ranges. Increase memory for heavy ranges.
-        if (
-            self.network == Network.TESTNET
-            and self.start_version >= 6700000000
-            and self.end_version < 6800000000
-        ):
-            pod_manifest["spec"]["containers"][0]["resources"]["requests"][
-                "memory"
-            ] = "180Gi"
-            pod_manifest["spec"]["containers"][0]["resources"]["limits"][
-                "memory"
-            ] = "180Gi"
 
         if SHARDING_ENABLED:
             pod_manifest["spec"]["containers"][0]["command"].append(

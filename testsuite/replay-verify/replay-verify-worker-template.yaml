@@ -23,12 +23,21 @@ spec:
           value: "info"
       resources:
         requests:
-          memory: "90Gi"
+          memory: "180Gi"
           cpu: "30"
         limits:
-          memory: "90Gi"
+          memory: "180Gi"
           cpu: "30"
   volumes:
     - name: archive
       persistentVolumeClaim:
         claimName: testnet-archive-9
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/machine-family
+                operator: In
+                values:
+                  - c3d
