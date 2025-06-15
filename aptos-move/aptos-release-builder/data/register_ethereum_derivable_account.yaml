@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+name: "AIP-122 - x-chain DAA authentication using Sign-in-With-Ethereum"
+proposals:
+  - name: register_ethereum_derivable_account
+    metadata:
+      title: "Register Ethereum Derivable Account authentication function"
+      description: "Enables AIP-122"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-122.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_122_registration.move
