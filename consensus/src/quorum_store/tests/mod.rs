@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod batch_coordinator_test;
 mod batch_generator_test;
 mod batch_proof_queue_test;
 mod batch_requester_test;

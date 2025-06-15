@@ -28,7 +28,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::QuorumStoreConfig;
+use aptos_config::config::{QuorumStoreConfig, TransactionFilterConfig};
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
@@ -125,6 +125,7 @@ pub struct InnerBuilder {
     author: Author,
     num_validators: u64,
     config: QuorumStoreConfig,
+    transaction_filter_config: TransactionFilterConfig,
     consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
@@ -160,6 +161,7 @@ impl InnerBuilder {
         author: Author,
         num_validators: u64,
         config: QuorumStoreConfig,
+        transaction_filter_config: TransactionFilterConfig,
         consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
@@ -199,6 +201,7 @@ impl InnerBuilder {
             author,
             num_validators,
             config,
+            transaction_filter_config,
             consensus_to_quorum_store_receiver,
             quorum_store_to_mempool_sender,
             mempool_txn_pull_timeout_ms,
@@ -327,6 +330,7 @@ impl InnerBuilder {
                 self.config.receiver_max_total_txns as u64,
                 self.config.receiver_max_total_bytes as u64,
                 self.config.batch_expiry_gap_when_init_usecs,
+                self.transaction_filter_config.clone(),
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i);

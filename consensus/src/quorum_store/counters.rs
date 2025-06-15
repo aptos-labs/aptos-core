@@ -652,6 +652,15 @@ pub static RECEIVED_BATCH_MAX_LIMIT_FAILED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the batch messages that contained transactions rejected by the filter
+pub static RECEIVED_BATCH_REJECTED_BY_FILTER: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_rejected_by_filter",
+        "Count of the batch messages that contained transactions rejected by the filter"
+    )
+    .unwrap()
+});
+
 /// Count of the missed batches when execute.
 pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
