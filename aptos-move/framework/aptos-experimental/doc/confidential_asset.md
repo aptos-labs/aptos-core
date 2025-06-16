@@ -68,7 +68,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `deserialize_auditor_eks`](#0x7_confidential_asset_deserialize_auditor_eks)
 -  [Function `deserialize_auditor_amounts`](#0x7_confidential_asset_deserialize_auditor_amounts)
 -  [Function `ensure_sufficient_fa`](#0x7_confidential_asset_ensure_sufficient_fa)
--  [Function `init_module_for_testing`](#0x7_confidential_asset_init_module_for_testing)
+-  [Function `init_module_for_genesis`](#0x7_confidential_asset_init_module_for_genesis)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -2543,13 +2543,13 @@ Returns <code>Some(Object&lt;Metadata&gt;)</code> if user has a suffucient amoun
 
 </details>
 
-<a id="0x7_confidential_asset_init_module_for_testing"></a>
+<a id="0x7_confidential_asset_init_module_for_genesis"></a>
 
-## Function `init_module_for_testing`
+## Function `init_module_for_genesis`
 
 
 
-<pre><code>entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_init_module_for_testing">init_module_for_testing</a>(deployer: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code>entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_init_module_for_genesis">init_module_for_genesis</a>(deployer: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -2558,7 +2558,7 @@ Returns <code>Some(Object&lt;Metadata&gt;)</code> if user has a suffucient amoun
 <summary>Implementation</summary>
 
 
-<pre><code>entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_init_module_for_testing">init_module_for_testing</a>(deployer: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code>entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_init_module_for_genesis">init_module_for_genesis</a>(deployer: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(deployer) == @aptos_experimental, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>));
     <b>assert</b>!(<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>() != <a href="confidential_asset.md#0x7_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>));
     <b>assert</b>!(<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>() != <a href="confidential_asset.md#0x7_confidential_asset_TESTNET_CHAIN_ID">TESTNET_CHAIN_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>));

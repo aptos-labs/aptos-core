@@ -859,7 +859,7 @@ fn initialize_confidential_asset(
             session,
             module_storage,
             "confidential_asset",
-            "init_module_for_testing",
+            "init_module_for_genesis",
             vec![],
             serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
         );

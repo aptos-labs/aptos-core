@@ -1096,7 +1096,7 @@ module aptos_experimental::confidential_asset {
         fa
     }
 
-    entry fun init_module_for_testing(deployer: &signer) {
+    entry fun init_module_for_genesis(deployer: &signer) {
         assert!(signer::address_of(deployer) == @aptos_experimental, error::invalid_argument(EINIT_MODULE_FAILED));
         assert!(chain_id::get() != MAINNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
         assert!(chain_id::get() != TESTNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
@@ -1106,6 +1106,10 @@ module aptos_experimental::confidential_asset {
     //
     // Test-only functions
     //
+    #[test_only]
+    public fun init_module_for_testing(deployer: &signer) {
+        init_module(deployer)
+    }
 
     #[test_only]
     public fun verify_pending_balance(
