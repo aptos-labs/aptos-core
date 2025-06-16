@@ -333,7 +333,7 @@ impl RoundManager {
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<()> {
         counters::CURRENT_ROUND.set(new_round_event.round as i64);
-        counters::ROUND_TIMEOUT_MS.with_label_values(&[&new_round_event.round.to_string()]).inc_by(new_round_event.timeout.as_millis() as u64);
+        counters::ROUND_TIMEOUT_MS.observe(new_round_event.timeout.as_millis() as f64);
         match new_round_event.reason {
             NewRoundReason::QCReady => {
                 counters::QC_ROUNDS_COUNT.inc();
