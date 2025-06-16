@@ -46,7 +46,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
     );
     let (_, storage) = MockStorage::start_for_testing((&validators).into());
 
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage);
+    let safety_rules_manager = SafetyRulesManager::new_serializer(safety_storage);
     let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
     safety_rules.perform_initialize().unwrap();
 

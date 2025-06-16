@@ -25,9 +25,11 @@ impl SafetyRules {
         self.signer()?;
         let mut safety_data = self.persistent_storage.safety_data()?;
         self.verify_epoch(timeout.epoch(), &safety_data)?;
-        timeout
-            .verify(&self.epoch_state()?.verifier)
-            .map_err(|e| Error::InvalidTimeout(e.to_string()))?;
+        if !self.skip_sig_verify {
+            timeout
+                .verify(&self.epoch_state()?.verifier)
+                .map_err(|e| Error::InvalidTimeout(e.to_string()))?;
+        }
         if let Some(tc) = timeout_cert {
             self.verify_tc(tc)?;
         }
@@ -179,8 +181,10 @@ impl SafetyRules {
     fn verify_tc(&self, tc: &TwoChainTimeoutCertificate) -> Result<(), Error> {
         let epoch_state = self.epoch_state()?;
 
-        tc.verify(&epoch_state.verifier)
-            .map_err(|e| Error::InvalidTimeoutCertificate(e.to_string()))?;
+        if !self.skip_sig_verify {
+            tc.verify(&epoch_state.verifier)
+                .map_err(|e| Error::InvalidTimeoutCertificate(e.to_string()))?;
+        }
         Ok(())
     }
 

@@ -248,7 +248,7 @@ pub fn test_safety_rules() -> SafetyRules {
     let storage = test_storage(&signer);
     let (epoch_change_proof, _) = make_genesis(&signer);
 
-    let mut safety_rules = SafetyRules::new(storage);
+    let mut safety_rules = SafetyRules::new(storage, false);
     safety_rules.initialize(&epoch_change_proof).unwrap();
     safety_rules
 }
@@ -257,7 +257,7 @@ pub fn test_safety_rules() -> SafetyRules {
 pub fn test_safety_rules_uninitialized() -> SafetyRules {
     let signer = ValidatorSigner::from_int(0);
     let storage = test_storage(&signer);
-    SafetyRules::new(storage)
+    SafetyRules::new(storage, false)
 }
 
 /// Returns a simple serializer for testing purposes.

@@ -98,10 +98,10 @@ impl ProposalMsg {
         self.proposal().payload().map_or(Ok(()), |p| {
             p.verify(validator, proof_cache, quorum_store_enabled)
         })?;
-
         self.proposal()
             .validate_signature(validator)
             .map_err(|e| format_err!("{:?}", e))?;
+
         // if there is a timeout certificate, verify its signatures
         if let Some(tc) = self.sync_info.highest_2chain_timeout_cert() {
             tc.verify(validator).map_err(|e| format_err!("{:?}", e))?;

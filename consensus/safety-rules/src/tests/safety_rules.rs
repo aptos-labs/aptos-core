@@ -14,7 +14,7 @@ fn safety_rules() -> suite::Callback {
     Box::new(move || {
         let signer = ValidatorSigner::from_int(0);
         let storage = test_utils::test_storage(&signer);
-        let safety_rules = Box::new(SafetyRules::new(storage));
+        let safety_rules = Box::new(SafetyRules::new(storage, false));
         (safety_rules, signer)
     })
 }
