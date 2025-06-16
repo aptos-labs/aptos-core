@@ -27,19 +27,109 @@ use move_vm_types::{
 };
 use std::collections::btree_map::{BTreeMap, Entry};
 
+pub trait MoveVmDataCache {
+    fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool;
+
+    fn insert_resource(
+        &mut self,
+        addr: AccountAddress,
+        ty: Type,
+        entry: DataCacheEntry,
+    ) -> PartialVMResult<()>;
+
+    fn get_resource_mut(
+        &mut self,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<&mut GlobalValue>;
+}
+
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
-pub(crate) struct DataCacheEntry {
-    struct_tag: StructTag,
-    layout: MoveTypeLayout,
-    contains_delayed_fields: bool,
-    value: GlobalValue,
+pub struct DataCacheEntry {
+    pub struct_tag: StructTag,
+    pub layout: MoveTypeLayout,
+    pub contains_delayed_fields: bool,
+    pub value: GlobalValue,
 }
 
 impl DataCacheEntry {
     pub(crate) fn value(&self) -> &GlobalValue {
         &self.value
+    }
+
+    /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
+    /// Also returns the size of the loaded resource in bytes. This method does not add the entry
+    /// to the cache - it is the caller's responsibility to add it there.
+    pub fn new(
+        module_storage: &dyn ModuleStorage,
+        resource_resolver: &dyn ResourceResolver,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Self, NumBytes)> {
+        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
+            TypeTag::Struct(struct_tag) => *struct_tag,
+            _ => {
+                // Since every resource is a struct, the tag must be also a struct tag.
+                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+            },
+        };
+
+        // TODO(Gas): Shall we charge for this?
+        let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
+            .type_to_type_layout_with_identifier_mappings(ty)?;
+
+        let (data, bytes_loaded) = {
+            let metadata = module_storage
+                .fetch_existing_module_metadata(
+                    &struct_tag.address,
+                    struct_tag.module.as_ident_str(),
+                )
+                .map_err(|err| err.to_partial())?;
+
+            // If we need to process delayed fields, we pass type layout to remote storage. Remote
+            // storage, in turn ensures that all delayed field values are pre-processed.
+            resource_resolver.get_resource_bytes_with_metadata_and_layout(
+                addr,
+                &struct_tag,
+                &metadata,
+                if contains_delayed_fields {
+                    Some(&layout)
+                } else {
+                    None
+                },
+            )?
+        };
+
+        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        let value = match data {
+            Some(blob) => {
+                let val = ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_value_extension)
+                    .with_delayed_fields_serde()
+                    .deserialize(&blob, &layout)
+                    .ok_or_else(|| {
+                        let msg = format!(
+                            "Failed to deserialize resource {} at {}!",
+                            struct_tag.to_canonical_string(),
+                            addr
+                        );
+                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                            .with_message(msg)
+                    })?;
+                GlobalValue::cached(val)?
+            },
+            None => GlobalValue::none(),
+        };
+
+        let entry = Self {
+            struct_tag,
+            layout,
+            contains_delayed_fields,
+            value,
+        };
+        Ok((entry, NumBytes::new(bytes_loaded as u64)))
     }
 }
 
@@ -123,83 +213,12 @@ impl TransactionDataCache {
 
         Ok(change_set)
     }
+}
 
-    /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
-    /// Also returns the size of the loaded resource in bytes. This method does not add the entry
-    /// to the cache - it is the caller's responsibility to add it there.
-    pub(crate) fn create_data_cache_entry(
-        module_storage: &dyn ModuleStorage,
-        resource_resolver: &dyn ResourceResolver,
-        addr: &AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
-        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
-            TypeTag::Struct(struct_tag) => *struct_tag,
-            _ => {
-                // Since every resource is a struct, the tag must be also a struct tag.
-                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
-            },
-        };
-
-        // TODO(Gas): Shall we charge for this?
-        let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)?;
-
-        let (data, bytes_loaded) = {
-            let metadata = module_storage
-                .fetch_existing_module_metadata(
-                    &struct_tag.address,
-                    struct_tag.module.as_ident_str(),
-                )
-                .map_err(|err| err.to_partial())?;
-
-            // If we need to process delayed fields, we pass type layout to remote storage. Remote
-            // storage, in turn ensures that all delayed field values are pre-processed.
-            resource_resolver.get_resource_bytes_with_metadata_and_layout(
-                addr,
-                &struct_tag,
-                &metadata,
-                if contains_delayed_fields {
-                    Some(&layout)
-                } else {
-                    None
-                },
-            )?
-        };
-
-        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-        let value = match data {
-            Some(blob) => {
-                let val = ValueSerDeContext::new()
-                    .with_func_args_deserialization(&function_value_extension)
-                    .with_delayed_fields_serde()
-                    .deserialize(&blob, &layout)
-                    .ok_or_else(|| {
-                        let msg = format!(
-                            "Failed to deserialize resource {} at {}!",
-                            struct_tag.to_canonical_string(),
-                            addr
-                        );
-                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
-                            .with_message(msg)
-                    })?;
-                GlobalValue::cached(val)?
-            },
-            None => GlobalValue::none(),
-        };
-
-        let entry = DataCacheEntry {
-            struct_tag,
-            layout,
-            contains_delayed_fields,
-            value,
-        };
-        Ok((entry, NumBytes::new(bytes_loaded as u64)))
-    }
-
+impl MoveVmDataCache for TransactionDataCache {
     /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
     /// state of the cache does not chang when calling this function.
-    pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
+    fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
         self.account_map
             .get(addr)
             .is_some_and(|account_cache| account_cache.contains_key(ty))
@@ -207,7 +226,7 @@ impl TransactionDataCache {
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
     /// entry already for the specified address-type pair.
-    pub(crate) fn insert_resource(
+    fn insert_resource(
         &mut self,
         addr: AccountAddress,
         ty: Type,
@@ -227,7 +246,7 @@ impl TransactionDataCache {
 
     /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
     /// not exist in cache), an error is returned.
-    pub(crate) fn get_resource_mut(
+    fn get_resource_mut(
         &mut self,
         addr: &AccountAddress,
         ty: &Type,

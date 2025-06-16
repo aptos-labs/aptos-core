@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
-    data_cache::{DataCacheEntry, TransactionDataCache},
+    data_cache::{DataCacheEntry, MoveVmDataCache},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -117,7 +117,7 @@ impl Interpreter {
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         module_storage: &impl ModuleStorage,
         ty_depth_checker: &TypeDepthChecker<impl Loader>,
         resource_resolver: &impl ResourceResolver,
@@ -148,7 +148,7 @@ where
     pub(crate) fn entrypoint(
         function: LoadedFunction,
         args: Vec<Value>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         module_storage: &impl ModuleStorage,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
@@ -228,7 +228,7 @@ where
 
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
         self,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -270,7 +270,7 @@ where
     /// at the top of the stack (return). If the call stack is empty execution is completed.
     fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -784,7 +784,7 @@ where
     fn call_native<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -828,7 +828,7 @@ where
     fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1083,12 +1083,8 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
-        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-            module_storage,
-            resource_resolver,
-            &addr,
-            ty,
-        )?;
+        let (entry, bytes_loaded) =
+            DataCacheEntry::new(module_storage, resource_resolver, &addr, ty)?;
         gas_meter.charge_load_resource(
             addr,
             TypeWithRuntimeEnvironment {
@@ -1103,7 +1099,7 @@ where
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
-        data_cache: &'c mut TransactionDataCache,
+        data_cache: &'c mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1128,7 +1124,7 @@ where
         &mut self,
         is_mut: bool,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1206,7 +1202,7 @@ where
     fn exists(
         &mut self,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1240,7 +1236,7 @@ where
     fn move_from(
         &mut self,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1291,7 +1287,7 @@ where
     fn move_to(
         &mut self,
         is_generic: bool,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1701,7 +1697,7 @@ impl Frame {
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         interpreter: &mut InterpreterImpl<impl Loader>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1728,7 +1724,7 @@ impl Frame {
     fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         interpreter: &mut InterpreterImpl<impl Loader>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,

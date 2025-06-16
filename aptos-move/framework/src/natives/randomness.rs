@@ -9,7 +9,9 @@ use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension, native_functions::NativeFunction,
+};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -24,6 +26,21 @@ pub struct RandomnessContext {
     // True if the current transaction's payload was a public(friend) or
     // private entry function, which also has `#[randomness]` annotation.
     unbiasable: bool,
+}
+
+impl VersionControlledNativeExtension for RandomnessContext {
+    fn undo(&mut self) {
+        // No-op: nothing to undo.
+    }
+
+    fn save(&mut self) {
+        // No-op: nothing to save.
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.txn_local_state = vec![0; 8];
+        self.unbiasable = false;
+    }
 }
 
 impl RandomnessContext {
