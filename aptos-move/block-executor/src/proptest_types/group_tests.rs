@@ -52,7 +52,7 @@ pub(crate) fn run_tests_with_groups(
     num_executions_parallel: usize,
     num_executions_sequential: usize,
 ) {
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     // Run parallel execution tests
     for maybe_block_gas_limit in gas_limits {

@@ -47,7 +47,7 @@ fn run_transactions_deltas(
             .into_iter()
             .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, delta_threshold, false))
             .collect();
-        let txn_provider = DefaultTxnProvider::new(transactions);
+        let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
         let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
             phantom: PhantomData,
