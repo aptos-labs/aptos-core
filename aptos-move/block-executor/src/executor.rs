@@ -1158,7 +1158,7 @@ where
             .map_or(false, |idx| outputs[idx].has_new_epoch_event());
         if !has_reconfig {
             if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
-                block_epilogue_txn = Some(Self::gen_block_epilogue(block_id, block_end_info));
+                block_epilogue_txn = Some(self.gen_block_epilogue(block_id, block_end_info));
                 // TODO(grao): Call VM for block_epilogue_txn.
             }
         }
@@ -1169,9 +1169,18 @@ where
     }
 
     fn gen_block_epilogue(
+        &self,
         block_id: HashValue,
         block_end_info: TBlockEndInfoExt<T::Key>,
     ) -> Transaction {
+        if !self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            return Transaction::StateCheckpoint(block_id);
+        }
         Transaction::block_epilogue(block_id, block_end_info.to_persistent())
     }
 
@@ -1618,7 +1627,7 @@ where
                         }
                     }
                     if !has_reconfig {
-                        block_epilogue_txn = Some(Self::gen_block_epilogue(
+                        block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
                             block_limit_processor.get_block_end_info(),
                         ));
