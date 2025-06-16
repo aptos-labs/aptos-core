@@ -54,6 +54,8 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
         get_ready_transactions_name: Identifier::new("get_ready_transactions").unwrap(),
         execute_user_function_wrapper_name: Identifier::new("execute_user_function_wrapper")
             .unwrap(),
+        emit_transaction_failed_event_name: Identifier::new("emit_transaction_failed_event")
+            .unwrap(),
     });
 
 pub struct ScheduledTxnsModuleInfo {
@@ -61,6 +63,7 @@ pub struct ScheduledTxnsModuleInfo {
     pub module_name: Identifier,
     pub get_ready_transactions_name: Identifier,
     pub execute_user_function_wrapper_name: Identifier,
+    pub emit_transaction_failed_event_name: Identifier,
 }
 
 impl ScheduledTxnsModuleInfo {

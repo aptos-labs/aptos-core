@@ -12,7 +12,7 @@
 -  [Resource `AuxiliaryData`](#0x1_scheduled_txns_AuxiliaryData)
 -  [Resource `ToRemoveTbl`](#0x1_scheduled_txns_ToRemoveTbl)
 -  [Enum `CancelledTxnCode`](#0x1_scheduled_txns_CancelledTxnCode)
--  [Struct `TransactionExpiredEvent`](#0x1_scheduled_txns_TransactionExpiredEvent)
+-  [Struct `TransactionFailedEvent`](#0x1_scheduled_txns_TransactionFailedEvent)
 -  [Struct `ShutdownEvent`](#0x1_scheduled_txns_ShutdownEvent)
 -  [Struct `KeyAndTxnInfo`](#0x1_scheduled_txns_KeyAndTxnInfo)
 -  [Struct `State`](#0x1_scheduled_txns_State)
@@ -28,6 +28,7 @@
 -  [Function `finish_execution`](#0x1_scheduled_txns_finish_execution)
 -  [Function `remove_txns`](#0x1_scheduled_txns_remove_txns)
 -  [Function `execute_user_function_wrapper`](#0x1_scheduled_txns_execute_user_function_wrapper)
+-  [Function `emit_transaction_failed_event`](#0x1_scheduled_txns_emit_transaction_failed_event)
 -  [Function `step`](#0x1_scheduled_txns_step)
 
 
@@ -349,16 +350,32 @@ Signer for the store for gas fee deposits
 
 </details>
 
+<details>
+<summary>Failed</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
 </details>
 
-<a id="0x1_scheduled_txns_TransactionExpiredEvent"></a>
+</details>
 
-## Struct `TransactionExpiredEvent`
+</details>
+
+<a id="0x1_scheduled_txns_TransactionFailedEvent"></a>
+
+## Struct `TransactionFailedEvent`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionExpiredEvent">TransactionExpiredEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -767,7 +784,7 @@ Stop, remove and refund all scheduled txns; can be called only by the framework
     <b>while</b> (!txns_to_cancel.is_empty()) {
         <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a> { key, account_addr, deposit_amt } = txns_to_cancel.pop_back();
         <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt);
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_TransactionExpiredEvent">TransactionExpiredEvent</a> {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
             key,
             sender_addr: account_addr,
             cancelled_txn_code: CancelledTxnCode::Shutdown
@@ -1109,7 +1126,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
             key,
             deposit_amt
         );
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_TransactionExpiredEvent">TransactionExpiredEvent</a> {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
             key,
             sender_addr: account_addr,
             cancelled_txn_code: CancelledTxnCode::Expired
@@ -1248,6 +1265,37 @@ Called by the executor when the scheduled transaction is run
     } <b>else</b> {
         f(std::option::none());
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_emit_transaction_failed_event"></a>
+
+## Function `emit_transaction_failed_event`
+
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">emit_transaction_failed_event</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, sender_addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">emit_transaction_failed_event</a>(
+    key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>,
+    sender_addr: <b>address</b>,
+) {
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
+        key,
+        sender_addr,
+        cancelled_txn_code: CancelledTxnCode::Failed
+    });
 }
 </code></pre>
 

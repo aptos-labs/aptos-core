@@ -2819,7 +2819,6 @@ impl AptosVM {
             code_storage,
             &self.storage_gas_params(log_context)?.change_set_configs,
         )?;
-        // println!("scheduled transaction output: {:?}", output);
         Ok((VMStatus::Executed, output))
     }
 }

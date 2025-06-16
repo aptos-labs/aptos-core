@@ -139,10 +139,12 @@ module aptos_framework::scheduled_txns {
         Shutdown,
         /// Transaction was expired
         Expired,
+        /// Transcation failed to execute
+        Failed,
     }
 
     #[event]
-    struct TransactionExpiredEvent has drop, store {
+    struct TransactionFailedEvent has drop, store {
         key: ScheduleMapKey,
         sender_addr: address,
         cancelled_txn_code: CancelledTxnCode,
@@ -234,7 +236,7 @@ module aptos_framework::scheduled_txns {
         while (!txns_to_cancel.is_empty()) {
             let KeyAndTxnInfo { key, account_addr, deposit_amt } = txns_to_cancel.pop_back();
             cancel_internal(account_addr, key, deposit_amt);
-            event::emit(TransactionExpiredEvent {
+            event::emit(TransactionFailedEvent {
                 key,
                 sender_addr: account_addr,
                 cancelled_txn_code: CancelledTxnCode::Shutdown
@@ -457,7 +459,7 @@ module aptos_framework::scheduled_txns {
                 key,
                 deposit_amt
             );
-            event::emit(TransactionExpiredEvent {
+            event::emit(TransactionFailedEvent {
                 key,
                 sender_addr: account_addr,
                 cancelled_txn_code: CancelledTxnCode::Expired
@@ -536,6 +538,17 @@ module aptos_framework::scheduled_txns {
         } else {
             f(std::option::none());
         };
+    }
+
+    fun emit_transaction_failed_event(
+        key: ScheduleMapKey,
+        sender_addr: address,
+    ) {
+        event::emit(TransactionFailedEvent {
+            key,
+            sender_addr,
+            cancelled_txn_code: CancelledTxnCode::Failed
+        });
     }
 
     ////////////////////////// TESTS //////////////////////////

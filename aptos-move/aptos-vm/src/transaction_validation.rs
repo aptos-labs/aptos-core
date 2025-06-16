@@ -39,6 +39,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
+use aptos_types::transaction::scheduled_txn::SCHEDULED_TRANSACTIONS_MODULE_INFO;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -745,4 +746,19 @@ pub(crate) fn run_scheduled_txn_cleanup(
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
         .expect("Failed to run scheduled txn cleanup");
+
+    // emit event for the failed scheduled transaction
+    let args = vec![
+        txn.key.as_move_value(),
+        MoveValue::Address(txn.sender_handle),
+    ];
+    session.execute_function_bypass_visibility(
+        &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+        &SCHEDULED_TRANSACTIONS_MODULE_INFO.emit_transaction_failed_event_name,
+        vec![],
+        serialize_values(&args),
+        &mut UnmeteredGasMeter,
+        traversal_context,
+        module_storage,
+    ).expect("Failed to emit transaction failed event");
 }
