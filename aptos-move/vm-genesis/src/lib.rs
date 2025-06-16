@@ -17,7 +17,10 @@ use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
-    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    account_config::{
+        self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS,
+        EXPERIMENTAL_CODE_ADDRESS,
+    },
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     executable::ModulePath,
@@ -311,6 +314,7 @@ pub fn encode_genesis_change_set(
         genesis_config.initial_jwks.clone(),
         genesis_config.keyless_groth16_vk.clone(),
     );
+    initialize_confidential_asset(&mut session, &module_storage, chain_id);
     set_genesis_end(&mut session, &module_storage);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -395,6 +399,39 @@ fn exec_function(
         .unwrap_or_else(|e| {
             panic!(
                 "Error calling {}.{}: ({:#x}) {}",
+                module_name,
+                function_name,
+                e.sub_status().unwrap_or_default(),
+                e,
+            )
+        });
+}
+
+fn exec_experimental_function(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl ModuleStorage,
+    module_name: &str,
+    function_name: &str,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) {
+    let storage = TraversalStorage::new();
+    session
+        .execute_function_bypass_visibility(
+            &ModuleId::new(
+                EXPERIMENTAL_CODE_ADDRESS,
+                Identifier::new(module_name).unwrap(),
+            ),
+            &Identifier::new(function_name).unwrap(),
+            ty_args,
+            args,
+            &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&storage),
+            module_storage,
+        )
+        .unwrap_or_else(|e| {
+            panic!(
+                "Error calling experimental {}.{}: ({:#x}) {}",
                 module_name,
                 function_name,
                 e.sub_status().unwrap_or_default(),
@@ -808,6 +845,23 @@ fn initialize_keyless_accounts(
                 MoveValue::Signer(CORE_CODE_ADDRESS),
                 jwk_patches.as_move_value(),
             ]),
+        );
+    }
+}
+
+fn initialize_confidential_asset(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    chain_id: ChainId,
+) {
+    if !chain_id.is_mainnet() && !chain_id.is_testnet() {
+        exec_experimental_function(
+            session,
+            module_storage,
+            "confidential_asset",
+            "init_module_for_testing",
+            vec![],
+            serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
         );
     }
 }

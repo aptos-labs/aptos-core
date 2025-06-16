@@ -79,6 +79,15 @@ module aptos_experimental::confidential_asset {
     /// An internal error occurred, indicating unexpected behavior.
     const EINTERNAL_ERROR: u64 = 16;
 
+    /// Sender and recipient amounts encrypt different transfer amounts
+    const EINVALID_SENDER_AMOUNT: u64 = 17;
+
+    /// The confidential asset controller is not installed.
+    const EFA_CONTROLLER_NOT_INSTALLED: u64 = 18;
+
+    /// [TEST-ONLY] The confidential asset module initialization failed.
+    const EINIT_MODULE_FAILED: u64 = 1000;
+
     //
     // Constants
     //
@@ -88,6 +97,9 @@ module aptos_experimental::confidential_asset {
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
     const MAINNET_CHAIN_ID: u8 = 1;
+
+    /// The testnet chain ID.
+    const TESTNET_CHAIN_ID: u8 = 2;
 
     //
     // Structs
@@ -506,6 +518,12 @@ module aptos_experimental::confidential_asset {
     }
 
     #[view]
+    /// Checks if the confidential asset controller is installed.
+    public fun confidential_asset_controller_exists(): bool {
+        exists<FAController>(@aptos_experimental)
+    }
+
+    #[view]
     /// Checks if the token is allowed for confidential transfers.
     public fun is_token_allowed(token: Object<Metadata>): bool acquires FAController, FAConfig {
         if (!is_allow_list_enabled()) {
@@ -526,6 +544,7 @@ module aptos_experimental::confidential_asset {
     /// If the allow list is enabled, only tokens from the allow list can be transferred.
     /// Otherwise, all tokens are allowed.
     public fun is_allow_list_enabled(): bool acquires FAController {
+        assert!(confidential_asset_controller_exists(), error::invalid_state(EFA_CONTROLLER_NOT_INSTALLED));
         borrow_global<FAController>(@aptos_experimental).allow_list_enabled
     }
 
@@ -1068,14 +1087,16 @@ module aptos_experimental::confidential_asset {
         fa
     }
 
+    entry fun init_module_for_testing(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @aptos_experimental, error::invalid_argument(EINIT_MODULE_FAILED));
+        assert!(chain_id::get() != MAINNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
+        assert!(chain_id::get() != TESTNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
+        init_module(deployer)
+    }
+
     //
     // Test-only functions
     //
-
-    #[test_only]
-    public fun init_module_for_testing(deployer: &signer) {
-        init_module(deployer)
-    }
 
     #[test_only]
     public fun verify_pending_balance(
