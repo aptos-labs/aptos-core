@@ -1053,7 +1053,11 @@ impl fmt::Display for PrettyEvent<'_> {
             },
             ContractEvent::V2(_v2) => (),
         }
-        writeln!(f, "    type:    {}", self.0.type_tag())?;
+        writeln!(
+            f,
+            "    type:    {}",
+            self.0.type_tag().to_canonical_string()
+        )?;
         writeln!(f, "    data:    {:?}", hex::encode(self.0.event_data()))?;
         write!(f, "}}")
     }

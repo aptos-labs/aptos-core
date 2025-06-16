@@ -60,16 +60,15 @@ fuzz_target!(|data: FuzzData| -> Corpus {
         tdbg!(
             "a_type:{:?}\na_string:{}\nserialized:{:?}",
             data.a.clone(),
-            data.a.to_string(),
+            data.a.to_canonical_string(),
             bcs::to_bytes(&data.a).unwrap()
         );
         tdbg!(
             "b_type:{:?}\nb_string:{}\nserialized:{:?}",
             data.b.clone(),
-            data.b.to_string(),
+            data.b.to_canonical_string(),
             bcs::to_bytes(&data.b).unwrap()
         );
-        assert!(data.a.to_string() != data.b.to_string());
         assert!(data.a.to_canonical_string() != data.b.to_canonical_string());
     }
 

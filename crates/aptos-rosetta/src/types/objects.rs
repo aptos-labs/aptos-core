@@ -1385,7 +1385,7 @@ async fn parse_operations_from_write_set(
                 if let Some(currency) = maybe_currency {
                     parse_coinstore_changes(
                         currency.clone(),
-                        type_tag.to_string(),
+                        type_tag.to_canonical_string(),
                         version,
                         address,
                         data,
@@ -1398,7 +1398,8 @@ async fn parse_operations_from_write_set(
             } else {
                 warn!(
                     "Failed to parse coinstore {} at version {}",
-                    struct_tag, version
+                    struct_tag.to_canonical_string(),
+                    version
                 );
                 Ok(vec![])
             }

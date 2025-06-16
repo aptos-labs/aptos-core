@@ -903,9 +903,9 @@ impl serde::Serialize for MoveStruct {
                 // Unfortunately, we can't serialize this in the logical way: as a Serde struct named `type` with a field for
                 // each of `fields` because serde insists that struct and field names be `'static &str`'s
                 let mut t = serializer.serialize_struct(MOVE_STRUCT_NAME, 2)?;
-                // serialize type as string (e.g., 0x0::ModuleName::StructName<TypeArg1,TypeArg2>) instead of (e.g.
+                // serialize type as string (e.g., 0x0::ModuleName::StructName<TypeArg1, TypeArg2>) instead of (e.g.
                 // { address: 0x0...0, module: ModuleName, name: StructName, type_args: [TypeArg1, TypeArg2]})
-                t.serialize_field(MOVE_STRUCT_TYPE, &type_.to_string())?;
+                t.serialize_field(MOVE_STRUCT_TYPE, &type_.to_canonical_string())?;
                 t.serialize_field(MOVE_STRUCT_FIELDS, &MoveFields(fields))?;
                 t.end()
             },
@@ -973,7 +973,7 @@ impl fmt::Display for MoveStructLayout {
                 }
             },
             Self::WithTypes { type_, fields } => {
-                write!(f, "Type: {}", type_)?;
+                write!(f, "Type: {}", type_.to_canonical_string())?;
                 write!(f, "Fields:")?;
                 for field in fields {
                     write!(f, "{}, ", field)?
@@ -1035,76 +1035,4 @@ impl TryInto<StructTag> for &MoveStructLayout {
             WithTypes { type_, .. } => Ok(type_.clone()),
         }
     }
-}
-
-impl fmt::Display for MoveValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MoveValue::U8(u) => write!(f, "{}u8", u),
-            MoveValue::U16(u) => write!(f, "{}u16", u),
-            MoveValue::U32(u) => write!(f, "{}u32", u),
-            MoveValue::U64(u) => write!(f, "{}u64", u),
-            MoveValue::U128(u) => write!(f, "{}u128", u),
-            MoveValue::U256(u) => write!(f, "{}u256", u),
-            MoveValue::Bool(false) => write!(f, "false"),
-            MoveValue::Bool(true) => write!(f, "true"),
-            MoveValue::Address(a) => write!(f, "{}", a.to_hex_literal()),
-            MoveValue::Signer(a) => write!(f, "signer({})", a.to_hex_literal()),
-            MoveValue::Vector(v) => fmt_list(f, "vector[", v, "]"),
-            MoveValue::Struct(s) => fmt::Display::fmt(s, f),
-            MoveValue::Closure(c) => fmt::Display::fmt(c, f),
-        }
-    }
-}
-
-impl fmt::Display for MoveStruct {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MoveStruct::Runtime(v) => fmt_list(f, "struct[", v, "]"),
-            MoveStruct::RuntimeVariant(tag, v) => fmt_list(f, &format!("variant#{}[", tag), v, "]"),
-            MoveStruct::WithFields(fields) => {
-                fmt_list(f, "{", fields.iter().map(DisplayFieldBinding), "}")
-            },
-            MoveStruct::WithTypes {
-                _type_: type_,
-                _fields: fields,
-            } => {
-                fmt::Display::fmt(type_, f)?;
-                fmt_list(f, " {", fields.iter().map(DisplayFieldBinding), "}")
-            },
-            MoveStruct::WithVariantFields(name, _tag, fields) => fmt_list(
-                f,
-                &format!("{}{{", name),
-                fields.iter().map(DisplayFieldBinding),
-                "}",
-            ),
-        }
-    }
-}
-
-struct DisplayFieldBinding<'a>(&'a (Identifier, MoveValue));
-
-impl fmt::Display for DisplayFieldBinding<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let DisplayFieldBinding((field, value)) = self;
-        write!(f, "{}: {}", field, value)
-    }
-}
-
-fn fmt_list<T: fmt::Display>(
-    f: &mut fmt::Formatter<'_>,
-    begin: &str,
-    items: impl IntoIterator<Item = T>,
-    end: &str,
-) -> fmt::Result {
-    write!(f, "{}", begin)?;
-    let mut items = items.into_iter();
-    if let Some(x) = items.next() {
-        write!(f, "{}", x)?;
-        for x in items {
-            write!(f, ", {}", x)?;
-        }
-    }
-    write!(f, "{}", end)?;
-    Ok(())
 }

@@ -195,13 +195,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
+    fn module_write_set(&self) -> Vec<ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get module writes")
             .module_write_set()
-            .clone()
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -345,6 +347,28 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .fee_statement()
     }
 
+    /// Returns true iff the TransactionsStatus is Retry.
+    fn is_retry(&self) -> bool {
+        if let Some(committed_output) = self.committed_output.get() {
+            committed_output.status().is_retry()
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .expect("Either vm_output or committed_output must exist.")
+                .status()
+                .is_retry()
+        }
+    }
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool {
+        self.committed_output
+            .get()
+            .expect("Must call after commit.")
+            .has_new_epoch_event()
+    }
+
     fn output_approx_size(&self) -> u64 {
         let vm_output = self.vm_output.lock();
         vm_output
@@ -419,7 +443,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
@@ -446,6 +470,7 @@ impl<
         let ret = executor.execute_block(
             signature_verified_block,
             state_view,
+            &transaction_slice_metadata,
             &mut module_cache_manager_guard,
         );
         match ret {
@@ -490,7 +515,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,

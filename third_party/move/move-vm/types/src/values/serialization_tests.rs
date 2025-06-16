@@ -382,7 +382,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn to_stable_string(&self) -> String {
+        fn to_canonical_string(&self) -> String {
             // Needed for assertion failure printing
             "<some function>".to_string()
         }
