@@ -6,6 +6,7 @@ use crate::{
     move_vm_ext::{
         resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
     },
+    session::Session,
 };
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
@@ -81,34 +82,13 @@ where
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
     ) -> Self {
-        let mut extensions = NativeContextExtensions::default();
-        let txn_hash: [u8; 32] = session_id
-            .as_uuid()
-            .to_vec()
-            .try_into()
-            .expect("HashValue should convert to [u8; 32]");
-
-        extensions.add(NativeTableContext::new(txn_hash, resolver));
-        extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(
-            txn_hash,
+        let extensions = aptos_extensions(
             resolver,
-            vm_config.delayed_field_optimization_enabled,
-            resolver,
-        ));
-        extensions.add(RandomnessContext::new());
-        extensions.add(NativeTransactionContext::new(
-            txn_hash.to_vec(),
-            session_id.into_script_hash(),
-            chain_id.id(),
+            chain_id,
+            vm_config,
+            session_id,
             maybe_user_transaction_context,
-        ));
-        extensions.add(NativeCodeContext::new());
-        extensions.add(NativeStateStorageContext::new(resolver));
-        extensions.add(NativeEventContext::default());
-        extensions.add(NativeObjectContext::default());
-
+        );
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
             data_cache: TransactionDataCache::empty(),
@@ -117,8 +97,13 @@ where
             is_storage_slot_metadata_enabled,
         }
     }
+}
 
-    pub fn execute_function_bypass_visibility(
+impl<'r, R> Session for SessionExt<'r, R>
+where
+    R: AptosMoveResolver,
+{
+    fn execute_function_bypass_visibility(
         &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
@@ -141,7 +126,7 @@ where
         )
     }
 
-    pub fn execute_loaded_function(
+    fn execute_loaded_function(
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
@@ -161,6 +146,21 @@ where
         )
     }
 
+    fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+        let ctx = self.extensions.get_mut::<NativeCodeContext>();
+        ctx.extract_publish_request()
+    }
+
+    fn mark_unbiasable(&mut self) {
+        let txn_context = self.extensions.get_mut::<RandomnessContext>();
+        txn_context.mark_unbiasable();
+    }
+}
+
+impl<'r, R> SessionExt<'r, R>
+where
+    R: AptosMoveResolver,
+{
     pub fn finish(
         self,
         configs: &ChangeSetConfigs,
@@ -237,18 +237,6 @@ where
         .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(change_set)
-    }
-
-    /// Returns the publish request if it exists. If the provided flag is set to true, disables any
-    /// subsequent module publish requests.
-    pub(crate) fn extract_publish_request(&mut self) -> Option<PublishRequest> {
-        let ctx = self.extensions.get_mut::<NativeCodeContext>();
-        ctx.extract_publish_request()
-    }
-
-    pub(crate) fn mark_unbiasable(&mut self) {
-        let txn_context = self.extensions.get_mut::<RandomnessContext>();
-        txn_context.mark_unbiasable();
     }
 
     fn populate_v0_resource_group_change_set(
@@ -525,4 +513,40 @@ pub fn convert_modules_into_write_ops(
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
+}
+
+pub(crate) fn aptos_extensions<'r, R>(
+    resolver: &'r R,
+    chain_id: ChainId,
+    vm_config: &VMConfig,
+    session_id: SessionId,
+    maybe_user_transaction_context: Option<UserTransactionContext>,
+) -> NativeContextExtensions<'r>
+where
+    R: AptosMoveResolver,
+{
+    let mut extensions = NativeContextExtensions::default();
+    let txn_hash = session_id.txn_hash();
+
+    extensions.add(NativeTableContext::new(txn_hash, resolver));
+    extensions.add(NativeRistrettoPointContext::new());
+    extensions.add(AlgebraContext::new());
+    extensions.add(NativeAggregatorContext::new(
+        txn_hash,
+        resolver,
+        vm_config.delayed_field_optimization_enabled,
+        resolver,
+    ));
+    extensions.add(RandomnessContext::new());
+    extensions.add(NativeTransactionContext::new(
+        txn_hash.to_vec(),
+        session_id.into_script_hash(),
+        chain_id.id(),
+        maybe_user_transaction_context,
+    ));
+    extensions.add(NativeCodeContext::new());
+    extensions.add(NativeStateStorageContext::new(resolver));
+    extensions.add(NativeEventContext::default());
+    extensions.add(NativeObjectContext::default());
+    extensions
 }

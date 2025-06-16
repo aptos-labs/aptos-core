@@ -4,7 +4,7 @@
 use crate::{
     aptos_vm::SerializedSigners,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::{AptosMoveResolver, SessionExt},
+    session::Session,
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
@@ -105,7 +105,7 @@ impl TransactionValidation {
 }
 
 pub(crate) fn run_script_prologue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
@@ -396,7 +396,7 @@ pub(crate) fn run_script_prologue(
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
     executable: TransactionExecutableRef,
@@ -448,7 +448,7 @@ pub(crate) fn run_multisig_prologue(
 }
 
 fn run_epilogue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -598,7 +598,7 @@ fn run_epilogue(
 }
 
 fn emit_fee_statement(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
@@ -618,7 +618,7 @@ fn emit_fee_statement(
 /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -653,7 +653,7 @@ pub(crate) fn run_success_epilogue(
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,

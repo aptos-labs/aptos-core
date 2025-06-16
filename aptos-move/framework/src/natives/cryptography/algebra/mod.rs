@@ -28,7 +28,10 @@ use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::{NativeExtensionCheckpoint, VersionControlledNativeExtension},
+    native_functions::NativeFunction,
+};
 use once_cell::sync::Lazy;
 use std::{any::Any, hash::Hash, rc::Rc};
 
@@ -188,6 +191,21 @@ const E_TOO_MUCH_MEMORY_USED: u64 = 0x09_0003;
 pub struct AlgebraContext {
     bytes_used: usize,
     objs: Vec<Rc<dyn Any>>,
+}
+
+impl VersionControlledNativeExtension for AlgebraContext {
+    fn restore(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // No-op: nothing to restore.
+    }
+
+    fn save(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // No-op: nothing to save.
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.bytes_used = 0;
+        self.objs.clear();
+    }
 }
 
 impl AlgebraContext {

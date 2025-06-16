@@ -13,6 +13,9 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetad
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::native_extensions::{
+    NativeExtensionCheckpoint, VersionControlledNativeExtension,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -52,6 +55,20 @@ pub struct NativeAggregatorContext<'a> {
     pub(crate) delayed_field_optimization_enabled: bool,
     pub(crate) delayed_field_resolver: &'a dyn DelayedFieldResolver,
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
+}
+
+impl<'a> VersionControlledNativeExtension for NativeAggregatorContext<'a> {
+    fn restore(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // TODO: implement
+    }
+
+    fn save(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // TODO: implement
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.txn_hash = *txn_hash;
+    }
 }
 
 impl<'a> NativeAggregatorContext<'a> {

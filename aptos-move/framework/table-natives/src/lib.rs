@@ -25,7 +25,10 @@ use move_core_types::{
 // ===========================================================================================
 // Public Data Structures and Constants
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
-use move_vm_runtime::native_functions::NativeFunctionTable;
+use move_vm_runtime::{
+    native_extensions::{NativeExtensionCheckpoint, VersionControlledNativeExtension},
+    native_functions::NativeFunctionTable,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -105,6 +108,21 @@ pub struct TableChange {
 
 // =========================================================================================
 // Implementation of Native Table Context
+
+impl<'a> VersionControlledNativeExtension for NativeTableContext<'a> {
+    fn restore(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // TODO
+    }
+
+    fn save(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // TODO
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        // Update transaction hash only.
+        self.txn_hash = *txn_hash;
+    }
+}
 
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an

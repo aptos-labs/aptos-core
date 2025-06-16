@@ -63,6 +63,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
+    session::Session,
     AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;

@@ -14,7 +14,10 @@ use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::{NativeExtensionCheckpoint, VersionControlledNativeExtension},
+    native_functions::NativeFunction,
+};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
@@ -30,6 +33,20 @@ pub const ECANNOT_CREATE_EVENT: u64 = 1;
 #[derive(Default, Tid)]
 pub struct NativeEventContext {
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+}
+
+impl VersionControlledNativeExtension for NativeEventContext {
+    fn restore(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // TODO
+    }
+
+    fn save(&mut self, _checkpoint: NativeExtensionCheckpoint) {
+        // TODO
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        // No-op: nothing needs to be updated.
+    }
 }
 
 impl NativeEventContext {
