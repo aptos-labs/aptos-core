@@ -99,6 +99,24 @@ impl SubmissionWorker {
             let loop_stats = stats_clone.get_cur();
 
             let requests = self.gen_requests();
+            // Log the requests being sent for debugging
+            if !requests.is_empty() {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(60)),
+                    info!(
+                        "[{:?}] Sending {} transactions: {:?}",
+                        self.client().path_prefix_string(),
+                        requests.len(),
+                        requests.iter().map(|req| format!(
+                            "sender: {}, seq: {}, gas_price: {}, max_gas: {}",
+                            req.sender(),
+                            req.sequence_number(),
+                            req.gas_unit_price(),
+                            req.max_gas_amount()
+                        )).collect::<Vec<_>>()
+                    )
+                );
+            }
             if !requests.is_empty() {
                 let mut account_to_start_and_end_seq_num = HashMap::new();
                 for req in requests.iter() {
@@ -477,7 +495,7 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
-
+            warn!("Number of failures: {}", failures.len());
             stats
                 .failed_submission
                 .fetch_add(failures.len() as u64, Ordering::Relaxed);
@@ -491,6 +509,7 @@ pub async fn submit_transactions(
                 })
                 .counts();
             if let Some(failure) = failures.first() {
+                warn!("Number of failures: {}", failures.len());
                 sample!(SampleRate::Duration(Duration::from_secs(60)), {
                     let first_failed_txn = &txns[failure.transaction_index];
                     let sender = first_failed_txn.sender();

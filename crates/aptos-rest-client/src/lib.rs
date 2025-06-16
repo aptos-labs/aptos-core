@@ -55,6 +55,7 @@ use std::{collections::BTreeMap, future::Future, str::FromStr, time::Duration};
 use tokio::time::Instant;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 use url::Url;
+use aptos_logger::warn;
 
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
 const DEFAULT_MAX_WAIT_MS: u64 = 60000;
@@ -646,6 +647,7 @@ impl Client {
         txns: &[SignedTransaction],
     ) -> AptosResult<Response<TransactionsBatchSubmissionResult>> {
         let txn_payload = bcs::to_bytes(&txns.to_vec())?;
+        warn!("Txn payload: {:?}", txn_payload);
         let url = self.build_path("transactions/batch")?;
 
         let response = self
@@ -656,7 +658,7 @@ impl Client {
             .body(txn_payload)
             .send()
             .await?;
-
+        warn!("Response: {:?}", response);
         let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }

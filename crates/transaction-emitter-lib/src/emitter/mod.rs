@@ -214,8 +214,8 @@ impl Default for EmitJobRequest {
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::Workflow {
                 workflow_kind: Box::new(TokenWorkflowKind::MarketplaceWorkflow {
-                    count: 1000,
-                    creation_balance: 200000,
+                    count: 10,
+                    creation_balance: 3_0000_000000,
                 }),
                 num_modules: 1,
                 use_account_pool: false,

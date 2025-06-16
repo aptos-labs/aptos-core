@@ -16,6 +16,7 @@ use aptos_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, SeedableRng};
 use std::{sync::Arc, time::Duration};
+use aptos_transaction_workloads_lib::token_workflow::TokenWorkflowKind;
 
 pub async fn generate_traffic(
     swarm: &mut dyn Swarm,
@@ -117,42 +118,16 @@ pub async fn create_emit_job_request(
 
 static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Lazy::new(|| {
     vec![
-        // vec![(
-        //     TransactionType::AccountGeneration {
-        //         add_created_accounts_to_pool: true,
-        //         max_account_working_set: 1_000_000,
-        //         creation_balance: 1_000_000,
-        //     },
-        //     20,
-        // )],
-        // vec![
-        //     (TransactionTypeArg::CoinTransfer.materialize_default(), 20),
-        //     // // commenting this out given it consistently fails smoke test
-        //     // // and it seems to be called only from `test_txn_emmitter`
-        //     (
-        //         TransactionType::PublishPackage {
-        //             use_account_pool: false,
-        //         },
-        //         20,
-        //     ),
-        // ],
         vec![
             (
-                TransactionTypeArg::NoOp.materialize(
-                    100,
-                    false,
-                    WorkflowProgress::when_done_default(),
-                ),
-                20,
-            ),
-            (
-                TransactionType::CallCustomModules {
-                    entry_point: Box::new(EntryPoints::MakeOrChangeTable {
-                        offset: 0,
-                        count: 60,
+                TransactionType::Workflow {
+                    workflow_kind: Box::new(TokenWorkflowKind::MarketplaceWorkflow {
+                        count: 1000,
+                        creation_balance: 2000_000_000,  // 2000 APT to support 1000 transactions at max gas
                     }),
                     num_modules: 1,
                     use_account_pool: false,
+                    progress_type: WorkflowProgress::MoveByPhases,
                 },
                 20,
             ),
@@ -165,14 +140,14 @@ static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Laz
 #[ignore]
 #[tokio::test]
 async fn test_txn_emmitter() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
     let txn_stat = generate_traffic(
         &mut swarm,
         &all_validators,
-        Duration::from_secs(20),
+        Duration::from_secs(60),
         100,
         TRANSACTION_MIX_PER_PHASE.to_vec(),
     )

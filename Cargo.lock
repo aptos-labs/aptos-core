@@ -16832,6 +16832,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-workloads-lib",
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",
