@@ -52,6 +52,7 @@ async fn test_view_gas_used_header() {
     let txn2 = context.account_transfer(creator, owner, 100_000);
 
     context.commit_block(&vec![txn1, txn2]).await;
+    context.wait_for_internal_indexer_caught_up().await;
 
     let req = warp::test::request()
         .method("POST")

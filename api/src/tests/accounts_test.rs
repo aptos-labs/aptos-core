@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use crate::tests::new_test_context_with_db_sharding_and_internal_indexer;
 use aptos_api_test_context::{current_function_name, find_value, TestContext};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
@@ -55,8 +54,7 @@ async fn test_get_account_resources_by_valid_account_address() {
         res.push(resp);
     }
 
-    let shard_context =
-        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let shard_context = new_test_context(current_function_name!());
     let mut shard_res = vec![];
     for address in &addresses {
         let resp = shard_context.get(&account_resources(address)).await;
@@ -159,8 +157,7 @@ async fn test_get_account_resources_by_ledger_version() {
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_by_ledger_version_with_shard_context() {
-    let shard_context =
-        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let shard_context = new_test_context(current_function_name!());
     test_account_resources_by_ledger_version_with_context(shard_context).await;
 }
 
@@ -311,8 +308,7 @@ async fn test_get_account_modules_by_ledger_version_with_context(mut context: Te
 async fn test_get_account_modules_by_ledger_version() {
     let context = new_test_context(current_function_name!());
     test_get_account_modules_by_ledger_version_with_context(context).await;
-    let shard_context =
-        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let shard_context = new_test_context(current_function_name!());
     test_get_account_modules_by_ledger_version_with_context(shard_context).await;
 }
 
