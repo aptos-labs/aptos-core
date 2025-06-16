@@ -197,4 +197,33 @@ impl SessionId {
             | Self::BlockMetaExt { id: _ } => vec![],
         }
     }
+
+    pub fn txn_hash(&self) -> [u8; 32] {
+        let txn_hash: [u8; 32] = self
+            .as_uuid()
+            .to_vec()
+            .try_into()
+            .expect("HashValue should convert to [u8; 32]");
+        txn_hash
+    }
+
+    pub fn txn_hash_and_script_hash(&self) -> ([u8; 32], &[u8]) {
+        let script_hash = match self {
+            Self::Txn { script_hash, .. }
+            | Self::Prologue { script_hash, .. }
+            | Self::Epilogue { script_hash, .. }
+            | Self::RunOnAbort { script_hash, .. }
+            | Self::ValidatorTxn { script_hash }
+            | Self::OrderlessTxn { script_hash, .. }
+            | Self::OrderlessTxnProlouge { script_hash, .. }
+            | Self::OrderlessTxnEpilogue { script_hash, .. }
+            | Self::OrderlessRunOnAbort { script_hash, .. } => script_hash.as_slice(),
+            Self::BlockMeta { id: _ }
+            | Self::Genesis { id: _ }
+            | Self::Void
+            | Self::BlockMetaExt { id: _ }
+            | Self::BlockEpilogue { id: _ } => &[],
+        };
+        (self.txn_hash(), script_hash)
+    }
 }

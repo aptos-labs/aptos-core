@@ -39,7 +39,7 @@ use aptos_types::{
     state_store::TStateView,
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
 };
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::SessionId, session::Session, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{

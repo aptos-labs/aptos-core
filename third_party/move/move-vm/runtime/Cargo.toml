@@ -27,6 +27,7 @@ move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
+smallvec = { workspace = true }
 triomphe = { workspace = true }
 typed-arena = { workspace = true }
 

@@ -58,6 +58,7 @@ ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+smallvec = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

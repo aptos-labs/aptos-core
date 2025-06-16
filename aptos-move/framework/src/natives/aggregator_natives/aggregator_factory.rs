@@ -49,7 +49,7 @@ fn native_new_aggregator(
     // number of aggregator instances created so far.
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
     hasher.update(&aggregator_context.txn_hash());
-    hasher.update(&(aggregator_data.num_aggregators() as u32).to_be_bytes());
+    hasher.update(&aggregator_data.aggregator_count().to_be_bytes());
     let hash = hasher.finish().to_vec();
 
     if let Ok(key) = AccountAddress::from_bytes(hash) {

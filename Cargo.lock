@@ -457,8 +457,10 @@ dependencies = [
  "claims",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "smallvec",
  "test-case",
 ]
 
@@ -4802,6 +4804,7 @@ dependencies = [
  "rand_core 0.5.1",
  "rayon",
  "serde",
+ "smallvec",
  "test-case",
 ]
 
@@ -12665,6 +12668,7 @@ dependencies = [
  "proptest",
  "serde",
  "smallbitvec",
+ "smallvec",
  "triomphe",
  "typed-arena",
 ]

@@ -14,7 +14,9 @@ use aptos_types::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
-use std::collections::{BTreeMap, BTreeSet};
+use move_vm_runtime::native_extensions::ValueHistory;
+use smallvec::{smallvec, SmallVec};
+use std::collections::{btree_map::Entry, BTreeMap};
 
 /// When `Addition` operation overflows the `limit`.
 pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -52,7 +54,7 @@ pub enum AggregatorState {
 }
 
 /// Internal aggregator data structure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Aggregator {
     // Describes a value of an aggregator.
     value: u128,
@@ -278,19 +280,36 @@ impl Aggregator {
 
 /// Stores all information about aggregators (how many have been created or
 /// removed), what are their states, etc. per single transaction).
-#[derive(Default)]
 pub struct AggregatorData {
-    // All aggregators that were created in the current transaction, stored as ids.
-    // Used to filter out aggregators that were created and destroyed in the
-    // within a single transaction.
-    new_aggregators: BTreeSet<AggregatorID>,
-    // All aggregators that were destroyed in the current transaction, stored as ids.
-    destroyed_aggregators: BTreeSet<AggregatorID>,
+    next_version: u32,
+    saved_versions: SmallVec<[u32; 2]>,
+    current_version: u32,
     // All aggregator instances that exist in the current transaction.
-    aggregators: BTreeMap<AggregatorID, Aggregator>,
+    aggregators: BTreeMap<AggregatorID, ValueHistory<Option<Aggregator>>>,
+    aggregators_count: u32,
 }
 
 impl AggregatorData {
+    pub fn undo(&mut self) {
+        if self.saved_versions.len() > 1 {
+            self.saved_versions.pop();
+            self.current_version = *self
+                .saved_versions
+                .last()
+                .expect("Saved version must exist");
+        }
+    }
+
+    pub fn save(&mut self) {
+        self.current_version = self.next_version;
+        self.saved_versions.push(self.current_version);
+        self.next_version += 1;
+    }
+
+    pub fn update(&mut self) {
+        self.aggregators_count = 0;
+    }
+
     /// Returns a mutable reference to an aggregator with `id` and a `max_value`.
     /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
@@ -300,18 +319,42 @@ impl AggregatorData {
         id: AggregatorID,
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
-        let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
-            value: 0,
-            state: AggregatorState::PositiveDelta,
-            max_value,
-            history: Some(DeltaHistory::new()),
-        });
-        Ok(aggregator)
+        Ok(match self.aggregators.entry(id) {
+            Entry::Vacant(entry) => {
+                let mut value = ValueHistory::new();
+                value.set(
+                    self.current_version,
+                    Some(Aggregator {
+                        value: 0,
+                        state: AggregatorState::PositiveDelta,
+                        max_value,
+                        history: Some(DeltaHistory::new()),
+                    }),
+                );
+
+                let h = entry.insert(value);
+                h.last_mut(self.current_version)
+                    .expect("Aggregator value must be set")
+                    .as_mut()
+                    .expect("Aggregator was just created")
+            },
+            Entry::Occupied(entry) => {
+                let e = entry.into_mut();
+                e.last_mut(self.current_version)
+                    .expect("If history exists, there should be at least one value")
+                    .as_mut()
+                    .ok_or_else(|| {
+                        PartialVMError::new_invariant_violation(
+                            "Cannot request an aggregator if it was deleted",
+                        )
+                    })?
+            },
+        })
     }
 
     /// Returns the number of aggregators that are used in the current transaction.
-    pub fn num_aggregators(&self) -> u128 {
-        self.aggregators.len() as u128
+    pub fn aggregator_count(&self) -> u32 {
+        self.aggregators_count
     }
 
     /// Creates and a new Aggregator with a given `id` and a `max_value`. The value
@@ -324,39 +367,66 @@ impl AggregatorData {
             max_value,
             history: None,
         };
-        self.aggregators.insert(id.clone(), aggregator);
-        self.new_aggregators.insert(id);
+
+        self.aggregators
+            .entry(id.clone())
+            .or_insert_with(ValueHistory::new)
+            .set(self.current_version, Some(aggregator));
+        self.aggregators_count += 1;
     }
 
     /// If aggregator has been used in this transaction, it is removed. Otherwise,
     /// it is marked for deletion.
-    pub fn remove_aggregator(&mut self, id: AggregatorID) {
-        // Aggregator no longer in use during this transaction: remove it.
-        self.aggregators.remove(&id);
-
-        if self.new_aggregators.contains(&id) {
-            // Aggregator has been created in the same transaction. Therefore, no
-            // side-effects.
-            self.new_aggregators.remove(&id);
-        } else {
-            // Otherwise, aggregator has been created somewhere else.
-            self.destroyed_aggregators.insert(id);
+    pub fn remove_aggregator(&mut self, id: AggregatorID) -> PartialVMResult<()> {
+        match self.aggregators.entry(id) {
+            Entry::Vacant(entry) => {
+                let mut value = ValueHistory::new();
+                value.set(self.current_version, None);
+                entry.insert(value);
+            },
+            Entry::Occupied(entry) => {
+                if entry
+                    .into_mut()
+                    .last_mut(self.current_version)
+                    .expect("If history exists, there should be at least one value")
+                    .take()
+                    .is_none()
+                {
+                    return Err(PartialVMError::new_invariant_violation(
+                        "Aggregator is already removed",
+                    ));
+                }
+            },
         }
+        Ok(())
     }
 
     /// Unpacks aggregator data.
-    pub fn into(
-        self,
-    ) -> (
-        BTreeSet<AggregatorID>,
-        BTreeSet<AggregatorID>,
-        BTreeMap<AggregatorID, Aggregator>,
-    ) {
-        (
-            self.new_aggregators,
-            self.destroyed_aggregators,
-            self.aggregators,
-        )
+    pub fn into(self) -> BTreeMap<AggregatorID, Option<Aggregator>> {
+        let current_version = self.current_version;
+
+        self.aggregators
+            .into_iter()
+            .map(|(id, h)| {
+                (
+                    id,
+                    h.into_last(current_version)
+                        .expect("At least one value must always exist"),
+                )
+            })
+            .collect()
+    }
+}
+
+impl Default for AggregatorData {
+    fn default() -> Self {
+        Self {
+            next_version: 1,
+            saved_versions: smallvec![0],
+            current_version: 0,
+            aggregators: BTreeMap::new(),
+            aggregators_count: 0,
+        }
     }
 }
 

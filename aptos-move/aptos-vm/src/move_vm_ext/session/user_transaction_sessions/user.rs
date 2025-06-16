@@ -10,6 +10,7 @@ use crate::{
         },
         AptosMoveResolver, SessionId,
     },
+    session::Session,
     transaction_metadata::TransactionMetadata,
     verifier, AptosVM,
 };
@@ -29,6 +30,7 @@ use move_vm_runtime::{
     module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, ModuleStorage,
     StagingModuleStorage,
 };
+use std::collections::BTreeMap;
 
 #[derive(Deref, DerefMut)]
 pub struct UserSession<'r> {
@@ -91,71 +93,19 @@ impl<'r> UserSession<'r> {
         modules: &[CompiledModule],
         compatability_checks: Compatibility,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        // Stage module bundle on top of module storage. In case modules cannot be added (for
-        // example, fail compatibility checks, create cycles, etc.), we return an error here.
-        let staging_module_storage = StagingModuleStorage::create_with_compat_config(
-            &destination,
-            compatability_checks,
-            module_storage,
-            bundle.into_bytes(),
-        )?;
-
-        let init_func_name = ident_str!("init_module");
-        for module in modules {
-            // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
-                continue;
-            }
-
-            self.session.execute(|session| {
-                if gas_feature_version <= RELEASE_V1_30 {
-                    let module_id = module.self_id();
-                    let init_function_exists = staging_module_storage
-                        .load_function(&module_id, init_func_name, &[])
-                        .is_ok();
-
-                    if init_function_exists {
-                        // We need to check that init_module function we found is well-formed.
-                        verifier::module_init::legacy_verify_module_init_function(module)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-
-                        session.execute_function_bypass_visibility(
-                            &module_id,
-                            init_func_name,
-                            vec![],
-                            vec![MoveValue::Signer(destination)
-                                .simple_serialize()
-                                .expect("Signer is always serializable")],
-                            gas_meter,
-                            traversal_context,
-                            &staging_module_storage,
-                        )?;
-                    }
-                } else {
-                    let module = staging_module_storage
-                        .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
-                    if let Ok(function) = module.get_function(init_func_name) {
-                        verifier::module_init::verify_init_module_function(&function)?;
-
-                        let loaded_function = LoadedFunction {
-                            owner: LoadedFunctionOwner::Module(module),
-                            ty_args: vec![],
-                            function,
-                        };
-                        session.execute_loaded_function(
-                            loaded_function,
-                            vec![MoveValue::Signer(destination)
-                                .simple_serialize()
-                                .expect("Signer is always serializable")],
-                            gas_meter,
-                            traversal_context,
-                            &staging_module_storage,
-                        )?;
-                    }
-                }
-                Ok::<_, VMStatus>(())
-            })?;
-        }
+        let staging_module_storage = self.session.execute(|session| {
+            run_init_modules(
+                session,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                gas_feature_version,
+                destination,
+                bundle,
+                modules,
+                compatability_checks,
+            )
+        })?;
 
         // Get the changes from running module initialization. Note that here we use the staged
         // module storage to ensure resource group metadata from new modules is visible.
@@ -166,7 +116,9 @@ impl<'r> UserSession<'r> {
             false,
         )?;
 
-        let write_ops = convert_modules_into_write_ops(
+        let mut write_ops = BTreeMap::new();
+        convert_modules_into_write_ops(
+            &mut write_ops,
             resolver,
             features,
             module_storage,
@@ -176,4 +128,84 @@ impl<'r> UserSession<'r> {
         let module_write_set = ModuleWriteSet::new(write_ops);
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
+}
+
+pub(crate) fn run_init_modules<'a, T>(
+    session: &mut impl Session,
+    module_storage: &'a T,
+    gas_meter: &mut impl AptosGasMeter,
+    traversal_context: &mut TraversalContext,
+    gas_feature_version: u64,
+    destination: AccountAddress,
+    bundle: ModuleBundle,
+    modules: &[CompiledModule],
+    compatability_checks: Compatibility,
+) -> Result<StagingModuleStorage<'a, T>, VMStatus>
+where
+    T: AptosModuleStorage,
+{
+    // Stage module bundle on top of module storage. In case modules cannot be added (for
+    // example, fail compatibility checks, create cycles, etc.), we return an error here.
+    let staging_module_storage = StagingModuleStorage::create_with_compat_config(
+        &destination,
+        compatability_checks,
+        module_storage,
+        bundle.into_bytes(),
+    )?;
+
+    let init_func_name = ident_str!("init_module");
+    for module in modules {
+        // Check if module existed previously. If not, we do not run initialization.
+        if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            continue;
+        }
+
+        if gas_feature_version <= RELEASE_V1_30 {
+            let module_id = module.self_id();
+            let init_function_exists = staging_module_storage
+                .load_function(&module_id, init_func_name, &[])
+                .is_ok();
+
+            if init_function_exists {
+                // We need to check that init_module function we found is well-formed.
+                verifier::module_init::legacy_verify_module_init_function(module)
+                    .map_err(|e| e.finish(Location::Undefined))?;
+
+                session.execute_function_bypass_visibility(
+                    &module_id,
+                    init_func_name,
+                    vec![],
+                    vec![MoveValue::Signer(destination)
+                        .simple_serialize()
+                        .expect("Signer is always serializable")],
+                    gas_meter,
+                    traversal_context,
+                    &staging_module_storage,
+                )?;
+            }
+        } else {
+            let module = staging_module_storage
+                .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
+            if let Ok(function) = module.get_function(init_func_name) {
+                verifier::module_init::verify_init_module_function(&function)?;
+
+                let loaded_function = LoadedFunction {
+                    owner: LoadedFunctionOwner::Module(module),
+                    ty_args: vec![],
+                    function,
+                };
+                session.execute_loaded_function(
+                    loaded_function,
+                    vec![MoveValue::Signer(destination)
+                        .simple_serialize()
+                        .expect("Signer is always serializable")],
+                    gas_meter,
+                    traversal_context,
+                    &staging_module_storage,
+                )?;
+            }
+        }
+    }
+
+    Ok(staging_module_storage)
 }

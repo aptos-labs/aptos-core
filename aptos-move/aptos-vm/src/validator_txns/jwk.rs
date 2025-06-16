@@ -5,6 +5,7 @@ use crate::{
     aptos_vm::get_system_transaction_output,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
+    session::Session,
     system_module_names::{JWKS_MODULE, UPSERT_INTO_OBSERVED_JWKS},
     validator_txns::jwk::{
         ExecutionFailure::{Expected, Unexpected},

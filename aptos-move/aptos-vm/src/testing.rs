@@ -1,15 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(any(test, feature = "testing"))]
-use crate::aptos_vm::{serialized_signer, SerializedSigners};
 use crate::AptosVM;
 #[cfg(any(test, feature = "testing"))]
-use crate::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::session::user_transaction_sessions::session_change_sets::SystemSessionChangeSet,
-    transaction_metadata::TransactionMetadata,
-};
+use crate::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata};
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
@@ -72,15 +66,15 @@ impl AptosVM {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_failed_transaction_cleanup(
         &self,
-        error_vm_status: VMStatus,
+        _error_vm_status: VMStatus,
         txn: &SignedTransaction,
         state_view: &impl StateView,
         gas_meter_balance: u64,
     ) -> (VMStatus, VMOutput) {
         use crate::gas::make_prod_gas_meter;
-        use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+        use move_vm_runtime::module_traversal::TraversalStorage;
 
-        let txn_data = TransactionMetadata::new(txn);
+        let _txn_data = TransactionMetadata::new(txn);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let vm_gas_params = self
@@ -93,7 +87,7 @@ impl AptosVM {
             .expect("should be able to get storage gas params")
             .clone();
 
-        let mut gas_meter = make_prod_gas_meter(
+        let _gas_meter = make_prod_gas_meter(
             self.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
@@ -102,29 +96,31 @@ impl AptosVM {
             &NoopBlockSynchronizationKillSwitch {},
         );
 
-        let change_set_configs = &self
+        let _change_set_configs = &self
             .storage_gas_params(&log_context)
             .expect("Storage gas parameters should exist for tests")
             .change_set_configs;
 
-        let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
+        let _resolver = state_view.as_move_resolver();
+        let _module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
 
-        let traversal_storage = TraversalStorage::new();
-        self.failed_transaction_cleanup(
-            SystemSessionChangeSet::empty(),
-            error_vm_status,
-            &mut gas_meter,
-            &txn_data,
-            &resolver,
-            &module_storage,
-            &SerializedSigners::new(
-                vec![serialized_signer(&txn_data.sender)],
-                txn_data.fee_payer().as_ref().map(serialized_signer),
-            ),
-            &log_context,
-            change_set_configs,
-            &mut TraversalContext::new(&traversal_storage),
-        )
+        let _traversal_storage = TraversalStorage::new();
+
+        unimplemented!("todo")
+        // self.failed_transaction_cleanup(
+        //     SystemSessionChangeSet::empty(),
+        //     error_vm_status,
+        //     &mut gas_meter,
+        //     &txn_data,
+        //     &resolver,
+        //     &module_storage,
+        //     &SerializedSigners::new(
+        //         vec![serialized_signer(&txn_data.sender)],
+        //         txn_data.fee_payer().as_ref().map(serialized_signer),
+        //     ),
+        //     &log_context,
+        //     change_set_configs,
+        //     &mut TraversalContext::new(&traversal_storage),
+        // )
     }
 }
