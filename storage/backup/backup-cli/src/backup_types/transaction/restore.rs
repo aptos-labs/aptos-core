@@ -35,7 +35,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
-    transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
+    transaction::{
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithProof, Version,
+    },
     write_set::WriteSet,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM};
@@ -610,6 +612,11 @@ impl TransactionRestoreBatchController {
                     tokio::task::spawn_blocking(move || {
                         chunk_replayer.enqueue_chunks(
                             txns,
+                            // TODO(grao): Support PersistedAuxiliaryInfo in restore.
+                            txn_infos
+                                .iter()
+                                .map(|_| PersistedAuxiliaryInfo::None)
+                                .collect(),
                             txn_infos,
                             write_sets,
                             events,

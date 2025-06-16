@@ -5,7 +5,7 @@ use crate::metrics::TIMER;
 use anyhow::{ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::state_update_refs::StateUpdateRefs;
-use aptos_types::transaction::{Transaction, TransactionOutput, Version};
+use aptos_types::transaction::{PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version};
 use itertools::izip;
 use std::{
     fmt::{Debug, Formatter},
@@ -16,17 +16,21 @@ use std::{
 pub struct TransactionsWithOutput {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
+    pub persisted_info: Vec<PersistedAuxiliaryInfo>,
 }
 
 impl TransactionsWithOutput {
     pub fn new(
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
+        persisted_info: Vec<PersistedAuxiliaryInfo>,
     ) -> Self {
         assert_eq!(transactions.len(), transaction_outputs.len());
+        assert_eq!(transactions.len(), persisted_info.len());
         Self {
             transactions,
             transaction_outputs,
+            persisted_info,
         }
     }
 
@@ -34,9 +38,15 @@ impl TransactionsWithOutput {
         Self::default()
     }
 
-    pub fn push(&mut self, transaction: Transaction, transaction_output: TransactionOutput) {
+    pub fn push(
+        &mut self,
+        transaction: Transaction,
+        transaction_output: TransactionOutput,
+        persisted_info: PersistedAuxiliaryInfo,
+    ) {
         self.transactions.push(transaction);
         self.transaction_outputs.push(transaction_output);
+        self.persisted_info.push(persisted_info);
     }
 
     pub fn len(&self) -> usize {
@@ -47,8 +57,14 @@ impl TransactionsWithOutput {
         self.transactions.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &TransactionOutput)> {
-        izip!(self.transactions.iter(), self.transaction_outputs.iter(),)
+    pub fn iter(
+        &self,
+    ) -> impl Iterator<Item = (&Transaction, &TransactionOutput, &PersistedAuxiliaryInfo)> {
+        izip!(
+            self.transactions.iter(),
+            self.transaction_outputs.iter(),
+            self.persisted_info.iter()
+        )
     }
 }
 
@@ -96,19 +112,21 @@ impl TransactionsToKeep {
         first_version: Version,
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
+        auxiliary_info: Vec<PersistedAuxiliaryInfo>,
         is_reconfig: bool,
     ) -> Self {
-        let txns_with_output = TransactionsWithOutput::new(transactions, transaction_outputs);
+        let txns_with_output =
+            TransactionsWithOutput::new(transactions, transaction_outputs, auxiliary_info);
         Self::index(first_version, txns_with_output, is_reconfig)
     }
 
     pub fn new_empty() -> Self {
-        Self::make(0, vec![], vec![], false)
+        Self::make(0, vec![], vec![], vec![], false)
     }
 
     pub fn new_dummy_success(txns: Vec<Transaction>) -> Self {
         let txn_outputs = vec![TransactionOutput::new_empty_success(); txns.len()];
-        Self::make(0, txns, txn_outputs, false)
+        Self::make(0, txns, txn_outputs, vec![], false)
     }
 
     pub fn is_reconfig(&self) -> bool {
