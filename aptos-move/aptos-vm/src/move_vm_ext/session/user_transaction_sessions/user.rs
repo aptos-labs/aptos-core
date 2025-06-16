@@ -10,6 +10,7 @@ use crate::{
         },
         AptosMoveResolver, SessionId,
     },
+    session::Session,
     transaction_metadata::TransactionMetadata,
     verifier, AptosVM,
 };
