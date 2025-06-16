@@ -49,12 +49,18 @@ fn native_new_aggregator(
     // number of aggregator instances created so far.
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
     hasher.update(&aggregator_context.txn_hash());
-    hasher.update(&(aggregator_data.num_aggregators() as u32).to_be_bytes());
+    hasher.update(
+        &aggregator_context
+            .aggregator_v1_counter
+            .borrow()
+            .to_be_bytes(),
+    );
     let hash = hasher.finish().to_vec();
 
     if let Ok(key) = AccountAddress::from_bytes(hash) {
         let id = AggregatorID::new(handle, key);
         aggregator_data.create_new_aggregator(id, limit);
+        *aggregator_context.aggregator_v1_counter.borrow_mut() += 1;
 
         Ok(smallvec![Value::struct_(Struct::pack(vec![
             Value::address(handle.0),

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_v1_extension::{AggregatorData, AggregatorState},
+    aggregator_v1_extension::{AggregatorState, VersionedAggregatorData},
     bounded_math::SignedU128,
     delayed_change::DelayedChange,
     delayed_field_extension::DelayedFieldData,
@@ -13,6 +13,7 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetad
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::native_extensions::VersionControlledNativeExtension;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -48,10 +49,26 @@ pub struct AggregatorChangeSet {
 pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
     pub(crate) aggregator_v1_resolver: &'a dyn AggregatorV1Resolver,
-    pub(crate) aggregator_v1_data: RefCell<AggregatorData>,
+    pub(crate) aggregator_v1_data: RefCell<VersionedAggregatorData>,
+    pub(crate) aggregator_v1_counter: RefCell<u32>,
     pub(crate) delayed_field_optimization_enabled: bool,
     pub(crate) delayed_field_resolver: &'a dyn DelayedFieldResolver,
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
+}
+
+impl<'a> VersionControlledNativeExtension for NativeAggregatorContext<'a> {
+    fn undo(&mut self) {
+        self.aggregator_v1_data.borrow_mut().undo();
+    }
+
+    fn save(&mut self) {
+        self.aggregator_v1_data.borrow_mut().save();
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.txn_hash = *txn_hash;
+        *self.aggregator_v1_counter.borrow_mut() = 0;
+    }
 }
 
 impl<'a> NativeAggregatorContext<'a> {
@@ -67,6 +84,7 @@ impl<'a> NativeAggregatorContext<'a> {
             txn_hash,
             aggregator_v1_resolver,
             aggregator_v1_data: Default::default(),
+            aggregator_v1_counter: RefCell::new(0),
             delayed_field_resolver,
             delayed_field_optimization_enabled,
             delayed_field_data: Default::default(),
@@ -86,7 +104,7 @@ impl<'a> NativeAggregatorContext<'a> {
             delayed_field_data,
             ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
+        let (destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
 
         let mut aggregator_v1_changes = BTreeMap::new();
 

@@ -14,7 +14,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{hash_map::Entry::Vacant, BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// When `Addition` operation overflows the `limit`.
 pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -52,7 +52,7 @@ pub enum AggregatorState {
 }
 
 /// Internal aggregator data structure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Aggregator {
     // Describes a value of an aggregator.
     value: u128,
@@ -309,11 +309,6 @@ impl AggregatorData {
         Ok(aggregator)
     }
 
-    /// Returns the number of aggregators that are used in the current transaction.
-    pub fn num_aggregators(&self) -> u128 {
-        self.aggregators.len() as u128
-    }
-
     /// Creates and a new Aggregator with a given `id` and a `max_value`. The value
     /// of a new aggregator is always known, therefore it is created in a data
     /// state, with a zero-initialized value.
@@ -327,36 +322,101 @@ impl AggregatorData {
         self.aggregators.insert(id.clone(), aggregator);
         self.new_aggregators.insert(id);
     }
+}
 
-    /// If aggregator has been used in this transaction, it is removed. Otherwise,
-    /// it is marked for deletion.
+#[derive(Default)]
+struct AggregatorDataDiff {
+    /// All aggregators that have been changed.
+    aggregators: HashMap<AggregatorID, Aggregator>,
+    /// All aggregators that have not existed before and were created.
+    created: HashSet<AggregatorID>,
+    /// All aggregators that were destroyed.
+    destroyed: HashMap<AggregatorID, Option<Aggregator>>,
+}
+
+#[derive(Default)]
+pub struct VersionedAggregatorData {
+    current: AggregatorData,
+    diffs: Vec<AggregatorDataDiff>,
+}
+
+impl VersionedAggregatorData {
+    pub fn save(&mut self) {
+        self.diffs.push(AggregatorDataDiff::default());
+    }
+
+    pub fn undo(&mut self) {
+        if let Some(diff) = self.diffs.pop() {
+            // Override all aggregators that existed before the new state.
+            for (id, aggregator) in diff.aggregators {
+                self.current.aggregators.insert(id, aggregator);
+            }
+
+            // Remove all aggregators that were created but haven't existed before.
+            for id in diff.created {
+                self.current.new_aggregators.remove(&id);
+                self.current.aggregators.remove(&id);
+            }
+
+            // For all aggregators that were destroyed, bring them back.
+            for (id, maybe_aggregator) in diff.destroyed {
+                self.current.destroyed_aggregators.remove(&id);
+                if let Some(aggregator) = maybe_aggregator {
+                    self.current.aggregators.insert(id, aggregator);
+                }
+            }
+        }
+    }
+
+    pub fn get_aggregator(
+        &mut self,
+        id: AggregatorID,
+        max_value: u128,
+    ) -> PartialVMResult<&mut Aggregator> {
+        let aggregator = self.current.get_aggregator(id.clone(), max_value)?;
+        if let Some(diff) = self.diffs.last_mut() {
+            if let Vacant(entry) = diff.aggregators.entry(id) {
+                entry.insert(aggregator.clone());
+            }
+        }
+        Ok(aggregator)
+    }
+
+    pub fn create_new_aggregator(&mut self, id: AggregatorID, max_value: u128) {
+        self.current.create_new_aggregator(id.clone(), max_value);
+        if let Some(diff) = self.diffs.last_mut() {
+            diff.created.insert(id);
+        }
+    }
+
     pub fn remove_aggregator(&mut self, id: AggregatorID) {
-        // Aggregator no longer in use during this transaction: remove it.
-        self.aggregators.remove(&id);
+        let previous = self.current.aggregators.remove(&id);
 
-        if self.new_aggregators.contains(&id) {
-            // Aggregator has been created in the same transaction. Therefore, no
-            // side-effects.
-            self.new_aggregators.remove(&id);
+        if self.current.new_aggregators.contains(&id) {
+            // Aggregator has been created before, so this is a no-op. Also, we need to revert
+            // the diff to not contain this change.
+            self.current.new_aggregators.remove(&id);
+            self.current.aggregators.remove(&id);
+            if let Some(diff) = self.diffs.last_mut() {
+                diff.created.remove(&id);
+            }
         } else {
-            // Otherwise, aggregator has been created somewhere else.
-            self.destroyed_aggregators.insert(id);
+            // Otherwise, aggregator has existed before. We need to make sure existing value is
+            // reflected in the diff.
+            self.current.destroyed_aggregators.insert(id.clone());
+            if let Some(diff) = self.diffs.last_mut() {
+                diff.destroyed.insert(id, previous);
+            }
         }
     }
 
     /// Unpacks aggregator data.
-    pub fn into(
-        self,
-    ) -> (
-        BTreeSet<AggregatorID>,
-        BTreeSet<AggregatorID>,
-        BTreeMap<AggregatorID, Aggregator>,
-    ) {
-        (
-            self.new_aggregators,
-            self.destroyed_aggregators,
-            self.aggregators,
-        )
+    pub fn into(self) -> (BTreeSet<AggregatorID>, BTreeMap<AggregatorID, Aggregator>) {
+        assert!(
+            self.diffs.is_empty(),
+            "Diffs must be empty if aggregator V1 data is consumed"
+        );
+        (self.current.destroyed_aggregators, self.current.aggregators)
     }
 }
 
