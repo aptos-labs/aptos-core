@@ -28,8 +28,9 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ExecutionStatus,
-        TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
+        block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
+        BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
+        TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
@@ -83,7 +84,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _transaction_slice_metadata: TransactionSliceMetadata,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
@@ -111,7 +112,17 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
                 )
             })?;
 
-        Ok(BlockOutput::new(transaction_outputs, None))
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .unwrap(),
+            BlockEndInfo::new_empty(),
+        );
+
+        Ok(BlockOutput::new(
+            transaction_outputs,
+            Some(block_epilogue_txn),
+        ))
     }
 }
 

@@ -1,35 +1,58 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_slot::StateSlot;
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::state_slot::StateSlot, transaction::Version, write_set::BaseStateOp,
+};
 
 #[derive(Clone, Debug)]
 pub struct StateUpdateRef<'kv> {
     /// The version where the key got updated (incl. deletion).
     pub version: Version,
-    /// `None` indicates deletion.
-    pub value: Option<&'kv StateValue>,
+    pub state_op: &'kv BaseStateOp,
 }
 
 impl StateUpdateRef<'_> {
-    /// TODO(HotState): Revisit: assuming every write op results in a hot slot
-    pub fn to_hot_slot(&self) -> StateSlot {
-        match self.value {
-            None => StateSlot::HotVacant {
-                deletion_version: Some(self.version),
+    pub fn to_result_slot(&self) -> StateSlot {
+        match self.state_op.clone() {
+            BaseStateOp::Creation(value) | BaseStateOp::Modification(value) => {
+                StateSlot::HotOccupied {
+                    value_version: self.version,
+                    value,
+                    hot_since_version: self.version,
+                }
+            },
+            BaseStateOp::Deletion(_) => StateSlot::HotVacant {
                 hot_since_version: self.version,
             },
-            Some(value) => StateSlot::HotOccupied {
-                value_version: self.version,
-                value: value.clone(),
-                hot_since_version: self.version,
+            BaseStateOp::MakeHot { prev_slot } => match prev_slot {
+                StateSlot::ColdVacant => StateSlot::HotVacant {
+                    hot_since_version: self.version,
+                },
+                StateSlot::HotVacant {
+                    hot_since_version: _,
+                } => StateSlot::HotVacant {
+                    hot_since_version: self.version,
+                },
+                StateSlot::ColdOccupied {
+                    value_version,
+                    value,
+                }
+                | StateSlot::HotOccupied {
+                    value_version,
+                    value,
+                    hot_since_version: _,
+                } => StateSlot::HotOccupied {
+                    value_version,
+                    value,
+                    hot_since_version: self.version,
+                },
             },
         }
     }
 
     pub fn value_hash_opt(&self) -> Option<HashValue> {
-        self.value.as_ref().map(|val| val.hash())
+        self.state_op.as_state_value_opt().map(|val| val.hash())
     }
 }

@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dkg::{DKGSessionMetadata, DKGTrait};
+use crate::{
+    dkg::{DKGSessionMetadata, DKGTrait},
+    validator_verifier::ValidatorVerifier,
+};
 use anyhow::{anyhow, ensure};
 use aptos_crypto::{bls12381, Uniform};
+use move_core_types::account_address::AccountAddress;
 use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -49,6 +53,15 @@ impl DKGTrait for DummyDKG {
             secret: *input_secret,
             contributions_by_dealer: BTreeMap::from([(my_index, *input_secret)]),
         }
+    }
+
+    fn verify_transcript_extra(
+        _trx: &Self::Transcript,
+        _verifier: &ValidatorVerifier,
+        _checks_voting_power: bool,
+        _ensures_single_dealer: Option<AccountAddress>,
+    ) -> anyhow::Result<()> {
+        Ok(())
     }
 
     fn verify_transcript(

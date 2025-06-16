@@ -5,7 +5,7 @@ use crate::{
     metrics,
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_block_executor::txn_provider::TxnProvider;
@@ -42,7 +42,7 @@ use aptos_types::{
         TStateView,
     },
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         Transaction, TransactionOutput, TransactionStatus, Version,
     },
     write_set::{TransactionWrite, WriteSet},
@@ -57,6 +57,7 @@ impl DoGetExecutionOutput {
     pub fn by_transaction_execution<V: VMBlockExecutor>(
         executor: &V,
         transactions: ExecutableTransactions,
+        auxiliary_info: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -67,6 +68,7 @@ impl DoGetExecutionOutput {
                 Self::by_transaction_execution_unsharded::<V>(
                     executor,
                     txns,
+                    auxiliary_info,
                     parent_state,
                     state_view,
                     onchain_config,
@@ -100,14 +102,13 @@ impl DoGetExecutionOutput {
     fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
         executor: &V,
         transactions: Vec<SignatureVerifiedTransaction>,
+        auxiliary_info: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
-        let append_state_checkpoint_to_block =
-            transaction_slice_metadata.append_state_checkpoint_to_block();
-        let txn_provider = DefaultTxnProvider::new(transactions);
+        let txn_provider = DefaultTxnProvider::new(transactions, auxiliary_info);
         let block_output = Self::execute_block::<V>(
             executor,
             &txn_provider,
@@ -115,21 +116,36 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (transaction_outputs, block_end_info) = block_output.into_inner();
+        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let mut transactions: Vec<_> = txn_provider
+            .txns
+            .into_iter()
+            .map(|t| t.into_inner())
+            .collect();
+        if let Some(block_epilogue_txn) = block_epilogue_txn {
+            transactions.push(block_epilogue_txn);
+            // TODO(HotState): there are three possible paths where the block epilogue
+            // output is passed to the DB:
+            //   1. a block from consensus is executed: the VM outputs the block end info
+            //      and the block epilogue transaction and output are generated here.
+            //   2. a chunk re-executed: The VM will see the block epilogue transaction and
+            //      should output the transaction output by looking at the block end info
+            //      embedded in the epilogue transaction (and maybe the state view).
+            //   3. a chunk replayed by transaction output: we get the transaction output
+            //      directly.
+            transaction_outputs.push(TransactionOutput::new_empty_success());
+        }
 
         Parser::parse(
             state_view.next_version(),
-            txn_provider
-                .txns
-                .into_iter()
-                .map(|t| t.into_inner())
-                .collect(),
+            transactions,
             transaction_outputs,
             parent_state,
             state_view,
-            block_end_info,
-            append_state_checkpoint_to_block,
             false, // prime_state_cache
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .is_some(),
         )
     }
 
@@ -161,9 +177,8 @@ impl DoGetExecutionOutput {
             transaction_outputs,
             parent_state,
             state_view,
-            None, // block end info
-            append_state_checkpoint_to_block,
             false, // prime_state_cache
+            append_state_checkpoint_to_block.is_some(),
         )
     }
 
@@ -179,9 +194,8 @@ impl DoGetExecutionOutput {
             transaction_outputs,
             parent_state,
             state_view,
-            None, // block end info
-            None, // append state checkpoint to block
-            true, // prime state cache
+            true,  // prime state cache
+            false, // is_block
         )?;
 
         let ret = out.clone();
@@ -292,16 +306,13 @@ impl Parser {
         mut transaction_outputs: Vec<TransactionOutput>,
         parent_state: &LedgerState,
         base_state_view: CachedStateView,
-        block_end_info: Option<BlockEndInfo>,
-        append_state_checkpoint_to_block: Option<HashValue>,
         prime_state_cache: bool,
+        is_block: bool,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
 
-        let is_block = append_state_checkpoint_to_block.is_some();
-
         // Collect all statuses.
-        let statuses_for_input_txns = {
+        let mut statuses_for_input_txns = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__all_statuses"]);
             transaction_outputs
                 .iter()
@@ -317,20 +328,18 @@ impl Parser {
         // Isolate discards.
         let to_discard = Self::extract_discards(&mut transactions, &mut transaction_outputs);
 
+        let mut block_end_info = None;
+        if is_block && !has_reconfig {
+            if let Some(Transaction::BlockEpilogue(payload)) = transactions.last() {
+                block_end_info = payload.try_as_block_end_info().cloned();
+                ensure!(statuses_for_input_txns.pop().is_some());
+            }
+        }
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
             let to_commit = TransactionsWithOutput::new(transactions, transaction_outputs);
-            TransactionsToKeep::index(
-                first_version,
-                Self::maybe_add_block_epilogue(
-                    to_commit,
-                    has_reconfig,
-                    block_end_info.as_ref(),
-                    append_state_checkpoint_to_block,
-                ),
-                has_reconfig,
-            )
+            TransactionsToKeep::index(first_version, to_commit, has_reconfig)
         };
         let next_epoch_state = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__next_epoch_state"]);
@@ -450,29 +459,6 @@ impl Parser {
         to_discard
     }
 
-    fn maybe_add_block_epilogue(
-        mut to_commit: TransactionsWithOutput,
-        is_reconfig: bool,
-        block_end_info: Option<&BlockEndInfo>,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> TransactionsWithOutput {
-        if !is_reconfig {
-            // Append the StateCheckpoint transaction to the end
-            if let Some(block_id) = append_state_checkpoint_to_block {
-                let state_checkpoint_txn = match block_end_info {
-                    None => Transaction::StateCheckpoint(block_id),
-                    Some(block_end_info) => {
-                        Transaction::block_epilogue(block_id, block_end_info.clone())
-                    },
-                };
-
-                to_commit.push(state_checkpoint_txn, TransactionOutput::new_empty_success());
-            }
-        }; // else: not adding block epilogue at epoch ending.
-
-        to_commit
-    }
-
     fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
         let last_write_set = to_commit
             .transaction_outputs
@@ -509,7 +495,7 @@ impl TStateView for WriteSetStateView<'_> {
     ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
         Ok(self
             .write_set
-            .get(state_key)
+            .get_write_op(state_key)
             .and_then(|write_op| write_op.as_state_value()))
     }
 
@@ -567,8 +553,7 @@ mod tests {
             txn_outs,
             &state,
             CachedStateView::new_dummy(&state),
-            None,
-            None,
+            false,
             false,
         )
         .unwrap();

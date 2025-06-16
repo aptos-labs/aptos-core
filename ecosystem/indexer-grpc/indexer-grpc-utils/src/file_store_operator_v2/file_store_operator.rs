@@ -18,7 +18,7 @@ pub struct FileStoreOperatorV2 {
 }
 
 impl FileStoreOperatorV2 {
-    pub async fn new(
+    pub fn new(
         max_size_per_file: usize,
         num_txns_per_folder: u64,
         version: u64,

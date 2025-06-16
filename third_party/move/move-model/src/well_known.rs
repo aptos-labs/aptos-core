@@ -30,6 +30,17 @@ pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
 pub const BORROW_NAME: &str = "borrow";
 pub const BORROW_MUT_NAME: &str = "borrow_mut";
+/// Functions in the std::vector module that are implemented as bytecode instructions.
+pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
+    "empty",
+    "length",
+    "borrow",
+    "borrow_mut",
+    "push_back",
+    "pop_back",
+    "destroy_empty",
+    "swap",
+];
 
 pub const TYPE_NAME_MOVE: &str = "type_info::type_name";
 pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";

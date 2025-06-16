@@ -131,6 +131,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/indexer-grpc/indexer-grpc-v2-file-store-backfiller",
     "ecosystem/indexer-grpc/indexer-test-transactions",
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
@@ -246,6 +247,7 @@ members = [
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
+    "third_party/move/tools/move-package-manifest",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
@@ -368,6 +370,7 @@ aptos-indexer-grpc-manager = { path = "ecosystem/indexer-grpc/indexer-grpc-manag
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-test-transactions = { path = "ecosystem/indexer-grpc/indexer-test-transactions" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
+aptos-indexer-grpc-v2-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-v2-file-store-backfiller" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
 aptos-infallible = { path = "crates/aptos-infallible" }
@@ -479,6 +482,7 @@ nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
 ambassador = "0.4.1"
+annotate-snippets = "0.11.5"
 anyhow = "1.0.98"
 anstyle = "1.0.1"
 arbitrary = { version = "1.4.1", features = ["derive"] }
@@ -492,7 +496,7 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "c63f6ee891e42cc50f92480c21d4afa86012b157", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.1", features = [
     "postgres_partial",
 ] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
@@ -691,7 +695,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", rev = "8628f1534efa28ada547bbcd34afec1af55697d4", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.1.4", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -851,6 +855,7 @@ move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-byt
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
+move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }

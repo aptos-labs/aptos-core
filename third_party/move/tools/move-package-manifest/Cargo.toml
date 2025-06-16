@@ -1,0 +1,42 @@
+[package]
+name = "move-package-manifest"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+annotate-snippets = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+url = { workspace = true }
+
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+
+[dev-dependencies]
+datatest-stable = { workspace = true }
+move-prover-test-utils = { workspace = true }
+
+[[test]]
+name = "expected_output"
+harness = false
+
+[[test]]
+name = "serde_round_trip"
+harness = false
+
+[[test]]
+name = "framework_manifests"
+harness = false
+
+[[test]]
+name = "move_example_manifests"
+harness = false

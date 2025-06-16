@@ -1,5 +1,61 @@
 
 Diagnostics:
+warning: storage operation on type `M::R` can only be done within the defining module `0x42::M`, but `M::inline_borrow` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:13:23
+   │
+13 │     public inline fun inline_borrow(addr: address): &R {
+   │                       ^^^^^^^^^^^^^
+14 │         borrow_global<R>(addr)
+   │         ---------------------- called here
+
+warning: storage operation on type `M::R` can only be done within the defining module `0x42::M`, but `M::inline_borrow_mut` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:17:23
+   │
+17 │     public inline fun inline_borrow_mut(addr: address): &R {
+   │                       ^^^^^^^^^^^^^^^^^
+18 │         borrow_global_mut<R>(addr)
+   │         -------------------------- called here
+
+warning: storage operation on type `M::R` can only be done within the defining module `0x42::M`, but `M::inline_move_to` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:21:23
+   │
+21 │     public inline fun inline_move_to(account: &signer, r: R) {
+   │                       ^^^^^^^^^^^^^^
+22 │         move_to<R>(account, r)
+   │         ---------------------- called here
+
+warning: storage operation on type `M::R` can only be done within the defining module `0x42::M`, but `M::inline_move_from` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:25:23
+   │
+25 │     public inline fun inline_move_from(addr: address): R {
+   │                       ^^^^^^^^^^^^^^^^
+26 │         move_from<R>(addr)
+   │         ------------------ called here
+
+warning: pack of `M::R` can only be done within the defining module `0x42::M`, but `M::inline_pack` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:29:23
+   │
+29 │     public inline fun inline_pack(): R {
+   │                       ^^^^^^^^^^^
+30 │         R {}
+   │         ---- packed here
+
+warning: unpack of `M::R` can only be done within the defining module `0x42::M`, but `M::inline_unpack` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:33:23
+   │
+33 │     public inline fun inline_unpack(r: R) {
+   │                       ^^^^^^^^^^^^^
+34 │         let R{} = r;
+   │             --- unpacked here
+
+warning: access of the field `r` on type `M::T` can only be done within the defining module `0x42::M`, but `M::inline_access` could be called (and expanded) outside the module
+   ┌─ tests/visibility-checker/resource_operator_inline.move:37:23
+   │
+37 │     public inline fun inline_access(t: T): R {
+   │                       ^^^^^^^^^^^^^
+38 │         t.r
+   │         --- accessed here
+
 error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
    ┌─ tests/visibility-checker/resource_operator_inline.move:45:9
    │

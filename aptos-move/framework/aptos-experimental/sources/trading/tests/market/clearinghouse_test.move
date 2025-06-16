@@ -2,7 +2,6 @@
 module aptos_experimental::clearinghouse_test {
     use std::error;
     use std::option;
-    use std::option::Option;
     use std::signer;
     use aptos_std::table;
     use aptos_std::table::Table;
@@ -14,6 +13,9 @@ module aptos_experimental::clearinghouse_test {
     };
 
     const EINVALID_ADDRESS: u64 = 1;
+    const E_DUPLICATE_ORDER: u64 = 2;
+    const E_ORDER_NOT_FOUND: u64 = 3;
+    const E_ORDER_NOT_CLEANED_UP: u64 = 4;
 
     struct TestOrderMetadata has store, copy, drop {}
 
@@ -27,7 +29,9 @@ module aptos_experimental::clearinghouse_test {
     }
 
     struct GlobalState has key {
-        user_positions: Table<address, Position>
+        user_positions: Table<address, Position>,
+        open_orders: Table<u64, bool>,
+        maker_order_calls: Table<u64, bool>
     }
 
     public(package) fun initialize(admin: &signer) {
@@ -35,10 +39,17 @@ module aptos_experimental::clearinghouse_test {
             signer::address_of(admin) == @0x1,
             error::invalid_argument(EINVALID_ADDRESS)
         );
-        move_to(admin, GlobalState { user_positions: table::new() });
+        move_to(admin, GlobalState {
+            user_positions: table::new(),
+            open_orders: table::new(),
+            maker_order_calls: table::new()
+        });
     }
 
-    public(package) fun validate_settlement_update(): bool {
+    public(package) fun validate_order_placement(order_id: u64): bool acquires GlobalState {
+        let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
+        assert!(!open_orders.contains(order_id), error::invalid_argument(E_DUPLICATE_ORDER));
+        open_orders.add(order_id, true);
         return true
     }
 
@@ -51,12 +62,12 @@ module aptos_experimental::clearinghouse_test {
     }
 
     fun update_position(
-        position: &mut Position, size: u64, is_long: bool
+        position: &mut Position, size: u64, is_bid: bool
     ) {
-        if (position.is_long != is_long) {
+        if (position.is_long != is_bid) {
             if (size > position.size) {
                 position.size = size - position.size;
-                position.is_long = is_long;
+                position.is_long = is_bid;
             } else {
                 position.size -= size;
             }
@@ -85,34 +96,88 @@ module aptos_experimental::clearinghouse_test {
         new_settle_trade_result(size, option::none(), option::none())
     }
 
+    public(package) fun place_maker_order(
+        order_id: u64,
+    ) acquires GlobalState {
+        let maker_order_calls = &mut borrow_global_mut<GlobalState>(@0x1).maker_order_calls;
+        assert!(!maker_order_calls.contains(order_id), error::invalid_argument(E_DUPLICATE_ORDER));
+        maker_order_calls.add(order_id, true);
+    }
+
+    public(package) fun is_maker_order_called(
+        order_id: u64
+    ): bool acquires GlobalState {
+        let maker_order_calls = &borrow_global<GlobalState>(@0x1).maker_order_calls;
+        maker_order_calls.contains(order_id)
+    }
+
+    public(package) fun cleanup_order(
+        order_id: u64,
+    ) acquires GlobalState {
+        let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
+        assert!(open_orders.contains(order_id), error::invalid_argument(E_ORDER_NOT_FOUND));
+        open_orders.remove(order_id);
+    }
+
+    public(package) fun order_exists(
+        order_id: u64
+    ): bool acquires GlobalState {
+        let open_orders = &borrow_global<GlobalState>(@0x1).open_orders;
+        open_orders.contains(order_id)
+    }
+
     public(package) fun settle_trade_with_taker_cancelled(
         _taker: address,
         _maker: address,
         size: u64,
         _is_taker_long: bool
     ): SettleTradeResult {
-        new_settle_trade_result(size/2,
+        new_settle_trade_result(
+            size / 2,
             option::none(),
-            option::some(std::string::utf8(b"Max open interest violation")))
+            option::some(std::string::utf8(b"Max open interest violation"))
+        )
     }
 
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+            |taker, maker, _taker_order_id, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
+            | _account, order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
+                validate_order_placement(order_id)
+            },
+            |_account, order_id, _is_bid, _price, _size, _order_metadata| {
+                place_maker_order(order_id);
+            },
+            | _account, _order_id, _is_bid, _remaining_size| {
+                cleanup_order(_order_id);
+            },
+            | _account, _order_id, _is_bid, _price, _size| {
+                // decrease order size is not used in this test
+            },
         )
     }
 
     public(package) fun test_market_callbacks_with_taker_cancelled():
-    MarketClearinghouseCallbacks<TestOrderMetadata>{
+        MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
+            |taker, maker, _taker_order_id, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata| {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
-            |_account, _is_taker, _is_long, _price, _size, _order_metadata| { validate_settlement_update() },
+            | _account, order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
+                validate_order_placement(order_id)
+            },
+            |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
+                // place_maker_order is not used in this test
+            },
+            | _account, _order_id, _is_bid, _remaining_size| {
+                cleanup_order(_order_id);
+            },
+            | _account, _order_id, _is_bid, _price, _size| {
+                // decrease order size is not used in this test
+            },
         )
     }
 }

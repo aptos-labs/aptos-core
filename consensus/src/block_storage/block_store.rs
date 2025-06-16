@@ -57,6 +57,12 @@ pub mod sync_manager;
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
+        if block.block().is_opt_block() {
+            observe_block(
+                block.block().timestamp_usecs(),
+                BlockStage::ORDERED_OPT_BLOCK,
+            );
+        }
     }
 }
 
@@ -341,7 +347,7 @@ impl BlockStore {
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(
-                &blocks_to_commit,
+                blocks_to_commit,
                 finality_proof.clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<PipelinedBlock>],
@@ -551,6 +557,12 @@ impl BlockStore {
                     pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
+                if pipelined_block.block().is_opt_block() {
+                    observe_block(
+                        pipelined_block.block().timestamp_usecs(),
+                        BlockStage::QC_ADDED_OPT_BLOCK,
+                    );
+                }
                 pipelined_block.set_qc(Arc::new(qc.clone()));
             },
             None => bail!("Insert {} without having the block in store first", qc),

@@ -79,9 +79,11 @@ impl Opt {
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {
             error!("{} failed transactions", all_errors.len());
+            /* errors were printed as found.
             for e in all_errors {
                 error!("Failed: {}", e);
             }
+             */
             process::exit(2);
         }
         Ok(())
@@ -217,6 +219,11 @@ impl Verifier {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
+                    error!(
+                        "Verify timeout: {}s elapsed. Deadline: {}s",
+                        self.replay_stat.get_elapsed_secs(),
+                        duration
+                    );
                     return Ok(total_failed_txns);
                 }
             }
@@ -306,7 +313,8 @@ impl Verifier {
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
             .collect::<Vec<_>>();
-        let txns_provider = DefaultTxnProvider::new(txns);
+        // TODO(grao): Pass in persisted info.
+        let txns_provider = DefaultTxnProvider::new_without_info(txns);
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             &txns_provider,
             &self
@@ -325,23 +333,12 @@ impl Verifier {
                 Some(&expected_writesets[idx]),
                 Some(&expected_events[idx]),
             ) {
-                let err_opt = if idx == 0 {
-                    // FIXME(aldenhu): remove this hack
-                    warn!(
-                        version = version,
-                        "Probably known failure due to StateStorageUsage missing from a restored DB."
-                    );
-                    Ok(None)
-                } else {
-                    Ok(Some(err))
-                };
-
                 cur_txns.drain(0..idx + 1);
                 expected_txn_infos.drain(0..idx + 1);
                 expected_events.drain(0..idx + 1);
                 expected_writesets.drain(0..idx + 1);
 
-                return err_opt;
+                return Ok(Some(err));
             }
         }
 

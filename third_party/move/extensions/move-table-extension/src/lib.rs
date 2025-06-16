@@ -70,7 +70,12 @@ impl TableInfo {
 
 impl Display for TableInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Table<{}, {}>", self.key_type, self.value_type)
+        writeln!(
+            f,
+            "Table<{}, {}>",
+            self.key_type.to_canonical_string(),
+            self.value_type.to_canonical_string()
+        )
     }
 }
 

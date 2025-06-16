@@ -18,7 +18,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
-    ability::{Ability, AbilitySet},
+    ability::AbilitySet,
     function::ClosureMask,
     identifier::{IdentStr, Identifier},
     language_storage,
@@ -261,8 +261,12 @@ impl LazyLoadedFunction {
             for (actual_arg_ty, serialized_layout) in
                 captured_arg_types.into_iter().zip(captured_layouts)
             {
-                // Note that the below call returns a runtime layout, so we can directly
-                // compare it without desugaring.
+                // We do not allow function values to capture any delayed fields, for now. Note
+                // that this is enforced at serialization time. Here we cannot enforce it because
+                // function value could have stored an old version of an enum without an aggregator
+                // but the new layout has the new variant with the aggregator. In any case, the
+                // serializer will fail on this resolved closure if there is an attempt to put it
+                // back into storage.
                 let actual_arg_layout = if function.ty_args().is_empty() {
                     converter.type_to_type_layout(actual_arg_ty)?
                 } else {
@@ -270,6 +274,7 @@ impl LazyLoadedFunction {
                         ty_builder.create_ty_with_subst(actual_arg_ty, function.ty_args())?;
                     converter.type_to_type_layout(&actual_arg_ty)?
                 };
+
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
@@ -311,7 +316,7 @@ impl AbstractFunction for LazyLoadedFunction {
         Ok(Box::new(self.clone()))
     }
 
-    fn to_stable_string(&self) -> String {
+    fn to_canonical_string(&self) -> String {
         self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
             let prefix = if let Some(m) = module_id {
                 format!("0x{}::{}::", m.address(), m.name())
@@ -327,7 +332,7 @@ impl AbstractFunction for LazyLoadedFunction {
                         .iter()
                         .map(|t| t.to_canonical_string())
                         .collect::<Vec<_>>()
-                        .join(",")
+                        .join(", ")
                 )
             };
             format!("{}::{}{}", prefix, fun_id, ty_args_str)
@@ -339,10 +344,6 @@ impl LoadedFunction {
     /// Returns type arguments used to instantiate the loaded function.
     pub fn ty_args(&self) -> &[Type] {
         &self.ty_args
-    }
-
-    pub fn abilities(&self) -> AbilitySet {
-        self.function.abilities()
     }
 
     /// Returns the corresponding module id of this function, i.e., its address and module name.
@@ -373,12 +374,22 @@ impl LoadedFunction {
 
     /// Returns true if the loaded function has friend or private visibility.
     pub fn is_friend_or_private(&self) -> bool {
-        self.function.is_friend() || self.function.is_private()
+        self.is_friend() || self.is_private()
     }
 
     /// Returns true if the loaded function has public visibility.
     pub fn is_public(&self) -> bool {
         self.function.is_public()
+    }
+
+    /// Returns true if the loaded function has friend visibility.
+    pub fn is_friend(&self) -> bool {
+        self.function.is_friend()
+    }
+
+    /// Returns true if the loaded function has private visibility.
+    pub fn is_private(&self) -> bool {
+        self.function.is_private()
     }
 
     /// Returns an error if the loaded function is **NOT** an entry function.
@@ -569,28 +580,6 @@ impl Function {
 
     pub fn has_module_lock(&self) -> bool {
         self.has_module_reentrancy_lock
-    }
-
-    /// Creates the function type instance for this function. This requires cloning
-    /// the parameter and result types.
-    pub fn create_function_type(&self) -> Type {
-        Type::Function {
-            args: self.param_tys.clone(),
-            results: self.return_tys.clone(),
-            abilities: self.abilities(),
-        }
-    }
-
-    /// Returns the abilities associated with this function, without consideration of any captured
-    /// closure arguments. By default, this is copy and drop, and if the function signature cannot
-    /// be changed (i.e., the function has `#[persistent]` attribute or is public), also store.
-    pub fn abilities(&self) -> AbilitySet {
-        let result = AbilitySet::singleton(Ability::Copy).add(Ability::Drop);
-        if self.is_persistent() {
-            result.add(Ability::Store)
-        } else {
-            result
-        }
     }
 
     pub fn is_native(&self) -> bool {

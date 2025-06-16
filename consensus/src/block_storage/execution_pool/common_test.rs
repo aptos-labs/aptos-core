@@ -25,6 +25,7 @@ pub const DEFAULT_MAX_PRUNED_BLOCKS_IN_MEM: usize = 10;
 
 /// Helper function to create a `QuorumCert` which can provide a `highest_commit_cert` via
 /// `highest_quorum_cert.into_wrapped_ledger_info()`
+#[allow(dead_code)]
 pub fn generate_qc(round: Round, parent_round: Round) -> QuorumCert {
     let num_nodes = 4;
     let (signers, validators) = random_validator_verifier(num_nodes, None, false);

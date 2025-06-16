@@ -12,8 +12,8 @@ use aptos_types::{
     },
     state_store::StateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        TransactionOutput,
+        block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
+        BlockOutput, Transaction, TransactionOutput,
     },
     vm_status::VMStatus,
 };
@@ -35,7 +35,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _transaction_slice_metadata: TransactionSliceMetadata,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
@@ -68,6 +68,16 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                 .collect::<Result<Vec<_>, _>>()
         })?;
 
-        Ok(BlockOutput::new(transaction_outputs, None))
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .unwrap(),
+            BlockEndInfo::new_empty(),
+        );
+
+        Ok(BlockOutput::new(
+            transaction_outputs,
+            Some(block_epilogue_txn),
+        ))
     }
 }

@@ -103,12 +103,12 @@ pub fn compare_txn_outputs(
         // we support global supply tracking in sharded execution.
         let unsharded_write_set_without_table_item = unsharded_txn_output[i]
             .write_set()
-            .into_iter()
+            .write_op_iter()
             .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
             .collect::<Vec<_>>();
         let sharded_write_set_without_table_item = sharded_txn_output[i]
             .write_set()
-            .into_iter()
+            .write_op_iter()
             .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
             .collect::<Vec<_>>();
         assert_eq!(
@@ -148,7 +148,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<InMemoryStateSt
             .into_iter()
             .map(|t| t.into_txn())
             .collect();
-    let txn_provider = DefaultTxnProvider::new(txns);
+    let txn_provider = DefaultTxnProvider::new_without_info(txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
         .execute_block_no_limit(&txn_provider, &state_store)
         .unwrap();
@@ -204,7 +204,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<InMemoryStateStore
         )
         .unwrap();
 
-    let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
+    let txn_provider = DefaultTxnProvider::new_without_info(execution_ordered_txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
         .execute_block_no_limit(&txn_provider, &state_store)
         .unwrap();

@@ -1,41 +1,34 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::block_epilogue::BlockEndInfo;
+use super::Transaction;
 use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct BlockOutput<Output: Debug> {
     transaction_outputs: Vec<Output>,
-    block_end_info: Option<BlockEndInfo>,
+    // A BlockEpilogueTxn might be appended to the block.
+    // This field will be None iff the input is not a block, or an epoch change is triggered.
+    block_epilogue_txn: Option<Transaction>,
 }
 
 impl<Output: Debug> BlockOutput<Output> {
-    pub fn new(transaction_outputs: Vec<Output>, block_end_info: Option<BlockEndInfo>) -> Self {
+    pub fn new(transaction_outputs: Vec<Output>, block_epilogue_txn: Option<Transaction>) -> Self {
         Self {
             transaction_outputs,
-            block_end_info,
+            block_epilogue_txn,
         }
     }
 
-    fn is_block_limit_reached(&self) -> bool {
-        self.block_end_info
-            .as_ref()
-            .is_some_and(BlockEndInfo::limit_reached)
-    }
-
-    /// If block limit is not set (i.e. in tests), we can safely unwrap here
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        assert!(!self.is_block_limit_reached());
         self.transaction_outputs
     }
 
-    pub fn into_inner(self) -> (Vec<Output>, Option<BlockEndInfo>) {
-        (self.transaction_outputs, self.block_end_info)
+    pub fn into_inner(self) -> (Vec<Output>, Option<Transaction>) {
+        (self.transaction_outputs, self.block_epilogue_txn)
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
-        assert!(!self.is_block_limit_reached());
         &self.transaction_outputs
     }
 }

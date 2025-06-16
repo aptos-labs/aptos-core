@@ -1,0 +1,45 @@
+
+Diagnostics:
+error: parameter `f` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/bug_16406.move:3:19
+   │
+ 3 │     inline fun id(f: ||u64 has copy+drop): ||u64 {
+   │                   ^
+ 4 │         f
+   │         - being used here
+   ·
+26 │         id(||1)()
+   │         ------- from a call inlined at this callsite
+
+error: parameter `f` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/bug_16406.move:7:21
+   │
+ 7 │     inline fun id_2(f: ||u64 has copy+drop): ||u64 {
+   │                     ^
+ 8 │         let k = f;
+   │                 - being used here
+   ·
+30 │         id_2(||1)()
+   │         --------- from a call inlined at this callsite
+
+error: parameter `f1` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/bug_16406.move:13:21
+   │
+13 │     inline fun id_3(f1: ||u64 has copy+drop, x: u64, f2: ||u64 has copy+drop): ||u64 {
+   │                     ^^
+14 │         let k = f1;
+   │                 -- being used here
+   ·
+34 │         id_3(||1, 2, ||3)()
+   │         ----------------- from a call inlined at this callsite
+
+error: parameter `f2` with function type cannot be used as a local variable in an inline function
+   ┌─ tests/checking-lang-v2.2/lambda/inline-parity/bug_16406.move:19:54
+   │
+19 │     inline fun id_4(f1: ||u64 has copy+drop, x: u64, f2: ||u64 has copy+drop): ||u64 {
+   │                                                      ^^
+20 │         let k = f2;
+   │                 -- being used here
+   ·
+38 │         id_4(||1, 2, ||3)()
+   │         ----------------- from a call inlined at this callsite

@@ -9,6 +9,8 @@ pub mod block_data;
 pub mod block_retrieval;
 pub mod common;
 pub mod epoch_retrieval;
+pub mod opt_block_data;
+pub mod opt_proposal_msg;
 pub mod order_vote;
 pub mod order_vote_msg;
 pub mod order_vote_proposal;

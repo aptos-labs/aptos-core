@@ -66,6 +66,7 @@ module aptos_experimental::active_order_book {
         }
     }
 
+
     /// Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
     /// aborts if there are no buys
     public fun best_bid_price(self: &ActiveOrderBook): Option<u64> {
@@ -301,21 +302,37 @@ module aptos_experimental::active_order_book {
         }
     }
 
-    public fun increase_maker_order_size(
+    /// Increase the size of the order in the orderbook without altering its position in the price-time priority.
+    public fun increase_order_size(
         self: &mut ActiveOrderBook,
         price: u64,
         unique_priority_idx: UniqueIdxType,
-        size: u64,
+        size_delta: u64,
         is_buy: bool
     ) {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_buy);
         let key = ActiveBidKey { price, tie_breaker };
-        // Assert that this is not a taker order
-        assert!(!self.is_taker_order(price, is_buy), EINVALID_MAKER_ORDER);
         if (is_buy) {
-            self.buys.borrow_mut(&key).size += size;
+            self.buys.borrow_mut(&key).size += size_delta;
         } else {
-            self.sells.borrow_mut(&key).size += size;
+            self.sells.borrow_mut(&key).size += size_delta;
+        };
+    }
+
+    /// Decrease the size of the order in the order book without altering its position in the price-time priority.
+    public fun decrease_order_size(
+        self: &mut ActiveOrderBook,
+        price: u64,
+        unique_priority_idx: UniqueIdxType,
+        size_delta: u64,
+        is_buy: bool
+    ) {
+        let tie_breaker = get_tie_breaker(unique_priority_idx, is_buy);
+        let key = ActiveBidKey { price, tie_breaker };
+        if (is_buy) {
+            self.buys.borrow_mut(&key).size -= size_delta;
+        } else {
+            self.sells.borrow_mut(&key).size -= size_delta;
         };
     }
 
@@ -340,7 +357,7 @@ module aptos_experimental::active_order_book {
     }
 
     #[test_only]
-    public(friend) fun destroy_active_order_book(self: ActiveOrderBook) {
+    public fun destroy_active_order_book(self: ActiveOrderBook) {
         let ActiveOrderBook::V1 { sells, buys } = self;
         sells.destroy(|_v| {});
         buys.destroy(|_v| {});

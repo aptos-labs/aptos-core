@@ -3770,9 +3770,9 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
             },
 
             // Functions.
-            (L::Function(fun_layout), ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
+            (L::Function, ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
                 ctx: self.ctx,
-                layout: fun_layout,
+                layout: &(),
                 value: clos,
             }
             .serialize(serializer),
@@ -4042,10 +4042,10 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
             }),
 
             // Functions
-            L::Function(fun_layout) => {
+            L::Function => {
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
-                    layout: fun_layout,
+                    layout: (),
                 };
                 let closure = deserializer.deserialize_seq(ClosureVisitor(seed))?;
                 Ok(Value(ValueImpl::ClosureValue(closure)))
@@ -4710,7 +4710,7 @@ pub mod prop {
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
 
-            L::Function(_function_layout) => {
+            L::Function => {
                 // TODO(#15664): not clear how to generate closure values, we'd need
                 //   some test functions for this, and generate `AbstractFunction` impls.
                 //   As we do not generate function layouts in the first place, we can bail

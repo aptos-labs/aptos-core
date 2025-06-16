@@ -1,0 +1,24 @@
+//# publish
+module 0x2.a {
+    import 0x1.string;
+
+    public test() {
+        let b: vector<u8>;
+    label b0:
+        b = vec_pack_0<u8>();
+        _ = string.internal_check_utf8(&b);
+        return;
+}
+}
+
+//# run 0x2::a::test
+
+//# run --signers 0x1
+import 0x1.string;
+main(account: signer) {
+    let b: vector<u8>;
+label b0:
+    b = vec_pack_0<u8>();
+    _ = string.internal_check_utf8(&b);
+    return;
+}

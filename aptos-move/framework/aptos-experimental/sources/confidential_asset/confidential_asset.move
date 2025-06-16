@@ -330,7 +330,8 @@ module aptos_experimental::confidential_asset {
         token: Object<Metadata>,
         to: address,
         new_balance: vector<u8>,
-        transfer_amount: vector<u8>,
+        sender_amount: vector<u8>,
+        recipient_amount: vector<u8>,
         auditor_eks: vector<u8>,
         auditor_amounts: vector<u8>,
         zkrp_new_balance: vector<u8>,
@@ -338,7 +339,8 @@ module aptos_experimental::confidential_asset {
         sigma_proof: vector<u8>) acquires ConfidentialAssetStore, FAConfig, FAController
     {
         let new_balance = confidential_balance::new_actual_balance_from_bytes(new_balance).extract();
-        let transfer_amount = confidential_balance::new_pending_balance_from_bytes(transfer_amount).extract();
+        let sender_amount = confidential_balance::new_pending_balance_from_bytes(sender_amount).extract();
+        let recipient_amount = confidential_balance::new_pending_balance_from_bytes(recipient_amount).extract();
         let auditor_eks = deserialize_auditor_eks(auditor_eks).extract();
         let auditor_amounts = deserialize_auditor_amounts(auditor_amounts).extract();
         let proof = confidential_proof::deserialize_transfer_proof(
@@ -352,7 +354,8 @@ module aptos_experimental::confidential_asset {
             token,
             to,
             new_balance,
-            transfer_amount,
+            sender_amount,
+            recipient_amount,
             auditor_eks,
             auditor_amounts,
             proof
@@ -722,7 +725,8 @@ module aptos_experimental::confidential_asset {
         token: Object<Metadata>,
         to: address,
         new_balance: confidential_balance::ConfidentialBalance,
-        transfer_amount: confidential_balance::ConfidentialBalance,
+        sender_amount: confidential_balance::ConfidentialBalance,
+        recipient_amount: confidential_balance::ConfidentialBalance,
         auditor_eks: vector<twisted_elgamal::CompressedPubkey>,
         auditor_amounts: vector<confidential_balance::ConfidentialBalance>,
         proof: TransferProof) acquires ConfidentialAssetStore, FAConfig, FAController
@@ -730,8 +734,12 @@ module aptos_experimental::confidential_asset {
         assert!(is_token_allowed(token), error::invalid_argument(ETOKEN_DISABLED));
         assert!(!is_frozen(to, token), error::invalid_state(EALREADY_FROZEN));
         assert!(
-            validate_auditors(token, &transfer_amount, &auditor_eks, &auditor_amounts, &proof),
+            validate_auditors(token, &recipient_amount, &auditor_eks, &auditor_amounts, &proof),
             error::invalid_argument(EINVALID_AUDITORS)
+        );
+        assert!(
+            confidential_balance::balance_c_equals(&sender_amount, &recipient_amount),
+            error::invalid_argument(EINVALID_SENDER_AMOUNT)
         );
 
         let from = signer::address_of(sender);
@@ -750,7 +758,8 @@ module aptos_experimental::confidential_asset {
             &recipient_ek,
             &sender_current_actual_balance,
             &new_balance,
-            &transfer_amount,
+            &sender_amount,
+            &recipient_amount,
             &auditor_eks,
             &auditor_amounts,
             &proof);
@@ -771,7 +780,7 @@ module aptos_experimental::confidential_asset {
         let recipient_pending_balance = confidential_balance::decompress_balance(
             &recipient_ca_store.pending_balance
         );
-        confidential_balance::add_balances_mut(&mut recipient_pending_balance, &transfer_amount);
+        confidential_balance::add_balances_mut(&mut recipient_pending_balance, &recipient_amount);
 
         recipient_ca_store.pending_counter += 1;
         recipient_ca_store.pending_balance = confidential_balance::compress_balance(&recipient_pending_balance);
