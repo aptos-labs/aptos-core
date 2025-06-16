@@ -17,7 +17,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    transaction::{AuxiliaryInfo, Transaction, TransactionOutput, Version},
+    transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
@@ -108,6 +108,7 @@ impl TransactionChunk for ChunkToExecute {
 pub struct ChunkToApply {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
+    pub persisted_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -128,12 +129,17 @@ impl TransactionChunk for ChunkToApply {
         let Self {
             transactions,
             transaction_outputs,
+            persisted_info,
             first_version: _,
         } = self;
 
         DoGetExecutionOutput::by_transaction_output(
             transactions,
             transaction_outputs,
+            persisted_info
+                .into_iter()
+                .map(|info| AuxiliaryInfo::new(info, None))
+                .collect(),
             parent_state,
             state_view,
         )

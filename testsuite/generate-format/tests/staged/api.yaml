@@ -777,7 +777,7 @@ TransactionInfoV0:
     - state_checkpoint_hash:
         OPTION:
           TYPENAME: HashValue
-    - state_cemetery_hash:
+    - auxiliary_info_hash:
         OPTION:
           TYPENAME: HashValue
 TransactionOnChainData:
