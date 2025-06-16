@@ -338,21 +338,33 @@ impl Block {
                     .signature
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
-                validator.verify(*author, &self.block_data, signature)?;
-                self.quorum_cert().verify(validator)
+                let (res1, res2) = rayon::join(
+                    || validator.verify(*author, &self.block_data, signature),
+                    || self.quorum_cert().verify(validator),
+                );
+                res1?;
+                res2
             },
             BlockType::ProposalExt(proposal_ext) => {
                 let signature = self
                     .signature
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
-                validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
-                self.quorum_cert().verify(validator)
+                let (res1, res2) = rayon::join(
+                    || validator.verify(*proposal_ext.author(), &self.block_data, signature),
+                    || self.quorum_cert().verify(validator),
+                );
+                res1?;
+                res2
             },
             BlockType::OptimisticProposal(p) => {
                 // Note: Optimistic proposal is not signed by proposer unlike normal proposal
-                p.grandparent_qc().verify(validator)?;
-                self.quorum_cert().verify(validator)
+                let (res1, res2) = rayon::join(
+                    || p.grandparent_qc().verify(validator),
+                    || self.quorum_cert().verify(validator),
+                );
+                res1?;
+                res2
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
         }
