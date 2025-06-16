@@ -28,7 +28,6 @@ pub const TOKEN_ADDRESS: AccountAddress = AccountAddress::THREE;
 pub const TOKEN_OBJECTS_ADDRESS: AccountAddress = AccountAddress::FOUR;
 pub const EXPERIMENTAL_CODE_ADDRESS: AccountAddress = AccountAddress::SEVEN;
 
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
