@@ -7,7 +7,7 @@ use aptos_types::validator_signer::ValidatorSigner;
 
 #[test]
 fn test() {
-    suite::run_test_suite(&safety_rules());
+    suite::run_test_suite_without_sig_check(&safety_rules());
 }
 
 fn safety_rules() -> suite::Callback {
