@@ -515,7 +515,7 @@ pub static CONSENSUS_LAST_TIMEOUT_VOTE_ROUND: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static CURRENT_ROUND: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_current_round",
-        "This counter is set to the last round reported by the local round_state."
+        "Current consensus round"
     )
     .unwrap()
 });
@@ -546,11 +546,14 @@ pub static TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_consensus_timeout_count", "Count the number of timeouts a node experienced since last restart (close to 0 in happy path).").unwrap()
 });
 
-/// The timeout of the current round.
-pub static ROUND_TIMEOUT_MS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "aptos_consensus_round_timeout_s",
-        "The timeout of the current round."
+/// Round timeout in milliseconds
+pub static ROUND_TIMEOUT_MS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_round_timeout_ms",
+        "Round timeout in milliseconds",
+        vec![
+            100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 50000.0, 100000.0
+        ]
     )
     .unwrap()
 });
@@ -638,8 +641,8 @@ pub static ORDER_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
 /// Counts the number of times the sync info message has been set since last restart.
 pub static SYNC_INFO_MSGS_SENT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_consensus_sync_info_msg_sent_count",
-        "Counts the number of times the sync info message has been set since last restart."
+        "aptos_consensus_sync_info_msgs_sent_count",
+        "Number of sync info messages sent"
     )
     .unwrap()
 });
@@ -790,6 +793,16 @@ pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(register_histogram!("aptos_consensus_wait_duration_s",
     "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.",
     CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()).unwrap())
+});
+
+/// Wait duration in milliseconds
+pub static WAIT_DURATION_MS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_wait_duration_ms",
+        "Wait duration in milliseconds",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
 });
 
 const VERIFY_BUCKETS: &[f64] = &[

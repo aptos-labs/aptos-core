@@ -18,6 +18,7 @@ use std::{
 };
 
 mod configuration;
+mod custom_metrics;
 mod index;
 mod json_encoder;
 mod metrics;
@@ -36,6 +37,11 @@ pub const JSON_METRICS_PATH: &str = "/json_metrics";
 pub const METRICS_PATH: &str = "/metrics";
 pub const PEER_INFORMATION_PATH: &str = "/peer_information";
 pub const SYSTEM_INFORMATION_PATH: &str = "/system_information";
+
+// New custom metrics paths
+pub const CONSENSUS_METRICS_PATH: &str = "/consensus_metrics"; 
+pub const MEMPOOL_METRICS_PATH: &str = "/mempool_metrics";
+pub const STORAGE_METRICS_PATH: &str = "/storage_metrics";
 
 // Useful string constants
 pub const HEADER_CONTENT_TYPE: &str = "Content-Type";
@@ -130,6 +136,21 @@ async fn serve_requests(
             // /metrics
             // Exposes text encoded metrics
             metrics::handle_metrics_request()
+        },
+        CONSENSUS_METRICS_PATH => {
+            // /consensus_metrics
+            // Exposes consensus metrics only
+            custom_metrics::handle_consensus_metrics_request()
+        },
+        MEMPOOL_METRICS_PATH => {
+            // /mempool_metrics
+            // Exposes mempool metrics only
+            custom_metrics::handle_mempool_metrics_request()
+        },
+        STORAGE_METRICS_PATH => {
+            // /storage_metrics
+            // Exposes storage metrics only
+            custom_metrics::handle_storage_metrics_request()
         },
         PEER_INFORMATION_PATH => {
             // /peer_information

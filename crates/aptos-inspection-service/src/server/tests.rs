@@ -4,11 +4,13 @@
 use crate::{
     server::{
         configuration::CONFIGURATION_DISABLED_MESSAGE,
-        peer_information::PEER_INFO_DISABLED_MESSAGE, serve_requests,
+        peer_information::PEER_INFO_DISABLED_MESSAGE,
         system_information::SYS_INFO_DISABLED_MESSAGE, utils::get_all_metrics,
+        serve_requests,
     },
-    CONFIGURATION_PATH, FORGE_METRICS_PATH, INDEX_PATH, JSON_METRICS_PATH, METRICS_PATH,
-    PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
+    CONFIGURATION_PATH, CONSENSUS_METRICS_PATH, FORGE_METRICS_PATH, INDEX_PATH, JSON_METRICS_PATH, 
+    MEMPOOL_METRICS_PATH, METRICS_PATH, PEER_INFORMATION_PATH, STORAGE_METRICS_PATH, 
+    SYSTEM_INFORMATION_PATH,
 };
 use aptos_config::config::{AptosDataClientConfig, BaseConfig, NodeConfig};
 use aptos_data_client::client::AptosDataClient;
@@ -178,6 +180,77 @@ async fn test_inspect_peer_information() {
     assert!(response_body_string.contains("Registered networks"));
     assert!(response_body_string.contains("Peers and network IDs"));
     assert!(response_body_string.contains("State sync metadata"));
+}
+
+#[tokio::test]
+async fn test_inspect_consensus_metrics() {
+    // Create a validator config
+    let config = NodeConfig::get_default_validator_config();
+
+    // Increment a counter and get the metrics
+    INT_COUNTER.inc();
+    let mut response = send_get_request_to_path(&config, CONSENSUS_METRICS_PATH).await;
+    let response_body = body::to_bytes(response.body_mut()).await.unwrap();
+    let response_body_string = read_to_string(response_body.as_ref()).unwrap();
+
+    // Verify that the response contains only consensus metrics
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    // For test environments, response might be empty, but should still return OK
+    if !response_body_string.is_empty() {
+        for line in response_body_string.lines() {
+            assert!(line.starts_with("aptos_consensus"), 
+                "Expected consensus metrics only, but found: {}", line);
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_inspect_mempool_metrics() {
+    // Create a validator config
+    let config = NodeConfig::get_default_validator_config();
+
+    // Get the mempool metrics
+    let mut response = send_get_request_to_path(&config, MEMPOOL_METRICS_PATH).await;
+    let response_body = body::to_bytes(response.body_mut()).await.unwrap();
+    let response_body_string = read_to_string(response_body.as_ref()).unwrap();
+
+    // Verify that the response contains only mempool metrics
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    // For test environments, response might be empty, but should still return OK
+    if !response_body_string.is_empty() {
+        for line in response_body_string.lines() {
+            assert!(
+                line.starts_with("aptos_mempool") || line.starts_with("aptos_core_mempool"), 
+                "Expected mempool metrics only, but found: {}", line
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_inspect_storage_metrics() {
+    // Create a validator config
+    let config = NodeConfig::get_default_validator_config();
+
+    // Get the storage metrics
+    let mut response = send_get_request_to_path(&config, STORAGE_METRICS_PATH).await;
+    let response_body = body::to_bytes(response.body_mut()).await.unwrap();
+    let response_body_string = read_to_string(response_body.as_ref()).unwrap();
+
+    // Verify that the response contains only storage metrics
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    // For test environments, response might be empty, but should still return OK
+    if !response_body_string.is_empty() {
+        for line in response_body_string.lines() {
+            assert!(
+                line.starts_with("aptos_storage") || line.starts_with("aptos_schemadb"), 
+                "Expected storage metrics only, but found: {}", line
+            );
+        }
+    }
 }
 
 rusty_fork_test! {

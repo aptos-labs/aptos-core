@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter, register_int_gauge,
-    register_int_gauge_vec, HistogramVec, IntCounter, IntGauge, IntGaugeVec,
+    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
+    register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec, IntCounter, IntGauge,
+    IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -236,6 +237,34 @@ pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         "Various timers for performance analysis.",
         &["name"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static APTOS_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_schemadb_get_latency_seconds",
+        "Latency of schema db get operations in seconds",
+        &["cf_name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static APTOS_STORAGE_SERVICE_COMMIT_LATENCY_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_storage_service_commit_latency_seconds",
+        "Latency of storage service commit operations in seconds",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static APTOS_STORAGE_SERVICE_SAVE_TRANSACTIONS_LATENCY_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_storage_service_save_transactions_latency_seconds",
+        "Latency of storage service save transactions operations in seconds",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()
 });

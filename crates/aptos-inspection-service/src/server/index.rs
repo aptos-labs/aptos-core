@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    server::utils::CONTENT_TYPE_TEXT, CONFIGURATION_PATH, FORGE_METRICS_PATH, JSON_METRICS_PATH,
-    METRICS_PATH, PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
+    server::utils::CONTENT_TYPE_TEXT, CONFIGURATION_PATH, CONSENSUS_METRICS_PATH, FORGE_METRICS_PATH, 
+    JSON_METRICS_PATH, MEMPOOL_METRICS_PATH, METRICS_PATH, PEER_INFORMATION_PATH, 
+    STORAGE_METRICS_PATH, SYSTEM_INFORMATION_PATH,
 };
 use hyper::{Body, StatusCode};
 
@@ -25,10 +26,13 @@ fn get_index_response() -> String {
     index_response.push("Welcome to the Aptos Inspection Service!".into());
     index_response.push("The following endpoints are available:".into());
     index_response.push(format!("\t- {}", CONFIGURATION_PATH));
+    index_response.push(format!("\t- {}", CONSENSUS_METRICS_PATH));
     index_response.push(format!("\t- {}", FORGE_METRICS_PATH));
     index_response.push(format!("\t- {}", JSON_METRICS_PATH));
+    index_response.push(format!("\t- {}", MEMPOOL_METRICS_PATH));
     index_response.push(format!("\t- {}", METRICS_PATH));
     index_response.push(format!("\t- {}", PEER_INFORMATION_PATH));
+    index_response.push(format!("\t- {}", STORAGE_METRICS_PATH));
     index_response.push(format!("\t- {}", SYSTEM_INFORMATION_PATH));
 
     index_response.join("\n") // Separate each entry with a newline

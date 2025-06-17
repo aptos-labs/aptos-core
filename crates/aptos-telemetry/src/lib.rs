@@ -14,3 +14,6 @@ pub mod cli_metrics;
 pub mod service;
 pub mod system_information;
 pub mod utils;
+
+#[cfg(test)]
+mod tests;
