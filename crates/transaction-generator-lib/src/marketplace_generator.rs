@@ -20,6 +20,7 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use rand::{rngs::StdRng, Rng};
 use std::sync::{Arc, RwLock};
+use aptos_logger::{info, warn, error};
 
 /// Represents a minted token with its object address
 #[derive(Debug, Clone)]
@@ -42,6 +43,7 @@ pub struct MintNftTransactionGenerator {
 
 impl MintNftTransactionGenerator {
     pub fn new(minted_tokens: Arc<RwLock<Vec<MintedTokenInfo>>>) -> Self {
+        info!("[Marketplace Workflow] Initializing MintNftTransactionGenerator");
         Self { minted_tokens }
     }
 }
@@ -55,6 +57,7 @@ impl UserModuleTransactionGenerator for MintNftTransactionGenerator {
         _txn_factory: &TransactionFactory,
         _rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
+        info!("[Marketplace Workflow] Initializing package for MintNftTransactionGenerator");
         vec![]
     }
 
@@ -66,11 +69,13 @@ impl UserModuleTransactionGenerator for MintNftTransactionGenerator {
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let minted_tokens = self.minted_tokens.clone();
+        info!("[Marketplace Workflow] Creating mint NFT transaction generator function");
 
-        Arc::new(move |account, _package, publisher, txn_factory, rng| {
+        Arc::new(move |account, _package, publisher, txn_factory, _rng, _0| {
+            info!("[Marketplace Workflow] Generating mint NFT transaction for account {}", account.address());
             // Create mint NFT transaction using the provided account as signer
-            let collection_name = format!("TestCollection{}", rng.gen::<u32>());
-            let token_name = format!("TestToken{}", rng.gen::<u32>());
+            let collection_name = format!("TestCollection{}", _rng.gen::<u32>());
+            let token_name = format!("TestToken{}", _rng.gen::<u32>());
             
             let payload = TransactionPayload::EntryFunction(EntryFunction::new(
                 ModuleId::new(publisher.address(), ident_str!("create_nft").to_owned()),
@@ -95,6 +100,9 @@ impl UserModuleTransactionGenerator for MintNftTransactionGenerator {
             
             if let Ok(mut tokens) = minted_tokens.write() {
                 tokens.push(simulated_token_info);
+                info!("[Marketplace Workflow] Added new minted token to pool. Total tokens: {}", tokens.len());
+            } else {
+                warn!("[Marketplace Workflow] Failed to write to minted tokens pool");
             }
 
             Some(txn)
@@ -109,6 +117,7 @@ pub struct CreateFeeScheduleTransactionGenerator {
 
 impl CreateFeeScheduleTransactionGenerator {
     pub fn new(fee_schedules: Arc<RwLock<Vec<FeeScheduleInfo>>>) -> Self {
+        info!("[Marketplace Workflow] Initializing CreateFeeScheduleTransactionGenerator");
         Self { fee_schedules }
     }
 }
@@ -122,6 +131,7 @@ impl UserModuleTransactionGenerator for CreateFeeScheduleTransactionGenerator {
         _txn_factory: &TransactionFactory,
         _rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
+        info!("[Marketplace Workflow] Initializing package for CreateFeeScheduleTransactionGenerator");
         vec![]
     }
 
@@ -133,12 +143,14 @@ impl UserModuleTransactionGenerator for CreateFeeScheduleTransactionGenerator {
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let fee_schedules = self.fee_schedules.clone();
+        info!("[Marketplace Workflow] Creating fee schedule transaction generator function");
 
-        Arc::new(move |account, _package, publisher, txn_factory, _rng| {
+        Arc::new(move |account, _package, publisher, txn_factory, _rng, _0| {
+            info!("[Marketplace Workflow] Generating fee schedule transaction for account {}", account.address());
             // Create fee schedule transaction using the provided account as signer
             let payload = TransactionPayload::EntryFunction(EntryFunction::new(
                 ModuleId::new(publisher.address(), ident_str!("fee_schedule").to_owned()),
-                ident_str!("create_zero_fee_schedule").to_owned(),
+                ident_str!("init_zero_commission").to_owned(),
                 vec![],
                 vec![],
             ));
@@ -155,6 +167,9 @@ impl UserModuleTransactionGenerator for CreateFeeScheduleTransactionGenerator {
             
             if let Ok(mut schedules) = fee_schedules.write() {
                 schedules.push(simulated_fee_schedule_info);
+                info!("[Marketplace Workflow] Added new fee schedule to pool. Total schedules: {}", schedules.len());
+            } else {
+                warn!("[Marketplace Workflow] Failed to write to fee schedules pool");
             }
 
             Some(txn)
@@ -173,6 +188,7 @@ impl PlaceListingTransactionGenerator {
         minted_tokens: Arc<RwLock<Vec<MintedTokenInfo>>>,
         fee_schedules: Arc<RwLock<Vec<FeeScheduleInfo>>>,
     ) -> Self {
+        info!("[Marketplace Workflow] Initializing PlaceListingTransactionGenerator");
         Self {
             minted_tokens,
             fee_schedules,
@@ -189,6 +205,7 @@ impl UserModuleTransactionGenerator for PlaceListingTransactionGenerator {
         _txn_factory: &TransactionFactory,
         _rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
+        info!("[Marketplace Workflow] Initializing package for PlaceListingTransactionGenerator");
         vec![]
     }
 
@@ -201,56 +218,44 @@ impl UserModuleTransactionGenerator for PlaceListingTransactionGenerator {
     ) -> Arc<TransactionGeneratorWorker> {
         let minted_tokens = self.minted_tokens.clone();
         let fee_schedules = self.fee_schedules.clone();
+        info!("[Marketplace Workflow] Creating place listing transaction generator function");
 
-        Arc::new(move |account, _package, publisher, txn_factory, rng| {
-            // Get random objects from previous stages
-            let token_info = {
-                if let Ok(tokens) = minted_tokens.read() {
-                    if !tokens.is_empty() {
-                        Some(tokens[rng.gen_range(0, tokens.len())].clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            };
+        Arc::new(move |account, _package, publisher, txn_factory, rng, i| {
+            info!("[Marketplace Workflow] Generating place listing transaction for account {}", account.address());
+            
+            let token_info = minted_tokens.read().ok().and_then(|tokens| tokens.get(i).cloned());
+            let fee_schedule_info = fee_schedules.read().ok().and_then(|schedules| schedules.first().cloned());
 
-            let fee_schedule_info = {
-                if let Ok(schedules) = fee_schedules.read() {
-                    if !schedules.is_empty() {
-                        Some(schedules[rng.gen_range(0, schedules.len())].clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            };
-
-            if let (Some(token_info), Some(fee_schedule_info)) = (token_info, fee_schedule_info) {
-                // Create marketplace listing transaction using object addresses from previous stages
-                let listing_price = rng.gen_range(100, 10000u64);
-                
-                let payload = TransactionPayload::EntryFunction(EntryFunction::new(
-                    ModuleId::new(publisher.address(), ident_str!("marketplace").to_owned()),
-                    ident_str!("place_token_listing").to_owned(),
-                    vec![],
-                    vec![
-                        bcs::to_bytes(&token_info.token_address).unwrap(),
-                        bcs::to_bytes(&fee_schedule_info.fee_schedule_address).unwrap(),
-                        bcs::to_bytes(&fee_schedule_info.fee_metadata_address).unwrap(),
-                        bcs::to_bytes(&listing_price).unwrap(),
-                    ],
-                ));
-
-                // Use the provided account as the transaction signer (follows CreateMintBurn pattern)
-                let txn = account.sign_with_transaction_builder(txn_factory.payload(payload));
-                Some(txn)
-            } else {
-                // Skip transaction if no tokens or fee schedules are available yet
-                None
+            if token_info.is_none() {
+                panic!("[Marketplace Workflow] No minted tokens available for listing. Workflow failed at token selection stage.");
             }
+            if fee_schedule_info.is_none() {
+                panic!("[Marketplace Workflow] No fee schedules available for listing. Workflow failed at fee schedule selection stage.");
+            }
+
+            let token_info = token_info.unwrap();
+            let fee_schedule_info = fee_schedule_info.unwrap();
+            
+            info!("[Marketplace Workflow] Creating listing with token {} and fee schedule {} ", 
+                token_info.token_address, fee_schedule_info.fee_schedule_address);
+            // Create marketplace listing transaction using object addresses from previous stages
+            let listing_price = rng.gen_range(100, 10000u64);
+            
+            let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+                ModuleId::new(publisher.address(), ident_str!("open_marketplace").to_owned()),
+                ident_str!("place_listing").to_owned(),
+                vec![],
+                vec![
+                    bcs::to_bytes(&token_info.token_address).unwrap(),
+                    bcs::to_bytes(&fee_schedule_info.fee_schedule_address).unwrap(),
+                    bcs::to_bytes(&fee_schedule_info.fee_metadata_address).unwrap(),
+                    bcs::to_bytes(&listing_price).unwrap(),
+                ],
+            ));
+
+            // Use the provided account as the transaction signer (follows CreateMintBurn pattern)
+            let txn = account.sign_with_transaction_builder(txn_factory.payload(payload));
+            Some(txn)
         })
     }
 }

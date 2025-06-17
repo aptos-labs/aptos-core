@@ -24,6 +24,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
+        usize,
     ) -> Option<SignedTransaction>
     + Send
     + Sync;
@@ -113,7 +114,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
 
-        for _ in 0..num_to_create {
+        for i in 0..num_to_create {
             let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
             let request = (self.txn_generator)(
                 account,
@@ -121,6 +122,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
                 publisher,
                 &self.txn_factory,
                 &mut self.rng,
+                i,
             );
             if let Some(request) = request {
                 requests.push(request);

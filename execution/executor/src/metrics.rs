@@ -305,16 +305,21 @@ pub fn update_counters_for_processed_chunk<T>(
                 ExecutionStatus::ExecutionFailure { .. } => {
                     ("keep_rejected", "ExecutionFailure", "error".to_string())
                 },
-                ExecutionStatus::MiscellaneousError(e) => (
+                ExecutionStatus::MiscellaneousError(e) => {
+                    info!("MiscellaneousError: {:?} for txn {:?}", e.map(|v| format!("{:?}", v).to_lowercase())
+                    .unwrap_or_else(|| "none".to_string()), txn);
+
+                    (
                     "keep_rejected",
                     "MiscellaneousError",
-                    if detailed_counters {
+                    if true {
                         e.map(|v| format!("{:?}", v).to_lowercase())
                             .unwrap_or_else(|| "none".to_string())
                     } else {
                         "error".to_string()
                     },
-                ),
+                )
+            },
             },
             TransactionStatus::Discard(discard_status_code) => {
                 (

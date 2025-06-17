@@ -9,6 +9,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
+use log::warn;
 use std::sync::Arc;
 
 pub struct AccountGenerator {
@@ -49,6 +50,7 @@ impl TransactionGenerator for AccountGenerator {
         let mut requests = Vec::with_capacity(num_to_create);
         let mut new_accounts = Vec::with_capacity(num_to_create);
         let mut new_account_addresses = Vec::with_capacity(num_to_create);
+        warn!("Generating {} transactions", num_to_create);
         for _ in 0..num_to_create {
             let receiver = LocalAccount::generate(&mut self.rng);
             let receiver_address = receiver.address();

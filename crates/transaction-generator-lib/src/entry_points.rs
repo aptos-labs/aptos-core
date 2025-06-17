@@ -130,7 +130,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             });
         }
 
-        Arc::new(move |account, package, publisher, txn_factory, rng| {
+        Arc::new(move |account, package, publisher, txn_factory, rng, _0| {
             let entry_point_idx = Self::pick_random(&entry_points, total_weight, rng);
             let entry_point = &entry_points[entry_point_idx].0;
 

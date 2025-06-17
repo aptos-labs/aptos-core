@@ -14,6 +14,7 @@ use aptos_transaction_generator_lib::{
 };
 use async_trait::async_trait;
 use std::sync::Arc;
+use aptos_logger::{info, warn, error, debug};
 
 #[derive(Debug, Copy, Clone)]
 pub enum TokenWorkflowKind {
@@ -37,6 +38,7 @@ impl WorkflowKind for TokenWorkflowKind {
                 count,
                 creation_balance,
             } => {
+                info!("[Token Workflow] Initializing CreateMintBurn workflow with count: {}, balance: {}", count, creation_balance);
                 let mint_entry_point = EntryPoints::TokenV2AmbassadorMint { numbered: false };
                 let burn_entry_point = EntryPoints::TokenV2AmbassadorBurn;
 
@@ -77,12 +79,14 @@ impl WorkflowKind for TokenWorkflowKind {
                 .await
             },
             TokenWorkflowKind::MarketplaceWorkflow { count, creation_balance } => {
+                info!("[Token Workflow] Initializing MarketplaceWorkflow with count: {}, balance: {}", count, creation_balance);
                 use aptos_transaction_generator_lib::marketplace_generator::{
                     MintNftTransactionGenerator, CreateFeeScheduleTransactionGenerator, PlaceListingTransactionGenerator
                 };
                 
                 // Publish the on-chain-nft-marketplace package
                 let marketplace_entry_point = EntryPoints::CreateNftCollection;
+                info!("[Token Workflow] Publishing marketplace package");
                 let packages = Arc::new(
                     CustomModulesDelegationGeneratorCreator::publish_package(
                         init_txn_factory.clone(),
@@ -95,12 +99,15 @@ impl WorkflowKind for TokenWorkflowKind {
                     )
                     .await,
                 );
+                info!("[Token Workflow] Marketplace package published successfully");
 
                 // Create the shared object pools for cross-stage communication
+                info!("[Token Workflow] Creating shared object pools for cross-stage communication");
                 let minted_token_objects = Arc::new(std::sync::RwLock::new(Vec::new()));
                 let fee_schedule_objects = Arc::new(std::sync::RwLock::new(Vec::new()));
 
                 // Create stage-specific generators with only the pools they need
+                info!("[Token Workflow] Creating stage-specific generators");
                 let workers: Vec<Box<dyn UserModuleTransactionGenerator>> = vec![
                     Box::new(MintNftTransactionGenerator::new(minted_token_objects.clone())),
                     Box::new(CreateFeeScheduleTransactionGenerator::new(fee_schedule_objects.clone())),
@@ -109,10 +116,12 @@ impl WorkflowKind for TokenWorkflowKind {
                         fee_schedule_objects.clone(),
                     )),
                 ];
+                info!("[Token Workflow] Stage-specific generators created successfully");
 
                 // Note: Since new_staged_with_account_pool only supports account pools,
                 // we'll need a custom approach for object pools. For now, this compiles
                 // but we may need to create a custom workflow delegator later.
+                info!("[Token Workflow] Creating workflow with account pool");
                 WorkflowTxnGeneratorCreator::new_staged_with_account_pool(
                     *count,
                     *creation_balance,

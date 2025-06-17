@@ -214,12 +214,12 @@ impl Default for EmitJobRequest {
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::Workflow {
                 workflow_kind: Box::new(TokenWorkflowKind::MarketplaceWorkflow {
-                    count: 10,
+                    count: 1000,
                     creation_balance: 3_0000_000000,
                 }),
                 num_modules: 1,
                 use_account_pool: false,
-                progress_type: WorkflowProgress::MoveByPhases,
+                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 30 },
             }, 1)]],
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,

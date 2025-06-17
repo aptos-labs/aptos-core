@@ -11,7 +11,7 @@ use crate::{
     ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
     TransactionGeneratorCreator, WorkflowProgress,
 };
-use aptos_logger::{sample, sample::SampleRate};
+use aptos_logger::{sample, sample::SampleRate, warn, error, debug};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
@@ -148,11 +148,14 @@ impl TransactionGenerator for WorkflowTxnGenerator {
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
         let stage = match self.stage.load_current_stage() {
-            Some(stage) => stage,
+            Some(stage) => {
+                debug!("[Workflow] Current stage: {}", stage);
+                stage
+            },
             None => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(2)),
-                    info!("Waiting for delay before next stage");
+                    info!("[Workflow] Waiting for delay before next stage");
                 );
                 return Vec::new();
             },
@@ -171,7 +174,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                         .unwrap()
                         .should_switch()
                 {
-                    info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
+                    info!("[Workflow] Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
                     stage_start_time.store(
                         StageTracking::current_timestamp() + delay_between_stages.as_secs(),
                         Ordering::Relaxed,
@@ -194,7 +197,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                             .unwrap()
                             .should_switch())
                 {
-                    info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
+                    info!("[Workflow] Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
                     return Vec::new();
                 }
             },
@@ -202,17 +205,22 @@ impl TransactionGenerator for WorkflowTxnGenerator {
 
         sample!(
             SampleRate::Duration(Duration::from_secs(2)),
-            info!("Cur stage: {}, stage switch conditions: {:?}", stage, self.stage_switch_conditions);
+            debug!("[Workflow] Current stage: {}, stage switch conditions: {:?}", stage, self.stage_switch_conditions);
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
+            info!("[Workflow] Generating transactions for stage {}", stage);
             generator.generate_transactions(account, num_to_create)
         } else {
+            warn!("[Workflow] No generator found for stage {}", stage);
             Vec::new()
         };
+
         if let Some(switch_condition) = self.stage_switch_conditions.get_mut(stage) {
+            debug!("[Workflow] Reducing transaction count for stage {} by {}", stage, result.len());
             switch_condition.reduce_txn_count(result.len());
         }
+
         result
     }
 }
@@ -225,13 +233,26 @@ pub enum StageSwitchCondition {
 
 impl StageSwitchCondition {
     pub fn new_max_transactions(max_transactions: usize) -> Self {
+        debug!("[Workflow] Creating new max transactions condition with limit: {}", max_transactions);
         Self::MaxTransactions(Arc::new(AtomicUsize::new(max_transactions)))
     }
 
     fn should_switch(&self) -> bool {
         match self {
-            StageSwitchCondition::WhenPoolBecomesEmpty(pool) => pool.len() == 0,
-            StageSwitchCondition::MaxTransactions(max) => max.load(Ordering::Relaxed) == 0,
+            StageSwitchCondition::WhenPoolBecomesEmpty(pool) => {
+                let should_switch = pool.len() == 0;
+                if should_switch {
+                    debug!("[Workflow] Pool is empty, should switch stage");
+                }
+                should_switch
+            },
+            StageSwitchCondition::MaxTransactions(max) => {
+                let should_switch = max.load(Ordering::Relaxed) == 0;
+                if should_switch {
+                    debug!("[Workflow] Max transactions reached, should switch stage");
+                }
+                should_switch
+            },
         }
     }
 
@@ -241,8 +262,11 @@ impl StageSwitchCondition {
             StageSwitchCondition::MaxTransactions(max) => {
                 let current = max.load(Ordering::Relaxed);
                 if count > current {
+                    debug!("[Workflow] Reducing max transactions from {} to 0 (count: {})", current, count);
                     max.store(0, Ordering::Relaxed);
                 } else {
+                    debug!("[Workflow] Reducing max transactions from {} to {} (count: {})", 
+                        current, current - count, count);
                     max.fetch_sub(count, Ordering::Relaxed);
                 }
             },

@@ -647,7 +647,7 @@ impl Client {
         txns: &[SignedTransaction],
     ) -> AptosResult<Response<TransactionsBatchSubmissionResult>> {
         let txn_payload = bcs::to_bytes(&txns.to_vec())?;
-        warn!("Txn payload: {:?}", txn_payload);
+        // warn!("Txn payload: {:?}", txn_payload);
         let url = self.build_path("transactions/batch")?;
 
         let response = self

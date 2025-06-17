@@ -484,13 +484,16 @@ pub async fn submit_transactions(
             stats
                 .failed_submission
                 .fetch_add(txns.len() as u64, Ordering::Relaxed);
-            sample!(
-                SampleRate::Duration(Duration::from_secs(60)),
-                warn!(
-                    "[{:?}] Failed to submit batch request: {:?}",
+            // error!(
+                // SampleRate::Duration(Duration::from_secs(60)),
+                error!(
+                    "[{:?}] Failed to submit batch request: {:?} txn entry function: {:?}, txn sequence number: {:?}, for account {:?}",
                     client.path_prefix_string(),
-                    e
-                )
+                    e,
+                    txns.first().map(|txn| txn.payload().clone().into_entry_function()),
+                    txns.first().map(|txn| txn.sequence_number()),
+                    txns.first().map(|txn| txn.sender()),
+                // )
             );
         },
         Ok(v) => {

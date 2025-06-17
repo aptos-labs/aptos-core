@@ -4551,6 +4551,7 @@ name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
  "aptos-framework",
+ "aptos-logger",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
  "async-trait",
