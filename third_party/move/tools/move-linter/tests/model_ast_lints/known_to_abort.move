@@ -148,7 +148,7 @@ module 0xc0ffee::m {
 
     // ===== NEGATIVE TESTS (should NOT trigger lint) =====
 
-    public fun test_complex_expr_1(x: u8): u8 {
+    public fun test_complex_expr(x: u8): u8 {
         ((x + 1) * 2) as u8
     }
 
