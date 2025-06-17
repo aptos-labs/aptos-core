@@ -50,11 +50,11 @@ enum EntryCell<V> {
     /// stored in a shared pointer (to ensure ownership and avoid clones). and
     /// a mutex-protected set of (txn_idx, incarnation) pairs that have registered
     /// a read of this entry.
-    ResourceWrite(
-        Incarnation,
-        ValueWithLayout<V>,
-        Mutex<BTreeSet<(TxnIndex, Incarnation)>>,
-    ),
+    ResourceWrite {
+        incarnation: Incarnation,
+        value_with_layout: ValueWithLayout<V>,
+        dependencies: Mutex<BTreeSet<(TxnIndex, Incarnation)>>,
+    },
 
     /// Recorded in the shared multi-version data-structure for each delta.
     /// Option<u128> is a shortcut to aggregated value (to avoid traversing down
@@ -79,11 +79,11 @@ fn new_write_entry<V>(
     value: ValueWithLayout<V>,
     dependencies: BTreeSet<(TxnIndex, Incarnation)>,
 ) -> Entry<EntryCell<V>> {
-    Entry::new(EntryCell::ResourceWrite(
+    Entry::new(EntryCell::ResourceWrite {
         incarnation,
-        value,
-        Mutex::new(dependencies),
-    ))
+        value_with_layout: value,
+        dependencies: Mutex::new(dependencies),
+    })
 }
 
 fn new_delta_entry<V>(data: DeltaOp) -> Entry<EntryCell<V>> {
@@ -144,42 +144,50 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
     // of 'data' at 'txn_idx'. Some of these dependencies that remain valid can be
     // relocated by a caller to a different (new) entry in the data-structure. The
     // boolean flag indicates whether the dependency is still valid after the write.
-    fn get_affected_read_dependencies<const ONLY_COMPARE_METADATA: bool>(
+    fn split_off_affected_read_dependencies<const ONLY_COMPARE_METADATA: bool>(
         &self,
         txn_idx: TxnIndex,
-        data: &Arc<V>,
-        maybe_layout: &Option<Arc<MoveTypeLayout>>,
+        new_data: &Arc<V>,
+        new_maybe_layout: &Option<Arc<MoveTypeLayout>>,
     ) -> (BTreeSet<(TxnIndex, Incarnation)>, bool) {
         let mut affected_deps = BTreeSet::new();
-        let mut validation_result = true;
+        let mut still_valid = false;
 
-        // Look at entries at or below txn_idx
+        // Look at entries at or below txn_idx, which is where all the affected
+        // dependencies may be stored. Here, for generality, we assume that there
+        // may also be an entry at txn_idx, which could be getting overwritten,
+        // in which case all of its dependencies would be considered affected.
         if let Some((_, entry)) = self
             .versioned_map
             .range(..=ShiftedTxnIndex::new(txn_idx))
             .next_back()
         {
-            if let EntryCell::ResourceWrite(_, value, dependencies) = &entry.value {
+            // Non-exchanged format is default validation failure.
+            if let EntryCell::ResourceWrite {
+                incarnation: _,
+                value_with_layout,
+                dependencies,
+            } = &entry.value
+            {
                 // Take dependencies above txn_idx
-                let mut deps = dependencies.lock();
-                let new_deps = deps.split_off(&(txn_idx + 1, 0));
-                if !new_deps.is_empty() {
-                    // Only validate if we have dependencies to check.
-                    // Validate by comparing both value and layout, or metadata if only_compare_metadata is true
-                    validation_result = if let ValueWithLayout::Exchanged(v, l) = value {
-                        if ONLY_COMPARE_METADATA {
-                            v.as_state_value_metadata() == data.as_state_value_metadata()
-                        } else {
-                            v == data && l == maybe_layout
-                        }
-                    } else {
-                        false
-                    };
+                affected_deps = dependencies.lock().split_off(&(txn_idx + 1, 0));
+                if !affected_deps.is_empty() {
+                    if let ValueWithLayout::Exchanged(
+                        previous_entry_value,
+                        previous_entry_maybe_layout,
+                    ) = value_with_layout
+                    {
+                        still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
+                            previous_entry_value,
+                            new_data,
+                            previous_entry_maybe_layout.as_ref(),
+                            new_maybe_layout.as_ref(),
+                        );
+                    }
                 }
-                affected_deps = new_deps;
             }
         }
-        (affected_deps, validation_result)
+        (affected_deps, still_valid)
     }
 
     /// Handle dependencies from a removed entry by validating against the next (lower) entry.
@@ -191,8 +199,8 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
         &mut self,
         txn_idx: TxnIndex,
         mut dependencies: BTreeSet<(TxnIndex, Incarnation)>,
-        data: &Arc<V>,
-        maybe_layout: &Option<Arc<MoveTypeLayout>>,
+        removed_data: &Arc<V>,
+        removed_maybe_layout: &Option<Arc<MoveTypeLayout>>,
     ) -> BTreeSet<(TxnIndex, Incarnation)> {
         // If we have dependencies and a next (lower) entry exists, validate against it.
         if !dependencies.is_empty() {
@@ -207,16 +215,21 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                     "Entry at txn_idx must be removed before calling handle_removed_dependencies"
                 );
 
-                if let EntryCell::ResourceWrite(_, ValueWithLayout::Exchanged(v, l), next_deps) =
-                    &next_entry.value
+                // Non-exchanged format is default validation failure.
+                if let EntryCell::ResourceWrite {
+                    incarnation: _,
+                    value_with_layout: ValueWithLayout::Exchanged(entry_value, entry_maybe_layout),
+                    dependencies: next_deps,
+                } = &next_entry.value
                 {
-                    let validation_passed = if ONLY_COMPARE_METADATA {
-                        v.as_state_value_metadata() == data.as_state_value_metadata()
-                    } else {
-                        v == data && l == maybe_layout
-                    };
+                    let still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
+                        entry_value,
+                        removed_data,
+                        entry_maybe_layout.as_ref(),
+                        removed_maybe_layout.as_ref(),
+                    );
 
-                    if validation_passed {
+                    if still_valid {
                         // If validation passed, add dependencies to next entry and clear them.
                         next_deps.lock().extend(std::mem::take(&mut dependencies));
                     }
@@ -252,7 +265,14 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             }
 
             match (&entry.value, accumulator.as_mut()) {
-                (EntryCell::ResourceWrite(incarnation, data, dependencies), None) => {
+                (
+                    EntryCell::ResourceWrite {
+                        incarnation,
+                        value_with_layout,
+                        dependencies,
+                    },
+                    None,
+                ) => {
                     // Record the read dependency (only in V2 case, not to add contention to V1).
                     if let Some(reader_incarnation) = maybe_reader_incarnation {
                         dependencies
@@ -263,13 +283,22 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                     // Resolve to the write if no deltas were applied in between.
                     return Ok(Versioned(
                         idx.idx().map(|idx| (idx, *incarnation)),
-                        data.clone(),
+                        value_with_layout.clone(),
                     ));
                 },
-                (EntryCell::ResourceWrite(incarnation, data, _), Some(accumulator)) => {
+                (
+                    EntryCell::ResourceWrite {
+                        incarnation,
+                        value_with_layout,
+                        // We ignore dependencies here because accumulator is set, i.e.
+                        // we are dealing with AggregatorV1 flow w.o. push validation.
+                        dependencies: _,
+                    },
+                    Some(accumulator),
+                ) => {
                     // Deltas were applied. We must deserialize the value
                     // of the write and apply the aggregated delta accumulator.
-                    let value = data.extract_value_no_layout();
+                    let value = value_with_layout.extract_value_no_layout();
                     return match value
                         .as_u128()
                         .expect("Aggregator value must deserialize to u128")
@@ -280,7 +309,7 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                             // over any speculative delta accumulation errors on top.
                             Ok(Versioned(
                                 idx.idx().map(|idx| (idx, *incarnation)),
-                                data.clone(),
+                                value_with_layout.clone(),
                             ))
                         },
                         Some(value) => {
@@ -341,6 +370,33 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             None => Err(Uninitialized),
         }
     }
+}
+
+// Helper function to perform push validation whereby a read of an entry containing
+// prev_value with prev_maybe_layout would now be reading an entry containing new_value
+// with new_maybe_layout.
+fn compare_values_and_layouts<
+    const ONLY_COMPARE_METADATA: bool,
+    V: TransactionWrite + PartialEq,
+>(
+    prev_value: &V,
+    new_value: &V,
+    prev_maybe_layout: Option<&Arc<MoveTypeLayout>>,
+    new_maybe_layout: Option<&Arc<MoveTypeLayout>>,
+) -> bool {
+    // ONLY_COMPARE_METADATA is a const static flag that indicates that these entries are
+    // versioning metadata only, and not the actual value (Currently, only used for versioning
+    // resource group metadata). Hence, validation is only performed on the metadata.
+    if ONLY_COMPARE_METADATA {
+        prev_value.as_state_value_metadata() == new_value.as_state_value_metadata()
+    } else {
+        // Layouts pass validation only if they are both None. Otherwise, validation pessimistically
+        // fails. This is a simple logic that avoids potentially costly layout comparisons.
+        prev_value == new_value && prev_maybe_layout.is_none() && new_maybe_layout.is_none()
+    }
+    // TODO(BlockSTMv2): optimize layout validation (potentially based on size, or by having
+    // a more efficient representation. Optimizing value validation by having a configurable
+    // size threshold above which validation can automatically pessimistically fail.
 }
 
 impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedData<K, V> {
@@ -417,16 +473,28 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             .remove(&ShiftedTxnIndex::new(txn_idx))
             .expect("Entry for key / idx must exist to be deleted");
 
-        if let EntryCell::ResourceWrite(_, ValueWithLayout::Exchanged(data, layout), deps) =
-            &removed_entry.value
+        if let EntryCell::ResourceWrite {
+            incarnation: _,
+            value_with_layout,
+            dependencies,
+        } = &removed_entry.value
         {
-            let removed_deps = std::mem::take(&mut *deps.lock());
-            v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
-                txn_idx,
-                removed_deps,
-                data,
-                layout,
-            )
+            match value_with_layout {
+                ValueWithLayout::RawFromStorage(_) => {
+                    unreachable!(
+                        "Removed value written by txn {txn_idx} may not be RawFromStorage"
+                    );
+                },
+                ValueWithLayout::Exchanged(data, layout) => {
+                    let removed_deps = std::mem::take(&mut *dependencies.lock());
+                    v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
+                        txn_idx,
+                        removed_deps,
+                        data,
+                        layout,
+                    )
+                },
+            }
         } else {
             BTreeSet::new()
         }
@@ -466,28 +534,40 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 
     // The caller needs to repeat the read after set_base_value (concurrent caller might have
     // exchanged and stored a different delayed field ID).
-    pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
+    pub fn set_base_value(&self, key: K, base_value_with_layout: ValueWithLayout<V>) {
         let mut v = self.values.entry(key).or_default();
         // For base value, incarnation is irrelevant, and is always set to 0.
 
         use btree_map::Entry::*;
         use ValueWithLayout::*;
         match v.versioned_map.entry(ShiftedTxnIndex::zero_idx()) {
-            Vacant(v) => {
-                if let Some(base_size) = value.bytes_len() {
+            Vacant(vacant_entry) => {
+                if let Some(base_size) = base_value_with_layout.bytes_len() {
                     self.total_base_value_size
                         .fetch_add(base_size as u64, Ordering::Relaxed);
                 }
-                v.insert(CachePadded::new(new_write_entry(0, value, BTreeSet::new())));
+                vacant_entry.insert(CachePadded::new(new_write_entry(
+                    0,
+                    base_value_with_layout,
+                    BTreeSet::new(),
+                )));
             },
             Occupied(mut o) => {
-                if let EntryCell::ResourceWrite(i, existing_value, dependencies) = &o.get().value {
-                    assert!(*i == 0);
-                    match (existing_value, &value) {
-                        (RawFromStorage(ev), RawFromStorage(v)) => {
+                if let EntryCell::ResourceWrite {
+                    incarnation,
+                    value_with_layout: existing_value_with_layout,
+                    dependencies,
+                } = &o.get().value
+                {
+                    assert!(*incarnation == 0);
+                    match (existing_value_with_layout, &base_value_with_layout) {
+                        (RawFromStorage(existing_value), RawFromStorage(base_value)) => {
                             // Base value from storage needs to be identical
                             // Assert the length of bytes for efficiency (instead of full equality)
-                            assert!(v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len()))
+                            assert!(
+                                base_value.bytes().map(|b| b.len())
+                                    == existing_value.bytes().map(|b| b.len())
+                            );
                         },
                         (Exchanged(_, _), RawFromStorage(_)) => {
                             // Stored value contains more info, nothing to do.
@@ -497,9 +577,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                             // Received more info, update, but keep the same dependencies.
                             // TODO(BlockSTMv2): Once we support dependency kind, here we could check
                             // that carried over dependencies can be only size & metadata.
-                            o.insert(CachePadded::new(new_write_entry(0, value, dependencies)));
+                            o.insert(CachePadded::new(new_write_entry(
+                                0,
+                                base_value_with_layout,
+                                dependencies,
+                            )));
                         },
-                        (Exchanged(ev, e_layout), Exchanged(v, layout)) => {
+                        (
+                            Exchanged(existing_value, existing_layout),
+                            Exchanged(base_value, base_layout),
+                        ) => {
                             // base value may have already been provided by another transaction
                             // executed simultaneously and asking for the same resource.
                             // Value from storage must be identical, but then delayed field
@@ -508,9 +595,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                             // If maybe_layout is None, they are required to be identical
                             // If maybe_layout is Some, there might have been an exchange
                             // Assert the length of bytes for efficiency (instead of full equality)
-                            assert_eq!(e_layout.is_some(), layout.is_some());
-                            if layout.is_none() {
-                                assert_eq!(v.bytes().map(|b| b.len()), ev.bytes().map(|b| b.len()));
+                            assert_eq!(existing_layout.is_some(), base_layout.is_some());
+                            if existing_layout.is_none() {
+                                assert_eq!(
+                                    existing_value.bytes().map(|b| b.len()),
+                                    base_value.bytes().map(|b| b.len())
+                                );
                             }
                         },
                     }
@@ -533,8 +623,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
         assert!(prev_entry.map_or(true, |entry| -> bool {
-            if let EntryCell::ResourceWrite(i, _, _) = entry.value {
-                i < incarnation
+            if let EntryCell::ResourceWrite {
+                incarnation: prev_incarnation,
+                value_with_layout: _,
+                dependencies: _,
+            } = entry.value
+            {
+                prev_incarnation < incarnation
             } else {
                 true
             }
@@ -570,12 +665,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         maybe_layout: Option<Arc<MoveTypeLayout>>,
     ) -> BTreeSet<(TxnIndex, Incarnation)> {
         let mut v = self.values.entry(key).or_default();
-
         let (affected_dependencies, validation_passed) = v
-            .get_affected_read_dependencies::<ONLY_COMPARE_METADATA>(txn_idx, &data, &maybe_layout);
+            .split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(
+                txn_idx,
+                &data,
+                &maybe_layout,
+            );
 
-        // If validation passed, keep the dependencies (pass to write_impl), o.w. return them to the caller.
-        let (deps_to_pass, deps_to_return) = if validation_passed {
+        // If validation passed, keep the dependencies (pass to write_impl), o.w. return them
+        // (invalidated read dependencies) to the caller.
+        let (deps_to_retain, deps_to_return) = if validation_passed {
             (affected_dependencies, BTreeSet::new())
         } else {
             (BTreeSet::new(), affected_dependencies)
@@ -586,7 +685,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             txn_idx,
             incarnation,
             ValueWithLayout::Exchanged(data, maybe_layout),
-            deps_to_pass,
+            deps_to_retain,
         );
 
         deps_to_return
@@ -616,9 +715,14 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
 
         // Changes versioned metadata that was stored.
         prev_entry.map_or(true, |entry| -> bool {
-            if let EntryCell::ResourceWrite(_, existing_v, _) = &entry.value {
+            if let EntryCell::ResourceWrite {
+                incarnation: _,
+                value_with_layout: existing_value_with_layout,
+                dependencies: _,
+            } = &entry.value
+            {
                 arc_data.as_state_value_metadata()
-                    != existing_v
+                    != existing_value_with_layout
                         .extract_value_no_layout()
                         .as_state_value_metadata()
             } else {
@@ -670,7 +774,11 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             .expect("Entry must exist for the given txn_idx")
             .value
         {
-            EntryCell::ResourceWrite(_, _, deps) => deps.lock().clone(),
+            EntryCell::ResourceWrite {
+                incarnation: _,
+                value_with_layout: _,
+                dependencies,
+            } => dependencies.lock().clone(),
             _ => unreachable!("Dependencies can only be recorded for resource writes"),
         }
     }
@@ -737,8 +845,13 @@ mod tests {
     fn get_deps_from_entry(
         entry: &Entry<EntryCell<TestValueWithMetadata>>,
     ) -> BTreeSet<(TxnIndex, Incarnation)> {
-        if let EntryCell::ResourceWrite(_, _, deps) = &entry.value {
-            deps.lock().clone()
+        if let EntryCell::ResourceWrite {
+            incarnation: _,
+            value_with_layout: _,
+            dependencies,
+        } = &entry.value
+        {
+            dependencies.lock().clone()
         } else {
             unreachable!()
         }
@@ -749,9 +862,9 @@ mod tests {
     #[test_case(5, BTreeSet::from([(7, 1)]), true; "deps > 5 from write at idx 0, pass validation")]
     #[test_case(0, BTreeSet::from([(1, 0), (2, 0), (3, 0), (3, 1), (7, 1)]), true; "all deps > 0 from idx 0 write, pass validation")]
     #[test_case(9, BTreeSet::from([(10, 0), (10, 2)]), false; "deps > 9 from write at idx 7, fail validation")]
-    #[test_case(12, BTreeSet::from([]), true; "entries >= idx 12 - no deps, pass validation")]
+    #[test_case(12, BTreeSet::from([]), false; "entries >= idx 12 - no deps, default fail validation")]
     #[test_case(7, BTreeSet::from([(8, 1), (9, 0), (10, 0), (10, 2)]), false; "all deps from write at idx 7, fail validation")]
-    fn test_get_affected_read_dependencies(
+    fn test_split_off_affected_read_dependencies(
         idx: TxnIndex,
         expected_deps: BTreeSet<(TxnIndex, Incarnation)>,
         expected_validation_result: bool,
@@ -794,7 +907,7 @@ mod tests {
             get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(7)).unwrap());
 
         // Get the actual dependencies and verify they match expected.
-        let (affected_deps, validation_passed) = v.get_affected_read_dependencies::<false>(
+        let (affected_deps, validation_passed) = v.split_off_affected_read_dependencies::<false>(
             idx,
             &Arc::new(TestValueWithMetadata::new(10, 100)),
             &None,
@@ -810,7 +923,7 @@ mod tests {
 
         // Verify that the remaining dependencies in entries match what we expect.
         if idx < 7 {
-            let (remaining_deps, _) = v.get_affected_read_dependencies::<false>(
+            let (remaining_deps, _) = v.split_off_affected_read_dependencies::<false>(
                 6,
                 &Arc::new(TestValueWithMetadata::new(10, 100)),
                 &None,
@@ -837,7 +950,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_affected_read_dependencies_delta_only() {
+    fn test_split_off_affected_read_dependencies_delta_only() {
         let mut v = VersionedValue::<TestValueWithMetadata>::default();
         v.versioned_map.insert(
             ShiftedTxnIndex::new(0),
@@ -865,7 +978,7 @@ mod tests {
                 },
             ))),
         );
-        let (deps, _) = v.get_affected_read_dependencies::<false>(
+        let (deps, _) = v.split_off_affected_read_dependencies::<false>(
             3,
             &Arc::new(TestValueWithMetadata::new(10, 100)),
             &None,
@@ -904,8 +1017,8 @@ mod tests {
                                 same_value && same_metadata && same_layout
                             };
 
-                            // Test get_affected_read_dependencies
-                            let (deps, validation_passed) = v.get_affected_read_dependencies::<{ $only_compare_metadata }>(
+                            // Test split_off_affected_read_dependencies
+                            let (deps, validation_passed) = v.split_off_affected_read_dependencies::<{ $only_compare_metadata }>(
                                 0,
                                 &Arc::new(test_value.clone()),
                                 &None,
@@ -966,8 +1079,8 @@ mod tests {
                     CachePadded::new(new_write_entry(0, ValueWithLayout::RawFromStorage(Arc::new(TestValueWithMetadata::new(10, 100))), deps)),
                 );
 
-                // Test get_affected_read_dependencies with Exchanged value
-                let (deps, validation_passed) = v.get_affected_read_dependencies::<{ $only_compare_metadata }>(
+                // Test split_off_affected_read_dependencies with Exchanged value
+                let (deps, validation_passed) = v.split_off_affected_read_dependencies::<{ $only_compare_metadata }>(
                     0,
                     &Arc::new(TestValueWithMetadata::new(10, 100)),
                     &None,

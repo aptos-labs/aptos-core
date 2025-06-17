@@ -24,13 +24,11 @@ use std::{
 };
 use test_case::test_case;
 
-// Unlike in the other proptest, InsertAndRemove here removes the actual
-// speculatively written value, not insert another deletion. Thus,
-// InsertAndRemove transforms into two operations, with the second
-// operation taking place after the first operation is completed.
 #[derive(Debug, Clone)]
 enum Operator<V: Debug + Clone> {
     Insert(V),
+    // InsertAndRemove transforms into two operations, with the second
+    // operation taking place after the first operation is completed.
     InsertAndRemove(V),
     Read,
 }
@@ -44,12 +42,12 @@ fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V
 }
 
 /// This test works as follows:
-/// We generate a sequence of transactions based on the above Operator and
-/// generate and expected baseline
-/// The worker threads pick transactions from the queue and execute them.
-/// For the reads, the final result is recorded, and reads are rescheduled
+/// 1. We generate a sequence of transactions based on the above Operator and
+/// generate the expected baseline.
+/// 2. The worker threads pick transactions from the queue and execute them.
+/// 3. For the reads, the final result is recorded, and reads are rescheduled
 /// when a write_v2 or remove_v2 invalidate the previous dependency record.
-/// In the end we simply ensure that the final result matches the expected
+/// 4. In the end we simply ensure that the final result matches the expected
 /// baseline, and is recorded once as a dependency in the corresponding entry.
 #[test_case(30, 2, 1, 30, 5)]
 #[test_case(50, 4, 3, 20, 5)]
