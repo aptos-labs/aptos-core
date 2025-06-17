@@ -46,6 +46,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `is_frozen`](#0x7_confidential_asset_is_frozen)
 -  [Function `get_auditor`](#0x7_confidential_asset_get_auditor)
 -  [Function `confidential_asset_balance`](#0x7_confidential_asset_confidential_asset_balance)
+-  [Function `get_pending_balance_transfer_count`](#0x7_confidential_asset_get_pending_balance_transfer_count)
 -  [Function `register_internal`](#0x7_confidential_asset_register_internal)
 -  [Function `deposit_to_internal`](#0x7_confidential_asset_deposit_to_internal)
 -  [Function `withdraw_to_internal`](#0x7_confidential_asset_withdraw_to_internal)
@@ -1637,6 +1638,34 @@ Returns the circulating supply of the confidential asset.
     <b>assert</b>!(<a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_fungible_store::primary_store_exists</a>(fa_store_address, token), <a href="confidential_asset.md#0x7_confidential_asset_EINTERNAL_ERROR">EINTERNAL_ERROR</a>);
 
     <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_balance">primary_fungible_store::balance</a>(fa_store_address, token)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_confidential_asset_get_pending_balance_transfer_count"></a>
+
+## Function `get_pending_balance_transfer_count`
+
+Returns the pending balance transfer count for the specified token.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_pending_balance_transfer_count">get_pending_balance_transfer_count</a>(user: <b>address</b>, token: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_pending_balance_transfer_count">get_pending_balance_transfer_count</a>(user: <b>address</b>, token: Object&lt;Metadata&gt;): u64 <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a> {
+    <b>assert</b>!(<a href="confidential_asset.md#0x7_confidential_asset_has_confidential_asset_store">has_confidential_asset_store</a>(user, token), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>));
+
+    <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>&gt;(<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)).pending_counter
 }
 </code></pre>
 
