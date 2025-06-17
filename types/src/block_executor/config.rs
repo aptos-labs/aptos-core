@@ -105,7 +105,7 @@ impl BlockExecutorConfigFromOnchain {
                     conflict_penalty_window: 8,
                     use_module_publishing_block_conflict: true,
                     include_user_txn_size_in_block_output: true,
-                    add_block_limit_outcome_onchain: false,
+                    add_block_limit_outcome_onchain: true,
                     use_granular_resource_group_conflicts: false,
                 },
             enable_per_block_gas_limit: false,
