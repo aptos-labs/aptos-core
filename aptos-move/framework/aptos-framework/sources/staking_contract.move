@@ -83,6 +83,10 @@ module aptos_framework::staking_contract {
         signer_cap: SignerCapability,
     }
 
+    struct Staker has key, copy, drop, store {
+        staker: address,
+    }
+
     struct Store has key {
         staking_contracts: SimpleMap<address, StakingContract>,
 
@@ -268,6 +272,22 @@ module aptos_framework::staking_contract {
     }
 
     #[view]
+    /// Return the staker address for the provided pool address.
+    ///
+    /// If the pool address doesn't exist,
+    /// or it's not a stake pool account,
+    /// or the pool is created by a staker other than this module,
+    /// or the pool is created before this feature,
+    /// return None.
+    public fun staker_address(pool_address: address): std::option::Option<address> acquires Staker {
+        if (exists<Staker>(pool_address)) {
+            return std::option::some(borrow_global<Staker>(pool_address).staker)
+        } else {
+            std::option::none()
+        }
+    }
+
+    #[view]
     /// Return the last recorded principal (the amount that 100% belongs to the staker with commission already paid for)
     /// for staking contract between the provided staker and operator.
     ///
@@ -401,6 +421,11 @@ module aptos_framework::staking_contract {
 
         // Add the stake to the stake pool.
         stake::add_stake_with_cap(&owner_cap, coins);
+
+        // Create the staker record.
+        move_to(&stake_pool_signer, Staker {
+            staker: staker_address,
+        });
 
         // Create the contract record.
         let pool_address = signer::address_of(&stake_pool_signer);
@@ -1018,7 +1043,7 @@ module aptos_framework::staking_contract {
         aptos_framework: &signer,
         staker: &signer,
         operator: &signer
-    ) acquires Store, BeneficiaryForOperator {
+    ) acquires Store, BeneficiaryForOperator, Staker {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
         let staker_address = signer::address_of(staker);
         let operator_address = signer::address_of(operator);
@@ -1029,6 +1054,9 @@ module aptos_framework::staking_contract {
         let pool_address = stake_pool_address(staker_address, operator_address);
         stake::assert_stake_pool(pool_address, INITIAL_BALANCE, 0, 0, 0);
         assert!(last_recorded_principal(staker_address, operator_address) == INITIAL_BALANCE, 0);
+
+        // Verify that the staker address is correct.
+        assert!(staker_address(pool_address) == std::option::some(staker_address), 0);
 
         // Operator joins the validator set.
         let (_sk, pk, pop) = stake::generate_identity();
