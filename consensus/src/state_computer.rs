@@ -13,7 +13,6 @@ use crate::{
     pipeline::{pipeline_builder::PipelineBuilder, pipeline_phase::CountedRequest},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -30,6 +29,7 @@ use aptos_executor_types::{
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
+use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
@@ -523,9 +523,9 @@ async fn test_commit_sync_race() {
         transaction_deduper::create_transaction_deduper,
         transaction_shuffler::create_transaction_shuffler,
     };
-    use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
     use aptos_infallible::Mutex;
+    use aptos_transactions_filter::transaction_matcher::Filter;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_executor::partitioner::ExecutableBlock,
