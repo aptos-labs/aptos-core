@@ -50,6 +50,7 @@ use aptos_types::{
         IndexedTransactionSummary, SignedTransaction, Transaction, TransactionWithProof, Version,
     },
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use futures::{channel::oneshot, SinkExt};
 use mini_moka::sync::Cache;
 use move_core_types::{
@@ -166,6 +167,16 @@ impl Context {
             .latest_state_checkpoint_view()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn aptos_env<E: InternalError>(
+        &self,
+        ledger_info: &LedgerInfo,
+    ) -> Result<AptosEnvironment, E> {
+        let state_view = self.latest_state_view().map_err(|err| {
+            E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+        })?;
+        Ok(AptosEnvironment::new(&state_view))
     }
 
     pub fn feature_enabled(&self, feature: FeatureFlag) -> Result<bool> {

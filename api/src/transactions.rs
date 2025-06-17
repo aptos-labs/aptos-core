@@ -42,6 +42,7 @@ use aptos_types::{
     AptosCoinType, CoinType,
 };
 use aptos_vm::{AptosSimulationVM, AptosVM};
+use aptos_vm_types::storage::space_pricing::DiskSpacePricing;
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
@@ -612,14 +613,21 @@ impl TransactionsApi {
                 (true, false) => Some(context.estimate_gas_price(&ledger_info)?.gas_estimate),
                 (false, false) => None,
             };
+            let gas_unit_price =
+                estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
             // If estimate max gas amount is provided, we will just make it the maximum value
             let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
                 // Retrieve max possible gas units
                 let (_, gas_params) = context.get_gas_schedule(&ledger_info)?;
-                let min_number_of_gas_units =
-                    u64::from(gas_params.vm.txn.min_transaction_gas_units)
-                        / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+                let aptos_env = context.aptos_env(&ledger_info)?;
+                let disk_space_pricing =
+                    DiskSpacePricing::new(aptos_env.gas_feature_version(), aptos_env.features());
+                let account_creation = 2 * u64::from(
+                    disk_space_pricing.hack_estimated_fee_for_account_creation(&gas_params.vm.txn),
+                );
+                // TODO: This 10 needs to be documented as a minimum cost of a transaction
+                let min_number_of_gas_units = 10 + (account_creation.div_ceil(gas_unit_price));
                 let max_number_of_gas_units =
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
@@ -653,9 +661,6 @@ impl TransactionsApi {
                         AptosErrorCode::InvalidInput,
                     )
                 })?;
-
-                let gas_unit_price =
-                    estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
                 // With 0 gas price, we set it to max gas units, since we can't divide by 0
                 let max_account_gas_units = if gas_unit_price == 0 {
