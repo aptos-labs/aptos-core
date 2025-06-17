@@ -1,0 +1,5896 @@
+// -- Model dump before env processor pipeline:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor unused checks:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor inlining:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor specification checker:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := infer($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := infer($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := infer($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := infer($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := infer($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := infer($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t1)
+     # live vars: $t0, $t3, $t6
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t1)
+     # live vars: $t0, $t3, $t6
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t1)
+     # live vars: $t0, $t3, $t6
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+     # refs: [$t6 => #6, $t7 => #7]
+     # #6
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #   => #7 via [local `y`] at line 14
+     #
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+     # refs: [$t4 => #4, $t8 => #8]
+     # #4
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #   => #8 via [local `z`] at line 14
+     #
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+     # refs: []
+     #
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+     # refs: []
+     #
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #   => #6 via [local `y`] at line 22
+     #
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+     # refs: []
+     #
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 36
+     #
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`, field `a`] at line 36
+     #
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `y`] at line 36
+     #
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `y`, field `a`] at line 36
+     #
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+     # refs: []
+     #
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 40
+     #
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+     # refs: [$t3 => #3, $t6 => #6]
+     # #3
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #6 via [local `y`] at line 40
+     #
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+     # refs: [$t3 => #3, $t5 => #5]
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #5 via [local `y`, field `a`] at line 40
+     #
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #   => #4 via [local `y`] at line 45
+     #
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `y`] at line 45
+     #
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+     # refs: []
+     #
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := ==($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #
+  1: $t7 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t2, $t6, $t7
+     # refs: [$t6 => #6, $t7 => #7]
+     # #6
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #   => #7 via [local `y`] at line 14
+     #
+  2: $t5 := ==($t6, $t7)
+     # abort state: {returns}
+     # live vars: $t2, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_local($t5)
+     # abort state: {returns}
+     # live vars: $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #
+  4: $t8 := borrow_local($t2)
+     # abort state: {returns}
+     # live vars: $t4, $t8
+     # refs: [$t4 => #4, $t8 => #8]
+     # #4
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #   => #8 via [local `z`] at line 14
+     #
+  5: $t3 := ==($t4, $t8)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  1: $t4 := ==($t5, $t1)
+     # abort state: {returns}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  2: $t3 := ==($t4, $t2)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #
+  1: $t6 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t2, $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #   => #6 via [local `y`] at line 22
+     #
+  2: $t4 := ==($t5, $t6)
+     # abort state: {returns}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  3: $t3 := ==($t4, $t2)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 36
+     #
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`, field `a`] at line 36
+     #
+  2: $t3 := read_ref($t5)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  3: $t7 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `y`] at line 36
+     #
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # abort state: {returns}
+     # live vars: $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `y`, field `a`] at line 36
+     #
+  5: $t6 := read_ref($t8)
+     # abort state: {returns}
+     # live vars: $t3, $t6
+     # refs: []
+     #
+  6: $t2 := ==($t3, $t6)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 40
+     #
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #
+  2: $t6 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t6
+     # refs: [$t3 => #3, $t6 => #6]
+     # #3
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #6 via [local `y`] at line 40
+     #
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: [$t3 => #3, $t5 => #5]
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #5 via [local `y`, field `a`] at line 40
+     #
+  4: $t2 := ==($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #
+  1: $t4 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #   => #4 via [local `y`] at line 45
+     #
+  2: $t5 := read_ref($t3)
+     # abort state: {returns}
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `y`] at line 45
+     #
+  3: $t6 := read_ref($t4)
+     # abort state: {returns}
+     # live vars: $t5, $t6
+     # refs: []
+     #
+  4: $t2 := ==($t5, $t6)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := copy($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := move($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := move($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+// -- Model dump before env processor pipeline:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+// -- Model dump after env processor simplifier:
+module 0xcfff::m {
+    struct Test {
+        a: u64,
+        b: u64,
+    }
+    struct Test1 {
+        a: Test,
+        b: u64,
+    }
+    public fun eq1<T>(x: T,y: T): bool {
+        Eq<T>(m::foo<T>(x, y), m::foo<T>(y, x))
+    }
+    public fun eq2<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Borrow(Immutable)(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y))), Borrow(Immutable)(z))
+    }
+    public fun eq3<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(x, y), z)
+    }
+    public fun eq4<T>(x: T,y: T,z: bool): bool {
+        Eq<bool>(Eq<T>(Borrow(Immutable)(x), Borrow(Immutable)(y)), z)
+    }
+    public fun eq5(x: Test1,y: Test1): bool {
+        Eq<Test>(select m::Test1.a<Test1>(x), select m::Test1.a<Test1>(y))
+    }
+    public fun eq6(x: Test1,y: Test1): bool {
+        Eq<Test>(Borrow(Immutable)(select m::Test1.a<Test1>(x)), Borrow(Immutable)(select m::Test1.a<Test1>(y)))
+    }
+    public fun eq7(x: Test1,y: Test1): bool {
+        {
+          let s1: &Test1 = Borrow(Immutable)(x);
+          {
+            let s2: &Test1 = Borrow(Immutable)(y);
+            Eq<Test1>(Deref(s1), Deref(s2))
+          }
+        }
+    }
+    private fun foo<T>(x: T,y: T): T {
+        if Eq<T>(x, y) {
+          x
+        } else {
+          y
+        }
+    }
+} // end 0xcfff::m
+
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := infer($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := infer($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := infer($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := infer($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := infer($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := infer($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := infer($t1)
+     # live vars: $t0, $t3, $t6
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := infer($t0)
+     # live vars: $t2
+  5: goto 8
+     # live vars: $t0, $t1
+  6: label L1
+     # live vars: $t1
+  7: $t2 := infer($t1)
+     # live vars: $t2
+  8: label L2
+     # live vars: $t2
+  9: return $t2
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+     # refs: [$t6 => #6, $t7 => #7]
+     # #6
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #   => #7 via [local `y`] at line 14
+     #
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+     # refs: [$t4 => #4, $t8 => #8]
+     # #4
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #   => #8 via [local `z`] at line 14
+     #
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+     # refs: []
+     #
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+     # refs: []
+     #
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #   => #6 via [local `y`] at line 22
+     #
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+     # refs: []
+     #
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 36
+     #
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`, field `a`] at line 36
+     #
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `y`] at line 36
+     #
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `y`, field `a`] at line 36
+     #
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+     # refs: []
+     #
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 40
+     #
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+     # refs: [$t3 => #3, $t6 => #6]
+     # #3
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #6 via [local `y`] at line 40
+     #
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+     # refs: [$t3 => #3, $t5 => #5]
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #5 via [local `y`, field `a`] at line 40
+     #
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #   => #4 via [local `y`] at line 45
+     #
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `y`] at line 45
+     #
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+     # refs: []
+     #
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := ==($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #
+  1: $t7 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t2, $t6, $t7
+     # refs: [$t6 => #6, $t7 => #7]
+     # #6
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #6 via [local `x`] at line 14
+     #   => #7 via [local `y`] at line 14
+     #
+  2: $t5 := ==($t6, $t7)
+     # abort state: {returns}
+     # live vars: $t2, $t5
+     # refs: []
+     #
+  3: $t4 := borrow_local($t5)
+     # abort state: {returns}
+     # live vars: $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #
+  4: $t8 := borrow_local($t2)
+     # abort state: {returns}
+     # live vars: $t4, $t8
+     # refs: [$t4 => #4, $t8 => #8]
+     # #4
+     #   <no edges>
+     # #8
+     #   <no edges>
+     # #root
+     #   => #4 via [value] at line 14
+     #   => #8 via [local `z`] at line 14
+     #
+  5: $t3 := ==($t4, $t8)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  1: $t4 := ==($t5, $t1)
+     # abort state: {returns}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  2: $t3 := ==($t4, $t2)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #
+  1: $t6 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t2, $t5, $t6
+     # refs: [$t5 => #5, $t6 => #6]
+     # #5
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`] at line 22
+     #   => #6 via [local `y`] at line 22
+     #
+  2: $t4 := ==($t5, $t6)
+     # abort state: {returns}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  3: $t3 := ==($t4, $t2)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 36
+     #
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t5
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `x`, field `a`] at line 36
+     #
+  2: $t3 := read_ref($t5)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  3: $t7 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `y`] at line 36
+     #
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # abort state: {returns}
+     # live vars: $t3, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `y`, field `a`] at line 36
+     #
+  5: $t6 := read_ref($t8)
+     # abort state: {returns}
+     # live vars: $t3, $t6
+     # refs: []
+     #
+  6: $t2 := ==($t3, $t6)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `x`] at line 40
+     #
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #
+  2: $t6 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t6
+     # refs: [$t3 => #3, $t6 => #6]
+     # #3
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #6 via [local `y`] at line 40
+     #
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # abort state: {returns}
+     # live vars: $t3, $t5
+     # refs: [$t3 => #3, $t5 => #5]
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`, field `a`] at line 40
+     #   => #5 via [local `y`, field `a`] at line 40
+     #
+  4: $t2 := ==($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #
+  1: $t4 := borrow_local($t1)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   => #3 via [local `x`] at line 44
+     #   => #4 via [local `y`] at line 45
+     #
+  2: $t5 := read_ref($t3)
+     # abort state: {returns}
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `y`] at line 45
+     #
+  3: $t6 := read_ref($t4)
+     # abort state: {returns}
+     # live vars: $t5, $t6
+     # refs: []
+     #
+  4: $t2 := ==($t5, $t6)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := ==($t4, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: if ($t3) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: goto 8
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  8: label L2
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := copy($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := move($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := move($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 6
+  3: label L0
+  4: $t2 := move($t0)
+  5: goto 8
+  6: label L1
+  7: $t2 := move($t1)
+  8: label L2
+  9: return $t2
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := copy($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := move($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := move($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := copy($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := move($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := move($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # maybe
+  2: $t6 := move($t1)
+     # maybe
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # maybe
+  4: $t2 := ==($t3, $t5)
+     # maybe
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # maybe
+  0: $t6 := borrow_local($t0)
+     # maybe
+  1: $t7 := borrow_local($t1)
+     # maybe
+  2: $t5 := ==($t6, $t7)
+     # maybe
+  3: $t4 := borrow_local($t5)
+     # maybe
+  4: $t8 := borrow_local($t2)
+     # maybe
+  5: $t3 := ==($t4, $t8)
+     # maybe
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # maybe
+  0: $t5 := move($t0)
+     # maybe
+  1: $t4 := ==($t5, $t1)
+     # maybe
+  2: $t3 := ==($t4, $t2)
+     # maybe
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # maybe
+  0: $t5 := borrow_local($t0)
+     # maybe
+  1: $t6 := borrow_local($t1)
+     # maybe
+  2: $t4 := ==($t5, $t6)
+     # maybe
+  3: $t3 := ==($t4, $t2)
+     # maybe
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # maybe
+  0: $t4 := borrow_local($t0)
+     # maybe
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # maybe
+  2: $t3 := read_ref($t5)
+     # maybe
+  3: $t7 := borrow_local($t1)
+     # maybe
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # maybe
+  5: $t6 := read_ref($t8)
+     # maybe
+  6: $t2 := ==($t3, $t6)
+     # maybe
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # maybe
+  0: $t4 := borrow_local($t0)
+     # maybe
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # maybe
+  2: $t6 := borrow_local($t1)
+     # maybe
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # maybe
+  4: $t2 := ==($t3, $t5)
+     # maybe
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # maybe
+  0: $t3 := borrow_local($t0)
+     # maybe
+  1: $t4 := borrow_local($t1)
+     # maybe
+  2: $t5 := read_ref($t3)
+     # maybe
+  3: $t6 := read_ref($t4)
+     # maybe
+  4: $t2 := ==($t5, $t6)
+     # maybe
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # maybe
+  0: $t4 := copy($t0)
+     # maybe
+  1: $t3 := ==($t4, $t1)
+     # maybe
+  2: if ($t3) goto 3 else goto 7
+     # maybe
+  3: label L0
+     # maybe
+  4: $t2 := move($t0)
+     # maybe
+  5: label L2
+     # maybe
+  6: return $t2
+     # maybe
+  7: label L1
+     # maybe
+  8: $t2 := move($t1)
+     # maybe
+  9: goto 5
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := copy($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := move($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := move($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := move($t1)
+     # live vars: $t0, $t3, $t6
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := move($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+  0: $t4 := copy($t0)
+  1: $t3 := m::foo<#0>($t4, $t1)
+  2: $t6 := move($t1)
+  3: $t5 := m::foo<#0>($t6, $t0)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+  0: $t5 := move($t0)
+  1: $t4 := ==($t5, $t1)
+  2: $t3 := ==($t4, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t3 := ==($t4, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t7 := borrow_local($t1)
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+  5: $t6 := read_ref($t8)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t6 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t2 := move($t0)
+  5: label L2
+  6: return $t2
+  7: label L1
+  8: $t2 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0
+     var $t4: #0
+     var $t5: #0
+     var $t6: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: $t6 := move($t1)
+     # live vars: $t0, $t3, $t6
+  3: $t5 := m::foo<#0>($t6, $t0)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: #0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := move($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t4 := ==($t5, $t1)
+     # live vars: $t2, $t4
+  2: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  3: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t3 := ==($t4, $t2)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1
+     var $t8: &0xcfff::m::Test
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t7 := borrow_local($t1)
+     # live vars: $t3, $t7
+  4: $t8 := borrow_field<0xcfff::m::Test1>.a($t7)
+     # live vars: $t3, $t8
+  5: $t6 := read_ref($t8)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t6 := borrow_local($t1)
+     # live vars: $t3, $t6
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t6)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t2 := move($t0)
+     # live vars: $t2
+  5: label L2
+     # live vars: $t2
+  6: return $t2
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t2 := move($t1)
+     # live vars: $t2
+  9: goto 5
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0 [unused]
+     var $t4: #0
+     var $t5: #0 [unused]
+     var $t6: #0 [unused]
+  0: $t4 := copy($t0)
+  1: $t4 := m::foo<#0>($t4, $t1)
+  2: $t1 := move($t1)
+  3: $t0 := m::foo<#0>($t1, $t0)
+  4: $t2 := ==($t4, $t0)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: #0 [unused]
+  0: $t0 := move($t0)
+  1: $t4 := ==($t0, $t1)
+  2: $t2 := ==($t4, $t2)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t2 := ==($t4, $t2)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1 [unused]
+     var $t8: &0xcfff::m::Test [unused]
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t4 := borrow_local($t1)
+  4: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  5: $t6 := read_ref($t5)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1 [unused]
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t4 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0 [unused]
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0 [unused]
+     var $t4: #0
+     var $t5: #0 [unused]
+     var $t6: #0 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := m::foo<#0>($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := ==($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: #0 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2
+  1: $t4 := ==($t0, $t1)
+     # live vars: $t2, $t4
+  2: $t2 := ==($t4, $t2)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t2 := ==($t4, $t2)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1 [unused]
+     var $t8: &0xcfff::m::Test [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  4: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t3, $t5
+  5: $t6 := read_ref($t5)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0 [unused]
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0 [unused]
+     var $t4: #0
+     var $t5: #0 [unused]
+     var $t6: #0 [unused]
+  0: $t4 := copy($t0)
+  1: $t4 := m::foo<#0>($t4, $t1)
+  2: $t1 := move($t1)
+  3: $t0 := m::foo<#0>($t1, $t0)
+  4: $t2 := ==($t4, $t0)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_local($t1)
+  2: $t5 := ==($t6, $t7)
+  3: $t4 := borrow_local($t5)
+  4: $t8 := borrow_local($t2)
+  5: $t3 := ==($t4, $t8)
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: #0 [unused]
+  0: $t0 := move($t0)
+  1: $t4 := ==($t0, $t1)
+  2: $t2 := ==($t4, $t2)
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+  0: $t5 := borrow_local($t0)
+  1: $t6 := borrow_local($t1)
+  2: $t4 := ==($t5, $t6)
+  3: $t2 := ==($t4, $t2)
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1 [unused]
+     var $t8: &0xcfff::m::Test [unused]
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t3 := read_ref($t5)
+  3: $t4 := borrow_local($t1)
+  4: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  5: $t6 := read_ref($t5)
+  6: $t2 := ==($t3, $t6)
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1 [unused]
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+  2: $t4 := borrow_local($t1)
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+  4: $t2 := ==($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_local($t1)
+  2: $t5 := read_ref($t3)
+  3: $t6 := read_ref($t4)
+  4: $t2 := ==($t5, $t6)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0 [unused]
+     var $t3: bool
+     var $t4: #0
+  0: $t4 := copy($t0)
+  1: $t3 := ==($t4, $t1)
+  2: if ($t3) goto 3 else goto 7
+  3: label L0
+  4: $t4 := move($t0)
+  5: label L2
+  6: return $t4
+  7: label L1
+  8: $t4 := move($t1)
+  9: goto 5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0 [unused]
+     var $t4: #0
+     var $t5: #0 [unused]
+     var $t6: #0 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := m::foo<#0>($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := ==($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: #0 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2
+  1: $t4 := ==($t0, $t1)
+     # live vars: $t2, $t4
+  2: $t2 := ==($t4, $t2)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t2 := ==($t4, $t2)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1 [unused]
+     var $t8: &0xcfff::m::Test [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  4: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t3, $t5
+  5: $t6 := read_ref($t5)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0 [unused]
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+public fun m::eq1<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     var $t3: #0 [unused]
+     var $t4: #0
+     var $t5: #0 [unused]
+     var $t6: #0 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := m::foo<#0>($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := m::foo<#0>($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := ==($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq2<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool
+     var $t4: &bool
+     var $t5: bool
+     var $t6: &#0
+     var $t7: &#0
+     var $t8: &bool
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_local($t1)
+     # live vars: $t2, $t6, $t7
+  2: $t5 := ==($t6, $t7)
+     # live vars: $t2, $t5
+  3: $t4 := borrow_local($t5)
+     # live vars: $t2, $t4
+  4: $t8 := borrow_local($t2)
+     # live vars: $t4, $t8
+  5: $t3 := ==($t4, $t8)
+     # live vars: $t3
+  6: return $t3
+}
+
+
+[variant baseline]
+public fun m::eq3<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: #0 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2
+  1: $t4 := ==($t0, $t1)
+     # live vars: $t2, $t4
+  2: $t2 := ==($t4, $t2)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq4<#0>($t0: #0, $t1: #0, $t2: bool): bool {
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: &#0
+     var $t6: &#0
+     # live vars: $t0, $t1, $t2
+  0: $t5 := borrow_local($t0)
+     # live vars: $t1, $t2, $t5
+  1: $t6 := borrow_local($t1)
+     # live vars: $t2, $t5, $t6
+  2: $t4 := ==($t5, $t6)
+     # live vars: $t2, $t4
+  3: $t2 := ==($t4, $t2)
+     # live vars: $t2
+  4: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq5($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: 0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: 0xcfff::m::Test
+     var $t7: &0xcfff::m::Test1 [unused]
+     var $t8: &0xcfff::m::Test [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t5
+  2: $t3 := read_ref($t5)
+     # live vars: $t1, $t3
+  3: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  4: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t3, $t5
+  5: $t6 := read_ref($t5)
+     # live vars: $t3, $t6
+  6: $t2 := ==($t3, $t6)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq6($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test
+     var $t4: &0xcfff::m::Test1
+     var $t5: &0xcfff::m::Test
+     var $t6: &0xcfff::m::Test1 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := borrow_local($t0)
+     # live vars: $t1, $t4
+  1: $t3 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t1, $t3
+  2: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  3: $t5 := borrow_field<0xcfff::m::Test1>.a($t4)
+     # live vars: $t3, $t5
+  4: $t2 := ==($t3, $t5)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+public fun m::eq7($t0: 0xcfff::m::Test1, $t1: 0xcfff::m::Test1): bool {
+     var $t2: bool
+     var $t3: &0xcfff::m::Test1
+     var $t4: &0xcfff::m::Test1
+     var $t5: 0xcfff::m::Test1
+     var $t6: 0xcfff::m::Test1
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t0)
+     # flush: $t4
+     # live vars: $t1, $t3
+  1: $t4 := borrow_local($t1)
+     # live vars: $t3, $t4
+  2: $t5 := read_ref($t3)
+     # live vars: $t4, $t5
+  3: $t6 := read_ref($t4)
+     # live vars: $t5, $t6
+  4: $t2 := ==($t5, $t6)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun m::foo<#0>($t0: #0, $t1: #0): #0 {
+     var $t2: #0 [unused]
+     var $t3: bool
+     var $t4: #0
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t3 := ==($t4, $t1)
+     # live vars: $t0, $t1, $t3
+  2: if ($t3) goto 3 else goto 7
+     # live vars: $t0, $t1
+  3: label L0
+     # flush: $t4
+     # live vars: $t0
+  4: $t4 := move($t0)
+     # live vars: $t4
+  5: label L2
+     # live vars: $t4
+  6: return $t4
+     # live vars: $t0, $t1
+  7: label L1
+     # flush: $t4
+     # live vars: $t1
+  8: $t4 := move($t1)
+     # live vars: $t4
+  9: goto 5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module cfff.m {
+struct Test has copy, drop {
+	a: u64,
+	b: u64
+}
+struct Test1 has copy, drop {
+	a: Test,
+	b: u64
+}
+
+public eq1<T: copy + drop>(x: T, y: T): bool /* def_idx: 0 */ {
+B0:
+	0: CopyLoc[0](x: T)
+	1: CopyLoc[1](y: T)
+	2: Call foo<T>(T, T): T
+	3: MoveLoc[1](y: T)
+	4: MoveLoc[0](x: T)
+	5: Call foo<T>(T, T): T
+	6: Eq
+	7: Ret
+}
+public eq2<T: copy + drop>(x: T, y: T, z: bool): bool /* def_idx: 1 */ {
+L3:	$t5: bool
+B0:
+	0: ImmBorrowLoc[0](x: T)
+	1: ImmBorrowLoc[1](y: T)
+	2: Eq
+	3: StLoc[3]($t5: bool)
+	4: ImmBorrowLoc[3]($t5: bool)
+	5: ImmBorrowLoc[2](z: bool)
+	6: Eq
+	7: Ret
+}
+public eq3<T: copy + drop>(x: T, y: T, z: bool): bool /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](x: T)
+	1: MoveLoc[1](y: T)
+	2: Eq
+	3: MoveLoc[2](z: bool)
+	4: Eq
+	5: Ret
+}
+public eq4<T: copy + drop>(x: T, y: T, z: bool): bool /* def_idx: 3 */ {
+B0:
+	0: ImmBorrowLoc[0](x: T)
+	1: ImmBorrowLoc[1](y: T)
+	2: Eq
+	3: MoveLoc[2](z: bool)
+	4: Eq
+	5: Ret
+}
+public eq5(x: Test1, y: Test1): bool /* def_idx: 4 */ {
+B0:
+	0: ImmBorrowLoc[0](x: Test1)
+	1: ImmBorrowField[0](Test1.a: Test)
+	2: ReadRef
+	3: ImmBorrowLoc[1](y: Test1)
+	4: ImmBorrowField[0](Test1.a: Test)
+	5: ReadRef
+	6: Eq
+	7: Ret
+}
+public eq6(x: Test1, y: Test1): bool /* def_idx: 5 */ {
+B0:
+	0: ImmBorrowLoc[0](x: Test1)
+	1: ImmBorrowField[0](Test1.a: Test)
+	2: ImmBorrowLoc[1](y: Test1)
+	3: ImmBorrowField[0](Test1.a: Test)
+	4: Eq
+	5: Ret
+}
+public eq7(x: Test1, y: Test1): bool /* def_idx: 6 */ {
+L2:	s2: &Test1
+B0:
+	0: ImmBorrowLoc[0](x: Test1)
+	1: ImmBorrowLoc[1](y: Test1)
+	2: StLoc[2](s2: &Test1)
+	3: ReadRef
+	4: MoveLoc[2](s2: &Test1)
+	5: ReadRef
+	6: Eq
+	7: Ret
+}
+foo<T: copy + drop>(x: T, y: T): T /* def_idx: 7 */ {
+L2:	$t4: T
+B0:
+	0: CopyLoc[0](x: T)
+	1: CopyLoc[1](y: T)
+	2: Eq
+	3: BrFalse(8)
+B1:
+	4: MoveLoc[0](x: T)
+	5: StLoc[2]($t4: T)
+B2:
+	6: MoveLoc[2]($t4: T)
+	7: Ret
+B3:
+	8: MoveLoc[1](y: T)
+	9: StLoc[2]($t4: T)
+	10: Branch(6)
+}
+}
+============ bytecode verification succeeded ========

@@ -1,0 +1,77 @@
+
+Diagnostics:
+error: cannot use `T2` with an operator which expects a value of type `T1`
+  ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:3:14
+  │
+3 │         x == y
+  │              ^
+
+error: reference type `&T1` is not allowed as a type argument (type was inferred)
+  ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:9:12
+  │
+9 │         &x == &y
+  │            ^^
+  │
+  = required by instantiating type parameter `T` of function `==`
+
+error: cannot use `u16` with an operator which expects a value of type `u8`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:15:14
+   │
+15 │         x == y
+   │              ^
+
+error: cannot use `address` with an operator which expects a value of type `u256`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:21:14
+   │
+21 │         x == y
+   │              ^
+
+error: cannot use `&vector<u8>` with an operator which expects a value of type `vector<u8>`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:27:14
+   │
+27 │         x == y
+   │              ^
+
+error: cannot use `&Foo` with an operator which expects a value of type `Foo`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:34:14
+   │
+34 │         x == y
+   │              ^
+
+error: cannot use `T2` with an operator which expects a value of type `T1`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:40:14
+   │
+40 │         x != y
+   │              ^
+
+error: reference type `&T1` is not allowed as a type argument (type was inferred)
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:46:12
+   │
+46 │         &x != &y
+   │            ^^
+   │
+   = required by instantiating type parameter `T` of function `!=`
+
+error: cannot use `u16` with an operator which expects a value of type `u8`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:52:14
+   │
+52 │         x != y
+   │              ^
+
+error: cannot use `address` with an operator which expects a value of type `u256`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:58:14
+   │
+58 │         x != y
+   │              ^
+
+error: cannot use `&vector<u8>` with an operator which expects a value of type `vector<u8>`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:64:14
+   │
+64 │         x != y
+   │              ^
+
+error: cannot use `&Foo` with an operator which expects a value of type `Foo`
+   ┌─ tests/cmp-rewrite/illegal-example-lang-v2.1-v2.2/cmp_mistype.move:71:14
+   │
+71 │         x != y
+   │              ^

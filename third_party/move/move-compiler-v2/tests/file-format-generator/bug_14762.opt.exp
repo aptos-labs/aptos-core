@@ -44,51 +44,50 @@ B1:
 	14: Lt
 	15: BrTrue(17)
 B2:
-	16: Branch(29)
+	16: Branch(28)
 B3:
 	17: CopyLoc[2](v: &vector<T>)
 	18: CopyLoc[5](i: u64)
 	19: VecImmBorrow(2)
 	20: ImmBorrowField[1](T.issuer: vector<u8>)
-	21: ReadRef
-	22: CopyLoc[1](issuer: vector<u8>)
-	23: Eq
-	24: BrFalse(49)
+	21: ImmBorrowLoc[1](issuer: vector<u8>)
+	22: Eq
+	23: BrFalse(48)
 B4:
-	25: LdTrue
-	26: StLoc[3](find: bool)
-	27: MoveLoc[5](i: u64)
-	28: StLoc[4](found_index: u64)
+	24: LdTrue
+	25: StLoc[3](find: bool)
+	26: MoveLoc[5](i: u64)
+	27: StLoc[4](found_index: u64)
 B5:
-	29: Nop
-	30: MoveLoc[2](v: &vector<T>)
-	31: Pop
-	32: MoveLoc[3](find: bool)
-	33: MoveLoc[4](found_index: u64)
-	34: StLoc[7]($t12: u64)
-	35: BrFalse(44)
+	28: Nop
+	29: MoveLoc[2](v: &vector<T>)
+	30: Pop
+	31: MoveLoc[3](find: bool)
+	32: MoveLoc[4](found_index: u64)
+	33: StLoc[7]($t12: u64)
+	34: BrFalse(43)
 B6:
-	36: MoveLoc[0](s: &mut S)
-	37: MutBorrowField[0](S.entries: vector<T>)
-	38: MoveLoc[7]($t12: u64)
-	39: Call vector::remove<T>(&mut vector<T>, u64): T
-	40: Call option::some<T>(T): Option<T>
-	41: StLoc[8](ret: Option<T>)
+	35: MoveLoc[0](s: &mut S)
+	36: MutBorrowField[0](S.entries: vector<T>)
+	37: MoveLoc[7]($t12: u64)
+	38: Call vector::remove<T>(&mut vector<T>, u64): T
+	39: Call option::some<T>(T): Option<T>
+	40: StLoc[8](ret: Option<T>)
 B7:
-	42: MoveLoc[8](ret: Option<T>)
-	43: Ret
+	41: MoveLoc[8](ret: Option<T>)
+	42: Ret
 B8:
-	44: MoveLoc[0](s: &mut S)
-	45: Pop
-	46: Call option::none<T>(): Option<T>
-	47: StLoc[8](ret: Option<T>)
-	48: Branch(42)
+	43: MoveLoc[0](s: &mut S)
+	44: Pop
+	45: Call option::none<T>(): Option<T>
+	46: StLoc[8](ret: Option<T>)
+	47: Branch(41)
 B9:
-	49: MoveLoc[5](i: u64)
-	50: LdU64(1)
-	51: Add
-	52: StLoc[5](i: u64)
-	53: Branch(12)
+	48: MoveLoc[5](i: u64)
+	49: LdU64(1)
+	50: Add
+	51: StLoc[5](i: u64)
+	52: Branch(12)
 }
 }
 ============ bytecode verification succeeded ========
