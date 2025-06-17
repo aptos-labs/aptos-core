@@ -321,4 +321,14 @@ module 0xc0ffee::m {
         if (x && y) ();
         if (x || y) ();
     }
+
+    // ===== THE FOLLOWING TEST SHOULD NOT TRIGGER THE LINT, BUT IS INCLUDED FOR FUTURE REFERENCE =====
+    // Detecting these patterns is not yet supported.
+
+    public fun test_vector_no_lint() {
+        let new_vec = vector[true, false];
+
+        if (new_vec[0] && new_vec[0]) ();
+        if (new_vec[1] || new_vec[1]) ();
+    }
 }
