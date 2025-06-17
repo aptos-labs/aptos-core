@@ -49,6 +49,7 @@ use aptos_vm::{
         convert_modules_into_write_ops, AptosMoveResolver, GenesisMoveVm, GenesisRuntimeBuilder,
         SessionExt,
     },
+    session::Session,
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
