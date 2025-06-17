@@ -79,7 +79,7 @@ pub struct ResetRequest {
 }
 
 pub struct OrderedBlocks {
-    pub ordered_blocks: Vec<PipelinedBlock>,
+    pub ordered_blocks: Vec<Arc<PipelinedBlock>>,
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
@@ -415,7 +415,7 @@ impl BufferManager {
         });
         if let Some(consensus_publisher) = &self.consensus_publisher {
             let message = ConsensusObserverMessage::new_ordered_block_message(
-                ordered_blocks.clone().into_iter().map(Arc::new).collect(),
+                ordered_blocks.clone(),
                 ordered_proof.clone(),
             );
             consensus_publisher.publish_message(message);
@@ -504,12 +504,7 @@ impl BufferManager {
         let mut blocks_to_persist: Vec<Arc<PipelinedBlock>> = vec![];
 
         while let Some(item) = self.buffer.pop_front() {
-            blocks_to_persist.extend(
-                item.get_blocks()
-                    .iter()
-                    .map(|eb| Arc::new(eb.clone()))
-                    .collect::<Vec<Arc<PipelinedBlock>>>(),
-            );
+            blocks_to_persist.extend(item.get_blocks().clone());
             if self.signing_root == Some(item.block_id()) {
                 self.signing_root = None;
             }

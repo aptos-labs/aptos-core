@@ -4,7 +4,7 @@
 use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
-use aptos_logger::{error, info};
+use aptos_logger::{info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
@@ -294,7 +294,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
             x.get_slots_to_make_hot()
         } else {
-            error!("BlockHotStateOpAccumulator is not set.");
+            warn!("BlockHotStateOpAccumulator is not set.");
             BTreeMap::new()
         };
 
@@ -306,7 +306,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
 mod test {
     use super::*;
     use crate::{
-        proptest_types::types::{KeyType, MockEvent, MockTransaction},
+        proptest_types::{
+            mock_executor::MockEvent,
+            types::{KeyType, MockTransaction},
+        },
         types::InputOutputKey,
     };
     use aptos_types::state_store::{
@@ -413,8 +416,8 @@ mod test {
         reads
             .iter()
             .map(|key| match key {
-                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k, false)),
-                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k, false), *t),
+                InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k)),
+                InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k), *t),
                 InputOutputKey::DelayedField(i) => InputOutputKey::DelayedField(*i),
             })
             .collect()

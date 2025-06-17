@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use aptos_sdk::types::{account_address::AccountAddress, contract_event::ContractEvent};
+use aptos_sdk::{
+    move_types::language_storage::TypeTag,
+    types::{account_address::AccountAddress, contract_event::ContractEvent},
+};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DepositMoveStruct {
@@ -32,30 +36,26 @@ pub struct BurnMoveStruct {
 }
 
 pub fn get_mint_token_addr(events: &[ContractEvent]) -> Result<AccountAddress> {
-    let mint_event: MintMoveStruct = search_single_event_data(
-        events,
-        "0000000000000000000000000000000000000000000000000000000000000004::collection::Mint",
-    )?;
+    let mint_event: MintMoveStruct =
+        search_single_event_data(events, &TypeTag::from_str("0x4::collection::Mint")?)?;
     Ok(mint_event.token)
 }
 
 pub fn get_burn_token_addr(events: &[ContractEvent]) -> Result<AccountAddress> {
-    let burn_event: BurnMoveStruct = search_single_event_data(
-        events,
-        "0000000000000000000000000000000000000000000000000000000000000004::collection::Burn",
-    )?;
+    let burn_event: BurnMoveStruct =
+        search_single_event_data(events, &TypeTag::from_str("0x4::collection::Burn")?)?;
     Ok(burn_event.token)
 }
 
-pub fn search_event(events: &[ContractEvent], type_tag: &str) -> Vec<ContractEvent> {
+fn search_event(events: &[ContractEvent], type_tag: &TypeTag) -> Vec<ContractEvent> {
     events
         .iter()
-        .filter(|event| event.type_tag().to_canonical_string() == type_tag)
+        .filter(|event| event.type_tag() == type_tag)
         .cloned()
         .collect::<Vec<_>>()
 }
 
-pub fn search_single_event_data<T>(events: &[ContractEvent], type_tag: &str) -> Result<T>
+fn search_single_event_data<T>(events: &[ContractEvent], type_tag: &TypeTag) -> Result<T>
 where
     T: serde::de::DeserializeOwned,
 {
@@ -77,6 +77,9 @@ where
 }
 
 pub fn get_deposit_dst(events: &[ContractEvent]) -> Result<AccountAddress> {
-    let deposit_event: DepositMoveStruct = search_single_event_data(events, "0000000000000000000000000000000000000000000000000000000000000001::coin::Deposit<0000000000000000000000000000000000000000000000000000000000000001::aptos_coin::AptosCoin>")?;
+    let deposit_event: DepositMoveStruct = search_single_event_data(
+        events,
+        &TypeTag::from_str("0x1::coin::Deposit<0x1::aptos_coin::AptosCoin>")?,
+    )?;
     Ok(deposit_event.account)
 }

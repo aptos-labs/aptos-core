@@ -501,7 +501,7 @@ impl AptosTestAdapter<'_> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
-        let txn_provider = DefaultTxnProvider::new(sig_verified_block);
+        let txn_provider = DefaultTxnProvider::new_without_info(sig_verified_block);
         let mut outputs = AptosVMBlockExecutor::new()
             .execute_block_no_limit(&txn_provider, &self.storage.clone())?;
 
@@ -1053,7 +1053,11 @@ impl fmt::Display for PrettyEvent<'_> {
             },
             ContractEvent::V2(_v2) => (),
         }
-        writeln!(f, "    type:    {}", self.0.type_tag())?;
+        writeln!(
+            f,
+            "    type:    {}",
+            self.0.type_tag().to_canonical_string()
+        )?;
         writeln!(f, "    data:    {:?}", hex::encode(self.0.event_data()))?;
         write!(f, "}}")
     }

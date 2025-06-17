@@ -21,13 +21,34 @@ pub enum BlockEpiloguePayload {
         block_id: HashValue,
         block_end_info: BlockEndInfo,
     },
+    V1 {
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    },
 }
 
 impl BlockEpiloguePayload {
     pub fn try_as_block_end_info(&self) -> Option<&BlockEndInfo> {
         match self {
             BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
+            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(block_end_info),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum FeeDistribution {
+    V0 {
+        // Validator index -> Octa
+        amount: BTreeMap<u64, u64>,
+    },
+}
+
+impl FeeDistribution {
+    pub fn new(amount: BTreeMap<u64, u64>) -> Self {
+        Self::V0 { amount }
     }
 }
 
@@ -46,6 +67,15 @@ pub enum BlockEndInfo {
 }
 
 impl BlockEndInfo {
+    pub fn new_empty() -> Self {
+        Self::V0 {
+            block_gas_limit_reached: false,
+            block_output_limit_reached: false,
+            block_effective_block_gas_units: 0,
+            block_approx_output_size: 0,
+        }
+    }
+
     pub fn limit_reached(&self) -> bool {
         match self {
             BlockEndInfo::V0 {
@@ -86,12 +116,7 @@ pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
 impl<Key: Debug> TBlockEndInfoExt<Key> {
     pub fn new_empty() -> Self {
         Self {
-            inner: BlockEndInfo::V0 {
-                block_gas_limit_reached: false,
-                block_output_limit_reached: false,
-                block_effective_block_gas_units: 0,
-                block_approx_output_size: 0,
-            },
+            inner: BlockEndInfo::new_empty(),
             slots_to_make_hot: BTreeMap::new(),
         }
     }

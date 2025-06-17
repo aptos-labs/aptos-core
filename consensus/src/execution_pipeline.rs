@@ -24,11 +24,13 @@ use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
     },
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, FutureExt};
+use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
@@ -101,6 +103,7 @@ impl ExecutionPipeline {
         pre_commit_hook: PreCommitHook,
         lifetime_guard: CountedRequest<()>,
         shuffler: Arc<dyn TransactionShuffler>,
+        validators: Arc<[AccountAddress]>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
@@ -117,6 +120,7 @@ impl ExecutionPipeline {
                 lifetime_guard,
                 block_qc,
                 shuffler,
+                validators,
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -148,6 +152,7 @@ impl ExecutionPipeline {
             lifetime_guard,
             block_qc,
             shuffler,
+            validators,
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
@@ -178,12 +183,31 @@ impl ExecutionPipeline {
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
+            let proposer_index = block
+                .author()
+                .and_then(|proposer| validators.iter().position(|&v| v == proposer));
+            let auxiliary_info = sig_verified_txns
+                .iter()
+                .map(|txn| {
+                    txn.borrow_into_inner().try_as_signed_user_txn().map_or(
+                        AuxiliaryInfo::new_empty(),
+                        |_| {
+                            AuxiliaryInfo::new(
+                                PersistedAuxiliaryInfo::None,
+                                proposer_index.map(|index| EphemeralAuxiliaryInfo {
+                                    proposer_index: index as u64,
+                                }),
+                            )
+                        },
+                    )
+                })
+                .collect();
             counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
                 .observe_duration(sig_verification_start.elapsed());
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
-                    block: (block.id(), sig_verified_txns).into(),
+                    block: (block.id(), sig_verified_txns, auxiliary_info).into(),
                     parent_block_id,
                     block_executor_onchain_config,
                     pre_commit_hook,
@@ -393,6 +417,7 @@ struct PrepareBlockCommand {
     lifetime_guard: CountedRequest<()>,
     block_qc: Option<Arc<QuorumCert>>,
     shuffler: Arc<dyn TransactionShuffler>,
+    validators: Arc<[AccountAddress]>,
 }
 
 struct ExecuteBlockCommand {

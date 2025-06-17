@@ -13,7 +13,6 @@ use crate::{
     pipeline::{pipeline_builder::PipelineBuilder, pipeline_phase::CountedRequest},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -30,6 +29,7 @@ use aptos_executor_types::{
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
+use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
@@ -288,6 +288,7 @@ impl StateComputer for ExecutionProxy {
                 self.pre_commit_hook(),
                 lifetime_guard,
                 transaction_shuffler,
+                validators,
             )
             .await;
         observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);
@@ -341,7 +342,7 @@ impl StateComputer for ExecutionProxy {
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -352,7 +353,7 @@ impl StateComputer for ExecutionProxy {
         );
 
         // wait until all blocks are committed
-        for block in blocks {
+        for block in &blocks {
             block.take_pre_commit_fut().await?
         }
 
@@ -371,7 +372,7 @@ impl StateComputer for ExecutionProxy {
 
         self.commit_notifier
             .clone()
-            .send(self.commit_hook(blocks, callback, finality_proof))
+            .send(self.commit_hook(&blocks, callback, finality_proof))
             .await
             .expect("Failed to send commit notification");
 
@@ -522,9 +523,9 @@ async fn test_commit_sync_race() {
         transaction_deduper::create_transaction_deduper,
         transaction_shuffler::create_transaction_shuffler,
     };
-    use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
     use aptos_infallible::Mutex;
+    use aptos_transactions_filter::transaction_matcher::Filter;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_executor::partitioner::ExecutableBlock,
@@ -670,11 +671,11 @@ async fn test_commit_sync_race() {
         false,
     );
     executor
-        .commit(&[], generate_li(1, 1), callback.clone())
+        .commit(vec![], generate_li(1, 1), callback.clone())
         .await
         .unwrap();
     executor
-        .commit(&[], generate_li(1, 10), callback)
+        .commit(vec![], generate_li(1, 10), callback)
         .await
         .unwrap();
     assert!(executor.sync_to_target(generate_li(1, 8)).await.is_ok());

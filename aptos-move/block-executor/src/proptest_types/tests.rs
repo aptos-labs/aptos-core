@@ -17,7 +17,10 @@ use crate::{
     txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
+    contract_event::TransactionEvent,
     state_store::MockStateView,
 };
 use claims::{assert_matches, assert_ok};
@@ -69,7 +72,7 @@ fn run_transactions<K, V, E>(
             .unwrap(),
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     for _ in 0..num_repeat {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
@@ -84,7 +87,12 @@ fn run_transactions<K, V, E>(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &state_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &state_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         if module_access.0 && module_access.1 {
             assert_matches!(output, Err(()));
@@ -195,7 +203,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .into_iter()
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
         phantom: PhantomData,
@@ -222,7 +230,12 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -253,7 +266,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .into_iter()
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -276,7 +289,12 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -373,7 +391,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions.clone());
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions.clone());
     // Confirm still no intersection
     let mut guard = AptosModuleCacheManagerGuard::none();
     let output = BlockExecutor::<
@@ -387,7 +405,12 @@ fn publishing_fixed_params_with_block_gas_limit(
         executor_thread_pool,
         None,
     )
-    .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+    .execute_transactions_parallel(
+        &txn_provider,
+        &data_view,
+        &TransactionSliceMetadata::unknown(),
+        &mut guard,
+    );
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -417,7 +440,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     for _ in 0..200 {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
@@ -435,7 +458,12 @@ fn publishing_fixed_params_with_block_gas_limit(
             executor_thread_pool.clone(),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         assert_matches!(output, Err(()));
     }
@@ -487,7 +515,7 @@ fn non_empty_group(
             txn_gen.materialize_groups::<[u8; 32], MockEvent>(&key_universe, group_size_pcts)
         })
         .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
         group_keys: key_universe[(key_universe_len - 3)..key_universe_len]
@@ -517,7 +545,12 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+        .execute_transactions_parallel(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        );
 
         BaselineOutput::generate(txn_provider.get_txns(), None).assert_parallel_output(&output);
     }
@@ -536,7 +569,13 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_sequential(&txn_provider, &data_view, &mut guard, false);
+        .execute_transactions_sequential(
+            &txn_provider,
+            &data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+            false,
+        );
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(txn_provider.get_txns(), None).assert_output(&output.map_err(
