@@ -15,6 +15,8 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::coin::ensure_paired_metadata;
     use aptos_framework::event;
     use aptos_framework::fungible_asset::upgrade_store_to_concurrent;
+    use aptos_framework::object;
+    use aptos_framework::object::{DeleteRef, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -85,6 +87,11 @@ module aptos_framework::scheduled_txns {
         f: |Option<signer>| has copy + store + drop,
     }
 
+    struct ScheduledTransactionContainer has key {
+        transaction: ScheduledTransaction,
+        delete_ref: DeleteRef,
+    }
+
     /// We pass around only needed info
     struct ScheduledTransactionInfoWithKey has drop {
         sender_addr: address,
@@ -111,7 +118,7 @@ module aptos_framework::scheduled_txns {
 
     struct ScheduleQueue has key {
         /// key_size = 48 bytes; value_size = key_size + AVG_SCHED_TXN_SIZE
-        schedule_map: BigOrderedMap<ScheduleMapKey, ScheduledTransaction>,
+        schedule_map: BigOrderedMap<ScheduleMapKey, Object<ScheduledTransactionContainer>>,
     }
 
     /// BigOrderedMap has MAX_NODE_BYTES = 409600 (400KB), MAX_DEGREE = 4096, DEFAULT_TARGET_NODE_SIZE = 4096;
@@ -160,6 +167,7 @@ module aptos_framework::scheduled_txns {
         key: ScheduleMapKey,
         account_addr: address,
         deposit_amt: u64,
+        delete_ref: DeleteRef,
     }
 
     /// Can be called only by the framework
@@ -203,7 +211,7 @@ module aptos_framework::scheduled_txns {
     /// Stop, remove and refund all scheduled txns; can be called only by the framework
     public fun shutdown(
         framework: &signer
-    ) acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
+    ) acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData, ScheduledTransactionContainer {
         system_addresses::assert_aptos_framework(framework);
 
         // set stop_scheduling flag
@@ -220,12 +228,14 @@ module aptos_framework::scheduled_txns {
             let cancel_count = 0;
             while ((!iter.iter_is_end(&queue.schedule_map)) && (cancel_count < SHUTDOWN_CANCEL_LIMIT)) {
                 let key = iter.iter_borrow_key();
-                let txn = iter.iter_borrow(&queue.schedule_map);
+                let txn_obj = iter.iter_borrow(&queue.schedule_map);
+                let (txn, delete_ref) = move_scheduled_transaction_container(txn_obj);
                 let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
                 txns_to_cancel.push_back(KeyAndTxnInfo {
                     key: *key,
                     account_addr: txn.sender_addr,
-                    deposit_amt
+                    deposit_amt,
+                    delete_ref
                 });
                 cancel_count = cancel_count + 1;
                 iter = iter.iter_next(&queue.schedule_map);
@@ -234,8 +244,9 @@ module aptos_framework::scheduled_txns {
 
         // Cancel transactions
         while (!txns_to_cancel.is_empty()) {
-            let KeyAndTxnInfo { key, account_addr, deposit_amt } = txns_to_cancel.pop_back();
+            let KeyAndTxnInfo { key, account_addr, deposit_amt, delete_ref } = txns_to_cancel.pop_back();
             cancel_internal(account_addr, key, deposit_amt);
+            object::delete(delete_ref);
             event::emit(TransactionFailedEvent {
                 key,
                 sender_addr: account_addr,
@@ -332,8 +343,20 @@ module aptos_framework::scheduled_txns {
             txn_id
         };
 
+        // Create the object with delete capability
+        let constructor_ref = object::create_object_from_account(sender);
+        let object_signer = object::generate_signer(&constructor_ref);
+        let delete_ref = object::generate_delete_ref(&constructor_ref);
+
+        let scheduled_txn_container = ScheduledTransactionContainer {
+            transaction: txn,
+            delete_ref,
+        };
+        move_to(&object_signer, scheduled_txn_container);
+        let scheduled_txn_obj = object::object_from_constructor_ref<ScheduledTransactionContainer>(&constructor_ref);
+
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
-        queue.schedule_map.add(key, txn);
+        queue.schedule_map.add(key, scheduled_txn_obj);
 
         // Collect deposit
         // Get owner signer from capability
@@ -356,7 +379,7 @@ module aptos_framework::scheduled_txns {
     public fun cancel(
         sender: &signer,
         key: ScheduleMapKey
-    ) acquires ScheduleQueue, AuxiliaryData {
+    ) acquires ScheduleQueue, AuxiliaryData, ScheduledTransactionContainer {
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         assert!(!aux_data.stop_scheduling, error::unavailable(EUNAVAILABLE));
@@ -366,7 +389,8 @@ module aptos_framework::scheduled_txns {
             return
         };
 
-        let txn = *queue.schedule_map.borrow(&key);
+        let txn_obj = queue.schedule_map.borrow(&key);
+        let (txn, delete_ref) = move_scheduled_transaction_container(txn_obj);
         let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
 
         // verify sender
@@ -375,6 +399,14 @@ module aptos_framework::scheduled_txns {
             error::permission_denied(EINVALID_SIGNER)
         );
         cancel_internal(signer::address_of(sender), key, deposit_amt);
+        // Delete the transaction object
+        object::delete(delete_ref);
+    }
+
+    fun move_scheduled_transaction_container(txn_obj: &Object<ScheduledTransactionContainer>): (ScheduledTransaction, DeleteRef) acquires ScheduledTransactionContainer {
+        let txn_obj_addr = object::object_address(txn_obj);
+        let ScheduledTransactionContainer { transaction: txn, delete_ref } = move_from<ScheduledTransactionContainer>(txn_obj_addr);
+        (txn, delete_ref)
     }
 
     /// Internal cancel function that takes an address instead of signer. No signer verification, assumes key is present
@@ -407,7 +439,7 @@ module aptos_framework::scheduled_txns {
     /// Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
     fun get_ready_transactions(
         timestamp_ms: u64
-    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         remove_txns();
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
@@ -427,7 +459,10 @@ module aptos_framework::scheduled_txns {
             if (key.time > block_time) {
                 break;
             };
-            let txn = *iter.iter_borrow(&queue.schedule_map);
+            let txn_obj = iter.iter_borrow(&queue.schedule_map);
+            let txn_obj_addr = object::object_address(txn_obj);
+            let txn = borrow_global<ScheduledTransactionContainer>(txn_obj_addr).transaction;
+
             let scheduled_txn_info_with_key = ScheduledTransactionInfoWithKey {
                 sender_addr: txn.sender_addr,
                 max_gas_amount: txn.max_gas_amount,
@@ -437,11 +472,13 @@ module aptos_framework::scheduled_txns {
             };
 
             if ((block_time - key.time) > aux_data.expiry_delta) {
+                let (_, delete_ref) = move_scheduled_transaction_container(txn_obj);
                 let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
                 txns_to_expire.push_back(KeyAndTxnInfo {
                     key: *key,
                     account_addr: txn.sender_addr,
-                    deposit_amt
+                    deposit_amt,
+                    delete_ref
                 });
             } else {
                 scheduled_txns.push_back(scheduled_txn_info_with_key);
@@ -453,12 +490,13 @@ module aptos_framework::scheduled_txns {
 
         // Cancel expired transactions
         while (!txns_to_expire.is_empty()) {
-            let KeyAndTxnInfo { key, account_addr, deposit_amt } = txns_to_expire.pop_back();
+            let KeyAndTxnInfo { key, account_addr, deposit_amt, delete_ref } = txns_to_expire.pop_back();
             cancel_internal(
                 account_addr,
                 key,
                 deposit_amt
             );
+            object::delete(delete_ref);
             event::emit(TransactionFailedEvent {
                 key,
                 sender_addr: account_addr,
@@ -526,11 +564,13 @@ module aptos_framework::scheduled_txns {
     fun execute_user_function_wrapper(
         signer: signer,
         txn_key: ScheduleMapKey,
-    ) acquires ScheduleQueue {
+    ) acquires ScheduleQueue, ScheduledTransactionContainer {
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         assert!(queue.schedule_map.contains(&txn_key), 0);
 
-        let txn = *queue.schedule_map.borrow(&txn_key);
+        let txn_obj = queue.schedule_map.borrow(&txn_key);
+        let txn_obj_addr = object::object_address(txn_obj);
+        let txn = borrow_global<ScheduledTransactionContainer>(txn_obj_addr).transaction;
         let pass_signer = txn.pass_signer;
         let f = txn.f;
         if (pass_signer) {
@@ -562,7 +602,7 @@ module aptos_framework::scheduled_txns {
     #[test_only]
     public fun get_ready_transactions_test(
         timestamp: u64
-    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         get_ready_transactions(timestamp)
     }
 
@@ -576,17 +616,19 @@ module aptos_framework::scheduled_txns {
     #[test_only]
     public fun get_func_from_txn_key(
         key: ScheduleMapKey
-    ): |Option<signer>| has copy acquires ScheduleQueue {
+    ): |Option<signer>| has copy acquires ScheduleQueue, ScheduledTransactionContainer {
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         assert!(queue.schedule_map.contains(&key), 0);
-        let txn = *queue.schedule_map.borrow(&key);
+        let txn_obj = queue.schedule_map.borrow(&key);
+        let txn_obj_addr = object::object_address(txn_obj);
+        let txn = borrow_global<ScheduledTransactionContainer>(txn_obj_addr).transaction;
         txn.f
     }
 
     #[test_only]
     public fun shutdown_test(
         fx: &signer
-    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         shutdown(fx);
     }
 
@@ -625,7 +667,7 @@ module aptos_framework::scheduled_txns {
     #[test(fx = @0x1, user = @0x1234)]
     fun test_basic(
         fx: &signer, user: signer
-    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         // Setup test environment
@@ -812,7 +854,7 @@ module aptos_framework::scheduled_txns {
     // error::permission_denied(EINVALID_SIGNER)
     fun test_cancel_wrong_user(
         fx: &signer, user: signer, other_user: signer
-    ) acquires ScheduleQueue, AuxiliaryData {
+    ) acquires ScheduleQueue, AuxiliaryData, ScheduledTransactionContainer {
         let user_addr = signer::address_of(&user);
         let curr_mock_time = 1000000;
         setup_test_env(fx, &user, curr_mock_time);
@@ -833,7 +875,7 @@ module aptos_framework::scheduled_txns {
     fun test_insert_when_stopped(
         fx: &signer,
         user: signer
-    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
 
@@ -864,7 +906,7 @@ module aptos_framework::scheduled_txns {
     fun test_exceeding_limits(
         fx: &signer,
         user: signer
-    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl {
+    ) acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         let user_addr = signer::address_of(&user);
         let curr_mock_time_micro_s = 1000000;
         setup_test_env(fx, &user, curr_mock_time_micro_s);
