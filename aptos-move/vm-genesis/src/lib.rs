@@ -377,18 +377,19 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
     );
 }
 
-fn exec_function(
+fn exec_function_internal(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
+    address: AccountAddress,
 ) {
     let storage = TraversalStorage::new();
     session
         .execute_function_bypass_visibility(
-            &ModuleId::new(CORE_CODE_ADDRESS, Identifier::new(module_name).unwrap()),
+            &ModuleId::new(address, Identifier::new(module_name).unwrap()),
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
@@ -398,13 +399,33 @@ fn exec_function(
         )
         .unwrap_or_else(|e| {
             panic!(
-                "Error calling {}.{}: ({:#x}) {}",
+                "Error calling {}.{}.{}: ({:#x}) {}",
+                address,
                 module_name,
                 function_name,
                 e.sub_status().unwrap_or_default(),
                 e,
             )
         });
+}
+
+fn exec_function(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl ModuleStorage,
+    module_name: &str,
+    function_name: &str,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) {
+    exec_function_internal(
+        session,
+        module_storage,
+        module_name,
+        function_name,
+        ty_args,
+        args,
+        CORE_CODE_ADDRESS,
+    );
 }
 
 fn exec_experimental_function(
@@ -415,29 +436,15 @@ fn exec_experimental_function(
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
 ) {
-    let storage = TraversalStorage::new();
-    session
-        .execute_function_bypass_visibility(
-            &ModuleId::new(
-                EXPERIMENTAL_CODE_ADDRESS,
-                Identifier::new(module_name).unwrap(),
-            ),
-            &Identifier::new(function_name).unwrap(),
-            ty_args,
-            args,
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&storage),
-            module_storage,
-        )
-        .unwrap_or_else(|e| {
-            panic!(
-                "Error calling experimental {}.{}: ({:#x}) {}",
-                module_name,
-                function_name,
-                e.sub_status().unwrap_or_default(),
-                e,
-            )
-        });
+    exec_function_internal(
+        session,
+        module_storage,
+        module_name,
+        function_name,
+        ty_args,
+        args,
+        EXPERIMENTAL_CODE_ADDRESS,
+    );
 }
 
 fn initialize(
