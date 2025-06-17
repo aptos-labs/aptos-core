@@ -1,0 +1,31 @@
+---
+remote_endpoint: ~
+name: "Enable BlockEpilogue (aip-88)"
+proposals:
+  - name: enable_block_epilogue
+    metadata:
+      title: "enable block epilogue"
+      description: "Generate BlockEpilogue transaction instead of StateCheckpoint transaction."
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/11298"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-88.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - Execution:
+          V4:
+            transaction_shuffler_type:
+              use_case_aware:
+                sender_spread_factor: 32
+                platform_use_case_spread_factor: 0
+                user_use_case_spread_factor: 4
+            block_gas_limit_type:
+              complex_limit_v1:
+                effective_block_gas_limit: 30000
+                execution_gas_effective_multiplier: 1
+                io_gas_effective_multiplier: 1
+                conflict_penalty_window: 9
+                use_granular_resource_group_conflicts: false
+                use_module_publishing_block_conflict: true
+                block_output_limit: 5242880
+                include_user_txn_size_in_block_output: true
+                add_block_limit_outcome_onchain: true
+            transaction_deduper_type: txn_hash_and_authenticator_v1
