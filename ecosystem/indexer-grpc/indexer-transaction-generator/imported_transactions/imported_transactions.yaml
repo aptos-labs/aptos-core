@@ -115,6 +115,10 @@ mainnet:
     # events processor
     554229017: 554229017_events_with_no_event_size_info
     2448304257: 2448304257_coinstore_deletion_event
+    # stake module events https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-71.md
+    2892460037: 2892460037_distribute
+    2894800604: 2894800604_add_distribution_request_commission_and_unlock_stake
+    2835047481: 2835047481_update_commission
 
     # Fungible asset migration
     1680592683: 1680592683_fa_migration_coin_info

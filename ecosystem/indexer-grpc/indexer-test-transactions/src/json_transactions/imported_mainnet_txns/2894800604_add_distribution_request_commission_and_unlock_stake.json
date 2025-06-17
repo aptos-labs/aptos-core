@@ -1,0 +1,1644 @@
+{
+  "timestamp": {
+    "seconds": "1750168812",
+    "nanos": 168902000
+  },
+  "version": "2894800604",
+  "info": {
+    "hash": "jB9783nafX9zK+oPYpRR8nPGk8O31lt5yMyw4nLp3ho=",
+    "stateChangeHash": "HWiDzNo9IZ8AD/K9Go4DPo+vE8KLYN+H0itrl5J/SKc=",
+    "eventRootHash": "pjpsLkvjDApg+poxjSlLTuO+wbrjeXmNOaXiU/MJ7Ec=",
+    "gasUsed": "133",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "LYEikOADKKWd24VlFsIsFllA6gnT17veRqdbXzyGeRs=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac",
+          "stateKeyHash": "CdlfNeziBNfPWsv5Nw3nEKbQyzmBFIkWZSMtf9iWfaA=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2112\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1063\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"value\":\"13725369421\"},{\"key\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"value\":\"260715542121\"}]},\"total_coins\":\"274580876469\",\"total_shares\":\"274440911542\"},\"owner_cap\":{\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"},\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"principal\":\"522500535036494\",\"signer_cap\":{\"account\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1049\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc86386cbe303ee65c394a5da964e682f1dc4780997ec9bf8f1d00fcb702efac\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5",
+          "stateKeyHash": "mLemKf8TkWU74Ug1g4hDtxomblbJYlgLm8lI247EI1Q=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"513565068340712\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x15654b15e898fdf9c342bc19d7759a1e507cc47f77e6dc64b8eedfa90bc9593\",\"distribute_rewards_events\":{\"counter\":\"11619\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"270807995963\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2126\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae",
+          "stateKeyHash": "OTL077d07SpNPHi4mtRPoDYjiDM1aXPPrk89iiO3UpQ=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2086\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1036\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"value\":\"14378627809\"},{\"key\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"value\":\"273124049534\"}]},\"total_coins\":\"287649820410\",\"total_shares\":\"287502677343\"},\"owner_cap\":{\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"},\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"principal\":\"545504201778154\",\"signer_cap\":{\"account\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1e3e6abec254af8597d03e4a0221825a9fd9c0d759bb46b43e57ea57963543ae\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8",
+          "stateKeyHash": "+vZmZCsGc8EEqqjurQ//UHi7AowKaWdlrbw4EjRFvg0=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"585743368575982\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47\",\"distribute_rewards_events\":{\"counter\":\"11617\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"308868335442\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"9518\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"39\",\"guid\":{\"id\":{\"addr\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3",
+          "stateKeyHash": "vJU9PBDJcIH3uaw/Ob051yhhC7sdhuc2JaHqQuYYML0=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2104\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1054\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"value\":\"14672880891\"},{\"key\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"value\":\"278713428030\"}]},\"total_coins\":\"293536463191\",\"total_shares\":\"293386308921\"},\"owner_cap\":{\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"},\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"principal\":\"556667735147864\",\"signer_cap\":{\"account\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x377c8c0165853b43804270a4b8b78020756d4de115b210f9415cce1d281f3ed3\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75",
+          "stateKeyHash": "73m8S++KIhexz/WaFcC5GJVCngebelVzxgpbJ7kGWIw=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2126\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"77\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1076\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"value\":\"13536762767\"},{\"key\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"value\":\"257132705323\"}]},\"total_coins\":\"270807995963\",\"total_shares\":\"270669468090\"},\"owner_cap\":{\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"},\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\",\"principal\":\"513565068340712\",\"signer_cap\":{\"account\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}}}]},\"switch_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x39f3251daf2b9ea5b2810b8897bf3297453c8535ee3ab0bf38fa22e6d8503c75\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039",
+          "stateKeyHash": "J3JBS5kYlFBLGwO/4doNV5XDD6O5nbd/xeDQlDp6CYM=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"541825668432818\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47\",\"distribute_rewards_events\":{\"counter\":\"11623\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"285710092998\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2084\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587",
+          "stateKeyHash": "ohHhLx9YnHwT/s9dpd+w0/YAA1wEuGshWPCwh1o2DSE=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2119\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1069\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"value\":\"14314902834\"},{\"key\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"value\":\"271913584425\"}]},\"total_coins\":\"286374978175\",\"total_shares\":\"286228487259\"},\"owner_cap\":{\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"},\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"principal\":\"543086568436934\",\"signer_cap\":{\"account\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3de72a2e5d6a330b919ee6de9a6f51f6250c32b1385107c7b2db02bc82bfd587\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af",
+          "stateKeyHash": "BPRqfJ/Gav4MzM+4nBIPbOow5bnLWjS4x5zueB3HsPs=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"38146700\"},\"deposit_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af",
+          "stateKeyHash": "GPQaNkPpTulgiCg6JoEo1CvvP3bjQttfMzJ37ow9EgQ=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"4\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"932\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9",
+          "stateKeyHash": "20N5SSX+c0rSvtbJMlq+dmPTk5i7Wp30Up2MjZ7RDUA=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"9518\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"77\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"8475\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"value\":\"15439268623\"},{\"key\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"value\":\"293271069770\"}]},\"total_coins\":\"308868335442\",\"total_shares\":\"308710338393\"},\"owner_cap\":{\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"},\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\",\"principal\":\"585743368575982\",\"signer_cap\":{\"account\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}}}]},\"switch_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1043\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x50805f9addbbab5da0e339aae0ba05fa51e831c1b66f7c7599e51c4f782db4f9\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce",
+          "stateKeyHash": "z3a/kXyJuRdJgAFuqIwqYqBZNkzh+X5DUauR2C28D+A=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2084\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1034\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"value\":\"14281667509\"},{\"key\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"value\":\"271282274693\"}]},\"total_coins\":\"285710092998\",\"total_shares\":\"285563942202\"},\"owner_cap\":{\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"},\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\",\"principal\":\"541825668432818\",\"signer_cap\":{\"account\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x63d02eb9ba371b951086f8ceefd8f8e5bc2d14218e6e0234984b56d5777150ce\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e",
+          "stateKeyHash": "E8atJDFZ5iFawKMdrjLx+M96sA84mt9jDsUGRA01S4M=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"556667735147864\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x15654b15e898fdf9c342bc19d7759a1e507cc47f77e6dc64b8eedfa90bc9593\",\"distribute_rewards_events\":{\"counter\":\"11619\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"293536463191\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2104\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089",
+          "stateKeyHash": "Cn6eVrvmjh4qBKxELtbASF9BqNltgTKL7hQ9FMztl/8=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"513999168342126\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47\",\"distribute_rewards_events\":{\"counter\":\"11620\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"271036901240\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2115\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"39\",\"guid\":{\"id\":{\"addr\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f",
+          "stateKeyHash": "UhcP45/Q4D5pAsUdemu5QWAZzC25a3ZRanTnUbdvF7c=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"545504201778154\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x15654b15e898fdf9c342bc19d7759a1e507cc47f77e6dc64b8eedfa90bc9593\",\"distribute_rewards_events\":{\"counter\":\"11614\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"287649820410\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2086\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58",
+          "stateKeyHash": "ILOke/cpCLpuE8rRxTiUX2JusYh7xdjuGKERgWUGyCI=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2123\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"77\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1073\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"value\":\"16120005497\"},{\"key\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"value\":\"306201762564\"}]},\"total_coins\":\"322486731414\",\"total_shares\":\"322321768061\"},\"owner_cap\":{\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"},\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"principal\":\"611569535326826\",\"signer_cap\":{\"account\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x8d9d6cddf7985da906ab5026c0c8db4c53ebbb0b7d1dd84e1feb821b43f89f58\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744",
+          "stateKeyHash": "XieHJ2ibin4EzrL4U2fMiJhc4LkdvXdeDlsOW9Go+nI=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"543086568436934\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x15654b15e898fdf9c342bc19d7759a1e507cc47f77e6dc64b8eedfa90bc9593\",\"distribute_rewards_events\":{\"counter\":\"11617\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"286374978175\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2119\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc",
+          "stateKeyHash": "MsHb7h6CSF1mzjc/MJG8Y1+78fPt48CVPMwR+4x3RU4=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"522500535036494\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47\",\"distribute_rewards_events\":{\"counter\":\"11616\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"274580876469\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2112\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553",
+          "stateKeyHash": "YkzR7r5MORqRSgPTdd2WwpSgIbJ7Zk9qzRRCEgEqTys=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2083\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"76\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1033\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"value\":\"14857178965\"},{\"key\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"value\":\"282214195449\"}]},\"total_coins\":\"297223414697\",\"total_shares\":\"297071374414\"},\"owner_cap\":{\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"},\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"principal\":\"563659735170656\",\"signer_cap\":{\"account\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa69946a1fb8365a23e8244b3b3cadcaf819c481b31f10e2f0b6fee73af4b3553\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d",
+          "stateKeyHash": "ZVkFnnXy6NJuobTQhAbAbNG4sz0kp/0qYDUsFhuo1VI=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"2115\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"77\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"1065\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"value\":\"13548204951\"},{\"key\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"value\":\"257350051352\"}]},\"total_coins\":\"271036901240\",\"total_shares\":\"270898256303\"},\"owner_cap\":{\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"},\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\",\"principal\":\"513999168342126\",\"signer_cap\":{\"account\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"1050\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xbbb4f61c9f090d0ae1085a98ef1bb5dd51785af6c0bfcfe56e2928f5c84cc50d\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26",
+          "stateKeyHash": "zZSranA97MJWx18cPOTq5MgnEDBte2GtNH8A10Nd77A=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"611569535326826\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x8ac6fe79b3656feda6485fcf872e00033dd35cd9d8e10b485e3dee34949b2f47\",\"distribute_rewards_events\":{\"counter\":\"11620\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"322486731414\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2123\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"39\",\"guid\":{\"id\":{\"addr\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f",
+          "stateKeyHash": "J4wQ9XFDygFvaPpjTC2eEcY5bYL6TVzaGzF9p5LH8CY=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"563659735170656\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x15654b15e898fdf9c342bc19d7759a1e507cc47f77e6dc64b8eedfa90bc9593\",\"distribute_rewards_events\":{\"counter\":\"11614\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751137696\",\"operator_address\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"297223414697\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"2083\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"38\",\"guid\":{\"id\":{\"addr\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"114979467960173052\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "11802",
+  "blockHeight": "365271987",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 227,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 143
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 103
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 755
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0x4c6c73f4fdc2fd35db857ddbdec09a432fe68ef6a4b83ecf6471af9cc14352af",
+      "sequenceNumber": "931",
+      "maxGasAmount": "200000",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1750168831"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0xad3356929855e241fd24a6d62bb4c46e675de537a16eb5ccb750b0e6ff6a278",
+              "name": "rewards_v1"
+            },
+            "name": "process_rewards"
+          },
+          "entryFunctionIdStr": "0xad3356929855e241fd24a6d62bb4c46e675de537a16eb5ccb750b0e6ff6a278::rewards_v1::process_rewards"
+        }
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "sBtIWtKYNU2nXQJe5Z0eglqpqPl3z3nD5z2jtO0IMk4=",
+          "signature": "0xfcFG081T28SNsaWa0CvjUHx8XYY5TIYgH5SoTHU/uFqookBcoV6pX2bfq3FMNi/Jmt0MU+b5yfYJ6CbfPCBg=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"436981443\",\"operator\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"436981443\",\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"8739628866\",\"commission_amount\":\"436981443\",\"operator\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"8302647423\",\"operator\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"8302647423\",\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"8302647423\",\"commission_paid\":\"436981443\",\"operator\":\"0x4ec7c16e84a77dc053ed3df66ddc99fd555d04b6e9a32e8fae9699af810237e\",\"pool_address\":\"0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"454101946\",\"operator\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"454101946\",\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"9082038920\",\"commission_amount\":\"454101946\",\"operator\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"8627936974\",\"operator\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"8627936974\",\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"8627936974\",\"commission_paid\":\"454101946\",\"operator\":\"0x17db30d438e1d228938b7bd7b7546d60b89f6921889936859d9f5ba2898e628b\",\"pool_address\":\"0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"431560842\",\"operator\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"431560842\",\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"8631216856\",\"commission_amount\":\"431560842\",\"operator\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"8199656014\",\"operator\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"8199656014\",\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"8199656014\",\"commission_paid\":\"431560842\",\"operator\":\"0xbf6f8eec9fd4a3cff09d97f3104cdd938b64d63ce97394432fbf9d8c0dc1ce5a\",\"pool_address\":\"0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"398145176\",\"operator\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"398145176\",\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"7962903532\",\"commission_amount\":\"398145176\",\"operator\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"7564758356\",\"operator\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"7564758356\",\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"7564758356\",\"commission_paid\":\"398145176\",\"operator\":\"0xd48023ab21212c4ddd37841de8e0bb486674d3568257577920bb4ea9c74616c2\",\"pool_address\":\"0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"422906229\",\"operator\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"422906229\",\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"8458124594\",\"commission_amount\":\"422906229\",\"operator\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"8035218365\",\"operator\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"8035218365\",\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"8035218365\",\"commission_paid\":\"422906229\",\"operator\":\"0x41dfe164de503348266a4ccee52d4b6baaef8d8c3b839cc21c214a619319080b\",\"pool_address\":\"0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"421031941\",\"operator\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"421031941\",\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"8420638826\",\"commission_amount\":\"421031941\",\"operator\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"7999606885\",\"operator\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"7999606885\",\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"7999606885\",\"commission_paid\":\"421031941\",\"operator\":\"0xf38e33a23f29712ee8501c3e8e7c37bffaa8631de59d3866e71ba08eb8a9d8f1\",\"pool_address\":\"0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"405072464\",\"operator\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"405072464\",\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"8101449285\",\"commission_amount\":\"405072464\",\"operator\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"7696376821\",\"operator\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"7696376821\",\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"7696376821\",\"commission_paid\":\"405072464\",\"operator\":\"0xa5666b816a11c54b8b4bfecd2fef7d4349936a09f8004306d2e4f720ba3f48bb\",\"pool_address\":\"0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"398481715\",\"operator\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"398481715\",\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"7969634318\",\"commission_amount\":\"398481715\",\"operator\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"7571152603\",\"operator\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"7571152603\",\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"7571152603\",\"commission_paid\":\"398481715\",\"operator\":\"0xf4f2c4cc3f63476a58048e43fd564fbf6c6b96ebbffa154e13fd0d3da0c82546\",\"pool_address\":\"0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"474123875\",\"operator\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"474123875\",\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"9482477515\",\"commission_amount\":\"474123875\",\"operator\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"9008353640\",\"operator\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"9008353640\",\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"9008353640\",\"commission_paid\":\"474123875\",\"operator\":\"0x9e9884d83108645b96aa13848462094e4255f5c930f99a7ee4a4df02e1325123\",\"pool_address\":\"0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"420054419\",\"operator\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"420054419\",\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"8401088382\",\"commission_amount\":\"420054419\",\"operator\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"7981033963\",\"operator\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"7981033963\",\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UnlockStake",
+        "data": "{\"amount\":\"7981033963\",\"commission_paid\":\"420054419\",\"operator\":\"0x639fd7e993d9fbdee08e96a77b0fc6cde10d0636fa289382812124156738348\",\"pool_address\":\"0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "transaction_fee",
+            "name": "FeeStatement"
+          }
+        },
+        "typeStr": "0x1::transaction_fee::FeeStatement",
+        "data": "{\"execution_gas_units\":\"80\",\"io_gas_units\":\"54\",\"storage_fee_octas\":\"0\",\"storage_fee_refund_octas\":\"0\",\"total_charge_gas_units\":\"133\"}"
+      }
+    ]
+  }
+}

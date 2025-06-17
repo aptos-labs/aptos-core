@@ -1,0 +1,328 @@
+{
+  "timestamp": {
+    "seconds": "1750129223",
+    "nanos": 109171000
+  },
+  "version": "2892460037",
+  "info": {
+    "hash": "S96GnoNimxaTNhiFw+sR7zuEx87CzhKZHByQF132AYw=",
+    "stateChangeHash": "aLLmb/mQNR7tWfZzhc4JsShjI/+WqMzTh3sUd31ivZA=",
+    "eventRootHash": "loKoZB844TxSGZ1fUBQokXgtPsBUk/FAh92paZrml08=",
+    "gasUsed": "22",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "Mah1zYokEO3tb6oQOa0z/vEJT82T7eKgTH0WJKFuc70=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1ac438a91f99bf3e8f89a3fd5372a0d20566254ea36a3c9cdedf29137f2abd2d",
+          "stateKeyHash": "WeJRjY8cG88Ecr4Tb9f8YZz9vA59NzOjMje2pqPikzM=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"1872452918768\"},\"deposit_events\":{\"counter\":\"23\",\"guid\":{\"id\":{\"addr\":\"0x1ac438a91f99bf3e8f89a3fd5372a0d20566254ea36a3c9cdedf29137f2abd2d\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"40\",\"guid\":{\"id\":{\"addr\":\"0x1ac438a91f99bf3e8f89a3fd5372a0d20566254ea36a3c9cdedf29137f2abd2d\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067",
+          "stateKeyHash": "NsHG896VJrEhyDiBFGuVfrVpRYlvRKxcwdAwfcR/VgY=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"493484650\"},\"deposit_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067",
+          "stateKeyHash": "+JVqaKPMT4M04H96ewDgGXfQJORaDikUBKadCX0bqHU=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"4\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"376\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7",
+          "stateKeyHash": "B6sHi04FEgXiQ5iLhJRSdPyPHTUjnxkfALmxt1Fte5U=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"1019993181151725\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x17a23057cc0ff1038a859d7ad3bd1d5c8a11b74824d7c2744e2959b7c2f86102\",\"distribute_rewards_events\":{\"counter\":\"4129\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1751289244\",\"operator_address\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"132851152357\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"347\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"20\",\"guid\":{\"id\":{\"addr\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1",
+          "stateKeyHash": "yeT+4Y1naaOLrTA867T5Q4TOv7vdqBV3H9WQe7YBG/4=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"347\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"20\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"347\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"value\":{\"commission_percentage\":\"70\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"value\":\"132851152357\"}]},\"total_coins\":\"132851152357\",\"total_shares\":\"132851152357\"},\"owner_cap\":{\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\"},\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"principal\":\"1019993181151725\",\"signer_cap\":{\"account\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"114993266112449296\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "11796",
+  "blockHeight": "364952449",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 302,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 54,
+        "totalBytes": 94
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 62,
+        "totalBytes": 166
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 103
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 683
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067",
+      "sequenceNumber": "375",
+      "maxGasAmount": "33",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1750129252"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0x1",
+              "name": "staking_contract"
+            },
+            "name": "request_commission"
+          },
+          "arguments": [
+            "\"0xefe03f2eab2c6cf0c1bb5953e580a85de59821d57062f31f7ce7137102a61ec1\"",
+            "\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\""
+          ],
+          "entryFunctionIdStr": "0x1::staking_contract::request_commission"
+        }
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "GOZzvX34PsF9Zp223LfWBjHv2jb3KNO6BWO843Zx+58=",
+          "signature": "tXD1faloQULrfLUB7CdbIoQbPLapv6Cj4T6sfNdcGqjy6mcqVQBSas8bJYiFoKySWxbFCv6KWnoJqjI+3CDtCA=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "WithdrawStake"
+          }
+        },
+        "typeStr": "0x1::stake::WithdrawStake",
+        "data": "{\"amount_withdrawn\":\"1872452815806\",\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x1ac438a91f99bf3e8f89a3fd5372a0d20566254ea36a3c9cdedf29137f2abd2d"
+        },
+        "sequenceNumber": "22",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"1872452815806\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Distribute"
+          }
+        },
+        "typeStr": "0x1::staking_contract::Distribute",
+        "data": "{\"amount\":\"1872452815806\",\"operator\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\",\"recipient\":\"0x1ac438a91f99bf3e8f89a3fd5372a0d20566254ea36a3c9cdedf29137f2abd2d\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"132851152357\",\"operator\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"132851152357\",\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"189787360511\",\"commission_amount\":\"132851152357\",\"operator\":\"0x7182e06b42c54781c97da9690eaeda3c95211f0fca4460b07dcc46ccbefb5067\",\"pool_address\":\"0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "transaction_fee",
+            "name": "FeeStatement"
+          }
+        },
+        "typeStr": "0x1::transaction_fee::FeeStatement",
+        "data": "{\"execution_gas_units\":\"8\",\"io_gas_units\":\"14\",\"storage_fee_octas\":\"0\",\"storage_fee_refund_octas\":\"0\",\"total_charge_gas_units\":\"22\"}"
+      }
+    ]
+  }
+}
