@@ -85,6 +85,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
         Arc::new(Mutex::new(CoreMempool::new(&config))),
         config.mempool.clone(),
+        config.transaction_filter.clone(),
         network_client,
         Arc::new(mock_db),
         vm_validator,

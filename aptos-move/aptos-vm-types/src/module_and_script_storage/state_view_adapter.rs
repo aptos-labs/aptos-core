@@ -159,7 +159,7 @@ where
 impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
     for AptosCodeStorageAdapter<'_, S, E>
 {
-    fn fetch_state_value_metadata(
+    fn get_module_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,

@@ -148,7 +148,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<InMemoryStateSt
             .into_iter()
             .map(|t| t.into_txn())
             .collect();
-    let txn_provider = DefaultTxnProvider::new(txns);
+    let txn_provider = DefaultTxnProvider::new_without_info(txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
         .execute_block_no_limit(&txn_provider, &state_store)
         .unwrap();
@@ -204,7 +204,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<InMemoryStateStore
         )
         .unwrap();
 
-    let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
+    let txn_provider = DefaultTxnProvider::new_without_info(execution_ordered_txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
         .execute_block_no_limit(&txn_provider, &state_store)
         .unwrap();

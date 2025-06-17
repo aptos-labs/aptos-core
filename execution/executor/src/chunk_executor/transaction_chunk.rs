@@ -17,7 +17,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    transaction::{Transaction, TransactionOutput, Version},
+    transaction::{AuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
@@ -90,9 +90,13 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
+        let mut auxiliary_info = Vec::new();
+        // TODO(grao): Pass in persisted auxiliary info.
+        auxiliary_info.resize(sig_verified_txns.len(), AuxiliaryInfo::new_empty());
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
+            auxiliary_info,
             parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),

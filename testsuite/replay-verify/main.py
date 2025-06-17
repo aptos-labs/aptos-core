@@ -97,13 +97,13 @@ class ReplayConfig:
             self.pvc_number = 5
             self.min_range_size = 10_000
             self.range_size = 5_000_000
-            self.timeout_secs = 2000
+            self.timeout_secs = 5400
         else:
-            self.concurrent_replayer = 18
-            self.pvc_number = 8
+            self.concurrent_replayer = 20
+            self.pvc_number = 7
             self.min_range_size = 10_000
             self.range_size = 2_000_000
-            self.timeout_secs = 1000
+            self.timeout_secs = 3600
 
 
 class WorkerPod:
@@ -234,6 +234,18 @@ class WorkerPod:
             "--block-cache-size",
             "10737418240",
         ]
+        # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
+        if (
+            self.network == Network.TESTNET
+            and self.start_version >= 6700000000
+            and self.end_version < 6800000000
+        ):
+            pod_manifest["spec"]["containers"][0]["resources"]["requests"][
+                "memory"
+            ] = "180Gi"
+            pod_manifest["spec"]["containers"][0]["resources"]["limits"][
+                "memory"
+            ] = "180Gi"
 
         if SHARDING_ENABLED:
             pod_manifest["spec"]["containers"][0]["command"].append(
@@ -409,7 +421,7 @@ class ReplayScheduler:
                 current_skip[1] = max(current_skip[1], next_skip[1])
         ret.append(current_skip)
 
-        return sorted_skips
+        return ret
 
     def create_tasks(self) -> None:
         current = self.start_version
@@ -423,10 +435,6 @@ class ReplayScheduler:
             (skip_start, skip_end) = (
                 (INT64_MAX, INT64_MAX) if len(skips) == 0 else skips[0]
             )
-            if skip_start <= current:
-                skips.pop(0)
-                current = skip_end + 1
-                continue
 
             # TODO(ibalajiarun): temporary hack to handle heavy ranges
             if (
@@ -441,6 +449,18 @@ class ReplayScheduler:
                 next_current = min(
                     current + range_size, self.end_version + 1, skip_start
                 )
+
+            # Only skip if current is within the skip range
+            if skip_start <= current <= skip_end:
+                skips.pop(0)
+                current = skip_end + 1
+                continue
+            elif skip_start <= next_current - 1 <= skip_end:
+                # If the next current is within the skip range, we need to adjust it
+                next_current = skip_start
+            elif next_current > skip_start:
+                # If the next current is beyond the skip range, we need to adjust it
+                next_current = skip_start
 
             # avoid having too many small tasks, simply skip the task
             range = (current, next_current - 1)

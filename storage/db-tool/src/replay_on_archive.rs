@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Error, Ok, Result};
+use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
@@ -79,11 +79,9 @@ impl Opt {
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {
             error!("{} failed transactions", all_errors.len());
-            /* errors were printed as found.
             for e in all_errors {
                 error!("Failed: {}", e);
             }
-             */
             process::exit(2);
         }
         Ok(())
@@ -196,7 +194,7 @@ impl Verifier {
         let res = ranges
             .par_iter()
             .map(|(start, limit)| self.verify(*start, *limit))
-            .collect::<Vec<Result<Vec<Error>>>>();
+            .collect::<Vec<_>>();
         let mut all_failed_txns = Vec::new();
         for iter in res.into_iter() {
             all_failed_txns.extend(iter?);
@@ -219,12 +217,12 @@ impl Verifier {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
-                    error!(
-                        "Verify timeout: {}s elapsed. Deadline: {}s",
+                    bail!(
+                        "Verify timeout: {}s elapsed. Deadline: {}s. Failed txns count: {}",
                         self.replay_stat.get_elapsed_secs(),
-                        duration
+                        duration,
+                        total_failed_txns.len(),
                     );
-                    return Ok(total_failed_txns);
                 }
             }
 
@@ -313,7 +311,8 @@ impl Verifier {
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
             .collect::<Vec<_>>();
-        let txns_provider = DefaultTxnProvider::new(txns);
+        // TODO(grao): Pass in persisted info.
+        let txns_provider = DefaultTxnProvider::new_without_info(txns);
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             &txns_provider,
             &self

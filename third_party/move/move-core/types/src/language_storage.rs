@@ -26,6 +26,7 @@ pub const RESOURCE_TAG: u8 = 1;
 pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
 pub const TOKEN_ADDRESS: AccountAddress = AccountAddress::THREE;
 pub const TOKEN_OBJECTS_ADDRESS: AccountAddress = AccountAddress::FOUR;
+pub const EXPERIMENTAL_CODE_ADDRESS: AccountAddress = AccountAddress::SEVEN;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(

@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   dispatch_event:
-    runs-on: runs-on,cpu=16,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
 
     steps:
       - name: Checkout the repository

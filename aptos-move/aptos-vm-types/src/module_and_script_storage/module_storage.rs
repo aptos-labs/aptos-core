@@ -10,7 +10,7 @@ use move_vm_runtime::ModuleStorage;
 pub trait AptosModuleStorage: ModuleStorage {
     /// Returns the state value metadata associated with this module. The error is returned if
     /// there is a storage error. If the module does not exist, [None] is returned.
-    fn fetch_state_value_metadata(
+    fn get_module_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,

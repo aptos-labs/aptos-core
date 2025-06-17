@@ -94,7 +94,11 @@ impl BlockPreparationStage {
                 let partitioned_txns =
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 timer.stop_and_record();
-                ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
+                ExecutableBlock::new(
+                    block_id,
+                    ExecutableTransactions::Sharded(partitioned_txns),
+                    vec![],
+                )
             },
         };
         self.num_blocks_processed += 1;
