@@ -11,7 +11,7 @@ use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::files::FileHash;
 use move_model::{
     metadata::LanguageVersion,
-    model::{GlobalEnv, Loc},
+    model::{GlobalEnv, Loc, ModuleId},
     sourcifier::Sourcifier,
 };
 use move_stackless_bytecode::{
@@ -130,57 +130,26 @@ impl Decompiler {
     /// Decompiles the given binary module. A source map must be provided for error
     /// reporting; use `self.empty_source_map` to create one if none is available.
     pub fn decompile_module(&mut self, module: CompiledModule, source_map: SourceMap) -> String {
-        // Verify the module
-        if let Err(e) = move_bytecode_verifier::verify_module(&module) {
-            self.env.error(
-                &self.env.to_loc(&source_map.definition_location),
-                &format!("bytecode verification failed: {:#?}", e),
-            );
-            return String::default();
-        }
-        // Load module into environment, creating stubs for any missing dependencies
-        let module_id = self
-            .env
-            .load_compiled_module(/*with_dep_closure*/ true, module, source_map);
-        if self.env.has_errors() {
+        // Step 1: Validate if the module is well-formed.
+        if !self.validate_module(&module, &source_map) {
             return String::default();
         }
 
-        // Create FunctionTargetsHolder with stackless bytecode for all functions in the module,
-        let module_env = self.env.get_module(module_id);
+        // Step 2: Load the module into self.env
+        let module_id = match self.load_module(module, source_map) {
+            Some(id) => id,
+            None => return String::default(),
+        };
+
+        // Step 3: Lift file format bytecode to stackless bytecode.
         let mut targets = FunctionTargetsHolder::default();
-        for func_env in module_env.get_functions() {
-            targets.add_target(&func_env)
-        }
+        self.lift_to_stackless_bytecode(module_id, &mut targets);
 
-        // Generate AST for all function targets.
-        for fun_id in targets.get_funs() {
-            let fun_env = self.env.get_function(fun_id);
-            let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
-            if target.get_bytecode().is_empty() {
-                continue;
-            }
-            if let Some(def) = astifier::generate_ast_raw(&target) {
-                let def = if self.options.no_expressions {
-                    def
-                } else {
-                    astifier::transform_assigns(&target, def)
-                };
-                let def = if self.options.no_conditionals {
-                    def
-                } else {
-                    astifier::transform_conditionals(&target, def)
-                };
-                // The next step must always happen to create valid Move
-                let def = astifier::bind_free_vars(&target, def);
-                self.env.set_function_def(fun_env.get_qualified_id(), def)
-            }
-        }
+        // Step 4: Lift stackless bytecode to AST.
+        self.lift_to_ast(&targets);
 
-        // Render the module as source
-        let sourcifier = Sourcifier::new(&self.env);
-        sourcifier.print_module(module_id);
-        sourcifier.result()
+        // Step 5: Sourcify the ast.
+        self.sourcify_ast(module_id)
     }
 
     /// Decompiles the give binary script. Same as `decompile_module` but for scripts.
@@ -212,5 +181,69 @@ impl Decompiler {
         );
         let loc = Loc::new(file_id, Span::new(0, 0));
         SourceMap::new(self.env.to_ir_loc(&loc), None)
+    }
+
+    pub fn validate_module(&self, module: &CompiledModule, source_map: &SourceMap) -> bool {
+        // Run bytecode verification on the module.
+        if let Err(e) = move_bytecode_verifier::verify_module(module) {
+            self.env.error(
+                &self.env.to_loc(&source_map.definition_location),
+                &format!("bytecode verification failed: {:#?}", e),
+            );
+            return false;
+        }
+        true
+    }
+
+    // Load module into environment, creating stubs for any missing dependencies
+    pub fn load_module(&mut self, module: CompiledModule, source_map: SourceMap) -> Option<ModuleId> {
+        let module_id = self
+            .env
+            .load_compiled_module(/*with_dep_closure*/ true, module, source_map);
+        if self.env.has_errors() {
+            return None;
+        }
+        Some(module_id)
+    }
+
+    pub fn lift_to_stackless_bytecode(&mut self, module_id: ModuleId, targets: &mut FunctionTargetsHolder) {
+        // Create FunctionTargetsHolder with stackless bytecode for all functions in the module,
+        let module_env = self.env.get_module(module_id);
+        for func_env in module_env.get_functions() {
+            targets.add_target(&func_env)
+        }
+    }
+
+    pub fn lift_to_ast(&mut self, targets: &FunctionTargetsHolder) {
+        // Generate AST for all function targets.
+        for fun_id in targets.get_funs() {
+            let fun_env = self.env.get_function(fun_id);
+            let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
+            if target.get_bytecode().is_empty() {
+                continue;
+            }
+            if let Some(def) = astifier::generate_ast_raw(&target) {
+                let def = if self.options.no_expressions {
+                    def
+                } else {
+                    astifier::transform_assigns(&target, def)
+                };
+                let def = if self.options.no_conditionals {
+                    def
+                } else {
+                    astifier::transform_conditionals(&target, def)
+                };
+                // The next step must always happen to create valid Move
+                let def = astifier::bind_free_vars(&target, def);
+                self.env.set_function_def(fun_env.get_qualified_id(), def)
+            }
+        }
+    }
+
+    pub fn sourcify_ast(&self, module_id: ModuleId) -> String {
+        // Render the module as source
+        let sourcifier = Sourcifier::new(&self.env);
+        sourcifier.print_module(module_id);
+        sourcifier.result()
     }
 }
