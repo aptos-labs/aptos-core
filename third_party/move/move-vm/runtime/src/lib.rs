@@ -27,6 +27,7 @@ mod access_control;
 mod frame;
 mod frame_type_cache;
 mod reentrancy_checker;
+mod runtime_ref_checks;
 mod runtime_type_checks;
 mod storage;
 

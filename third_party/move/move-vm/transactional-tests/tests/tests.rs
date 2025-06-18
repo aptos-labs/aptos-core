@@ -67,13 +67,28 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             include: &["/function_values_safety/"],
             exclude: &[],
         },
+        // This config is used to test the runtime reference checker.
+        TestConfig {
+            name: "ref",
+            experiments: &[],
+            language_version: LanguageVersion::latest(),
+            // Verifier config is irrelevant here, because we disable verifier for these tests.
+            // Importantly, paranoid checks and runtime ref checks are enabled.
+            vm_config: vm_config_for_tests(
+                VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
+            ),
+            include: &["/runtime_ref_checks/"],
+            exclude: &[],
+        },
     ]
 });
 
-/// VM configuration used for testing. By default, paranoid mode is always on.
+/// VM configuration used for testing.
+/// By default, paranoid mode and runtime ref checks are always on.
 fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
     VMConfig {
         paranoid_type_checks: true,
+        paranoid_ref_checks: true,
         verifier_config,
         ..VMConfig::default()
     }
@@ -85,7 +100,7 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
 /// `test.mvir`) to the same baseline file `test.exp` *unless* there is an entry in this array
 /// matching the path of `test.move` or `test.mvir`. If there is such an entry, then each config
 /// "foo" will have a separate baseline output file `test.foo.exp`.
-const SEPARATE_BASELINE: &[&str] = &["/function_values_safety/"];
+const SEPARATE_BASELINE: &[&str] = &["/function_values_safety/", "/runtime_ref_checks/"];
 
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
