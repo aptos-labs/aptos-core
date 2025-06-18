@@ -353,8 +353,8 @@ pub(crate) fn realistic_env_max_load_test(
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog })
-                .init_gas_price_multiplier(20),
+                .mode(EmitJobMode::ConstTps { tps: 1000 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
                     7000
