@@ -1049,6 +1049,7 @@ mod tests {
             RawTransaction, Script, SignedTransaction,
         },
     };
+    use move_core_types::u256::U256;
 
     fn create_user_txn(gas_unit_price: u64) -> SignatureVerifiedTransaction {
         let sender = AccountAddress::random();
@@ -1080,7 +1081,7 @@ mod tests {
             key: ScheduleMapKey {
                 time: 0,
                 gas_priority: max_gas_unit_price,
-                txn_id: Vec::new(),
+                txn_id: U256::zero(),
             },
         }
     }

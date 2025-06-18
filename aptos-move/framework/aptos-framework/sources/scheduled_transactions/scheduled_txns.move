@@ -44,6 +44,8 @@ module aptos_framework::scheduled_txns {
     /// Txn size is too large; beyond 10KB
     const ETXN_TOO_LARGE: u64 = 5;
 
+    const EINVALID_HASH_SIZE: u64 = 6;
+
     const U64_MAX: u64 = 18446744073709551615;
 
     /// Conversion factor between our time granularity (100ms) and microseconds
@@ -113,7 +115,7 @@ module aptos_framework::scheduled_txns {
         time: u64,
         gas_priority: u64,
         /// SHA3-256
-        txn_id: vector<u8>
+        txn_id: u256
     }
 
     struct ScheduleQueue has key {
@@ -191,11 +193,7 @@ module aptos_framework::scheduled_txns {
 
         // Initialize queue
         let queue = ScheduleQueue {
-            schedule_map: big_ordered_map::new_with_config(
-                BIG_ORDRD_MAP_TGT_ND_SZ / SCHEDULE_MAP_KEY_SIZE,
-                (BIG_ORDRD_MAP_TGT_ND_SZ / (SCHEDULE_MAP_KEY_SIZE + AVG_SCHED_TXN_SIZE)),
-                true
-            ),
+            schedule_map: big_ordered_map::new_with_reusable(),
         };
         move_to(framework, queue);
 
@@ -333,7 +331,8 @@ module aptos_framework::scheduled_txns {
         );
 
         // Generate unique transaction ID
-        let txn_id = sha3_256(bcs::to_bytes(&txn));
+        let hash = sha3_256(bcs::to_bytes(&txn));
+        let txn_id = hash_to_u256(hash);
 
         // Insert the transaction into the schedule_map
         // Create schedule map key
@@ -401,6 +400,19 @@ module aptos_framework::scheduled_txns {
         cancel_internal(signer::address_of(sender), key, deposit_amt);
         // Delete the transaction object
         object::delete(delete_ref);
+    }
+
+    const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
+
+    fun u256_to_u64_safe(val: u256): u64 {
+        let masked = val & MASK_64; // Truncate high bits
+        (masked as u64) // Now safe: always <= u64::MAX
+    }
+
+    // Converting 32-byte hash to u256
+    fun hash_to_u256(hash: vector<u8>): u256 {
+        assert!(hash.length() == 32, error::invalid_argument(EINVALID_HASH_SIZE));
+        from_bcs::to_u256(hash)
     }
 
     fun move_scheduled_transaction_container(txn_obj: &Object<ScheduledTransactionContainer>): (ScheduledTransaction, DeleteRef) acquires ScheduledTransactionContainer {
@@ -509,21 +521,8 @@ module aptos_framework::scheduled_txns {
     /// Increment after every scheduled transaction is run
     /// IMP: Make sure this does not affect parallel execution of txns
     public(friend) fun finish_execution(key: ScheduleMapKey) acquires ToRemoveTbl {
-        // Get first 8 bytes of the hash as u64 and then mod
-        let hash_bytes = key.txn_id;
-        assert!(hash_bytes.length() == 32, hash_bytes.length()); // SHA3-256 produces 32 bytes
-
-        // Take last 8 bytes and convert to u64
-        let hash_last_8_bytes = vector::empty();
-        let idx = hash_bytes.length() - 8;
-        while (idx < hash_bytes.length()) {
-            hash_last_8_bytes.push_back(hash_bytes[idx]);
-            idx = idx + 1;
-        };
-        let value = from_bcs::to_u64(hash_last_8_bytes);
-
         // Calculate table index using hash
-        let tbl_idx = ((value % TO_REMOVE_PARALLELISM) as u16);
+        let tbl_idx = ((u256_to_u64_safe(key.txn_id) % TO_REMOVE_PARALLELISM) as u16);
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
 
         if (!to_remove.remove_tbl.contains(tbl_idx)) {

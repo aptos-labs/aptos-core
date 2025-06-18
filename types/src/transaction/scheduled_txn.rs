@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
+use move_core_types::u256::U256;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -20,7 +21,7 @@ pub struct ScheduleMapKey {
     pub time: u64,
     pub gas_priority: u64,
     /// SHA3-256
-    pub txn_id: Vec<u8>,
+    pub txn_id: U256,
 }
 
 impl AsMoveValue for ScheduleMapKey {
@@ -28,7 +29,7 @@ impl AsMoveValue for ScheduleMapKey {
         MoveValue::Struct(MoveStruct::Runtime(vec![
             self.time.as_move_value(),
             self.gas_priority.as_move_value(),
-            self.txn_id.as_move_value(),
+            MoveValue::U256(self.txn_id),
         ]))
     }
 }

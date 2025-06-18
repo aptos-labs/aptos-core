@@ -24,6 +24,8 @@
 -  [Function `new_scheduled_transaction`](#0x1_scheduled_txns_new_scheduled_transaction)
 -  [Function `insert`](#0x1_scheduled_txns_insert)
 -  [Function `cancel`](#0x1_scheduled_txns_cancel)
+-  [Function `u256_to_u64_safe`](#0x1_scheduled_txns_u256_to_u64_safe)
+-  [Function `hash_to_u256`](#0x1_scheduled_txns_hash_to_u256)
 -  [Function `move_scheduled_transaction_container`](#0x1_scheduled_txns_move_scheduled_transaction_container)
 -  [Function `cancel_internal`](#0x1_scheduled_txns_cancel_internal)
 -  [Function `get_ready_transactions`](#0x1_scheduled_txns_get_ready_transactions)
@@ -234,7 +236,7 @@ Note: ScheduledTxn is still variable size though due to its closure.
 
 </dd>
 <dt>
-<code>txn_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>txn_id: u256</code>
 </dt>
 <dd>
  SHA3-256
@@ -578,6 +580,15 @@ BigOrderedMap has MAX_NODE_BYTES = 409600 (400KB), MAX_DEGREE = 4096, DEFAULT_TA
 
 
 
+<a id="0x1_scheduled_txns_EINVALID_HASH_SIZE"></a>
+
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_HASH_SIZE">EINVALID_HASH_SIZE</a>: u64 = 6;
+</code></pre>
+
+
+
 <a id="0x1_scheduled_txns_EINVALID_SIGNER"></a>
 
 Map key already exists
@@ -644,6 +655,15 @@ The maximum number of scheduled transactions that can be run in a block
 
 
 <pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 1000;
+</code></pre>
+
+
+
+<a id="0x1_scheduled_txns_MASK_64"></a>
+
+
+
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MASK_64">MASK_64</a>: u256 = 18446744073709551615;
 </code></pre>
 
 
@@ -752,11 +772,7 @@ Can be called only by the framework
 
     // Initialize queue
     <b>let</b> queue = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
-        schedule_map: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(
-            <a href="scheduled_txns.md#0x1_scheduled_txns_BIG_ORDRD_MAP_TGT_ND_SZ">BIG_ORDRD_MAP_TGT_ND_SZ</a> / <a href="scheduled_txns.md#0x1_scheduled_txns_SCHEDULE_MAP_KEY_SIZE">SCHEDULE_MAP_KEY_SIZE</a>,
-            (<a href="scheduled_txns.md#0x1_scheduled_txns_BIG_ORDRD_MAP_TGT_ND_SZ">BIG_ORDRD_MAP_TGT_ND_SZ</a> / (<a href="scheduled_txns.md#0x1_scheduled_txns_SCHEDULE_MAP_KEY_SIZE">SCHEDULE_MAP_KEY_SIZE</a> + <a href="scheduled_txns.md#0x1_scheduled_txns_AVG_SCHED_TXN_SIZE">AVG_SCHED_TXN_SIZE</a>)),
-            <b>true</b>
-        ),
+        schedule_map: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_reusable">big_ordered_map::new_with_reusable</a>(),
     };
     <b>move_to</b>(framework, queue);
 
@@ -973,7 +989,8 @@ Insert a scheduled transaction into the queue. ScheduleMapKey is returned to use
     );
 
     // Generate unique transaction ID
-    <b>let</b> txn_id = sha3_256(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&txn));
+    <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> = sha3_256(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&txn));
+    <b>let</b> txn_id = <a href="scheduled_txns.md#0x1_scheduled_txns_hash_to_u256">hash_to_u256</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>);
 
     // Insert the transaction into the schedule_map
     // Create schedule map key
@@ -1061,6 +1078,56 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
     <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), key, deposit_amt);
     // Delete the transaction <a href="object.md#0x1_object">object</a>
     <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_u256_to_u64_safe"></a>
+
+## Function `u256_to_u64_safe`
+
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_u256_to_u64_safe">u256_to_u64_safe</a>(val: u256): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_u256_to_u64_safe">u256_to_u64_safe</a>(val: u256): u64 {
+    <b>let</b> masked = val & <a href="scheduled_txns.md#0x1_scheduled_txns_MASK_64">MASK_64</a>; // Truncate high bits
+    (masked <b>as</b> u64) // Now safe: always &lt;= u64::MAX
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_hash_to_u256"></a>
+
+## Function `hash_to_u256`
+
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_hash_to_u256">hash_to_u256</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u256
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_hash_to_u256">hash_to_u256</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u256 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>.length() == 32, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_HASH_SIZE">EINVALID_HASH_SIZE</a>));
+    <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u256">from_bcs::to_u256</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>)
 }
 </code></pre>
 
@@ -1249,21 +1316,8 @@ IMP: Make sure this does not affect parallel execution of txns
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_finish_execution">finish_execution</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> {
-    // Get first 8 bytes of the <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> <b>as</b> u64 and then mod
-    <b>let</b> hash_bytes = key.txn_id;
-    <b>assert</b>!(hash_bytes.length() == 32, hash_bytes.length()); // SHA3-256 produces 32 bytes
-
-    // Take last 8 bytes and convert <b>to</b> u64
-    <b>let</b> hash_last_8_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>let</b> idx = hash_bytes.length() - 8;
-    <b>while</b> (idx &lt; hash_bytes.length()) {
-        hash_last_8_bytes.push_back(hash_bytes[idx]);
-        idx = idx + 1;
-    };
-    <b>let</b> value = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_u64">from_bcs::to_u64</a>(hash_last_8_bytes);
-
     // Calculate <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> index using <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
-    <b>let</b> tbl_idx = ((value % <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) <b>as</b> u16);
+    <b>let</b> tbl_idx = ((<a href="scheduled_txns.md#0x1_scheduled_txns_u256_to_u64_safe">u256_to_u64_safe</a>(key.txn_id) % <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) <b>as</b> u16);
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
 
     <b>if</b> (!to_remove.remove_tbl.contains(tbl_idx)) {
