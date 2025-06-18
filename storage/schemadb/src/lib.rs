@@ -340,7 +340,7 @@ impl Drop for DB {
 /// selectively turning this off for some non-critical writes to improve performance.
 fn default_write_options() -> rocksdb::WriteOptions {
     let mut opts = rocksdb::WriteOptions::default();
-    opts.set_sync(true);
+    // opts.set_sync(true);
     opts
 }
 
