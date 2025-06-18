@@ -5,24 +5,23 @@ spec aptos_std::i128 {
 
     /// Interprets the I128 `bits` field as a signed integer.
     spec fun to_num(self: I128): num {
-        // Compare to 2^127: if gte, value is negative
-        if (self.bits >= BITS_MIN_I128) {
-            // Interpret bits as two's complement negative number
-            (self.bits as num) - TWO_POW_U128
-        } else {
-            (self.bits as num)
-        }
+        if (self.bits >= BITS_MIN_I128) (self.bits as num) - TWO_POW_128
+        else (self.bits as num)
     }
 
     spec from {
         aborts_if v > BITS_MAX_I128 with EOVERFLOW;
+
+        ensures to_num(result) == v;
     }
 
     spec neg_from {
         aborts_if v > BITS_MIN_I128 with EOVERFLOW;
 
-        // neg_from(s) == twos_complement(v)
-        ensures result.bits == twos_complement(v);
+        // v + (-v) == 0
+        ensures is_zero(add(result, from(v)));
+
+        ensures to_num(result) + v == 0;
     }
 
     spec neg {
@@ -32,63 +31,75 @@ spec aptos_std::i128 {
         // Abort if abs(self) would overflow (MIN_I128 cannot be negated)
         aborts_if self.is_neg() && self.bits == BITS_MIN_I128 with EOVERFLOW;
 
-        // Mathematical behavior
+        // -v = v * -1
         ensures result.eq(self.mul(neg_from(1)));
 
-        // Involution: neg(neg(v)) == v (if both directions do not abort)
+        // -(-v) = v
         ensures result.neg().eq(self);
     }
 
     spec wrapping_add {
-        ensures result.bits == (self.bits + num2.bits) % TWO_POW_U128;
+        ensures result.bits == (self.bits + num2.bits) % TWO_POW_128;
     }
 
     spec add {
         pragma opaque;
 
-        // Abort conditions
         // Overflow when: two positives yield negative, or two negatives yield positive
         aborts_if !self.is_neg() && !num2.is_neg() && self.wrapping_add(num2).is_neg() with EOVERFLOW;
         aborts_if self.is_neg() && num2.is_neg() && !self.wrapping_add(num2).is_neg() with EOVERFLOW;
 
-        // Inverse property
-        // add(a, -a) = 0
-        ensures self.abs().eq(num2.abs()) && self.sign() != num2.sign() ==> result.is_zero();
+        // by definition
+        ensures result == self.wrapping_add(num2);
 
-        // Identity properties
-        ensures num2.is_zero() ==> result.eq(self);
-        ensures self.is_zero() ==> result.eq(num2);
+        // a + (-a) = 0
+        ensures self.eq(num2.neg()) ==> result.is_zero();
+
+        // a + 0 = a
+        ensures num2.is_zero() ==> self.eq(result);
+
+        // 0 + a = a
+        ensures self.is_zero() ==> num2.eq(result);
+
+        // a + b >= a if b >= 0
+        ensures !num2.is_neg() ==> result.gte(self);
+
+        // a + b < a if b < 0
+        ensures num2.is_neg() ==> result.lt(self);
 
         ensures to_num(result) == to_num(self) + to_num(num2);
-
-        ensures result == self.wrapping_add(num2);
     }
 
     spec wrapping_sub {
-        ensures result.bits == (self.bits + twos_complement(num2.bits)) % TWO_POW_U128;
+        ensures result.bits == (self.bits + twos_complement(num2.bits)) % TWO_POW_128;
     }
 
     spec sub {
         pragma opaque;
-        // Function aborts if subtraction would overflow
-        aborts_if !self.is_neg() && !from(twos_complement(num2.bits)).is_neg() && self.wrapping_add(
-            from(twos_complement(num2.bits))
-        ).is_neg() with EOVERFLOW;
-        aborts_if self.is_neg() && from(twos_complement(num2.bits)).is_neg() && !self.wrapping_add(
-            from(twos_complement(num2.bits))
-        ).is_neg() with EOVERFLOW;
 
-        // Subtracting zero returns the original number
-        ensures self.is_zero() ==> result.bits == twos_complement(num2.bits);
-        ensures num2.is_zero() ==> result.eq(self);
+        // overflow when positive - negative = negative or negative - positive = positive
+        aborts_if !self.is_neg() && num2.is_neg() && self.wrapping_sub(num2).is_neg() with EOVERFLOW;
+        aborts_if self.is_neg() && !num2.is_neg() && !self.wrapping_sub(num2).is_neg() with EOVERFLOW;
 
-        // Subtracting a number from itself gives zero
+        // by definition
+        ensures result == self.wrapping_sub(num2);
+
+        // 0 - a = -a
+        ensures self.is_zero() ==> result.eq(num2.neg());
+
+        // a - 0 = a
+        ensures num2.is_zero() ==> self.eq(result);
+
+        // a - a = 0
         ensures self.eq(num2) ==> result.is_zero();
 
-        // Subtraction behaves like adding the negative in num space
-        ensures to_num(result) == to_num(self) + to_num(from(twos_complement(num2.bits)));
+        // a - b <= a if b >= 0
+        ensures !num2.is_neg() ==> result.lte(self);
 
-        ensures result == self.wrapping_sub(num2);
+        // a - b > a if b < 0
+        ensures num2.is_neg() ==> result.gt(self);
+
+        ensures to_num(result) == to_num(self) - to_num(num2);
     }
 
     spec mul {
@@ -98,7 +109,7 @@ spec aptos_std::i128 {
             (self.abs_u128() as u256) * (num2.abs_u128() as u256) > (BITS_MIN_I128 as u256)
             with EOVERFLOW;
 
-        // If result should be positive (same signs), must not exceed MAX_I64
+        // If result should be positive (same signs), must not exceed MAX_I128
         aborts_if self.sign() == num2.sign() &&
             (self.abs_u128() as u256) * (num2.abs_u128() as u256) > (BITS_MAX_I128 as u256)
             with EOVERFLOW;
@@ -112,8 +123,9 @@ spec aptos_std::i128 {
         // result is 0, self is zero or num2 is zero
         ensures result.is_zero() ==> self.is_zero() || num2.is_zero();
 
-        // Behavior guarantees
+        // a * b = b * a
         ensures result.eq(num2.mul(self));
+
         ensures to_num(result) == to_num(self) * to_num(num2);
     }
 
@@ -121,7 +133,7 @@ spec aptos_std::i128 {
         // Abort conditions
         aborts_if num2.is_zero() with EDIVISION_BY_ZERO;
 
-        // MIN_I64 / -1 = MAX_I64 + 1, which is too big to fit in an I64
+        // MIN_I128 / -1 = MAX_I128 + 1, which is too big to fit in an I128
         aborts_if self.sign() == num2.sign() && self.abs_u128() / num2.abs_u128() > BITS_MAX_I128 with EOVERFLOW;
         aborts_if self.sign() != num2.sign() && self.abs_u128() / num2.abs_u128() > BITS_MIN_I128 with EOVERFLOW;
 
@@ -131,7 +143,7 @@ spec aptos_std::i128 {
         ensures !num2.is_zero() ==>
             to_num(self) == to_num(result) * to_num(num2) + to_num(self.mod(num2));
 
-        // Zero divided by anything is zero
+        // 0 / a = 0
         ensures self.is_zero() ==> result.is_zero();
 
         // Sign correctness
@@ -148,8 +160,6 @@ spec aptos_std::i128 {
     }
 
     spec mod {
-        // pragma timeout = 120;
-
         // Abort conditions - enumerate abort cases
         aborts_with EDIVISION_BY_ZERO, EOVERFLOW;
 
@@ -158,23 +168,35 @@ spec aptos_std::i128 {
 
         // Result has the same sign as the dividend (Solidity-style behavior)
         ensures result.is_zero() || result.sign() == self.sign();
+
+        ensures to_num(result) + to_num(num2) * to_num(self.div(num2)) == to_num(self);
     }
 
     spec abs {
         aborts_if self.is_neg() && self.bits <= BITS_MIN_I128 with EOVERFLOW;
 
-        ensures self.is_neg() ==> self.abs().wrapping_add(self).is_zero();
+        // by definition
         ensures self.is_neg() ==> self.abs().bits == twos_complement(self.bits);
         ensures !self.is_neg() ==> self.abs().bits == self.bits;
 
+        // if a < 0, a + abs(a) = 0
+        ensures self.is_neg() ==> self.abs().add(self).is_zero();
+        ensures self.is_neg() ==> to_num(result) + to_num(self) == 0;
+
+        // if a >= 0, abs(a) = a
         ensures !self.is_neg() ==> self.abs().eq(self);
+        ensures !self.is_neg() ==> to_num(result) == to_num(self);
     }
 
     spec abs_u128 {
         aborts_if self.is_neg() && self.bits < BITS_MIN_I128 with EOVERFLOW;
 
+        // by definition
         ensures self.is_neg() ==> result == twos_complement(self.bits);
         ensures !self.is_neg() ==> result == self.bits;
+
+        ensures self.is_neg() ==> result + to_num(self) == 0;
+        ensures !self.is_neg() ==> result == to_num(self);
     }
 
     spec min {
@@ -202,7 +224,7 @@ spec aptos_std::i128 {
         ensures result == spec_pow(self, exponent);
     }
 
-    spec fun spec_pow(self: I128, e: u64): I128 {
+    spec fun spec_pow(self: I128, e: u128): I128 {
         if (e == 0) {
             from(1)
         }
@@ -299,6 +321,9 @@ spec aptos_std::i128 {
 
         // If a = b, then b = a
         ensures self.eq(num2) ==> num2.eq(self);
+
+        ensures result ==> to_num(self) == to_num(num2);
+        ensures !result ==> to_num(self) != to_num(num2);
     }
 
     spec gt {
@@ -310,6 +335,9 @@ spec aptos_std::i128 {
 
         // If gt is true, then lt is false
         ensures self.gt(num2) ==> num2.lt(self);
+
+        ensures result ==> to_num(self) > to_num(num2);
+        ensures !result ==> to_num(self) <= to_num(num2);
     }
 
     spec gte {
@@ -321,6 +349,9 @@ spec aptos_std::i128 {
 
         // If a >= b, then b <= a
         ensures self.gte(num2) ==> num2.lte(self);
+
+        ensures result ==> to_num(self) >= to_num(num2);
+        ensures !result ==> to_num(self) < to_num(num2);
     }
 
     spec lt {
@@ -332,6 +363,9 @@ spec aptos_std::i128 {
 
         // If a < b, then b > a
         ensures self.lt(num2) ==> num2.gt(self);
+
+        ensures result ==> to_num(self) < to_num(num2);
+        ensures !result ==> to_num(self) >= to_num(num2);
     }
 
     spec lte {
@@ -341,12 +375,15 @@ spec aptos_std::i128 {
         // Never returns true if self > num2
         ensures self.cmp(num2) == GT ==> result == false;
 
-        // If a < b, then b > a
+        // If a <= b, then b >= a
         ensures self.lte(num2) ==> num2.gte(self);
+
+        ensures result ==> to_num(self) <= to_num(num2);
+        ensures !result ==> to_num(self) > to_num(num2);
     }
 
     spec twos_complement {
         ensures v == 0 ==> result == 0;
-        ensures v > 0 ==> result + v == TWO_POW_U128;
+        ensures v > 0 ==> result + v == TWO_POW_128;
     }
 }

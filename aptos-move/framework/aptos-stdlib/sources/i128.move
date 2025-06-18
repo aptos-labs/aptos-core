@@ -5,16 +5,16 @@ module aptos_std::i128 {
     const EDIVISION_BY_ZERO: u64 = 2;
 
     /// min number that a I128 could represent = (1 followed by 127 0s) = 1 << 127
-    const BITS_MIN_I128: u128 = 1 << 127;
+    const BITS_MIN_I128: u128 = 0x80000000000000000000000000000000;
 
     /// max number that a I128 could represent = (0 followed by 127 1s) = (1 << 127) - 1
     const BITS_MAX_I128: u128 = 0x7fffffffffffffffffffffffffffffff;
 
     /// (1 << 128) - 1
-    const MAX_U128: u128 = 340282366920938463463374607431768211455;
+    const MAX_U128: u128 = 0xffffffffffffffffffffffffffffffff;
 
     /// 1 << 128
-    const TWO_POW_U128: u256 = 340282366920938463463374607431768211456;
+    const TWO_POW_128: u256 = 0x100000000000000000000000000000000;
 
     const LT: u8 = 0;
     const EQ: u8 = 1;
@@ -45,18 +45,14 @@ module aptos_std::i128 {
 
     /// Performs wrapping addition on two I128 numbers
     public fun wrapping_add(self: I128, num2: I128): I128 {
-        I128 { bits: (((self.bits as u256) + (num2.bits as u256)) % TWO_POW_U128 as u128) }
+        I128 { bits: (((self.bits as u256) + (num2.bits as u256)) % TWO_POW_128 as u128) }
     }
 
     /// Performs checked addition on two I128 numbers, abort on overflow
     public fun add(self: I128, num2: I128): I128 {
         let sum = self.wrapping_add(num2);
         // overflow only if: (1) postive + postive = negative, OR (2) negative + negative = positive
-        let is_num1_neg = self.is_neg();
-        let is_num2_neg = num2.is_neg();
-        let is_sum_neg = sum.is_neg();
-        let overflow = (is_num1_neg && is_num2_neg && !is_sum_neg) || (!is_num1_neg && !is_num2_neg && is_sum_neg);
-        assert!(!overflow, EOVERFLOW);
+        let overflow = sign(self) == sign(num2) && sign(self) != sign(sum);assert!(!overflow, EOVERFLOW);
         sum
     }
 
@@ -67,7 +63,10 @@ module aptos_std::i128 {
 
     /// Performs checked subtraction on two I128 numbers, asserting on overflow
     public fun sub(self: I128, num2: I128): I128 {
-        self.add(I128 { bits: twos_complement(num2.bits) })
+        let difference = wrapping_sub(self, num2);
+        let overflow = sign(self) != sign(num2) && sign(self) != sign(difference);
+        assert!(!overflow, EOVERFLOW);
+        difference
     }
 
     /// Performs multiplication on two I128 numbers
@@ -137,7 +136,7 @@ module aptos_std::i128 {
                 result = result.mul(self);
             };
             self = self.mul(self);
-            exponent >>= 1;
+            exponent = exponent / 2;
         };
         result
     }
@@ -147,8 +146,13 @@ module aptos_std::i128 {
         I128 { bits: v }
     }
 
-    /// Get internal bits of I128
+    /// Destroys an I128 and returns its internal bits
     public fun unpack(self: I128): u128 {
+        self.bits
+    }
+
+    /// Get internal bits of I128
+    public fun bits(self: &I128): u128 {
         self.bits
     }
 

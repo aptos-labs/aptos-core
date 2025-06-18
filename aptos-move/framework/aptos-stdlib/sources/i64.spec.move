@@ -5,13 +5,8 @@ spec aptos_std::i64 {
 
     /// Interprets the I64 `bits` field as a signed integer.
     spec fun to_num(self: I64): num {
-        // Compare to 2^63: if gte, value is negative
-        if (self.bits >= BITS_MIN_I64) {
-            // Interpret bits as two's complement negative number
-            (self.bits as num) - TWO_POW_64
-        } else {
-            (self.bits as num)
-        }
+        if (self.bits >= BITS_MIN_I64) (self.bits as num) - TWO_POW_64
+        else (self.bits as num)
     }
 
     spec from {
@@ -51,18 +46,25 @@ spec aptos_std::i64 {
         aborts_if !self.is_neg() && !num2.is_neg() && self.wrapping_add(num2).is_neg() with EOVERFLOW;
         aborts_if self.is_neg() && num2.is_neg() && !self.wrapping_add(num2).is_neg() with EOVERFLOW;
 
-        // Inverse property
-        // add(a, -a) = 0
-        ensures self.abs().eq(num2.abs()) && self.sign() != num2.sign() ==> result.is_zero();
-
-        // Identity properties
-        ensures num2.is_zero() ==> result.eq(self);
-        ensures self.is_zero() ==> result.eq(num2);
-
-        // Soundness: result equals self + num2 in num domain
-        ensures to_num(result) == to_num(self) + to_num(num2);
-
+        // by definition
         ensures result == self.wrapping_add(num2);
+
+        // a + (-a) = 0
+        ensures self.eq(num2.neg()) ==> result.is_zero();
+
+        // a + 0 = a
+        ensures num2.is_zero() ==> self.eq(result);
+
+        // 0 + a = a
+        ensures self.is_zero() ==> num2.eq(result);
+
+        // a + b >= a if b >= 0
+        ensures !num2.is_neg() ==> result.gte(self);
+
+        // a + b < a if b < 0
+        ensures num2.is_neg() ==> result.lt(self);
+
+        ensures to_num(result) == to_num(self) + to_num(num2);
     }
 
     spec wrapping_sub {
@@ -72,25 +74,29 @@ spec aptos_std::i64 {
     spec sub {
         pragma opaque;
 
-        // Function aborts if subtraction would overflow
-        aborts_if !num1.is_neg() && !from(twos_complement(num2.bits)).is_neg() && num1.wrapping_add(
-            from(twos_complement(num2.bits))
-        ).is_neg() with EOVERFLOW;
-        aborts_if num1.is_neg() && from(twos_complement(num2.bits)).is_neg() && !num1.wrapping_add(
-            from(twos_complement(num2.bits))
-        ).is_neg() with EOVERFLOW;
+        // overflow when positive - negative = negative or negative - positive = positive
+        aborts_if !self.is_neg() && num2.is_neg() && self.wrapping_sub(num2).is_neg() with EOVERFLOW;
+        aborts_if self.is_neg() && !num2.is_neg() && !self.wrapping_sub(num2).is_neg() with EOVERFLOW;
 
-        // Subtracting zero returns the original number
-        ensures num1.is_zero() ==> result.bits == twos_complement(num2.bits);
-        ensures num2.is_zero() ==> result.eq(num1);
+        // by definition
+        ensures result == self.wrapping_sub(num2);
 
-        // Subtracting a number from itself gives zero
-        ensures num1.eq(num2) ==> result.is_zero();
+        // 0 - a = -a
+        ensures self.is_zero() ==> result.eq(num2.neg());
 
-        // Subtraction behaves like adding the negative in num space
-        ensures to_num(result) == to_num(num1) + to_num(from(twos_complement(num2.bits)));
+        // a - 0 = a
+        ensures num2.is_zero() ==> self.eq(result);
 
-        ensures result == num1.wrapping_sub(num2);
+        // a - a = 0
+        ensures self.eq(num2) ==> result.is_zero();
+
+        // a - b <= a if b >= 0
+        ensures !num2.is_neg() ==> result.lte(self);
+
+        // a - b > a if b < 0
+        ensures num2.is_neg() ==> result.gt(self);
+
+        ensures to_num(result) == to_num(self) - to_num(num2);
     }
 
     spec mul {
@@ -105,17 +111,18 @@ spec aptos_std::i64 {
             (self.abs_u64() as u128) * (num2.abs_u64() as u128) > (BITS_MAX_I64 as u128)
             with EOVERFLOW;
 
-        // result is positive, sign(num1) == sign(num2)
+        // result is positive, sign(self) == sign(num2)
         ensures !result.is_neg() && !result.is_zero() ==> self.sign() == num2.sign();
 
-        // result is negative, sign(num1) != sign(num2)
+        // result is negative, sign(self) != sign(num2)
         ensures result.is_neg() && !result.is_zero() ==> self.sign() != num2.sign();
 
-        // result is 0, num1 is zero or num2 is zero
+        // result is 0, self is zero or num2 is zero
         ensures result.is_zero() ==> self.is_zero() || num2.is_zero();
 
-        // Behavior guarantees
+        // a * b = b * a
         ensures result.eq(num2.mul(self));
+
         ensures to_num(result) == to_num(self) * to_num(num2);
     }
 
@@ -129,11 +136,11 @@ spec aptos_std::i64 {
 
         // Behavior guarantees
         // Division result always rounds toward zero.
-        // The result multiplied back gives the truncated part of num1
+        // The result multiplied back gives the truncated part of self
         ensures !num2.is_zero() ==>
             to_num(self) == to_num(result) * to_num(num2) + to_num(self.mod(num2));
 
-        // Zero divided by anything is zero
+        // 0 / a = 0
         ensures self.is_zero() ==> result.is_zero();
 
         // Sign correctness
@@ -143,7 +150,7 @@ spec aptos_std::i64 {
         ensures result.is_neg() && !result.is_zero() ==> self.sign() != num2.sign();
 
         // Always round down
-        // if num1 is positive, mul(num2, result) <= num1
+        // if self is positive, mul(num2, result) <= self
         ensures !self.is_neg() ==> num2.mul(result).lte(self);
         // if self is negative, mul(num2, result) >= self
         ensures self.is_neg() ==> num2.mul(result).gte(self);
@@ -158,23 +165,35 @@ spec aptos_std::i64 {
 
         // Result has the same sign as the dividend (Solidity-style behavior)
         ensures result.is_zero() || result.sign() == self.sign();
+
+        ensures to_num(result) + to_num(num2) * to_num(self.div(num2)) == to_num(self);
     }
 
     spec abs {
         aborts_if self.is_neg() && self.bits <= BITS_MIN_I64 with EOVERFLOW;
 
-        ensures self.is_neg() ==> self.abs().wrapping_add(self).is_zero();
+        // by definition
         ensures self.is_neg() ==> self.abs().bits == twos_complement(self.bits);
         ensures !self.is_neg() ==> self.abs().bits == self.bits;
 
+        // if a < 0, a + abs(a) = 0
+        ensures self.is_neg() ==> self.abs().add(self).is_zero();
+        ensures self.is_neg() ==> to_num(result) + to_num(self) == 0;
+
+        // if a >= 0, abs(a) = a
         ensures !self.is_neg() ==> self.abs().eq(self);
+        ensures !self.is_neg() ==> to_num(result) == to_num(self);
     }
 
     spec abs_u64 {
         aborts_if self.is_neg() && self.bits < BITS_MIN_I64 with EOVERFLOW;
 
+        // by definition
         ensures self.is_neg() ==> result == twos_complement(self.bits);
         ensures !self.is_neg() ==> result == self.bits;
+
+        ensures self.is_neg() ==> result + to_num(self) == 0;
+        ensures !self.is_neg() ==> result == to_num(self);
     }
 
     spec min {
@@ -299,6 +318,9 @@ spec aptos_std::i64 {
 
         // If a = b, then b = a
         ensures self.eq(num2) ==> num2.eq(self);
+
+        ensures result ==> to_num(self) == to_num(num2);
+        ensures !result ==> to_num(self) != to_num(num2);
     }
 
     spec gt {
@@ -310,10 +332,13 @@ spec aptos_std::i64 {
 
         // If gt is true, then lt is false
         ensures self.gt(num2) ==> num2.lt(self);
+
+        ensures result ==> to_num(self) > to_num(num2);
+        ensures !result ==> to_num(self) <= to_num(num2);
     }
 
     spec gte {
-        // Only returns true if num1 is equal to or greater than num2
+        // Only returns true if self is equal to or greater than num2
         ensures result == (self.cmp(num2) == EQ || self.cmp(num2) == GT);
 
         // Never returns true if self < num2
@@ -321,10 +346,13 @@ spec aptos_std::i64 {
 
         // If a >= b, then b <= a
         ensures self.gte(num2) ==> num2.lte(self);
+
+        ensures result ==> to_num(self) >= to_num(num2);
+        ensures !result ==> to_num(self) < to_num(num2);
     }
 
     spec lt {
-        // Only returns true if num1 is strictly less than num2
+        // Only returns true if self is strictly less than num2
         ensures result == (self.cmp(num2) == LT);
 
         // Never returns true if self >= num2
@@ -332,10 +360,13 @@ spec aptos_std::i64 {
 
         // If a < b, then b > a
         ensures self.lt(num2) ==> num2.gt(self);
+
+        ensures result ==> to_num(self) < to_num(num2);
+        ensures !result ==> to_num(self) >= to_num(num2);
     }
 
     spec lte {
-        // Only returns true if num1 is equal to or less than num2
+        // Only returns true if self is equal to or less than num2
         ensures result == (self.cmp(num2) == EQ || self.cmp(num2) == LT);
 
         // Never returns true if self > num2
@@ -343,6 +374,9 @@ spec aptos_std::i64 {
 
         // If a <= b, then b >= a
         ensures self.lte(num2) ==> num2.gte(self);
+
+        ensures result ==> to_num(self) <= to_num(num2);
+        ensures !result ==> to_num(self) > to_num(num2);
     }
 
     spec twos_complement {

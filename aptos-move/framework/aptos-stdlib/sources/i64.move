@@ -5,16 +5,16 @@ module aptos_std::i64 {
     const EDIVISION_BY_ZERO: u64 = 2;
 
     /// min number that a I64 could represent = (1 followed by 63 0s) = 1 << 63
-    const BITS_MIN_I64: u64 = 1 << 63;
+    const BITS_MIN_I64: u64 = 0x8000000000000000;
 
     /// max number that a I64 could represent = (0 followed by 63 1s) = (1 << 63) - 1
     const BITS_MAX_I64: u64 = 0x7fffffffffffffff;
 
     /// (1 << 64) - 1
-    const MAX_U64: u64 = 18446744073709551615;
+    const MAX_U64: u64 = 0xffffffffffffffff;
 
     /// 1 << 64
-    const TWO_POW_64: u128 = 18446744073709551616;
+    const TWO_POW_64: u128 = 0x10000000000000000;
 
     const LT: u8 = 0;
     const EQ: u8 = 1;
@@ -52,11 +52,7 @@ module aptos_std::i64 {
     public fun add(self: I64, num2: I64): I64 {
         let sum = self.wrapping_add(num2);
         // overflow only if: (1) postive + postive = negative, OR (2) negative + negative = positive
-        let is_num1_neg = self.is_neg();
-        let is_num2_neg = num2.is_neg();
-        let is_sum_neg = sum.is_neg();
-        let overflow = (is_num1_neg && is_num2_neg && !is_sum_neg) || (!is_num1_neg && !is_num2_neg && is_sum_neg);
-        assert!(!overflow, EOVERFLOW);
+        let overflow = sign(self) == sign(num2) && sign(self) != sign(sum);assert!(!overflow, EOVERFLOW);
         sum
     }
 
@@ -66,8 +62,11 @@ module aptos_std::i64 {
     }
 
     /// Performs checked subtraction on two I64 numbers, asserting on overflow
-    public fun sub(num1: I64, num2: I64): I64 {
-        num1.add(I64 { bits: twos_complement(num2.bits) })
+    public fun sub(self: I64, num2: I64): I64 {
+        let difference = wrapping_sub(self, num2);
+        let overflow = sign(self) != sign(num2) && sign(self) != sign(difference);
+        assert!(!overflow, EOVERFLOW);
+        difference
     }
 
     /// Performs multiplication on two I64 numbers
@@ -137,7 +136,7 @@ module aptos_std::i64 {
                 result = result.mul(self);
             };
             self = self.mul(self);
-            exponent >>= 1;
+            exponent = exponent / 2;
         };
         result
     }
@@ -147,8 +146,13 @@ module aptos_std::i64 {
         I64 { bits: v }
     }
 
-    /// Get internal bits of I64
+    /// Destroys an I64 and returns its internal bits
     public fun unpack(self: I64): u64 {
+        self.bits
+    }
+
+    /// Get internal bits of I64
+    public fun bits(self: &I64): u64 {
         self.bits
     }
 
