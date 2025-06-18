@@ -5,11 +5,11 @@ use crate::{
     counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
     payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper,
-    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_executor_types::ExecutorResult;
+use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::future::Shared;

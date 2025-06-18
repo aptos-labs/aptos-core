@@ -895,6 +895,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-short-hex-str",
  "aptos-temppath",
+ "aptos-transactions-filter",
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
@@ -956,6 +957,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transactions-filter",
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
@@ -992,7 +994,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "serde_yaml 0.8.26",
  "sha3 0.9.1",
  "strum 0.27.1",
  "strum_macros 0.27.1",
@@ -2973,6 +2974,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-time-service",
+ "aptos-transactions-filter",
  "aptos-types",
  "aptos-vm-validator",
  "bcs 0.1.4",
@@ -4600,6 +4602,18 @@ dependencies = [
  "once_cell",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-transactions-filter"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "move-core-types",
+ "rand 0.7.3",
+ "serde",
+ "serde_yaml 0.8.26",
 ]
 
 [[package]]

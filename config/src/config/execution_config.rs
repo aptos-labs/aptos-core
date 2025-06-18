@@ -5,9 +5,9 @@
 use super::WaypointConfig;
 use crate::config::{
     config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
-    node_config_loader::NodeType, transaction_filter_type::Filter, utils::RootPath, Error,
-    NodeConfig,
+    node_config_loader::NodeType, utils::RootPath, Error, NodeConfig,
 };
+use aptos_transactions_filter::transaction_matcher::Filter;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;

@@ -11533,6 +11533,7 @@ components:
       - invalid_transaction_update
       - sequence_number_too_old
       - vm_error
+      - rejected_by_filter
       - health_check_failed
       - mempool_is_full
       - internal_error
