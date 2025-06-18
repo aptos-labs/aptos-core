@@ -126,7 +126,7 @@ impl Block {
     }
 
     /// Returns the number of proofs, the number of txns in the proofs, and the bytes of txns in the proofs
-    pub fn proof_statics(&self) -> (usize, usize, usize) {
+    pub fn proof_stats(&self) -> (usize, usize, usize) {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {
@@ -153,7 +153,7 @@ impl Block {
     }
 
     /// Returns the number of inline batches, the number of txns in the inline batches, and the bytes of txns in the inline batches
-    pub fn inline_batch_statics(&self) -> (usize, usize, usize) {
+    pub fn inline_batch_stats(&self) -> (usize, usize, usize) {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {
@@ -180,7 +180,7 @@ impl Block {
     }
 
     /// Returns the number of opt batches, the number of txns in the opt batches, and the bytes of txns in the opt batches
-    pub fn opt_batch_statics(&self) -> (usize, usize, usize) {
+    pub fn opt_batch_stats(&self) -> (usize, usize, usize) {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {

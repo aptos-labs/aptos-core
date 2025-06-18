@@ -187,7 +187,7 @@ pub static TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(||
 });
 
 pub fn update_batch_statics(block: &Block) {
-    let (proof_num, proof_txn_num, proof_txn_bytes) = block.proof_statics();
+    let (proof_num, proof_txn_num, proof_txn_bytes) = block.proof_stats();
     BATCH_NUM_PER_BLOCK
         .with_label_values(&["proof"])
         .observe(proof_num as f64);
@@ -198,7 +198,7 @@ pub fn update_batch_statics(block: &Block) {
         .with_label_values(&["proof"])
         .observe(proof_txn_bytes as f64);
     let (inline_batch_num, inline_batch_txn_num, inline_batch_txn_bytes) =
-        block.inline_batch_statics();
+        block.inline_batch_stats();
     BATCH_NUM_PER_BLOCK
         .with_label_values(&["inline_batch"])
         .observe(inline_batch_num as f64);
@@ -208,7 +208,7 @@ pub fn update_batch_statics(block: &Block) {
     TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK
         .with_label_values(&["inline_batch"])
         .observe(inline_batch_txn_bytes as f64);
-    let (opt_batch_num, opt_batch_txn_num, opt_batch_txn_bytes) = block.opt_batch_statics();
+    let (opt_batch_num, opt_batch_txn_num, opt_batch_txn_bytes) = block.opt_batch_stats();
     BATCH_NUM_PER_BLOCK
         .with_label_values(&["opt_batch"])
         .observe(opt_batch_num as f64);
