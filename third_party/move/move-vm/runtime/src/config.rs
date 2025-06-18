@@ -16,6 +16,9 @@ pub struct VMConfig {
     /// When this flag is set to true, MoveVM will perform type checks at every instruction
     /// execution to ensure that type safety cannot be violated at runtime.
     pub paranoid_type_checks: bool,
+    /// When this flag is set to true, Move VM will perform additional checks to ensure that
+    /// reference safety is maintained during execution.
+    pub paranoid_ref_checks: bool,
     pub check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs.
     pub max_value_nest_depth: Option<u64>,
@@ -40,6 +43,7 @@ impl Default for VMConfig {
             verifier_config: VerifierConfig::default(),
             deserializer_config: DeserializerConfig::default(),
             paranoid_type_checks: false,
+            paranoid_ref_checks: false,
             check_invariant_in_swap_loc: true,
             max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
             layout_max_size: 512,

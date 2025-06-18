@@ -22,6 +22,7 @@ use move_vm_types::{
 use once_cell::sync::OnceCell;
 
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
+static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
 /// Set the paranoid type check flag.
@@ -32,6 +33,16 @@ pub fn set_paranoid_type_checks(enable: bool) {
 /// Returns the paranoid type check flag if already set, and true otherwise.
 pub fn get_paranoid_type_checks() -> bool {
     PARANOID_TYPE_CHECKS.get().cloned().unwrap_or(true)
+}
+
+/// Set the paranoid reference check flag.
+pub fn set_paranoid_ref_checks(enable: bool) {
+    PARANOID_REF_CHECKS.set(enable).ok();
+}
+
+/// Returns the paranoid reference check flag if already set, and false otherwise.
+pub fn get_paranoid_ref_checks() -> bool {
+    PARANOID_REF_CHECKS.get().cloned().unwrap_or(false)
 }
 
 /// Set the timed feature override.
@@ -135,6 +146,7 @@ pub fn aptos_prod_vm_config(
     let check_invariant_in_swap_loc =
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
     let paranoid_type_checks = get_paranoid_type_checks();
+    let paranoid_ref_checks = get_paranoid_ref_checks();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(features);
@@ -157,6 +169,7 @@ pub fn aptos_prod_vm_config(
         verifier_config,
         deserializer_config,
         paranoid_type_checks,
+        paranoid_ref_checks,
         check_invariant_in_swap_loc,
         // Note: if updating, make sure the constant is in-sync.
         max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
