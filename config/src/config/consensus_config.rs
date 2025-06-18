@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
 const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
+const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 1000;
 const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
@@ -32,6 +33,7 @@ pub struct ConsensusConfig {
     pub max_network_channel_size: usize,
     pub max_sending_block_txns: u64,
     pub max_sending_block_txns_after_filtering: u64,
+    pub max_sending_opt_block_txns_after_filtering: u64,
     pub max_sending_block_bytes: u64,
     pub max_sending_inline_txns: u64,
     pub max_sending_inline_bytes: u64,
@@ -95,7 +97,8 @@ pub struct ConsensusConfig {
     pub max_pending_rounds_in_commit_vote_cache: u64,
     pub optimistic_sig_verification: bool,
     pub enable_round_timeout_msg: bool,
-    pub enable_pipeline: bool,
+    pub enable_optimistic_proposal_rx: bool,
+    pub enable_optimistic_proposal_tx: bool,
 }
 
 /// Deprecated
@@ -187,6 +190,7 @@ impl Default for ConsensusConfig {
             max_network_channel_size: 1024,
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
             max_sending_block_txns_after_filtering: MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            max_sending_opt_block_txns_after_filtering: MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING,
             max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
@@ -226,7 +230,7 @@ impl Default for ConsensusConfig {
                         min_block_time_ms_to_activate: 100,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Percentile(0.5),
-                        target_block_time_ms: 120,
+                        target_block_time_ms: 110,
                     },
                     min_calibrated_txns_per_block: 8,
                 }),
@@ -236,7 +240,7 @@ impl Default for ConsensusConfig {
                         min_block_time_ms_to_activate: 10,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Mean,
-                        target_block_time_ms: 120,
+                        target_block_time_ms: 110,
                     },
                     block_execution_overhead_ms: 10,
                     min_calibrated_block_gas_limit: 2000,
@@ -363,7 +367,8 @@ impl Default for ConsensusConfig {
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: true,
             enable_round_timeout_msg: true,
-            enable_pipeline: true,
+            enable_optimistic_proposal_rx: true,
+            enable_optimistic_proposal_tx: false,
         }
     }
 }

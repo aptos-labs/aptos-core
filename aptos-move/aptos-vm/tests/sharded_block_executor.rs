@@ -326,7 +326,7 @@ mod test_utils {
                 .into_iter()
                 .map(|t| t.into_txn())
                 .collect();
-        let txn_provider = DefaultTxnProvider::new(ordered_txns);
+        let txn_provider = DefaultTxnProvider::new_without_info(ordered_txns);
         let unsharded_txn_output = AptosVMBlockExecutor::new()
             .execute_block_no_limit(&txn_provider, &state_store)
             .unwrap();
@@ -377,7 +377,7 @@ mod test_utils {
             )
             .unwrap();
 
-        let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
+        let txn_provider = DefaultTxnProvider::new_without_info(execution_ordered_txns);
         let unsharded_txn_output = AptosVMBlockExecutor::new()
             .execute_block_no_limit(&txn_provider, &state_store)
             .unwrap();
@@ -432,7 +432,7 @@ mod test_utils {
             )
             .unwrap();
 
-        let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
+        let txn_provider = DefaultTxnProvider::new_without_info(execution_ordered_txns);
         let unsharded_txn_output = AptosVMBlockExecutor::new()
             .execute_block_no_limit(&txn_provider, &state_store)
             .unwrap();

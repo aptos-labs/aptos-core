@@ -255,41 +255,34 @@ impl ConsensusObserver {
             ))
         );
 
-        // If the new pipeline is enabled, build the pipeline for the ordered blocks
-        if self.pipeline_enabled() {
-            let block = ordered_block.first_block();
-            let get_parent_pipeline_futs = self
-                .observer_block_data
-                .lock()
-                .get_parent_pipeline_futs(&block, self.pipeline_builder());
+        let block = ordered_block.first_block();
+        let get_parent_pipeline_futs = self
+            .observer_block_data
+            .lock()
+            .get_parent_pipeline_futs(&block, self.pipeline_builder());
 
-            let mut parent_fut = if let Some(futs) = get_parent_pipeline_futs {
-                Some(futs)
-            } else {
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
-                        ordered_block.proof_block_info()
-                    ))
-                );
-                return;
-            };
+        let mut parent_fut = if let Some(futs) = get_parent_pipeline_futs {
+            Some(futs)
+        } else {
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                    ordered_block.proof_block_info()
+                ))
+            );
+            return;
+        };
 
-            for block in ordered_block.blocks() {
-                let commit_callback =
-                    block_data::create_commit_callback(self.observer_block_data.clone());
-                self.pipeline_builder().build(
-                    block,
-                    parent_fut.take().expect("future should be set"),
-                    commit_callback,
-                );
-                parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
-            }
+        for block in ordered_block.blocks() {
+            let commit_callback =
+                block_data::create_commit_callback(self.observer_block_data.clone());
+            self.pipeline_builder().build(
+                block,
+                parent_fut.take().expect("future should be set"),
+                commit_callback,
+            );
+            parent_fut = Some(block.pipeline_futs().expect("pipeline futures just built"));
         }
-
-        // Create the commit callback (to be called after the execution pipeline)
-        let commit_callback =
-            block_data::create_commit_callback_deprecated(self.observer_block_data.clone());
 
         // Send the ordered block to the execution pipeline
         if let Err(error) = self
@@ -297,7 +290,6 @@ impl ConsensusObserver {
             .finalize_order(
                 ordered_block.blocks().clone(),
                 WrappedLedgerInfo::new(VoteData::dummy(), ordered_block.ordered_proof().clone()),
-                commit_callback,
             )
             .await
         {
@@ -1086,12 +1078,9 @@ impl ConsensusObserver {
                 None,
                 rand_msg_rx,
                 0,
-                self.pipeline_enabled(),
             )
             .await;
-        if self.pipeline_enabled() {
-            self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer))
-        }
+        self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer));
     }
 
     /// Starts the consensus observer loop that processes incoming
@@ -1136,11 +1125,6 @@ impl ConsensusObserver {
         // Log the exit of the consensus observer loop
         error!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("The consensus observer loop exited unexpectedly!"));
-    }
-
-    /// Returns whether the pipeline is enabled
-    pub fn pipeline_enabled(&self) -> bool {
-        self.observer_epoch_state.pipeline_enabled()
     }
 
     /// Returns the builder, should only be called if pipeline is enabled

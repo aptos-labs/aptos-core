@@ -36,6 +36,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `disable_token`](#0x7_confidential_asset_disable_token)
 -  [Function `set_auditor`](#0x7_confidential_asset_set_auditor)
 -  [Function `has_confidential_asset_store`](#0x7_confidential_asset_has_confidential_asset_store)
+-  [Function `confidential_asset_controller_exists`](#0x7_confidential_asset_confidential_asset_controller_exists)
 -  [Function `is_token_allowed`](#0x7_confidential_asset_is_token_allowed)
 -  [Function `is_allow_list_enabled`](#0x7_confidential_asset_is_allow_list_enabled)
 -  [Function `pending_balance`](#0x7_confidential_asset_pending_balance)
@@ -45,6 +46,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `is_frozen`](#0x7_confidential_asset_is_frozen)
 -  [Function `get_auditor`](#0x7_confidential_asset_get_auditor)
 -  [Function `confidential_asset_balance`](#0x7_confidential_asset_confidential_asset_balance)
+-  [Function `get_pending_balance_transfer_count`](#0x7_confidential_asset_get_pending_balance_transfer_count)
 -  [Function `register_internal`](#0x7_confidential_asset_register_internal)
 -  [Function `deposit_to_internal`](#0x7_confidential_asset_deposit_to_internal)
 -  [Function `withdraw_to_internal`](#0x7_confidential_asset_withdraw_to_internal)
@@ -67,6 +69,7 @@ It enables private transfers by obfuscating token amounts while keeping sender a
 -  [Function `deserialize_auditor_eks`](#0x7_confidential_asset_deserialize_auditor_eks)
 -  [Function `deserialize_auditor_amounts`](#0x7_confidential_asset_deserialize_auditor_amounts)
 -  [Function `ensure_sufficient_fa`](#0x7_confidential_asset_ensure_sufficient_fa)
+-  [Function `init_module_for_genesis`](#0x7_confidential_asset_init_module_for_genesis)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -443,6 +446,26 @@ The confidential asset store has not been published for the given user-token pai
 
 
 
+<a id="0x7_confidential_asset_EFA_CONTROLLER_NOT_INSTALLED"></a>
+
+The confidential asset controller is not installed.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x7_confidential_asset_EFA_CONTROLLER_NOT_INSTALLED">EFA_CONTROLLER_NOT_INSTALLED</a>: u64 = 18;
+</code></pre>
+
+
+
+<a id="0x7_confidential_asset_EINIT_MODULE_FAILED"></a>
+
+[TEST-ONLY] The confidential asset module initialization failed.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>: u64 = 1000;
+</code></pre>
+
+
+
 <a id="0x7_confidential_asset_EINVALID_AUDITORS"></a>
 
 The provided auditors or auditor proofs are invalid.
@@ -549,6 +572,16 @@ The maximum number of transactions can be aggregated on the pending balance befo
 
 
 <pre><code><b>const</b> <a href="confidential_asset.md#0x7_confidential_asset_MAX_TRANSFERS_BEFORE_ROLLOVER">MAX_TRANSFERS_BEFORE_ROLLOVER</a>: u64 = 65534;
+</code></pre>
+
+
+
+<a id="0x7_confidential_asset_TESTNET_CHAIN_ID"></a>
+
+The testnet chain ID.
+
+
+<pre><code><b>const</b> <a href="confidential_asset.md#0x7_confidential_asset_TESTNET_CHAIN_ID">TESTNET_CHAIN_ID</a>: u8 = 2;
 </code></pre>
 
 
@@ -1304,6 +1337,32 @@ Checks if the user has a confidential asset store for the specified token.
 
 </details>
 
+<a id="0x7_confidential_asset_confidential_asset_controller_exists"></a>
+
+## Function `confidential_asset_controller_exists`
+
+Checks if the confidential asset controller is installed.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_confidential_asset_controller_exists">confidential_asset_controller_exists</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_confidential_asset_controller_exists">confidential_asset_controller_exists</a>(): bool {
+    <b>exists</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_confidential_asset_is_token_allowed"></a>
 
 ## Function `is_token_allowed`
@@ -1360,6 +1419,7 @@ Otherwise, all tokens are allowed.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_is_allow_list_enabled">is_allow_list_enabled</a>(): bool <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
+    <b>assert</b>!(<a href="confidential_asset.md#0x7_confidential_asset_confidential_asset_controller_exists">confidential_asset_controller_exists</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EFA_CONTROLLER_NOT_INSTALLED">EFA_CONTROLLER_NOT_INSTALLED</a>));
     <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).allow_list_enabled
 }
 </code></pre>
@@ -1578,6 +1638,34 @@ Returns the circulating supply of the confidential asset.
     <b>assert</b>!(<a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_fungible_store::primary_store_exists</a>(fa_store_address, token), <a href="confidential_asset.md#0x7_confidential_asset_EINTERNAL_ERROR">EINTERNAL_ERROR</a>);
 
     <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_balance">primary_fungible_store::balance</a>(fa_store_address, token)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_confidential_asset_get_pending_balance_transfer_count"></a>
+
+## Function `get_pending_balance_transfer_count`
+
+Returns the pending balance transfer count for the specified token.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_pending_balance_transfer_count">get_pending_balance_transfer_count</a>(user: <b>address</b>, token: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_pending_balance_transfer_count">get_pending_balance_transfer_count</a>(user: <b>address</b>, token: Object&lt;Metadata&gt;): u64 <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a> {
+    <b>assert</b>!(<a href="confidential_asset.md#0x7_confidential_asset_has_confidential_asset_store">has_confidential_asset_store</a>(user, token), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>));
+
+    <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>&gt;(<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)).pending_counter
 }
 </code></pre>
 
@@ -2477,6 +2565,33 @@ Returns <code>Some(Object&lt;Metadata&gt;)</code> if user has a suffucient amoun
     <a href="../../aptos-framework/doc/primary_fungible_store.md#0x1_primary_fungible_store_deposit">primary_fungible_store::deposit</a>(user, fa_amount);
 
     fa
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_confidential_asset_init_module_for_genesis"></a>
+
+## Function `init_module_for_genesis`
+
+
+
+<pre><code>entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_init_module_for_genesis">init_module_for_genesis</a>(deployer: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_init_module_for_genesis">init_module_for_genesis</a>(deployer: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(deployer) == @aptos_experimental, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>));
+    <b>assert</b>!(<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>() != <a href="confidential_asset.md#0x7_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>));
+    <b>assert</b>!(<a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>() != <a href="confidential_asset.md#0x7_confidential_asset_TESTNET_CHAIN_ID">TESTNET_CHAIN_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x7_confidential_asset_EINIT_MODULE_FAILED">EINIT_MODULE_FAILED</a>));
+    <a href="confidential_asset.md#0x7_confidential_asset_init_module">init_module</a>(deployer)
 }
 </code></pre>
 

@@ -11,6 +11,7 @@ use std::io::Write;
 pub mod acquires_checker;
 pub mod ast_simplifier;
 pub mod closure_checker;
+pub mod cmp_rewriter;
 pub mod cyclic_instantiation_checker;
 pub mod flow_insensitive_checkers;
 pub mod function_checker;

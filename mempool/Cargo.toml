@@ -31,6 +31,7 @@ aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-transactions-filter = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
 bcs = { workspace = true }
