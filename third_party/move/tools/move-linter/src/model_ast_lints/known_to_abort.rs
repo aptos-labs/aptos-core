@@ -33,6 +33,12 @@ const CAST_OVERFLOW_MSG: &str =
 #[derive(Default)]
 pub struct KnownToAbort;
 
+/// Attempts to compute a constant value from an expression tree involving
+/// arithmetic operations and constant integer values.
+///
+/// Currently handles expressions involving addition (`+`), multiplication (`*`),
+/// and constant integer values. This could be extended to include all numerical
+/// and bitwise operations.
 fn get_constant_value(args: &Vec<Exp>, op: &Operation) -> Option<BigInt> {
     let mut result = None;
     for arg in args {
