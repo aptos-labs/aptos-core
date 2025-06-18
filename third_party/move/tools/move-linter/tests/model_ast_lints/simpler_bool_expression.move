@@ -322,7 +322,7 @@ module 0xc0ffee::m {
         if (x || y) ();
     }
 
-    // ===== THE FOLLOWING TEST SHOULD NOT TRIGGER THE LINT, BUT IS INCLUDED FOR FUTURE REFERENCE =====
+    // ===== THE FOLLOWING TEST DOES NOT TRIGGER THE LINT, BUT IS INCLUDED FOR FUTURE REFERENCE =====
     // Detecting these patterns is not yet supported.
 
     public fun test_vector_no_lint() {
