@@ -471,7 +471,7 @@ impl Type {
                 return Ok(());
             }
         }
-        let msg = format!("Expected address type, got {}", self);
+        let msg = format!("Expected &signer type, got {}", self);
         paranoid_failure!(msg)
     }
 

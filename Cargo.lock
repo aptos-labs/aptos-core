@@ -12973,6 +12973,7 @@ dependencies = [
  "cfg-if",
  "claims",
  "fail",
+ "fxhash",
  "hashbrown 0.14.3",
  "hex",
  "lazy_static",

@@ -133,6 +133,7 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{
+        sub_status::unknown_invariant_violation,
         StatusCode::{ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED, OUT_OF_GAS},
         StatusType,
     },
@@ -2831,7 +2832,7 @@ impl AptosVM {
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                         if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE) =>
+                            == Some(unknown_invariant_violation::EPARANOID_FAILURE) =>
                             {
                                 error!(
                                 *log_context,
@@ -2843,11 +2844,23 @@ impl AptosVM {
                         // Paranoid mode failure but with reference counting
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                         if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
+                            == Some(unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
                             {
                                 error!(
                                 *log_context,
                                 "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(txn),
+                                vm_status,
+                            );
+                            },
+                        // Paranoid mode failure but with reference safety checks
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                        if vm_status.sub_status()
+                            == Some(unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE) =>
+                            {
+                                error!(
+                                *log_context,
+                                "[aptos_vm] Transaction breaking paranoid reference safety check. txn: {:?}, status: {:?}",
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );

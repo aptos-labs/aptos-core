@@ -183,18 +183,20 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    // For cross compilation, we need to always append the config name as a part of the outcome file suffix, as optimizations affect the generated code!
-    let vm_test_config = if config.cross_compile {
-        TestRunConfig::new(language_version, experiments).cross_compile_into(
+    let mut vm_test_config =
+        TestRunConfig::new(language_version, experiments).with_runtime_ref_checks();
+    // For cross compilation, we need to always append the config name as a part of the
+    // outcome file suffix, as optimizations affect the generated code.
+    if config.cross_compile {
+        vm_test_config = vm_test_config.cross_compile_into(
             SyntaxChoice::Source,
             true,
             exp_suffix
                 .clone()
                 .or_else(|| Some(format!("{}.exp", config.name))),
-        )
-    } else {
-        TestRunConfig::new(language_version, experiments)
-    };
+        );
+    }
+
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 
