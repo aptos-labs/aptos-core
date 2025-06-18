@@ -83,12 +83,28 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 "/lazy_loading/",
                 "/paranoid-tests/",
                 "/function_values_safety/",
+                "/runtime_ref_checks/",
             ],
+        },
+        // This config is used to test the runtime reference checker.
+        TestConfig {
+            name: "ref",
+            experiments: &[],
+            language_version: LanguageVersion::latest(),
+            // Verifier config is irrelevant here, because we disable verifier for these tests.
+            // Importantly, paranoid checks and runtime ref checks are enabled.
+            vm_config: vm_config_for_tests(
+                VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
+            )
+            .set_paranoid_ref_checks(true),
+            include: &["/runtime_ref_checks/"],
+            exclude: &[],
         },
     ]
 });
 
-/// VM configuration used for testing. By default, paranoid mode is always on.
+/// VM configuration used for testing.
+/// By default, paranoid mode is always on.
 fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
     VMConfig {
         paranoid_type_checks: true,
@@ -107,6 +123,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/function_values_safety/",
     "/module_publishing/",
     "/re_entrancy/",
+    "/runtime_ref_checks/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
