@@ -24,8 +24,8 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
+        Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion,
+        TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -197,6 +197,7 @@ trait ResourceState<T: Transaction> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -227,6 +228,7 @@ pub(crate) struct ParallelState<'a, T: Transaction> {
     scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
+    incarnation: Incarnation,
     pub(crate) captured_reads:
         RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
@@ -516,12 +518,14 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
+        incarnation: Incarnation,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
+            incarnation,
             captured_reads: RefCell::new(CapturedReads::new()),
         }
     }
@@ -592,6 +596,7 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -609,7 +614,15 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
         }
 
         loop {
-            match self.versioned_map.data().fetch_data(key, txn_idx) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .data()
+                    .fetch_data_v2(key, txn_idx, incarnation)
+            } else {
+                self.versioned_map.data().fetch_data(key, txn_idx)
+            };
+
+            match data {
                 Ok(Versioned(version, value)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
@@ -847,6 +860,7 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
     fn read_cached_data_by_kind(
         &self,
         _txn_idx: TxnIndex,
+        _incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -1024,6 +1038,13 @@ impl<T: Transaction> ViewState<'_, T> {
         match self {
             ViewState::Sync(state) => state,
             ViewState::Unsync(state) => state,
+        }
+    }
+
+    fn incarnation(&self) -> Incarnation {
+        match self {
+            ViewState::Sync(state) => state.incarnation,
+            ViewState::Unsync(_) => 0,
         }
     }
 }
@@ -1430,6 +1451,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
         let mut ret = state.read_cached_data_by_kind(
             self.txn_idx,
+            self.latest_view.incarnation(),
             state_key,
             kind,
             layout.clone(),
@@ -1447,6 +1469,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             // but need to fetch it from versioned_map again.
             ret = state.read_cached_data_by_kind(
                 self.txn_idx,
+                self.latest_view.incarnation(),
                 state_key,
                 kind,
                 layout.clone(),
@@ -1517,7 +1540,9 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
 {
     fn interrupt_requested(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Sync(state) => state
+                .scheduler
+                .interrupt_requested(self.txn_idx, state.incarnation),
             ViewState::Unsync(_) => false,
         }
     }
@@ -1676,10 +1701,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestV
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
+        true
     }
 }
 
@@ -2888,6 +2910,7 @@ mod test {
                         SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
                         self.start_counter,
                         &self.counter,
+                        0,
                     )),
                     1,
                 );

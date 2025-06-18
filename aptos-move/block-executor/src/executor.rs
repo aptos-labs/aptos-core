@@ -16,6 +16,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
+    scheduler_v2::{AbortManager, SchedulerV2, TaskKind},
     scheduler_wrapper::SchedulerWrapper,
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -76,6 +77,24 @@ use std::{
         Arc,
     },
 };
+
+struct SharedSyncParams<'a, T, E, S>
+where
+    T: BlockExecutableTransaction,
+    E: ExecutorTask<Txn = T>,
+    S: TStateView<Key = T::Key> + Sync,
+{
+    // TODO: should not need to pass base view.
+    base_view: &'a S,
+    scheduler: &'a SchedulerV2,
+    versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    global_module_cache:
+        &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
+    delayed_field_id_counter: &'a AtomicU32,
+    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'a, T, S>>,
+    final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
+}
 
 pub struct BlockExecutor<T, E, S, L, TP> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -141,6 +160,95 @@ where
                 )))
             },
         }
+    }
+
+    fn execute_v2(
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
+        signature_verified_block: &TP,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        executor: &E,
+        base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        runtime_environment: &RuntimeEnvironment,
+        parallel_state: ParallelState<T>,
+        scheduler: &SchedulerV2,
+    ) -> Result<(), PanicError> {
+        let _timer = TASK_EXECUTE_SECONDS.start_timer();
+
+        // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
+        let txn = signature_verified_block.get_txn(idx_to_execute);
+
+        let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
+        let sync_view = LatestView::new(
+            base_view,
+            global_module_cache,
+            runtime_environment,
+            ViewState::Sync(parallel_state),
+            idx_to_execute,
+        );
+        let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+
+        let mut prev_modified_resource_keys = last_input_output
+            .modified_resource_keys(idx_to_execute)
+            .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
+        let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
+            .modified_group_keys(idx_to_execute)
+            .into_iter()
+            .collect();
+        let mut read_set = sync_view.take_parallel_reads();
+        if read_set.is_incorrect_use() {
+            return Err(code_invariant_error(format!(
+                "Incorrect use detected in CapturedReads after executing txn = {idx_to_execute} incarnation = {incarnation}"
+            )));
+        }
+
+        let maybe_output =
+            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+
+        // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
+        let mut resource_write_set = Vec::new();
+        if let Some(output) = maybe_output {
+            resource_write_set = output.resource_write_set();
+            for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
+                prev_modified_resource_keys.remove(&key);
+                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
+                    key,
+                    idx_to_execute,
+                    incarnation,
+                    value,
+                    maybe_layout,
+                ))?;
+            }
+            // TODO(BlockSTMv2): handle groups, delayed fields and aggregator v1.
+        }
+
+        // Remove entries from previous write/delta set that were not overwritten.
+        for key in prev_modified_resource_keys {
+            abort_manager.invalidate_dependencies(
+                versioned_cache
+                    .data()
+                    .remove_v2::<_, false>(&key, idx_to_execute),
+            )?;
+        }
+
+        last_input_output.record(
+            idx_to_execute,
+            read_set,
+            execution_result,
+            resource_write_set,
+            // TODO(BlockSTMv2): handle groups.
+            vec![],
+        );
+
+        scheduler.finish_execution(abort_manager)?;
+        Ok(())
     }
 
     fn execute(
@@ -498,7 +606,7 @@ where
         scheduler: SchedulerWrapper,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -513,7 +621,7 @@ where
         block: &TP,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        let block_limit_processor = &mut shared_commit_state.acquire();
+        let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
         if !Self::validate_and_commit_delayed_fields(
@@ -530,6 +638,7 @@ where
                 scheduler,
                 start_shared_counter,
                 shared_counter,
+                incarnation + 1,
             );
 
             Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
@@ -773,6 +882,9 @@ where
             scheduler,
             start_shared_counter,
             shared_counter,
+            0,
+            // Incarnation does not matter here (no re-execution & interrupts)
+            // TODO(BlockSTMv2): we could still provide the latest incarnation.
         );
         let latest_view = LatestView::new(
             base_view,
@@ -887,7 +999,7 @@ where
         skip_module_reads_validation: &AtomicBool,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
         num_txns_materialized: &AtomicU32,
@@ -957,7 +1069,7 @@ where
                             block_id,
                             block,
                             outputs.dereference(),
-                            shared_commit_state.acquire().get_block_end_info(),
+                            block_limit_processor.acquire().get_block_end_info(),
                             environment.features(),
                         );
                         outputs.dereference_mut().push(E::Output::skip_output()); // placeholder
@@ -976,6 +1088,7 @@ where
                                 scheduler_wrapper,
                                 start_shared_counter,
                                 shared_counter,
+                                0,
                             ),
                         ) != Ok(false)
                         {
@@ -1036,7 +1149,7 @@ where
                         scheduler_wrapper,
                         versioned_cache,
                         last_input_output,
-                        shared_commit_state,
+                        block_limit_processor,
                         base_view,
                         global_module_cache,
                         runtime_environment,
@@ -1091,6 +1204,7 @@ where
                             scheduler_wrapper,
                             start_shared_counter,
                             shared_counter,
+                            incarnation,
                         ),
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
@@ -1115,6 +1229,234 @@ where
                 },
             }
         }
+    }
+
+    fn worker_loop_v2(
+        &self,
+        block: &TP,
+        environment: &AptosEnvironment,
+        // TODO: use worker id.
+        _worker_id: u32,
+        num_workers: u32,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        start_delayed_field_id_counter: u32,
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        let num_txns = block.num_txns() as u32;
+        let executor = {
+            let _init_timer = VM_INIT_SECONDS.start_timer();
+            E::init(&environment.clone(), shared_sync_params.base_view)
+        };
+
+        let _work_with_task_timer = WORK_WITH_TASK_SECONDS.start_timer();
+
+        // Shared environment used by each executor.
+        let runtime_environment = environment.runtime_environment();
+
+        let scheduler = shared_sync_params.scheduler;
+        let base_view = shared_sync_params.base_view;
+        let last_input_output = shared_sync_params.last_input_output;
+        let versioned_cache = shared_sync_params.versioned_cache;
+        let global_module_cache = shared_sync_params.global_module_cache;
+        let delayed_field_id_counter = shared_sync_params.delayed_field_id_counter;
+        let scheduler_wrapper = SchedulerWrapper::V2(scheduler);
+
+        loop {
+            while scheduler.commit_hooks_try_lock() {
+                // Perform sequential commit hooks.
+                while let Some((txn_idx, incarnation)) = scheduler.start_commit()? {
+                    self.prepare_and_queue_commit_ready_txn(
+                        txn_idx,
+                        incarnation,
+                        num_txns,
+                        &self.config.onchain.block_gas_limit_type,
+                        scheduler_wrapper,
+                        versioned_cache,
+                        last_input_output,
+                        shared_sync_params.block_limit_processor,
+                        base_view,
+                        global_module_cache,
+                        runtime_environment,
+                        start_delayed_field_id_counter,
+                        delayed_field_id_counter,
+                        &executor,
+                        block,
+                        num_workers as usize,
+                    )?;
+                }
+
+                scheduler.commit_hooks_unlock();
+            }
+
+            // TODO(BlockSTMv2): pass worker_id to next_task.
+            match scheduler.next_task()? {
+                TaskKind::Execute(txn_idx, incarnation) => {
+                    if incarnation > num_workers.pow(2) + num_txns + 10 {
+                        // Something is wrong if we observe high incarnations (e.g. a bug
+                        // might manifest as an execution-invalidation cycle). Break out
+                        // to fallback to sequential execution.
+                        error!("Observed incarnation {} of txn {txn_idx}", incarnation);
+                        return Err(PanicOr::Or(ParallelBlockExecutionError::IncarnationTooHigh));
+                    }
+
+                    Self::execute_v2(
+                        txn_idx,
+                        incarnation,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        &executor,
+                        base_view,
+                        shared_sync_params.global_module_cache,
+                        runtime_environment,
+                        ParallelState::new(
+                            versioned_cache,
+                            scheduler_wrapper,
+                            start_delayed_field_id_counter,
+                            delayed_field_id_counter,
+                            incarnation,
+                        ),
+                        scheduler,
+                    )?;
+                },
+                TaskKind::PostCommitProcessing(txn_idx) => {
+                    self.materialize_txn_commit(
+                        txn_idx,
+                        versioned_cache,
+                        scheduler_wrapper,
+                        num_txns as u32,
+                        start_delayed_field_id_counter,
+                        delayed_field_id_counter,
+                        last_input_output,
+                        base_view,
+                        shared_sync_params.global_module_cache,
+                        runtime_environment,
+                        shared_sync_params.final_results,
+                    )?;
+                },
+                TaskKind::NextTask => {
+                    // TODO: Anything intelligent to do here?.
+                },
+                TaskKind::Done => {
+                    break;
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn execute_transactions_parallel_v2(
+        &self,
+        signature_verified_block: &TP,
+        base_view: &S,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<E::Output>, ()> {
+        let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
+        // Using parallel execution with 1 thread currently will not work as it
+        // will only have a coordinator role but no workers for rolling commit.
+        // Need to special case no roles (commit hook by thread itself) to run
+        // w. concurrency_level = 1 for some reason.
+        assert!(
+            self.config.local.concurrency_level > 1,
+            "Must use sequential execution"
+        );
+
+        let num_txns = signature_verified_block.num_txns();
+        if num_txns == 0 {
+            return Ok(BlockOutput::new(vec![], None));
+        }
+        let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
+        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
+        {
+            final_results
+                .acquire()
+                .resize_with(num_txns, E::Output::skip_output);
+        }
+        let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
+            base_view,
+            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
+            num_txns,
+        ));
+        let num_txns = num_txns as u32;
+
+        let start_delayed_field_id_counter = gen_id_start_value(false);
+        let delayed_field_id_counter = AtomicU32::new(start_delayed_field_id_counter);
+
+        let shared_maybe_error = AtomicBool::new(false);
+        let last_input_output = TxnLastInputOutput::new(num_txns);
+        let mut versioned_cache = MVHashMap::new();
+        let scheduler = SchedulerV2::new(num_txns, num_workers);
+
+        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+            base_view,
+            scheduler: &scheduler,
+            versioned_cache: &versioned_cache,
+            global_module_cache: module_cache_manager_guard.module_cache(),
+            last_input_output: &last_input_output,
+            delayed_field_id_counter: &delayed_field_id_counter,
+            block_limit_processor: &block_limit_processor,
+            final_results: &final_results,
+        };
+        let worker_ids: Vec<u32> = (0..num_workers).collect();
+
+        let timer = RAYON_EXECUTION_SECONDS.start_timer();
+        self.executor_thread_pool.scope(|s| {
+            for worker_id in &worker_ids {
+                s.spawn(|_| {
+                    if let Err(err) = self.worker_loop_v2(
+                        signature_verified_block,
+                        module_cache_manager_guard.environment(),
+                        *worker_id,
+                        num_workers,
+                        &shared_sync_params,
+                        start_delayed_field_id_counter,
+                    ) {
+                        // If there are multiple errors, they all get logged: FatalVMError is
+                        // logged at construction, below we log CodeInvariantErrors.
+                        if let PanicOr::CodeInvariantError(err_msg) = err {
+                            alert!(
+                                "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
+                                err_msg
+                            );
+                        }
+                        shared_maybe_error.store(true, Ordering::SeqCst);
+
+                        // Make sure to halt the scheduler if it hasn't already been halted.
+                        scheduler.halt();
+                    }
+                });
+            }
+        });
+        drop(timer);
+
+        if !shared_maybe_error.load(Ordering::SeqCst)
+            && !scheduler.post_commit_processing_queue_is_empty()
+        {
+            // No error is recorded, parallel execution workers are done, but there is still
+            // a post commit processing task remaining. Commit tasks must be drained before workers
+            // exit, hence we log an error and fallback to sequential execution.
+            alert!("[BlockSTMv2] error: commit tasks not drained after parallel execution");
+
+            shared_maybe_error.store(true, Ordering::Relaxed);
+        }
+
+        counters::update_state_counters(versioned_cache.stats(), true);
+        module_cache_manager_guard
+            .module_cache_mut()
+            .insert_verified(versioned_cache.take_modules_iter())
+            .map_err(|err| {
+                alert!("[BlockSTM] Encountered panic error: {:?}", err);
+            })?;
+
+        // Explicit async drops.
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+
+        // TODO(BlockSTMv2): handle block epilogue txn and add block_end_info.
+        (!shared_maybe_error.load(Ordering::SeqCst))
+            .then(|| BlockOutput::new(final_results.into_inner(), None))
+            .ok_or(())
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -1145,7 +1487,7 @@ where
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
-        let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
+        let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
@@ -1188,7 +1530,7 @@ where
                         &skip_module_reads_validation,
                         start_shared_counter,
                         &shared_counter,
-                        &shared_commit_state,
+                        &block_limit_processor,
                         &final_results,
                         &block_epilogue_txn,
                         &num_txns_materialized,

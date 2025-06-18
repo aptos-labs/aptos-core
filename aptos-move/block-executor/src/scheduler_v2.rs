@@ -79,7 +79,7 @@ Interaction with Other Components:
     consumes the `AbortManager` to finalize these aborts and update dependencies.
 -   **Worker Threads**: Continuously request tasks from `SchedulerV2` via `[SchedulerV2::next_task]`.
     They execute these tasks and report results (e.g., via `[SchedulerV2::finish_execution]`,
-    `[SchedulerV2::commit_hook_performed]`).
+    `[SchedulerV2::end_commit]`).
 
 Conceptual Execution Model:
 --------------------------

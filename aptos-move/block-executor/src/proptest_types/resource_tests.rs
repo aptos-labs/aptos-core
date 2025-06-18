@@ -104,6 +104,7 @@ pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
     txn_provider: &Provider,
     data_view: &ViewType,
     all_module_ids: Option<&[ModuleId]>,
+    block_stm_v2: bool,
 ) -> Result<BlockOutput<MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
 where
     TxnType: Transaction<Key = KeyType<[u8; 32]>> + Debug + Clone + Send + Sync + 'static,
@@ -120,19 +121,30 @@ where
 
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), block_gas_limit);
 
-    BlockExecutor::<
-        TxnType,
-        MockTask<KeyType<[u8; 32]>, MockEvent>,
-        ViewType,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
-        Provider,
-    >::new(config, executor_thread_pool, None)
-    .execute_transactions_parallel(
-        txn_provider,
-        data_view,
-        &TransactionSliceMetadata::unknown(),
-        &mut guard,
-    )
+    if block_stm_v2 {
+        BlockExecutor::<
+            TxnType,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            ViewType,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+            Provider,
+        >::new(config, executor_thread_pool, None)
+        .execute_transactions_parallel_v2(txn_provider, data_view, &mut guard)
+    } else {
+        BlockExecutor::<
+            TxnType,
+            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            ViewType,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+            Provider,
+        >::new(config, executor_thread_pool, None)
+        .execute_transactions_parallel(
+            txn_provider,
+            data_view,
+            &TransactionSliceMetadata::unknown(),
+            &mut guard,
+        )
+    }
 }
 
 pub(crate) fn generate_universe_and_transactions(
@@ -221,20 +233,23 @@ pub(crate) fn run_transactions_resources(
             let txn_provider = DefaultTxnProvider::new_without_info(transactions);
             let state_view = MockStateView::empty();
             for _ in 0..num_executions {
-                let output = execute_block_parallel::<
-                    MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-                    MockStateView<KeyType<[u8; 32]>>,
-                    DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-                >(
-                    executor_thread_pool.clone(),
-                    maybe_block_gas_limit,
-                    &txn_provider,
-                    &state_view,
-                    None,
-                );
+                for block_stm_v2 in [false, true] {
+                    let output = execute_block_parallel::<
+                        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                        MockStateView<KeyType<[u8; 32]>>,
+                        DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                    >(
+                        executor_thread_pool.clone(),
+                        maybe_block_gas_limit,
+                        &txn_provider,
+                        &state_view,
+                        None,
+                        block_stm_v2,
+                    );
 
-                BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
-                    .assert_parallel_output(&output);
+                    BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
+                        .assert_parallel_output(&output);
+                }
             }
         }
     }
