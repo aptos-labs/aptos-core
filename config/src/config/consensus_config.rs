@@ -370,7 +370,7 @@ impl Default for ConsensusConfig {
             enable_round_timeout_msg: true,
             enable_pipeline: true,
             enable_optimistic_proposal_rx: true,
-            enable_optimistic_proposal_tx: true,
+            enable_optimistic_proposal_tx: false,
         }
     }
 }
