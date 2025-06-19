@@ -4765,7 +4765,6 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
- "aptos-infallible",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",

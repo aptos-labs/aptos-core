@@ -252,8 +252,9 @@ where
                     HashSet::new(),
                 )
                 .unwrap();
+            let tags_5: Vec<usize> = vec![5];
             map.group_data()
-                .mark_estimate(&key, idx, &[5usize].into_iter().collect());
+                .mark_estimate(&key, idx, tags_5.iter().collect());
         } else {
             map.data().write(key.clone(), idx, 0, Arc::new(value), None);
             map.data().mark_estimate(&key, idx);

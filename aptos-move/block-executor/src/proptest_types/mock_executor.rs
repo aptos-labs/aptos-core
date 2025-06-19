@@ -753,13 +753,24 @@ where
 
     fn resource_group_write_set(
         &self,
-    ) -> Vec<(
-        K,
-        ValueType,
-        ResourceGroupSize,
-        BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
-    )> {
-        self.group_writes.clone()
+    ) -> impl Iterator<
+        Item = (
+            K,
+            ValueType,
+            ResourceGroupSize,
+            BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+        ),
+    > {
+        self.group_writes.clone().into_iter()
+    }
+
+    fn resource_group_key_and_tags_ref(&self) -> impl Iterator<Item = (&K, HashSet<&u32>)> {
+        self.group_writes
+            .iter()
+            .map(|(group_key, _, _, group_ops)| {
+                let tags = group_ops.iter().map(|(tag, _)| tag).collect();
+                (group_key, tags)
+            })
     }
 
     fn skip_output() -> Self {
@@ -787,7 +798,7 @@ where
         HashSet::new()
     }
 
-    fn materialize_agg_v1(
+    fn legacy_sequential_materialize_agg_v1(
         &self,
         _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
     ) {

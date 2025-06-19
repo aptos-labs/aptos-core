@@ -1005,12 +1005,12 @@ mod tests {
                 // Test all combinations of value/metadata/layout comparison parameters
                 for same_value in [true, false] {
                     for same_metadata in [true, false] {
-                        for same_layout in [true, false] {
+                        for no_layouts in [true, false] {
                             let mut v = VersionedValue::<TestValueWithMetadata>::default();
 
                             // Setup: Create a write with value 10, metadata 100 and one dependency
                             let deps = BTreeSet::from([(1, 0)]);
-                            let layout = if same_layout { None } else { Some(Arc::new(MoveTypeLayout::Bool)) };
+                            let layout = if no_layouts { None } else { Some(Arc::new(MoveTypeLayout::Bool)) };
                             v.versioned_map.insert(
                                 ShiftedTxnIndex::new(0),
                                 CachePadded::new(new_write_entry(0, ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), layout), deps)),
@@ -1026,7 +1026,7 @@ mod tests {
                             let expected_validation = if $only_compare_metadata {
                                 same_metadata
                             } else {
-                                same_value && same_metadata && same_layout
+                                same_value && same_metadata && no_layouts
                             };
 
                             // Test split_off_affected_read_dependencies
@@ -1040,14 +1040,14 @@ mod tests {
                             assert_eq!(
                                 validation_passed,
                                 expected_validation,
-                                "Validation failed for same_value={}, same_metadata={}, only_compare_metadata={}, same_layout={}",
-                                same_value, same_metadata, $only_compare_metadata, same_layout
+                                "Validation failed for same_value={}, same_metadata={}, only_compare_metadata={}, no_layouts={}",
+                                same_value, same_metadata, $only_compare_metadata, no_layouts
                             );
                             assert_eq!(
                                 deps,
                                 BTreeSet::from([(1, 0)]),
-                                "Dependencies don't match for same_value={}, same_metadata={}, only_compare_metadata={}, same_layout={}",
-                                same_value, same_metadata, $only_compare_metadata, same_layout
+                                "Dependencies don't match for same_value={}, same_metadata={}, only_compare_metadata={}, no_layouts={}",
+                                same_value, same_metadata, $only_compare_metadata, no_layouts
                             );
 
                             // Test handle_removed_dependencies
@@ -1076,6 +1076,67 @@ mod tests {
         // Test both cases
         test_metadata_layout_case!(true);
         test_metadata_layout_case!(false);
+    }
+
+    #[test]
+    fn test_same_layout_validation_fails() {
+        let mut v = VersionedValue::<TestValueWithMetadata>::default();
+
+        // Setup: Create a write with value 10, metadata 100 and layout Some(Bool)
+        let deps = BTreeSet::from([(1, 0)]);
+        let layout = Some(Arc::new(MoveTypeLayout::Bool));
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(0),
+            CachePadded::new(new_write_entry(
+                0,
+                ValueWithLayout::Exchanged(
+                    Arc::new(TestValueWithMetadata::new(10, 100)),
+                    layout.clone(),
+                ),
+                deps,
+            )),
+        );
+
+        // Create test value with same value, metadata, and layout
+        let test_value = TestValueWithMetadata::new(10, 100);
+
+        // Test split_off_affected_read_dependencies with ONLY_COMPARE_METADATA = false
+        let (deps, validation_passed) = v.split_off_affected_read_dependencies::<false>(
+            0,
+            &Arc::new(test_value.clone()),
+            &layout,
+        );
+
+        // Validation should fail because both layouts are Some, even though they're identical
+        assert!(
+            !validation_passed,
+            "Validation should fail when both layouts are Some, even if identical"
+        );
+        assert_eq!(
+            deps,
+            BTreeSet::from([(1, 0)]),
+            "Dependencies should be returned"
+        );
+
+        // Test handle_removed_dependencies
+        let remaining_deps = v.handle_removed_dependencies::<false>(
+            1,
+            BTreeSet::from([(2, 0)]),
+            &Arc::new(test_value),
+            &layout,
+        );
+
+        assert_eq!(
+            remaining_deps,
+            BTreeSet::from([(2, 0)]),
+            "Dependencies should be returned when validation fails"
+        );
+        // Verify that dependencies are empty in 0-th entry (invalidated)
+        assert_eq!(
+            get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()).len(),
+            0,
+            "Dependencies should be cleared when validation fails"
+        );
     }
 
     #[test]
