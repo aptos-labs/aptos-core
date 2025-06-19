@@ -137,17 +137,26 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn resource_group_write_set(
         &self,
+    ) -> impl Iterator<
+        Item = (
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+            ResourceGroupSize,
+            BTreeMap<
+                <Self::Txn as Transaction>::Tag,
+                (
+                    <Self::Txn as Transaction>::Value,
+                    Option<Arc<MoveTypeLayout>>,
+                ),
+            >,
+        ),
+    >;
+
+    fn resource_group_key_and_tags_ref(
+        &self,
     ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-        ResourceGroupSize,
-        BTreeMap<
-            <Self::Txn as Transaction>::Tag,
-            (
-                <Self::Txn as Transaction>::Value,
-                Option<Arc<MoveTypeLayout>>,
-            ),
-        >,
+        &<Self::Txn as Transaction>::Key,
+        HashSet<&<Self::Txn as Transaction>::Tag>,
     )>;
 
     fn resource_group_metadata_ops(
@@ -157,7 +166,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         <Self::Txn as Transaction>::Value,
     )> {
         self.resource_group_write_set()
-            .into_iter()
             .map(|(key, op, _, _)| (key, op))
             .collect()
     }
