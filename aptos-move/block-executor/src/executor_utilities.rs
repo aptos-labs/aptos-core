@@ -146,7 +146,7 @@ pub(crate) fn serialize_groups<T: Transaction>(
                         {
                             alert!(
                                 "Serialized resource group size mismatch key = {:?} num items {}, \
-				 len {} recorded size {}, op {:?}",
+                                len {} recorded size {}, op {:?}",
                                 group_key,
                                 btree.len(),
                                 group_bytes.len(),
