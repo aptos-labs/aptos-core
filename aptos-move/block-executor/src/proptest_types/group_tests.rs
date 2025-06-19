@@ -56,22 +56,24 @@ pub(crate) fn run_tests_with_groups(
 
     // Run parallel execution tests
     for maybe_block_gas_limit in gas_limits {
-        for _ in 0..num_executions_parallel {
-            let output = execute_block_parallel::<
-                MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-                NonEmptyGroupDataView<KeyType<[u8; 32]>>,
-                DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-            >(
-                executor_thread_pool.clone(),
-                maybe_block_gas_limit,
-                &txn_provider,
-                data_view,
-                None,
-                false,
-            );
+        for block_stm_v2 in [false, true] {
+            for _ in 0..num_executions_parallel {
+                let output = execute_block_parallel::<
+                    MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                    NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+                    DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                >(
+                    executor_thread_pool.clone(),
+                    maybe_block_gas_limit,
+                    &txn_provider,
+                    data_view,
+                    None,
+                    block_stm_v2,
+                );
 
-            BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
-                .assert_parallel_output(&output);
+                BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
+                    .assert_parallel_output(&output);
+            }
         }
     }
 
