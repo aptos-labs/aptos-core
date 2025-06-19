@@ -137,6 +137,8 @@ return true.
 -  [Function `supra_automation_payload_gas_check_enabled`](#0x1_features_supra_automation_payload_gas_check_enabled)
 -  [Function `get_supra_private_poll_feature`](#0x1_features_get_supra_private_poll_feature)
 -  [Function `supra_private_poll_enabled`](#0x1_features_supra_private_poll_enabled)
+-  [Function `get_supra_automation_task_sync_feature`](#0x1_features_get_supra_automation_task_sync_feature)
+-  [Function `supra_automation_task_sync_enabled`](#0x1_features_supra_automation_task_sync_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -883,6 +885,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK">SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK</a>: u64 = 90;
+</code></pre>
+
+
+
+<a id="0x1_features_SUPRA_AUTOMATION_TASK_SYNC"></a>
+
+Whether the automation task sync on block basis is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SUPRA_AUTOMATION_TASK_SYNC">SUPRA_AUTOMATION_TASK_SYNC</a>: u64 = 92;
 </code></pre>
 
 
@@ -3476,6 +3490,54 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_private_poll_enabled">supra_private_poll_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PRIVATE_POLL">PRIVATE_POLL</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_supra_automation_task_sync_feature"></a>
+
+## Function `get_supra_automation_task_sync_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_automation_task_sync_feature">get_supra_automation_task_sync_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_supra_automation_task_sync_feature">get_supra_automation_task_sync_feature</a>(): u64 {
+    <a href="features.md#0x1_features_SUPRA_AUTOMATION_TASK_SYNC">SUPRA_AUTOMATION_TASK_SYNC</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_supra_automation_task_sync_enabled"></a>
+
+## Function `supra_automation_task_sync_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_automation_task_sync_enabled">supra_automation_task_sync_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_supra_automation_task_sync_enabled">supra_automation_task_sync_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SUPRA_AUTOMATION_TASK_SYNC">SUPRA_AUTOMATION_TASK_SYNC</a>)
 }
 </code></pre>
 

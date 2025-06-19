@@ -714,6 +714,19 @@ module std::features {
         is_enabled(PRIVATE_POLL)
     }
 
+    /// Whether the automation task sync on block basis is enabled.
+    ///
+    /// Lifetime: transient
+    const SUPRA_AUTOMATION_TASK_SYNC: u64 = 92;
+
+    public fun get_supra_automation_task_sync_feature(): u64 {
+        SUPRA_AUTOMATION_TASK_SYNC
+    }
+
+    public fun supra_automation_task_sync_enabled(): bool acquires Features {
+        is_enabled(SUPRA_AUTOMATION_TASK_SYNC)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
