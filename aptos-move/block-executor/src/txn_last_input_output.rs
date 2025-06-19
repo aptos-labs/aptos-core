@@ -246,7 +246,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
-    pub(crate) fn modified_group_keys(&self, txn_idx: TxnIndex) -> Vec<(T::Key, HashSet<T::Tag>)> {
+    pub(crate) fn take_modified_group_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Vec<(T::Key, HashSet<T::Tag>)> {
         std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
     }
 

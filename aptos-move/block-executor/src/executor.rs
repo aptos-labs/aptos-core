@@ -198,6 +198,10 @@ where
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
+        let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
+            .take_modified_group_keys(idx_to_execute)
+            .into_iter()
+            .collect();
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
@@ -209,8 +213,38 @@ where
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
-        let mut resource_write_set = Vec::new();
+        let mut resource_write_set = vec![];
+        let mut group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = vec![];
         if let Some(output) = maybe_output {
+            let group_output = output.resource_group_write_set();
+            group_keys_and_tags = group_output
+                .iter()
+                .map(|(key, _, _, ops)| {
+                    let tags = ops.iter().map(|(tag, _)| tag.clone()).collect();
+                    (key.clone(), tags)
+                })
+                .collect();
+            for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
+                let prev_tags = prev_modified_group_keys
+                    .remove(&group_key)
+                    .unwrap_or_default();
+                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<true>(
+                    group_key.clone(),
+                    idx_to_execute,
+                    incarnation,
+                    Arc::new(group_metadata_op),
+                    None,
+                ))?;
+                abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
+                    group_key,
+                    idx_to_execute,
+                    incarnation,
+                    group_ops.into_iter(),
+                    group_size,
+                    prev_tags,
+                )?)?;
+            }
+
             resource_write_set = output.resource_write_set();
             for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
                 prev_modified_resource_keys.remove(&key);
@@ -222,7 +256,7 @@ where
                     maybe_layout,
                 ))?;
             }
-            // TODO(BlockSTMv2): handle groups, delayed fields and aggregator v1.
+            // TODO(BlockSTMv2): delayed fields and aggregator v1.
         }
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -233,14 +267,25 @@ where
                     .remove_v2::<_, false>(&key, idx_to_execute),
             )?;
         }
+        for (key, tags) in prev_modified_group_keys {
+            abort_manager.invalidate_dependencies(
+                versioned_cache
+                    .data()
+                    .remove_v2::<_, true>(&key, idx_to_execute),
+            )?;
+            abort_manager.invalidate_dependencies(versioned_cache.group_data().remove_v2(
+                &key,
+                idx_to_execute,
+                tags,
+            )?)?;
+        }
 
         last_input_output.record(
             idx_to_execute,
             read_set,
             execution_result,
             resource_write_set,
-            // TODO(BlockSTMv2): handle groups.
-            vec![],
+            group_keys_and_tags,
         );
 
         scheduler.finish_execution(abort_manager)?;
@@ -280,7 +325,7 @@ where
             .modified_resource_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
         let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
-            .modified_group_keys(idx_to_execute)
+            .take_modified_group_keys(idx_to_execute)
             .into_iter()
             .collect();
         let mut prev_modified_delayed_fields = last_input_output
@@ -1362,6 +1407,7 @@ where
         if num_txns == 0 {
             return Ok(BlockOutput::new(vec![], None));
         }
+
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
         {
@@ -1482,7 +1528,6 @@ where
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
-
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             base_view,
             self.config.onchain.block_gas_limit_type.clone(),
