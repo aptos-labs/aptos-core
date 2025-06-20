@@ -186,7 +186,7 @@ pub static TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
-pub fn update_batch_statics(block: &Block) {
+pub fn update_batch_stats(block: &Block) {
     let (proof_num, proof_txn_num, proof_txn_bytes) = block.proof_stats();
     BATCH_NUM_PER_BLOCK
         .with_label_values(&["proof"])

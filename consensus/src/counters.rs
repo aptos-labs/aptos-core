@@ -1303,7 +1303,7 @@ pub fn update_counters_for_block(block: &Block) {
     if failed_rounds > 0 {
         COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
     }
-    quorum_store::counters::update_batch_statics(block);
+    quorum_store::counters::update_batch_stats(block);
 }
 
 pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
