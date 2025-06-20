@@ -48,6 +48,7 @@ use aptos_consensus_types::{
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     utils::PayloadTxnsSize,
     vote_msg::VoteMsg,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -330,6 +331,13 @@ impl NodeSetup {
             Arc::new(Mutex::new(PendingBlocks::new())),
             None,
         ));
+        let block_store_clone = Arc::clone(&block_store);
+        let callback = Box::new(
+            move |block_id: HashValue, block_round: Round, commit_proof: WrappedLedgerInfo| {
+                block_store_clone.commit_callback(block_id, block_round, commit_proof, None)
+            },
+        );
+        mock_execution_client.set_callback(callback);
 
         let proposer_election = Self::create_proposer_election(proposers.clone());
         let proposal_generator = ProposalGenerator::new(

@@ -13,7 +13,6 @@ use crate::{
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
-    state_replication::StateComputer,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
@@ -30,11 +29,9 @@ use std::sync::{
 #[allow(clippy::too_many_arguments)]
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
-    execution_proxy: Arc<dyn StateComputer>,
     safety_rules: Arc<dyn CommitSignerProvider>,
     commit_msg_tx: NetworkSender,
     commit_msg_rx: Receiver<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
-    persisting_proxy: Arc<dyn StateComputer>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
@@ -45,7 +42,6 @@ pub fn prepare_phases_and_buffer_manager(
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     max_pending_rounds_in_commit_vote_cache: u64,
-    new_pipeline_enabled: bool,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -61,7 +57,7 @@ pub fn prepare_phases_and_buffer_manager(
         create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
         create_channel::<ExecutionWaitRequest>();
-    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy);
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new();
     let execution_schedule_phase = PipelinePhase::new(
         execution_schedule_phase_request_rx,
         Some(execution_schedule_phase_response_tx),
@@ -101,7 +97,7 @@ pub fn prepare_phases_and_buffer_manager(
     let (persisting_phase_response_tx, persisting_phase_response_rx) = create_channel();
     let commit_msg_tx = Arc::new(commit_msg_tx);
 
-    let persisting_phase_processor = PersistingPhase::new(persisting_proxy, commit_msg_tx.clone());
+    let persisting_phase_processor = PersistingPhase::new(commit_msg_tx.clone());
     let persisting_phase = PipelinePhase::new(
         persisting_phase_request_rx,
         Some(persisting_phase_response_tx),
@@ -138,7 +134,6 @@ pub fn prepare_phases_and_buffer_manager(
             consensus_observer_config,
             consensus_publisher,
             max_pending_rounds_in_commit_vote_cache,
-            new_pipeline_enabled,
         ),
     )
 }

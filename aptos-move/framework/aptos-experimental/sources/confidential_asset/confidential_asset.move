@@ -628,6 +628,14 @@ module aptos_experimental::confidential_asset {
         primary_fungible_store::balance(fa_store_address, token)
     }
 
+    #[view]
+    /// Returns the pending balance transfer count for the specified token.
+    public fun get_pending_balance_transfer_count(user: address, token: Object<Metadata>): u64 acquires ConfidentialAssetStore {
+        assert!(has_confidential_asset_store(user, token), error::not_found(ECA_STORE_NOT_PUBLISHED));
+
+        borrow_global<ConfidentialAssetStore>(get_user_address(user, token)).pending_counter
+    }
+
     //
     // Public functions that correspond to the entry functions and don't require serializtion of the input data.
     // These function can be useful for external contracts that want to integrate with the Confidential Asset protocol.

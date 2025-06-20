@@ -49,8 +49,6 @@ use aptos_types::{
 };
 pub use mock_payload_manager::MockPayloadManager;
 #[cfg(test)]
-pub use mock_state_computer::EmptyStateComputer;
-#[cfg(test)]
 pub use mock_state_computer::RandomComputeResultStateComputer;
 pub use mock_storage::{EmptyStorage, MockStorage};
 use move_core_types::account_address::AccountAddress;

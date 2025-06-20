@@ -13,7 +13,6 @@ use aptos_consensus_types::{
 };
 use aptos_logger::info;
 use fail::fail_point;
-use futures::future::BoxFuture;
 use futures_channel::{mpsc, oneshot};
 use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
@@ -93,7 +92,6 @@ impl UserPayloadClient for QuorumStoreClient {
     async fn pull(
         &self,
         params: PayloadPullParameters,
-        wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let return_non_full = params.recent_max_fill_fraction
             < self.wait_for_full_blocks_above_recent_fill_threshold
@@ -105,7 +103,6 @@ impl UserPayloadClient for QuorumStoreClient {
         fail_point!("consensus::pull_payload", |_| {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())
         });
-        let mut callback_wrapper = Some(wait_callback);
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
         let start_time = Instant::now();
 
@@ -125,9 +122,6 @@ impl UserPayloadClient for QuorumStoreClient {
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
-                if let Some(callback) = callback_wrapper.take() {
-                    callback.await;
-                }
                 sleep(Duration::from_millis(NO_TXN_DELAY)).await;
                 continue;
             }

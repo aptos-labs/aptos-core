@@ -483,7 +483,6 @@ impl RoundManager {
             epoch_state.clone(),
             new_round_event,
             sync_info,
-            network.clone(),
             proposal_generator,
             safety_rules,
             proposer_election,
@@ -615,7 +614,6 @@ impl RoundManager {
             self.epoch_state.clone(),
             new_round_event,
             self.block_store.sync_info(),
-            self.network.clone(),
             self.proposal_generator.clone(),
             self.safety_rules.clone(),
             self.proposer_election.clone(),
@@ -627,20 +625,12 @@ impl RoundManager {
         epoch_state: Arc<EpochState>,
         new_round_event: NewRoundEvent,
         sync_info: SyncInfo,
-        network: Arc<NetworkSender>,
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) -> anyhow::Result<ProposalMsg> {
-        // Proposal generator will ensure that at most one proposal is generated per round
-        let callback_sync_info = sync_info.clone();
-        let callback = async move {
-            network.broadcast_sync_info(callback_sync_info).await;
-        }
-        .boxed();
-
         let proposal = proposal_generator
-            .generate_proposal(new_round_event.round, proposer_election, callback)
+            .generate_proposal(new_round_event.round, proposer_election)
             .await?;
         let signature = safety_rules.lock().sign_proposal(&proposal)?;
         let signed_proposal =
@@ -667,7 +657,6 @@ impl RoundManager {
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) -> anyhow::Result<OptProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
-        let callback = async move {}.boxed();
 
         let proposal = proposal_generator
             .generate_opt_proposal(
@@ -676,7 +665,6 @@ impl RoundManager {
                 parent,
                 grandparent_qc,
                 proposer_election,
-                callback,
             )
             .await?;
         observe_block(proposal.timestamp_usecs(), BlockStage::OPT_PROPOSED);

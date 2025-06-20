@@ -9,7 +9,6 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     counters,
-    counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
@@ -199,14 +198,11 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             StateComputeResult::new_dummy(),
         ));
         let block_info = block.block_info();
-        let ledger_info_provider = self.ledger_info_provider.clone();
-        let dag = self.dag.clone();
         *self.parent_block_info.write() = block_info.clone();
 
         self.block_ordered_ts
             .write()
             .insert(block_info.round(), Instant::now());
-        let block_created_ts = self.block_ordered_ts.clone();
 
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
 
@@ -216,20 +212,22 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 LedgerInfo::new(block_info, anchor.digest()),
                 AggregateSignature::empty(),
             ),
-            callback: Box::new(
-                move |committed_blocks: &[Arc<PipelinedBlock>],
-                      commit_decision: LedgerInfoWithSignatures| {
-                    block_created_ts
-                        .write()
-                        .retain(|&round, _| round > commit_decision.commit_info().round());
-                    dag.commit_callback(commit_decision.commit_info().round());
-                    ledger_info_provider
-                        .write()
-                        .notify_commit_proof(commit_decision);
-                    update_counters_for_committed_blocks(committed_blocks);
-                },
-            ),
+            // TODO: this needs to be properly integrated with pipeline_builder
+            // callback: Box::new(
+            //     move |committed_blocks: &[Arc<PipelinedBlock>],
+            //           commit_decision: LedgerInfoWithSignatures| {
+            //         block_created_ts
+            //             .write()
+            //             .retain(|&round, _| round > commit_decision.commit_info().round());
+            //         dag.commit_callback(commit_decision.commit_info().round());
+            //         ledger_info_provider
+            //             .write()
+            //             .notify_commit_proof(commit_decision);
+            //         update_counters_for_committed_blocks(committed_blocks);
+            //     },
+            // ),
         };
+        //
         if self
             .executor_channel
             .unbounded_send(blocks_to_send)

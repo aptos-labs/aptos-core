@@ -22,14 +22,9 @@ use aptos_consensus_types::{
     utils::PayloadTxnsSize,
 };
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_signer::ValidatorSigner};
-use futures::{future::BoxFuture, FutureExt};
 use std::{sync::Arc, time::Duration};
 
 const MAX_BLOCK_GAS_LIMIT: u64 = 30_000;
-
-fn empty_callback() -> BoxFuture<'static, ()> {
-    async move {}.boxed()
-}
 
 struct MockOptQSPayloadProvider {}
 
@@ -69,7 +64,7 @@ async fn test_proposal_generation_empty_tree() {
 
     // Generate proposals for an empty tree.
     let proposal_data = proposal_generator
-        .generate_proposal(1, proposer_election.clone(), empty_callback())
+        .generate_proposal(1, proposer_election.clone())
         .await
         .unwrap();
     let proposal = Block::new_proposal_from_block_data(proposal_data, &signer).unwrap();
@@ -80,7 +75,7 @@ async fn test_proposal_generation_empty_tree() {
 
     // Duplicate proposals on the same round are not allowed
     let proposal_err = proposal_generator
-        .generate_proposal(1, proposer_election.clone(), empty_callback())
+        .generate_proposal(1, proposer_election.clone())
         .await
         .err();
     assert!(proposal_err.is_some());
@@ -121,7 +116,7 @@ async fn test_proposal_generation_parent() {
         .await;
 
     let original_res = proposal_generator
-        .generate_proposal(10, proposer_election.clone(), empty_callback())
+        .generate_proposal(10, proposer_election.clone())
         .await
         .unwrap();
     // With no certifications the parent is genesis
@@ -135,7 +130,7 @@ async fn test_proposal_generation_parent() {
     // Once a1 is certified, it should be the one to choose from
     inserter.insert_qc_for_block(a1.as_ref(), None);
     let a1_child_res = proposal_generator
-        .generate_proposal(11, proposer_election.clone(), empty_callback())
+        .generate_proposal(11, proposer_election.clone())
         .await
         .unwrap();
     assert_eq!(a1_child_res.parent_id(), a1.id());
@@ -150,7 +145,7 @@ async fn test_proposal_generation_parent() {
     // Once b1 is certified, it should be the one to choose from
     inserter.insert_qc_for_block(b1.as_ref(), None);
     let b1_child_res = proposal_generator
-        .generate_proposal(15, proposer_election.clone(), empty_callback())
+        .generate_proposal(15, proposer_election.clone())
         .await
         .unwrap();
     assert_eq!(b1_child_res.parent_id(), b1.id());
@@ -196,7 +191,7 @@ async fn test_old_proposal_generation() {
     inserter.insert_qc_for_block(a1.as_ref(), None);
 
     let proposal_err = proposal_generator
-        .generate_proposal(1, proposer_election.clone(), empty_callback())
+        .generate_proposal(1, proposer_election.clone())
         .await
         .err();
     assert!(proposal_err.is_some());
@@ -234,7 +229,7 @@ async fn test_correct_failed_authors() {
     let genesis = block_store.ordered_root();
 
     let result = proposal_generator
-        .generate_proposal(6, proposer_election.clone(), empty_callback())
+        .generate_proposal(6, proposer_election.clone())
         .await
         .unwrap();
     // With no certifications the parent is genesis

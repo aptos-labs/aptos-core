@@ -857,17 +857,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config.clone(),
                 rand_msg_rx,
                 recovery_data.commit_root_block().round(),
-                self.config.enable_pipeline,
             )
             .await;
         let consensus_sk = consensus_key;
 
-        let maybe_pipeline_builder = if self.config.enable_pipeline {
-            let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
-            Some(self.execution_client.pipeline_builder(signer))
-        } else {
-            None
-        };
+        let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
+        let pipeline_builder = self.execution_client.pipeline_builder(signer);
         info!(epoch = epoch, "Create BlockStore");
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
@@ -882,7 +877,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
-            maybe_pipeline_builder,
+            Some(pipeline_builder),
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
@@ -1436,7 +1431,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 highest_committed_round,
-                self.config.enable_pipeline,
             )
             .await;
 
