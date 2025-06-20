@@ -146,7 +146,7 @@ where
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &TP,
+        txn: &T,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
@@ -161,7 +161,6 @@ where
         parallel_state: ParallelState<T>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let txn = signature_verified_block.get_txn(idx_to_execute);
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -558,7 +557,7 @@ where
             let _needs_suffix_validation = Self::execute(
                 txn_idx,
                 incarnation + 1,
-                block,
+                block.get_txn(txn_idx),
                 last_input_output,
                 versioned_cache,
                 executor,
@@ -750,6 +749,7 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: SchedulerWrapper,
+        num_txns: TxnIndex,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -762,7 +762,7 @@ where
         >,
         runtime_environment: &RuntimeEnvironment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<bool, PanicError> {
         // Do a final validation for safety as a part of (parallel) post-processing.
         // Delayed fields are already validated in the sequential commit hook.
         if !Self::validate(
@@ -865,9 +865,19 @@ where
         }
 
         let mut final_results = final_results.acquire();
+
+        let mut end_block = false;
+
         match last_input_output.take_output(txn_idx)? {
-            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+            ExecutionStatus::Success(t) => {
                 final_results[txn_idx as usize] = t;
+                if txn_idx + 1 == num_txns {
+                    end_block = true;
+                }
+            },
+            ExecutionStatus::SkipRest(t) => {
+                final_results[txn_idx as usize] = t;
+                end_block = true;
             },
             ExecutionStatus::Abort(_) => (),
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
@@ -875,13 +885,15 @@ where
                 panic!("Cannot be materializing with {}", msg);
             },
         };
-        Ok(())
+        Ok(end_block)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn worker_loop(
         &self,
         environment: &AptosEnvironment,
         block: &TP,
+        transaction_slice_metadata: &TransactionSliceMetadata,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
@@ -898,6 +910,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns();
@@ -914,10 +927,11 @@ where
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                self.materialize_txn_commit(
+                let end_block = self.materialize_txn_commit(
                     txn_idx,
                     versioned_cache,
                     scheduler_wrapper,
+                    num_txns as u32,
                     start_shared_counter,
                     shared_counter,
                     last_input_output,
@@ -926,6 +940,66 @@ where
                     runtime_environment,
                     final_results,
                 )?;
+
+                if !end_block {
+                    continue;
+                }
+
+                if let Some(block_id) =
+                    transaction_slice_metadata.append_state_checkpoint_to_block()
+                {
+                    let mut outputs = final_results.acquire();
+                    let last_non_retry = outputs
+                        .iter()
+                        .rposition(|t| !t.committed_status().is_retry());
+                    let has_reconfig = if let Some(idx) = last_non_retry {
+                        outputs[idx].has_new_epoch_event()
+                    } else {
+                        false
+                    };
+
+                    if !has_reconfig {
+                        let txn = self.gen_block_epilogue(
+                            block_id,
+                            block,
+                            outputs.dereference(),
+                            shared_commit_state.acquire().get_block_end_info(),
+                            module_cache_manager_guard.environment().features(),
+                        );
+                        outputs.dereference_mut().push(E::Output::skip_output()); // placeholder
+                        if Self::execute(
+                            txn_idx + 1,
+                            0,
+                            &T::from_txn(txn.clone()),
+                            last_input_output,
+                            versioned_cache,
+                            &executor,
+                            base_view,
+                            global_module_cache,
+                            runtime_environment,
+                            ParallelState::new(
+                                versioned_cache,
+                                scheduler,
+                                start_shared_counter,
+                                shared_counter,
+                            ),
+                        ) != Ok(false)
+                        {
+                            return Err(code_invariant_error(
+                                "BlockEpilogue txn should not fail or need validation.",
+                            ));
+                        }
+
+                        Self::validate_and_commit_delayed_fields(
+                            txn_idx + 1,
+                            versioned_cache,
+                            last_input_output,
+                        )?;
+                        *block_epilogue_txn.acquire().dereference_mut() = Some(txn);
+
+                        scheduler.add_to_commit_queue(txn_idx + 1);
+                    }
+                }
             }
             Ok(())
         };
@@ -1005,7 +1079,7 @@ where
                     let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
-                        block,
+                        block.get_txn(txn_idx),
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -1075,11 +1149,11 @@ where
             base_view,
             self.config.onchain.block_gas_limit_type.clone(),
             self.config.onchain.block_gas_limit_override(),
-            num_txns,
+            num_txns + 1,
         ));
         let shared_maybe_error = AtomicBool::new(false);
 
-        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
+        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns + 1));
 
         {
             final_results
@@ -1087,10 +1161,13 @@ where
                 .resize_with(num_txns, E::Output::skip_output);
         }
 
+        let block_epilogue_txn = ExplicitSyncWrapper::new(None);
+
         let num_txns = num_txns as u32;
 
         let skip_module_reads_validation = AtomicBool::new(true);
-        let last_input_output = TxnLastInputOutput::new(num_txns);
+        // +1 for potential BlockEpilogue txn.
+        let last_input_output = TxnLastInputOutput::new(num_txns + 1);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
@@ -1100,6 +1177,7 @@ where
                     if let Err(err) = self.worker_loop(
                         module_cache_manager_guard.environment(),
                         signature_verified_block,
+                        &transaction_slice_metadata,
                         &last_input_output,
                         &versioned_cache,
                         &scheduler,
@@ -1110,6 +1188,7 @@ where
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
+                        &block_epilogue_txn,
                         num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:
@@ -1145,34 +1224,17 @@ where
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
 
+        if shared_maybe_error.load(Ordering::SeqCst) {
+            return Err(());
+        }
+
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let block_end_info = shared_commit_state.into_inner().get_block_end_info();
-        let mut block_epilogue_txn = None;
-
-        let outputs = final_results.into_inner();
-
-        let has_reconfig = outputs
-            .iter()
-            .rposition(|t| !t.is_retry())
-            .map_or(false, |idx| outputs[idx].has_new_epoch_event());
-        if !has_reconfig {
-            if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
-                block_epilogue_txn = Some(self.gen_block_epilogue(
-                    block_id,
-                    signature_verified_block,
-                    &outputs,
-                    block_end_info,
-                    module_cache_manager_guard.environment().features(),
-                ));
-                // TODO(grao): Call VM for block_epilogue_txn.
-            }
-        }
-
-        (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(outputs, block_epilogue_txn))
-            .ok_or(())
+        Ok(BlockOutput::new(
+            final_results.into_inner(),
+            block_epilogue_txn.into_inner(),
+        ))
     }
 
     fn gen_block_epilogue(
@@ -1423,9 +1485,11 @@ where
             num_txns,
         );
 
+        let mut idx = 0;
+        let mut txn = signature_verified_block.get_txn(idx as TxnIndex);
         let mut block_epilogue_txn = None;
-        for idx in 0..num_txns {
-            let txn = signature_verified_block.get_txn(idx as TxnIndex);
+        let mut block_epilogue_txn_to_execute;
+        loop {
             let latest_view = LatestView::<T, S>::new(
                 base_view,
                 module_cache_manager_guard.module_cache(),
@@ -1468,46 +1532,48 @@ where
                     ));
                 },
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                    // Calculating the accumulated gas costs of the committed txns.
-                    let fee_statement = output.fee_statement();
-
-                    let approx_output_size = self
-                        .config
-                        .onchain
-                        .block_gas_limit_type
-                        .block_output_limit()
-                        .map(|_| {
-                            output.output_approx_size()
-                                + if self
-                                    .config
-                                    .onchain
-                                    .block_gas_limit_type
-                                    .include_user_txn_size_in_block_output()
-                                {
-                                    txn.user_txn_bytes_len()
-                                } else {
-                                    0
-                                } as u64
-                        });
-
                     let sequential_reads = latest_view.take_sequential_reads();
-                    let read_write_summary = self
-                        .config
-                        .onchain
-                        .block_gas_limit_type
-                        .conflict_penalty_window()
-                        .map(|_| {
-                            ReadWriteSummary::new(
-                                sequential_reads.get_read_summary(),
-                                output.get_write_summary(),
-                            )
-                        });
+                    if idx != num_txns {
+                        // Calculating the accumulated gas costs of the committed txns.
+                        let fee_statement = output.fee_statement();
 
-                    block_limit_processor.accumulate_fee_statement(
-                        fee_statement,
-                        read_write_summary,
-                        approx_output_size,
-                    );
+                        let approx_output_size = self
+                            .config
+                            .onchain
+                            .block_gas_limit_type
+                            .block_output_limit()
+                            .map(|_| {
+                                output.output_approx_size()
+                                    + if self
+                                        .config
+                                        .onchain
+                                        .block_gas_limit_type
+                                        .include_user_txn_size_in_block_output()
+                                    {
+                                        txn.user_txn_bytes_len()
+                                    } else {
+                                        0
+                                    } as u64
+                            });
+
+                        let read_write_summary = self
+                            .config
+                            .onchain
+                            .block_gas_limit_type
+                            .conflict_penalty_window()
+                            .map(|_| {
+                                ReadWriteSummary::new(
+                                    sequential_reads.get_read_summary(),
+                                    output.get_write_summary(),
+                                )
+                            });
+
+                        block_limit_processor.accumulate_fee_statement(
+                            fee_statement,
+                            read_write_summary,
+                            approx_output_size,
+                        );
+                    }
 
                     output.materialize_agg_v1(&latest_view);
                     assert_eq!(
@@ -1682,38 +1748,49 @@ where
                 },
             };
 
-            if must_skip
-                || block_limit_processor.should_end_block_sequential()
-                || idx + 1 == num_txns
-            {
-                let mut has_reconfig = false;
-                if let Some(last_output) = ret.last() {
-                    if last_output.has_new_epoch_event() {
-                        has_reconfig = true;
-                    }
-                }
-                ret.resize_with(num_txns, E::Output::skip_output);
-                if let Some(block_id) =
-                    transaction_slice_metadata.append_state_checkpoint_to_block()
-                {
-                    if !has_reconfig {
-                        block_epilogue_txn = Some(self.gen_block_epilogue(
-                            block_id,
-                            signature_verified_block,
-                            &ret,
-                            block_limit_processor.get_block_end_info(),
-                            module_cache_manager_guard.environment().features(),
-                        ));
-                    }
-                }
+            if idx == num_txns {
                 break;
             }
+
+            idx += 1;
+
+            if must_skip || block_limit_processor.should_end_block_sequential() {
+                ret.resize_with(num_txns, E::Output::skip_output);
+                idx = num_txns;
+            }
+
+            if idx < num_txns {
+                txn = signature_verified_block.get_txn(idx as TxnIndex);
+                continue;
+            }
+
+            assert!(idx == num_txns);
+
+            block_limit_processor
+                .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
+
+            if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+                if !ret[idx - 1].has_new_epoch_event() {
+                    block_epilogue_txn = Some(self.gen_block_epilogue(
+                        block_id,
+                        signature_verified_block,
+                        &ret,
+                        block_limit_processor.get_block_end_info(),
+                        module_cache_manager_guard.environment().features(),
+                    ));
+                    block_epilogue_txn_to_execute =
+                        T::from_txn(block_epilogue_txn.clone().unwrap());
+                    txn = &block_epilogue_txn_to_execute;
+                    continue;
+                } else {
+                    info!("Reach epoch ending, do not append BlockEpilogue txn, block_id: {block_id:?}.");
+                }
+            }
+            break;
         }
 
-        block_limit_processor
-            .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
-
         counters::update_state_counters(unsync_map.stats(), false);
+
         module_cache_manager_guard
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
@@ -1749,7 +1826,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.num_txns());
+            init_speculative_logs(signature_verified_block.num_txns() + 1);
 
             // Flush all caches to re-run from the "clean" state.
             module_cache_manager_guard
