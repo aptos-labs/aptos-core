@@ -173,7 +173,7 @@ module aptos_framework::code {
             error::invalid_argument(EINCOMPATIBLE_POLICY_DISABLED),
         );
 
-        let addr = permissioned_signer::address_of(owner);
+        let addr = signer::address_of(owner);
         if (!exists<PackageRegistry>(addr)) {
             move_to(owner, PackageRegistry { packages: vector::empty() })
         };
@@ -232,7 +232,7 @@ module aptos_framework::code {
         let code_object_addr = object::object_address(&code_object);
         assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
         assert!(
-            object::is_owner(code_object, permissioned_signer::address_of(publisher)),
+            object::is_owner(code_object, signer::address_of(publisher)),
             error::permission_denied(ENOT_PACKAGE_OWNER)
         );
 

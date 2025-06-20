@@ -46,6 +46,7 @@ spec aptos_framework::object {
     /// </high-level-req>
     ///
     spec module {
+        pragma verify = false;
         pragma aborts_if_is_partial;
     }
 

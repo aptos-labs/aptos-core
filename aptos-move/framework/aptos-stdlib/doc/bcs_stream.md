@@ -18,6 +18,7 @@ especially useful for systems requiring cross-chain message interpretation or of
 -  [Struct `BCSStream`](#0x1_bcs_stream_BCSStream)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_bcs_stream_new)
+-  [Function `has_remaining`](#0x1_bcs_stream_has_remaining)
 -  [Function `deserialize_uleb128`](#0x1_bcs_stream_deserialize_uleb128)
 -  [Function `deserialize_bool`](#0x1_bcs_stream_deserialize_bool)
 -  [Function `deserialize_address`](#0x1_bcs_stream_deserialize_address)
@@ -128,6 +129,30 @@ Constructs a new BCSStream instance from the provided byte array.
 
 </details>
 
+<a id="0x1_bcs_stream_has_remaining"></a>
+
+## Function `has_remaining`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">BCSStream</a>): bool {
+    stream.cur &lt; stream.data.length()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_bcs_stream_deserialize_uleb128"></a>
 
 ## Function `deserialize_uleb128`
@@ -149,15 +174,15 @@ In the BCS format, lengths of vectors are represented using ULEB128 encoding.
     <b>let</b> res = 0;
     <b>let</b> shift = 0;
 
-    <b>while</b> (stream.cur &lt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&stream.data)) {
-        <b>let</b> byte = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&stream.data, stream.cur);
-        stream.cur = stream.cur + 1;
+    <b>while</b> (stream.cur &lt; stream.data.length()) {
+        <b>let</b> byte = stream.data[stream.cur];
+        stream.cur += 1;
 
         <b>let</b> val = ((byte & 0x7f) <b>as</b> u64);
         <b>if</b> (((val &lt;&lt; shift) &gt;&gt; shift) != val) {
             <b>abort</b> <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="bcs_stream.md#0x1_bcs_stream_EMALFORMED_DATA">EMALFORMED_DATA</a>)
         };
-        res = res | (val &lt;&lt; shift);
+        res |= (val &lt;&lt; shift);
 
         <b>if</b> ((byte & 0x80) == 0) {
             <b>if</b> (shift &gt; 0 && val == 0) {
@@ -166,7 +191,7 @@ In the BCS format, lengths of vectors are represented using ULEB128 encoding.
             <b>return</b> res
         };
 
-        shift = shift + 7;
+        shift += 7;
         <b>if</b> (shift &gt; 64) {
             <b>abort</b> <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="bcs_stream.md#0x1_bcs_stream_EMALFORMED_DATA">EMALFORMED_DATA</a>)
         };
@@ -197,9 +222,9 @@ Deserializes a <code>bool</code> value from the stream.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_deserialize_bool">deserialize_bool</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">BCSStream</a>): bool {
-    <b>assert</b>!(stream.cur &lt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&stream.data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
-    <b>let</b> byte = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&stream.data, stream.cur);
-    stream.cur = stream.cur + 1;
+    <b>assert</b>!(stream.cur &lt; stream.data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>let</b> byte = stream.data[stream.cur];
+    stream.cur += 1;
     <b>if</b> (byte == 0) {
         <b>false</b>
     } <b>else</b> <b>if</b> (byte == 1) {
@@ -237,8 +262,8 @@ because the Move type system does not permit per-byte referencing of addresses.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + 32 &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
-    <b>let</b> res = <a href="from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(data, cur, cur + 32));
+    <b>assert</b>!(cur + 32 &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>let</b> res = <a href="from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(data.slice(cur, cur + 32));
 
     stream.cur = cur + 32;
     res
@@ -270,9 +295,9 @@ Deserializes a <code>u8</code> value from the stream.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur &lt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur &lt; data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
 
-    <b>let</b> res = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur);
+    <b>let</b> res = data[cur];
 
     stream.cur = cur + 1;
     res
@@ -304,13 +329,13 @@ Deserializes a <code>u16</code> value from the stream.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + 2 &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur + 2 &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
     <b>let</b> res =
-        (*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur) <b>as</b> u16) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 1) <b>as</b> u16) &lt;&lt; 8)
+        (data[cur] <b>as</b> u16) |
+            ((data[cur + 1] <b>as</b> u16) &lt;&lt; 8)
     ;
 
-    stream.cur = stream.cur + 2;
+    stream.cur += 2;
     res
 }
 </code></pre>
@@ -340,15 +365,15 @@ Deserializes a <code>u32</code> value from the stream.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + 4 &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur + 4 &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
     <b>let</b> res =
-        (*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur) <b>as</b> u32) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 1) <b>as</b> u32) &lt;&lt; 8) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 2) <b>as</b> u32) &lt;&lt; 16) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 3) <b>as</b> u32) &lt;&lt; 24)
+        (data[cur] <b>as</b> u32) |
+            ((data[cur + 1] <b>as</b> u32) &lt;&lt; 8) |
+            ((data[cur + 2] <b>as</b> u32) &lt;&lt; 16) |
+            ((data[cur + 3] <b>as</b> u32) &lt;&lt; 24)
     ;
 
-    stream.cur = stream.cur + 4;
+    stream.cur += 4;
     res
 }
 </code></pre>
@@ -378,19 +403,19 @@ Deserializes a <code>u64</code> value from the stream.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + 8 &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur + 8 &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
     <b>let</b> res =
-        (*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur) <b>as</b> u64) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 1) <b>as</b> u64) &lt;&lt; 8) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 2) <b>as</b> u64) &lt;&lt; 16) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 3) <b>as</b> u64) &lt;&lt; 24) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 4) <b>as</b> u64) &lt;&lt; 32) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 5) <b>as</b> u64) &lt;&lt; 40) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 6) <b>as</b> u64) &lt;&lt; 48) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 7) <b>as</b> u64) &lt;&lt; 56)
+        (data[cur] <b>as</b> u64) |
+            ((data[cur + 1] <b>as</b> u64) &lt;&lt; 8) |
+            ((data[cur + 2] <b>as</b> u64) &lt;&lt; 16) |
+            ((data[cur + 3] <b>as</b> u64) &lt;&lt; 24) |
+            ((data[cur + 4] <b>as</b> u64) &lt;&lt; 32) |
+            ((data[cur + 5] <b>as</b> u64) &lt;&lt; 40) |
+            ((data[cur + 6] <b>as</b> u64) &lt;&lt; 48) |
+            ((data[cur + 7] <b>as</b> u64) &lt;&lt; 56)
     ;
 
-    stream.cur = stream.cur + 8;
+    stream.cur += 8;
     res
 }
 </code></pre>
@@ -420,27 +445,27 @@ Deserializes a <code>u128</code> value from the stream.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + 16 &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur + 16 &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
     <b>let</b> res =
-        (*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur) <b>as</b> u128) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 1) <b>as</b> u128) &lt;&lt; 8) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 2) <b>as</b> u128) &lt;&lt; 16) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 3) <b>as</b> u128) &lt;&lt; 24) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 4) <b>as</b> u128) &lt;&lt; 32) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 5) <b>as</b> u128) &lt;&lt; 40) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 6) <b>as</b> u128) &lt;&lt; 48) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 7) <b>as</b> u128) &lt;&lt; 56) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 8) <b>as</b> u128) &lt;&lt; 64) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 9) <b>as</b> u128) &lt;&lt; 72) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 10) <b>as</b> u128) &lt;&lt; 80) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 11) <b>as</b> u128) &lt;&lt; 88) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 12) <b>as</b> u128) &lt;&lt; 96) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 13) <b>as</b> u128) &lt;&lt; 104) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 14) <b>as</b> u128) &lt;&lt; 112) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 15) <b>as</b> u128) &lt;&lt; 120)
+        (data[cur] <b>as</b> u128) |
+            ((data[cur + 1] <b>as</b> u128) &lt;&lt; 8) |
+            ((data[cur + 2] <b>as</b> u128) &lt;&lt; 16) |
+            ((data[cur + 3] <b>as</b> u128) &lt;&lt; 24) |
+            ((data[cur + 4] <b>as</b> u128) &lt;&lt; 32) |
+            ((data[cur + 5] <b>as</b> u128) &lt;&lt; 40) |
+            ((data[cur + 6] <b>as</b> u128) &lt;&lt; 48) |
+            ((data[cur + 7] <b>as</b> u128) &lt;&lt; 56) |
+            ((data[cur + 8] <b>as</b> u128) &lt;&lt; 64) |
+            ((data[cur + 9] <b>as</b> u128) &lt;&lt; 72) |
+            ((data[cur + 10] <b>as</b> u128) &lt;&lt; 80) |
+            ((data[cur + 11] <b>as</b> u128) &lt;&lt; 88) |
+            ((data[cur + 12] <b>as</b> u128) &lt;&lt; 96) |
+            ((data[cur + 13] <b>as</b> u128) &lt;&lt; 104) |
+            ((data[cur + 14] <b>as</b> u128) &lt;&lt; 112) |
+            ((data[cur + 15] <b>as</b> u128) &lt;&lt; 120)
     ;
 
-    stream.cur = stream.cur + 16;
+    stream.cur += 16;
     res
 }
 </code></pre>
@@ -470,43 +495,42 @@ Deserializes a <code>u256</code> value from the stream.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + 32 &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur + 32 &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
     <b>let</b> res =
-        (*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur) <b>as</b> u256) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 1) <b>as</b> u256) &lt;&lt; 8) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 2) <b>as</b> u256) &lt;&lt; 16) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 3) <b>as</b> u256) &lt;&lt; 24) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 4) <b>as</b> u256) &lt;&lt; 32) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 5) <b>as</b> u256) &lt;&lt; 40) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 6) <b>as</b> u256) &lt;&lt; 48) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 7) <b>as</b> u256) &lt;&lt; 56) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 8) <b>as</b> u256) &lt;&lt; 64) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 9) <b>as</b> u256) &lt;&lt; 72) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 10) <b>as</b> u256) &lt;&lt; 80) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 11) <b>as</b> u256) &lt;&lt; 88) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 12) <b>as</b> u256) &lt;&lt; 96) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 13) <b>as</b> u256) &lt;&lt; 104) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 14) <b>as</b> u256) &lt;&lt; 112) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 15) <b>as</b> u256) &lt;&lt; 120) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 16) <b>as</b> u256) &lt;&lt; 128) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 17) <b>as</b> u256) &lt;&lt; 136) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 18) <b>as</b> u256) &lt;&lt; 144) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 19) <b>as</b> u256) &lt;&lt; 152) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 20) <b>as</b> u256) &lt;&lt; 160) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 21) <b>as</b> u256) &lt;&lt; 168) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 22) <b>as</b> u256) &lt;&lt; 176) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 23) <b>as</b> u256) &lt;&lt; 184) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 24) <b>as</b> u256) &lt;&lt; 192) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 25) <b>as</b> u256) &lt;&lt; 200) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 26) <b>as</b> u256) &lt;&lt; 208) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 27) <b>as</b> u256) &lt;&lt; 216) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 28) <b>as</b> u256) &lt;&lt; 224) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 29) <b>as</b> u256) &lt;&lt; 232) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 30) <b>as</b> u256) &lt;&lt; 240) |
-            ((*<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(data, cur + 31) <b>as</b> u256) &lt;&lt; 248)
-    ;
+        (data[cur] <b>as</b> u256) |
+            ((data[cur + 1] <b>as</b> u256) &lt;&lt; 8) |
+            ((data[cur + 2] <b>as</b> u256) &lt;&lt; 16) |
+            ((data[cur + 3] <b>as</b> u256) &lt;&lt; 24) |
+            ((data[cur + 4] <b>as</b> u256) &lt;&lt; 32) |
+            ((data[cur + 5] <b>as</b> u256) &lt;&lt; 40) |
+            ((data[cur + 6] <b>as</b> u256) &lt;&lt; 48) |
+            ((data[cur + 7] <b>as</b> u256) &lt;&lt; 56) |
+            ((data[cur + 8] <b>as</b> u256) &lt;&lt; 64) |
+            ((data[cur + 9] <b>as</b> u256) &lt;&lt; 72) |
+            ((data[cur + 10] <b>as</b> u256) &lt;&lt; 80) |
+            ((data[cur + 11] <b>as</b> u256) &lt;&lt; 88) |
+            ((data[cur + 12] <b>as</b> u256) &lt;&lt; 96) |
+            ((data[cur + 13] <b>as</b> u256) &lt;&lt; 104) |
+            ((data[cur + 14] <b>as</b> u256) &lt;&lt; 112) |
+            ((data[cur + 15] <b>as</b> u256) &lt;&lt; 120) |
+            ((data[cur + 16] <b>as</b> u256) &lt;&lt; 128) |
+            ((data[cur + 17] <b>as</b> u256) &lt;&lt; 136) |
+            ((data[cur + 18] <b>as</b> u256) &lt;&lt; 144) |
+            ((data[cur + 19] <b>as</b> u256) &lt;&lt; 152) |
+            ((data[cur + 20] <b>as</b> u256) &lt;&lt; 160) |
+            ((data[cur + 21] <b>as</b> u256) &lt;&lt; 168) |
+            ((data[cur + 22] <b>as</b> u256) &lt;&lt; 176) |
+            ((data[cur + 23] <b>as</b> u256) &lt;&lt; 184) |
+            ((data[cur + 24] <b>as</b> u256) &lt;&lt; 192) |
+            ((data[cur + 25] <b>as</b> u256) &lt;&lt; 200) |
+            ((data[cur + 26] <b>as</b> u256) &lt;&lt; 208) |
+            ((data[cur + 27] <b>as</b> u256) &lt;&lt; 216) |
+            ((data[cur + 28] <b>as</b> u256) &lt;&lt; 224) |
+            ((data[cur + 29] <b>as</b> u256) &lt;&lt; 232) |
+            ((data[cur + 30] <b>as</b> u256) &lt;&lt; 240) |
+            ((data[cur + 31] <b>as</b> u256) &lt;&lt; 248);
 
-    stream.cur = stream.cur + 32;
+    stream.cur += 32;
     res
 }
 </code></pre>
@@ -533,7 +557,7 @@ Deserializes a <code>u256</code> value from the stream.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_deserialize_u256_entry">deserialize_u256_entry</a>(data: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, cursor: u64) {
     <b>let</b> stream = <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">BCSStream</a> {
-        data: data,
+        data,
         cur: cursor,
     };
     <a href="bcs_stream.md#0x1_bcs_stream_deserialize_u256">deserialize_u256</a>(&<b>mut</b> stream);
@@ -567,10 +591,8 @@ The <code>elem_deserializer</code> lambda expression is used sequentially to des
     <b>let</b> len = <a href="bcs_stream.md#0x1_bcs_stream_deserialize_uleb128">deserialize_uleb128</a>(stream);
     <b>let</b> v = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> v, elem_deserializer(stream));
-        i = i + 1;
+    for (i in 0..len) {
+        v.push_back(elem_deserializer(stream));
     };
 
     v
@@ -604,9 +626,9 @@ After determining the length, it then reads the contents of the String.
     <b>let</b> data = &stream.data;
     <b>let</b> cur = stream.cur;
 
-    <b>assert</b>!(cur + len &lt;= <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(data), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
+    <b>assert</b>!(cur + len &lt;= data.length(), <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="bcs_stream.md#0x1_bcs_stream_EOUT_OF_BYTES">EOUT_OF_BYTES</a>));
 
-    <b>let</b> res = <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="../../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(data, cur, cur + len));
+    <b>let</b> res = <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(data.slice(cur, cur + len));
     stream.cur = cur + len;
 
     res

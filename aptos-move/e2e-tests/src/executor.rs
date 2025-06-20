@@ -6,10 +6,6 @@
 
 use crate::{
     account::{Account, AccountData},
-    data_store::{
-        FakeDataStore, GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET,
-        GENESIS_CHANGE_SET_TESTNET,
-    },
     golden_outputs::GoldenOutputs,
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
@@ -24,10 +20,16 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
+use aptos_rest_client::AptosBaseUrl;
+use aptos_transaction_simulation::{
+    DeltaStateStore, EitherStateView, EmptyStateView, SimulationStateStore,
+    GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET, GENESIS_CHANGE_SET_TESTNET,
+};
 use aptos_types::{
     account_config::{
-        new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
+        new_block_event_key, primary_apt_store, AccountResource, CoinInfoResource,
+        ConcurrentSupplyResource, FungibleStoreResource, NewBlockEvent, ObjectGroupResource,
+        CORE_CODE_ADDRESS,
     },
     block_executor::{
         config::{
@@ -40,24 +42,27 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
-    on_chain_config::{AptosVersion, FeatureFlag, Features, OnChainConfig, ValidatorSet},
+    on_chain_config::{
+        AptosVersion, CurrentTimeMicroseconds, FeatureFlag, Features, OnChainConfig, ValidatorSet,
+    },
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
+        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType, CoinType,
 };
+use aptos_validator_interface::{DebuggerStateView, RestDebuggerInterface};
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
     AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -124,11 +129,17 @@ pub enum ExecutorMode {
     BothComparison,
 }
 
+type FakeExecutorStateStore = DeltaStateStore<EitherStateView<EmptyStateView, DebuggerStateView>>;
+
+fn empty_in_memory_state_store() -> FakeExecutorStateStore {
+    DeltaStateStore::new_with_base(EitherStateView::Left(EmptyStateView))
+}
+
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
 pub struct FakeExecutor {
-    data_store: FakeDataStore,
+    state_store: FakeExecutorStateStore,
     event_store: Vec<ContractEvent>,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     block_time: u64,
@@ -196,11 +207,11 @@ impl FakeExecutor {
                 .unwrap(),
         );
 
-        let mut data_store = FakeDataStore::default();
-        data_store.set_chain_id(chain_id);
+        let state_store = empty_in_memory_state_store();
+        state_store.set_chain_id(chain_id).unwrap();
 
         let mut executor = FakeExecutor {
-            data_store,
+            state_store,
             event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
@@ -220,11 +231,11 @@ impl FakeExecutor {
         chain_id: ChainId,
         executor_thread_pool: Arc<rayon::ThreadPool>,
     ) -> Self {
-        let mut data_store = FakeDataStore::default();
-        data_store.set_chain_id(chain_id);
+        let state_store = empty_in_memory_state_store();
+        state_store.set_chain_id(chain_id).unwrap();
 
         let mut executor = FakeExecutor {
-            data_store,
+            state_store,
             event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
@@ -236,6 +247,71 @@ impl FakeExecutor {
         };
         executor.apply_write_set(write_set);
         executor
+    }
+
+    fn from_remote_state_impl(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: Option<&str>,
+    ) -> Self {
+        let mut builder = aptos_rest_client::Client::builder(network_url);
+        if let Some(api_key) = api_key {
+            builder = builder
+                .api_key(api_key)
+                .expect("failed to configure API key")
+        }
+        let rest_client = builder.build();
+
+        let debugger = Arc::new(RestDebuggerInterface::new(rest_client));
+        let debugger_state_view = DebuggerStateView::new(debugger, txn_id);
+        let state_store =
+            DeltaStateStore::new_with_base(EitherStateView::Right(debugger_state_view));
+
+        let timestamp = state_store
+            .get_on_chain_config::<CurrentTimeMicroseconds>()
+            .expect("failed to get block time from remote");
+
+        let executor_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_cpus::get())
+                .build()
+                .unwrap(),
+        );
+
+        Self {
+            state_store,
+            event_store: Vec::new(),
+            executor_thread_pool,
+            block_time: timestamp.microseconds,
+            executed_output: None,
+            trace_dir: None,
+            rng: KeyGen::from_seed(RNG_SEED),
+            executor_mode: None,
+            allow_block_executor_fallback: true,
+        }
+    }
+
+    /// Creates a [`FakeExecutor`] from a remote network state at the version specified by the
+    /// transaction id, with support for a custom API key to access node APIs.
+    ///
+    /// Simulations based on remote states rely heavily on API calls, which can easily run into
+    /// rate limits if executed repeatedly or in parallel.
+    /// Providing an API key raises these limits significantly.
+    ///
+    /// If you hit rate limits, you can create a free Aptos Build account and generate an API key:
+    /// - https://build.aptoslabs.com/docs/start#api-quick-start
+    pub fn from_remote_state_with_api_key(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: &str,
+    ) -> Self {
+        Self::from_remote_state_impl(network_url, txn_id, Some(api_key))
+    }
+
+    /// Creates a [`FakeExecutor`] from a remote network state at the version specified by the
+    /// transaction id.
+    pub fn from_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
+        Self::from_remote_state_impl(network_url, txn_id, None)
     }
 
     pub fn set_executor_mode(mut self, mode: ExecutorMode) -> Self {
@@ -289,12 +365,8 @@ impl FakeExecutor {
         )
     }
 
-    pub fn data_store(&self) -> &FakeDataStore {
-        &self.data_store
-    }
-
-    pub fn data_store_mut(&mut self) -> &mut FakeDataStore {
-        &mut self.data_store
+    pub fn state_store(&self) -> &impl SimulationStateStore {
+        &self.state_store
     }
 
     /// Creates an executor in which no genesis state has been applied yet.
@@ -306,7 +378,7 @@ impl FakeExecutor {
                 .unwrap(),
         );
         FakeExecutor {
-            data_store: FakeDataStore::default(),
+            state_store: empty_in_memory_state_store(),
             event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
@@ -339,8 +411,8 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let aptos_version = AptosVersion::fetch_config(&self.data_store.as_move_resolver())
-                .map_or(0, |v| v.major);
+            let aptos_version =
+                AptosVersion::fetch_config(&self.state_store).map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
@@ -429,7 +501,7 @@ impl FakeExecutor {
         balance: u64,
         seq_num: u64,
     ) -> AccountData {
-        let features = Features::fetch_config(&self.data_store).unwrap_or_default();
+        let features = Features::fetch_config(&self.state_store).unwrap_or_default();
         let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         let use_concurrent_balance =
             features.is_enabled(FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE);
@@ -448,7 +520,7 @@ impl FakeExecutor {
 
     /// Applies a [`WriteSet`] to this executor's data store.
     pub fn apply_write_set(&mut self, write_set: &WriteSet) {
-        self.data_store.add_write_set(write_set);
+        self.state_store.apply_write_set(write_set).unwrap();
     }
 
     pub fn append_events(&mut self, events: Vec<ContractEvent>) {
@@ -457,7 +529,7 @@ impl FakeExecutor {
 
     /// Adds an account to this executor's data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
-        self.data_store.add_account_data(account_data);
+        self.state_store.add_account_data(account_data).unwrap();
         // When a new account data with balance is initialized. The total_supply should be updated
         // correspondingly to be consistent with the global state.
         // if new_added_supply = 0, it is a noop.
@@ -468,11 +540,13 @@ impl FakeExecutor {
                     .read_apt_coin_info_resource()
                     .expect("coin info must exist in data store");
                 let old_supply = self.read_coin_supply().unwrap();
-                self.data_store.add_write_set(
-                    &coin_info_resource
-                        .to_writeset(old_supply + (new_added_supply as u128))
-                        .unwrap(),
-                )
+                self.state_store
+                    .apply_write_set(
+                        &coin_info_resource
+                            .to_writeset(old_supply + (new_added_supply as u128))
+                            .unwrap(),
+                    )
+                    .unwrap();
             }
         }
 
@@ -498,33 +572,32 @@ impl FakeExecutor {
                         bcs::to_bytes(&supply).unwrap(),
                     )
                     .unwrap();
-                self.data_store.add_write_set(
-                    &WriteSetMut::new(vec![(
-                        StateKey::resource_group(
-                            &AccountAddress::TEN,
-                            &ObjectGroupResource::struct_tag(),
-                        ),
-                        WriteOp::legacy_modification(
-                            bcs::to_bytes(&fa_resource_group).unwrap().into(),
-                        ),
-                    )])
-                    .freeze()
-                    .unwrap(),
-                )
+                self.state_store
+                    .apply_write_set(
+                        &WriteSetMut::new(vec![(
+                            StateKey::resource_group(
+                                &AccountAddress::TEN,
+                                &ObjectGroupResource::struct_tag(),
+                            ),
+                            WriteOp::legacy_modification(
+                                bcs::to_bytes(&fa_resource_group).unwrap().into(),
+                            ),
+                        )])
+                        .freeze()
+                        .unwrap(),
+                    )
+                    .unwrap();
             }
         }
-    }
-
-    /// Adds coin info to this executor's data store.
-    pub fn add_coin_info(&mut self) {
-        self.data_store.add_coin_info()
     }
 
     /// Adds a module to this executor's data store.
     ///
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, module_blob: Vec<u8>) {
-        self.data_store.add_module(module_id, module_blob)
+        self.state_store
+            .add_module_blob(module_id, module_blob)
+            .unwrap()
     }
 
     /// Reads the resource `Value` for an account from this executor's data store.
@@ -534,7 +607,7 @@ impl FakeExecutor {
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let data_blob = TStateView::get_state_value_bytes(
-            &self.data_store,
+            &self.state_store,
             &StateKey::resource_typed::<T>(addr).expect("failed to create StateKey"),
         )
         .expect("account must exist in data store")
@@ -544,7 +617,7 @@ impl FakeExecutor {
 
     pub fn read_resource_group<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let data_blob = TStateView::get_state_value_bytes(
-            &self.data_store,
+            &self.state_store,
             &StateKey::resource_group(addr, &T::struct_tag()),
         )
         .expect("account must exist in data store")
@@ -558,7 +631,7 @@ impl FakeExecutor {
         resource_group_tag: &StructTag,
     ) -> Option<T> {
         let bytes_opt = TStateView::get_state_value_bytes(
-            &self.data_store,
+            &self.state_store,
             &StateKey::resource_group(addr, resource_group_tag),
         )
         .expect("account must exist in data store");
@@ -583,11 +656,14 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinStore resource value for an account from this executor's data store.
-    pub fn read_apt_coin_store_resource(
+    pub fn read_apt_fungible_store_resource(
         &self,
         account: &Account,
-    ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_apt_coin_store_resource_at_address(account.address())
+    ) -> Option<FungibleStoreResource> {
+        self.read_resource_from_group(
+            &primary_apt_store(*account.address()),
+            &ObjectGroupResource::struct_tag(),
+        )
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.
@@ -611,15 +687,6 @@ impl FakeExecutor {
     /// Reads the CoinInfo resource value from this executor's data store.
     pub fn read_apt_coin_info_resource(&self) -> Option<CoinInfoResource<AptosCoinType>> {
         self.read_resource(&AptosCoinType::coin_info_address())
-    }
-
-    /// Reads the CoinStore resource value for an account under the given address from this executor's
-    /// data store.
-    pub fn read_apt_coin_store_resource_at_address(
-        &self,
-        addr: &AccountAddress,
-    ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_resource(addr)
     }
 
     /// Executes the given block of transactions.
@@ -706,6 +773,7 @@ impl FakeExecutor {
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
         // dump serialized transaction details before execution, if tracing
+        /*
         if let Some(trace_dir) = &self.trace_dir {
             let trace_data_dir = trace_dir.join(TRACE_DIR_DATA);
             trace_map.0 = Self::trace(trace_data_dir.as_path(), self.get_state_view());
@@ -715,6 +783,7 @@ impl FakeExecutor {
                 trace_map.1.push(input_seq);
             }
         }
+        */
 
         let sig_verified_block = into_signature_verified_block(txn_block);
 
@@ -800,7 +869,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        self.execute_transaction_block_with_state_view(txn_block, &self.data_store)
+        self.execute_transaction_block_with_state_view(txn_block, &self.state_store)
     }
 
     pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {
@@ -821,13 +890,13 @@ impl FakeExecutor {
             .check_signature()
             .expect("invalid signature for transaction");
 
-        let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
+        let log_context = AdapterLogSchema::new(self.state_store.id(), 0);
 
         // TODO(Gas): revisit this.
-        let env = AptosEnvironment::new(&self.data_store);
+        let env = AptosEnvironment::new(&self.state_store);
         let vm = AptosVM::new(&env, self.get_state_view());
 
-        let resolver = self.data_store.as_move_resolver();
+        let resolver = self.state_store.as_move_resolver();
         let code_storage = self.get_state_view().as_aptos_code_storage(&env);
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
@@ -836,20 +905,20 @@ impl FakeExecutor {
             &txn,
             &log_context,
             |gas_meter| {
-                let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
-                    // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has been removed")
+                let gas_profiler = match txn.payload().executable_ref() {
+                    Ok(TransactionExecutableRef::Script(_)) => GasProfiler::new_script(gas_meter),
+                    Ok(TransactionExecutableRef::EntryFunction(entry_func))
+                        if !txn.payload().is_multisig() =>
+                    {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
                     },
+                    Ok(_) => unimplemented!("multisig or empty payload not supported yet"),
+                    Err(_) => unimplemented!("payload type is deprecated"),
                 };
                 gas_profiler
             },
@@ -881,33 +950,34 @@ impl FakeExecutor {
     }
 
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
-        TStateView::get_state_value(&self.data_store, state_key).unwrap()
+        TStateView::get_state_value(&self.state_store, state_key).unwrap()
     }
 
     /// Get the blob for the associated AccessPath
     pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
-        TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
+        TStateView::get_state_value_bytes(&self.state_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath
     pub fn write_state_value(&mut self, state_key: StateKey, data_blob: Vec<u8>) {
-        self.data_store
-            .set(state_key, StateValue::new_legacy(data_blob.into()));
+        self.state_store
+            .set_state_value(state_key, StateValue::new_legacy(data_blob.into()))
+            .unwrap();
     }
 
     /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let env = AptosEnvironment::new(&self.data_store);
+        let env = AptosEnvironment::new(&self.state_store);
         let vm = AptosVM::new(&env, self.get_state_view());
         vm.validate_transaction(
             txn,
-            &self.data_store,
-            &self.data_store.as_aptos_code_storage(&env),
+            &self.state_store,
+            &self.state_store.as_aptos_code_storage(&env),
         )
     }
 
-    pub fn get_state_view(&self) -> &FakeDataStore {
-        &self.data_store
+    pub fn get_state_view(&self) -> &impl StateView {
+        &self.state_store
     }
 
     pub fn new_block(&mut self) {
@@ -917,7 +987,7 @@ impl FakeExecutor {
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
 
-        let validator_set = ValidatorSet::fetch_config(&self.data_store)
+        let validator_set = ValidatorSet::fetch_config(&self.state_store)
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
@@ -932,7 +1002,7 @@ impl FakeExecutor {
     ) -> Vec<(TransactionStatus, u64)> {
         let mut txn_block: Vec<Transaction> =
             txns.into_iter().map(Transaction::UserTransaction).collect();
-        let validator_set = ValidatorSet::fetch_config(&self.data_store)
+        let validator_set = ValidatorSet::fetch_config(&self.state_store)
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
@@ -995,6 +1065,10 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
+    pub fn get_chain_id(&self) -> ChainId {
+        self.state_store.get_chain_id().unwrap()
+    }
+
     /// exec_func_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
     /// Additionally we have dynamic_args and gas_meter_type to configure it further.
@@ -1016,13 +1090,13 @@ impl FakeExecutor {
             _ => vec![],
         };
 
-        let env = AptosEnvironment::new(&self.data_store);
-        let resolver = self.data_store.as_move_resolver();
+        let env = AptosEnvironment::new(&self.state_store);
+        let resolver = self.state_store.as_move_resolver();
         let vm = MoveVmExt::new(&env);
 
         // Create module storage, and ensure the module for the function we want to execute is
         // cached.
-        let module_storage = self.data_store.as_aptos_code_storage(&env);
+        let module_storage = self.state_store.as_aptos_code_storage(&env);
         assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
@@ -1157,15 +1231,15 @@ impl FakeExecutor {
 
         let (write_set, _events) = {
             let env = AptosEnvironment::new_with_gas_hook(
-                &self.data_store,
+                &self.state_store,
                 Arc::new(move |expression| {
                     a2.lock().unwrap().push(expression);
                 }),
             );
-            let resolver = self.data_store.as_move_resolver();
+            let resolver = self.state_store.as_move_resolver();
             let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.data_store.as_aptos_code_storage(&env);
+            let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1203,7 +1277,7 @@ impl FakeExecutor {
                 .change_set_configs;
             finish_session_assert_no_modules(session, &module_storage, change_set_configs)
         };
-        self.data_store.add_write_set(&write_set);
+        self.state_store.apply_write_set(&write_set).unwrap();
 
         let a1_result = Arc::into_inner(a1);
         a1_result
@@ -1222,11 +1296,11 @@ impl FakeExecutor {
     ) {
         let module_id = Self::module(module_name);
         let (write_set, events) = {
-            let env = AptosEnvironment::new(&self.data_store);
-            let resolver = self.data_store.as_move_resolver();
+            let env = AptosEnvironment::new(&self.state_store);
+            let resolver = self.state_store.as_move_resolver();
             let vm = MoveVmExt::new(&env);
 
-            let module_storage = self.data_store.as_aptos_code_storage(&env);
+            let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1254,7 +1328,7 @@ impl FakeExecutor {
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(env.gas_feature_version()),
             )
         };
-        self.data_store.add_write_set(&write_set);
+        self.state_store.apply_write_set(&write_set).unwrap();
         self.event_store.extend(events);
     }
 
@@ -1265,11 +1339,11 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let env = AptosEnvironment::new(&self.data_store);
-        let resolver = self.data_store.as_move_resolver();
+        let env = AptosEnvironment::new(&self.state_store);
+        let resolver = self.state_store.as_move_resolver();
         let vm = MoveVmExt::new(&env);
 
-        let module_storage = self.data_store.as_aptos_code_storage(&env);
+        let module_storage = self.state_store.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();
@@ -1308,12 +1382,31 @@ impl FakeExecutor {
             max_gas_amount,
         )
     }
+
+    /// Force-rotates the authentication key of the account at the given address.
+    ///
+    /// Returns a new [`Account`] struct that contains the newly generated key pair, which you
+    /// can use to sign transactions.
+    pub fn rotate_account_authentication_key(&mut self, addr: AccountAddress) -> Account {
+        let account = Account::new_from_addr_with_new_keypair_from_seed(addr, &mut self.rng);
+
+        // Note: This does not update the mapping of originating addresses but it is probably fine
+        //       for testing purposes.
+        self.exec("account", "rotate_authentication_key_call", vec![], vec![
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            MoveValue::vector_u8(account.auth_key())
+                .simple_serialize()
+                .unwrap(),
+        ]);
+
+        account
+    }
 }
 
 /// Finishes the session, and asserts there has been no modules published (publishing is the
 /// responsibility of the adapter, i.e., [AptosVM]).
 fn finish_session_assert_no_modules(
-    session: SessionExt,
+    session: SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
 ) -> (WriteSet, Vec<ContractEvent>) {

@@ -296,6 +296,7 @@ impl NativeVMExecutorTask {
                         recipient,
                         fail_on_account_existing,
                         fail_on_account_missing,
+                        !fa_migration_complete,
                         view,
                         &mut resource_write_set,
                     )?;
@@ -344,6 +345,7 @@ impl NativeVMExecutorTask {
                             recipient_address,
                             fail_on_recipient_account_existing,
                             fail_on_recipient_account_missing,
+                            !fa_migration_complete,
                             view,
                             &mut resource_write_set,
                         )?;
@@ -353,7 +355,9 @@ impl NativeVMExecutorTask {
         };
 
         events.push((
-            FeeStatement::new(gas_units, gas_units, 0, 0, 0).create_event_v2(),
+            FeeStatement::new(gas_units, gas_units, 0, 0, 0)
+                .create_event_v2()
+                .expect("Creating FeeStatement should always succeed"),
             None,
         ));
 
@@ -432,8 +436,23 @@ impl NativeVMExecutorTask {
                 }
             },
             None => {
-                error!("Account doesn't exist");
-                Err(())
+                let mut account = DbAccessUtil::new_account_resource(sender_address);
+                if sequence_number == 0 {
+                    account.sequence_number = 1;
+                    resource_write_set.insert(
+                        sender_account_key,
+                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
+                            bcs::to_bytes(&account).map_err(hide_error)?,
+                        ))),
+                    );
+                    Ok(())
+                } else {
+                    error!(
+                        "Invalid sequence number: txn: {} vs account: {}",
+                        sequence_number, account.sequence_number
+                    );
+                    Err(())
+                }
             },
         }
     }
@@ -443,6 +462,7 @@ impl NativeVMExecutorTask {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        create_account_resource: bool,
         view: &(impl ExecutorView + ResourceGroupView),
         resource_write_set: &mut BTreeMap<StateKey, AbstractResourceWriteOp>,
     ) -> Result<(), ()> {
@@ -458,7 +478,7 @@ impl NativeVMExecutorTask {
             None => {
                 if fail_on_account_missing {
                     return Err(());
-                } else {
+                } else if create_account_resource {
                     let account = DbAccessUtil::new_account_resource(address);
 
                     resource_write_set.insert(
@@ -638,7 +658,8 @@ impl NativeVMExecutorTask {
                                 store: sender_store_address,
                                 amount: transfer_amount,
                             }
-                            .create_event_v2(),
+                            .create_event_v2()
+                            .expect("Creating WithdrawFAEvent should always succeed"),
                             None,
                         ));
                     }
@@ -791,7 +812,12 @@ impl NativeVMExecutorTask {
                 store: recipient_store_address,
                 amount: transfer_amount,
             };
-            events.push((event.create_event_v2(), None));
+            events.push((
+                event
+                    .create_event_v2()
+                    .expect("Creating DepositFAEvent should always succeed"),
+                None,
+            ));
         }
         Ok(existed)
     }
@@ -820,7 +846,8 @@ impl NativeVMExecutorTask {
                             type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()
                                 .map_err(hide_error)?,
                         }
-                        .create_event_v2(),
+                        .create_event_v2()
+                        .expect("Creating CoinRegister should always succeed"),
                         None,
                     ));
                     (

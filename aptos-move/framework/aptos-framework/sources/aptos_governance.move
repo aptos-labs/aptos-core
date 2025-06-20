@@ -343,11 +343,7 @@ module aptos_framework::aptos_governance {
             stake_pool,
             proposal_id,
         };
-        let used_voting_power = 0u64;
-        if (features::partial_governance_voting_enabled()) {
-            let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
-            used_voting_power = *smart_table::borrow_with_default(&voting_records_v2.votes, record_key, &0);
-        };
+        let used_voting_power = *VotingRecordsV2[@aptos_framework].votes.borrow_with_default(record_key, &0);
         get_voting_power(stake_pool) - used_voting_power
     }
 
@@ -415,7 +411,7 @@ module aptos_framework::aptos_governance {
         is_multi_step_proposal: bool,
     ): u64 acquires GovernanceConfig, GovernanceEvents {
         check_governance_permission(proposer);
-        let proposer_address = permissioned_signer::address_of(proposer);
+        let proposer_address = signer::address_of(proposer);
         assert!(
             stake::get_delegated_voter(stake_pool) == proposer_address,
             error::invalid_argument(ENOT_DELEGATED_VOTER)
@@ -573,18 +569,9 @@ module aptos_framework::aptos_governance {
             stake_pool,
             proposal_id,
         };
-        if (features::partial_governance_voting_enabled()) {
-            let voting_records_v2 = borrow_global_mut<VotingRecordsV2>(@aptos_framework);
-            let used_voting_power = smart_table::borrow_mut_with_default(&mut voting_records_v2.votes, record_key, 0);
-            // This calculation should never overflow because the used voting cannot exceed the total voting power of this stake pool.
-            *used_voting_power = *used_voting_power + voting_power;
-        } else {
-            let voting_records = borrow_global_mut<VotingRecords>(@aptos_framework);
-            assert!(
-                !table::contains(&voting_records.votes, record_key),
-                error::invalid_argument(EALREADY_VOTED));
-            table::add(&mut voting_records.votes, record_key, true);
-        };
+        let used_voting_power = VotingRecordsV2[@aptos_framework].votes.borrow_mut_with_default(record_key, 0);
+        // This calculation should never overflow because the used voting cannot exceed the total voting power of this stake pool.
+        *used_voting_power += voting_power;
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
@@ -597,8 +584,8 @@ module aptos_framework::aptos_governance {
                 },
             );
         } else {
-            let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
-            event::emit_event<VoteEvent>(
+            let events = &mut GovernanceEvents[@aptos_framework];
+            event::emit_event(
                 &mut events.vote_events,
                 VoteEvent {
                     proposal_id,
@@ -775,9 +762,7 @@ module aptos_framework::aptos_governance {
     }
 
     fun assert_voting_initialization() {
-        if (features::partial_governance_voting_enabled()) {
-            assert!(exists<VotingRecordsV2>(@aptos_framework), error::invalid_state(EPARTIAL_VOTING_NOT_INITIALIZED));
-        };
+        assert!(exists<VotingRecordsV2>(@aptos_framework), error::invalid_state(EPARTIAL_VOTING_NOT_INITIALIZED));
     }
 
     #[test_only]
@@ -785,8 +770,7 @@ module aptos_framework::aptos_governance {
         proposer: &signer,
         multi_step: bool,
     ) acquires GovernanceConfig, GovernanceEvents {
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
         if (multi_step) {
             create_proposal_v2(
                 proposer,
@@ -845,8 +829,7 @@ module aptos_framework::aptos_governance {
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         setup_partial_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
 
         create_proposal_for_test(&proposer, multi_step);
 
@@ -1095,8 +1078,7 @@ module aptos_framework::aptos_governance {
         voter_2: signer,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
         let proposer_addr = signer::address_of(&proposer);
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
@@ -1123,8 +1105,7 @@ module aptos_framework::aptos_governance {
         voter_2: signer,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
         let proposer_addr = signer::address_of(&proposer);
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
@@ -1150,8 +1131,7 @@ module aptos_framework::aptos_governance {
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_coin_to_fungible_asset_migration_feature()], vector[]);
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
         stake::set_delegated_voter(&voter_2, voter_1_addr);
@@ -1169,8 +1149,7 @@ module aptos_framework::aptos_governance {
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_coin_to_fungible_asset_migration_feature()], vector[]);
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
         stake::set_delegated_voter(&voter_2, voter_1_addr);
@@ -1187,8 +1166,7 @@ module aptos_framework::aptos_governance {
         voter_2: signer,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
+        let execution_hash = vector[1];
         let proposer_addr = signer::address_of(&proposer);
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
@@ -1207,43 +1185,6 @@ module aptos_framework::aptos_governance {
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    public entry fun test_stake_pool_can_vote_before_and_after_partial_governance_voting_enabled(
-        aptos_framework: signer,
-        proposer: signer,
-        voter_1: signer,
-        voter_2: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_partial_governance_voting()]);
-        setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
-        let proposer_addr = signer::address_of(&proposer);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
-
-        create_proposal_for_test(&proposer, true);
-        vote(&voter_1, voter_1_addr, 0, true);
-        assert!(get_remaining_voting_power(proposer_addr, 0) == 100, 0);
-        assert!(get_remaining_voting_power(voter_1_addr, 0) == 0, 1);
-        assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
-
-        features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
-
-        coin::register<AptosCoin>(&voter_1);
-        coin::register<AptosCoin>(&voter_2);
-        stake::add_stake(&voter_1, 20);
-        stake::add_stake(&voter_2, 5);
-
-        // voter1 has already voted before partial governance voting is enalbed. So it cannot vote even after adding stake.
-        // voter2's voting poewr increase after adding stake.
-        assert!(get_remaining_voting_power(proposer_addr, 0) == 100, 0);
-        assert!(get_remaining_voting_power(voter_1_addr, 0) == 0, 1);
-        assert!(get_remaining_voting_power(voter_2_addr, 0) == 15, 2);
-
-        test_resolving_proposal_generic(aptos_framework, true, execution_hash);
-    }
-
-    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
     public entry fun test_no_remaining_voting_power_about_proposal_expiration_time(
         aptos_framework: signer,
         proposer: signer,
@@ -1251,8 +1192,6 @@ module aptos_framework::aptos_governance {
         voter_2: signer,
     ) acquires GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
         setup_partial_voting_with_initialized_stake(&aptos_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
         let proposer_addr = signer::address_of(&proposer);
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
@@ -1385,7 +1324,6 @@ module aptos_framework::aptos_governance {
         yes_voter: &signer,
         no_voter: &signer,
     ) acquires GovernanceResponsbility {
-        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
         setup_voting_with_initialized_stake(aptos_framework, proposer, yes_voter, no_voter);
     }
 
@@ -1396,7 +1334,6 @@ module aptos_framework::aptos_governance {
         voter_1: &signer,
         voter_2: &signer,
     ) acquires GovernanceResponsbility {
-        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
         setup_voting(aptos_framework, proposer, voter_1, voter_2);
     }
 

@@ -19,15 +19,17 @@ pub struct VMConfig {
     pub check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs.
     pub max_value_nest_depth: Option<u64>,
+    /// Maximum allowed number of nodes in a type layout. This includes the types of fields for
+    /// struct types.
+    pub layout_max_size: u64,
+    /// Maximum depth (in number of nodes) of the type layout tree.
+    pub layout_max_depth: u64,
     pub type_max_cost: u64,
     pub type_base_cost: u64,
     pub type_byte_cost: u64,
     pub delayed_field_optimization_enabled: bool,
     pub ty_builder: TypeBuilder,
-    pub disallow_dispatch_for_native: bool,
-    pub use_compatibility_checker_v2: bool,
     pub use_call_tree_and_instruction_cache: bool,
-    pub abort_on_move_to_with_permissioned_signer: bool,
 }
 
 impl Default for VMConfig {
@@ -38,15 +40,14 @@ impl Default for VMConfig {
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
             max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
+            layout_max_size: 256,
+            layout_max_depth: 128,
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
             ty_builder: TypeBuilder::with_limits(128, 20),
-            disallow_dispatch_for_native: true,
-            use_compatibility_checker_v2: true,
             use_call_tree_and_instruction_cache: true,
-            abort_on_move_to_with_permissioned_signer: true,
         }
     }
 }

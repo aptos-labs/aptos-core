@@ -548,14 +548,6 @@ pub enum AccountAuthenticator {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub enum DomainAccount {
-    V1 {
-        #[serde(with = "serde_bytes")]
-        account_identity: Vec<u8>,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum AbstractionAuthData {
     V1 {
         #[serde(with = "serde_bytes")]
@@ -563,12 +555,13 @@ pub enum AbstractionAuthData {
         #[serde(with = "serde_bytes")]
         authenticator: Vec<u8>,
     },
-    DomainV1 {
+    DerivableV1 {
         #[serde(with = "serde_bytes")]
         signing_message_digest: Vec<u8>,
         #[serde(with = "serde_bytes")]
-        authenticator: Vec<u8>,
-        account: DomainAccount,
+        abstract_signature: Vec<u8>,
+        #[serde(with = "serde_bytes")]
+        abstract_public_key: Vec<u8>,
     },
 }
 
@@ -579,7 +572,7 @@ impl AbstractionAuthData {
                 signing_message_digest,
                 ..
             }
-            | Self::DomainV1 {
+            | Self::DerivableV1 {
                 signing_message_digest,
                 ..
             } => signing_message_digest,
@@ -645,18 +638,18 @@ impl AccountAuthenticator {
     }
 
     /// Create a domain abstracted authenticator
-    pub fn domain_abstraction(
+    pub fn derivable_abstraction(
         function_info: FunctionInfo,
         signing_message_digest: Vec<u8>,
-        authenticator: Vec<u8>,
-        account_identity: Vec<u8>,
+        abstract_signature: Vec<u8>,
+        abstract_public_key: Vec<u8>,
     ) -> Self {
         Self::Abstraction {
             function_info,
-            auth_data: AbstractionAuthData::DomainV1 {
+            auth_data: AbstractionAuthData::DerivableV1 {
                 signing_message_digest,
-                authenticator,
-                account: DomainAccount::V1 { account_identity },
+                abstract_signature,
+                abstract_public_key,
             },
         }
     }
@@ -846,6 +839,8 @@ impl AuthenticationKey {
 }
 
 impl ValidCryptoMaterial for AuthenticationKey {
+    const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_vec()
     }

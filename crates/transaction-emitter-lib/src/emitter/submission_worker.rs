@@ -8,7 +8,7 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{sample, sample::SampleRate};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -23,6 +23,7 @@ use core::{
 };
 use futures::future::join_all;
 use itertools::Itertools;
+use log::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
@@ -493,17 +494,7 @@ pub async fn submit_transactions(
                 sample!(SampleRate::Duration(Duration::from_secs(60)), {
                     let first_failed_txn = &txns[failure.transaction_index];
                     let sender = first_failed_txn.sender();
-                    use aptos_types::transaction::TransactionPayload::*;
-                    let payload = match first_failed_txn.payload() {
-                        Script(_) => "script".to_string(),
-                        ModuleBundle(_) => "module_bundle".to_string(),
-                        EntryFunction(entry_function) => format!(
-                            "entry {}::{}",
-                            entry_function.module(),
-                            entry_function.function()
-                        ),
-                        Multisig(_) => "multisig".to_string(),
-                    };
+                    let payload = first_failed_txn.payload().payload_type();
 
                     let first_failed_txn_info = format!(
                         "due to {:?}, for account {}, max gas {}, payload {}",
@@ -516,7 +507,7 @@ pub async fn submit_transactions(
                     let last_transactions =
                         if let Ok(account) = client.get_account_bcs(sender).await {
                             client
-                                .get_account_transactions_bcs(
+                                .get_account_ordered_transactions_bcs(
                                     sender,
                                     Some(account.into_inner().sequence_number().saturating_sub(1)),
                                     Some(5),

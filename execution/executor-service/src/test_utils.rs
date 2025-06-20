@@ -3,9 +3,10 @@
 
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
-use aptos_language_e2e_tests::{
-    account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
-    executor::FakeExecutor,
+use aptos_keygen::KeyGen;
+use aptos_language_e2e_tests::common_transactions::peer_to_peer_txn;
+use aptos_transaction_simulation::{
+    Account, AccountData, InMemoryStateStore, SimulationStateStore,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -29,24 +30,32 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
-    executor.new_account_data_at(address)
+pub fn generate_account_at(
+    state_store: &impl SimulationStateStore,
+    address: AccountAddress,
+) -> AccountData {
+    let acc = Account::new_genesis_account(address);
+    state_store
+        .store_and_fund_account(acc, 1_000_000_000_000_000, 0)
+        .unwrap()
 }
 
 fn generate_non_conflicting_sender_receiver(
-    executor: &mut FakeExecutor,
+    rng: &mut KeyGen,
+    state_store: &impl SimulationStateStore,
 ) -> (AccountData, AccountData) {
-    let sender = executor.create_raw_account_data(3_000_000_000, 0);
-    let receiver = executor.create_raw_account_data(3_000_000_000, 0);
-    executor.add_account_data(&sender);
-    executor.add_account_data(&receiver);
+    let sender = AccountData::new_from_seed(rng, 3_000_000_000, 0);
+    let receiver = AccountData::new_from_seed(rng, 3_000_000_000, 0);
+    state_store.add_account_data(&sender).unwrap();
+    state_store.add_account_data(&receiver).unwrap();
     (sender, receiver)
 }
 
 pub fn generate_non_conflicting_p2p(
-    executor: &mut FakeExecutor,
+    rng: &mut KeyGen,
+    state_store: &impl SimulationStateStore,
 ) -> (AnalyzedTransaction, AccountData, AccountData) {
-    let (mut sender, receiver) = generate_non_conflicting_sender_receiver(executor);
+    let (mut sender, receiver) = generate_non_conflicting_sender_receiver(rng, state_store);
     let transfer_amount = 1_000;
     let txn = generate_p2p_txn(&mut sender, &receiver, transfer_amount);
     // execute transaction
@@ -109,15 +118,16 @@ pub fn compare_txn_outputs(
     }
 }
 
-pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
-    mut sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<InMemoryStateStore>>(
+    mut sharded_block_executor: ShardedBlockExecutor<InMemoryStateStore, E>,
 ) {
     let num_txns = 400;
     let num_shards = sharded_block_executor.num_shards();
-    let mut executor = FakeExecutor::from_head_genesis();
+    let state_store = InMemoryStateStore::from_head_genesis();
     let mut transactions = Vec::new();
+    let mut rng = KeyGen::from_seed([9; 32]);
     for _ in 0..num_txns {
-        transactions.push(generate_non_conflicting_p2p(&mut executor).0)
+        transactions.push(generate_non_conflicting_p2p(&mut rng, &state_store).0)
     }
     let partitioner = PartitionerV2Config::default()
         .max_partitioning_rounds(2)
@@ -127,7 +137,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
-            Arc::new(executor.data_store().clone()),
+            Arc::new(state_store.clone()),
             partitioned_txns.clone(),
             2,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -140,25 +150,25 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             .collect();
     let txn_provider = DefaultTxnProvider::new(txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
-        .execute_block_no_limit(&txn_provider, executor.data_store())
+        .execute_block_no_limit(&txn_provider, &state_store)
         .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();
 }
 
-pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
-    mut sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+pub fn sharded_block_executor_with_conflict<E: ExecutorClient<InMemoryStateStore>>(
+    mut sharded_block_executor: ShardedBlockExecutor<InMemoryStateStore, E>,
     concurrency: usize,
 ) {
     let num_txns = 800;
     let num_shards = sharded_block_executor.num_shards();
     let num_accounts = 80;
-    let mut executor = FakeExecutor::from_head_genesis();
+    let state_store = InMemoryStateStore::from_head_genesis();
     let mut transactions = Vec::new();
     let mut accounts = Vec::new();
     let mut txn_hash_to_account = HashMap::new();
     for _ in 0..num_accounts {
-        let account = generate_account_at(&mut executor, AccountAddress::random());
+        let account = generate_account_at(&state_store, AccountAddress::random());
         accounts.push(Mutex::new(account));
     }
     for i in 1..num_txns / num_accounts {
@@ -187,7 +197,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
             .collect();
     let sharded_txn_output = sharded_block_executor
         .execute_block(
-            Arc::new(executor.data_store().clone()),
+            Arc::new(state_store.clone()),
             partitioned_txns,
             concurrency,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -196,7 +206,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
 
     let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
-        .execute_block_no_limit(&txn_provider, executor.data_store())
+        .execute_block_no_limit(&txn_provider, &state_store)
         .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{access_specifier_loader::load_access_specifier, Module, Resolver, Script},
+    loader::{access_specifier_loader::load_access_specifier, Module, Script},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
@@ -72,6 +72,12 @@ pub struct LoadedFunction {
     pub ty_args: Vec<Type>,
     // Definition of the loaded function.
     pub function: Arc<Function>,
+}
+
+impl LoadedFunction {
+    pub fn owner(&self) -> &LoadedFunctionOwner {
+        &self.owner
+    }
 }
 
 /// A lazy loaded function, which can either be unresolved (as resulting
@@ -199,14 +205,9 @@ impl LazyLoadedFunction {
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
+        let function = module_storage
+            .load_function(module_id, fun_id, ty_args)
             .map_err(|err| err.to_partial())?;
-        let ty_args = ty_args
-            .iter()
-            .map(|t| module_storage.fetch_ty(t))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
 
         // Verify that the function argument types match the layouts used for deserialization.
         // This is only done in paranoid mode. Since integrity of storage
@@ -225,12 +226,20 @@ impl LazyLoadedFunction {
                         "captured argument count does not match declared parameters".to_string(),
                     ));
             }
+
+            let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
             for (actual_arg_ty, serialized_layout) in
                 captured_arg_types.into_iter().zip(captured_layouts)
             {
                 // Note that the below call returns a runtime layout, so we can directly
                 // compare it without desugaring.
-                let actual_arg_layout = converter.type_to_type_layout(actual_arg_ty)?;
+                let actual_arg_layout = if function.ty_args().is_empty() {
+                    converter.type_to_type_layout(actual_arg_ty)?
+                } else {
+                    let actual_arg_ty =
+                        ty_builder.create_ty_with_subst(actual_arg_ty, function.ty_args())?;
+                    converter.type_to_type_layout(&actual_arg_ty)?
+                };
                 if !serialized_layout.is_compatible_with(&actual_arg_layout) {
                     return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                         .with_message(
@@ -240,11 +249,7 @@ impl LazyLoadedFunction {
                 }
             }
         }
-        Ok(Rc::new(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
-            ty_args,
-            function,
-        }))
+        Ok(Rc::new(function))
     }
 }
 
@@ -348,7 +353,7 @@ impl LoadedFunction {
     }
 
     /// Returns true if the loaded function is an entry function.
-    pub(crate) fn is_entry(&self) -> bool {
+    pub fn is_entry(&self) -> bool {
         self.function.is_entry()
     }
 
@@ -407,17 +412,6 @@ impl LoadedFunction {
                 m.self_name().as_str(),
                 self.function.name()
             ),
-        }
-    }
-
-    pub(crate) fn get_resolver<'a>(&self, module_storage: &'a impl ModuleStorage) -> Resolver<'a> {
-        match &self.owner {
-            LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(module_storage, module.clone())
-            },
-            LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(module_storage, script.clone())
-            },
         }
     }
 }
@@ -583,14 +577,6 @@ impl Function {
         })
     }
 }
-
-//
-// Internal structures that are saved at the proper index in the proper tables to access
-// execution information (interpreter).
-// The following structs are internal to the loader and never exposed out.
-// The `Loader` will create those struct and the proper table when loading a module.
-// The `Resolver` uses those structs to return information to the `Interpreter`.
-//
 
 // A function instantiation.
 #[derive(Clone, Debug)]

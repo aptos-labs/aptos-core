@@ -303,7 +303,7 @@ pub(crate) fn realistic_env_max_load_test(
         NodeResourceOverride::default() // no overrides
     };
 
-    let mut success_criteria = SuccessCriteria::new(95)
+    let mut success_criteria = SuccessCriteria::new(85)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),

@@ -201,21 +201,21 @@ Provides a framework for comparing two elements
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="comparator.md#0x1_comparator_compare_u8_vector">compare_u8_vector</a>(left: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, right: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="comparator.md#0x1_comparator_Result">Result</a> {
-    <b>let</b> left_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&left);
-    <b>let</b> right_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&right);
+    <b>let</b> left_length = left.length();
+    <b>let</b> right_length = right.length();
 
     <b>let</b> idx = 0;
 
     <b>while</b> (idx &lt; left_length && idx &lt; right_length) {
-        <b>let</b> left_byte = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&left, idx);
-        <b>let</b> right_byte = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&right, idx);
+        <b>let</b> left_byte = left[idx];
+        <b>let</b> right_byte = right[idx];
 
         <b>if</b> (left_byte &lt; right_byte) {
             <b>return</b> <a href="comparator.md#0x1_comparator_Result">Result</a> { inner: <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a> }
         } <b>else</b> <b>if</b> (left_byte &gt; right_byte) {
             <b>return</b> <a href="comparator.md#0x1_comparator_Result">Result</a> { inner: <a href="comparator.md#0x1_comparator_GREATER">GREATER</a> }
         };
-        idx = idx + 1;
+        idx += 1;
     };
 
     <b>if</b> (left_length &lt; right_length) {

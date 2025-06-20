@@ -1,11 +1,11 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         continue
     }
 } // end <SELF>_0
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 script {
     fun main() {
         continue

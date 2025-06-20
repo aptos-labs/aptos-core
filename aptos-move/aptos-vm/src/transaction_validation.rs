@@ -4,7 +4,7 @@
 use crate::{
     aptos_vm::SerializedSigners,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    move_vm_ext::SessionExt,
+    move_vm_ext::{AptosMoveResolver, SessionExt},
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
@@ -14,8 +14,11 @@ use crate::{
 };
 use aptos_gas_algebra::Gas;
 use aptos_types::{
-    account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
+    account_config::constants::CORE_CODE_ADDRESS,
+    fee_statement::FeeStatement,
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::Features,
+    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -54,6 +57,11 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         unified_prologue_name: Identifier::new("unified_prologue").unwrap(),
         unified_prologue_fee_payer_name: Identifier::new("unified_prologue_fee_payer").unwrap(),
         unified_epilogue_name: Identifier::new("unified_epilogue").unwrap(),
+
+        unified_prologue_v2_name: Identifier::new("unified_prologue_v2").unwrap(),
+        unified_prologue_fee_payer_v2_name: Identifier::new("unified_prologue_fee_payer_v2")
+            .unwrap(),
+        unified_epilogue_v2_name: Identifier::new("unified_epilogue_v2").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -74,6 +82,11 @@ pub struct TransactionValidation {
     pub unified_prologue_name: Identifier,
     pub unified_prologue_fee_payer_name: Identifier,
     pub unified_epilogue_name: Identifier,
+
+    // Only these v2 functions support Txn Payload V2 format and Orderless transactions
+    pub unified_prologue_v2_name: Identifier,
+    pub unified_prologue_fee_payer_v2_name: Identifier,
+    pub unified_epilogue_v2_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -92,7 +105,7 @@ impl TransactionValidation {
 }
 
 pub(crate) fn run_script_prologue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
@@ -101,20 +114,39 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
-    let txn_sequence_number = txn_data.sequence_number();
+    let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
     let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
     let chain_id = txn_data.chain_id();
     let mut gas_meter = UnmeteredGasMeter;
+
     // Use the new prologues that takes signer from both sender and optional gas payer
-    if features.is_account_abstraction_enabled() {
+    if features.is_account_abstraction_enabled()
+        || features.is_derivable_account_abstraction_enabled()
+    {
         let secondary_auth_keys: Vec<MoveValue> = txn_data
             .secondary_authentication_proofs
             .iter()
             .map(|auth_key| auth_key.optional_auth_key().as_move_value())
             .collect();
+        let replay_protector_move_value = if features.is_transaction_payload_v2_enabled() {
+            txn_replay_protector
+                .to_move_value()
+                .simple_serialize()
+                .unwrap()
+        } else {
+            match txn_replay_protector {
+                ReplayProtector::SequenceNumber(seq_num) => {
+                    MoveValue::U64(seq_num).simple_serialize().unwrap()
+                },
+                ReplayProtector::Nonce(_) => {
+                    unreachable!("Orderless transactions are discarded already")
+                },
+            }
+        };
+
         let (prologue_function_name, serialized_args) =
             if let (Some(_fee_payer), Some(fee_payer_auth_key)) = (
                 txn_data.fee_payer(),
@@ -136,9 +168,7 @@ pub(crate) fn run_script_prologue(
                         .as_move_value()
                         .simple_serialize()
                         .unwrap(),
-                    MoveValue::U64(txn_sequence_number)
-                        .simple_serialize()
-                        .unwrap(),
+                    replay_protector_move_value,
                     MoveValue::vector_address(txn_data.secondary_signers())
                         .simple_serialize()
                         .unwrap(),
@@ -158,7 +188,11 @@ pub(crate) fn run_script_prologue(
                     MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
                 ];
                 (
-                    &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_name,
+                    if features.is_transaction_payload_v2_enabled() {
+                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_v2_name
+                    } else {
+                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_name
+                    },
                     serialized_args,
                 )
             } else {
@@ -168,9 +202,7 @@ pub(crate) fn run_script_prologue(
                         .as_move_value()
                         .simple_serialize()
                         .unwrap(),
-                    MoveValue::U64(txn_sequence_number)
-                        .simple_serialize()
-                        .unwrap(),
+                    replay_protector_move_value,
                     MoveValue::vector_address(txn_data.secondary_signers())
                         .simple_serialize()
                         .unwrap(),
@@ -190,7 +222,11 @@ pub(crate) fn run_script_prologue(
                     MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
                 ];
                 (
-                    &APTOS_TRANSACTION_VALIDATION.unified_prologue_name,
+                    if features.is_transaction_payload_v2_enabled() {
+                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_v2_name
+                    } else {
+                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_name
+                    },
                     serialized_args,
                 )
             };
@@ -208,6 +244,21 @@ pub(crate) fn run_script_prologue(
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     } else {
+        // Txn payload v2 format and orderless transactions are only supported with unified_prologue methods.
+        // Old prologue functions do not support these features.
+        let txn_sequence_number = match txn_replay_protector {
+            ReplayProtector::SequenceNumber(seq_num) => seq_num,
+            ReplayProtector::Nonce(_) => {
+                return Err(VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some(
+                        "Orderless transactions is not supported without unified_prologue methods"
+                            .to_string(),
+                    ),
+                ));
+            },
+        };
+
         let secondary_auth_keys: Vec<MoveValue> = txn_data
             .secondary_authentication_proofs
             .iter()
@@ -345,24 +396,36 @@ pub(crate) fn run_script_prologue(
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
-    payload: &Multisig,
+    executable: TransactionExecutableRef,
+    multisig_address: AccountAddress,
     features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
-    let provided_payload = if let Some(payload) = &payload.transaction_payload {
-        bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
-    } else {
-        // Default to empty bytes if payload is not provided.
-        if features.is_abort_if_multisig_payload_mismatch_enabled() {
-            vec![]
-        } else {
-            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
-        }
+    // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
+    // So, converting the executable to this format.
+    let provided_payload = match executable {
+        TransactionExecutableRef::EntryFunction(entry_function) => bcs::to_bytes(
+            &MultisigTransactionPayload::EntryFunction(entry_function.clone()),
+        )
+        .map_err(|_| unreachable_error.clone())?,
+        TransactionExecutableRef::Empty => {
+            if features.is_abort_if_multisig_payload_mismatch_enabled() {
+                vec![]
+            } else {
+                bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error.clone())?
+            }
+        },
+        TransactionExecutableRef::Script(_) => {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Script payload not supported for multisig transactions".to_string()),
+            ));
+        },
     };
 
     session
@@ -372,7 +435,7 @@ pub(crate) fn run_multisig_prologue(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(txn_data.sender),
-                MoveValue::Address(payload.multisig_address),
+                MoveValue::Address(multisig_address),
                 MoveValue::vector_u8(provided_payload),
             ]),
             &mut UnmeteredGasMeter,
@@ -385,7 +448,7 @@ pub(crate) fn run_multisig_prologue(
 }
 
 fn run_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -397,9 +460,12 @@ fn run_epilogue(
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
+    let is_orderless_txn = txn_data.is_orderless();
 
-    if features.is_account_abstraction_enabled() {
-        let serialize_args = vec![
+    if features.is_account_abstraction_enabled()
+        || features.is_derivable_account_abstraction_enabled()
+    {
+        let mut serialize_args = vec![
             serialized_signers.sender(),
             serialized_signers
                 .fee_payer()
@@ -418,9 +484,20 @@ fn run_epilogue(
                 .unwrap(),
             MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
         ];
+        if features.is_transaction_payload_v2_enabled() {
+            serialize_args.push(
+                MoveValue::Bool(is_orderless_txn)
+                    .simple_serialize()
+                    .unwrap(),
+            );
+        }
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.unified_epilogue_name,
+            if features.is_transaction_payload_v2_enabled() {
+                &APTOS_TRANSACTION_VALIDATION.unified_epilogue_v2_name
+            } else {
+                &APTOS_TRANSACTION_VALIDATION.unified_epilogue_name
+            },
             vec![],
             serialize_args,
             &mut UnmeteredGasMeter,
@@ -521,7 +598,7 @@ fn run_epilogue(
 }
 
 fn emit_fee_statement(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
@@ -541,7 +618,7 @@ fn emit_fee_statement(
 /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
@@ -576,7 +653,7 @@ pub(crate) fn run_success_epilogue(
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
-    session: &mut SessionExt,
+    session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,

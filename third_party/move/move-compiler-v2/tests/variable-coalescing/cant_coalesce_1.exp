@@ -6,7 +6,7 @@ warning: Unused local variable `x`. Consider removing or prefixing with an under
 3 │         let x = a + a;
   │             ^
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test($t0: u64): u64 {
@@ -28,6 +28,21 @@ warning: Unused assignment/binding to `x`. Consider removing the assignment/bind
   │
 3 │         let x = a + a;
   │                 ^^^^^
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t3 := infer($t0)
+  1: $t2 := +($t3, $t0)
+  2: $t4 := 2
+  3: $t1 := infer($t4)
+  4: return $t1
+}
 
 ============ after DeadStoreElimination: ================
 

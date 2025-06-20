@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::RuntimeModuleMetadataV1;
+use aptos_types::vm::module_metadata::{get_metadata_from_compiled_code, RuntimeModuleMetadataV1};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -38,12 +38,10 @@ pub(crate) fn validate_module_events(
     modules: &[CompiledModule],
 ) -> VMResult<()> {
     for module in modules {
-        let mut new_event_structs =
-            if let Some(metadata) = aptos_framework::get_metadata_from_compiled_module(module) {
-                extract_event_metadata(&metadata)?
-            } else {
-                HashSet::new()
-            };
+        let mut new_event_structs = get_metadata_from_compiled_code(module).map_or_else(
+            || Ok(HashSet::new()),
+            |metadata| extract_event_metadata(&metadata),
+        )?;
 
         // Check all the emit calls have the correct struct with event attribute.
         validate_emit_calls(&new_event_structs, module)?;
@@ -123,7 +121,7 @@ pub(crate) fn extract_event_metadata_from_module(
     // TODO(loader_v2): We can optimize metadata calls as well.
     let metadata = module_storage
         .fetch_deserialized_module(module_id.address(), module_id.name())?
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(module.as_ref()));
+        .map(|module| get_metadata_from_compiled_code(module.as_ref()));
     if let Some(Some(metadata)) = metadata {
         extract_event_metadata(&metadata)
     } else {

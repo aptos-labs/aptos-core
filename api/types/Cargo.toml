@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-framework = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-openapi = { workspace = true }
 aptos-resource-viewer = { workspace = true }

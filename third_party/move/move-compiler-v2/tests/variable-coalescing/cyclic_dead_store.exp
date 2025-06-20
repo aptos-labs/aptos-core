@@ -1,4 +1,64 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t3 := 0
+  1: label L0
+  2: $t5 := infer($t3)
+  3: $t4 := <($t5, $t0)
+  4: if ($t4) goto 5 else goto 13
+  5: label L2
+  6: $t1 := infer($t2)
+  7: $t2 := infer($t1)
+  8: $t7 := infer($t3)
+  9: $t8 := 1
+ 10: $t6 := +($t7, $t8)
+ 11: $t3 := infer($t6)
+ 12: goto 15
+ 13: label L3
+ 14: goto 17
+ 15: label L4
+ 16: goto 1
+ 17: label L1
+ 18: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t2 := 0
+  1: label L0
+  2: $t4 := infer($t2)
+  3: $t3 := <($t4, $t0)
+  4: if ($t3) goto 5 else goto 12
+  5: label L2
+  6: $t1 := infer($t1)
+  7: $t6 := infer($t2)
+  8: $t7 := 1
+  9: $t5 := +($t6, $t7)
+ 10: $t2 := infer($t5)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 1
+ 16: label L1
+ 17: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 public fun m::test1($t0: u64, $t1: u64, $t2: u64) {

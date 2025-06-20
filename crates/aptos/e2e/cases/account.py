@@ -3,6 +3,7 @@
 
 import json
 import secrets
+import time
 
 from common import OTHER_ACCOUNT_ONE, TestError
 from test_helpers import RunHelper
@@ -11,6 +12,11 @@ from test_results import test_case
 
 @test_case
 async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
+    old_balance = int(
+        await run_helper.api_client.account_balance(
+            run_helper.get_account_info().account_address
+        )
+    )
     amount_in_octa = 100000000000
 
     # Fund the account.
@@ -21,7 +27,7 @@ async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
             "account",
             "fund-with-faucet",
             "--account",
-            run_helper.get_account_info().account_address,
+            str(run_helper.get_account_info().account_address),
             "--amount",
             str(amount_in_octa),
         ],
@@ -33,9 +39,9 @@ async def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
             run_helper.get_account_info().account_address
         )
     )
-    if balance == amount_in_octa:
+    if balance != amount_in_octa + old_balance:
         raise TestError(
-            f"Account {run_helper.get_account_info().account_address} has balance {balance}, expected {amount_in_octa}"
+            f"Account {run_helper.get_account_info().account_address} has balance {balance}, expected {amount_in_octa + old_balance}"
         )
 
 
@@ -49,7 +55,7 @@ async def test_account_create_and_transfer(run_helper: RunHelper, test_name=None
             "account",
             "create",
             "--account",
-            OTHER_ACCOUNT_ONE.account_address,
+            str(OTHER_ACCOUNT_ONE.account_address),
             "--assume-yes",
         ],
     )
@@ -72,7 +78,7 @@ async def test_account_create_and_transfer(run_helper: RunHelper, test_name=None
             "account",
             "transfer",
             "--account",
-            OTHER_ACCOUNT_ONE.account_address,
+            str(OTHER_ACCOUNT_ONE.account_address),
             "--amount",
             str(transfer_amount),
             "--assume-yes",
@@ -99,7 +105,7 @@ def test_account_list(run_helper: RunHelper, test_name=None):
             "account",
             "list",
             "--account",
-            OTHER_ACCOUNT_ONE.account_address,
+            str(run_helper.get_account_info().account_address),
         ],
     )
 
@@ -127,11 +133,11 @@ def test_account_lookup_address(run_helper: RunHelper, test_name=None):
             "account",
             "lookup-address",
             "--auth-key",
-            run_helper.get_account_info().account_address,  # initially the account address is the auth key
+            str(run_helper.get_account_info().account_address),  # initially the account address is the auth key
         ],
     )
 
-    if run_helper.get_account_info().account_address not in result_addr.stdout:
+    if str(run_helper.get_account_info().account_address)[2:] not in result_addr.stdout:
         raise TestError(
             f"lookup-address result does not match {run_helper.get_account_info().account_address}"
         )
@@ -182,7 +188,7 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
         ],
     )
     response = json.loads(result.stdout)
-    if response["Result"] != old_profile.account_address:
+    if f"0x{response['Result']}" != str(old_profile.account_address):
         raise TestError(
             f"lookup-address of old public key does not match original address: {old_profile.account_address}"
         )
@@ -198,7 +204,7 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
         ],
     )
     response = json.loads(result.stdout)
-    if response["Result"] != old_profile.account_address:
+    if f"0x{response['Result']}" != str(old_profile.account_address):
         raise TestError(
             f"lookup-address of new public key does not match original address: {old_profile.account_address}"
         )
@@ -249,6 +255,7 @@ def test_account_resource_account(run_helper: RunHelper, test_name=None):
         )
 
     # List the resource account
+    time.sleep(5)
     result = run_helper.run_command(
         test_name,
         [

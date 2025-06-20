@@ -264,10 +264,10 @@ Return the value of n raised to power e
         <b>let</b> p = 1;
         <b>while</b> (e &gt; 1) {
             <b>if</b> (e % 2 == 1) {
-                p = p * n;
+                p *= n;
             };
-            e = e / 2;
-            n = n * n;
+            e /= 2;
+            n *= n;
         };
         p * n
     }
@@ -301,10 +301,10 @@ Returns floor(lg2(x))
     <b>let</b> n = 32;
     <b>while</b> (n &gt; 0) {
         <b>if</b> (x &gt;= (1 &lt;&lt; n)) {
-            x = x &gt;&gt; n;
-            res = res + n;
+            x &gt;&gt;= n;
+            res += n;
         };
-        n = n &gt;&gt; 1;
+        n &gt;&gt;= 1;
     };
     res
 }
@@ -345,8 +345,8 @@ Returns floor(lg2(x))
         y = (y * y) &gt;&gt; 32;
         // x is now in [1, 4)
         // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
-        <b>if</b> (y &gt;= (2 &lt;&lt; 32)) { frac = frac + delta; y = y &gt;&gt; 1; };
-        delta = delta &gt;&gt; 1;
+        <b>if</b> (y &gt;= (2 &lt;&lt; 32)) { frac += delta; y &gt;&gt;= 1; };
+        delta &gt;&gt;= 1;
     };
     <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
 }

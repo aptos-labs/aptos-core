@@ -4,7 +4,7 @@
   "state_change_hash": "",
   "event_root_hash": "",
   "state_checkpoint_hash": null,
-  "gas_used": "3",
+  "gas_used": "4",
   "success": false,
   "vm_status": "LINKER_ERROR",
   "accumulator_root_hash": "",
@@ -25,7 +25,7 @@
               }
             }
           },
-          "guid_creation_num": "4",
+          "guid_creation_num": "2",
           "key_rotation_events": {
             "counter": "0",
             "guid": {
@@ -72,6 +72,7 @@
     "signature": "0x72e5b26a971d06d000f7e4a805b46623428d610f66d8425baa81e60522da00ab5c8e874377b2619dae1ddbf9141f41f71a97aed927b8eee2e6683e6b19e4ae00",
     "type": "ed25519_signature"
   },
+  "replay_protection_nonce": null,
   "events": [
     {
       "guid": {
@@ -81,11 +82,11 @@
       "sequence_number": "0",
       "type": "0x1::transaction_fee::FeeStatement",
       "data": {
-        "execution_gas_units": "3",
-        "io_gas_units": "0",
+        "execution_gas_units": "4",
+        "io_gas_units": "1",
         "storage_fee_octas": "0",
         "storage_fee_refund_octas": "0",
-        "total_charge_gas_units": "3"
+        "total_charge_gas_units": "4"
       }
     }
   ],

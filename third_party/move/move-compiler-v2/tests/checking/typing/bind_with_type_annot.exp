@@ -1,30 +1,38 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0() {
-        0;
         {
-          let (x: u64, b: bool, M::R{ f }): (u64, bool, R) = Tuple(0, false, pack M::R(0));
-          0;
-          false;
-          0;
-          Tuple()
+          let (): () = Tuple();
+          {
+            let x: u64 = 0;
+            x;
+            {
+              let (x: u64, b: bool, M::R{ f }): (u64, bool, R) = Tuple(0, false, pack M::R(0));
+              x;
+              b;
+              f;
+              Tuple()
+            }
+          }
         }
     }
 } // end 0x8675309::M
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     fun t0() {
-        0;
+        let () = ();
+        let x = 0;
+        x;
         let (x,b,R{f: f}) = (0, false, R{f: 0});
-        0;
-        false;
-        0;
+        x;
+        b;
+        f;
     }
 }

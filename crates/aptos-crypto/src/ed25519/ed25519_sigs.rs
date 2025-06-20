@@ -151,6 +151,8 @@ impl Length for Ed25519Signature {
 }
 
 impl ValidCryptoMaterial for Ed25519Signature {
+    const AIP_80_PREFIX: &'static str = "ed25519-sig-";
+
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }

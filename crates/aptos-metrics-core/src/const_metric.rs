@@ -37,7 +37,7 @@ impl ConstMetric {
 
         let mut metric = Metric::default();
         metric.set_counter(counter);
-        metric.set_label(labels);
+        metric.set_label(labels.into());
 
         Ok(ConstMetric {
             desc,
@@ -63,7 +63,7 @@ impl ConstMetric {
 
         let mut metric = Metric::default();
         metric.set_gauge(guage);
-        metric.set_label(labels);
+        metric.set_label(labels.into());
 
         Ok(ConstMetric {
             desc,
@@ -84,7 +84,7 @@ impl Collector for ConstMetric {
         met.set_name(self.desc.fq_name.clone());
         met.set_help(self.desc.help.clone());
         met.set_field_type(self.metric_type);
-        met.set_metric(vec![self.metric.clone()]);
+        met.set_metric(vec![self.metric.clone()].into());
 
         vec![met]
     }

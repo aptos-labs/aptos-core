@@ -10,7 +10,6 @@
 module aptos_std::ristretto255_bulletproofs {
     use std::error;
     use std::features;
-    use std::vector;
     use aptos_std::ristretto255_pedersen as pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
 
@@ -109,7 +108,7 @@ module aptos_std::ristretto255_bulletproofs {
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
         assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
-        assert!(vector::length(&dst) <= 256, error::invalid_argument(E_DST_TOO_LONG));
+        assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&ristretto255::point_compress(com)),
@@ -129,7 +128,7 @@ module aptos_std::ristretto255_bulletproofs {
         num_bits: u64, dst: vector<u8>): bool
     {
         verify_batch_range_proof(
-            &std::vector::map_ref(comms, |com| ristretto255::point_clone(pedersen::commitment_as_point(com))),
+            &comms.map_ref(|com| ristretto255::point_clone(pedersen::commitment_as_point(com))),
             &ristretto255::basepoint(), &ristretto255::hash_to_point_base(),
             proof,
             num_bits,
@@ -149,9 +148,9 @@ module aptos_std::ristretto255_bulletproofs {
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
         assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
-        assert!(vector::length(&dst) <= 256, error::invalid_argument(E_DST_TOO_LONG));
+        assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
 
-        let comms = std::vector::map_ref(comms, |com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
+        let comms = comms.map_ref(|com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
 
         verify_batch_range_proof_internal(
             comms,
@@ -179,7 +178,7 @@ module aptos_std::ristretto255_bulletproofs {
     {
         let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, val_base, rand_base);
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
-        let point = &std::option::extract(&mut point);
+        let point = &point.extract();
 
         (
             RangeProof { bytes },
@@ -209,13 +208,13 @@ module aptos_std::ristretto255_bulletproofs {
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         num_bits: u64, dst: vector<u8>): (RangeProof, vector<pedersen::Commitment>)
     {
-        let vals = std::vector::map_ref(vals, |val| scalar_to_bytes(val));
-        let rs = std::vector::map_ref(rs, |r| scalar_to_bytes(r));
+        let vals = vals.map_ref(|val| scalar_to_bytes(val));
+        let rs = rs.map_ref(|r| scalar_to_bytes(r));
 
         let (bytes, compressed_comms) = prove_batch_range_internal(vals, rs, num_bits, dst, val_base, rand_base);
-        let comms = std::vector::map(compressed_comms, |compressed_comm| {
+        let comms = compressed_comms.map(|compressed_comm| {
             let comm = pedersen::new_commitment_from_bytes(compressed_comm);
-            std::option::extract(&mut comm)
+            comm.extract()
         });
 
         (
@@ -319,7 +318,7 @@ module aptos_std::ristretto255_bulletproofs {
         features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let comm = pedersen::new_commitment_from_bytes(A_COMM);
-        let comm = std::option::extract(&mut comm);
+        let comm = comm.extract();
 
         verify_range_proof_pedersen(&comm, &range_proof_from_bytes(A_RANGE_PROOF_PEDERSEN), 10, A_DST);
     }
@@ -332,7 +331,7 @@ module aptos_std::ristretto255_bulletproofs {
         let comm_a = pedersen::new_commitment_from_bytes(A_COMM);
         let comm_b = pedersen::new_commitment_from_bytes(B_COMM);
 
-        let comms = vector[std::option::extract(&mut comm_a), std::option::extract(&mut comm_b)];
+        let comms = vector[comm_a.extract(), comm_b.extract()];
 
         verify_batch_range_proof_pedersen(&comms, &range_proof_from_bytes(AB_BATCH_RANGE_PROOF_PEDERSEN), 10, A_DST);
     }
@@ -343,7 +342,7 @@ module aptos_std::ristretto255_bulletproofs {
 
         let v = ristretto255::new_scalar_from_u64(59);
         let r = ristretto255::new_scalar_from_bytes(A_BLINDER);
-        let r = std::option::extract(&mut r);
+        let r = r.extract();
         let num_bits = 8;
 
         let (proof, comm) = prove_range_pedersen(&v, &r, num_bits, A_DST);
@@ -363,8 +362,8 @@ module aptos_std::ristretto255_bulletproofs {
             ristretto255::new_scalar_from_u64(60),
         ];
         let rs = vector[
-            std::option::extract(&mut ristretto255::new_scalar_from_bytes(A_BLINDER)),
-            std::option::extract(&mut ristretto255::new_scalar_from_bytes(B_BLINDER)),
+            ristretto255::new_scalar_from_bytes(A_BLINDER).extract(),
+            ristretto255::new_scalar_from_bytes(B_BLINDER).extract(),
         ];
         let num_bits = 8;
 
@@ -383,7 +382,7 @@ module aptos_std::ristretto255_bulletproofs {
 
         let v = ristretto255::new_scalar_from_u64(59);
         let r = ristretto255::new_scalar_from_bytes(A_BLINDER);
-        let r = std::option::extract(&mut r);
+        let r = r.extract();
         let num_bits = 8;
 
         let (proof, comm) = prove_range_pedersen(&v, &r, num_bits, A_DST);
@@ -402,8 +401,8 @@ module aptos_std::ristretto255_bulletproofs {
             ristretto255::new_scalar_from_u64(60),
         ];
         let rs = vector[
-            std::option::extract(&mut ristretto255::new_scalar_from_bytes(A_BLINDER)),
-            std::option::extract(&mut ristretto255::new_scalar_from_bytes(B_BLINDER)),
+            ristretto255::new_scalar_from_bytes(A_BLINDER).extract(),
+            ristretto255::new_scalar_from_bytes(B_BLINDER).extract(),
         ];
         let num_bits = 8;
 
@@ -456,8 +455,8 @@ module aptos_std::ristretto255_bulletproofs {
         let blinder_a = ristretto255::new_scalar_from_bytes(A_BLINDER);
         let blinder_b = ristretto255::new_scalar_from_bytes(B_BLINDER);
 
-        let values = vector[std::option::extract(&mut value_a), value_b];
-        let blinders = vector[std::option::extract(&mut blinder_a), std::option::extract(&mut blinder_b)];
+        let values = vector[value_a.extract(), value_b];
+        let blinders = vector[blinder_a.extract(), blinder_b.extract()];
 
         // This will fail with error::invalid_argument(E_VALUE_OUTSIDE_RANGE)
         prove_batch_range_pedersen(&values, &blinders, 64, A_DST);
@@ -469,7 +468,7 @@ module aptos_std::ristretto255_bulletproofs {
         features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_batch_feature() ], vector[]);
 
         let value = ristretto255::new_scalar_from_u128(1 << 65);
-        let blinder = std::option::extract(&mut ristretto255::new_scalar_from_bytes(A_BLINDER));
+        let blinder = ristretto255::new_scalar_from_bytes(A_BLINDER).extract();
 
         // This will fail with error::invalid_argument(E_VALUE_OUTSIDE_RANGE)
         prove_range_pedersen(&value, &blinder, 64, A_DST);
@@ -489,13 +488,13 @@ module aptos_std::ristretto255_bulletproofs {
         let blinder_c = ristretto255::new_scalar_from_u32(1);
 
         let values = vector[
-            std::option::extract(&mut value_a),
-            std::option::extract(&mut value_b),
+            value_a.extract(),
+            value_b.extract(),
             value_c,
         ];
         let blinders = vector[
-            std::option::extract(&mut blinder_a),
-            std::option::extract(&mut blinder_b),
+            blinder_a.extract(),
+            blinder_b.extract(),
             blinder_c,
         ];
 
@@ -513,8 +512,8 @@ module aptos_std::ristretto255_bulletproofs {
 
         let blinder_a = ristretto255::new_scalar_from_bytes(A_BLINDER);
 
-        let values = vector[std::option::extract(&mut value_a), std::option::extract(&mut value_b)];
-        let blinders = vector[std::option::extract(&mut blinder_a)];
+        let values = vector[value_a.extract(), value_b.extract()];
+        let blinders = vector[blinder_a.extract()];
 
         // This will fail with error::invalid_argument(E_VECTOR_LENGTHS_MISMATCH)
         prove_batch_range_pedersen(&values, &blinders, 64, A_DST);
@@ -525,14 +524,14 @@ module aptos_std::ristretto255_bulletproofs {
         features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_batch_feature() ], vector[]);
 
         let value = ristretto255::new_scalar_from_bytes(A_VALUE);
-        let value = std::option::extract(&mut value);
+        let value = value.extract();
 
         let blinder = ristretto255::new_scalar_from_bytes(A_BLINDER);
-        let blinder = std::option::extract(&mut blinder);
+        let blinder = blinder.extract();
 
         let comm = pedersen::new_commitment_for_bulletproof(&value, &blinder);
 
-        let expected_comm = std::option::extract(&mut pedersen::new_commitment_from_bytes(A_COMM));
+        let expected_comm = pedersen::new_commitment_from_bytes(A_COMM).extract();
         assert!(commitment_equals(&comm, &expected_comm), 1);
 
         assert!(verify_range_proof_pedersen(
@@ -550,15 +549,20 @@ module aptos_std::ristretto255_bulletproofs {
         let blinder_a = ristretto255::new_scalar_from_bytes(A_BLINDER);
         let blinder_b = ristretto255::new_scalar_from_bytes(B_BLINDER);
 
-        let values = vector[std::option::extract(&mut value_a), std::option::extract(&mut value_b)];
-        let blinders = vector[std::option::extract(&mut blinder_a), std::option::extract(&mut blinder_b)];
+        let values = vector[value_a.extract(), value_b.extract()];
+        let blinders = vector[blinder_a.extract(), blinder_b.extract()];
 
-        let comms = std::vector::zip_map(values, blinders, |val, blinder| {
-            pedersen::new_commitment_for_bulletproof(&val, &blinder)
-        });
+        let comms = values.zip_map(
+            blinders,
+            |val, blinder| {
+                pedersen::new_commitment_for_bulletproof(&val, &blinder)
+            }
+        );
 
-        assert!(commitment_equals(std::vector::borrow(&comms, 0), &std::option::extract(&mut pedersen::new_commitment_from_bytes(A_COMM))), 1);
-        assert!(commitment_equals(std::vector::borrow(&comms, 1), &std::option::extract(&mut pedersen::new_commitment_from_bytes(B_COMM))), 1);
+        assert!(commitment_equals(comms.borrow(0), &pedersen::new_commitment_from_bytes(A_COMM).extract()
+        ), 1);
+        assert!(commitment_equals(comms.borrow(1), &pedersen::new_commitment_from_bytes(B_COMM).extract()
+        ), 1);
 
         assert!(verify_batch_range_proof_pedersen(
             &comms,
@@ -570,15 +574,15 @@ module aptos_std::ristretto255_bulletproofs {
         features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let comm = pedersen::new_commitment_from_bytes(A_COMM);
-        let comm = std::option::extract(&mut comm);
+        let comm = comm.extract();
 
         // Take a valid proof...
         let range_proof_invalid = A_RANGE_PROOF_PEDERSEN;
 
         // ...and modify a byte in the middle of the proof
-        let pos = std::vector::length(&range_proof_invalid) / 2;
-        let byte = std::vector::borrow_mut(&mut range_proof_invalid, pos);
-        *byte = *byte + 1;
+        let pos = range_proof_invalid.length() / 2;
+        let byte = range_proof_invalid.borrow_mut(pos);
+        *byte += 1;
 
         assert!(verify_range_proof_pedersen(
             &comm,
@@ -592,15 +596,14 @@ module aptos_std::ristretto255_bulletproofs {
         let comm_a = pedersen::new_commitment_from_bytes(A_COMM);
         let comm_b = pedersen::new_commitment_from_bytes(B_COMM);
 
-        let comms = vector[std::option::extract(&mut comm_a), std::option::extract(&mut comm_b)];
+        let comms = vector[comm_a.extract(), comm_b.extract()];
 
         // Take a valid proof...
         let range_proof_invalid = AB_BATCH_RANGE_PROOF_PEDERSEN;
 
         // ...and modify a byte in the middle of the proof
-        let pos = std::vector::length(&range_proof_invalid) / 2;
-        let byte = std::vector::borrow_mut(&mut range_proof_invalid, pos);
-        *byte = *byte + 1;
+        let pos = range_proof_invalid.length() / 2;
+        range_proof_invalid[pos] += 1;
 
         assert!(verify_batch_range_proof_pedersen(
             &comms,

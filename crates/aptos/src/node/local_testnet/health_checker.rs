@@ -3,18 +3,19 @@
 
 use super::indexer_api::confirm_metadata_applied;
 use anyhow::{anyhow, Context, Result};
-use aptos_protos::indexer::v1::GetTransactionsRequest;
+use aptos_indexer_processor_sdk::{
+    aptos_indexer_transaction_stream::{transaction_stream::get_chain_id, TransactionStreamConfig},
+    postgres::processor_metadata_schema::processor_metadata::processor_status,
+};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
-use futures::StreamExt;
-use processor::schema::processor_status;
 use reqwest::Url;
 use serde::Serialize;
 use std::time::Duration;
 use tokio::time::Instant;
 use tracing::info;
 
-const MAX_WAIT_S: u64 = 60;
+const MAX_WAIT_S: u64 = 120;
 const WAIT_INTERVAL_MS: u64 = 200;
 
 /// This provides a single place to define a variety of different healthchecks. In
@@ -56,25 +57,32 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
-                let mut client = aptos_indexer_grpc_utils::create_data_service_grpc_client(
-                    url.clone(),
-                    Some(Duration::from_secs(5)),
-                )
-                .await?;
-                let request = tonic::Request::new(GetTransactionsRequest {
-                    starting_version: Some(0),
+                let backoff = backoff::ExponentialBackoff {
+                    max_elapsed_time: Some(Duration::from_secs(5)),
                     ..Default::default()
-                });
-                // Make sure we can stream the first message from the stream.
-                client
-                    .get_transactions(request)
-                    .await
-                    .context("GRPC connection error")?
-                    .into_inner()
-                    .next()
-                    .await
-                    .context("Did not receive init signal from data service GRPC stream")?
-                    .context("Error processing first message from GRPC stream")?;
+                };
+                backoff::future::retry(backoff, || async {
+                    let transaction_stream_config = TransactionStreamConfig {
+                        indexer_grpc_data_service_address: url.clone(),
+                        auth_token: "notused".to_string(),
+                        starting_version: Some(0),
+                        request_ending_version: None,
+                        request_name_header: "notused".to_string(),
+                        additional_headers: Default::default(),
+                        indexer_grpc_http2_ping_interval_secs: Default::default(),
+                        indexer_grpc_http2_ping_timeout_secs: 60,
+                        indexer_grpc_response_item_timeout_secs: 60,
+                        indexer_grpc_reconnection_timeout_secs: 60,
+                        indexer_grpc_reconnection_max_retries: Default::default(),
+                        transaction_filter: None,
+                    };
+                    get_chain_id(transaction_stream_config)
+                        .await
+                        .context("Failed to get chain id")?;
+                    Ok(())
+                })
+                .await
+                .context("Failed to get a response from gRPC")?;
                 Ok(())
             },
             HealthChecker::Postgres(connection_string) => {

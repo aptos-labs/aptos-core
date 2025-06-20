@@ -152,13 +152,6 @@ impl CliTestFramework {
         self.account_addresses.clone()
     }
 
-    async fn check_account_exists(&self, index: usize) -> bool {
-        // Create account if it doesn't exist (and there's a faucet)
-        let client = aptos_rest_client::Client::new(self.endpoint.clone());
-        let address = self.account_id(index);
-        client.get_account(address).await.is_ok()
-    }
-
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
         let address = account_address_from_public_key(&private_key.public_key());
         self.account_addresses.push(address);
@@ -187,11 +180,6 @@ impl CliTestFramework {
         sender_index: usize,
     ) -> CliTypedResult<usize> {
         let index = self.add_account_to_cli(private_key);
-        if self.check_account_exists(index).await {
-            return Err(CliError::UnexpectedError(
-                "Account already exists".to_string(),
-            ));
-        }
         CreateAccount {
             txn_options: self.transaction_options(sender_index, None),
             account: self.account_id(index),
@@ -208,12 +196,6 @@ impl CliTestFramework {
         amount: Option<u64>,
     ) -> CliTypedResult<usize> {
         let index = self.add_account_to_cli(private_key);
-        if self.check_account_exists(index).await {
-            return Err(CliError::UnexpectedError(
-                "Account already exists".to_string(),
-            ));
-        }
-
         self.fund_account(index, amount).await?;
         warn!(
             "Funded account {:?} with {:?} OCTA",
@@ -1275,20 +1257,7 @@ impl CliTestFramework {
 // and json is serialized with different types from both, so hardcoding deserialization.
 
 fn json_account_to_balance(value: &Value) -> u64 {
-    u64::from_str(
-        value
-            .as_object()
-            .unwrap()
-            .get("coin")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("value")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap()
+    value.as_u64().unwrap()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

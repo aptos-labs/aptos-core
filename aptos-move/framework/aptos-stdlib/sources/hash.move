@@ -110,15 +110,12 @@ module aptos_std::aptos_hash {
             x"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
         ];
 
-        let i = 0;
-        while (i < std::vector::length(&inputs)) {
-            let input = *std::vector::borrow(&inputs, i);
-            let hash_expected = *std::vector::borrow(&outputs, i);
+        for (i in 0..inputs.length()) {
+            let input = inputs[i];
+            let hash_expected = outputs[i];
             let hash = keccak256(input);
 
             assert!(hash_expected == hash, 1);
-
-            i = i + 1;
         };
     }
 
@@ -138,15 +135,12 @@ module aptos_std::aptos_hash {
         x"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
         ];
 
-        let i = 0;
-        while (i < std::vector::length(&inputs)) {
-            let input = *std::vector::borrow(&inputs, i);
-            let hash_expected = *std::vector::borrow(&outputs, i);
+        for (i in 0..inputs.length()) {
+            let input = inputs[i];
+            let hash_expected = outputs[i];
             let hash = sha2_512(input);
 
             assert!(hash_expected == hash, 1);
-
-            i = i + 1;
         };
     }
 
@@ -165,15 +159,12 @@ module aptos_std::aptos_hash {
         x"a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26",
         ];
 
-        let i = 0;
-        while (i < std::vector::length(&inputs)) {
-            let input = *std::vector::borrow(&inputs, i);
-            let hash_expected = *std::vector::borrow(&outputs, i);
+        for (i in 0..inputs.length()) {
+            let input = inputs[i];
+            let hash_expected = outputs[i];
             let hash = sha3_512(input);
 
             assert!(hash_expected == hash, 1);
-
-            i = i + 1;
         };
     }
 
@@ -192,15 +183,12 @@ module aptos_std::aptos_hash {
         x"9c1185a5c5e9fc54612808977ee8f548b2258d31",
         ];
 
-        let i = 0;
-        while (i < std::vector::length(&inputs)) {
-            let input = *std::vector::borrow(&inputs, i);
-            let hash_expected = *std::vector::borrow(&outputs, i);
+        for (i in 0..inputs.length()) {
+            let input = inputs[i];
+            let hash_expected = outputs[i];
             let hash = ripemd160(input);
 
             assert!(hash_expected == hash, 1);
-
-            i = i + 1;
         };
     }
 
@@ -239,15 +227,12 @@ module aptos_std::aptos_hash {
         x"1deab5a4eb7481453ca9b29e1f7c4be8ba44de4faeeafdf173b310cbaecfc84c",
         ];
 
-        let i = 0;
-        while (i < std::vector::length(&inputs)) {
-            let input = *std::vector::borrow(&inputs, i);
-            let hash_expected = *std::vector::borrow(&outputs, i);
+        for (i in 0..inputs.length()) {
+            let input = inputs[i];
+            let hash_expected = outputs[i];
             let hash = blake2b_256(input);
 
             assert!(hash_expected == hash, 1);
-
-            i = i + 1;
         };
     }
 }

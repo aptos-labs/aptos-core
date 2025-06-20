@@ -108,7 +108,7 @@ pub enum PrimitiveType {
 }
 
 /// A type substitution.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct Substitution {
     /// Assignment of types to variables.
     subs: BTreeMap<u32, Type>,
@@ -151,9 +151,9 @@ pub enum Constraint {
     /// and result type. This is used to represent function types for which the ability set
     /// is unknown.
     SomeFunctionValue(
-        // The argument type. This is contra-variant.
+        /// The argument type. This is contra-variant.
         Type,
-        // The result type. This is co-variant.
+        /// The result type. This is co-variant.
         Type,
     ),
     /// The type must not be reference because it is used as the type of some field or
@@ -384,7 +384,7 @@ impl ConstraintOrigin {
 }
 
 impl Constraint {
-    /// Returns the default type of some constraint. At the end of type unification, variables
+    /// Returns the default type of constraint. At the end of type unification, variables
     /// with constraints that have defaults will be substituted by those defaults.
     pub fn default_type(&self) -> Option<Type> {
         match self {
@@ -405,6 +405,45 @@ impl Constraint {
                     AbilitySet::EMPTY,
                 ))
             },
+            _ => None,
+        }
+    }
+
+    /// Determines the default type for a list of constraints. This finds a constraint
+    /// which can generate a type, and then checks whether it is compatible with any
+    /// other provided constraints.
+    pub fn default_type_for<'a>(constrs: impl Iterator<Item = &'a Constraint>) -> Option<Type> {
+        let mut result = None;
+        let mut abilities = None;
+        for ctr in constrs {
+            if let Some(ty) = ctr.default_type() {
+                result = Some(ty)
+            } else {
+                match ctr {
+                    Constraint::HasAbilities(abs, _) => abilities = Some(*abs),
+                    Constraint::NoTuple | Constraint::NoPhantom | Constraint::NoReference => {
+                        // Skip, is trivially satisfied for a concrete type
+                    },
+                    Constraint::SomeNumber(_)
+                    | Constraint::SomeReference(_)
+                    | Constraint::SomeStruct(_)
+                    | Constraint::SomeReceiverFunction(..)
+                    | Constraint::SomeFunctionValue(..)
+                    | Constraint::WithDefault(_) => {
+                        // Incompatible
+                        return None;
+                    },
+                }
+            }
+        }
+        match (abilities, result) {
+            (Some(abs), Some(Type::Fun(arg, res, _))) => Some(Type::Fun(arg, res, abs)),
+            (Some(abs), Some(Type::Primitive(PrimitiveType::U64)))
+                if !abs.has_ability(Ability::Key) =>
+            {
+                Some(Type::Primitive(PrimitiveType::U64))
+            },
+            (None, result) => result,
             _ => None,
         }
     }
@@ -538,11 +577,7 @@ impl Constraint {
                     )?;
                     Ok(true)
                 } else {
-                    Err(TypeUnificationError::ConstraintsIncompatible(
-                        loc.clone(),
-                        self.clone(),
-                        other.clone(),
-                    ))
+                    Ok(false)
                 }
             },
             (
@@ -668,6 +703,11 @@ impl Constraint {
         result
     }
 
+    /// Returns the constraints which need to be satisfied for function parameters.
+    pub fn for_fun_parameter() -> Vec<Constraint> {
+        vec![Constraint::NoPhantom, Constraint::NoTuple]
+    }
+
     /// Returns the constraints which need to be satisfied for a local or
     /// parameter type.
     pub fn for_local() -> Vec<Constraint> {
@@ -756,7 +796,7 @@ pub enum TypeUnificationError {
     /// The arity  of some construct mismatches: `ArityMismatch(for_type_args, actual, expected)`
     ArityMismatch(/*for_type_args*/ bool, usize, usize),
     /// Two types have different mutability: `MutabilityMismatch(actual, expected)`.
-    MutabilityMismatch(ReferenceKind, ReferenceKind),
+    MutabilityMismatch(Type, Type),
     /// A generic representation of the error that a constraint wasn't satisfied, with
     /// an optional constraint context.
     ConstraintUnsatisfied(
@@ -1171,7 +1211,7 @@ impl Type {
         if params.is_empty() {
             self.clone()
         } else {
-            self.replace(Some(params), None, false)
+            self.replace(Some(params), None, false, &mut BTreeSet::new())
         }
     }
 
@@ -1208,11 +1248,12 @@ impl Type {
         params: Option<&[Type]>,
         subs: Option<&Substitution>,
         use_constr: bool,
+        visiting: &mut BTreeSet<u32>,
     ) -> Type {
-        let replace_vec = |types: &[Type]| -> Vec<Type> {
+        let replace_vec = |types: &[Type], visited: &mut BTreeSet<u32>| -> Vec<Type> {
             types
                 .iter()
-                .map(|t| t.replace(params, subs, use_constr))
+                .map(move |t| t.replace(params, subs, use_constr, visited))
                 .collect()
         };
         match self {
@@ -1228,14 +1269,34 @@ impl Type {
                     if let Some(t) = s.subs.get(i) {
                         // Recursively call replacement again here, in case the substitution s
                         // refers to type variables.
-                        // TODO: a more efficient approach is to maintain that type assignments
-                        // are always fully specialized w.r.t. to the substitution.
-                        t.replace(params, subs, use_constr)
+                        //
+                        // We need to check for cycles here because a type created by
+                        // `Constraint::default_type_for` below can introduce a cyclic
+                        // replacement. As an example, consider:
+                        //
+                        //   v1 -> v5
+                        //   v5 where SomeFunctionValue(v1, t)
+                        //
+                        // In this case, we abandon replacement which leads to free type variables
+                        // and produces an inference error.
+                        if visiting.insert(*i) {
+                            let result = t.replace(params, subs, use_constr, visiting);
+                            visiting.remove(i);
+                            result
+                        } else {
+                            t.clone()
+                        }
                     } else if use_constr {
-                        if let Some(default_ty) = s.constraints.get(i).and_then(|constrs| {
-                            constrs.iter().find_map(|(_, _, c)| c.default_type())
+                        if let Some(default_ty) = s.constraints.get(i).and_then(|ctrs| {
+                            Constraint::default_type_for(ctrs.iter().map(|(_, _, c)| c))
                         }) {
-                            default_ty.replace(params, subs, use_constr)
+                            if visiting.insert(*i) {
+                                let result = default_ty.replace(params, subs, use_constr, visiting);
+                                visiting.remove(i);
+                                result
+                            } else {
+                                default_ty
+                            }
                         } else {
                             self.clone()
                         }
@@ -1246,23 +1307,28 @@ impl Type {
                     self.clone()
                 }
             },
-            Type::Reference(kind, bt) => {
-                Type::Reference(*kind, Box::new(bt.replace(params, subs, use_constr)))
-            },
-            Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args)),
+            Type::Reference(kind, bt) => Type::Reference(
+                *kind,
+                Box::new(bt.replace(params, subs, use_constr, visiting)),
+            ),
+            Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args, visiting)),
             Type::Fun(arg, result, abilities) => Type::Fun(
-                Box::new(arg.replace(params, subs, use_constr)),
-                Box::new(result.replace(params, subs, use_constr)),
+                Box::new(arg.replace(params, subs, use_constr, visiting)),
+                Box::new(result.replace(params, subs, use_constr, visiting)),
                 *abilities,
             ),
-            Type::Tuple(args) => Type::Tuple(replace_vec(args)),
-            Type::Vector(et) => Type::Vector(Box::new(et.replace(params, subs, use_constr))),
+            Type::Tuple(args) => Type::Tuple(replace_vec(args, visiting)),
+            Type::Vector(et) => {
+                Type::Vector(Box::new(et.replace(params, subs, use_constr, visiting)))
+            },
             Type::TypeDomain(et) => {
-                Type::TypeDomain(Box::new(et.replace(params, subs, use_constr)))
+                Type::TypeDomain(Box::new(et.replace(params, subs, use_constr, visiting)))
             },
-            Type::ResourceDomain(mid, sid, args_opt) => {
-                Type::ResourceDomain(*mid, *sid, args_opt.as_ref().map(|args| replace_vec(args)))
-            },
+            Type::ResourceDomain(mid, sid, args_opt) => Type::ResourceDomain(
+                *mid,
+                *sid,
+                args_opt.as_ref().map(|args| replace_vec(args, visiting)),
+            ),
             Type::Primitive(..) | Type::Error => self.clone(),
         }
     }
@@ -1568,7 +1634,7 @@ impl Type {
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Variance {
     /// All integer types are compatible, and reference types are eliminated.
     SpecVariance,
@@ -1577,8 +1643,12 @@ pub enum Variance {
     /// not `vector<num>` and `vector<u64>`.
     ShallowSpecVariance,
     /// Variance used in the impl language fragment. This is currently for adapting mutable to
-    /// immutable references.
+    /// immutable references, and function types
     ShallowImplVariance,
+    /// Variance used in the impl language fragment for inline functions. Historically,
+    /// inline functions allow variance in function value types, and this variance is
+    /// used to capture this.
+    ShallowImplInlineVariance,
     /// No variance.
     NoVariance,
 }
@@ -1602,7 +1672,14 @@ impl Variance {
     }
 
     pub fn is_impl_variance(self) -> bool {
-        matches!(self, Variance::ShallowImplVariance)
+        matches!(
+            self,
+            Variance::ShallowImplVariance | Variance::ShallowImplInlineVariance
+        )
+    }
+
+    pub fn is_impl_inline_variance(self) -> bool {
+        matches!(self, Variance::ShallowImplInlineVariance)
     }
 
     /// Constructs the variance to be used for subterms of the current type.
@@ -1611,7 +1688,21 @@ impl Variance {
             Variance::ShallowSpecVariance => Variance::NoVariance,
             Variance::SpecVariance => Variance::SpecVariance,
             Variance::ShallowImplVariance => Variance::NoVariance,
+            Variance::ShallowImplInlineVariance => Variance::NoVariance,
             Variance::NoVariance => Variance::NoVariance,
+        }
+    }
+
+    /// Constructs the variance to be used for argument/result of a function
+    /// type. The behavior here differs for inline function parameters: those
+    /// are allowed to have variance whereas for function values, this is not
+    /// allowed. Inline functions had historically this behavior which can't be
+    /// broken, whereas for function values, the required type checks at runtime
+    /// are too expensive and hence not supported.
+    fn fun_argument_variance(self) -> Variance {
+        match self {
+            Variance::ShallowImplInlineVariance => self,
+            _ => self.sub_variance(),
         }
     }
 
@@ -1621,6 +1712,7 @@ impl Variance {
             Variance::ShallowSpecVariance => Variance::ShallowSpecVariance,
             Variance::SpecVariance => Variance::ShallowSpecVariance,
             Variance::ShallowImplVariance => Variance::ShallowImplVariance,
+            Variance::ShallowImplInlineVariance => Variance::ShallowImplInlineVariance,
             Variance::NoVariance => Variance::NoVariance,
         }
     }
@@ -1704,6 +1796,8 @@ pub struct ReceiverFunctionInstance {
     pub arg_types: Vec<Type>,
     /// Result type, instantiated
     pub result_type: Type,
+    /// Whether this is an inline function.
+    pub is_inline: bool,
 }
 
 impl ReceiverFunctionInstance {
@@ -1756,6 +1850,23 @@ impl AbilityContext for NoUnificationContext {
         _qid: QualifiedId<StructId>,
     ) -> (Symbol, Vec<TypeParameter>, AbilitySet) {
         unimplemented!("NoUnificationContext does not support abilities")
+    }
+}
+
+impl Debug for Substitution {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for (i, ty) in &self.subs {
+            writeln!(f, "Var({}) => {:?}", i, ty)?
+        }
+        for (i, ctrs) in &self.constraints {
+            writeln!(
+                f,
+                "Var({}) where {:?}",
+                i,
+                ctrs.iter().map(|(_, _, c)| c).collect_vec()
+            )?
+        }
+        Ok(())
     }
 }
 
@@ -1846,7 +1957,7 @@ impl Substitution {
         ty: Type,
     ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
-        let ty = self.specialize(&ty);
+        let mut ty = self.specialize(&ty);
         if let Some(mut constrs) = self.constraints.remove(&var) {
             // Sort constraints to report primary errors first
             constrs.sort_by(|(_, _, c1), (_, _, c2)| c1.compare(c2).reverse());
@@ -1874,9 +1985,18 @@ impl Substitution {
                     },
                 }
             }
+            // New bindings could have been created, so specialize again.
+            ty = self.specialize(&ty)
         }
-        self.subs.insert(var, ty);
-        Ok(())
+
+        // Occurs check. Since we specialized the type, we do not need to
+        // check transitively.
+        if ty.get_vars().contains(&var) {
+            Err(TypeUnificationError::CyclicSubstitution(Type::Var(var), ty))
+        } else {
+            self.subs.insert(var, ty);
+            Ok(())
+        }
     }
 
     /// Evaluates whether the given type satisfies the constraint, discharging the constraint.
@@ -1906,7 +2026,7 @@ impl Substitution {
         if matches!(ty, Type::Error) {
             Ok(())
         } else if let Type::Var(other_var) = ty {
-            // Transfer constraint on to other variable, which we assert to be free
+            // Transfer constraint on to other variable which we assert to be free
             debug_assert!(!self.subs.contains_key(other_var));
             self.add_constraint(context, *other_var, loc.clone(), order, c, ctx_opt)
         } else if c.propagate_over_reference() && ty.is_reference() {
@@ -1973,6 +2093,14 @@ impl Substitution {
                     ty,
                 ) => {
                     if let Some(receiver) = context.get_receiver_function(ty, *name) {
+                        let variance = if variance.is_impl_variance() && receiver.is_inline {
+                            // Switch to inline function variance now that we know this is an
+                            // inline function. At the moment the constraint is constructed,
+                            // this is not known.
+                            Variance::ShallowImplInlineVariance
+                        } else {
+                            variance
+                        };
                         self.eval_receiver_function_constraint(
                             context,
                             loc,
@@ -1991,10 +2119,22 @@ impl Substitution {
                     Constraint::SomeFunctionValue(ctr_arg_ty, ctr_result_ty),
                     Type::Fun(arg_ty, result_ty, _),
                 ) => {
-                    self.unify(context, variance, order.swap(), arg_ty, ctr_arg_ty)
-                        .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
-                    self.unify(context, variance, order, result_ty, ctr_result_ty)
-                        .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                    self.unify(
+                        context,
+                        variance.fun_argument_variance(),
+                        order.swap(),
+                        arg_ty,
+                        ctr_arg_ty,
+                    )
+                    .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                    self.unify(
+                        context,
+                        variance.fun_argument_variance(),
+                        order,
+                        result_ty,
+                        ctr_result_ty,
+                    )
+                    .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
                     Ok(())
                 },
                 (
@@ -2005,10 +2145,22 @@ impl Substitution {
                     if let Some(Type::Fun(arg_ty, result_ty, _)) =
                         context.get_function_wrapper_type(sid)
                     {
-                        self.unify(context, variance, order.swap(), &arg_ty, ctr_arg_ty)
-                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
-                        self.unify(context, variance, order, &result_ty, ctr_result_ty)
-                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
+                        self.unify(
+                            context,
+                            variance.fun_argument_variance(),
+                            order.swap(),
+                            &arg_ty,
+                            ctr_arg_ty,
+                        )
+                        .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?;
+                        self.unify(
+                            context,
+                            variance.fun_argument_variance(),
+                            order,
+                            &result_ty,
+                            ctr_result_ty,
+                        )
+                        .map_err(TypeUnificationError::map_to_fun_result_mismatch)?;
                         Ok(())
                     } else {
                         constraint_unsatisfied_error()
@@ -2243,14 +2395,14 @@ impl Substitution {
 
     /// Specializes the type, substituting all variables bound in this substitution.
     pub fn specialize(&self, t: &Type) -> Type {
-        t.replace(None, Some(self), false)
+        t.replace(None, Some(self), false, &mut BTreeSet::new())
     }
 
     /// Similar like `specialize`, but if a variable is not resolvable but has constraints,
     /// attempts to derive a default from the constraints. For instance, a `SomeNumber(..u64..)`
     /// constraint can default to `u64`.
     pub fn specialize_with_defaults(&self, t: &Type) -> Type {
-        t.replace(None, Some(self), true)
+        t.replace(None, Some(self), true, &mut BTreeSet::new())
     }
 
     /// Checks whether the type is a number, considering constraints.
@@ -2377,8 +2529,9 @@ impl Substitution {
                 }
             },
             (Type::Reference(k1, ty1), Type::Reference(k2, ty2)) => {
+                // For references, allow variance to be passed down, and not use sub-variance
                 let ty = self
-                    .unify(context, sub_variance, order, ty1, ty2)
+                    .unify(context, variance, order, ty1, ty2)
                     .map_err(TypeUnificationError::lift(order, t1, t2))?;
                 let k = if variance.is_impl_variance() {
                     use ReferenceKind::*;
@@ -2388,16 +2541,16 @@ impl Substitution {
                         (Immutable, Mutable, RightToLeft | Join) => k1,
                         (Mutable, Immutable, LeftToRight | Join) => k2,
                         _ => {
-                            let (kl, kr) = if matches!(order, LeftToRight) {
-                                (k1, k2)
+                            let (t1, t2) = if matches!(order, LeftToRight) {
+                                (t1, t2)
                             } else {
-                                (k2, k1)
+                                (t2, t1)
                             };
-                            return Err(TypeUnificationError::MutabilityMismatch(*kl, *kr));
+                            return Err(TypeUnificationError::MutabilityMismatch(t1.clone(), t2.clone()));
                         },
                     }
                 } else if *k1 != *k2 {
-                    return Err(TypeUnificationError::MutabilityMismatch(*k1, *k2));
+                    return Err(TypeUnificationError::MutabilityMismatch(t1.clone(), t2.clone()));
                 } else {
                     k1
                 };
@@ -2415,44 +2568,41 @@ impl Substitution {
                     .map_err(TypeUnificationError::lift(order, t1, t2))?,
                 ));
             },
-            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2)) => {
-                // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
-                // conversion for arguments. We also have contra-variance of arguments:
+            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2))
+                // Abilities must be same if NoVariance requested
+                if variance != Variance::NoVariance || abilities1 == abilities2 =>
+            {
+                // If variance is given, arguments can be converted, with contra-variance
+                // in the argument type. Formally:
                 //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
                 // Intuitively, function f1 can safely _substitute_ function f2 if any argument
-                // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
-                // T2 is also a T1).
-                //
-                // We test for abilities match last, to give more intuitive error messages.
-                return Ok(Type::Fun(
-                    Box::new(
-                        self.unify(context, variance, order.swap(), a1, a2)
-                            .map_err(TypeUnificationError::map_to_fun_arg_mismatch)?,
-                    ),
-                    Box::new(
-                        self.unify(context, variance, order, r1, r2)
-                            .map_err(TypeUnificationError::map_to_fun_result_mismatch)?,
-                    ),
-                    {
-                        // Widening/conversion can remove abilities, not add them.  So check that
-                        // the target has no more abilities than the source.
-                        let (missing_abilities, bad_ty) = match order {
-                            WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
-                            WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
-                            WideningOrder::Join => (AbilitySet::EMPTY, t1),
-                        };
-                        if missing_abilities.is_empty() {
-                            abilities1.intersect(*abilities2)
-                        } else {
-                            return Err(TypeUnificationError::MissingAbilities(
-                                Loc::default(),
-                                bad_ty.clone(),
-                                missing_abilities,
-                                None,
-                            ));
-                        }
-                    },
-                ));
+                // of type T2 can be passed as a T1 -- which is the case since T1 >= T2.
+                let arg_ty = self
+                    .unify(context, variance.fun_argument_variance(), order.swap(), a1, a2)
+                    .map_err(TypeUnificationError::lift(order, t1, t2))?;
+                let res_ty = self
+                    .unify(context, variance.fun_argument_variance(), order, r1, r2)
+                    .map_err(TypeUnificationError::lift(order, t1, t2))?;
+                let abilities = {
+                    // Widening/conversion can remove abilities, not add them.  So check that
+                    // the target has no more abilities than the source.
+                    let (missing_abilities, bad_ty) = match order {
+                        WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
+                        WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
+                        WideningOrder::Join => (AbilitySet::EMPTY, t1),
+                    };
+                    if missing_abilities.is_empty() {
+                        abilities1.intersect(*abilities2)
+                    } else {
+                        return Err(TypeUnificationError::MissingAbilities(
+                            Loc::default(),
+                            bad_ty.clone(),
+                            missing_abilities,
+                            None,
+                        ));
+                    }
+                };
+                return Ok(Type::Fun(Box::new(arg_ty), Box::new(res_ty), abilities));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
@@ -2568,38 +2718,16 @@ impl Substitution {
                     break;
                 }
             }
-            // Skip the cycle check if we are unifying the same two variables.
+            // Skip binding if we are unifying the same two variables.
             if t1 == &t2 {
-                return Ok(Some(t1.clone()));
-            }
-            // Cycle check.
-            if !self.occurs_check(&t2, *v1) {
+                Ok(Some(t1.clone()))
+            } else {
                 self.bind(context, *v1, variance, order, t2.clone())?;
                 Ok(Some(t2))
-            } else {
-                Err(TypeUnificationError::CyclicSubstitution(
-                    self.specialize(t1),
-                    self.specialize(&t2),
-                ))
             }
         } else {
             Ok(None)
         }
-    }
-
-    /// Check whether the variables occurs in the type, or in any assignment to variables in the
-    /// type.
-    fn occurs_check(&self, ty: &Type, var: u32) -> bool {
-        ty.get_vars().iter().any(|v| {
-            if v == &var {
-                return true;
-            }
-            if let Some(sty) = self.subs.get(v) {
-                self.occurs_check(sty, var)
-            } else {
-                false
-            }
-        })
     }
 }
 
@@ -2794,33 +2922,14 @@ impl ErrorMessageContext {
         }
     }
 
-    pub fn mutability_mismatch(self, actual: ReferenceKind, expected: ReferenceKind) -> String {
-        use ErrorMessageContext::*;
-        match self {
-            Binding | Assignment => format!(
-                "the left-hand side expected {} but {} was provided",
-                expected, actual
-            ),
-            Argument | ReceiverArgument => format!(
-                "the function takes {} but {} was provided",
-                expected, actual
-            ),
-            PositionalUnpackArgument => format!(
-                "the struct/variant has {} but {} were provided",
-                expected, actual
-            ),
-            Return => format!(
-                "the function returns {} but {} was provided",
-                expected, actual
-            ),
-            OperatorArgument => format!(
-                "the operator takes {} but {} was provided",
-                expected, actual
-            ),
-            SchemaInclusion(_) | TypeAnnotation | General | TypeArgument => {
-                format!("expected {} but {} was provided", expected, actual)
-            },
-        }
+    pub fn mutability_mismatch(
+        self,
+        display_context: &TypeDisplayContext,
+        actual: &Type,
+        expected: &Type,
+    ) -> String {
+        let msg = self.type_mismatch(display_context, actual, expected);
+        format!("{} (mutability mismatch)", msg)
     }
 
     pub fn expected_reference(self, display_context: &TypeDisplayContext, actual: &Type) -> String {
@@ -2867,43 +2976,52 @@ impl TypeUnificationError {
         cty2: &'a Type,
     ) -> impl Fn(TypeUnificationError) -> TypeUnificationError + 'a {
         move |this| {
-            if matches!(
-                this,
-                TypeUnificationError::TypeMismatch(_, _)
+            match this {
                 // A SomeNumber constraint error is conceptually the same as a TypeMismatch,
                 // so lift that one as well
+                TypeUnificationError::TypeMismatch(_, _)
                 | TypeUnificationError::ConstraintUnsatisfied(
                     _,
                     _,
                     _,
                     Constraint::SomeNumber(..),
-                    _
-                )
-            ) {
-                if matches!(order, WideningOrder::LeftToRight | WideningOrder::Join) {
-                    TypeUnificationError::TypeMismatch(cty1.clone(), cty2.clone())
-                } else {
-                    TypeUnificationError::TypeMismatch(cty2.clone(), cty1.clone())
-                }
-            } else {
-                this
+                    _,
+                ) => {
+                    if matches!(order, WideningOrder::LeftToRight | WideningOrder::Join) {
+                        TypeUnificationError::TypeMismatch(cty1.clone(), cty2.clone())
+                    } else {
+                        TypeUnificationError::TypeMismatch(cty2.clone(), cty1.clone())
+                    }
+                },
+                TypeUnificationError::MutabilityMismatch(_, _) => {
+                    if matches!(order, WideningOrder::LeftToRight | WideningOrder::Join) {
+                        TypeUnificationError::MutabilityMismatch(cty1.clone(), cty2.clone())
+                    } else {
+                        TypeUnificationError::MutabilityMismatch(cty2.clone(), cty1.clone())
+                    }
+                },
+                _ => this,
             }
         }
     }
 
     pub fn map_to_fun_arg_mismatch(self) -> Self {
-        if let TypeUnificationError::TypeMismatch(t1, t2) = self {
-            TypeUnificationError::FunArgTypeMismatch(t1, t2)
-        } else {
-            self
+        match self {
+            TypeUnificationError::TypeMismatch(t1, t2)
+            | TypeUnificationError::MutabilityMismatch(t1, t2) => {
+                TypeUnificationError::FunArgTypeMismatch(t1, t2)
+            },
+            _ => self,
         }
     }
 
     pub fn map_to_fun_result_mismatch(self) -> Self {
-        if let TypeUnificationError::TypeMismatch(t1, t2) = self {
-            TypeUnificationError::FunResultTypeMismatch(t1, t2)
-        } else {
-            self
+        match self {
+            TypeUnificationError::TypeMismatch(t1, t2)
+            | TypeUnificationError::MutabilityMismatch(t1, t2) => {
+                TypeUnificationError::FunResultTypeMismatch(t1, t2)
+            },
+            _ => self,
         }
     }
 
@@ -2954,18 +3072,18 @@ impl TypeUnificationError {
             TypeUnificationError::FunArgTypeMismatch(expected, actual) => (
                 // Because of contra-variance, switches actual/expected order
                 format!(
-                    "function takes arguments of type `{}` but `{}` was expected",
+                    "expected function type has argument of type `{}` but `{}` was provided",
+                    expected.display(display_context),
                     actual.display(display_context),
-                    expected.display(display_context)
                 ),
                 vec![],
                 vec![],
             ),
             TypeUnificationError::FunResultTypeMismatch(actual, expected) => (
                 format!(
-                    "function returns value of type `{}` but `{}` was expected",
+                    "expected function type returns value of type `{}` but `{}` was provided",
+                    expected.display(display_context),
                     actual.display(display_context),
-                    expected.display(display_context)
                 ),
                 vec![],
                 vec![],
@@ -2987,7 +3105,7 @@ impl TypeUnificationError {
                 )
             },
             TypeUnificationError::MutabilityMismatch(actual, expected) => (
-                error_context.mutability_mismatch(*actual, *expected),
+                error_context.mutability_mismatch(display_context, actual, expected),
                 vec![],
                 vec![],
             ),
@@ -3090,9 +3208,28 @@ impl TypeUnificationError {
                         main_msg
                     },
                     Constraint::SomeReceiverFunction(name, ..) => {
+                        let name_display =
+                            name.display(display_context.env.symbol_pool()).to_string();
+                        if let Type::Struct(mid, sid, inst) = ty {
+                            let sid = &mid.qualified_inst(*sid, inst.clone());
+                            let (field_decls, _) =
+                                unification_context.get_struct_field_decls(sid, *name);
+                            let field_is_function = !field_decls.is_empty()
+                                && field_decls
+                                    .iter()
+                                    .all(|(_, field_type)| field_type.is_function());
+                            if field_is_function {
+                                let hint = format!(
+                                    "if you intend to call the closure stored in field `{}`, \
+                                    surround the entire field access with parenthesis `()`",
+                                    name_display
+                                );
+                                hints.push(hint);
+                            }
+                        }
                         format!(
                             "undeclared receiver function `{}` for type `{}`",
-                            name.display(display_context.env.symbol_pool()),
+                            name_display,
                             ty.display(display_context)
                         )
                     },
@@ -3393,20 +3530,19 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
-                write!(f, "{}", a.display(self.context))?;
+                if !a.is_unit() {
+                    write!(f, "{}", a.display(self.context))?;
+                }
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))?;
+                    if t.is_function() {
+                        write!(f, "({})", t.display(self.context))?;
+                    } else {
+                        write!(f, "{}", t.display(self.context))?;
+                    }
                 }
-                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
-                    // Default formatter for Abilities is not compact, manually convert here.
-                    let abilities_as_str = abilities
-                        .setminus(AbilitySet::FUNCTIONS)
-                        .iter()
-                        .map(|a| a.to_string())
-                        .reduce(|l, r| format!("{}+{}", l, r))
-                        .unwrap_or_default();
-                    write!(f, " with {}", abilities_as_str)
+                if !abilities.is_empty() {
+                    write!(f, " has {}", abilities)
                 } else {
                     Ok(())
                 }

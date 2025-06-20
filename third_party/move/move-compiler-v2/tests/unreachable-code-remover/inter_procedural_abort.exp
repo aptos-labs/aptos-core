@@ -1,4 +1,32 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::always_abort() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+  2: return ()
+}
+
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: m::always_abort()
+  1: $t1 := 0
+  2: $t3 := infer($t1)
+  3: $t4 := 1
+  4: $t2 := +($t3, $t4)
+  5: $t1 := infer($t2)
+  6: $t0 := infer($t1)
+  7: return $t0
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::always_abort() {

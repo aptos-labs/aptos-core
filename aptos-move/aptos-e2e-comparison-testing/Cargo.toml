@@ -16,6 +16,7 @@ aptos-block-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-rest-client = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }

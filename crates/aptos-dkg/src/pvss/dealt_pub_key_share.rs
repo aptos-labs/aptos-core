@@ -40,6 +40,8 @@ macro_rules! dealt_pub_key_share_impl {
         }
 
         impl ValidCryptoMaterial for DealtPubKeyShare {
+            const AIP_80_PREFIX: &'static str = "";
+
             fn to_bytes(&self) -> Vec<u8> {
                 self.to_bytes().to_vec()
             }

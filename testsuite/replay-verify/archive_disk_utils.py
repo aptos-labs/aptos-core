@@ -503,7 +503,7 @@ def parse_args() -> argparse.Namespace:
     ),
 )
 def create_one_pvc_from_snapshot(
-    pvc_name: str, snapshot_name: str, namespace: str, label: str
+    pvc_name: str, snapshot_name: str, namespace: str, label: str, ttl_secs: int
 ) -> str:
     config.load_kube_config()
     api_instance = client.CoreV1Api()
@@ -516,7 +516,8 @@ def create_one_pvc_from_snapshot(
         "metadata": {
             "name": f"{pvc_name}",
             "annotations": {
-                "volume.kubernetes.io/storage-provisioner": "pd.csi.storage.gke.io"
+                "volume.kubernetes.io/storage-provisioner": "pd.csi.storage.gke.io",
+                "k8s-ttl-controller.twin.sh/ttl": f"{ttl_secs}s",
             },
             "labels": {"run": f"{label}"},
         },
@@ -540,7 +541,12 @@ def create_one_pvc_from_snapshot(
 
 
 def create_replay_verify_pvcs_from_snapshot(
-    run_id: str, snapshot_name: str, namespace: str, pvc_num: int, label: str
+    run_id: str,
+    snapshot_name: str,
+    namespace: str,
+    pvc_num: int,
+    label: str,
+    ttl_secs: int,
 ) -> List[str]:
     config.load_kube_config()
     api_instance = client.CustomObjectsApi()
@@ -601,6 +607,7 @@ def create_replay_verify_pvcs_from_snapshot(
             snapshot_name,
             namespace,
             label,
+            ttl_secs,
         )
         for pvc_id in range(pvc_num)
     ]

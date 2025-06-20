@@ -71,7 +71,7 @@ module aptos_std::ed25519 {
 
     /// Parses the input 32 bytes as an *unvalidated* Ed25519 public key.
     public fun new_unvalidated_public_key_from_bytes(bytes: vector<u8>): UnvalidatedPublicKey {
-        assert!(std::vector::length(&bytes) == PUBLIC_KEY_NUM_BYTES, std::error::invalid_argument(E_WRONG_PUBKEY_SIZE));
+        assert!(bytes.length() == PUBLIC_KEY_NUM_BYTES, std::error::invalid_argument(E_WRONG_PUBKEY_SIZE));
         UnvalidatedPublicKey { bytes }
     }
 
@@ -88,7 +88,7 @@ module aptos_std::ed25519 {
 
     /// Parses the input 64 bytes as a purported Ed25519 signature.
     public fun new_signature_from_bytes(bytes: vector<u8>): Signature {
-        assert!(std::vector::length(&bytes) == SIGNATURE_NUM_BYTES, std::error::invalid_argument(E_WRONG_SIGNATURE_SIZE));
+        assert!(bytes.length() == SIGNATURE_NUM_BYTES, std::error::invalid_argument(E_WRONG_SIGNATURE_SIZE));
         Signature { bytes }
     }
 
@@ -168,7 +168,7 @@ module aptos_std::ed25519 {
 
     /// Derives the Aptos-specific authentication key of the given Ed25519 public key.
     fun public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8> {
-        std::vector::push_back(&mut pk_bytes, SIGNATURE_SCHEME_ID);
+        pk_bytes.push_back(SIGNATURE_SCHEME_ID);
         std::hash::sha3_256(pk_bytes)
     }
 

@@ -95,7 +95,11 @@ impl<'kv> BatchedStateUpdateRefs<'kv> {
 
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
+    /// Batched updates (updates for the same keys are merged) from the
+    /// beginning of the block/chunk to the last checkpoint (if it exists).
     pub for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
+    /// Batched updates from the version after last check point to last version
+    /// (`None` if the last version is a checkpoint, e.g. in a regular block).
     pub for_latest: Option<BatchedStateUpdateRefs<'kv>>,
 }
 

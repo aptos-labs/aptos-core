@@ -22,8 +22,10 @@ pub(crate) mod cli {
         language_storage::{ModuleId, TypeTag},
         value::MoveValue,
     };
+    use rayon::prelude::*;
     use sha2::{Digest, Sha256};
     use std::{collections::HashMap, fs::File, io::Write, path::PathBuf};
+    use walkdir::WalkDir;
 
     /// Compiles a Move module from source code.
     /// The compiled module and its metadata are returned serialized.
@@ -421,6 +423,73 @@ pub(crate) mod cli {
         let mut file = File::create(&filename).map_err(|e| e.to_string())?;
         file.write_all(&bytes).map_err(|e| e.to_string())?;
         println!("Runnable state saved to {}", filename);
+
+        Ok(())
+    }
+
+    //Generate Runnable States recursively from all Move.toml projects under base directory
+    pub(crate) fn generate_runnable_states_recursive(
+        base_dir: &str,
+        destination_path: &str,
+    ) -> Result<(), String> {
+        std::fs::create_dir_all(destination_path).map_err(|e| e.to_string())?;
+
+        // First collect all Move.toml files
+        let toml_files: Vec<_> = WalkDir::new(base_dir)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|entry| entry.file_name().to_str() == Some("Move.toml"))
+            .map(|entry| entry.path().parent().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        println!("Found {} Move projects", toml_files.len());
+
+        // Process projects in parallel using rayon
+        toml_files.par_iter().for_each(|project_dir| {
+            println!("Processing Move project at: {}", project_dir);
+            // Process this Move project
+            match compile_source_code_from_project(project_dir) {
+                Ok(package) => {
+                    match to_runnablestate_from_package(&package) {
+                        Ok(runnable_state) => {
+                            println!("Generated runnable state from package at {}", project_dir);
+
+                            // Serialize the runnable state
+                            let bytes = runnable_state.dearbitrary_first().finish();
+
+                            // Generate a filename based on hash
+                            let mut hasher = Sha256::new();
+                            hasher.update(&bytes);
+                            let hash = hasher.finalize();
+                            let filename =
+                                format!("{}/{}.bytes", destination_path, hex::encode(hash));
+
+                            // Write to file
+                            if let Err(e) =
+                                File::create(&filename).and_then(|mut f| f.write_all(&bytes))
+                            {
+                                println!(
+                                    "Failed to write runnable state for {}: {}",
+                                    project_dir, e
+                                );
+                            } else {
+                                println!("Runnable state saved to {}", filename);
+                            }
+                        },
+                        Err(e) => {
+                            println!(
+                                "Failed to generate runnable state for {}: {}",
+                                project_dir, e
+                            );
+                        },
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to compile project at {}: {}", project_dir, e);
+                },
+            }
+        });
 
         Ok(())
     }

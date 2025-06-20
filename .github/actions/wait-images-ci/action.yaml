@@ -1,0 +1,27 @@
+name: Wait for Docker images used in CI
+description: Wait for Docker images used in CI to be available in the GCP artifact registry.
+inputs:
+  GIT_SHA:
+    description: "The git SHA to use for the images"
+    required: true
+  GCP_DOCKER_ARTIFACT_REPO:
+    description: "The GCP artifact registry to use for the images"
+    required: true
+  WAIT_FOR_IMAGE_SECONDS:
+    description: "The number of seconds to wait for the images to be available"
+    required: false
+    default: "1800" # a sane default based on the longest observed build time on the main branch
+runs:
+  using: composite
+  steps:
+    # Deps setup
+    - uses: actions/setup-node@v3
+      with:
+        node-version-file: .node-version
+    - uses: pnpm/action-setup@v4
+
+    # The source code must be checkout out by the workflow that invokes this action.
+    - name: Run wait-images-ci
+      run: |
+        GCP_DOCKER_ARTIFACT_REPO=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }} GIT_SHA=${{ inputs.GIT_SHA }} ./docker/wait-images-ci.mjs --wait-for-image-seconds=${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
+      shell: bash

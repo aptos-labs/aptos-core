@@ -22,7 +22,9 @@ aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-package-builder = { workspace = true }
+aptos-rest-client = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-transaction-workloads-lib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
@@ -48,6 +50,7 @@ test-case = { workspace = true }
 aptos-vm-types = { workspace = true }
 claims = { workspace = true }
 test-case = { workspace = true }
+tokio = { workspace = true }
 
 [lib]
 doctest = false

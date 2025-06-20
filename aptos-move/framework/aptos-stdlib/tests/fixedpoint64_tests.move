@@ -31,7 +31,7 @@ module aptos_std::fixed_point64_tests {
     #[test]
     fun create_zero() {
         let x = fixed_point64::create_from_rational(0, 1);
-        assert!(fixed_point64::is_zero(x), 0);
+        assert!(x.is_zero(), 0);
     }
 
     #[test]
@@ -97,7 +97,7 @@ module aptos_std::fixed_point64_tests {
         assert!(not_three == 2, 0);
 
         // Try again with a fraction slightly larger than 1/3.
-        let f = fixed_point64::create_from_raw_value(fixed_point64::get_raw_value(f) + 1);
+        let f = fixed_point64::create_from_raw_value(f.get_raw_value() + 1);
         let three = fixed_point64::multiply_u128(9, f);
         assert!(three == 3, 1);
     }
@@ -106,7 +106,7 @@ module aptos_std::fixed_point64_tests {
     fun create_from_rational_max_numerator_denominator() {
         // Test creating a 1.0 fraction from the maximum u64 value.
         let f = fixed_point64::create_from_rational(MAX_U128, MAX_U128);
-        let one = fixed_point64::get_raw_value(f);
+        let one = f.get_raw_value();
         assert!(one == POW2_64, 0); // 0x1.00000000
     }
 
@@ -115,10 +115,10 @@ module aptos_std::fixed_point64_tests {
         let one = fixed_point64::create_from_rational(1, 1);
         let two = fixed_point64::create_from_rational(2, 1);
         let smaller_number1 = fixed_point64::min(one, two);
-        let val1 = fixed_point64::get_raw_value(smaller_number1);
+        let val1 = smaller_number1.get_raw_value();
         assert!(val1 == POW2_64, 0);  // 0x1.00000000
         let smaller_number2 = fixed_point64::min(two, one);
-        let val2 = fixed_point64::get_raw_value(smaller_number2);
+        let val2 = smaller_number2.get_raw_value();
         assert!(val2 == POW2_64, 0);  // 0x1.00000000
     }
 
@@ -128,23 +128,23 @@ module aptos_std::fixed_point64_tests {
         let two = fixed_point64::create_from_rational(2, 1);
         let larger_number1 = fixed_point64::max(one, two);
         let larger_number2 = fixed_point64::max(two, one);
-        let val1 = fixed_point64::get_raw_value(larger_number1);
+        let val1 = larger_number1.get_raw_value();
         assert!(val1 == 2 * POW2_64, 0);  // 0x2.00000000
-        let val2 = fixed_point64::get_raw_value(larger_number2);
+        let val2 = larger_number2.get_raw_value();
         assert!(val2 == 2 * POW2_64, 0);  // 0x2.00000000
     }
 
     #[test]
     fun floor_can_return_the_correct_number_zero() {
         let point_five = fixed_point64::create_from_rational(1, 2);
-        let val = fixed_point64::floor(point_five);
+        let val = point_five.floor();
         assert!(val == 0, 0);
     }
 
     #[test]
     fun create_from_u128_create_correct_fixed_point_number() {
         let one = fixed_point64::create_from_u128(1);
-        let val = fixed_point64::get_raw_value(one);
+        let val = one.get_raw_value();
         assert!(val == POW2_64, 0);
     }
 
@@ -157,35 +157,35 @@ module aptos_std::fixed_point64_tests {
     #[test]
     fun floor_can_return_the_correct_number_one() {
         let three_point_five = fixed_point64::create_from_rational(7, 2); // 3.5
-        let val = fixed_point64::floor(three_point_five);
+        let val = three_point_five.floor();
         assert!(val == 3, 0);
     }
 
     #[test]
     fun ceil_can_round_up_correctly() {
         let point_five = fixed_point64::create_from_rational(1, 2); // 0.5
-        let val = fixed_point64::ceil(point_five);
+        let val = point_five.ceil();
         assert!(val == 1, 0);
     }
 
     #[test]
     fun ceil_will_not_change_if_number_already_integer() {
         let one = fixed_point64::create_from_rational(1, 1); // 0.5
-        let val = fixed_point64::ceil(one);
+        let val = one.ceil();
         assert!(val == 1, 0);
     }
 
     #[test]
     fun round_can_round_up_correctly() {
         let point_five = fixed_point64::create_from_rational(1, 2); // 0.5
-        let val = fixed_point64::round(point_five);
+        let val = point_five.round();
         assert!(val == 1, 0);
     }
 
     #[test]
     fun round_can_round_down_correctly() {
         let num = fixed_point64::create_from_rational(499, 1000); // 0.499
-        let val = fixed_point64::round(num);
+        let val = num.round();
         assert!(val == 0, 0);
     }
 }

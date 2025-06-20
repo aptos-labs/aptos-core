@@ -76,11 +76,11 @@ pub struct PreBuiltPackagesImpl;
 
 impl PreBuiltPackages for PreBuiltPackagesImpl {{
     fn package_metadata(&self, package_name: &str) -> &[u8] {{
-        &PACKAGE_TO_METADATA[package_name]
+        PACKAGE_TO_METADATA.get(package_name).expect(package_name)
     }}
 
     fn package_modules(&self, package_name: &str) -> &[Vec<u8>] {{
-        &PACKAGE_TO_MODULES[package_name]
+        PACKAGE_TO_MODULES.get(package_name).expect(package_name)
     }}
 
     fn package_script(&self, package_name: &str) -> Option<&Vec<u8>> {{

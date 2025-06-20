@@ -56,7 +56,6 @@ module aptos_framework::aptos_coin {
     }
 
     public fun has_mint_capability(account: &signer): bool {
-        // TODO: [signer::address_of] Is permissioned signer allowed?
         exists<MintCapStore>(signer::address_of(account))
     }
 
@@ -96,7 +95,6 @@ module aptos_framework::aptos_coin {
         dst_addr: address,
         amount: u64,
     ) acquires MintCapStore {
-        // TODO: Can this function be invoked by permissioned signer?
         let account_addr = signer::address_of(account);
 
         assert!(

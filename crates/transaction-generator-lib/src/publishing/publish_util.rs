@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::entry_point_trait::PreBuiltPackages;
-use aptos_framework::{
-    natives::code::PackageMetadata, KnownAttribute, APTOS_METADATA_KEY, APTOS_METADATA_KEY_V1,
-};
+use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
@@ -12,6 +10,10 @@ use aptos_sdk::{
     types::{
         account_address::AccountAddress,
         transaction::{Script, TransactionPayload},
+        vm::module_metadata::{
+            get_metadata_from_compiled_code, KnownAttribute, APTOS_METADATA_KEY,
+            APTOS_METADATA_KEY_V1,
+        },
     },
 };
 use move_binary_format::{
@@ -274,8 +276,7 @@ fn update(
                 }
             }
         }
-        if let Some(mut metadata) = aptos_framework::get_metadata_from_compiled_module(&new_module)
-        {
+        if let Some(mut metadata) = get_metadata_from_compiled_code(&new_module) {
             metadata
                 .struct_attributes
                 .iter_mut()

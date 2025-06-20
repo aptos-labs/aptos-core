@@ -32,7 +32,7 @@ error: cannot return nothing from a function with result type `bool`
 21 │ │     }
    │ ╰─────^
 
-error: the function returns `&mut` but `&` was provided
+error: cannot return `&u64` from a function with result type `&mut u64` (mutability mismatch)
    ┌─ tests/checking/error_context/return.move:24:9
    │
 24 │         r

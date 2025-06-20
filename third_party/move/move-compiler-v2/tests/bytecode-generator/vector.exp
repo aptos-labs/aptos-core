@@ -1,18 +1,40 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::vector {
     private fun create(): vector<u64> {
-        [Number(1), Number(2), Number(3)]
+        Vector<u64>(1, 2, 3)
     }
 } // end 0x42::vector
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::vector {
     fun create(): vector<u64> {
         vector[1, 2, 3]
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun vector::create(): vector<u64> {
+     var $t0: vector<u64>
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t3 := 3
+  3: $t0 := vector($t1, $t2, $t3)
+  4: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::vector {
+    private fun create(): vector<u64> {
+        [Number(1), Number(2), Number(3)]
+    }
+} // end 0x42::vector
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun vector::create(): vector<u64> {

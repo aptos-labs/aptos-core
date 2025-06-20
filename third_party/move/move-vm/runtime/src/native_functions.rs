@@ -3,12 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
-    interpreter::InterpreterDebugInterface,
-    loader::{Function, Resolver},
-    module_traversal::TraversalContext,
-    native_extensions::NativeContextExtensions,
-    storage::ty_tag_converter::TypeTagConverter,
+    data_cache::TransactionDataCache, interpreter::InterpreterDebugInterface, loader::Function,
+    module_traversal::TraversalContext, native_extensions::NativeContextExtensions,
+    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
+    StorageLayoutConverter,
 };
 use move_binary_format::errors::{
     ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
@@ -22,8 +20,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult,
-    value_serde::FunctionValueExtension, values::Value,
+    loaded_data::runtime_types::Type, natives::function::NativeResult, resolver::ResourceResolver,
+    values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -97,10 +95,11 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b, 'c> {
+pub struct NativeContext<'a, 'b> {
     interpreter: &'a mut dyn InterpreterDebugInterface,
-    data_store: &'a mut TransactionDataCache<'c>,
-    resolver: &'a Resolver<'a>,
+    data_store: &'a mut TransactionDataCache,
+    resource_resolver: &'a dyn ResourceResolver,
+    module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
     traversal_context: &'a TraversalContext<'a>,
@@ -113,11 +112,12 @@ pub struct NativeContext<'a, 'b, 'c> {
     heap_memory_usage: u64,
 }
 
-impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
+impl<'a, 'b> NativeContext<'a, 'b> {
     pub(crate) fn new(
         interpreter: &'a mut dyn InterpreterDebugInterface,
-        data_store: &'a mut TransactionDataCache<'c>,
-        resolver: &'a Resolver<'a>,
+        data_store: &'a mut TransactionDataCache,
+        resource_resolver: &'a dyn ResourceResolver,
+        module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
         traversal_context: &'a TraversalContext<'a>,
@@ -125,7 +125,8 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         Self {
             interpreter,
             data_store,
-            resolver,
+            resource_resolver,
+            module_storage,
             extensions,
             gas_balance,
             traversal_context,
@@ -135,9 +136,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     }
 }
 
-impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
+impl<'a, 'b> NativeContext<'a, 'b> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
-        self.interpreter.debug_print_stack_trace(buf, self.resolver)
+        self.interpreter
+            .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
     }
 
     pub fn exists_at(
@@ -150,7 +152,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         //                     need to actually load bytes.
         let (value, num_bytes) = self
             .data_store
-            .load_resource(self.resolver.module_storage(), address, ty)
+            .load_resource(self.module_storage, self.resource_resolver, address, ty)
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
             .exists()
@@ -159,25 +161,23 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        let ty_tag_builder =
-            TypeTagConverter::new(self.resolver.module_storage().runtime_environment());
-        ty_tag_builder.ty_to_ty_tag(ty)
+        self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
     pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        self.resolver.type_to_type_layout(ty)
+        StorageLayoutConverter::new(self.module_storage).type_to_type_layout(ty)
     }
 
     pub fn type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        self.resolver
+        StorageLayoutConverter::new(self.module_storage)
             .type_to_type_layout_with_identifier_mappings(ty)
     }
 
     pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        self.resolver.type_to_fully_annotated_layout(ty)
+        StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
@@ -210,26 +210,22 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.traversal_context
     }
 
-    pub fn function_value_extension(&self) -> &dyn FunctionValueExtension {
-        self.resolver
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+        FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        }
     }
 
     pub fn load_function(
         &mut self,
         module_id: &ModuleId,
         function_name: &Identifier,
-    ) -> PartialVMResult<Arc<Function>> {
-        let (_, function) = self
-            .resolver
-            .module_storage()
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            // TODO(#16077):
-            //   Keeping this consistent with loader V1 implementation which returned that
-            //   error. Check if we can avoid remapping by replaying transactions.
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!("Module {} doesn't exist", module_id))
-            })?;
+    ) -> VMResult<Arc<Function>> {
+        let (_, function) = self.module_storage.fetch_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
         Ok(function)
     }
 }

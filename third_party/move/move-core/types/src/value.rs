@@ -59,12 +59,10 @@ static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'st
     Lazy::new(|| Mutex::new(Default::default()));
 
 /// Returns variant name placeholders for providing dummy names in serde serialization.
-pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
-    assert!(
-        len < VARIANT_COUNT_MAX as usize,
-        "variant count is restricted to {}",
-        VARIANT_COUNT_MAX
-    );
+pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], anyhow::Error> {
+    if len > VARIANT_COUNT_MAX as usize {
+        bail!("variant count is restricted to {}", VARIANT_COUNT_MAX);
+    }
     let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
     let mut lock = mutex.lock().expect("acquire index name lock");
     match lock.entry(len) {
@@ -76,9 +74,9 @@ pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
             )
             .leak();
             e.insert(signature);
-            signature
+            Ok(signature)
         },
-        Entry::Occupied(e) => e.get(),
+        Entry::Occupied(e) => Ok(e.get()),
     }
 }
 
@@ -773,7 +771,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                 if variants.len() > (u16::MAX as usize) {
                     return Err(D::Error::custom("variant count out of range"));
                 }
-                let variant_names = variant_name_placeholder(variants.len());
+                let variant_names = variant_name_placeholder(variants.len())
+                    .map_err(|e| D::Error::custom(format!("{}", e)))?;
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
@@ -799,7 +798,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
             },
             MoveStructLayout::WithVariants(decorated_variants) => {
                 // Downgrade the decorated variants to simple layouts to deserialize the fields.
-                let variant_names = variant_name_placeholder(decorated_variants.len());
+                let variant_names = variant_name_placeholder(decorated_variants.len())
+                    .map_err(|e| D::Error::custom(format!("{}", e)))?;
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
@@ -877,7 +877,9 @@ impl serde::Serialize for MoveStruct {
                 // Variants need to be serialized as sequences, as the size is not statically known.
                 let tag_idx = *tag as usize;
                 let variant_tag = tag_idx as u32;
-                let variant_name = variant_name_placeholder((tag + 1) as usize)[tag_idx];
+                let variant_names = variant_name_placeholder((tag + 1) as usize)
+                    .map_err(|e| serde::ser::Error::custom(format!("{}", e)))?;
+                let variant_name = variant_names[tag_idx];
                 match values.len() {
                     0 => {
                         serializer.serialize_unit_variant(MOVE_ENUM_NAME, variant_tag, variant_name)

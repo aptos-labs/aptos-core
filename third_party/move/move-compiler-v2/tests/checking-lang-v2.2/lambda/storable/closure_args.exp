@@ -42,7 +42,7 @@ error: captured value is missing abilities `copy`
 148 │                 |x| base_fun(a, x)
     │                              ^
     │
-    = expected function type: `|u64|u64 with copy`
+    = expected function type: `|u64|u64 has copy`
 
 error: captured value is missing abilities `copy`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:150:34
@@ -50,7 +50,7 @@ error: captured value is missing abilities `copy`
 150 │                 |x| base_fun2(x, a)
     │                                  ^
     │
-    = expected function type: `|u64|u64 with copy`
+    = expected function type: `|u64|u64 has copy`
 
 error: captured value is missing abilities `copy`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:156:31
@@ -58,7 +58,7 @@ error: captured value is missing abilities `copy`
 156 │                 |x| store_fun(a_store, x)
     │                               ^^^^^^^
     │
-    = expected function type: `|u64|u64 with copy`
+    = expected function type: `|u64|u64 has copy`
 
 error: captured value is missing abilities `copy`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:158:35
@@ -66,7 +66,7 @@ error: captured value is missing abilities `copy`
 158 │                 |x| store_fun2(x, a_store)
     │                                   ^^^^^^^
     │
-    = expected function type: `|u64|u64 with copy`
+    = expected function type: `|u64|u64 has copy`
 
 warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:177:21
@@ -92,7 +92,7 @@ error: captured value is missing abilities `store`
 207 │                 |x| base_fun(a, x)
     │                              ^
     │
-    = expected function type: `|u64|u64 with store`
+    = expected function type: `|u64|u64 has store`
 
 error: captured value is missing abilities `store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:209:34
@@ -100,7 +100,7 @@ error: captured value is missing abilities `store`
 209 │                 |x| base_fun2(x, a)
     │                                  ^
     │
-    = expected function type: `|u64|u64 with store`
+    = expected function type: `|u64|u64 has store`
 
 error: captured value is missing abilities `store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:211:30
@@ -108,7 +108,7 @@ error: captured value is missing abilities `store`
 211 │                 |x| copy_fun(a_copy, x)
     │                              ^^^^^^
     │
-    = expected function type: `|u64|u64 with store`
+    = expected function type: `|u64|u64 has store`
 
 error: captured value is missing abilities `store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:213:34
@@ -116,7 +116,7 @@ error: captured value is missing abilities `store`
 213 │                 |x| copy_fun2(x, a_copy)
     │                                  ^^^^^^
     │
-    = expected function type: `|u64|u64 with store`
+    = expected function type: `|u64|u64 has store`
 
 error: function resulting from lambda lifting is missing the `store` ability
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:223:17
@@ -125,7 +125,7 @@ error: function resulting from lambda lifting is missing the `store` ability
     │                 ^^^^^^^^^
     │
     = lambda cannot be reduced to partial application of existing function
-    = expected function type: `|u64|u64 with store`
+    = expected function type: `|u64|u64 has store`
 
 warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:237:21
@@ -151,7 +151,7 @@ error: captured value is missing abilities `copy + store`
 267 │                 |x| base_fun(a, x)
     │                              ^
     │
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`
 
 error: captured value is missing abilities `copy + store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:269:34
@@ -159,7 +159,7 @@ error: captured value is missing abilities `copy + store`
 269 │                 |x| base_fun2(x, a)
     │                                  ^
     │
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`
 
 error: captured value is missing abilities `store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:271:30
@@ -167,7 +167,7 @@ error: captured value is missing abilities `store`
 271 │                 |x| copy_fun(a_copy, x)
     │                              ^^^^^^
     │
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`
 
 error: captured value is missing abilities `store`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:273:34
@@ -175,7 +175,7 @@ error: captured value is missing abilities `store`
 273 │                 |x| copy_fun2(x, a_copy)
     │                                  ^^^^^^
     │
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`
 
 error: captured value is missing abilities `copy`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:275:31
@@ -183,7 +183,7 @@ error: captured value is missing abilities `copy`
 275 │                 |x| store_fun(a_store, x)
     │                               ^^^^^^^
     │
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`
 
 error: captured value is missing abilities `copy`
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:277:35
@@ -191,7 +191,7 @@ error: captured value is missing abilities `copy`
 277 │                 |x| store_fun2(x, a_store)
     │                                   ^^^^^^^
     │
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`
 
 error: function resulting from lambda lifting is missing the `store` ability
     ┌─ tests/checking-lang-v2.2/lambda/storable/closure_args.move:283:17
@@ -200,4 +200,4 @@ error: function resulting from lambda lifting is missing the `store` ability
     │                 ^^^^^^^^^
     │
     = lambda cannot be reduced to partial application of existing function
-    = expected function type: `|u64|u64 with copy+store`
+    = expected function type: `|u64|u64 has copy + store`

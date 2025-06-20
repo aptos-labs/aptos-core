@@ -5,7 +5,7 @@ use crate::{
     common::{
         types::{
             account_address_from_public_key, CliError, CliTypedResult, EncodingOptions, KeyType,
-            RngArgs, SaveFile,
+            PrivateKeyInputOptions, RngArgs, SaveFile,
         },
         utils::{
             append_file_extension, check_if_file_exists, generate_vanity_account_ed25519,
@@ -16,7 +16,8 @@ use crate::{
 };
 use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{
-    bls12381, ed25519, encoding_type::EncodingType, x25519, PrivateKey, ValidCryptoMaterial,
+    bls12381, ed25519, ed25519::Ed25519PrivateKey, encoding_type::EncodingType, x25519, PrivateKey,
+    ValidCryptoMaterial,
 };
 use aptos_genesis::config::HostAndPort;
 use aptos_types::account_address::{
@@ -38,6 +39,7 @@ pub const PUBLIC_KEY_EXTENSION: &str = "pub";
 #[derive(Debug, Subcommand)]
 pub enum KeyTool {
     Generate(GenerateKey),
+    ExtractPublicKey(ExtractPublicKey),
     ExtractPeer(ExtractPeer),
 }
 
@@ -46,6 +48,7 @@ impl KeyTool {
         match self {
             KeyTool::Generate(tool) => tool.execute_serialized().await,
             KeyTool::ExtractPeer(tool) => tool.execute_serialized().await,
+            KeyTool::ExtractPublicKey(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -147,23 +150,23 @@ impl NetworkKeyInputOptions {
         encoding: EncodingType,
     ) -> CliTypedResult<x25519::PublicKey> {
         // The grouping above prevents there from being more than one, but just in case
-        match (self.public_network_key,  self.public_network_key_file, self.private_network_key, self.private_network_key_file){
+        match (self.public_network_key, self.public_network_key_file, self.private_network_key, self.private_network_key_file) {
             (Some(public_network_key), None, None, None) => Ok(encoding.decode_key("--public-network-key", public_network_key.as_bytes().to_vec())?),
-            (None, Some(public_network_key_file),None,  None) => Ok(encoding.load_key("--public-network-key-file", public_network_key_file.as_path())?),
-            (None, None, Some(private_network_key),  None) => {
+            (None, Some(public_network_key_file), None, None) => Ok(encoding.load_key("--public-network-key-file", public_network_key_file.as_path())?),
+            (None, None, Some(private_network_key), None) => {
                 let private_network_key: x25519::PrivateKey = encoding.decode_key("--private-network-key", private_network_key.as_bytes().to_vec())?;
                 Ok(private_network_key.public_key())
-            },
+            }
             (None, None, None, Some(private_network_key_file)) => {
                 let private_network_key: x25519::PrivateKey = encoding.load_key("--private-network-key-file", private_network_key_file.as_path())?;
                 Ok(private_network_key.public_key())
-            },
+            }
             _ => Err(CliError::CommandArgumentError("Must provide exactly one of [--public-network-key, --public-network-key-file, --private-network-key, --private-network-key-file]".to_string()))
         }
     }
 }
 
-/// Generates a `x25519` or `ed25519` key.
+/// Generates a `x25519`, `ed25519` or `bls12381` key.
 ///
 /// This can be used for generating an identity.  Two files will be created
 /// `output_file` and `output_file.pub`.  `output_file` will contain the private
@@ -308,7 +311,89 @@ impl GenerateKey {
     }
 }
 
+/// Extracts the public key and any appropriate proof of possession from the PrivateKey
+///
+/// You can simply run this by using the same kinds of inputs as Generate
+///
+/// ```bash
+/// aptos key extract-public-key --private-key-file ./path-to-key --output-file ./path-to-output --key-type bls12381
+/// ```
 #[derive(Debug, Parser)]
+pub struct ExtractPublicKey {
+    /// Key type to generate. Must be one of [x25519, ed25519, bls12381]
+    #[clap(long, default_value_t = KeyType::Ed25519)]
+    pub(crate) key_type: KeyType,
+    #[clap(flatten)]
+    pub(crate) private_key_params: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    pub rng_args: RngArgs,
+    #[clap(flatten)]
+    pub(crate) save_params: SaveKey,
+}
+
+#[async_trait]
+impl CliCommand<HashMap<&'static str, PathBuf>> for ExtractPublicKey {
+    fn command_name(&self) -> &'static str {
+        "ExtractPublicKey"
+    }
+
+    async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
+        let private_key_bytes = self
+            .private_key_params
+            .extract_private_key_input_from_cli_args()?;
+        let files = match self.key_type {
+            KeyType::Ed25519 => {
+                let key = self
+                    .save_params
+                    .encoding_options
+                    .encoding
+                    .decode_key::<Ed25519PrivateKey>("ed25519 private key", private_key_bytes)?;
+                vec![self.save_params.save_material(
+                    &key.public_key(),
+                    "ed25519 public key",
+                    PUBLIC_KEY_EXTENSION,
+                )?]
+            },
+            KeyType::X25519 => {
+                let key = self
+                    .save_params
+                    .encoding_options
+                    .encoding
+                    .decode_key::<x25519::PrivateKey>("ed25519 private key", private_key_bytes)?;
+                vec![self.save_params.save_material(
+                    &key.public_key(),
+                    "x25519 public key",
+                    PUBLIC_KEY_EXTENSION,
+                )?]
+            },
+            KeyType::Bls12381 => {
+                let key = self
+                    .save_params
+                    .encoding_options
+                    .encoding
+                    .decode_key::<bls12381::PrivateKey>(
+                        "bls12381 private key",
+                        private_key_bytes,
+                    )?;
+                vec![
+                    self.save_params.clone().save_material(
+                        &key.public_key(),
+                        "bls12381 public key",
+                        PUBLIC_KEY_EXTENSION,
+                    )?,
+                    self.save_params.save_material(
+                        &bls12381::ProofOfPossession::create(&key),
+                        "bls12381 proof of possession",
+                        "pop",
+                    )?,
+                ]
+            },
+        };
+        Ok(HashMap::from_iter(files))
+    }
+}
+
+#[derive(Debug, Parser, Clone)]
 pub struct SaveKey {
     #[clap(flatten)]
     pub(crate) file_options: SaveFile,
@@ -359,6 +444,19 @@ impl SaveKey {
         map.insert("PrivateKey Path", self.file_options.output_file);
         map.insert("PublicKey Path", public_key_file);
         Ok(map)
+    }
+
+    /// Saves material to an enocded file
+    pub fn save_material<Key: ValidCryptoMaterial>(
+        self,
+        material: &Key,
+        name: &'static str,
+        extension: &'static str,
+    ) -> CliTypedResult<(&'static str, PathBuf)> {
+        let encoded_material = self.encoding_options.encoding.encode_key(name, material)?;
+        let file = append_file_extension(self.file_options.output_file.as_path(), extension)?;
+        write_to_file(&file, name, &encoded_material)?;
+        Ok((name, file))
     }
 
     /// Saves a key to a file encoded in a string
