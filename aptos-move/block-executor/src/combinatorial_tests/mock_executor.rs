@@ -3,11 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    proptest_types::types::{
-        deserialize_to_delayed_field_id, serialize_from_delayed_field_id, DeltaTestKind,
-        GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType, RESERVED_TAG,
+    combinatorial_tests::types::{
+        DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
+        RESERVED_TAG,
     },
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    types::delayed_field_mock_serialization::{
+        deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
+    },
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,

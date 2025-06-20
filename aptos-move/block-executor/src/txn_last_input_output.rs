@@ -257,6 +257,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     // Extracts a set of resource paths (keys) written or updated during execution from
     // transaction output. The group keys are not included, and the boolean indicates
     // whether the resource is used as an AggregatorV1.
+    // Used only in BlockSTMv1. BlockSTMv2 uses modified_resource_keys_no_aggregator_v1
+    // and modified_aggregator_v1_keys methods below.
     pub(crate) fn modified_resource_keys(
         &self,
         txn_idx: TxnIndex,
@@ -274,6 +276,40 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                                 .into_iter()
                                 .map(|(k, _)| (k, true)),
                         ),
+                ),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn modified_resource_keys_no_aggregator_v1(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.resource_write_set().into_iter().map(|(k, _, _)| k))
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn modified_aggregator_v1_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                    t.aggregator_v1_write_set()
+                        .into_keys()
+                        .chain(t.aggregator_v1_delta_set().into_iter().map(|(k, _)| k)),
                 ),
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)

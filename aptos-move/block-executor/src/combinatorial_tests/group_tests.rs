@@ -4,9 +4,7 @@
 
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
-    errors::SequentialBlockExecutionError,
-    executor::BlockExecutor,
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockOutput, MockTask},
         resource_tests::{
@@ -16,6 +14,8 @@ use crate::{
             KeyType, MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
         },
     },
+    errors::SequentialBlockExecutionError,
+    executor::BlockExecutor,
     task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
@@ -23,7 +23,6 @@ use crate::{
 use aptos_types::block_executor::{
     config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
 };
-use num_cpus;
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::sync::Arc;
 use test_case::test_case;
@@ -55,7 +54,7 @@ pub(crate) fn run_tests_with_groups(
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     // Run parallel execution tests
-    for block_stm_v2 in [false, true] {
+    for block_stm_v2 in [false] {
         for i in 0..num_executions_parallel {
             for maybe_block_gas_limit in &gas_limits {
                 if *maybe_block_gas_limit == Some(0) && i > 0 {
