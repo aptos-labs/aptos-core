@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockTask},
         resource_tests::{
