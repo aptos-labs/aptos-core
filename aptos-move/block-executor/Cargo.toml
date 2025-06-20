@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 ambassador = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -28,6 +29,7 @@ aptos-vm-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+cfg-if = { workspace = true }
 claims = { workspace = true }
 concurrent-queue = { workspace = true }
 criterion = { workspace = true, optional = true }
@@ -46,7 +48,6 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
-scopeguard = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
@@ -70,3 +71,6 @@ fuzzing = ["criterion", "proptest", "proptest-derive"]
 name = "scheduler_benches"
 harness = false
 required-features = ["fuzzing"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

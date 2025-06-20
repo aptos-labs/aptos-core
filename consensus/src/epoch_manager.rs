@@ -857,17 +857,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config.clone(),
                 rand_msg_rx,
                 recovery_data.commit_root_block().round(),
-                self.config.enable_pipeline,
             )
             .await;
         let consensus_sk = consensus_key;
 
-        let maybe_pipeline_builder = if self.config.enable_pipeline {
-            let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
-            Some(self.execution_client.pipeline_builder(signer))
-        } else {
-            None
-        };
+        let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
+        let pipeline_builder = self.execution_client.pipeline_builder(signer);
         info!(epoch = epoch, "Create BlockStore");
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
@@ -882,7 +877,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
-            maybe_pipeline_builder,
+            Some(pipeline_builder),
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
@@ -896,6 +891,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
+        let max_sending_block_txns_after_filtering = if self.config.enable_optimistic_proposal_tx {
+            self.config.max_sending_opt_block_txns_after_filtering
+        } else {
+            self.config.max_sending_block_txns_after_filtering
+        };
         // txn manager is required both by proposal generator (to pull the proposers)
         // and by event processor (to update their status).
         let proposal_generator = ProposalGenerator::new(
@@ -908,7 +908,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.max_sending_block_txns,
                 self.config.max_sending_block_bytes,
             ),
-            self.config.max_sending_block_txns_after_filtering,
+            max_sending_block_txns_after_filtering,
             PayloadTxnsSize::new(
                 self.config.max_sending_inline_txns,
                 self.config.max_sending_inline_bytes,
@@ -940,6 +940,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
+
+        let (opt_proposal_loopback_tx, opt_proposal_loopback_rx) =
+            aptos_channels::new_unbounded(&counters::OP_COUNTERS.gauge("opt_proposal_queue"));
+
         self.round_manager_tx = Some(round_manager_tx.clone());
         self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
         let max_blocks_allowed = self
@@ -962,13 +966,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_jwk_consensus_config,
             fast_rand_config,
             failures_tracker,
+            opt_proposal_loopback_tx,
         );
 
         round_manager.init(last_vote).await;
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(round_manager_rx, buffered_proposal_rx, close_rx));
+        tokio::spawn(round_manager.start(
+            round_manager_rx,
+            buffered_proposal_rx,
+            opt_proposal_loopback_rx,
+            close_rx,
+        ));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
     }
@@ -1421,7 +1431,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 highest_committed_round,
-                self.config.enable_pipeline,
             )
             .await;
 
@@ -1494,6 +1503,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             observe_block(
                 proposal.proposal().timestamp_usecs(),
                 BlockStage::EPOCH_MANAGER_RECEIVED,
+            );
+        }
+        if let ConsensusMsg::OptProposalMsg(proposal) = &consensus_msg {
+            if !self.config.enable_optimistic_proposal_rx {
+                bail!(
+                    "Unexpected OptProposalMsg. Feature is disabled. Author: {}, Epoch: {}, Round: {}",
+                    proposal.block_data().author(),
+                    proposal.epoch(),
+                    proposal.round()
+                )
+            }
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED,
+            );
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_RECEIVED_OPT_PROPOSAL,
             );
         }
         // we can't verify signatures from a different epoch
@@ -1569,6 +1596,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> anyhow::Result<Option<UnverifiedEvent>> {
         match msg {
             ConsensusMsg::ProposalMsg(_)
+            | ConsensusMsg::OptProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::RoundTimeoutMsg(_)
@@ -1681,6 +1709,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 BlockStage::EPOCH_MANAGER_VERIFIED,
             );
         }
+        if let VerifiedEvent::OptProposalMsg(proposal) = &event {
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED,
+            );
+            observe_block(
+                proposal.timestamp_usecs(),
+                BlockStage::EPOCH_MANAGER_VERIFIED_OPT_PROPOSAL,
+            );
+        }
         if let Err(e) = match event {
             quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
@@ -1701,6 +1739,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
 
                 Self::forward_event_to(buffered_proposal_tx, peer_id, proposal_event)
+                    .context("proposal precheck sender")
+            },
+            opt_proposal_event @ VerifiedEvent::OptProposalMsg(_) => {
+                if let VerifiedEvent::OptProposalMsg(p) = &opt_proposal_event {
+                    payload_manager.prefetch_payload_data(
+                        p.block_data().payload(),
+                        p.proposer(),
+                        p.timestamp_usecs(),
+                    );
+                }
+
+                Self::forward_event_to(buffered_proposal_tx, peer_id, opt_proposal_event)
                     .context("proposal precheck sender")
             },
             round_manager_event => Self::forward_event_to(
@@ -1890,6 +1940,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum NoRandomnessReason {
     VTxnDisabled,

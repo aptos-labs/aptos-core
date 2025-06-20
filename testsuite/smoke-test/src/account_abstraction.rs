@@ -37,7 +37,13 @@ struct SIWEAbstractPublicKey {
 
 #[derive(Serialize)]
 enum SIWEAbstractSignature {
+    #[allow(dead_code)]
     MessageV1 {
+        issued_at: String,
+        signature: Vec<u8>,
+    },
+    MessageV2 {
+        scheme: String,
         issued_at: String,
         signature: Vec<u8>,
     },
@@ -169,6 +175,8 @@ async fn test_ethereum_derivable_account() {
     })
     .unwrap();
 
+    let scheme = "https";
+
     let account = LocalAccount::new_domain_aa(
         function_info,
         account_identity,
@@ -177,11 +185,12 @@ async fn test_ethereum_derivable_account() {
                 let function_name = "0x1::aptos_account::create_account";
                 let digest = format!("0x{}", hex::encode(x));
                 let message_body = format!(
-                    "{} wants you to sign in with your Ethereum account:\n{}\n\nPlease confirm you explicitly initiated this request from {}. You are approving to execute transaction {} on Aptos blockchain (local).\n\nURI: {}\nVersion: 1\nChain ID: {}\nNonce: {}\nIssued At: {}",
+                    "{} wants you to sign in with your Ethereum account:\n{}\n\nPlease confirm you explicitly initiated this request from {}. You are approving to execute transaction {} on Aptos blockchain (local).\n\nURI: {}://{}\nVersion: 1\nChain ID: {}\nNonce: {}\nIssued At: {}",
                     domain,
                     address_str,
                     domain,
                     function_name,
+                    scheme,
                     domain,
                     4,
                     digest,
@@ -197,7 +206,8 @@ async fn test_ethereum_derivable_account() {
                 let signature = wallet.sign_hash(H256::from(hash)).unwrap();
                 let sig_bytes = signature.to_vec();
 
-                let signature = SIWEAbstractSignature::MessageV1 {
+                let signature = SIWEAbstractSignature::MessageV2 {
+                    scheme: scheme.to_string(),
                     issued_at: "2025-01-01T00:00:00.000Z".to_string(),
                     signature: sig_bytes,
                 };

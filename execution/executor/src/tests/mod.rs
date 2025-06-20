@@ -30,10 +30,12 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, StateViewId},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
-        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
-        Version,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        AuxiliaryInfo, BlockEndInfo, ExecutionStatus, RawTransaction, Script, SignedTransaction,
+        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
+        TransactionPayload, TransactionStatus, Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -387,7 +389,7 @@ fn create_blocks_and_chunks(
         let block_id = gen_block_id(version);
         let output = block_executor
             .execute_block(
-                (block_id, txns.clone()).into(),
+                (block_id, into_signature_verified_block(txns.clone())).into(),
                 parent_block_id,
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -696,6 +698,7 @@ fn run_transactions_naive(
         let out = DoGetExecutionOutput::by_transaction_execution(
             &MockVM::new(),
             vec![txn].into(),
+            vec![AuxiliaryInfo::new_empty()],
             &ledger_summary.state,
             state_view,
             block_executor_onchain_config.clone(),
@@ -867,9 +870,9 @@ proptest! {
         let expected_root_hash = run_transactions_naive({
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
-            txns.push(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(block_a.id)));
+            txns.push(SignatureVerifiedTransaction::Valid(Transaction::block_epilogue_v0(block_a.id, BlockEndInfo::new_empty())));
             txns.extend(block_b.txns.iter().cloned());
-            txns.push(SignatureVerifiedTransaction::Valid(Transaction::StateCheckpoint(block_b.id)));
+            txns.push(SignatureVerifiedTransaction::Valid(Transaction::block_epilogue_v0(block_b.id, BlockEndInfo::new_empty())));
             txns
         }, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG);
 

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf-8-in-label.move:3:12
+  │
+3 │     'label1🔥: while (x > 10) {
+  │            ^^ Invalid character: `🔥`

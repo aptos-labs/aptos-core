@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closure.move:17:9
+   │
+17 │         ensures result == x + 2; // This does not verify
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closure.move:13: test_closure_2
+   =         x = <redacted>
+   =     at tests/sources/functional/closure.move:14: test_closure_2
+   =         x = <redacted>
+   =         y = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closure.move:14: test_closure_2
+   =         result = <redacted>
+   =     at tests/sources/functional/closure.move:15: test_closure_2
+   =     at tests/sources/functional/closure.move:17: test_closure_2 (spec)

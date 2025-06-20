@@ -55,6 +55,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
         SharedMempool::new(
             mempool.clone(),
             config.mempool.clone(),
+            config.transaction_filter.clone(),
             network_client,
             db,
             validator,

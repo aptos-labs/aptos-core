@@ -8,7 +8,7 @@ use crate::{
         MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
         MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
     },
-    Options,
+    Options, COMPILER_BUG_REPORT_MSG,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -19,10 +19,7 @@ use move_core_types::{
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::{
-        AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute,
-        ResourceSpecifier,
-    },
+    ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
     metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
@@ -991,15 +988,20 @@ impl ModuleGenerator {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Emits an error at the location.
     pub fn error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
         self.env.diag(Severity::Error, loc.as_ref(), msg.as_ref())
     }
 
     /// Emits an internal error at the location.
-    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
-        self.env.diag(Severity::Bug, loc.as_ref(), msg.as_ref())
+    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str> + ToString) {
+        self.env.diag_with_notes(
+            Severity::Bug,
+            loc.as_ref(),
+            format!("compiler internal error: {}", msg.to_string()).as_str(),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+        )
     }
 
     /// Check for a bound table index and report an error if its out of bound. All bounds
@@ -1030,29 +1032,37 @@ impl<'env> ModuleContext<'env> {
         inst_sign: Option<FF::SignatureIndex>,
     ) -> Option<FF::Bytecode> {
         let fun = self.env.get_function(qid);
-        let mod_name = fun.module_env.get_name();
-        if mod_name.addr() != &Address::Numerical(AccountAddress::ONE) {
+        if !fun.module_env.is_std_vector() {
             return None;
         }
         let pool = self.env.symbol_pool();
-        if pool.string(mod_name.name()).as_str() == "vector" {
-            if let Some(inst) = inst_sign {
-                match pool.string(fun.get_name()).as_str() {
-                    "empty" => Some(FF::Bytecode::VecPack(inst, 0)),
-                    "length" => Some(FF::Bytecode::VecLen(inst)),
-                    "borrow" => Some(FF::Bytecode::VecImmBorrow(inst)),
-                    "borrow_mut" => Some(FF::Bytecode::VecMutBorrow(inst)),
-                    "push_back" => Some(FF::Bytecode::VecPushBack(inst)),
-                    "pop_back" => Some(FF::Bytecode::VecPopBack(inst)),
-                    "destroy_empty" => Some(FF::Bytecode::VecUnpack(inst, 0)),
-                    "swap" => Some(FF::Bytecode::VecSwap(inst)),
-                    _ => None,
-                }
-            } else {
-                self.internal_error(loc, "expected type instantiation for vector operation");
-                None
+        let function_name = pool.string(fun.get_name());
+        if !well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&function_name.as_str()) {
+            // early return if vector function does not have a bytecode instruction
+            return None;
+        }
+
+        if let Some(inst) = inst_sign {
+            match function_name.as_str() {
+                // note: the following matched strings should all be present in `well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS`
+                "empty" => Some(FF::Bytecode::VecPack(inst, 0)),
+                "length" => Some(FF::Bytecode::VecLen(inst)),
+                "borrow" => Some(FF::Bytecode::VecImmBorrow(inst)),
+                "borrow_mut" => Some(FF::Bytecode::VecMutBorrow(inst)),
+                "push_back" => Some(FF::Bytecode::VecPushBack(inst)),
+                "pop_back" => Some(FF::Bytecode::VecPopBack(inst)),
+                "destroy_empty" => Some(FF::Bytecode::VecUnpack(inst, 0)),
+                "swap" => Some(FF::Bytecode::VecSwap(inst)),
+                _ => {
+                    self.internal_error(
+                        loc,
+                        format!("unexpected vector function `{}`", function_name),
+                    );
+                    None
+                },
             }
         } else {
+            self.internal_error(loc, "expected type instantiation for vector operation");
             None
         }
     }
@@ -1063,7 +1073,7 @@ impl<'env> ModuleContext<'env> {
     }
 }
 
-impl<'env> ModuleContext<'env> {
+impl ModuleContext<'_> {
     /// Acquires analysis. This is temporary until we have the full reference analysis.
     fn generate_acquires_map(&self, module: &ModuleEnv) -> BTreeMap<FunId, BTreeSet<StructId>> {
         // Compute map with direct usage of resources

@@ -122,7 +122,7 @@ fn test_dynamic_subscribers() {
     // Add another subscriber for event_key_1 and the reconfig_event_key
     let mut event_listener_2 = event_service
         .subscribe_to_events(vec![event_key_1], vec![
-            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_string()
+            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_canonical_string()
         ])
         .unwrap();
 
@@ -170,7 +170,9 @@ fn test_event_and_reconfig_subscribers() {
         .subscribe_to_events(vec![event_key_1, event_key_2], vec![])
         .unwrap();
     let mut event_listener_3 = event_service
-        .subscribe_to_events(vec![], vec![NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_string()])
+        .subscribe_to_events(vec![], vec![
+            NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.to_canonical_string()
+        ])
         .unwrap();
 
     // Create reconfiguration subscribers
@@ -396,7 +398,8 @@ fn test_event_v2_subscription_by_tag() {
     // Notify the subscription service.
     let version = 99;
     let event_1 = create_test_event(event_key_1);
-    let event_2 = ContractEvent::new_v2(TypeTag::from_str(event_tag_2).unwrap(), b"xyz".to_vec());
+    let event_2 =
+        ContractEvent::new_v2(TypeTag::from_str(event_tag_2).unwrap(), b"xyz".to_vec()).unwrap();
     notify_events(&mut event_service, version, vec![
         event_1.clone(),
         event_2.clone(),
@@ -531,7 +534,7 @@ fn notify_events(
 }
 
 fn create_test_event(event_key: EventKey) -> ContractEvent {
-    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+    ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap()).unwrap()
 }
 
 fn create_test_reconfig_event() -> ContractEvent {
@@ -539,6 +542,7 @@ fn create_test_reconfig_event() -> ContractEvent {
         NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
         bcs::to_bytes(&0).unwrap(),
     )
+    .unwrap()
 }
 
 fn create_random_event_key() -> EventKey {

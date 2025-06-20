@@ -79,6 +79,15 @@ module aptos_experimental::confidential_asset {
     /// An internal error occurred, indicating unexpected behavior.
     const EINTERNAL_ERROR: u64 = 16;
 
+    /// Sender and recipient amounts encrypt different transfer amounts
+    const EINVALID_SENDER_AMOUNT: u64 = 17;
+
+    /// The confidential asset controller is not installed.
+    const EFA_CONTROLLER_NOT_INSTALLED: u64 = 18;
+
+    /// [TEST-ONLY] The confidential asset module initialization failed.
+    const EINIT_MODULE_FAILED: u64 = 1000;
+
     //
     // Constants
     //
@@ -88,6 +97,9 @@ module aptos_experimental::confidential_asset {
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
     const MAINNET_CHAIN_ID: u8 = 1;
+
+    /// The testnet chain ID.
+    const TESTNET_CHAIN_ID: u8 = 2;
 
     //
     // Structs
@@ -318,7 +330,8 @@ module aptos_experimental::confidential_asset {
         token: Object<Metadata>,
         to: address,
         new_balance: vector<u8>,
-        transfer_amount: vector<u8>,
+        sender_amount: vector<u8>,
+        recipient_amount: vector<u8>,
         auditor_eks: vector<u8>,
         auditor_amounts: vector<u8>,
         zkrp_new_balance: vector<u8>,
@@ -326,7 +339,8 @@ module aptos_experimental::confidential_asset {
         sigma_proof: vector<u8>) acquires ConfidentialAssetStore, FAConfig, FAController
     {
         let new_balance = confidential_balance::new_actual_balance_from_bytes(new_balance).extract();
-        let transfer_amount = confidential_balance::new_pending_balance_from_bytes(transfer_amount).extract();
+        let sender_amount = confidential_balance::new_pending_balance_from_bytes(sender_amount).extract();
+        let recipient_amount = confidential_balance::new_pending_balance_from_bytes(recipient_amount).extract();
         let auditor_eks = deserialize_auditor_eks(auditor_eks).extract();
         let auditor_amounts = deserialize_auditor_amounts(auditor_amounts).extract();
         let proof = confidential_proof::deserialize_transfer_proof(
@@ -340,7 +354,8 @@ module aptos_experimental::confidential_asset {
             token,
             to,
             new_balance,
-            transfer_amount,
+            sender_amount,
+            recipient_amount,
             auditor_eks,
             auditor_amounts,
             proof
@@ -506,6 +521,12 @@ module aptos_experimental::confidential_asset {
     }
 
     #[view]
+    /// Checks if the confidential asset controller is installed.
+    public fun confidential_asset_controller_exists(): bool {
+        exists<FAController>(@aptos_experimental)
+    }
+
+    #[view]
     /// Checks if the token is allowed for confidential transfers.
     public fun is_token_allowed(token: Object<Metadata>): bool acquires FAController, FAConfig {
         if (!is_allow_list_enabled()) {
@@ -526,6 +547,7 @@ module aptos_experimental::confidential_asset {
     /// If the allow list is enabled, only tokens from the allow list can be transferred.
     /// Otherwise, all tokens are allowed.
     public fun is_allow_list_enabled(): bool acquires FAController {
+        assert!(confidential_asset_controller_exists(), error::invalid_state(EFA_CONTROLLER_NOT_INSTALLED));
         borrow_global<FAController>(@aptos_experimental).allow_list_enabled
     }
 
@@ -604,6 +626,14 @@ module aptos_experimental::confidential_asset {
         assert!(primary_fungible_store::primary_store_exists(fa_store_address, token), EINTERNAL_ERROR);
 
         primary_fungible_store::balance(fa_store_address, token)
+    }
+
+    #[view]
+    /// Returns the pending balance transfer count for the specified token.
+    public fun get_pending_balance_transfer_count(user: address, token: Object<Metadata>): u64 acquires ConfidentialAssetStore {
+        assert!(has_confidential_asset_store(user, token), error::not_found(ECA_STORE_NOT_PUBLISHED));
+
+        borrow_global<ConfidentialAssetStore>(get_user_address(user, token)).pending_counter
     }
 
     //
@@ -703,7 +733,8 @@ module aptos_experimental::confidential_asset {
         token: Object<Metadata>,
         to: address,
         new_balance: confidential_balance::ConfidentialBalance,
-        transfer_amount: confidential_balance::ConfidentialBalance,
+        sender_amount: confidential_balance::ConfidentialBalance,
+        recipient_amount: confidential_balance::ConfidentialBalance,
         auditor_eks: vector<twisted_elgamal::CompressedPubkey>,
         auditor_amounts: vector<confidential_balance::ConfidentialBalance>,
         proof: TransferProof) acquires ConfidentialAssetStore, FAConfig, FAController
@@ -711,8 +742,12 @@ module aptos_experimental::confidential_asset {
         assert!(is_token_allowed(token), error::invalid_argument(ETOKEN_DISABLED));
         assert!(!is_frozen(to, token), error::invalid_state(EALREADY_FROZEN));
         assert!(
-            validate_auditors(token, &transfer_amount, &auditor_eks, &auditor_amounts, &proof),
+            validate_auditors(token, &recipient_amount, &auditor_eks, &auditor_amounts, &proof),
             error::invalid_argument(EINVALID_AUDITORS)
+        );
+        assert!(
+            confidential_balance::balance_c_equals(&sender_amount, &recipient_amount),
+            error::invalid_argument(EINVALID_SENDER_AMOUNT)
         );
 
         let from = signer::address_of(sender);
@@ -731,7 +766,8 @@ module aptos_experimental::confidential_asset {
             &recipient_ek,
             &sender_current_actual_balance,
             &new_balance,
-            &transfer_amount,
+            &sender_amount,
+            &recipient_amount,
             &auditor_eks,
             &auditor_amounts,
             &proof);
@@ -752,7 +788,7 @@ module aptos_experimental::confidential_asset {
         let recipient_pending_balance = confidential_balance::decompress_balance(
             &recipient_ca_store.pending_balance
         );
-        confidential_balance::add_balances_mut(&mut recipient_pending_balance, &transfer_amount);
+        confidential_balance::add_balances_mut(&mut recipient_pending_balance, &recipient_amount);
 
         recipient_ca_store.pending_counter += 1;
         recipient_ca_store.pending_balance = confidential_balance::compress_balance(&recipient_pending_balance);
@@ -1068,10 +1104,16 @@ module aptos_experimental::confidential_asset {
         fa
     }
 
+    entry fun init_module_for_genesis(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @aptos_experimental, error::invalid_argument(EINIT_MODULE_FAILED));
+        assert!(chain_id::get() != MAINNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
+        assert!(chain_id::get() != TESTNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
+        init_module(deployer)
+    }
+
     //
     // Test-only functions
     //
-
     #[test_only]
     public fun init_module_for_testing(deployer: &signer) {
         init_module(deployer)

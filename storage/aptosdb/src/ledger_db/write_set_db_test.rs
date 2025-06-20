@@ -84,7 +84,7 @@ proptest! {
             );
         }
 
-        prop_assert!(write_set_db.get_write_set_iter(10, usize::max_value()).is_err());
+        prop_assert!(write_set_db.get_write_set_iter(10, usize::MAX).is_err());
     }
 
     #[test]

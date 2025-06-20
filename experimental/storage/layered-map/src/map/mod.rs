@@ -63,7 +63,7 @@ where
         let peak = self.top_layer.peak();
         let mut foot = 0;
         for _ in 0..peak.height() - 1 {
-            foot = foot << 1 | bits.next().expect("bits exhausted") as usize;
+            foot = (foot << 1) | bits.next().expect("bits exhausted") as usize;
         }
 
         self.get_under_node(peak.expect_foot(foot, self.base_layer()), key, &mut bits)

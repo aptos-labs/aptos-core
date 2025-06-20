@@ -28,6 +28,7 @@ use log::info;
 use move_model::{
     ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecBlockTarget, SpecFunDecl},
     exp_rewriter::ExpRewriterFunctions,
+    metadata::LanguageVersion,
     model::{
         FunId, FunctionData, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, SpecFunId,
         StructEnv,
@@ -401,7 +402,7 @@ impl<'a> SpecConverter<'a> {
     }
 }
 
-impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
+impl ExpRewriterFunctions for SpecConverter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         use ExpData::*;
         use Operation::*;
@@ -414,7 +415,34 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                 self.in_spec = false;
                 result
             } else {
-                self.rewrite_exp_descent(exp)
+                let exp = self.rewrite_exp_descent(exp);
+                if self
+                    .env
+                    .language_version()
+                    .is_at_least(LanguageVersion::V2_2)
+                    && !self.for_inline
+                {
+                    if let ExpData::Invoke(id, call, args) = exp.as_ref() {
+                        if let ExpData::Call(_, Closure(mid, fid, mask), captured) = call.as_ref() {
+                            let mut new_args = vec![];
+                            let mut captured_num = 0;
+                            let mut free_num = 0;
+                            let fun = self.env.get_function(mid.qualified(*fid));
+                            for i in 0..fun.get_parameter_count() {
+                                if mask.is_captured(i) {
+                                    new_args.push(captured[captured_num].clone());
+                                    captured_num += 1;
+                                } else {
+                                    new_args.push(args[free_num].clone());
+                                    free_num += 1;
+                                }
+                            }
+                            return Call(*id, MoveFunction(*mid, *fid), new_args.clone())
+                                .into_exp();
+                        }
+                    }
+                }
+                exp
             }
         } else {
             // Simplification which need to be done before descent

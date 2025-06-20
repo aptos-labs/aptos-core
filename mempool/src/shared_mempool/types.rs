@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_config::{
-    config::{MempoolConfig, NodeType},
+    config::{MempoolConfig, NodeType, TransactionFilterConfig},
     network_id::PeerNetworkId,
 };
 use aptos_consensus_types::common::{
@@ -56,6 +56,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
     pub use_case_history: Arc<Mutex<UseCaseHistory>>,
+    pub transaction_filter_config: TransactionFilterConfig,
 }
 
 impl<
@@ -66,6 +67,7 @@ impl<
     pub fn new(
         mempool: Arc<Mutex<CoreMempool>>,
         config: MempoolConfig,
+        transaction_filter_config: TransactionFilterConfig,
         network_client: NetworkClient,
         db: Arc<dyn DbReader>,
         validator: Arc<RwLock<TransactionValidator>>,
@@ -87,6 +89,7 @@ impl<
             subscribers,
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
             use_case_history: Arc::new(Mutex::new(use_case_history)),
+            transaction_filter_config,
         }
     }
 
@@ -376,8 +379,8 @@ impl MempoolMessageId {
                             assert!(timeline_index_identifier < 128);
                             assert!(sender_bucket < 128);
                             (
-                                sender_bucket << 56 | timeline_index_identifier << 48 | old,
-                                sender_bucket << 56 | timeline_index_identifier << 48 | new,
+                                (sender_bucket << 56) | (timeline_index_identifier << 48) | old,
+                                (sender_bucket << 56) | (timeline_index_identifier << 48) | new,
                             )
                         })
                 })
@@ -391,7 +394,7 @@ impl MempoolMessageId {
         let mut result = HashMap::new();
         for (start, end) in self.0.iter() {
             let sender_bucket = (start >> 56) as MempoolSenderBucket;
-            let timeline_index_identifier = (start >> 48 & 0xFF) as TimelineIndexIdentifier;
+            let timeline_index_identifier = ((start >> 48) & 0xFF) as TimelineIndexIdentifier;
             // Remove the leading two bytes that indicates the sender bucket.
             let start = start & 0x0000FFFFFFFFFFFF;
             let end = end & 0x0000FFFFFFFFFFFF;

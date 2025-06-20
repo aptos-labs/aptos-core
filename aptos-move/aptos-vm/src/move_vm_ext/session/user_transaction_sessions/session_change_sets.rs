@@ -55,7 +55,7 @@ impl ChangeSetInterface for UserSessionChangeSet {
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
         fix_prev_materialized_size: bool,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.change_set
             .write_op_info_iter_mut(executor_view, module_storage, fix_prev_materialized_size)
             .chain(self.module_write_set.write_op_info_iter_mut(module_storage))
@@ -106,7 +106,7 @@ impl ChangeSetInterface for SystemSessionChangeSet {
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
         fix_prev_materialized_size: bool,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.change_set.write_op_info_iter_mut(
             executor_view,
             module_storage,

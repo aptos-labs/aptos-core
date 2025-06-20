@@ -1103,6 +1103,29 @@ impl Type {
         false
     }
 
+    /// Returns compatible number type if `self` and `ty` are compatible number types.
+    pub fn is_compatible_num_type(&self, ty: &Type) -> Option<Type> {
+        let skip_reference_self = self.skip_reference();
+        let skip_reference_ty = ty.skip_reference();
+        if !skip_reference_self.is_number() || !skip_reference_ty.is_number() {
+            return None;
+        }
+        match (skip_reference_self, skip_reference_ty) {
+            (Type::Primitive(PrimitiveType::Num), Type::Primitive(PrimitiveType::Num)) => {
+                Some(Type::Primitive(PrimitiveType::Num))
+            },
+            (Type::Primitive(PrimitiveType::Num), _) => Some(skip_reference_ty.clone()),
+            (_, Type::Primitive(PrimitiveType::Num)) => Some(skip_reference_self.clone()),
+            _ => {
+                if skip_reference_self == skip_reference_ty {
+                    Some(skip_reference_self.clone())
+                } else {
+                    None
+                }
+            },
+        }
+    }
+
     /// Returns true if this is an address or signer type.
     pub fn is_signer_or_address(&self) -> bool {
         matches!(
@@ -1630,6 +1653,15 @@ impl Type {
     /// If this is a tuple, return true.
     pub fn is_tuple(&self) -> bool {
         matches!(self, Type::Tuple(_))
+    }
+
+    /// Returns true if this type is a reference to a reference.
+    pub fn is_reference_to_a_reference(&self) -> bool {
+        if let Type::Reference(_, bt) = self {
+            bt.is_reference()
+        } else {
+            false
+        }
     }
 }
 
@@ -2529,7 +2561,14 @@ impl Substitution {
                 }
             },
             (Type::Reference(k1, ty1), Type::Reference(k2, ty2)) => {
-                // For references, allow variance to be passed down, and not use sub-variance
+                let variance = if matches!((k1, k2), (ReferenceKind::Mutable, ReferenceKind::Mutable))
+                {
+                    // For both being mutable references, use no variance.
+                    Variance::NoVariance
+                } else {
+                    // For other cases of references, allow variance to be passed down, and not use sub-variance
+                    variance
+                };
                 let ty = self
                     .unify(context, variance, order, ty1, ty2)
                     .map_err(TypeUnificationError::lift(order, t1, t2))?;
@@ -3495,7 +3534,7 @@ impl Type {
     }
 }
 
-impl<'a> fmt::Display for TypeDisplay<'a> {
+impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Type::*;
         let comma_list = |f: &mut Formatter<'_>, ts: &[Type]| -> fmt::Result {
@@ -3608,7 +3647,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
     }
 }
 
-impl<'a> TypeDisplay<'a> {
+impl TypeDisplay<'_> {
     fn type_var_str(&self, idx: u32) -> String {
         if self.context.display_type_vars {
             format!("_{}", idx)
@@ -3770,7 +3809,7 @@ impl<'a> AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityContext for AbilityInferer<'a> {
+impl AbilityContext for AbilityInferer<'_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         self.type_params[idx as usize].clone()
     }
@@ -3788,4 +3827,4 @@ impl<'a> AbilityContext for AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityInference for AbilityInferer<'a> {}
+impl AbilityInference for AbilityInferer<'_> {}

@@ -28,6 +28,13 @@ pub struct ReleaseOptions {
     /// generated.
     #[clap(long)]
     pub rust_bindings: Vec<String>,
+
+    /// For each package, whether it should be built with using latest language features.
+    /// Generally packages being deployed to testnet/mainnet need to use default features,
+    /// while those that don't (like aptos-experimental) can use latest language features.
+    #[clap(long)]
+    pub package_use_latest_language: Vec<bool>,
+
     /// The path to the file where to place the release bundle.
     #[clap(long, default_value = "head.mrb", value_parser)]
     pub output: PathBuf,
@@ -41,19 +48,29 @@ impl ReleaseOptions {
             build_options,
             packages,
             rust_bindings,
+            package_use_latest_language,
             output,
         } = self;
         let mut released_packages = vec![];
         let mut source_paths = vec![];
-        for (package_path, rust_binding_path) in packages.into_iter().zip(rust_bindings.into_iter())
+        for ((package_path, rust_binding_path), use_latest_language) in packages
+            .into_iter()
+            .zip(rust_bindings.into_iter())
+            .zip(package_use_latest_language.into_iter())
         {
-            let built = BuiltPackage::build(package_path.clone(), build_options.clone())
-                .with_context(|| {
+            let cur_build_options = if use_latest_language {
+                build_options.clone().set_latest_language()
+            } else {
+                build_options.clone()
+            };
+            let built = BuiltPackage::build(package_path.clone(), cur_build_options).with_context(
+                || {
                     format!(
                         "Failed to build package at path: {}",
                         package_path.display()
                     )
-                })?;
+                },
+            )?;
             if !rust_binding_path.is_empty() {
                 let abis = built
                     .extract_abis()

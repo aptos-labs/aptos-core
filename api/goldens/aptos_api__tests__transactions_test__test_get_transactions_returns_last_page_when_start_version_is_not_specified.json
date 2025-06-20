@@ -11,7 +11,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "6000000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "37",
@@ -297,7 +303,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "6500000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "40",
@@ -583,7 +595,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "7000000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "43",
@@ -869,7 +887,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "7500000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "46",
@@ -1155,7 +1179,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "8000000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "49",
@@ -1441,7 +1471,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "8500000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "52",
@@ -1727,7 +1763,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "9000000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "55",
@@ -2013,7 +2055,13 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "9500000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   },
   {
     "version": "58",
@@ -2299,6 +2347,12 @@
     "accumulator_root_hash": "",
     "changes": [],
     "timestamp": "10000000",
-    "type": "state_checkpoint_transaction"
+    "block_end_info": {
+      "block_gas_limit_reached": false,
+      "block_output_limit_reached": false,
+      "block_effective_block_gas_units": 9,
+      "block_approx_output_size": 0
+    },
+    "type": "block_epilogue_transaction"
   }
 ]

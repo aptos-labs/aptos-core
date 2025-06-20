@@ -16,7 +16,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
-use futures::{channel::mpsc, future::BoxFuture};
+use futures::channel::mpsc;
 use rand::Rng;
 
 #[allow(dead_code)]
@@ -56,11 +56,11 @@ impl PayloadClient for MockPayloadManager {
         &self,
         _params: PayloadPullParameters,
         _validator_txn_filter: vtxn_pool::TransactionFilter,
-        _wait_callback: BoxFuture<'static, ()>,
     ) -> Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok((
-            vec![ValidatorTransaction::dummy(vec![0xFF; 1])],
+            // vec![ValidatorTransaction::dummy(vec![0xFF; 1])],
+            vec![], // TODO: re-implement dummy vtxn use it here
             random_payload(10),
         ))
     }

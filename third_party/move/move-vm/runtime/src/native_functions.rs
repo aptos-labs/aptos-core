@@ -3,14 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::InterpreterDebugInterface, loader::Function,
-    module_traversal::TraversalContext, native_extensions::NativeContextExtensions,
-    storage::module_storage::FunctionValueExtensionAdapter, LayoutConverter, ModuleStorage,
-    StorageLayoutConverter,
+    check_dependencies_and_charge_gas,
+    data_cache::TransactionDataCache,
+    interpreter::InterpreterDebugInterface,
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    },
+    ModuleStorage,
 };
-use move_binary_format::errors::{
-    ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
-};
+use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
@@ -20,8 +24,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, resolver::ResourceResolver,
-    values::Value,
+    gas::NativeGasMeter, loaded_data::runtime_types::Type, natives::function::NativeResult,
+    resolver::ResourceResolver, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -95,32 +99,25 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut dyn InterpreterDebugInterface,
+pub struct NativeContext<'a, 'b, 'c> {
+    interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
-    gas_balance: InternalGas,
-    traversal_context: &'a TraversalContext<'a>,
-
-    /// Counter used to record the (conceptual) heap memory usage by a native functions,
-    /// measured in abstract memory unit.
-    ///
-    /// This is a hack to emulate memory usage tracking, before we could refactor native functions
-    /// and allow them to access the gas meter directly.
-    heap_memory_usage: u64,
+    gas_meter: &'a mut dyn NativeGasMeter,
+    traversal_context: &'a mut TraversalContext<'c>,
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut dyn InterpreterDebugInterface,
+        interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
-        gas_balance: InternalGas,
-        traversal_context: &'a TraversalContext<'a>,
+        gas_meter: &'a mut dyn NativeGasMeter,
+        traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
             interpreter,
@@ -128,15 +125,13 @@ impl<'a, 'b> NativeContext<'a, 'b> {
             resource_resolver,
             module_storage,
             extensions,
-            gas_balance,
+            gas_meter,
             traversal_context,
-
-            heap_memory_usage: 0,
         }
     }
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
@@ -146,18 +141,26 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> VMResult<(bool, Option<NumBytes>)> {
-        // TODO(Rati, George): propagate exists call the way to resolver, because we
-        //                     can implement the check more efficiently, without the
-        //                     need to actually load bytes.
-        let (value, num_bytes) = self
-            .data_store
-            .load_resource(self.module_storage, self.resource_resolver, address, ty)
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let exists = value
-            .exists()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        Ok((exists, num_bytes))
+    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
+        // TODO(#16516):
+        //   Propagate exists call all the way to resolver, because we can implement the check more
+        //   efficiently, without the need to actually load bytes, deserialize the value and cache
+        //   it in the data cache.
+        Ok(if !self.data_store.contains_resource(&address, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+                self.module_storage,
+                self.resource_resolver,
+                &address,
+                ty,
+            )?;
+            let exists = entry.value().exists()?;
+            self.data_store
+                .insert_resource(address, ty.clone(), entry)?;
+            (exists, Some(bytes_loaded))
+        } else {
+            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
+            (exists, None)
+        })
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
@@ -180,6 +183,10 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         StorageLayoutConverter::new(self.module_storage).type_to_fully_annotated_layout(ty)
     }
 
+    pub fn module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
         self.extensions
     }
@@ -194,19 +201,30 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         self.interpreter.get_stack_frames(count)
     }
 
-    pub fn gas_balance(&self) -> InternalGas {
-        self.gas_balance
+    pub fn legacy_gas_budget(&self) -> InternalGas {
+        self.gas_meter.legacy_gas_budget_in_native_context()
     }
 
-    pub fn use_heap_memory(&mut self, amount: u64) {
-        self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
+    /// Returns the gas meter used for execution. Even if native functions cannot use it to
+    /// charge gas (feature-gating), gas meter can be used to query gas meter's balance.
+    pub fn gas_meter(&mut self) -> &mut dyn NativeGasMeter {
+        self.gas_meter
     }
 
-    pub fn heap_memory_usage(&self) -> u64 {
-        self.heap_memory_usage
+    pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> VMResult<()> {
+        let arena_id = self
+            .traversal_context
+            .referenced_module_ids
+            .alloc(module_id);
+        check_dependencies_and_charge_gas(
+            self.module_storage,
+            self.gas_meter,
+            self.traversal_context,
+            [(arena_id.address(), arena_id.name())],
+        )
     }
 
-    pub fn traversal_context(&self) -> &TraversalContext {
+    pub fn traversal_context(&self) -> &TraversalContext<'c> {
         self.traversal_context
     }
 
@@ -214,18 +232,5 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
-    }
-
-    pub fn load_function(
-        &mut self,
-        module_id: &ModuleId,
-        function_name: &Identifier,
-    ) -> VMResult<Arc<Function>> {
-        let (_, function) = self.module_storage.fetch_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )?;
-        Ok(function)
     }
 }

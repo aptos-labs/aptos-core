@@ -17,17 +17,15 @@ pub mod plan_builder;
 use crate::{
     diagnostics::Emitter,
     env_pipeline::{
-        acquires_checker, ast_simplifier, closure_checker, cyclic_instantiation_checker,
-        flow_insensitive_checkers, function_checker, inliner, lambda_lifter,
-        lambda_lifter::LambdaLiftingOptions, model_ast_lints, recursive_struct_checker,
-        rewrite_target::RewritingScope, seqs_in_binop_checker, spec_checker, spec_rewriter,
-        unused_params_checker, EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
+        cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
+        lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
+        recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
+        spec_checker, spec_rewriter, unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
-        avail_copies_analysis::AvailCopiesAnalysisProcessor,
         control_flow_graph_simplifier::ControlFlowGraphSimplifier,
-        copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         flush_writes_processor::FlushWritesProcessor,
@@ -74,6 +72,8 @@ pub use options::Options;
 use std::{collections::BTreeSet, path::Path};
 
 const DEBUG: bool = false;
+const COMPILER_BUG_REPORT_MSG: &str =
+    "please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)";
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -379,6 +379,20 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         env_pipeline.add("model AST lints", model_ast_lints::checker);
     }
 
+    // The comparison rewriter is a new features in Aptos Move 2.2 and onwards
+    let rewrite_cmp = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_2)
+        && options.experiment_on(Experiment::CMP_REWRITE);
+
+    if rewrite_cmp {
+        env_pipeline.add("rewrite comparison operations", |env| {
+            // This rewrite is suggested to run before inlining to avoid repeated rewriting
+            cmp_rewriter::rewrite(env);
+        });
+    }
+
     if options.experiment_on(Experiment::INLINING) {
         let rewriting_scope = if options.whole_program {
             RewritingScope::Everything
@@ -428,7 +442,7 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         .unwrap_or_default()
         .is_at_least(LanguageVersion::V2_2)
     {
-        env_pipeline.add("closure-ability-checker", |env: &mut GlobalEnv| {
+        env_pipeline.add("closure-checker", |env: &mut GlobalEnv| {
             closure_checker::check_closures(env)
         });
     }
@@ -568,11 +582,6 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
         pipeline.add_processor(Box::new(VariableCoalescing::transform_only()));
     }
 
-    if options.experiment_on(Experiment::COPY_PROPAGATION) {
-        pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
-        pipeline.add_processor(Box::new(CopyPropagation {}));
-    }
-
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
         pipeline.add_processor(Box::new(DeadStoreElimination::new(false)));
@@ -648,13 +657,14 @@ fn report_bytecode_verification_error(
         env.to_loc(module_ir_loc)
     });
     if e.status_type() != StatusType::Verification {
-        env.diag(
+        env.diag_with_notes(
             Severity::Bug,
             loc,
             &format!(
-                "unexpected error returned from bytecode verification. This is a compiler bug, consider reporting it.\n{:#?}",
+                "unexpected error returned from bytecode verification:\n{:#?}",
                 e
             ),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
         )
     } else {
         let debug_info = if command_line::get_move_compiler_backtrace_from_env() {
@@ -665,15 +675,15 @@ fn report_bytecode_verification_error(
                 e.message().cloned().unwrap_or_else(|| "none".to_string())
             )
         };
-        env.diag(
+        env.diag_with_notes(
             Severity::Bug,
             loc,
             &format!(
-                "bytecode verification failed with \
-                unexpected status code `{:?}`. This is a compiler bug, consider reporting it.{}",
+                "bytecode verification failed with unexpected status code `{:?}`:{}",
                 e.major_status(),
                 debug_info
             ),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
         )
     }
 }

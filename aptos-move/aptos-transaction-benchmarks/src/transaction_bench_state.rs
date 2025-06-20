@@ -185,7 +185,7 @@ where
     pub(crate) fn execute_sequential(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let txn_provider = DefaultTxnProvider::new(self.gen_transaction());
+        let txn_provider = DefaultTxnProvider::new_without_info(self.gen_transaction());
         self.execute_benchmark_sequential(&txn_provider, None);
     }
 
@@ -193,7 +193,7 @@ where
     pub(crate) fn execute_parallel(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let txn_provider = DefaultTxnProvider::new(self.gen_transaction());
+        let txn_provider = DefaultTxnProvider::new_without_info(self.gen_transaction());
         self.execute_benchmark_parallel(&txn_provider, num_cpus::get(), None);
     }
 
@@ -285,7 +285,7 @@ where
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
-        let txn_provider = DefaultTxnProvider::new(transactions);
+        let txn_provider = DefaultTxnProvider::new_without_info(transactions);
         let (output, par_tps) = if run_par {
             println!("Parallel execution starts...");
             let (output, tps) = if self.is_shareded() {

@@ -53,7 +53,7 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -719,7 +719,7 @@ pub enum TransactionExecutableRef<'a> {
     Empty,
 }
 
-impl<'a> TransactionExecutableRef<'a> {
+impl TransactionExecutableRef<'_> {
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::Empty)
     }
@@ -1698,14 +1698,18 @@ impl TransactionOutput {
         }
     }
 
-    pub fn new_empty_success() -> Self {
+    pub fn new_success_with_write_set(write_set: WriteSet) -> Self {
         Self {
-            write_set: WriteSet::default(),
+            write_set,
             events: vec![],
             gas_used: 0,
             status: TransactionStatus::Keep(ExecutionStatus::Success),
             auxiliary_data: TransactionAuxiliaryData::None,
         }
+    }
+
+    pub fn new_empty_success() -> Self {
+        Self::new_success_with_write_set(WriteSet::default())
     }
 
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
@@ -2495,10 +2499,22 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
-    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+    pub fn block_epilogue_v0(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V0 {
             block_id,
             block_end_info,
+        })
+    }
+
+    pub fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    ) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V1 {
+            block_id,
+            block_end_info,
+            fee_distribution,
         })
     }
 
@@ -2615,4 +2631,53 @@ impl ViewFunctionOutput {
     pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
         Self { values, gas_used }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AuxiliaryInfo {
+    persisted_info: PersistedAuxiliaryInfo,
+    ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+}
+
+impl AuxiliaryInfo {
+    pub fn new(
+        persisted_info: PersistedAuxiliaryInfo,
+        ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+    ) -> Self {
+        Self {
+            persisted_info,
+            ephemeral_info,
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
+        self.persisted_info
+    }
+
+    pub fn persisted_info(&self) -> &PersistedAuxiliaryInfo {
+        &self.persisted_info
+    }
+
+    pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
+        &self.ephemeral_info
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum PersistedAuxiliaryInfo {
+    None,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EphemeralAuxiliaryInfo {
+    // TODO(grao): After execution pool is implemented we might want this information be persisted
+    // onchain?
+    pub proposer_index: u64,
 }

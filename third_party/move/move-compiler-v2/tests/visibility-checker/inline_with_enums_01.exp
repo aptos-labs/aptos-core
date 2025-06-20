@@ -1,0 +1,40 @@
+
+Diagnostics:
+warning: pack of `m::Wrapper` can only be done within the defining module `0xc0ffee::m`, but `m::use_me_not` could be called (and expanded) outside the module
+  ┌─ tests/visibility-checker/inline_with_enums_01.move:6:23
+  │
+6 │     public inline fun use_me_not(): u64 {
+  │                       ^^^^^^^^^^
+7 │         let x = Wrapper::V1(22);
+  │                 --------------- packed here
+
+warning: access of the field `0` on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`, but `m::use_me_not` could be called (and expanded) outside the module
+  ┌─ tests/visibility-checker/inline_with_enums_01.move:6:23
+  │
+6 │     public inline fun use_me_not(): u64 {
+  │                       ^^^^^^^^^^
+7 │         let x = Wrapper::V1(22);
+8 │         x.0
+  │         --- accessed here
+
+error: Invalid operation: pack of `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/inline_with_enums_01.move:15:9
+   │
+ 7 │         let x = Wrapper::V1(22);
+   │                 --------------- packed here
+   ·
+15 │     fun test(): u64 {
+   │         ^^^^
+16 │         m::use_me_not()
+   │         --------------- from a call inlined at this callsite
+
+error: Invalid operation: access of the field `0` on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m`
+   ┌─ tests/visibility-checker/inline_with_enums_01.move:15:9
+   │
+ 8 │         x.0
+   │         --- accessed here
+   ·
+15 │     fun test(): u64 {
+   │         ^^^^
+16 │         m::use_me_not()
+   │         --------------- from a call inlined at this callsite

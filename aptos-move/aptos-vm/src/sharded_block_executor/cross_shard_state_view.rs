@@ -71,7 +71,7 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
     }
 }
 
-impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
+impl<S: StateView + Sync + Send> TStateView for CrossShardStateView<'_, S> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateViewError> {

@@ -272,7 +272,7 @@ impl From<RealSleep> for Sleep {
     }
 }
 
-#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+#[cfg(any(test, feature = "testing"))]
 impl From<MockSleep> for Sleep {
     fn from(sleep: MockSleep) -> Self {
         Sleep::MockSleep(sleep)
@@ -309,7 +309,7 @@ impl SleepTrait for Sleep {
     fn is_elapsed(&self) -> bool {
         match self {
             Sleep::RealSleep(inner) => SleepTrait::is_elapsed(inner),
-            #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+            #[cfg(any(test, feature = "testing"))]
             Sleep::MockSleep(inner) => SleepTrait::is_elapsed(inner),
         }
     }
@@ -317,7 +317,7 @@ impl SleepTrait for Sleep {
     fn reset(self: Pin<&mut Self>, duration: Duration) {
         match self.project() {
             SleepProject::RealSleep(inner) => SleepTrait::reset(inner, duration),
-            #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+            #[cfg(any(test, feature = "testing"))]
             SleepProject::MockSleep(inner) => SleepTrait::reset(Pin::new(inner), duration),
         }
     }
@@ -325,7 +325,7 @@ impl SleepTrait for Sleep {
     fn reset_until(self: Pin<&mut Self>, deadline: Instant) {
         match self.project() {
             SleepProject::RealSleep(inner) => SleepTrait::reset_until(inner, deadline),
-            #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+            #[cfg(any(test, feature = "testing"))]
             SleepProject::MockSleep(inner) => SleepTrait::reset_until(Pin::new(inner), deadline),
         }
     }

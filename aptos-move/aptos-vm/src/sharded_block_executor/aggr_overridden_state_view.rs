@@ -35,7 +35,7 @@ impl<'a, S: StateView + Sync + Send> AggregatorOverriddenStateView<'a, S> {
     }
 }
 
-impl<'a, S: StateView + Sync + Send> TStateView for AggregatorOverriddenStateView<'a, S> {
+impl<S: StateView + Sync + Send> TStateView for AggregatorOverriddenStateView<'_, S> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {

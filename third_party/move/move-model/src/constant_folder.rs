@@ -440,7 +440,7 @@ impl<'env> ConstantFolder<'env> {
     }
 }
 
-impl<'env> ExpRewriterFunctions for ConstantFolder<'env> {
+impl ExpRewriterFunctions for ConstantFolder<'_> {
     fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if matches!(oper, Operation::Tuple) {
             if self.in_constant_declaration {

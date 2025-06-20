@@ -25,6 +25,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
     common::Author,
+    opt_proposal_msg::OptProposalMsg,
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
@@ -256,18 +257,7 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        // TODO @bchcho @hariria the sending of new ConsensusMsg::BlockRetrievalRequest must be
-        // phased over multiple releases to avoid `warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);`
-        // Uncomment and replace after release
-        // let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
-        let msg = match &retrieval_request {
-            BlockRetrievalRequest::V1(v1) => {
-                ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(v1.clone()))
-            },
-            BlockRetrievalRequest::V2(_) => {
-                panic!("Unexpected BlockRetrievalRequest::V2, should be using ConsensusMsg::DeprecatedBlockRetrievalRequest with BlockRetrievalRequestV1")
-            },
-        };
+        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -348,6 +338,18 @@ impl NetworkSender {
             error!("Error broadcasting to self: {:?}", err);
         }
 
+        #[cfg(feature = "failpoints")]
+        {
+            let msg_ref = &msg;
+            fail_point!("consensus::send::broadcast_self_only", |maybe_msg_name| {
+                if let Some(msg_name) = maybe_msg_name {
+                    if msg_ref.name() != &msg_name {
+                        self.broadcast_without_self(msg_ref.clone());
+                    }
+                }
+            });
+        }
+
         self.broadcast_without_self(msg);
     }
 
@@ -402,6 +404,12 @@ impl NetworkSender {
     pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_opt_proposal(&self, proposal_msg: OptProposalMsg) {
+        fail_point!("consensus::send::broadcast_opt_proposal", |_| ());
+        let msg = ConsensusMsg::OptProposalMsg(Box::new(proposal_msg));
         self.broadcast(msg).await
     }
 
@@ -519,6 +527,7 @@ impl QuorumStoreSender for NetworkSender {
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
+        fail_point!("consensus::send::request_batch", |_| Err(anyhow!("failed")));
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self.send_rpc(recipient, msg, timeout).await?;
@@ -791,6 +800,7 @@ impl NetworkTask {
                             };
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
+                        | ConsensusMsg::OptProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
                         | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::OrderVoteMsg(_)
@@ -807,6 +817,23 @@ impl NetworkTask {
                                         .remote_peer(peer_id),
                                     block_round = proposal.proposal().round(),
                                     block_hash = proposal.proposal().id(),
+                                );
+                            }
+                            if let ConsensusMsg::OptProposalMsg(proposal) = &consensus_msg {
+                                observe_block(
+                                    proposal.timestamp_usecs(),
+                                    BlockStage::NETWORK_RECEIVED,
+                                );
+                                observe_block(
+                                    proposal.timestamp_usecs(),
+                                    BlockStage::NETWORK_RECEIVED_OPT_PROPOSAL,
+                                );
+                                info!(
+                                    LogSchema::new(LogEvent::NetworkReceiveOptProposal)
+                                        .remote_peer(peer_id),
+                                    block_author = proposal.proposer(),
+                                    block_epoch = proposal.epoch(),
+                                    block_round = proposal.round(),
                                 );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);

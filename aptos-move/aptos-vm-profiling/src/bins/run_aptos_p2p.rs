@@ -46,7 +46,7 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let txn_provider = DefaultTxnProvider::new(txns);
+    let txn_provider = DefaultTxnProvider::new_without_info(txns);
     let outputs =
         AptosVMBlockExecutor::new().execute_block_no_limit(&txn_provider, &state_store)?;
     for i in 0..NUM_TXNS {

@@ -17,7 +17,10 @@ use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
-    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    account_config::{
+        self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS,
+        EXPERIMENTAL_CODE_ADDRESS,
+    },
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     executable::ModulePath,
@@ -311,6 +314,7 @@ pub fn encode_genesis_change_set(
         genesis_config.initial_jwks.clone(),
         genesis_config.keyless_groth16_vk.clone(),
     );
+    initialize_confidential_asset(&mut session, &module_storage, chain_id);
     set_genesis_end(&mut session, &module_storage);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -373,18 +377,19 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
     );
 }
 
-fn exec_function(
+fn exec_function_internal(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
+    address: AccountAddress,
 ) {
     let storage = TraversalStorage::new();
     session
         .execute_function_bypass_visibility(
-            &ModuleId::new(CORE_CODE_ADDRESS, Identifier::new(module_name).unwrap()),
+            &ModuleId::new(address, Identifier::new(module_name).unwrap()),
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
@@ -394,13 +399,52 @@ fn exec_function(
         )
         .unwrap_or_else(|e| {
             panic!(
-                "Error calling {}.{}: ({:#x}) {}",
+                "Error calling {}.{}.{}: ({:#x}) {}",
+                address,
                 module_name,
                 function_name,
                 e.sub_status().unwrap_or_default(),
                 e,
             )
         });
+}
+
+fn exec_function(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl ModuleStorage,
+    module_name: &str,
+    function_name: &str,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) {
+    exec_function_internal(
+        session,
+        module_storage,
+        module_name,
+        function_name,
+        ty_args,
+        args,
+        CORE_CODE_ADDRESS,
+    );
+}
+
+fn exec_experimental_function(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl ModuleStorage,
+    module_name: &str,
+    function_name: &str,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) {
+    exec_function_internal(
+        session,
+        module_storage,
+        module_name,
+        function_name,
+        ty_args,
+        args,
+        EXPERIMENTAL_CODE_ADDRESS,
+    );
 }
 
 fn initialize(
@@ -812,6 +856,23 @@ fn initialize_keyless_accounts(
     }
 }
 
+fn initialize_confidential_asset(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    chain_id: ChainId,
+) {
+    if !chain_id.is_mainnet() && !chain_id.is_testnet() {
+        exec_experimental_function(
+            session,
+            module_storage,
+            "confidential_asset",
+            "init_module_for_genesis",
+            vec![],
+            serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
+        );
+    }
+}
+
 fn create_accounts(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
@@ -1052,7 +1113,7 @@ fn emit_new_block_and_epoch_event(
 
 /// Verify the consistency of modules in the genesis write set.
 fn verify_genesis_module_write_set(write_set: &WriteSet) {
-    for (state_key, write_op) in write_set {
+    for (state_key, write_op) in write_set.expect_write_op_iter() {
         if state_key.is_module_path() {
             assert!(write_op.is_creation())
         }
@@ -1183,11 +1244,7 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
-        let stake_amount = if let Some(amount) = initial_stake {
-            amount
-        } else {
-            1
-        };
+        let stake_amount = initial_stake.unwrap_or(1);
         let data = Validator {
             owner_address,
             consensus_pubkey,
@@ -1340,10 +1397,8 @@ pub fn test_genesis_module_publishing() {
 #[test]
 pub fn test_mainnet_end_to_end() {
     use aptos_types::{
-        account_address,
-        on_chain_config::ValidatorSet,
-        state_store::state_key::StateKey,
-        write_set::{TransactionWrite, WriteSet},
+        account_address, on_chain_config::ValidatorSet, state_store::state_key::StateKey,
+        write_set::TransactionWrite,
     };
 
     let balance = 10_000_000 * APTOS_COINS_BASE_WITH_DECIMALS;
@@ -1544,7 +1599,7 @@ pub fn test_mainnet_end_to_end() {
         panic!("Invalid WriteSetPayload");
     };
 
-    let WriteSet::V0(writeset) = changeset.write_set();
+    let writeset = changeset.write_set().expect_v0();
 
     let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset

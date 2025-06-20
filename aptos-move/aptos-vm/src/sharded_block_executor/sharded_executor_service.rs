@@ -139,7 +139,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
-                let txn_provider = DefaultTxnProvider::new(signature_verified_transactions);
+                let txn_provider =
+                    DefaultTxnProvider::new_without_info(signature_verified_transactions);
                 let ret = AptosVMBlockExecutorWrapper::execute_block_on_thread_pool(
                     executor_thread_pool,
                     &txn_provider,

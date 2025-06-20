@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, build_package, tests::common, MoveHarness};
+use crate::{assert_success, tests::common, MoveHarness};
+use aptos_framework::BuiltPackage;
 use aptos_types::account_address::create_resource_address;
 use move_core_types::account_address::AccountAddress;
 
@@ -18,7 +19,7 @@ fn test_nft_dao_txn_arguments() {
         .insert("dao_platform".to_string(), *acc.address());
 
     // build the package from our example code
-    let package = build_package(
+    let package = BuiltPackage::build(
         common::test_dir_path("../../../move-examples/dao/nft_dao"),
         build_options,
     )

@@ -45,6 +45,7 @@ aptos-short-hex-str = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-transactions-filter = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
@@ -77,8 +78,8 @@ scopeguard = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 sha3 = { workspace = true }
+strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -95,6 +96,7 @@ aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-safety-rules = { workspace = true, features = ["testing"] }
+aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["fuzzing"] }
 aptos-vm-validator = { workspace = true }
 claims = { workspace = true }
