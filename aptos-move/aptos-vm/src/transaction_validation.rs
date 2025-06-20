@@ -19,8 +19,8 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
     transaction::{
-        scheduled_txn::ScheduledTransactionInfoWithKey, MultisigTransactionPayload,
-        ReplayProtector, TransactionExecutableRef,
+        scheduled_txn::{ScheduledTransactionInfoWithKey, SCHEDULED_TRANSACTIONS_MODULE_INFO},
+        MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef,
     },
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -39,7 +39,6 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
-use aptos_types::transaction::scheduled_txn::SCHEDULED_TRANSACTIONS_MODULE_INFO;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -752,13 +751,15 @@ pub(crate) fn run_scheduled_txn_cleanup(
         txn.key.as_move_value(),
         MoveValue::Address(txn.sender_handle),
     ];
-    session.execute_function_bypass_visibility(
-        &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
-        &SCHEDULED_TRANSACTIONS_MODULE_INFO.emit_transaction_failed_event_name,
-        vec![],
-        serialize_values(&args),
-        &mut UnmeteredGasMeter,
-        traversal_context,
-        module_storage,
-    ).expect("Failed to emit transaction failed event");
+    session
+        .execute_function_bypass_visibility(
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.emit_transaction_failed_event_name,
+            vec![],
+            serialize_values(&args),
+            &mut UnmeteredGasMeter,
+            traversal_context,
+            module_storage,
+        )
+        .expect("Failed to emit transaction failed event");
 }
