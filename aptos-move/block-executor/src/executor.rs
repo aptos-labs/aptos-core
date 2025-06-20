@@ -209,8 +209,40 @@ where
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
-        let mut resource_write_set = Vec::new();
+        let mut resource_write_set = vec![];
+        let mut group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = vec![];
         if let Some(output) = maybe_output {
+            let group_output = output.resource_group_write_set();
+            group_keys_and_tags = group_output
+                .iter()
+                .map(|(key, _, _, ops)| {
+                    let tags = ops.iter().map(|(tag, _)| tag.clone()).collect();
+                    (key.clone(), tags)
+                })
+                .collect();
+            for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
+                let prev_tags = remove_from_previous_keys::<T>(
+                    &mut prev_modified_keys,
+                    &group_key,
+                    KeyKind::Group(HashSet::new()),
+                )?;
+                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<true>(
+                    group_key.clone(),
+                    idx_to_execute,
+                    incarnation,
+                    Arc::new(group_metadata_op),
+                    None,
+                ))?;
+                abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
+                    group_key,
+                    idx_to_execute,
+                    incarnation,
+                    group_ops.into_iter(),
+                    group_size,
+                    prev_tags.unwrap_or_default(),
+                )?)?;
+            }
+
             resource_write_set = output.resource_write_set();
             for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
                 remove_from_previous_keys::<T>(&mut prev_modified_keys, &key, KeyKind::Resource)?;
@@ -237,8 +269,20 @@ where
                             .remove_v2::<false>(&key, idx_to_execute),
                     )?;
                 },
-                _ => {
-                    // TODO(BlockSTMv2): handle groups and aggregator v1.
+                Group(tags) => {
+                    abort_manager.invalidate_dependencies(
+                        versioned_cache
+                            .data()
+                            .remove_v2::<true>(&key, idx_to_execute),
+                    )?;
+                    abort_manager.invalidate_dependencies(
+                        versioned_cache
+                            .group_data()
+                            .remove_v2(&key, idx_to_execute, tags)?,
+                    )?;
+                },
+                AggregatorV1 => {
+                    // TODO(BlockSTMv2): handle aggregator v1.
                 },
             };
         }
@@ -248,8 +292,7 @@ where
             read_set,
             execution_result,
             resource_write_set,
-            // TODO(BlockSTMv2): handle groups.
-            vec![],
+            group_keys_and_tags,
         );
 
         scheduler.finish_execution(abort_manager)?;
