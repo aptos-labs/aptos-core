@@ -117,7 +117,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
         let (transactions, mut auxiliary_info) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -125,7 +125,7 @@ impl DoGetExecutionOutput {
             .collect_vec();
         if let Some(block_epilogue_txn) = block_epilogue_txn {
             transactions.push(block_epilogue_txn);
-            transaction_outputs.push(TransactionOutput::new_empty_success());
+            // TODO(grao): Double check if we want to put anything into AuxiliaryInfo here.
             auxiliary_info.push(AuxiliaryInfo::new_empty());
         }
 
@@ -157,6 +157,8 @@ impl DoGetExecutionOutput {
             state_view_arc.clone(),
             onchain_config,
         )?;
+
+        // TODO(Manu): Handle state checkpoint here.
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
@@ -339,6 +341,7 @@ impl Parser {
                 ensure!(statuses_for_input_txns.pop().is_some());
             }
         }
+
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);

@@ -44,10 +44,18 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         let env = AptosEnvironment::new(state_view);
         let vm = AptosVM::new(&env, state_view);
 
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .unwrap(),
+            BlockEndInfo::new_empty(),
+        );
+
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
                 .get_txns()
                 .par_iter()
+                .chain(vec![block_epilogue_txn.clone().into()].par_iter())
                 .enumerate()
                 .map(|(txn_idx, txn)| {
                     let log_context = AdapterLogSchema::new(state_view.id(), txn_idx);
@@ -67,13 +75,6 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                 })
                 .collect::<Result<Vec<_>, _>>()
         })?;
-
-        let block_epilogue_txn = Transaction::block_epilogue_v0(
-            transaction_slice_metadata
-                .append_state_checkpoint_to_block()
-                .unwrap(),
-            BlockEndInfo::new_empty(),
-        );
 
         Ok(BlockOutput::new(
             transaction_outputs,
