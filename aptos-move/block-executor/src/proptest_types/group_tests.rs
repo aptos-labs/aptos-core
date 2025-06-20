@@ -67,6 +67,7 @@ pub(crate) fn run_tests_with_groups(
                 &txn_provider,
                 data_view,
                 None,
+                false,
             );
 
             BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
