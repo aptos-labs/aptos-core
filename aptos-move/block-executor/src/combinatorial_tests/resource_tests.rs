@@ -4,12 +4,12 @@
 
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
-    executor::BlockExecutor,
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockOutput, MockTask},
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams, MAX_GAS_PER_TXN},
     },
+    executor::BlockExecutor,
     task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
@@ -25,7 +25,6 @@ use aptos_types::{
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::Module;
 use move_vm_types::code::ModuleCode;
-use num_cpus;
 use proptest::{
     collection::vec,
     prelude::*,

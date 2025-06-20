@@ -306,7 +306,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
 mod test {
     use super::*;
     use crate::{
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{KeyType, MockTransaction},
         },

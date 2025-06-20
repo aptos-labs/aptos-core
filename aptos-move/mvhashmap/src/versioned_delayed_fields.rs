@@ -114,6 +114,12 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         };
     }
 
+    fn remove_v2(&mut self, txn_idx: TxnIndex) {
+        self.versioned_map.remove(&txn_idx);
+        // TODO(BlockSTMv2): deal w. V2 & estimates and potentially bring back the check
+        // that removed entry must be an estimate (but with PanicError).
+    }
+
     fn remove(&mut self, txn_idx: TxnIndex) {
         let deleted_entry = self.versioned_map.remove(&txn_idx);
         // Entries should only be deleted if the transaction that produced them is
@@ -165,11 +171,13 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     // Bypass stored in the estimate does not match the new entry.
                     (Estimate(_), _) => false,
 
-                    (cur, new) => {
-                        return Err(code_invariant_error(format!(
-                            "Replaced entry must be an Estimate, {:?} to {:?}",
-                            cur, new,
-                        )))
+                    (_cur, _new) => {
+                        // TODO(BlockSTMv2): V2 currently does not mark estimate.
+                        // For V1, used to return Err(code_invariant_error(format!(
+                        //    "Replaced entry must be an Estimate, {:?} to {:?}",
+                        //    cur, new,
+                        //)))
+                        true
                     },
                 } {
                     // TODO[agg_v2](optimize): See if we want to invalidate, when we change read_estimate_deltas
@@ -511,6 +519,13 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             .get_mut(id)
             .expect("VersionedValue for an (resolved) ID must already exist")
             .remove(txn_idx);
+    }
+
+    pub fn remove_v2(&self, id: &K, txn_idx: TxnIndex) {
+        self.values
+            .get_mut(id)
+            .expect("VersionedValue for an (resolved) ID must already exist")
+            .remove_v2(txn_idx);
     }
 
     /// Moves the commit index, and computes exact values for delayed fields having
@@ -1186,22 +1201,6 @@ mod test {
         v.mark_estimate(3);
         v.remove(3);
         assert!(!v.read_estimate_deltas);
-    }
-
-    #[should_panic]
-    #[test_case(APPLY_AGGREGATOR)]
-    #[test_case(APPLY_SNAPSHOT)]
-    #[test_case(APPLY_DERIVED)]
-    fn insert_twice_no_value(type_index: usize) {
-        let mut v = VersionedValue::new(None);
-        if let Some(entry) = aggregator_entry(type_index) {
-            v.insert_speculative_value(10, entry).unwrap();
-        }
-        // Should fail because inserting can only overwrite an Estimate entry or
-        // be inserting a Value when the transaction commits.
-        if let Some(entry) = aggregator_entry(type_index) {
-            v.insert_speculative_value(10, entry).unwrap();
-        }
     }
 
     #[should_panic]

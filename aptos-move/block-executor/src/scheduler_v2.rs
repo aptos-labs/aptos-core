@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO(BlockSTMv2): enable dead code lint.
-#![allow(dead_code)]
-
 use crate::{counters, scheduler::ArmedLock, scheduler_status::ExecutionStatuses};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
@@ -483,6 +480,7 @@ pub(crate) struct SchedulerV2 {
     /// Total number of transactions in the block. This is immutable after scheduler creation.
     num_txns: TxnIndex,
     /// The number of worker threads that will be processing tasks from this scheduler. Immutable.
+    #[allow(dead_code)]
     num_workers: u32,
 
     /// Manages the `ExecutionStatus` for each transaction, which includes its current
@@ -726,6 +724,7 @@ impl SchedulerV2 {
     /// The value is retrieved from `[ExecutionQueueManager::min_not_scheduled_idx]`.
     ///
     /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater than `num_txns`).
+    #[allow(dead_code)]
     pub(crate) fn min_not_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
         let ret = self
             .txn_statuses
@@ -935,11 +934,11 @@ impl SchedulerV2 {
     // (1) when processing dependencies (if the heuristics determines the txn is better to be
     // speculatively aborted, e.g. since it is low priority and likely to be invalidated.
     // Since the status must be Executing, we do not bother with propagating add / remove stall.
-    // Note: This functionality has not been landed yet. TODO(BlockSTMv2): land and remove comment.
+    // BlockSTMv2: Consider adding this functionality.
     // (2) when aborting due to aggregator or delayed field invalidation that happens during
     // the sequential commit hook - in this case, the immediate re-execution is about to follow.
-    // However, we need to distinguish the case to make sure in case (2) an execution task
-    // is not added to the scheduler's execution queue (the caller will re-execute itself).
+    // However, we need to distinguish the case (2) to make sure that an execution task is not
+    // added to the scheduler's execution queue (the caller will re-execute itself).
     // In this case, add_to_schedule is false.
     // (3) The module validation pass can cause invalidation, which requires aborting.
     pub(crate) fn direct_abort(
@@ -951,7 +950,7 @@ impl SchedulerV2 {
         if self.txn_statuses.start_abort(txn_idx, incarnation)? {
             self.txn_statuses
                 .finish_abort(txn_idx, incarnation, add_to_schedule)?;
-            if add_to_schedule {
+            if !add_to_schedule {
                 let executing_incarnation = self.start_executing(txn_idx)?;
                 if Some(incarnation + 1) != executing_incarnation {
                     return Err(code_invariant_error(format!(
