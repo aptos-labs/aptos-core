@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::view::{LatestView, ViewState};
+use crate::{
+    types::delayed_field_mock_serialization::deserialize_to_delayed_field_id,
+    view::{LatestView, ViewState},
+};
 use aptos_aggregator::{
     resolver::TDelayedFieldView,
     types::{DelayedFieldValue, ReadPosition},
@@ -14,8 +17,9 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
+use fail::fail_point;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
+use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
 use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth, TryFromMoveValue},
@@ -110,6 +114,18 @@ where
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<HashSet<DelayedFieldID>> {
+        fail_point!("delayed_field_test", |_| {
+            assert_eq!(
+                *layout,
+                MoveTypeLayout::Struct(MoveStructLayout::new(vec![])),
+                "Layout does not match expected mock layout"
+            );
+
+            let (id, _) = deserialize_to_delayed_field_id(bytes)
+                .expect("Mock deserialization failed in delayed field test.");
+            Ok(HashSet::from([id]))
+        });
+
         // TODO[agg_v2](optimize): this performs 2 traversals of a value:
         //   1) deserialize,
         //   2) find identifiers to populate the set.
