@@ -1042,6 +1042,16 @@ Sequence number exceeds the maximum value for a u64
 
 
 
+<a id="0x1_account_ESET_ORIGINATING_ADDRESS_DISABLED"></a>
+
+The set_originating_address is disabled due to potential poisoning from account abstraction
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ESET_ORIGINATING_ADDRESS_DISABLED">ESET_ORIGINATING_ADDRESS_DISABLED</a>: u64 = 27;
+</code></pre>
+
+
+
 <a id="0x1_account_EUNRECOGNIZED_SCHEME"></a>
 
 Specified scheme is not recognized. Should be ED25519_SCHEME(0), MULTI_ED25519_SCHEME(1), SINGLE_KEY_SCHEME(2), or MULTI_KEY_SCHEME(3).
@@ -2191,6 +2201,8 @@ authority of the new authentication key.
 
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_set_originating_address">set_originating_address</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account.md#0x1_account_ESET_ORIGINATING_ADDRESS_DISABLED">ESET_ORIGINATING_ADDRESS_DISABLED</a>);
+
     <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
     <b>let</b> auth_key_as_address =

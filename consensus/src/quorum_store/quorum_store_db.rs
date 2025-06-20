@@ -12,7 +12,11 @@ use anyhow::Result;
 use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_schemadb::{batch::SchemaBatch, Options, DB};
+use aptos_schemadb::{
+    batch::{SchemaBatch, WriteBatch},
+    schema::Schema,
+    Options, DB,
+};
 use std::{collections::HashMap, path::Path, time::Instant};
 
 pub trait QuorumStoreStorage: Sync + Send {
@@ -59,6 +63,15 @@ impl QuorumStoreDB {
 
         Self { db }
     }
+
+    /// Relaxed writes instead of sync writes.
+    pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
+        // Not necessary to use a batch, but we'd like a central place to bump counters.
+        let mut batch = self.db.new_native_batch();
+        batch.put::<S>(key, value)?;
+        self.db.write_schemas_relaxed(batch)?;
+        Ok(())
+    }
 }
 
 impl QuorumStoreStorage for QuorumStoreDB {
@@ -68,7 +81,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
             trace!("QS: db delete digest {}", digest);
             batch.delete::<BatchSchema>(digest)?;
         }
-        self.db.write_schemas(batch)?;
+        self.db.write_schemas_relaxed(batch)?;
         Ok(())
     }
 
@@ -85,7 +98,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
             batch.digest(),
             batch.expiration()
         );
-        Ok(self.db.put::<BatchSchema>(batch.digest(), &batch)?)
+        self.put::<BatchSchema>(batch.digest(), &batch)
     }
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError> {
@@ -95,7 +108,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError> {
         let mut batch = SchemaBatch::new();
         batch.delete::<BatchIdSchema>(&epoch)?;
-        self.db.write_schemas(batch)?;
+        self.db.write_schemas_relaxed(batch)?;
         Ok(())
     }
 
@@ -118,7 +131,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
     }
 
     fn save_batch_id(&self, epoch: u64, batch_id: BatchId) -> Result<(), DbError> {
-        Ok(self.db.put::<BatchIdSchema>(&epoch, &batch_id)?)
+        self.put::<BatchIdSchema>(&epoch, &batch_id)
     }
 }
 

@@ -295,8 +295,8 @@
     "block_end_info": {
       "block_gas_limit_reached": false,
       "block_output_limit_reached": false,
-      "block_effective_block_gas_units": 9,
-      "block_approx_output_size": 0
+      "block_effective_block_gas_units": 18,
+      "block_approx_output_size": 2045
     },
     "type": "block_epilogue_transaction"
   }

@@ -74,6 +74,10 @@ pub enum SessionId {
         expiration_time: u64,
         script_hash: Vec<u8>,
     },
+    BlockEpilogue {
+        // block id
+        id: HashValue,
+    },
 }
 
 impl SessionId {
@@ -107,6 +111,10 @@ impl SessionId {
         Self::BlockMetaExt {
             id: block_meta_ext.id(),
         }
+    }
+
+    pub fn block_epilogue(id: HashValue) -> Self {
+        Self::BlockEpilogue { id }
     }
 
     pub fn prologue_meta(txn_metadata: &TransactionMetadata) -> Self {
@@ -185,6 +193,7 @@ impl SessionId {
             Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void
+            | Self::BlockEpilogue { id: _ }
             | Self::BlockMetaExt { id: _ } => vec![],
         }
     }

@@ -197,6 +197,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Returns true iff it has a new epoch event.
     fn has_new_epoch_event(&self) -> bool;
 
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool;
+
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.
     ///

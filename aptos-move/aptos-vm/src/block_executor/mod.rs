@@ -369,6 +369,24 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .has_new_epoch_event()
     }
 
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool {
+        if let Some(committed_output) = self.committed_output.get() {
+            committed_output
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success())
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .expect("Either vm_output or committed_output must exist.")
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success())
+        }
+    }
+
     fn output_approx_size(&self) -> u64 {
         let vm_output = self.vm_output.lock();
         vm_output
