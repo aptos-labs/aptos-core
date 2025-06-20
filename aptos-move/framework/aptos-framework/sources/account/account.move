@@ -172,9 +172,9 @@ module aptos_framework::account {
     const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
     /// The specified rotation capability offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
-    // The signer capability is not offered to any address
+    /// The signer capability is not offered to any address
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
-    // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
+    /// This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
     const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
     /// The new authentication key already has an entry in the `OriginatingAddress` table
     const ENEW_AUTH_KEY_ALREADY_MAPPED: u64 = 21;
