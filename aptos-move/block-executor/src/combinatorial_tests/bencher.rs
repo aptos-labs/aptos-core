@@ -2,14 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
-    executor::BlockExecutor,
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockOutput, MockTask},
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams},
     },
+    executor::BlockExecutor,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
 };
