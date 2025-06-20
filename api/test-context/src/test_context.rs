@@ -830,7 +830,7 @@ impl TestContext {
             .execute_block(
                 (metadata.id(), into_signature_verified_block(txns.clone())).into(),
                 parent_id,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                BlockExecutorConfigFromOnchain::on_but_large_for_test(),
             )
             .unwrap();
         let compute_status = result.compute_status_for_input_txns().clone();
