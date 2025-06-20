@@ -120,7 +120,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Tests for model building and various post-processing checking
         TestConfig {
             name: "compiler-v2-tests",
-            runner: |p| run_test(p, get_config_by_name("v")),
+            runner: |p| run_test(p, get_config_by_name("compiler-v2-tests")),
             is_package: false,
             sources: "../../move-compiler-v2/tests",
             sources_deps: vec![],
