@@ -120,7 +120,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Tests for model building and various post-processing checking
         TestConfig {
             name: "compiler-v2-tests",
-            runner: |p| run_test(p, get_config_by_name("compiler-v2-tests")),
+            runner: |p| run_test(p, get_config_by_name("v")),
             is_package: false,
             sources: "../../move-compiler-v2/tests",
             sources_deps: vec![],
@@ -128,7 +128,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec![],
-            stop_after: StopAfter::AstGen, // FileFormat,
+            stop_after: StopAfter::AstGen,
             test_level: TestLevel::Decompile,
             ..config().lang(LanguageVersion::latest())
         },
@@ -142,7 +142,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec![],
-            stop_after: StopAfter::AstGen, // FileFormat,
+            stop_after: StopAfter::SourcifierRun,
             test_level: TestLevel::Decompile,
             ..config().lang(LanguageVersion::latest())
         },
@@ -150,13 +150,44 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "move-stdlib-tests",
             runner: |p| run_test(p, get_config_by_name("move-stdlib-tests")),
             is_package: true,
-            sources: "../../move-stdlib/sources",
+            sources: "../../../../aptos-move/framework/move-stdlib/sources",
             sources_deps: vec![],
             dependencies: vec![],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec![],
-            stop_after: StopAfter::AstGen, // FileFormat,
+            stop_after: StopAfter::AstGen,
+            test_level: TestLevel::Decompile,
+            ..config().lang(LanguageVersion::latest())
+        },
+        TestConfig {
+            name: "aptos-stdlib-tests",
+            runner: |p| run_test(p, get_config_by_name("aptos-stdlib-tests")),
+            is_package: true,
+            sources: "../../../../aptos-move/framework/aptos-stdlib/sources",
+            sources_deps: vec![],
+            dependencies: vec!["../../../../aptos-move/framework/move-stdlib/sources"],
+            // Need to exclude `inlining` because it is under checking
+            // TODO: move `inlining` tests to top-level test directory
+            exclude: vec![],
+            stop_after: StopAfter::AstGen,
+            test_level: TestLevel::Decompile,
+            ..config().lang(LanguageVersion::latest())
+        },
+        TestConfig {
+            name: "aptos-framework-tests",
+            runner: |p| run_test(p, get_config_by_name("aptos-framework-tests")),
+            is_package: true,
+            sources: "../../../../aptos-move/framework/aptos-framework/sources",
+            sources_deps: vec![],
+            dependencies: vec![
+                "../../../../aptos-move/framework/move-stdlib/sources",
+                "../../../../aptos-move/framework/aptos-stdlib/sources"
+            ],
+            // Need to exclude `inlining` because it is under checking
+            // TODO: move `inlining` tests to top-level test directory
+            exclude: vec![],
+            stop_after: StopAfter::AstGen,
             test_level: TestLevel::Decompile,
             ..config().lang(LanguageVersion::latest())
         },
@@ -193,6 +224,12 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
         "std=0x1".to_string(),
         "aptos_std=0x1".to_string(),
         "aptos_framework=0x1".to_string(),
+        "aptos_fungible_asset=0xA".to_string(),
+        "aptos_token=0x3".to_string(),
+        "core_resources=0xA550C18".to_string(),
+        "vm_reserved=0x0".to_string(),
+        "vm=0x0".to_string(),
+        // Add more named addresses as needed
     ];
 
     run_compile_decompile_test_workflow(&config, compiler_options)?;
@@ -204,12 +241,18 @@ fn run_compile_decompile_test_workflow(
     compiler_options: Options,
 ) -> anyhow::Result<String> {
     // Step 1: compile the test case
-    let env = match compile_test_case(compiler_options.clone()) {
+    let mut error_writer = Buffer::no_color();
+    let env = run_move_compiler_for_analysis(&mut error_writer, compiler_options.clone());
+    let env = match env {
         Ok(env) => {
             env
         },
         Err(_) => {
             // skip the test if compilation fails
+            print!("\n\nWarning: skipping test `{}` due to compilation failure {}.\n",
+                config.name,
+                String::from_utf8_lossy(&error_writer.into_inner())
+            );
             return Ok(String::default());
         },
     };
@@ -237,11 +280,6 @@ fn run_compile_decompile_test_workflow(
         // TBD
     }
     Ok(String::default())
-}
-
-fn compile_test_case(compiler_options: Options) -> anyhow::Result<GlobalEnv> {
-    let mut error_writer = Buffer::no_color();
-    run_move_compiler_for_analysis(&mut error_writer, compiler_options.clone())
 }
 
 fn decompile_test_case(
@@ -292,12 +330,14 @@ fn decompile_test_case(
             // lift file format bytecode to stackless bytecode
             decompiler.lift_to_stackless_bytecode(module_id, &mut targets);
             if config.stop_after == StopAfter::StackLessBytecodeGen {
+                print!("[Debug]: Decompilation one module of `{}` to stackless bytecode completed.\n", config.name);
                 continue;
             }
 
             // lift stackless bytecode to AST
             decompiler.lift_to_ast(&targets);
             if config.stop_after == StopAfter::AstGen {
+                print!("[Debug]: Decompilation one module of `{}` to AST completed.\n", config.name);
                 continue;
             }
             // sourcify the AST
@@ -314,6 +354,7 @@ fn decompile_test_case(
                     module_env.get_full_name_str()
                 ));
             }
+            print!("[Debug]: Decompilation one module of `{}` completed.\n", config.name);
         }
     }
     Ok((decompiler, targets))
@@ -362,7 +403,7 @@ fn collect_tests() -> Vec<Trial> {
         } else {
             if WalkDir::new(config.sources)
                 .follow_links(false)
-                .max_depth(1)
+                .min_depth(1)
                 .into_iter()
                 .filter_map(Result::ok)
                 .any(|e| e.path().extension() == Some("move".as_ref()))
