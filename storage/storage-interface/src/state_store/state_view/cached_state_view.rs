@@ -16,11 +16,15 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
+use aptos_experimental_layered_map::LayeredMap;
 use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        state_key::StateKey,
+        state_slot::{HotLRUEntry, StateSlot},
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
 };
@@ -280,6 +284,10 @@ impl TStateView for CachedStateView {
 
     fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        Some(self.speculative.num_free_hot_slots())
     }
 }
 
