@@ -4,7 +4,6 @@
 
 use crate::{
     counters,
-    counters::update_counters_for_committed_blocks,
     logging::{LogEvent, LogSchema},
     persistent_liveness_storage::PersistentLivenessStorage,
     util::calculate_window_start_round,
@@ -566,29 +565,6 @@ impl BlockTree {
     }
 
     /// Update the counters for committed blocks and prune them from the in-memory and persisted store.
-    pub fn commit_callback_deprecated(
-        &mut self,
-        storage: Arc<dyn PersistentLivenessStorage>,
-        blocks_to_commit: &[Arc<PipelinedBlock>],
-        finality_proof: WrappedLedgerInfo,
-        commit_decision: LedgerInfoWithSignatures,
-        window_size: Option<u64>,
-    ) {
-        update_counters_for_committed_blocks(blocks_to_commit);
-
-        let last_block = blocks_to_commit.last().expect("pipeline is empty").clone();
-        let (block_id, block_round) = (last_block.id(), last_block.round());
-
-        self.commit_callback(
-            storage,
-            block_id,
-            block_round,
-            finality_proof,
-            commit_decision,
-            window_size,
-        );
-    }
-
     pub fn commit_callback(
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,

@@ -330,8 +330,6 @@ impl BlockStore {
 
         assert!(!blocks_to_commit.is_empty());
 
-        let block_tree = self.inner.clone();
-        let storage = self.storage.clone();
         let finality_proof_clone = finality_proof.clone();
         self.pending_blocks
             .lock()
@@ -343,25 +341,8 @@ impl BlockStore {
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
-        let window_size = self.window_size;
-        // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
-            .finalize_order(
-                blocks_to_commit,
-                finality_proof.clone(),
-                Box::new(
-                    move |committed_blocks: &[Arc<PipelinedBlock>],
-                          commit_decision: LedgerInfoWithSignatures| {
-                        block_tree.write().commit_callback_deprecated(
-                            storage,
-                            committed_blocks,
-                            finality_proof,
-                            commit_decision,
-                            window_size,
-                        );
-                    },
-                ),
-            )
+            .finalize_order(blocks_to_commit, finality_proof.clone())
             .await
             .expect("Failed to persist commit");
 

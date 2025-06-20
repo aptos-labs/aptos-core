@@ -11,7 +11,7 @@ use crate::{
 use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
-use aptos_logger::prelude::{error, warn};
+use aptos_logger::prelude::warn;
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -1169,7 +1169,6 @@ pub fn log_executor_error_occurred(
     e: ExecutorError,
     counter: &Lazy<IntCounterVec>,
     block_id: HashValue,
-    new_pipeline_enabled: bool,
 ) {
     match e {
         ExecutorError::CouldNotGetData => {
@@ -1188,17 +1187,10 @@ pub fn log_executor_error_occurred(
         },
         e => {
             counter.with_label_values(&["UnexpectedError"]).inc();
-            if new_pipeline_enabled {
-                warn!(
-                    block_id = block_id,
-                    "Execution error {:?} for {}", e, block_id
-                );
-            } else {
-                error!(
-                    block_id = block_id,
-                    "Execution error {:?} for {}", e, block_id
-                );
-            }
+            warn!(
+                block_id = block_id,
+                "Execution error {:?} for {}", e, block_id
+            );
         },
     }
 }
@@ -1311,7 +1303,7 @@ pub fn update_counters_for_block(block: &Block) {
     if failed_rounds > 0 {
         COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
     }
-    quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
+    quorum_store::counters::update_batch_stats(block);
 }
 
 pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
