@@ -1,16 +1,13 @@
 ---
 remote_endpoint: ~
-name: "v1.30.0"
+name: "v1.30.2"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework, version v1.30.0"
+      title: "Multi-step proposal to upgrade mainnet framework, version v1.30.2"
       description: "This includes changes in https://github.com/aptos-labs/aptos-core/tree/aptos-release-v1.30"
     execution_mode: MultiStep
     update_sequence:
-      - Gas:
-          old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.29.0.json
-          new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.30.0.json
       - Framework:
           bytecode_version: 7
           git_hash: ~
