@@ -8,6 +8,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::transaction::SignedTransaction;
+use move_core_types::account_address::AccountAddress;
 
 #[test]
 fn test_all_filter() {
@@ -15,14 +16,15 @@ fn test_all_filter() {
         // Create a filter that allows all transactions
         let filter = BlockTransactionFilter::empty().add_all_filter(true);
 
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Verify that all transactions are allowed
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
         verify_all_transactions_allowed(
             filter,
             block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -35,6 +37,7 @@ fn test_all_filter() {
         verify_all_transactions_rejected(
             filter,
             block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -45,8 +48,8 @@ fn test_all_filter() {
 #[test]
 fn test_block_id_filter() {
     for use_new_txn_payload_format in [false, true] {
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Create a filter that only allows transactions with a specific block ID
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -58,6 +61,7 @@ fn test_block_id_filter() {
         verify_all_transactions_allowed(
             filter.clone(),
             block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -68,6 +72,7 @@ fn test_block_id_filter() {
         verify_all_transactions_rejected(
             filter.clone(),
             different_block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -80,6 +85,7 @@ fn test_block_id_filter() {
         verify_all_transactions_rejected(
             filter.clone(),
             block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -90,6 +96,7 @@ fn test_block_id_filter() {
         verify_all_transactions_allowed(
             filter.clone(),
             different_block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -105,8 +112,8 @@ fn test_block_epoch_greater_than_filter() {
             .add_block_epoch_greater_than_filter(true, 1000)
             .add_all_filter(false);
 
-        // Create a block ID and epoch
-        let (block_id, _, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, and timestamp
+        let (block_id, block_author, _, block_timestamp) = utils::get_random_block_info();
 
         // Verify that the filter only allows transactions with a block epoch greater than 1000
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -114,6 +121,7 @@ fn test_block_epoch_greater_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -123,6 +131,7 @@ fn test_block_epoch_greater_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -139,6 +148,7 @@ fn test_block_epoch_greater_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -148,6 +158,7 @@ fn test_block_epoch_greater_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -164,8 +175,8 @@ fn test_block_epoch_less_than_filter() {
             .add_block_epoch_less_than_filter(true, 1000)
             .add_all_filter(false);
 
-        // Create a block ID and epoch
-        let (block_id, _, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, and timestamp
+        let (block_id, block_author, _, block_timestamp) = utils::get_random_block_info();
 
         // Verify that the filter only allows transactions with a block epoch less than 1000
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -173,6 +184,7 @@ fn test_block_epoch_less_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -182,6 +194,7 @@ fn test_block_epoch_less_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -198,6 +211,7 @@ fn test_block_epoch_less_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -207,6 +221,7 @@ fn test_block_epoch_less_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -223,8 +238,8 @@ fn test_block_timestamp_greater_than_filter() {
             .add_block_timestamp_greater_than_filter(true, 1000)
             .add_all_filter(false);
 
-        // Create a block ID and epoch
-        let (block_id, block_epoch, _) = utils::get_random_block_info();
+        // Create a block ID, author, and epoch
+        let (block_id, block_author, block_epoch, _) = utils::get_random_block_info();
 
         // Verify that the filter only allows transactions with a block timestamp greater than 1000
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -232,6 +247,7 @@ fn test_block_timestamp_greater_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -241,6 +257,7 @@ fn test_block_timestamp_greater_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -257,6 +274,7 @@ fn test_block_timestamp_greater_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -266,6 +284,7 @@ fn test_block_timestamp_greater_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -282,8 +301,8 @@ fn test_block_timestamp_less_than_filter() {
             .add_block_timestamp_less_than_filter(true, 1000)
             .add_all_filter(false);
 
-        // Create a block ID and epoch
-        let (block_id, block_epoch, _) = utils::get_random_block_info();
+        // Create a block ID, author, and epoch
+        let (block_id, block_author, block_epoch, _) = utils::get_random_block_info();
 
         // Verify that the filter only allows transactions with a block timestamp less than 1000
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -291,6 +310,7 @@ fn test_block_timestamp_less_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -300,6 +320,7 @@ fn test_block_timestamp_less_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -316,6 +337,7 @@ fn test_block_timestamp_less_than_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -325,6 +347,7 @@ fn test_block_timestamp_less_than_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -339,14 +362,15 @@ fn test_empty_filter() {
         // Create an empty filter
         let filter = BlockTransactionFilter::empty();
 
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Verify that all transactions are allowed
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
         verify_all_transactions_allowed(
             filter.clone(),
             block_id,
+            block_author,
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -357,8 +381,8 @@ fn test_empty_filter() {
 #[test]
 fn test_multiple_matchers_filter() {
     for use_new_txn_payload_format in [false, true] {
-        // Create a block ID and epoch
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Create a filter that only allows block transactions with epoch > 1000 and a specific sender (txn 0)
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -377,6 +401,7 @@ fn test_multiple_matchers_filter() {
             verify_all_transactions_rejected(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -387,6 +412,7 @@ fn test_multiple_matchers_filter() {
         for block_epoch in [1001, 2002] {
             let filtered_transactions = filter.filter_block_transactions(
                 block_id,
+                Some(block_author),
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -417,6 +443,7 @@ fn test_multiple_matchers_filter() {
             verify_all_transactions_allowed(
                 filter.clone(),
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -427,6 +454,7 @@ fn test_multiple_matchers_filter() {
         for block_timestamp in [0, 999] {
             let filtered_transactions = filter.filter_block_transactions(
                 block_id,
+                Some(block_author),
                 block_epoch,
                 block_timestamp,
                 transactions.clone(),
@@ -440,12 +468,14 @@ fn test_multiple_matchers_filter() {
 fn verify_all_transactions_allowed(
     filter: BlockTransactionFilter,
     block_id: HashValue,
+    block_author: AccountAddress,
     block_epoch: u64,
     block_timestamp: u64,
     transactions: Vec<SignedTransaction>,
 ) {
     let filtered_transactions = filter.filter_block_transactions(
         block_id,
+        Some(block_author),
         block_epoch,
         block_timestamp,
         transactions.clone(),
@@ -457,11 +487,17 @@ fn verify_all_transactions_allowed(
 fn verify_all_transactions_rejected(
     filter: BlockTransactionFilter,
     block_id: HashValue,
+    block_author: AccountAddress,
     block_epoch: u64,
     block_timestamp: u64,
     transactions: Vec<SignedTransaction>,
 ) {
-    let filtered_transactions =
-        filter.filter_block_transactions(block_id, block_epoch, block_timestamp, transactions);
+    let filtered_transactions = filter.filter_block_transactions(
+        block_id,
+        Some(block_author),
+        block_epoch,
+        block_timestamp,
+        transactions,
+    );
     assert!(filtered_transactions.is_empty());
 }

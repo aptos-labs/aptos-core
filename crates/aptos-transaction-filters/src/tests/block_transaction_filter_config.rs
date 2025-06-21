@@ -44,12 +44,13 @@ fn test_block_transaction_filter_config_allow() {
             serde_yaml::from_str::<BlockTransactionFilter>(&block_transaction_filter_string)
                 .unwrap();
 
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Verify that only the first five transactions are allowed
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             block_id,
+            Some(block_author),
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -95,12 +96,13 @@ fn test_block_transaction_filter_config_deny() {
             serde_yaml::from_str::<BlockTransactionFilter>(&block_transaction_filter_string)
                 .unwrap();
 
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Verify that the first five transactions are denied
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             block_id,
+            Some(block_author),
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -112,8 +114,8 @@ fn test_block_transaction_filter_config_deny() {
 #[test]
 fn test_block_transaction_filter_config_multiple_matchers() {
     for use_new_txn_payload_format in [false, true] {
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Create a filter that denies transactions based on multiple criteria
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -163,6 +165,7 @@ fn test_block_transaction_filter_config_multiple_matchers() {
         // Verify that the first two transactions are denied in the current block
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             block_id,
+            Some(block_author),
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -172,6 +175,7 @@ fn test_block_transaction_filter_config_multiple_matchers() {
         // Verify that all transactions are denied in the previous block
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             HashValue::random(),
+            Some(block_author),
             block_epoch - 1,
             block_timestamp - 1,
             transactions.clone(),
@@ -181,6 +185,7 @@ fn test_block_transaction_filter_config_multiple_matchers() {
         // Verify that all transactions are allowed in a future block
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             HashValue::random(),
+            Some(block_author),
             block_epoch + 1,
             block_timestamp + 1,
             transactions.clone(),

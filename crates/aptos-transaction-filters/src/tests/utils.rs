@@ -317,12 +317,13 @@ pub fn get_random_batch_info() -> (BatchId, PeerId, HashValue) {
     (batch_id, batch_author, batch_digest)
 }
 
-/// Creates and returns a random block ID, epoch, and timestamp.
-pub fn get_random_block_info() -> (HashValue, u64, u64) {
+/// Creates and returns a random block ID, author, epoch, and timestamp.
+pub fn get_random_block_info() -> (HashValue, AccountAddress, u64, u64) {
     let block_id = HashValue::random();
+    let block_author = AccountAddress::random();
     let block_epoch = utils::get_random_u64();
     let block_timestamp = utils::get_random_u64();
-    (block_id, block_epoch, block_timestamp)
+    (block_id, block_author, block_epoch, block_timestamp)
 }
 
 /// Generates and returns a random number (u64)
