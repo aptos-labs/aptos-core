@@ -8,7 +8,11 @@ use aptos_types::{
     state_store::{state_slot::StateSlot, TStateView},
     transaction::Version,
 };
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+    hash::Hash,
+};
 
 pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     first_version: Version,
@@ -17,6 +21,7 @@ pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
     /// effect of the block epilogue (subject to per block limit)
     to_make_hot: BTreeMap<Key, StateSlot>,
+    to_evict: BTreeSet<Key>,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
     /// so no need to issue separate HotStateOps to promote them to the hot state.
@@ -55,6 +60,7 @@ where
             first_version: base_view.next_version(),
             base_view,
             to_make_hot: BTreeMap::new(),
+            to_evict: BTreeSet::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
             refresh_interval_versions,

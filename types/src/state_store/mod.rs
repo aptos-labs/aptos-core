@@ -75,6 +75,11 @@ pub trait TStateView {
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
         self.get_state_value(state_key).map(|opt| opt.is_some())
     }
+
+    /// Number of free slots in hot state. `None` for views that do not implement hot state.
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        None
+    }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
