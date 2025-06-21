@@ -2622,14 +2622,66 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     fn user_txn_bytes_len(&self) -> usize;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub enum ViewFunctionError {
+    ExecutionStatus(ExecutionStatus, Option<StatusCode>),
+    ErrorMessage(String, Option<StatusCode>),
+}
+
+impl std::fmt::Display for ViewFunctionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ViewFunctionError::ExecutionStatus(status, vm_status) => {
+                write!(
+                    f,
+                    "Execution status: {:?}, VM status: {:?}",
+                    status, vm_status
+                )
+            },
+            ViewFunctionError::ErrorMessage(msg, vm_status) => {
+                write!(f, "Error: {}, VM status: {:?}", msg, vm_status)
+            },
+        }
+    }
+}
+
 pub struct ViewFunctionOutput {
-    pub values: Result<Vec<Vec<u8>>>,
+    pub values: Result<Vec<Vec<u8>>, ViewFunctionError>,
     pub gas_used: u64,
 }
 
 impl ViewFunctionOutput {
-    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
+    pub fn new(values: Result<Vec<Vec<u8>>, ViewFunctionError>, gas_used: u64) -> Self {
         Self { values, gas_used }
+    }
+
+    pub fn new_ok(values: Vec<Vec<u8>>, gas_used: u64) -> Self {
+        Self {
+            values: Ok(values),
+            gas_used,
+        }
+    }
+
+    pub fn new_error_message(
+        message: String,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::ErrorMessage(message, vm_status)),
+            gas_used,
+        }
+    }
+
+    pub fn new_execution_status(
+        status: ExecutionStatus,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::ExecutionStatus(status, vm_status)),
+            gas_used,
+        }
     }
 }
 
