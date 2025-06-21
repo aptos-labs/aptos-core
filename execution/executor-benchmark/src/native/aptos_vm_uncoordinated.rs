@@ -68,7 +68,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                 .collect::<Result<Vec<_>, _>>()
         })?;
 
-        let block_epilogue_txn = Transaction::block_epilogue(
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
                 .unwrap(),

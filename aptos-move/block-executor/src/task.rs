@@ -108,9 +108,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
         Option<Arc<MoveTypeLayout>>,
     )>;
 
-    fn module_write_set(
-        &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>;
+    fn module_write_set(&self) -> Vec<ModuleWrite<<Self::Txn as Transaction>::Value>>;
 
     fn aggregator_v1_write_set(
         &self,
@@ -198,6 +196,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Returns true iff it has a new epoch event.
     fn has_new_epoch_event(&self) -> bool;
+
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool;
 
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.

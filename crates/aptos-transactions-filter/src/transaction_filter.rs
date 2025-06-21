@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::transaction_filter_type::Filter;
+use crate::transaction_matcher::Filter;
 use aptos_crypto::HashValue;
 use aptos_types::transaction::SignedTransaction;
 
@@ -10,7 +10,7 @@ pub struct TransactionFilter {
 }
 
 impl TransactionFilter {
-    pub(crate) fn new(filter: Filter) -> Self {
+    pub fn new(filter: Filter) -> Self {
         Self { filter }
     }
 
@@ -29,7 +29,7 @@ impl TransactionFilter {
         txns.into_iter()
             .filter(|txn| {
                 self.filter
-                    .allows(block_id, block_epoch, block_timestamp, txn)
+                    .allows_in_block(block_id, block_epoch, block_timestamp, txn)
             })
             .collect()
     }
@@ -37,8 +37,10 @@ impl TransactionFilter {
 
 #[cfg(test)]
 mod test {
-    use crate::transaction_filter::TransactionFilter;
-    use aptos_config::config::transaction_filter_type::{Filter, Matcher};
+    use crate::{
+        transaction_filter::TransactionFilter,
+        transaction_matcher::{Filter, Matcher},
+    };
     use aptos_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
         HashValue, PrivateKey, SigningKey, Uniform,

@@ -5,9 +5,10 @@
 use crate::{
     block_data::{BlockData, BlockType},
     common::{Author, Payload, Round},
+    opt_block_data::OptBlockData,
     quorum_cert::QuorumCert,
 };
-use anyhow::{bail, ensure, format_err};
+use anyhow::{bail, ensure, format_err, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
@@ -124,6 +125,83 @@ impl Block {
         }
     }
 
+    /// Returns the number of proofs, the number of txns in the proofs, and the bytes of txns in the proofs
+    pub fn proof_stats(&self) -> (usize, usize, usize) {
+        match self.block_data.payload() {
+            None => (0, 0, 0),
+            Some(payload) => match payload {
+                Payload::InQuorumStore(pos) => (pos.num_proofs(), pos.num_txns(), pos.num_bytes()),
+                Payload::DirectMempool(_txns) => (0, 0, 0),
+                Payload::InQuorumStoreWithLimit(pos) => (
+                    pos.proof_with_data.num_proofs(),
+                    pos.proof_with_data.num_txns(),
+                    pos.proof_with_data.num_bytes(),
+                ),
+                Payload::QuorumStoreInlineHybrid(_inline_batches, proof_with_data, _)
+                | Payload::QuorumStoreInlineHybridV2(_inline_batches, proof_with_data, _) => (
+                    proof_with_data.num_proofs(),
+                    proof_with_data.num_txns(),
+                    proof_with_data.num_bytes(),
+                ),
+                Payload::OptQuorumStore(opt_quorum_store_payload) => (
+                    opt_quorum_store_payload.proof_with_data().num_proofs(),
+                    opt_quorum_store_payload.proof_with_data().num_txns(),
+                    opt_quorum_store_payload.proof_with_data().num_bytes(),
+                ),
+            },
+        }
+    }
+
+    /// Returns the number of inline batches, the number of txns in the inline batches, and the bytes of txns in the inline batches
+    pub fn inline_batch_stats(&self) -> (usize, usize, usize) {
+        match self.block_data.payload() {
+            None => (0, 0, 0),
+            Some(payload) => match payload {
+                Payload::QuorumStoreInlineHybrid(inline_batches, _proof_with_data, _)
+                | Payload::QuorumStoreInlineHybridV2(inline_batches, _proof_with_data, _) => (
+                    inline_batches.len(),
+                    inline_batches
+                        .iter()
+                        .map(|(b, _)| b.num_txns() as usize)
+                        .sum(),
+                    inline_batches
+                        .iter()
+                        .map(|(b, _)| b.num_bytes() as usize)
+                        .sum(),
+                ),
+                Payload::OptQuorumStore(opt_quorum_store_payload) => (
+                    opt_quorum_store_payload.inline_batches().num_batches(),
+                    opt_quorum_store_payload.inline_batches().num_txns(),
+                    opt_quorum_store_payload.inline_batches().num_bytes(),
+                ),
+                _ => (0, 0, 0),
+            },
+        }
+    }
+
+    /// Returns the number of opt batches, the number of txns in the opt batches, and the bytes of txns in the opt batches
+    pub fn opt_batch_stats(&self) -> (usize, usize, usize) {
+        match self.block_data.payload() {
+            None => (0, 0, 0),
+            Some(payload) => match payload {
+                Payload::OptQuorumStore(opt_quorum_store_payload) => (
+                    opt_quorum_store_payload.opt_batches().len(),
+                    opt_quorum_store_payload
+                        .opt_batches()
+                        .iter()
+                        .map(|b| b.num_txns() as usize)
+                        .sum(),
+                    opt_quorum_store_payload
+                        .opt_batches()
+                        .iter()
+                        .map(|b| b.num_bytes() as usize)
+                        .sum(),
+                ),
+                _ => (0, 0, 0),
+            },
+        }
+    }
+
     pub fn quorum_cert(&self) -> &QuorumCert {
         self.block_data.quorum_cert()
     }
@@ -167,6 +245,10 @@ impl Block {
 
     pub fn is_nil_block(&self) -> bool {
         self.block_data.is_nil_block()
+    }
+
+    pub fn is_opt_block(&self) -> bool {
+        self.block_data.is_opt_block()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -309,6 +391,15 @@ impl Block {
         }
     }
 
+    pub fn new_from_opt(opt_block_data: OptBlockData, quorum_cert: QuorumCert) -> Self {
+        let block_data = BlockData::new_from_opt(opt_block_data, quorum_cert);
+        Block {
+            id: block_data.hash(),
+            block_data,
+            signature: None,
+        }
+    }
+
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         self.block_data.validator_txns()
     }
@@ -333,6 +424,11 @@ impl Block {
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
+                self.quorum_cert().verify(validator)
+            },
+            BlockType::OptimisticProposal(p) => {
+                // Note: Optimistic proposal is not signed by proposer unlike normal proposal
+                p.grandparent_qc().verify(validator)?;
                 self.quorum_cert().verify(validator)
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
@@ -441,11 +537,15 @@ impl Block {
             .collect()
     }
 
+    /// Returns the voters, as BitVec, of the parent block for a normal proposal or
+    /// the grandparent block for an optimistic proposal.
     fn previous_bitvec(&self) -> BitVec {
-        if let BlockType::DAGBlock { parents_bitvec, .. } = self.block_data.block_type() {
-            parents_bitvec.clone()
-        } else {
-            self.quorum_cert().ledger_info().get_voters_bitvec().clone()
+        match self.block_data.block_type() {
+            BlockType::DAGBlock { parents_bitvec, .. } => parents_bitvec.clone(),
+            BlockType::OptimisticProposal(p) => {
+                p.grandparent_qc().ledger_info().get_voters_bitvec().clone()
+            },
+            _ => self.quorum_cert().ledger_info().get_voters_bitvec().clone(),
         }
     }
 
