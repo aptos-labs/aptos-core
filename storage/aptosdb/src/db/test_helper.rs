@@ -181,6 +181,8 @@ prop_compose! {
                     state_checkpoint_hash,
                     placeholder_txn_info.gas_used(),
                     placeholder_txn_info.status().clone(),
+                    // TODO(grao): Consider making a real one?
+                    None,
                 );
                 txn_accumulator = txn_accumulator.append(&[txn_info.hash()]);
                 txn.set_transaction_info(txn_info);

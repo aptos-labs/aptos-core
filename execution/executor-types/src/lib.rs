@@ -15,8 +15,8 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_key::StateKey,
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
-        Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionOutputListWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -248,6 +248,7 @@ pub trait TransactionReplayer: Send {
     fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
+        persisted_info: Vec<PersistedAuxiliaryInfo>,
         transaction_infos: Vec<TransactionInfo>,
         write_sets: Vec<WriteSet>,
         event_vecs: Vec<Vec<ContractEvent>>,

@@ -33,9 +33,9 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, BlockEndInfo, ExecutionStatus, RawTransaction, Script, SignedTransaction,
-        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
-        TransactionPayload, TransactionStatus, Version,
+        AuxiliaryInfo, BlockEndInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProof,
+        TransactionOutput, TransactionPayload, TransactionStatus, Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -462,7 +462,7 @@ fn apply_transaction_by_writeset(
 ) {
     let ledger_summary: LedgerSummary = db.reader.get_pre_committed_ledger_summary().unwrap();
 
-    let (txns, txn_outs) = transactions_and_writesets
+    let (txns, txn_outs): (Vec<_>, Vec<_>) = transactions_and_writesets
         .iter()
         .map(|(txn, write_set)| {
             (
@@ -494,9 +494,11 @@ fn apply_transaction_by_writeset(
         ledger_summary.state.latest().clone(),
     )
     .unwrap();
+    let aux_info = txns.iter().map(|_| AuxiliaryInfo::new_empty()).collect();
     let chunk_output = DoGetExecutionOutput::by_transaction_output(
         txns,
         txn_outs,
+        aux_info,
         &ledger_summary.state,
         state_view,
     )
@@ -804,6 +806,7 @@ proptest! {
         let replayer = chunk_executor_tests::TestExecutor::new();
         let chunks_enqueued = replayer.executor.enqueue_chunks(
             txn_list.transactions,
+            txn_infos.iter().map(|_| PersistedAuxiliaryInfo::None).collect(),
             txn_infos,
             write_sets,
             event_vecs,
