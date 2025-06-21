@@ -152,7 +152,6 @@ pub struct RocksdbConfigs {
     pub state_merkle_db_config: RocksdbConfig,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
-    // Note: Not ready for production use yet.
     pub enable_storage_sharding: bool,
 }
 
@@ -166,7 +165,7 @@ impl Default for RocksdbConfigs {
                 max_open_files: 1000,
                 ..Default::default()
             },
-            enable_storage_sharding: false,
+            enable_storage_sharding: true,
         }
     }
 }
