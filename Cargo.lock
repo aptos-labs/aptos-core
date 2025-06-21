@@ -4510,6 +4510,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-filters"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "move-core-types",
+ "rand 0.7.3",
+ "serde",
+ "serde_yaml 0.8.26",
+]
+
+[[package]]
 name = "aptos-transaction-generator-lib"
 version = "0.0.0"
 dependencies = [
