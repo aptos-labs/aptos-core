@@ -1,1 +1,1 @@
-{"message":"PartialVMError with status INVALID_MAIN_FUNCTION_SIGNATURE and message 'function not marked as view function'","error_code":"invalid_input","vm_error_code":null}
+{"message":"function not marked as view function","error_code":"invalid_input","vm_error_code":1011}

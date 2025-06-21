@@ -1,0 +1,1 @@
+{"message":"Move abort in 0x1::account: ENO_SUCH_ROTATION_CAPABILITY_OFFER(0x60012): The specified rotation capability offer does not exist at the specified offerer address","error_code":"invalid_input","vm_error_code":4016}
