@@ -59,7 +59,7 @@ module aptos_framework::scheduled_txns {
     const EXPIRY_DELTA_DEFAULT: u64 = 100;
 
     /// The maximum number of scheduled transactions that can be run in a block
-    const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
+    const GET_READY_TRANSACTIONS_LIMIT: u64 = 1000;
 
     /// The maximum number of transactions that can be cancelled in a block during shutdown
     const SHUTDOWN_CANCEL_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
