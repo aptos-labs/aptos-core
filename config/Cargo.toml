@@ -21,6 +21,7 @@ aptos-secure-storage = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-transactions-filter = { workspace = true }
+aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }

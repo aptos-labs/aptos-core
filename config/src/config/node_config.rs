@@ -9,10 +9,10 @@ use crate::{
         jwk_consensus_config::JWKConsensusConfig, netbench_config::NetbenchConfig,
         node_config_loader::NodeConfigLoader, node_startup_config::NodeStartupConfig,
         persistable_config::PersistableConfig, transaction_filter_config::TransactionFilterConfig,
-        utils::RootPath, AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, Error,
-        ExecutionConfig, IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig,
-        MempoolConfig, NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig,
-        StateSyncConfig, StorageConfig,
+        transaction_filters_config::TransactionFiltersConfig, utils::RootPath, AdminServiceConfig,
+        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
+        IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -85,6 +85,8 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub transaction_filter: TransactionFilterConfig,
+    #[serde(default)]
+    pub transaction_filters: TransactionFiltersConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
     #[serde(default)]
