@@ -8,7 +8,7 @@ use crate::{
         internal_indexer_db_config::InternalIndexerDBConfig,
         jwk_consensus_config::JWKConsensusConfig, netbench_config::NetbenchConfig,
         node_config_loader::NodeConfigLoader, node_startup_config::NodeStartupConfig,
-        persistable_config::PersistableConfig, transaction_filter_config::TransactionFilterConfig,
+        persistable_config::PersistableConfig,
         transaction_filters_config::TransactionFiltersConfig, utils::RootPath, AdminServiceConfig,
         ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
         IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
@@ -83,8 +83,6 @@ pub struct NodeConfig {
     pub state_sync: StateSyncConfig,
     #[serde(default)]
     pub storage: StorageConfig,
-    #[serde(default)]
-    pub transaction_filter: TransactionFilterConfig,
     #[serde(default)]
     pub transaction_filters: TransactionFiltersConfig,
     #[serde(default)]

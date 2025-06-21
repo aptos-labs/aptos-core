@@ -37,7 +37,6 @@ mod safety_rules_config;
 mod secure_backend_config;
 mod state_sync_config;
 mod storage_config;
-mod transaction_filter_config;
 mod transaction_filters_config;
 mod utils;
 
@@ -70,4 +69,4 @@ pub use safety_rules_config::*;
 pub use secure_backend_config::*;
 pub use state_sync_config::*;
 pub use storage_config::*;
-pub use transaction_filter_config::*;
+pub use transaction_filters_config::*;

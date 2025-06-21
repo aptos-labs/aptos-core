@@ -59,7 +59,7 @@ use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
-    ConsensusConfig, DagConsensusConfig, NodeConfig, TransactionFilterConfig,
+    BatchTransactionFilterConfig, ConsensusConfig, DagConsensusConfig, NodeConfig,
 };
 use aptos_consensus_types::{
     block_retrieval::BlockRetrievalRequest,
@@ -133,7 +133,6 @@ pub enum LivenessStorageData {
 pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
-    transaction_filter_config: TransactionFilterConfig,
     randomness_override_seq_num: u64,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
@@ -176,6 +175,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     key_storage: PersistentSafetyStorage,
+
+    quorum_store_txn_filter_config: BatchTransactionFilterConfig,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -199,15 +200,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
-        let transaction_filter_config = node_config.transaction_filter.clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         let key_storage = safety_rules_manager::storage(sr_config);
+        let quorum_store_txn_filter_config =
+            node_config.transaction_filters.quorum_store_filter.clone();
+
         Self {
             author,
             config,
-            transaction_filter_config,
             randomness_override_seq_num: node_config.randomness_override_seq_num,
             time_service,
             self_sender,
@@ -247,6 +249,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
             key_storage,
+            quorum_store_txn_filter_config,
         }
     }
 
@@ -728,7 +731,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.author,
                 epoch_state.verifier.len() as u64,
                 quorum_store_config,
-                self.transaction_filter_config.clone(),
+                self.quorum_store_txn_filter_config.clone(),
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
