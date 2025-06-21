@@ -198,10 +198,6 @@ where
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
-        let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
-            .modified_group_keys(idx_to_execute)
-            .into_iter()
-            .collect();
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
@@ -1119,7 +1115,7 @@ where
 
         loop {
             if let SchedulerTask::ValidationTask(txn_idx, incarnation, _) = &scheduler_task {
-                if *incarnation as usize > num_workers.pow(2) + num_txns + 10 {
+                if *incarnation as usize > num_workers.pow(2) + num_txns + 30 {
                     // Something is wrong if we observe high incarnations (e.g. a bug
                     // might manifest as an execution-invalidation cycle). Break out
                     // to fallback to sequential execution.
@@ -1290,7 +1286,7 @@ where
             // TODO(BlockSTMv2): pass worker_id to next_task.
             match scheduler.next_task()? {
                 TaskKind::Execute(txn_idx, incarnation) => {
-                    if incarnation > num_workers.pow(2) + num_txns + 10 {
+                    if incarnation > num_workers.pow(2) + num_txns + 30 {
                         // Something is wrong if we observe high incarnations (e.g. a bug
                         // might manifest as an execution-invalidation cycle). Break out
                         // to fallback to sequential execution.
@@ -1323,13 +1319,14 @@ where
                         txn_idx,
                         versioned_cache,
                         scheduler_wrapper,
-                        num_txns as u32,
                         start_delayed_field_id_counter,
                         delayed_field_id_counter,
                         last_input_output,
                         base_view,
                         shared_sync_params.global_module_cache,
                         runtime_environment,
+                        // TODO(BlockSTMv2): fix w. block epilogue support
+                        &AtomicU32::new(0),
                         shared_sync_params.final_results,
                     )?;
                 },
@@ -1353,10 +1350,9 @@ where
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
     ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
-        // Using parallel execution with 1 thread currently will not work as it
-        // will only have a coordinator role but no workers for rolling commit.
-        // Need to special case no roles (commit hook by thread itself) to run
-        // w. concurrency_level = 1 for some reason.
+        // BlockSTMv2 should have less restrictions on the number of workers but we
+        // still sanity check that it is not instantiated w. concurrency level 1.
+        // (since it makes sense to use sequential execution in this case).
         assert!(
             self.config.local.concurrency_level > 1,
             "Must use sequential execution"

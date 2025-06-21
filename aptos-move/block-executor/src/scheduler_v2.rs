@@ -910,6 +910,7 @@ impl SchedulerV2 {
     ///   is never aborted early to ensure its speculative writes are produced).
     /// - Otherwise (not halted, `incarnation > 0`), returns the result of
     ///   `[ExecutionStatuses::already_started_abort]`.
+    #[inline]
     pub(crate) fn is_halted_or_aborted(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
         if self.is_halted() {
             return true;

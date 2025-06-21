@@ -17,10 +17,7 @@ use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 // TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
 // not possible due to type & API mismatch.

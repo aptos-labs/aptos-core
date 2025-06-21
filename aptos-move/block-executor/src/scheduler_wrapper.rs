@@ -66,6 +66,7 @@ impl SchedulerWrapper<'_> {
         }
     }
 
+    #[inline]
     pub(crate) fn interrupt_requested(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
         match self {
             SchedulerWrapper::V1(scheduler, _) => scheduler.has_halted(),
