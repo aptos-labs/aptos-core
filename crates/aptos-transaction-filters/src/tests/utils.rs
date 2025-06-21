@@ -248,6 +248,14 @@ pub fn get_auth_public_key(signed_transaction: &SignedTransaction) -> AnyPublicK
     }
 }
 
+/// Returns the Ed25519 public key of the authenticator of the given transaction
+pub fn get_ed25519_public_key(signed_transaction: &SignedTransaction) -> Ed25519PublicKey {
+    match signed_transaction.authenticator() {
+        TransactionAuthenticator::Ed25519 { public_key, .. } => public_key.clone(),
+        authenticator => panic!("Unexpected transaction authenticator: {:?}", authenticator),
+    }
+}
+
 /// Returns the fee payer address of the given transaction
 pub fn get_fee_payer_address(signed_transaction: &SignedTransaction) -> AccountAddress {
     match signed_transaction.authenticator() {

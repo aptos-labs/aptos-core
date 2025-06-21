@@ -893,6 +893,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-short-hex-str",
  "aptos-temppath",
+ "aptos-transaction-filters",
  "aptos-transactions-filter",
  "aptos-types",
  "arr_macro",
