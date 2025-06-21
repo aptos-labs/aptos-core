@@ -512,3 +512,432 @@ fn matches_transaction_authenticator_public_key(
         },
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_crypto::{
+        ed25519::Ed25519PrivateKey,
+        multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+        secp256k1_ecdsa, secp256r1_ecdsa, PrivateKey, SigningKey, Uniform,
+    };
+    use aptos_types::{
+        chain_id::ChainId,
+        function_info::FunctionInfo,
+        keyless::test_utils::get_sample_groth16_sig_and_pk,
+        transaction::{
+            authenticator::{AnySignature, SingleKeyAuthenticator},
+            RawTransaction,
+        },
+    };
+    use rand::thread_rng;
+
+    #[test]
+    fn test_matches_account_authenticator_address() {
+        // Create an empty account authenticator
+        let account_authenticator = AccountAuthenticator::NoAccountAuthenticator;
+
+        // Verify that the authenticator doesn't match the target address
+        let target_address = AccountAddress::random();
+        verify_matches_account_auth_address(&account_authenticator, &target_address, false);
+
+        // Create an Ed25519 account authenticator
+        let raw_transaction = create_raw_transaction();
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let signature = private_key.sign(&raw_transaction).unwrap();
+        let account_authenticator = AccountAuthenticator::Ed25519 {
+            public_key: public_key.clone(),
+            signature: signature.clone(),
+        };
+
+        // Verify that the authenticator doesn't match the target address
+        verify_matches_account_auth_address(&account_authenticator, &target_address, false);
+
+        // Create a MultiEd25519 account authenticator
+        let multi_public_key = MultiEd25519PublicKey::new(vec![public_key], 1).unwrap();
+        let multi_signature = MultiEd25519Signature::from(signature);
+        let account_authenticator = AccountAuthenticator::MultiEd25519 {
+            public_key: multi_public_key,
+            signature: multi_signature,
+        };
+
+        // Verify that the authenticator doesn't match the target address
+        verify_matches_account_auth_address(&account_authenticator, &target_address, false);
+
+        // Create an Abstraction account authenticator (with the target address as the module address)
+        let function_info = FunctionInfo::new(target_address, "".into(), "".into());
+        let account_authenticator =
+            AccountAuthenticator::abstraction(function_info, vec![], vec![]);
+
+        // Verify that the authenticator matches the target address
+        verify_matches_account_auth_address(&account_authenticator, &target_address, true);
+    }
+
+    #[test]
+    fn test_matches_any_public_key_address() {
+        // Create an Ed25519 public key
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = AnyPublicKey::ed25519(private_key.public_key());
+
+        // Verify that the public key doesn't match the target address
+        let target_address = AccountAddress::random();
+        verify_matches_public_key_address(&public_key, &target_address, false);
+
+        // Create a Secp256k1Ecdsa public key
+        let private_key = secp256k1_ecdsa::PrivateKey::generate_for_testing();
+        let public_key = AnyPublicKey::secp256k1_ecdsa(private_key.public_key());
+
+        // Verify that the public key doesn't match the target address
+        verify_matches_public_key_address(&public_key, &target_address, false);
+
+        // Create a Secp256r1Ecdsa public key
+        let private_key = secp256r1_ecdsa::PrivateKey::generate_for_testing();
+        let public_key = AnyPublicKey::secp256r1_ecdsa(private_key.public_key());
+
+        // Verify that the public key doesn't match the target address
+        verify_matches_public_key_address(&public_key, &target_address, false);
+
+        // Create a Keyless public key
+        let (_, keyless_public_key) = get_sample_groth16_sig_and_pk();
+        let public_key = AnyPublicKey::keyless(keyless_public_key.clone());
+
+        // Verify that the public key doesn't match the target address
+        verify_matches_public_key_address(&public_key, &target_address, false);
+
+        // Create a FederatedKeyless public key with the target address as the JWK address
+        let federated_keyless_public_key = aptos_types::keyless::FederatedKeylessPublicKey {
+            jwk_addr: target_address,
+            pk: keyless_public_key,
+        };
+        let public_key = AnyPublicKey::federated_keyless(federated_keyless_public_key);
+
+        // Verify that the public key matches the target address
+        verify_matches_public_key_address(&public_key, &target_address, true);
+    }
+
+    #[test]
+    fn test_matches_transaction_authenticator_address() {
+        // Create an Ed25519 transaction authenticator
+        let raw_transaction = create_raw_transaction();
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let signature = private_key.sign(&raw_transaction).unwrap();
+        let signed_transaction = SignedTransaction::new(
+            raw_transaction.clone(),
+            private_key.public_key(),
+            signature.clone(),
+        );
+
+        // Verify that the authenticator doesn't match the target address
+        let target_address = AccountAddress::random();
+        verify_matches_transaction_auth_address(&signed_transaction, &target_address, false);
+
+        // Create a MultiEd25519 transaction authenticator
+        let multi_public_key =
+            MultiEd25519PublicKey::new(vec![private_key.public_key()], 1).unwrap();
+        let multi_signature = MultiEd25519Signature::from(signature);
+        let signed_transaction = SignedTransaction::new_multisig(
+            raw_transaction.clone(),
+            multi_public_key,
+            multi_signature,
+        );
+
+        // Verify that the authenticator doesn't match the target address
+        verify_matches_transaction_auth_address(&signed_transaction, &target_address, false);
+
+        // Create a multi-agent transaction authenticator with the target secondary signer
+        let signed_transaction = SignedTransaction::new_multi_agent(
+            raw_transaction.clone(),
+            AccountAuthenticator::NoAccountAuthenticator,
+            vec![
+                AccountAddress::random(),
+                target_address,
+                AccountAddress::random(),
+            ],
+            vec![AccountAuthenticator::NoAccountAuthenticator],
+        );
+
+        // Verify that the authenticator matches the target address
+        verify_matches_transaction_auth_address(&signed_transaction, &target_address, true);
+
+        // Create a fee payer transaction authenticator
+        let fee_payer_address = AccountAddress::random();
+        let secondary_signer_address = AccountAddress::random();
+        let signed_transaction = SignedTransaction::new_fee_payer(
+            raw_transaction.clone(),
+            AccountAuthenticator::NoAccountAuthenticator,
+            vec![secondary_signer_address],
+            vec![AccountAuthenticator::NoAccountAuthenticator],
+            fee_payer_address,
+            AccountAuthenticator::NoAccountAuthenticator,
+        );
+
+        // Verify that the authenticator matches the fee payer and secondary signer addresses
+        for address in [&fee_payer_address, &secondary_signer_address] {
+            verify_matches_transaction_auth_address(&signed_transaction, address, true);
+        }
+
+        // Verify that the authenticator doesn't match the target address
+        verify_matches_transaction_auth_address(&signed_transaction, &target_address, false);
+    }
+
+    #[test]
+    fn test_matches_account_authenticator_public_key() {
+        // Create an empty account authenticator
+        let account_authenticator = AccountAuthenticator::NoAccountAuthenticator;
+
+        // Verify that the authenticator doesn't match the public key
+        let private_key_1 = get_random_private_key();
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            false,
+        );
+
+        // Create an abstraction account authenticator
+        let function_info = FunctionInfo::new(
+            AccountAddress::random(),
+            "test_module".to_string(),
+            "test_function".to_string(),
+        );
+        let account_authenticator =
+            AccountAuthenticator::abstraction(function_info, vec![], vec![]);
+
+        // Verify that the authenticator doesn't match the public key
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            false,
+        );
+
+        // Create an Ed25519 account authenticator (using the private key)
+        let account_authenticator = AccountAuthenticator::Ed25519 {
+            public_key: private_key_1.public_key(),
+            signature: private_key_1.sign(&create_raw_transaction()).unwrap(),
+        };
+
+        // Verify that the authenticator matches the expected public key
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            true,
+        );
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(get_random_private_key().public_key()),
+            false,
+        );
+
+        // Create a MultiEd25519 account authenticator
+        let private_key_2 = get_random_private_key();
+        let multi_public_key = MultiEd25519PublicKey::new(
+            vec![private_key_1.public_key(), private_key_2.public_key()],
+            1,
+        )
+        .unwrap();
+        let multi_signature =
+            MultiEd25519Signature::from(private_key_1.sign(&create_raw_transaction()).unwrap());
+        let account_authenticator = AccountAuthenticator::MultiEd25519 {
+            public_key: multi_public_key,
+            signature: multi_signature,
+        };
+
+        // Verify that the authenticator matches the expected public key
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            true,
+        );
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_2.public_key()),
+            true,
+        );
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(get_random_private_key().public_key()),
+            false,
+        );
+
+        // Create a SingleKey account authenticator
+        let account_authenticator = AccountAuthenticator::SingleKey {
+            authenticator: SingleKeyAuthenticator::new(
+                AnyPublicKey::Ed25519 {
+                    public_key: private_key_1.public_key(),
+                },
+                AnySignature::Ed25519 {
+                    signature: private_key_1.sign(&create_raw_transaction()).unwrap(),
+                },
+            ),
+        };
+
+        // Verify that the authenticator matches the expected public key
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            true,
+        );
+        verify_matches_account_auth_public_key(
+            &account_authenticator,
+            &AnyPublicKey::ed25519(private_key_2.public_key()),
+            false,
+        );
+    }
+
+    #[test]
+    fn test_matches_transaction_authenticator_public_key() {
+        // Create an Ed25519 transaction authenticator
+        let raw_transaction = create_raw_transaction();
+        let private_key_1 = Ed25519PrivateKey::generate_for_testing();
+        let signature = private_key_1.sign(&raw_transaction).unwrap();
+        let signed_transaction = SignedTransaction::new(
+            raw_transaction.clone(),
+            private_key_1.public_key(),
+            signature.clone(),
+        );
+
+        // Verify that the authenticator matches the expected public key
+        let private_key_2 = get_random_private_key();
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            true,
+        );
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(private_key_2.public_key()),
+            false,
+        );
+
+        // Create a MultiEd25519 transaction authenticator
+        let multi_public_key = MultiEd25519PublicKey::new(
+            vec![private_key_1.public_key(), private_key_2.public_key()],
+            1,
+        )
+        .unwrap();
+        let multi_signature = MultiEd25519Signature::from(signature.clone());
+        let signed_transaction = SignedTransaction::new_multisig(
+            raw_transaction.clone(),
+            multi_public_key,
+            multi_signature,
+        );
+
+        // Verify that the authenticator matches the expected public key
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            true,
+        );
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(private_key_2.public_key()),
+            true,
+        );
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(get_random_private_key().public_key()),
+            false,
+        );
+
+        // Create a multi-agent transaction authenticator
+        let signed_transaction = SignedTransaction::new_multi_agent(
+            raw_transaction.clone(),
+            AccountAuthenticator::Ed25519 {
+                public_key: private_key_1.public_key(),
+                signature: signature.clone(),
+            },
+            vec![],
+            vec![AccountAuthenticator::Ed25519 {
+                public_key: private_key_2.public_key(),
+                signature: signature.clone(),
+            }],
+        );
+
+        // Verify that the authenticator matches the expected public key
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(private_key_1.public_key()),
+            true,
+        );
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(private_key_2.public_key()),
+            true,
+        );
+        verify_matches_transaction_auth_public_key(
+            &signed_transaction,
+            &AnyPublicKey::ed25519(get_random_private_key().public_key()),
+            false,
+        );
+    }
+
+    /// Creates and returns a raw transaction
+    fn create_raw_transaction() -> RawTransaction {
+        RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::Script(Script::new(vec![], vec![], vec![])),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        )
+    }
+
+    /// Generates and returns a random Ed25519 private key
+    fn get_random_private_key() -> Ed25519PrivateKey {
+        Ed25519PrivateKey::generate(&mut thread_rng())
+    }
+
+    /// Verifies that the given account authenticator contains the expected address
+    fn verify_matches_account_auth_address(
+        account_authenticator: &AccountAuthenticator,
+        address: &AccountAddress,
+        matches: bool,
+    ) {
+        let result = matches_account_authenticator_address(account_authenticator, address);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the given account authenticator contains the expected public key
+    fn verify_matches_account_auth_public_key(
+        account_authenticator: &AccountAuthenticator,
+        any_public_key: &AnyPublicKey,
+        matches: bool,
+    ) {
+        let result =
+            matches_account_authenticator_public_key(account_authenticator, any_public_key);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the given public key contains the target address
+    fn verify_matches_public_key_address(
+        any_public_key: &AnyPublicKey,
+        address: &AccountAddress,
+        matches: bool,
+    ) {
+        let result = matches_any_public_key_address(any_public_key, address);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the given transaction authenticator contains the expected address
+    fn verify_matches_transaction_auth_address(
+        signed_transaction: &SignedTransaction,
+        address: &AccountAddress,
+        matches: bool,
+    ) {
+        let result = matches_transaction_authenticator_address(signed_transaction, address);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the given transaction authenticator contains the expected public key
+    fn verify_matches_transaction_auth_public_key(
+        signed_transaction: &SignedTransaction,
+        any_public_key: &AnyPublicKey,
+        matches: bool,
+    ) {
+        let result =
+            matches_transaction_authenticator_public_key(signed_transaction, any_public_key);
+        assert_eq!(matches, result);
+    }
+}
