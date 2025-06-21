@@ -284,7 +284,7 @@ mod test {
         block_data::{BlockData, BlockType},
         common::{Author, Payload, ProofWithData},
         pipelined_block::OrderedBlockWindow,
-        proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+        proof_of_store::{BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
@@ -292,6 +292,7 @@ mod test {
         aggregate_signature::AggregateSignature,
         block_info::{BlockInfo, Round},
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+        quorum_store::BatchId,
         transaction::Version,
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},

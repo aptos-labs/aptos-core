@@ -6,11 +6,11 @@ use crate::quorum_store::{
     quorum_store_db::QuorumStoreDB,
     types::{PersistedValue, StorageMode},
 };
-use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
+use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
+    account_address::AccountAddress, quorum_store::BatchId, transaction::SignedTransaction,
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_err, assert_ok, assert_ok_eq};
