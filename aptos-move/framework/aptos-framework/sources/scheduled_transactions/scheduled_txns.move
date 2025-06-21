@@ -59,7 +59,7 @@ module aptos_framework::scheduled_txns {
     const EXPIRY_DELTA_DEFAULT: u64 = 100;
 
     /// The maximum number of scheduled transactions that can be run in a block
-    const GET_READY_TRANSACTIONS_LIMIT: u64 = 1000;
+    const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
 
     /// The maximum number of transactions that can be cancelled in a block during shutdown
     const SHUTDOWN_CANCEL_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
@@ -257,8 +257,7 @@ module aptos_framework::scheduled_txns {
         while (!txns_to_cancel.is_empty()) {
             let KeyAndTxnInfo { key, account_addr, deposit_amt, delete_ref } =
                 txns_to_cancel.pop_back();
-            cancel_internal(account_addr, key, deposit_amt);
-            object::delete(delete_ref);
+            cancel_internal(account_addr, key, deposit_amt, delete_ref);
             event::emit(
                 TransactionFailedEvent {
                     key,
@@ -413,9 +412,7 @@ module aptos_framework::scheduled_txns {
             signer::address_of(sender) == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
-        cancel_internal(signer::address_of(sender), key, deposit_amt);
-        // Delete the transaction object
-        object::delete(delete_ref);
+        cancel_internal(signer::address_of(sender), key, deposit_amt, delete_ref);
     }
 
     const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
@@ -443,9 +440,12 @@ module aptos_framework::scheduled_txns {
     /// Internal cancel function that takes an address instead of signer. No signer verification, assumes key is present
     /// in the schedule_map.
     fun cancel_internal(
-        account_addr: address, key: ScheduleMapKey, deposit_amt: u64
+        account_addr: address, key: ScheduleMapKey, deposit_amt: u64, delete_ref: DeleteRef
     ) acquires ScheduleQueue, AuxiliaryData {
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
+
+        // Delete the scheduled function object
+        object::delete(delete_ref);
 
         // Remove the transaction from schedule_map
         queue.schedule_map.remove(&key);
@@ -526,8 +526,7 @@ module aptos_framework::scheduled_txns {
         while (!txns_to_expire.is_empty()) {
             let KeyAndTxnInfo { key, account_addr, deposit_amt, delete_ref } =
                 txns_to_expire.pop_back();
-            cancel_internal(account_addr, key, deposit_amt);
-            object::delete(delete_ref);
+            cancel_internal(account_addr, key, deposit_amt, delete_ref);
             event::emit(
                 TransactionFailedEvent {
                     key,
@@ -557,7 +556,7 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Remove the txns that are run
-    public(friend) fun remove_txns() acquires ToRemoveTbl, ScheduleQueue {
+    public(friend) fun remove_txns() acquires ToRemoveTbl, ScheduleQueue, ScheduledTransactionContainer {
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
         let tbl_idx: u16 = 0;
@@ -572,6 +571,11 @@ module aptos_framework::scheduled_txns {
                     if (queue.schedule_map.contains(&key)) {
                         // Remove transaction from schedule_map
                         remove_count = remove_count + 1;
+
+                        let txn_obj = queue.schedule_map.borrow(&key);
+                        let (_, delete_ref) = move_scheduled_transaction_container(txn_obj);
+                        // Delete the scheduled function object
+                        object::delete(delete_ref);
                         queue.schedule_map.remove(&key);
                     };
                 };

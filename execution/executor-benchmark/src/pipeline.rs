@@ -209,7 +209,7 @@ where
                 "Running scheduled transactions: {} total scheduled transactions",
                 total_scheduled_txns
             );
-            //let target_block_size = total_scheduled_txns / num_blocks.unwrap_or(1) as u64;
+
             let mut total_executed = 0;
             let mut stage_index = 0;
             let mut current_parent_id = parent_block_id;

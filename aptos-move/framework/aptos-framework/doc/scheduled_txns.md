@@ -695,7 +695,7 @@ If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will a
 The maximum number of scheduled transactions that can be run in a block
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 1000;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 5000;
 </code></pre>
 
 
@@ -743,7 +743,7 @@ Conversion factor between our time granularity (100ms) and milliseconds
 The maximum number of transactions that can be cancelled in a block during shutdown
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_SHUTDOWN_CANCEL_LIMIT">SHUTDOWN_CANCEL_LIMIT</a>: u64 = 2000;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_SHUTDOWN_CANCEL_LIMIT">SHUTDOWN_CANCEL_LIMIT</a>: u64 = 10000;
 </code></pre>
 
 
@@ -893,8 +893,7 @@ Stop, remove and refund all scheduled txns; can be called only by the framework
     <b>while</b> (!txns_to_cancel.is_empty()) {
         <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a> { key, account_addr, deposit_amt, delete_ref } =
             txns_to_cancel.pop_back();
-        <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt);
-        <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
+        <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt, delete_ref);
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
                 key,
@@ -1128,9 +1127,7 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
         <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender) == txn.sender_addr,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>)
     );
-    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), key, deposit_amt);
-    // Delete the transaction <a href="object.md#0x1_object">object</a>
-    <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), key, deposit_amt, delete_ref);
 }
 </code></pre>
 
@@ -1225,7 +1222,7 @@ Internal cancel function that takes an address instead of signer. No signer veri
 in the schedule_map.
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr: <b>address</b>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, deposit_amt: u64)
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr: <b>address</b>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, deposit_amt: u64, delete_ref: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
 </code></pre>
 
 
@@ -1235,9 +1232,12 @@ in the schedule_map.
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(
-    account_addr: <b>address</b>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, deposit_amt: u64
+    account_addr: <b>address</b>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, deposit_amt: u64, delete_ref: DeleteRef
 ) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
     <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
+
+    // Delete the scheduled function <a href="object.md#0x1_object">object</a>
+    <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
 
     // Remove the transaction from schedule_map
     queue.schedule_map.remove(&key);
@@ -1338,8 +1338,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
     <b>while</b> (!txns_to_expire.is_empty()) {
         <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a> { key, account_addr, deposit_amt, delete_ref } =
             txns_to_expire.pop_back();
-        <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt);
-        <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
+        <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt, delete_ref);
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
                 key,
@@ -1409,7 +1408,7 @@ Remove the txns that are run
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>() <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>() <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionContainer">ScheduledTransactionContainer</a> {
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
     <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
     <b>let</b> tbl_idx: u16 = 0;
@@ -1424,6 +1423,11 @@ Remove the txns that are run
                 <b>if</b> (queue.schedule_map.contains(&key)) {
                     // Remove transaction from schedule_map
                     remove_count = remove_count + 1;
+
+                    <b>let</b> txn_obj = queue.schedule_map.borrow(&key);
+                    <b>let</b> (_, delete_ref) = <a href="scheduled_txns.md#0x1_scheduled_txns_move_scheduled_transaction_container">move_scheduled_transaction_container</a>(txn_obj);
+                    // Delete the scheduled function <a href="object.md#0x1_object">object</a>
+                    <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
                     queue.schedule_map.remove(&key);
                 };
             };
