@@ -147,10 +147,16 @@ module aptos_framework::transaction_validation {
         // Check if the authentication key is valid
         if (!skip_auth_key_check(is_simulation, &txn_authentication_key)) {
             if (option::is_some(&txn_authentication_key)) {
-                assert!(
-                    txn_authentication_key == option::some(account::get_authentication_key(sender_address)),
-                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                );
+                if (
+                    sender_address == gas_payer_address ||
+                    account::exists_at(sender_address) ||
+                    !features::sponsored_automatic_account_creation_enabled()
+                ) {
+                    assert!(
+                        txn_authentication_key == option::some(account::get_authentication_key(sender_address)),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+                    );
+                };
             } else {
                 assert!(
                     allow_missing_txn_authentication_key(sender_address),

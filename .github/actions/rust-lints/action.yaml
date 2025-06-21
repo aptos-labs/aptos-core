@@ -17,5 +17,5 @@ runs:
     - name: Run cargo sort and rust lint checks
       shell: bash
       run: |
-        cargo install cargo-sort
+        cargo install cargo-sort --version 1.0.7
         scripts/rust_lint.sh --check
