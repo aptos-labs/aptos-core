@@ -155,6 +155,7 @@ return true.
 -  [Function `is_calculate_transaction_fee_for_distribution_enabled`](#0x1_features_is_calculate_transaction_fee_for_distribution_enabled)
 -  [Function `get_distribute_transaction_fee_feature`](#0x1_features_get_distribute_transaction_fee_feature)
 -  [Function `is_distribute_transaction_fee_enabled`](#0x1_features_is_distribute_transaction_fee_enabled)
+-  [Function `is_new_token_v1_collection_creation_disabled`](#0x1_features_is_new_token_v1_collection_creation_disabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -540,6 +541,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DERIVABLE_ACCOUNT_ABSTRACTION">DERIVABLE_ACCOUNT_ABSTRACTION</a>: u64 = 88;
+</code></pre>
+
+
+
+<a id="0x1_features_DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION">DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION</a>: u64 = 98;
 </code></pre>
 
 
@@ -3947,6 +3957,30 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_distribute_transaction_fee_enabled">is_distribute_transaction_fee_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISTRIBUTE_TRANSACTION_FEE">DISTRIBUTE_TRANSACTION_FEE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_new_token_v1_collection_creation_disabled"></a>
+
+## Function `is_new_token_v1_collection_creation_disabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_new_token_v1_collection_creation_disabled">is_new_token_v1_collection_creation_disabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_new_token_v1_collection_creation_disabled">is_new_token_v1_collection_creation_disabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION">DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION</a>)
 }
 </code></pre>
 
