@@ -846,6 +846,7 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 <a id="0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM"></a>
 
+This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM">EEXCEEDED_MAX_GUID_CREATION_NUM</a>: u64 = 20;
@@ -965,6 +966,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 <a id="0x1_account_ENO_SIGNER_CAPABILITY_OFFERED"></a>
 
+The signer capability is not offered to any address
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>: u64 = 19;
