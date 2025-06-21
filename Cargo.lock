@@ -488,6 +488,8 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "fail",
