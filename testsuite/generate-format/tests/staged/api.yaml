@@ -462,6 +462,10 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    1:
+      Script:
+        NEWTYPE:
+          TYPENAME: Script
 OpenIdSig:
   STRUCT:
     - jwt_sig: BYTES
