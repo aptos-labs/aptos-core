@@ -35,7 +35,7 @@ use proptest::{
 };
 use rand::Rng;
 use std::{fmt::Debug, sync::Arc};
-use test_case::test_case;
+use test_case::test_matrix;
 
 pub(crate) fn get_gas_limit_variants(
     use_gas_limit: bool,
@@ -255,24 +255,15 @@ pub(crate) fn run_transactions_resources(
     }
 }
 
-// Regular tests with 2 repetitions
-#[test_case(100, 4000, 0, 0, false, false, 2, 15; "no_early_termination")]
-#[test_case(100, 4000, 0, 0, true, false, 2, 15; "no_early_termination_with_block_gas_limit")]
-#[test_case(100, 4000, 1000, 0, false, false, 2, 15; "abort_only")]
-#[test_case(100, 4000, 1000, 0, true, false, 2, 15; "abort_only_with_block_gas_limit")]
-#[test_case(80, 300, 0, 5, false, false, 2, 15; "skip_rest_only")]
-#[test_case(80, 300, 0, 5, true, false, 2, 15; "skip_rest_only_with_block_gas_limit")]
-#[test_case(100, 5000, 5, 5, false, false, 2, 15; "mixed_transactions")]
-#[test_case(100, 5000, 5, 5, true, false, 2, 15; "mixed_transactions_with_block_gas_limit")]
-// Dynamic tests with 2 repetitions
-#[test_case(100, 3000, 3, 3, false, true, 2, 15; "dynamic_read_writes_mixed")]
-#[test_case(100, 3000, 3, 3, true, true, 2, 15; "dynamic_read_writes_mixed_with_block_gas_limit")]
-// Dynamic tests with 5 repetitions
-#[test_case(100, 3000, 0, 0, false, true, 5, 15; "dynamic_read_writes")]
-#[test_case(100, 3000, 0, 0, true, true, 5, 15; "dynamic_read_writes_with_block_gas_limit")]
-// Dynamic contended tests with 5 repetitions
-#[test_case(10, 1000, 0, 0, false, true, 5, 15; "dynamic_read_writes_contended")]
-#[test_case(10, 1000, 0, 0, true, true, 5, 15; "dynamic_read_writes_contended_with_block_gas_limit")]
+#[test_matrix(
+    100, 3000, 0, 0, [false, true], [false, true], 6, 5; "varying_incarnation_behavior_gas_limit"
+)]
+#[test_matrix(
+    50, 500, [0, 3, 200], [0, 3, 50], [false, true], [false, true], 5, 3; "with_mixed_abort_skip_rest"
+)]
+#[test_matrix(
+    [10, 20], 1000, 0, 0, [false, true], [false, true], 10, 3; "contended"
+)]
 fn resource_transaction_tests(
     universe_size: usize,
     transaction_count: usize,
@@ -280,8 +271,8 @@ fn resource_transaction_tests(
     skip_rest_count: usize,
     use_gas_limit: bool,
     is_dynamic: bool,
-    num_executions: usize,
     num_random_generations: usize,
+    num_executions: usize,
 ) {
     run_transactions_resources(
         universe_size,

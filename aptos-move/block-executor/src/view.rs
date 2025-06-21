@@ -197,7 +197,6 @@ trait ResourceState<T: Transaction> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
-        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -520,13 +519,14 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         shared_counter: &'a AtomicU32,
         incarnation: Incarnation,
     ) -> Self {
+        let blockstm_v2 = shared_scheduler.is_v2();
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
             incarnation,
-            captured_reads: RefCell::new(CapturedReads::new()),
+            captured_reads: RefCell::new(CapturedReads::new(blockstm_v2.then_some(incarnation))),
         }
     }
 
@@ -596,7 +596,6 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
     fn read_cached_data_by_kind(
         &self,
         txn_idx: TxnIndex,
-        incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -617,7 +616,7 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
             let data = if self.scheduler.is_v2() {
                 self.versioned_map
                     .data()
-                    .fetch_data_v2(key, txn_idx, incarnation)
+                    .fetch_data_v2(key, txn_idx, self.incarnation)
             } else {
                 self.versioned_map.data().fetch_data(key, txn_idx)
             };
@@ -860,7 +859,6 @@ impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
     fn read_cached_data_by_kind(
         &self,
         _txn_idx: TxnIndex,
-        _incarnation: Incarnation,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
@@ -1038,13 +1036,6 @@ impl<T: Transaction> ViewState<'_, T> {
         match self {
             ViewState::Sync(state) => state,
             ViewState::Unsync(state) => state,
-        }
-    }
-
-    fn incarnation(&self) -> Incarnation {
-        match self {
-            ViewState::Sync(state) => state.incarnation,
-            ViewState::Unsync(_) => 0,
         }
     }
 }
@@ -1450,7 +1441,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
         let mut ret = state.read_cached_data_by_kind(
             self.txn_idx,
-            self.latest_view.incarnation(),
             state_key,
             kind,
             layout.clone(),
@@ -1468,7 +1458,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             // but need to fetch it from versioned_map again.
             ret = state.read_cached_data_by_kind(
                 self.txn_idx,
-                self.latest_view.incarnation(),
                 state_key,
                 kind,
                 layout.clone(),
@@ -2004,7 +1993,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2149,7 +2138,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2294,7 +2283,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2439,7 +2428,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
