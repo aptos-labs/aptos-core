@@ -16,7 +16,7 @@ generate = "./generate.sh"
 [tool.poetry.dependencies]
 python = "^3.9"
 grpcio = "^1.57.0"
-protobuf = "^4.24.2"
+protobuf = "^4.25.8"
 grpclib = "^0.4.5"
 
 [tool.poetry.group.dev.dependencies]
