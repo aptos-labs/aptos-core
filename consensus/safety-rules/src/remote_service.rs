@@ -29,7 +29,7 @@ pub trait RemoteService {
 }
 
 pub fn execute(storage: PersistentSafetyStorage, listen_addr: SocketAddr, network_timeout_ms: u64) {
-    let mut safety_rules = SafetyRules::new(storage);
+    let mut safety_rules = SafetyRules::new(storage, false);
     if let Err(e) = safety_rules.consensus_state() {
         warn!("Unable to print consensus state: {}", e);
     }

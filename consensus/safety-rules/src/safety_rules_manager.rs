@@ -130,7 +130,7 @@ impl SafetyRulesManager {
     }
 
     pub fn new_local(storage: PersistentSafetyStorage) -> Self {
-        let safety_rules = SafetyRules::new(storage);
+        let safety_rules = SafetyRules::new(storage, true);
         Self {
             internal_safety_rules: SafetyRulesWrapper::Local(Arc::new(RwLock::new(safety_rules))),
         }
@@ -144,7 +144,7 @@ impl SafetyRulesManager {
     }
 
     pub fn new_serializer(storage: PersistentSafetyStorage) -> Self {
-        let safety_rules = SafetyRules::new(storage);
+        let safety_rules = SafetyRules::new(storage, false);
         let serializer_service = SerializerService::new(safety_rules);
         Self {
             internal_safety_rules: SafetyRulesWrapper::Serializer(Arc::new(RwLock::new(
