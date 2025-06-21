@@ -101,7 +101,6 @@ members = [
     "crates/aptos-temppath",
     "crates/aptos-time-service",
     "crates/aptos-transaction-filters",
-    "crates/aptos-transactions-filter",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
@@ -450,7 +449,6 @@ aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-system-utils = { path = "crates/aptos-system-utils" }
 aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
 aptos-transaction-filters = { path = "crates/aptos-transaction-filters" }
-aptos-transactions-filter = { path = "crates/aptos-transactions-filter" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }

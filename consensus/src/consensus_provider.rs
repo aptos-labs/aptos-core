@@ -34,7 +34,6 @@ use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_time_service::TimeService;
-use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use futures::channel::mpsc;
@@ -68,7 +67,7 @@ pub fn start_consensus(
         Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
-        TransactionFilter::new(node_config.execution.transaction_filter.clone()),
+        node_config.transaction_filters.execution_filter.clone(),
         node_config.consensus.enable_pre_commit,
     );
 
@@ -160,7 +159,7 @@ pub fn start_consensus_observer(
             Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db.clone())),
             txn_notifier,
             state_sync_notifier,
-            TransactionFilter::new(node_config.execution.transaction_filter.clone()),
+            node_config.transaction_filters.execution_filter.clone(),
             node_config.consensus.enable_pre_commit,
         );
 
