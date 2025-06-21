@@ -1251,8 +1251,9 @@ impl SpecTranslator<'_> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
-        let bv_flag = if is_vector_table_module && !args.is_empty() {
+        let is_vector_table_cmp_module =
+            module_env.is_std_vector() || module_env.is_table() || module_env.is_cmp();
+        let bv_flag = if is_vector_table_cmp_module && !args.is_empty() {
             global_state.get_node_num_oper(args[0].node_id()) == Bitwise
         } else {
             global_state.get_node_num_oper(node_id) == Bitwise
@@ -1441,12 +1442,6 @@ impl SpecTranslator<'_> {
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_intrinsic() {
-            self.env.error(
-                &self.env.get_node_loc(node_id),
-                "cannot test variants of intrinsic struct",
-            );
-        }
         let struct_type = &self.get_node_type(args[0].node_id());
         let (_, _, _) = struct_type.skip_reference().require_struct();
         let inst = self.env.get_node_instantiation(node_id);

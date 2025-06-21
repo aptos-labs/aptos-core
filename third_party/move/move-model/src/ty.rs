@@ -1086,6 +1086,89 @@ impl Type {
         matches!(self, Type::Var(_))
     }
 
+    /// Returns all internal types contained in this type (including itself), skipping reference types.
+    pub fn get_all_contained_types_with_skip_reference(&self, env: &GlobalEnv) -> Vec<Type> {
+        match self {
+            Type::Primitive(_) => vec![self.clone()],
+            Type::Tuple(ts) => ts
+                .iter()
+                .flat_map(|t| t.get_all_contained_types_with_skip_reference(env))
+                .collect(),
+            Type::Vector(et) => {
+                let mut types = et.get_all_contained_types_with_skip_reference(env);
+                types.push(self.clone());
+                types
+            },
+            Type::Struct(_, _, ts) => {
+                let struct_env = self.get_struct(env).unwrap().0;
+                let mut new_types = ts
+                    .iter()
+                    .zip(struct_env.data.type_params.iter())
+                    .filter(|(_, param)| !param.1.is_phantom)
+                    .flat_map(|(t, _)| t.get_all_contained_types_with_skip_reference(env))
+                    .collect_vec();
+                new_types.push(self.clone());
+                if struct_env.has_variants() {
+                    for variant in struct_env.get_variants() {
+                        for field in struct_env.get_fields_of_variant(variant) {
+                            new_types.extend(
+                                field
+                                    .get_type()
+                                    .instantiate(ts)
+                                    .get_all_contained_types_with_skip_reference(env),
+                            );
+                        }
+                    }
+                } else {
+                    for field in struct_env.get_fields() {
+                        new_types.extend(
+                            field
+                                .get_type()
+                                .instantiate(ts)
+                                .get_all_contained_types_with_skip_reference(env),
+                        );
+                    }
+                }
+                new_types
+            },
+            Type::Fun(arg, result, _) => {
+                let mut types = arg.get_all_contained_types_with_skip_reference(env);
+                types.extend(result.get_all_contained_types_with_skip_reference(env));
+                types
+            },
+            Type::Reference(_, bt) => {
+                let mut types = bt.get_all_contained_types_with_skip_reference(env);
+                types.push(self.clone());
+                types
+            },
+            Type::TypeDomain(bt) => {
+                let mut types = bt.get_all_contained_types_with_skip_reference(env);
+                types.push(self.clone());
+                types
+            },
+            Type::ResourceDomain(_, _, Some(bt)) => {
+                let mut types = bt
+                    .iter()
+                    .flat_map(|t| t.get_all_contained_types_with_skip_reference(env))
+                    .collect_vec();
+                types.push(self.clone());
+                types
+            },
+            Type::ResourceDomain(_, _, None) => {
+                vec![self.clone()]
+            },
+            Type::Var(..) => {
+                vec![self.clone()]
+            },
+            Type::Error => {
+                vec![self.clone()]
+            },
+            Type::TypeParameter(..) => {
+                vec![self.clone()]
+            },
+        }
+    }
+
     /// Returns true if this is any number type.
     pub fn is_number(&self) -> bool {
         if let Type::Primitive(p) = self {

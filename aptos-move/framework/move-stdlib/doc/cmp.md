@@ -14,7 +14,14 @@
 -  [Function `is_gt`](#0x1_cmp_is_gt)
 -  [Function `is_ge`](#0x1_cmp_is_ge)
 -  [Specification](#@Specification_0)
+    -  [Enum `Ordering`](#@Specification_0_Ordering)
     -  [Function `compare`](#@Specification_0_compare)
+    -  [Function `is_eq`](#@Specification_0_is_eq)
+    -  [Function `is_ne`](#@Specification_0_is_ne)
+    -  [Function `is_lt`](#@Specification_0_is_lt)
+    -  [Function `is_le`](#@Specification_0_is_le)
+    -  [Function `is_gt`](#@Specification_0_is_gt)
+    -  [Function `is_ge`](#@Specification_0_is_ge)
 
 
 <pre><code></code></pre>
@@ -263,6 +270,74 @@ and if equal we proceed to the next.
 ## Specification
 
 
+<a id="@Specification_0_Ordering"></a>
+
+### Enum `Ordering`
+
+
+<pre><code>enum <a href="cmp.md#0x1_cmp_Ordering">Ordering</a> <b>has</b> <b>copy</b>, drop
+</code></pre>
+
+
+
+<dl>
+
+<details>
+<summary>Less</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>Equal</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>Greater</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+</dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
 <a id="@Specification_0_compare"></a>
 
 ### Function `compare`
@@ -274,7 +349,115 @@ and if equal we proceed to the next.
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_0_is_eq"></a>
+
+### Function `is_eq`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_eq">is_eq</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_is_ne"></a>
+
+### Function `is_ne`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_ne">is_ne</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_is_lt"></a>
+
+### Function `is_lt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_lt">is_lt</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_is_le"></a>
+
+### Function `is_le`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_le">is_le</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_is_gt"></a>
+
+### Function `is_gt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_gt">is_gt</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_0_is_ge"></a>
+
+### Function `is_ge`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_is_ge">is_ge</a>(self: &<a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+<b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
