@@ -19,7 +19,7 @@ aptos = { workspace = true }
 aptos-config = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
-aptos-protos ={ workspace = true }
+aptos-protos = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }
