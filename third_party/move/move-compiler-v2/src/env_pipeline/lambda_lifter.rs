@@ -387,12 +387,10 @@ impl<'a> LambdaLifter<'a> {
                             {
                                 // We can capture an argument if it can be eagerly evaluated and if
                                 // it does not depend on lambda arguments.
-                                if pos >= ClosureMask::MAX_ARGS {
-                                    // Exceeded maximal number of arguments which can be captured
+                                if mask.set_captured(pos).is_err() {
                                     return None;
                                 }
                                 captured.push(arg.clone());
-                                mask.set_captured(pos);
                             } else if lambda_param_pos < lambda_params.len()
                                 && matches!(arg.as_ref(), LocalVar(_, name) if name == &lambda_params[lambda_param_pos].0)
                             {
@@ -724,7 +722,10 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
                 Operation::Closure(
                     module_id,
                     fun_id,
-                    ClosureMask::new_for_leading(closure_args.len()),
+                    ClosureMask::new_for_leading(closure_args.len()).unwrap_or_else(|err| {
+                        env.error(&env.get_node_loc(id), &err);
+                        ClosureMask::empty()
+                    }),
                 ),
                 closure_args,
             )
