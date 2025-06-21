@@ -74,7 +74,8 @@ impl ClosureMask {
         if i >= Self::MAX_ARGS {
             return Err(format!(
                 "Argument index {} exceeds maximum allowed arguments {}",
-                i, Self::MAX_ARGS
+                i,
+                Self::MAX_ARGS
             ));
         }
         self.0 |= 1 << i;
