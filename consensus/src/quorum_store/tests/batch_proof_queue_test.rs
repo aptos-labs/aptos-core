@@ -6,11 +6,14 @@ use crate::quorum_store::{
 };
 use aptos_consensus_types::{
     common::TxnSummaryWithExpiration,
-    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+    proof_of_store::{BatchInfo, ProofOfStore},
     utils::PayloadTxnsSize,
 };
 use aptos_crypto::HashValue;
-use aptos_types::{aggregate_signature::AggregateSignature, transaction::ReplayProtector, PeerId};
+use aptos_types::{
+    aggregate_signature::AggregateSignature, quorum_store::BatchId, transaction::ReplayProtector,
+    PeerId,
+};
 use maplit::hashset;
 use std::{collections::HashSet, time::Duration};
 

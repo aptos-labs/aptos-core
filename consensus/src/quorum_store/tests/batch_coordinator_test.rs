@@ -10,13 +10,14 @@ use crate::{
         quorum_store_db::MockQuorumStoreDB, types::Batch,
     },
 };
-use aptos_config::config::TransactionFilterConfig;
-use aptos_consensus_types::{common::Author, proof_of_store::BatchId};
+use aptos_config::config::BatchTransactionFilterConfig;
+use aptos_consensus_types::common::Author;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
 use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
-use aptos_transactions_filter::transaction_matcher::Filter;
+use aptos_transaction_filters::batch_transaction_filter::BatchTransactionFilter;
 use aptos_types::{
     chain_id::ChainId,
+    quorum_store::BatchId,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -37,12 +38,8 @@ async fn test_handle_batches_msg_filter_disabled() {
     let (sender_to_batch_generator, mut receiver_for_batch_generator) = channel(100);
 
     // Create a filtering config with filtering disabled
-    let transaction_filter = Filter::empty().add_all_filter(false);
-    let transaction_filter_config = TransactionFilterConfig {
-        enable_quorum_store_filter: false,
-        transaction_filter,
-        ..TransactionFilterConfig::default()
-    };
+    let transaction_filter = BatchTransactionFilter::empty();
+    let transaction_filter_config = BatchTransactionFilterConfig::new(false, transaction_filter);
 
     // Create a batch coordinator
     let mut batch_coordinator = create_batch_coordinator(
@@ -91,12 +88,9 @@ async fn test_handle_batches_msg_filter_enabled() {
 
     // Create a filtering config with filtering enabled (the first transaction sender is rejected)
     let transactions = create_signed_transactions(10);
-    let transaction_filter = Filter::empty().add_sender_filter(false, transactions[0].sender());
-    let transaction_filter_config = TransactionFilterConfig {
-        enable_quorum_store_filter: true,
-        transaction_filter,
-        ..TransactionFilterConfig::default()
-    };
+    let transaction_filter =
+        BatchTransactionFilter::empty().add_sender_filter(false, transactions[0].sender());
+    let transaction_filter_config = BatchTransactionFilterConfig::new(true, transaction_filter);
 
     // Create a batch coordinator
     let mut batch_coordinator = create_batch_coordinator(
@@ -129,7 +123,7 @@ async fn test_handle_batches_msg_filter_enabled() {
 fn create_batch_coordinator(
     sender_to_proof_manager: Sender<ProofManagerCommand>,
     sender_to_batch_generator: Sender<BatchGeneratorCommand>,
-    transaction_filter_config: TransactionFilterConfig,
+    transaction_filter_config: BatchTransactionFilterConfig,
 ) -> BatchCoordinator {
     // Create the consensus network sender and batch store
     let consensus_network_sender = create_consensus_network_sender();

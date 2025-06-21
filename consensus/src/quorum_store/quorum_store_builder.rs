@@ -28,7 +28,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{QuorumStoreConfig, TransactionFilterConfig};
+use aptos_config::config::{BatchTransactionFilterConfig, QuorumStoreConfig};
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
@@ -125,7 +125,7 @@ pub struct InnerBuilder {
     author: Author,
     num_validators: u64,
     config: QuorumStoreConfig,
-    transaction_filter_config: TransactionFilterConfig,
+    transaction_filter_config: BatchTransactionFilterConfig,
     consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
@@ -161,7 +161,7 @@ impl InnerBuilder {
         author: Author,
         num_validators: u64,
         config: QuorumStoreConfig,
-        transaction_filter_config: TransactionFilterConfig,
+        transaction_filter_config: BatchTransactionFilterConfig,
         consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
