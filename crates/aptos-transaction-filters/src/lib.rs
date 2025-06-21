@@ -6,3 +6,6 @@
 pub mod batch_transaction_filter;
 pub mod block_transaction_filter;
 pub mod transaction_filter;
+
+#[cfg(test)]
+mod tests;
