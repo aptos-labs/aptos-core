@@ -256,3 +256,119 @@ fn matches_timestamp_greater_than(block_timestamp: u64, target_timestamp: &u64) 
 fn matches_timestamp_less_than(block_timestamp: u64, target_timestamp: &u64) -> bool {
     block_timestamp < *target_timestamp
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_matches_block_id() {
+        // Create a block ID
+        let block_id = HashValue::random();
+
+        // Verify that the block ID matches itself
+        verify_matches_block_id(block_id, &block_id, true);
+
+        // Verify that a different block ID does not match
+        let different_block_id = HashValue::random();
+        verify_matches_block_id(block_id, &different_block_id, false);
+    }
+
+    #[test]
+    fn test_matches_epoch_greater_than() {
+        // Create an epoch
+        let epoch = 10;
+
+        // Verify that a greater epoch matches
+        verify_matches_epoch_greater_than(epoch + 1, &epoch, true);
+
+        // Verify that an equal epoch does not match
+        verify_matches_epoch_greater_than(epoch, &epoch, false);
+
+        // Verify that a lesser epoch does not match
+        verify_matches_epoch_greater_than(epoch - 1, &epoch, false);
+    }
+
+    #[test]
+    fn test_matches_epoch_less_than() {
+        // Create an epoch
+        let epoch = 10;
+
+        // Verify that a lesser epoch matches
+        verify_matches_epoch_less_than(epoch - 1, &epoch, true);
+
+        // Verify that an equal epoch does not match
+        verify_matches_epoch_less_than(epoch, &epoch, false);
+
+        // Verify that a greater epoch does not match
+        verify_matches_epoch_less_than(epoch + 1, &epoch, false);
+    }
+
+    #[test]
+    fn test_matches_timestamp_greater_than() {
+        // Create a timestamp
+        let timestamp = 100;
+
+        // Verify that a greater timestamp matches
+        verify_matches_timestamp_greater_than(timestamp + 1, &timestamp, true);
+
+        // Verify that an equal timestamp does not match
+        verify_matches_timestamp_greater_than(timestamp, &timestamp, false);
+
+        // Verify that a lesser timestamp does not match
+        verify_matches_timestamp_greater_than(timestamp - 1, &timestamp, false);
+    }
+
+    #[test]
+    fn test_matches_timestamp_less_than() {
+        // Create a timestamp
+        let timestamp = 100;
+
+        // Verify that a lesser timestamp matches
+        verify_matches_timestamp_less_than(timestamp - 1, &timestamp, true);
+
+        // Verify that an equal timestamp does not match
+        verify_matches_timestamp_less_than(timestamp, &timestamp, false);
+
+        // Verify that a greater timestamp does not match
+        verify_matches_timestamp_less_than(timestamp + 1, &timestamp, false);
+    }
+
+    /// Verifies that the block ID matches the target block ID
+    fn verify_matches_block_id(block_id: HashValue, target_block_id: &HashValue, matches: bool) {
+        let result = matches_block_id(block_id, target_block_id);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the block epoch is greater than the target epoch
+    fn verify_matches_epoch_greater_than(block_epoch: u64, target_epoch: &u64, matches: bool) {
+        let result = matches_epoch_greater_than(block_epoch, target_epoch);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the block epoch is less than the target epoch
+    fn verify_matches_epoch_less_than(block_epoch: u64, target_epoch: &u64, matches: bool) {
+        let result = matches_epoch_less_than(block_epoch, target_epoch);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the block timestamp is greater than the target timestamp
+    fn verify_matches_timestamp_greater_than(
+        block_timestamp: u64,
+        target_timestamp: &u64,
+        matches: bool,
+    ) {
+        let result = matches_timestamp_greater_than(block_timestamp, target_timestamp);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the block timestamp is less than the target timestamp
+    fn verify_matches_timestamp_less_than(
+        block_timestamp: u64,
+        target_timestamp: &u64,
+        matches: bool,
+    ) {
+        let result = matches_timestamp_less_than(block_timestamp, target_timestamp);
+        assert_eq!(matches, result);
+    }
+}

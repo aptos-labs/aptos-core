@@ -231,3 +231,69 @@ fn matches_batch_author(batch_author: PeerId, target_author: &PeerId) -> bool {
 fn matches_batch_digest(batch_digest: &HashValue, target_digest: &HashValue) -> bool {
     batch_digest == target_digest
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_matches_batch_id() {
+        // Create a batch ID
+        let batch_id = BatchId::new_for_test(1000);
+
+        // Verify that the batch ID matches itself
+        verify_matches_batch_id(batch_id, &batch_id, true);
+
+        // Verify that a different batch ID does not match
+        let different_batch_id = BatchId::new_for_test(122);
+        verify_matches_batch_id(batch_id, &different_batch_id, false);
+    }
+
+    #[test]
+    fn test_matches_batch_author() {
+        // Create a batch author
+        let batch_author = PeerId::random();
+
+        // Verify that the batch author matches itself
+        verify_matches_batch_author(batch_author, &batch_author, true);
+
+        // Verify that a different batch author does not match
+        let different_batch_author = PeerId::random();
+        verify_matches_batch_author(batch_author, &different_batch_author, false);
+    }
+
+    #[test]
+    fn test_matches_batch_digest() {
+        // Create a batch digest
+        let batch_digest = HashValue::random();
+
+        // Verify that the batch digest matches itself
+        verify_matches_batch_digest(&batch_digest, &batch_digest, true);
+
+        // Verify that a different batch digest does not match
+        let different_batch_digest = HashValue::random();
+        verify_matches_batch_digest(&batch_digest, &different_batch_digest, false);
+    }
+
+    /// Verifies that the batch ID matches the target batch ID
+    fn verify_matches_batch_id(batch_id: BatchId, target_batch_id: &BatchId, matches: bool) {
+        let result = matches_batch_id(batch_id, target_batch_id);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the batch author matches the target author
+    fn verify_matches_batch_author(batch_author: PeerId, target_author: &PeerId, matches: bool) {
+        let result = matches_batch_author(batch_author, target_author);
+        assert_eq!(matches, result);
+    }
+
+    /// Verifies that the batch digest matches the target digest
+    fn verify_matches_batch_digest(
+        batch_digest: &HashValue,
+        target_digest: &HashValue,
+        matches: bool,
+    ) {
+        let result = matches_batch_digest(batch_digest, target_digest);
+        assert_eq!(matches, result);
+    }
+}
