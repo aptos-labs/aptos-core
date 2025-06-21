@@ -72,6 +72,8 @@ pub use options::Options;
 use std::{collections::BTreeSet, path::Path};
 
 const DEBUG: bool = false;
+const COMPILER_BUG_REPORT_MSG: &str =
+    "please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)";
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -655,13 +657,14 @@ fn report_bytecode_verification_error(
         env.to_loc(module_ir_loc)
     });
     if e.status_type() != StatusType::Verification {
-        env.diag(
+        env.diag_with_notes(
             Severity::Bug,
             loc,
             &format!(
-                "unexpected error returned from bytecode verification. This is a compiler bug, consider reporting it.\n{:#?}",
+                "unexpected error returned from bytecode verification:\n{:#?}",
                 e
             ),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
         )
     } else {
         let debug_info = if command_line::get_move_compiler_backtrace_from_env() {
@@ -672,15 +675,15 @@ fn report_bytecode_verification_error(
                 e.message().cloned().unwrap_or_else(|| "none".to_string())
             )
         };
-        env.diag(
+        env.diag_with_notes(
             Severity::Bug,
             loc,
             &format!(
-                "bytecode verification failed with \
-                unexpected status code `{:?}`. This is a compiler bug, consider reporting it.{}",
+                "bytecode verification failed with unexpected status code `{:?}`:{}",
                 e.major_status(),
                 debug_info
             ),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
         )
     }
 }

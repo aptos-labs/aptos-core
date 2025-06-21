@@ -8,7 +8,7 @@ use crate::{
         MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
         MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
     },
-    Options,
+    Options, COMPILER_BUG_REPORT_MSG,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -995,8 +995,13 @@ impl ModuleContext<'_> {
     }
 
     /// Emits an internal error at the location.
-    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
-        self.env.diag(Severity::Bug, loc.as_ref(), msg.as_ref())
+    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str> + ToString) {
+        self.env.diag_with_notes(
+            Severity::Bug,
+            loc.as_ref(),
+            format!("compiler internal error: {}", msg.to_string()).as_str(),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+        )
     }
 
     /// Check for a bound table index and report an error if its out of bound. All bounds

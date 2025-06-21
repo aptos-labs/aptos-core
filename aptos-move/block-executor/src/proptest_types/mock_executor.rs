@@ -843,6 +843,10 @@ where
     fn has_new_epoch_event(&self) -> bool {
         false
     }
+
+    fn is_success(&self) -> bool {
+        !self.skipped
+    }
 }
 
 #[derive(Clone, Debug)]

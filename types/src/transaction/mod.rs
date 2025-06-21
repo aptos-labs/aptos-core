@@ -2620,6 +2620,15 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+
+    /// None if it is not a user transaction.
+    fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+        None
+    }
+
+    fn from_txn(_txn: Transaction) -> Self {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
