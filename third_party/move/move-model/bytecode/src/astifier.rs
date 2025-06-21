@@ -526,10 +526,20 @@ impl Generator {
         for header in &ctx.loop_headers {
             for after_loop_label in &ctx.after_loop_labels[header] {
                 for loop_block_label in &ctx.loop_labels[header] {
-                    top_sort.add_dependency(
-                        ctx.block_of_label(*loop_block_label),
-                        ctx.block_of_label(*after_loop_label),
-                    )
+                    // Only when the new virtual edge does not bring a loop back, we add it!
+                    let source_block = ctx.block_of_label(*loop_block_label);
+                    let dest_block = ctx.block_of_label(*after_loop_label);
+                    let edge_filter = |_: BlockId, _: BlockId| true;
+                    if !ctx
+                        .forward_cfg
+                        .reachable_blocks(dest_block, edge_filter)
+                        .contains(&source_block)
+                    {
+                        top_sort.add_dependency(
+                            ctx.block_of_label(*loop_block_label),
+                            ctx.block_of_label(*after_loop_label),
+                        )
+                    }
                 }
             }
         }
