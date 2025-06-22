@@ -281,6 +281,10 @@ impl TStateView for CachedStateView {
     fn next_version(&self) -> Version {
         self.speculative.next_version()
     }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        Some(self.speculative.num_free_hot_slots())
+    }
 }
 
 pub struct CachedDbStateView {
