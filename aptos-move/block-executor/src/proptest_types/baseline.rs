@@ -558,8 +558,11 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
                     // the last mock execution, and is >= 1 because there is at least one execution.
-                    let incarnation_counter = incarnation_counter.load(Ordering::SeqCst);
-                    // Mock execute_transaction call always increments the incarnation counter.
+                    let incarnation_counter = incarnation_counter.swap(0, Ordering::SeqCst);
+                    // Mock execute_transaction call always increments the incarnation counter. We
+                    // perform a swap to 0 so later re-executions with the same transactions will
+                    // also have a chance to start from scratch and e.g. assert below that at least
+                    // one incarnation has been executed.
                     assert_gt!(
                         incarnation_counter,
                         0,
