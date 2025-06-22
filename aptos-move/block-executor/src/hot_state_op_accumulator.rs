@@ -17,6 +17,8 @@ pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
     /// effect of the block epilogue (subject to per block limit)
     to_make_hot: BTreeMap<Key, StateSlot>,
+    to_evict: Vec<Key>,
+    num_free_slots: usize,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
     /// so no need to issue separate HotStateOps to promote them to the hot state.
@@ -55,6 +57,8 @@ where
             first_version: base_view.next_version(),
             base_view,
             to_make_hot: BTreeMap::new(),
+            to_evict: Vec::new(),
+            num_free_slots: base_view.num_free_hot_slots().unwrap(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
             refresh_interval_versions,
@@ -69,6 +73,10 @@ where
         Key: 'a,
     {
         for key in writes {
+            if !self.writes.contains(key) && !self.base_view.hot_state_contains(key) {
+                self.add_new_hot_key();
+            }
+
             if self.to_make_hot.remove(key).is_some() {
                 COUNTER.inc_with(&["promotion_removed_by_write"]);
             }
@@ -93,6 +101,7 @@ where
             let make_hot = match slot {
                 StateSlot::ColdVacant => {
                     COUNTER.inc_with(&["vacant_new"]);
+                    self.add_new_hot_key();
                     true
                 },
                 StateSlot::HotVacant { hot_since_version } => {
@@ -106,6 +115,7 @@ where
                 },
                 StateSlot::ColdOccupied { .. } => {
                     COUNTER.inc_with(&["occupied_new"]);
+                    self.add_new_hot_key();
                     true
                 },
                 StateSlot::HotOccupied {
@@ -123,6 +133,20 @@ where
             if make_hot {
                 self.to_make_hot.insert(key.clone(), slot);
             }
+        }
+    }
+
+    fn add_new_hot_key(&mut self) {
+        if self.num_free_slots > 0 {
+            self.num_free_slots -= 1;
+            return;
+        }
+
+        let last_evicted = self.to_evict.last();
+        if let Some(k) = self.base_view.get_next_old_key(last_evicted) {
+            // Unless the entire LRU is evicted (in that case `get_next_old_key` would return
+            // `None`), evict the next key.
+            self.to_evict.push(k);
         }
     }
 
