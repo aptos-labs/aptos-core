@@ -281,6 +281,20 @@ impl TStateView for CachedStateView {
     fn next_version(&self) -> Version {
         self.speculative.next_version()
     }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        Some(self.speculative.num_free_hot_slots())
+    }
+
+    fn hot_state_contains(&self, state_key: &StateKey) -> bool {
+        println!("state key: {:?}", state_key);
+        todo!();
+    }
+
+    fn get_next_old_key(&self, state_key: Option<&StateKey>) -> Option<StateKey> {
+        println!("state key: {:?}", state_key);
+        None
+    }
 }
 
 pub struct CachedDbStateView {
