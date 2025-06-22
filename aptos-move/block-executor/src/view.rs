@@ -552,11 +552,19 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         }
 
         loop {
-            match self
-                .versioned_map
-                .group_data()
-                .get_group_size(group_key, txn_idx)
-            {
+            let group_size = if self.scheduler.is_v2() {
+                self.versioned_map.group_data().get_group_size_v2(
+                    group_key,
+                    txn_idx,
+                    self.incarnation,
+                )
+            } else {
+                self.versioned_map
+                    .group_data()
+                    .get_group_size(group_key, txn_idx)
+            };
+
+            match group_size {
                 Ok(group_size) => {
                     assert_ok!(
                         self.captured_reads
@@ -739,11 +747,20 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
         }
 
         loop {
-            match self.versioned_map.group_data().fetch_tagged_data(
-                group_key,
-                resource_tag,
-                txn_idx,
-            ) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map.group_data().fetch_tagged_data_v2(
+                    group_key,
+                    resource_tag,
+                    txn_idx,
+                    self.incarnation,
+                )
+            } else {
+                self.versioned_map
+                    .group_data()
+                    .fetch_tagged_data(group_key, resource_tag, txn_idx)
+            };
+
+            match data {
                 Ok((version, value_with_layout)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
@@ -784,23 +801,15 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                     return Ok(GroupReadResult::Uninitialized);
                 },
                 Err(TagNotFound) => {
-                    let empty_data_read = DataRead::Versioned(
-                        Err(StorageVersion),
-                        Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
-                        None,
-                    );
-                    // Capture empty / deletion as a read.
-                    self.captured_reads.borrow_mut().capture_group_read(
-                        group_key.clone(),
-                        resource_tag.clone(),
-                        empty_data_read.clone(),
-                        &target_kind,
-                    )?;
-                    return Ok(GroupReadResult::from_data_read(
-                        empty_data_read
-                            .convert_to(&target_kind)
-                            .expect("Converting from value must succeed"),
-                    ));
+                    self.versioned_map
+                        .group_data()
+                        .update_tagged_base_value_with_layout(
+                            group_key.clone(),
+                            resource_tag.clone(),
+                            TransactionWrite::from_state_value(None),
+                            None,
+                        );
+                    continue;
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
