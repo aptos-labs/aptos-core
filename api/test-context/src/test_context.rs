@@ -61,7 +61,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::Arc,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 use tokio::sync::watch::channel;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
@@ -119,7 +119,7 @@ pub fn new_test_context(
     )
 }
 
-pub async fn new_test_context_inner(
+pub fn new_test_context_inner(
     test_name: String,
     mut node_config: NodeConfig,
     use_db_with_indexer: bool,
@@ -255,7 +255,7 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new(
+    pub fn new(
         context: Context,
         rng: rand::rngs::StdRng,
         root_key: Ed25519PrivateKey,
@@ -268,11 +268,7 @@ impl TestContext {
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
-        let fake_time_usecs = SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64;
-        let context = Self {
+        Self {
             context,
             rng,
             root_key: ConfigKey::new(root_key),
@@ -283,14 +279,11 @@ impl TestContext {
             db,
             test_name,
             golden_output: None,
-            fake_time_usecs,
+            fake_time_usecs: 0,
             api_specific_config,
             use_txn_payload_v2_format,
             use_orderless_transactions,
-        };
-        // Committing empty block to set the current time.
-        context.try_commit_block(&[]).await;
-        context
+        }
     }
 
     pub fn set_fake_time_usecs(&mut self, fake_time_usecs: u64) {

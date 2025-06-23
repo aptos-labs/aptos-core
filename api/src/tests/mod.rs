@@ -33,16 +33,24 @@ fn new_test_context(test_name: String) -> TestContext {
 
 fn new_test_context_with_config(
     test_name: String,
-    node_config: NodeConfig,
+    mut node_config: NodeConfig,
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
 ) -> TestContext {
-    super_new_test_context(
+    node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 0, true, 10);
+    let test_context = super_new_test_context(
         test_name,
         node_config,
+        false,
+        None,
         use_txn_payload_v2_format,
         use_orderless_transactions,
-    )
+    );
+    let _ = test_context
+        .get_indexer_reader()
+        .unwrap()
+        .wait_for_internal_indexer(0);
+    test_context
 }
 
 fn new_test_context_with_orderless_flags(
@@ -50,7 +58,7 @@ fn new_test_context_with_orderless_flags(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
 ) -> TestContext {
-    super_new_test_context(
+    new_test_context_with_config(
         test_name,
         NodeConfig::default(),
         use_txn_payload_v2_format,

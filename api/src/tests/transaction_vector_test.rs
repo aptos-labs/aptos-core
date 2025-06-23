@@ -15,7 +15,7 @@
  *
  **************************************************************************************/
 
-use super::new_test_context_with_orderless_flags;
+use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -32,7 +32,6 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
 };
 use proptest::{arbitrary::any, collection, prelude::*, string};
-use rstest::rstest;
 use serde::Serialize;
 use serde_json::{self, json, ser::Formatter};
 use std::io::{self, Write};
@@ -298,24 +297,8 @@ async fn entry_function_payload(context: &mut TestContext) -> Vec<serde_json::Va
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    case_name,
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case("", false, false),
-    case("_payload_v2", true, false),
-    case("_orderless", true, true)
-)]
-async fn test_entry_function_payload(
-    case_name: &str,
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!() + case_name,
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_entry_function_payload() {
+    let mut context = new_test_context(current_function_name!());
     let txns = entry_function_payload(&mut context).await;
     context.check_golden_output(json!(txns));
 }
@@ -385,24 +368,8 @@ async fn script_payload(context: &mut TestContext) -> Vec<serde_json::Value> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    case_name,
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case("", false, false),
-    case("_payload_v2", true, false),
-    case("_orderless", true, true)
-)]
-async fn test_script_payload(
-    case_name: &str,
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!() + case_name,
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
+async fn test_script_payload() {
+    let mut context = new_test_context(current_function_name!());
     let txns = script_payload(&mut context).await;
     context.check_golden_output(json!(txns));
 }

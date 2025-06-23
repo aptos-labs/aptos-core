@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use crate::tests::{
-    new_test_context_with_config,
-    new_test_context_with_orderless_flags,
-};
+use crate::tests::{new_test_context_with_config, new_test_context_with_orderless_flags};
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
 use aptos_config::config::{GasEstimationStaticOverride, NodeConfig, TransactionFilterConfig};
 use aptos_crypto::{
@@ -124,8 +121,6 @@ async fn test_get_transactions_with_zero_limit() {
         .await;
     context.check_golden_output(resp);
 }
-
-// TODO: Add tests for /transaction_summaries endpoint.
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
@@ -963,16 +958,11 @@ async fn test_signing_message_with_payload(
     txn: SignedTransaction,
     payload: serde_json::Value,
 ) {
-    let initial_ledger_version = context.get_latest_ledger_info().ledger_version;
     let sender = context.root_account().await;
     let mut body = {
         let mut json = json!({
             "sender": sender.address().to_hex_literal(),
-            "sequence_number": if context.use_orderless_transactions {
-                (u64::MAX).to_string()
-            } else {
-                sender.sequence_number().to_string()
-            },
+            "sequence_number": txn.sequence_number().to_string(),
             "gas_unit_price": txn.gas_unit_price().to_string(),
             "max_gas_amount": txn.max_gas_amount().to_string(),
             "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
@@ -989,7 +979,6 @@ async fn test_signing_message_with_payload(
 
         json
     };
-
     let resp = context
         .post("/transactions/encode_submission", body.clone())
         .await;
@@ -1038,10 +1027,8 @@ async fn test_signing_message_with_payload(
 
     context.commit_mempool_txns(10).await;
 
-    assert_eq!(
-        u64::from(context.get_latest_ledger_info().ledger_version),
-        u64::from(initial_ledger_version) + 3
-    ); // metadata + user txn + state checkpoint
+    let ledger = context.get("/").await;
+    assert_eq!(ledger["ledger_version"].as_str().unwrap(), "3"); // metadata + user txn + state checkpoint
 }
 
 async fn match_transactions_with_expected_value(

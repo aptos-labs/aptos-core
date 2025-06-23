@@ -96,8 +96,22 @@ async fn test_function_values(use_txn_payload_v2_format: bool, use_orderless_tra
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_function_values_with_references() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_function_values_with_references(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
     let mut account = context.create_account().await;
     let addr = account.address();
 

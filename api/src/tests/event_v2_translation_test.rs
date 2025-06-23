@@ -2,9 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::new_test_context_with_orderless_flags;
-
 use super::new_test_context;
+use crate::tests::new_test_context_with_orderless_flags;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, ValidCryptoMaterial};
 use aptos_sdk::types::LocalAccount;
@@ -51,9 +50,6 @@ async fn test_event_v2_translation_coin_deposit_event() {
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
-    context
-        .disable_feature(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
-        .await;
 
     // Create two accounts
     let account1 = &mut context.api_create_account().await;
@@ -66,9 +62,6 @@ async fn test_event_v2_translation_coin_deposit_event() {
 
     // Enable the MODULE_EVENT_MIGRATION feature
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
-    context
-        .disable_feature(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
-        .await;
 
     // Check the simulation API outputs the translated V1 event rather than the V2 event as it is
     let payload = json!({
@@ -678,7 +671,7 @@ async fn test_event_v2_translation_token_objects(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
 ) {
-    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+    let context = &mut new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
         use_orderless_transactions,
