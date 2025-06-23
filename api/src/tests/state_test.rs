@@ -140,8 +140,8 @@ async fn test_merkle_leaves_with_nft_transfer(
         use_orderless_transactions,
     );
     let num_block_resource = 1;
-    // For orderless transaction, 1 nonce table bucket and 10 storage slots in big ordered map are created
-    let num_nonce_table_resource = if use_orderless_transactions { 11 } else { 0 };
+    // For orderless transaction, 1 nonce table bucket and 1 storage slots in big ordered map are created
+    let num_nonce_table_resource = if use_orderless_transactions { 1 } else { 0 };
 
     let creator = &mut ctx.gen_account();
     let owner = &mut ctx.gen_account();

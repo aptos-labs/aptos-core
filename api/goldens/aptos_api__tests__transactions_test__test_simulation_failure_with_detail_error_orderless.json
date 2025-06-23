@@ -12,109 +12,9 @@
     "changes": [
       {
         "state_key_hash": "",
-        "handle": "0xb77b3940ed3fa35a98d3d6922754d35f5526e2900a5d833bb268a26dcbcb71d1",
-        "key": "0x0a00000000000000",
-        "value": "0x010000000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xb77b3940ed3fa35a98d3d6922754d35f5526e2900a5d833bb268a26dcbcb71d1",
-        "key": "0x0b00000000000000",
-        "value": "0x010a00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xb77b3940ed3fa35a98d3d6922754d35f5526e2900a5d833bb268a26dcbcb71d1",
-        "key": "0x0c00000000000000",
-        "value": "0x010b00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xb77b3940ed3fa35a98d3d6922754d35f5526e2900a5d833bb268a26dcbcb71d1",
-        "key": "0x0d00000000000000",
-        "value": "0x010c00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xb77b3940ed3fa35a98d3d6922754d35f5526e2900a5d833bb268a26dcbcb71d1",
-        "key": "0x0e00000000000000",
-        "value": "0x010d00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xcc8ddff85fb885d504887ebe4042d9f4b8e9b5a614f2cf88b548cecfc9634a7f",
-        "key": "0x0a00000000000000",
-        "value": "0x010000000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xcc8ddff85fb885d504887ebe4042d9f4b8e9b5a614f2cf88b548cecfc9634a7f",
-        "key": "0x0b00000000000000",
-        "value": "0x010a00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xcc8ddff85fb885d504887ebe4042d9f4b8e9b5a614f2cf88b548cecfc9634a7f",
-        "key": "0x0c00000000000000",
-        "value": "0x010b00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xcc8ddff85fb885d504887ebe4042d9f4b8e9b5a614f2cf88b548cecfc9634a7f",
-        "key": "0x0d00000000000000",
-        "value": "0x010c00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
-        "handle": "0xcc8ddff85fb885d504887ebe4042d9f4b8e9b5a614f2cf88b548cecfc9634a7f",
-        "key": "0x0e00000000000000",
-        "value": "0x010d00000000000000",
-        "data": {
-          "data": null
-        },
-        "type": "write_table_item"
-      },
-      {
-        "state_key_hash": "",
         "handle": "0xdc3189011da6e60643ef48030b4f8fc315beddc236c6c523db96778af7b47056",
         "key": "0x540f000000000000",
-        "value": "0x00000100013b00000000000000000000000000000000000000000000000000000000000000000000000a550c18e5a688742b47c5ad0101000000000000000000000000000000000001b77b3940ed3fa35a98d3d6922754d35f5526e2900a5d833bb268a26dcbcb71d105000000000000000f00000000000000010e00000000000000050000000100000000000000010000000000000001550053000000010001000000000000000000000000000000000000000000000000000000000a550c18e5a688742b47c5ad013b00000000000000000000000000000000000000000000000001cc8ddff85fb885d504887ebe4042d9f4b8e9b5a614f2cf88b548cecfc9634a7f05000000000000000f00000000000000010e0000000000000005000000010000000000000001000000000000000166005500",
+        "value": "0x00000100013c00000000000000000000000000000000000000000000000000000000000000000000000a550c18e5a688742b47c5ad01010000000000000000000000000000000000000a00000000000000010000000000000000000000000100000000000000010000000000000001550053000000010001000000000000000000000000000000000000000000000000000000000a550c18e5a688742b47c5ad013c000000000000000000000000000000000000000000000000000a0000000000000001000000000000000000000000010000000000000001000000000000000166005500",
         "data": {
           "data": null
         },
@@ -125,7 +25,7 @@
     "sequence_number": "18446744073709551615",
     "max_gas_amount": "100000000",
     "gas_unit_price": "0",
-    "expiration_timestamp_secs": "59",
+    "expiration_timestamp_secs": "60",
     "payload": {
       "function": "0x1::MemeCoin::transfer",
       "type_arguments": [
@@ -139,7 +39,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x36adad36d206c62af529ede765e625c52f2f9f9d4cb17376b0b6b6c4fbd2af577dc518c217078a8ebd9bb3169fc6f540424b8e5e9d7e0e20696fdaa22902fd04",
+      "signature": "0x87d02d3b1dbea4748e382f80e0c6a440f921a7873ed49dc391d9d93772bd390bcec0b366c3dbb0dd81bbe3327731a9cf1bd3580ecf186842edb5a9b5c1a3d800",
       "type": "ed25519_signature"
     },
     "replay_protection_nonce": "12521492590937810661",
