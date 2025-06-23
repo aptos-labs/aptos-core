@@ -678,7 +678,7 @@ async fn test_event_v2_translation_token_objects(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
 ) {
-    let context = &mut new_test_context_with_db_sharding_and_internal_indexer(
+    let context = &mut new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
         use_orderless_transactions,

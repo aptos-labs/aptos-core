@@ -55,7 +55,7 @@
   "sequence_number": "0",
   "max_gas_amount": "100000000",
   "gas_unit_price": "0",
-  "expiration_timestamp_secs": "59",
+  "expiration_timestamp_secs": "60",
   "payload": {
     "function": "0x1::Coin::transfer",
     "type_arguments": [
@@ -68,7 +68,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x169855a6970626deacc307ba1752c29cd4603f65a98cfb12f14eb7e537689785f177dfe79162081bfd5bda3922fabea9d4fb68445333a73810cd902173950e06",
+    "signature": "0x7ebf97bef9445b0e57eac9752da324964d7f2f3b53b92867b9f30f9f146039c9140b236c3bac11df1a341eba4f9441c6dbcd123dc9bd2d8db5395663624db301",
     "type": "ed25519_signature"
   },
   "replay_protection_nonce": null,
