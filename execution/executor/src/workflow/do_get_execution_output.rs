@@ -124,15 +124,6 @@ impl DoGetExecutionOutput {
             .collect();
         if let Some(block_epilogue_txn) = block_epilogue_txn {
             transactions.push(block_epilogue_txn);
-            // TODO(HotState): there are three possible paths where the block epilogue
-            // output is passed to the DB:
-            //   1. a block from consensus is executed: the VM outputs the block end info
-            //      and the block epilogue transaction and output are generated here.
-            //   2. a chunk re-executed: The VM will see the block epilogue transaction and
-            //      should output the transaction output by looking at the block end info
-            //      embedded in the epilogue transaction (and maybe the state view).
-            //   3. a chunk replayed by transaction output: we get the transaction output
-            //      directly.
             transaction_outputs.push(TransactionOutput::new_empty_success());
         }
 

@@ -4,7 +4,7 @@
 use crate::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{BlockExecutableTransaction, Transaction},
+    transaction::{BlockExecutableTransaction, SignedTransaction, Transaction},
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -97,6 +97,17 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
             },
             _ => 0,
         }
+    }
+
+    fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+        match self {
+            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => Some(txn),
+            _ => None,
+        }
+    }
+
+    fn from_txn(txn: Transaction) -> Self {
+        txn.into()
     }
 }
 
