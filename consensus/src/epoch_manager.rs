@@ -981,6 +981,30 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         ));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
+
+        #[cfg(feature = "consensus_fuzzer")]
+        {
+            let mut state_model = StateModel::new("");
+
+            let safety_rules_container = Arc::new(Mutex::new(safety_rules));
+            let mut rapture_network_sender = NetworkSender::new(
+                self.author,
+                self.network_sender.clone(),
+                self.self_sender.clone(),
+                epoch_state.verifier.clone(),
+            );
+            let mut copy_network = rapture_network_sender.clone();
+            let mut safety_rules_container_new = safety_rules_container.clone();
+            unsafe {
+                INIT.call_once(|| {
+                    thread::spawn(|| {
+                        info!("\n\n @@@@ RAPTURE enter the EPOCH time! Ready to Start Fuzzing! @@@@ \n\n");
+                        rapture_fuzzer::rapture_fuzzer::start_fuzzer(copy_network, &mut state_model, safety_rules_container_new, self.author);
+                        info!("\n\n @@@@ Finish RAPTURE Fuzzer! @@@@ \n\n");
+                    });
+                });
+            }
+        }
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {
@@ -1498,6 +1522,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
+        #[cfg(feature = "consensus_fuzzer")]
+        state_model.on_new_msg(&consensus_msg);
 
         if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
             observe_block(

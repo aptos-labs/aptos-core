@@ -61,6 +61,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
+use cfg_if::cfg_if;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -367,13 +368,27 @@ impl NetworkSender {
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc_by(other_validators.len() as u64);
-        // Broadcast message over direct-send to all other validators.
-        if let Err(err) = self
+        cfg_if! {
+            if #[cfg(feature = "consensus_fuzzer")] {
+                let mut fuzzing_msg = mutate_consensus_msg(msg.clone());
+                if let Err(err) = self
+                    .consensus_network_client
+                    .send_to_many(other_validators, fuzzing_msg)
+                {
+                    warn!(error = ?err, "Error broadcasting message");
+                }
+            }
+            else {
+            // Broadcast message over direct-send to all other validators.
+            if let Err(err) = self
             .consensus_network_client
             .send_to_many(other_validators, msg)
-        {
-            warn!(error = ?err, "Error broadcasting message");
+                {
+                    warn!(error = ?err, "Error broadcasting message");
+                }
+            }
         }
+
     }
 
     /// Tries to send msg to given recipients.

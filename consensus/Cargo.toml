@@ -53,6 +53,7 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
+cfg-if = { workspace = true }
 chrono = { workspace = true }
 claims = { workspace = true }
 clap = { workspace = true }
@@ -73,6 +74,7 @@ num-traits = { workspace = true }
 once_cell = { workspace = true }
 ordered-float = { workspace = true }
 rand = { workspace = true }
+rapture-fuzzer = { git="https://github.com/aptos-labs/rapture/", branch="rapture-clean", optional = true }
 rayon = { workspace = true }
 scopeguard = { workspace = true }
 serde = { workspace = true }
@@ -117,6 +119,7 @@ fuzzing = [
     "aptos-safety-rules/testing",
 ]
 failpoints = ["fail/failpoints"]
+consensus_fuzzer = ["dep:rapture-fuzzer"]
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
