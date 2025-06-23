@@ -4,6 +4,7 @@
 use crate::transaction_filter::TransactionMatcher;
 use aptos_crypto::HashValue;
 use aptos_types::transaction::SignedTransaction;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 /// A block transaction filter that applies a set of rules to determine
@@ -28,6 +29,7 @@ impl BlockTransactionFilter {
     pub fn allows_transaction(
         &self,
         block_id: HashValue,
+        block_author: Option<AccountAddress>,
         block_epoch: u64,
         block_timestamp: u64,
         signed_transaction: &SignedTransaction,
@@ -41,6 +43,7 @@ impl BlockTransactionFilter {
         for block_transaction_rule in &self.block_transaction_rules {
             if block_transaction_rule.matches(
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp,
                 signed_transaction,
@@ -66,6 +69,7 @@ impl BlockTransactionFilter {
     pub fn filter_block_transactions(
         &self,
         block_id: HashValue,
+        block_author: Option<AccountAddress>,
         block_epoch: u64,
         block_timestamp_usecs: u64,
         transactions: Vec<SignedTransaction>,
@@ -73,7 +77,13 @@ impl BlockTransactionFilter {
         transactions
             .into_iter()
             .filter(|txn| {
-                self.allows_transaction(block_id, block_epoch, block_timestamp_usecs, txn)
+                self.allows_transaction(
+                    block_id,
+                    block_author,
+                    block_epoch,
+                    block_timestamp_usecs,
+                    txn,
+                )
             })
             .collect()
     }
@@ -93,7 +103,13 @@ impl BlockTransactionFilter {
         self.add_multiple_matchers_filter(allow, vec![block_matcher])
     }
 
-    /// Adds a block ID filter to the filter
+    /// Adds a block author matcher to the filter
+    pub fn add_block_author_filter(self, allow: bool, block_author: AccountAddress) -> Self {
+        let block_matcher = BlockTransactionMatcher::Block(BlockMatcher::Author(block_author));
+        self.add_multiple_matchers_filter(allow, vec![block_matcher])
+    }
+
+    /// Adds a block ID matcher to the filter
     pub fn add_block_id_filter(self, allow: bool, block_id: HashValue) -> Self {
         let block_matcher = BlockTransactionMatcher::Block(BlockMatcher::BlockId(block_id));
         self.add_multiple_matchers_filter(allow, vec![block_matcher])
@@ -158,6 +174,7 @@ impl BlockTransactionRule {
     pub fn matches(
         &self,
         block_id: HashValue,
+        block_author: Option<AccountAddress>,
         block_epoch: u64,
         block_timestamp: u64,
         signed_transaction: &SignedTransaction,
@@ -167,7 +184,13 @@ impl BlockTransactionRule {
             BlockTransactionRule::Deny(matchers) => matchers,
         };
         block_transaction_matchers.iter().all(|matcher| {
-            matcher.matches(block_id, block_epoch, block_timestamp, signed_transaction)
+            matcher.matches(
+                block_id,
+                block_author,
+                block_epoch,
+                block_timestamp,
+                signed_transaction,
+            )
         })
     }
 }
@@ -184,13 +207,14 @@ impl BlockTransactionMatcher {
     pub fn matches(
         &self,
         block_id: HashValue,
+        block_author: Option<AccountAddress>,
         block_epoch: u64,
         block_timestamp: u64,
         signed_transaction: &SignedTransaction,
     ) -> bool {
         match self {
             BlockTransactionMatcher::Block(block_matcher) => {
-                block_matcher.matches(block_id, block_epoch, block_timestamp)
+                block_matcher.matches(block_id, block_author, block_epoch, block_timestamp)
             },
             BlockTransactionMatcher::Transaction(transaction_matcher) => {
                 transaction_matcher.matches(signed_transaction)
@@ -203,6 +227,7 @@ impl BlockTransactionMatcher {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum BlockMatcher {
     All,                            // Matches any block
+    Author(AccountAddress),         // Matches blocks proposed by the specified author
     BlockId(HashValue),             // Matches blocks with the specified ID
     BlockEpochGreaterThan(u64),     // Matches blocks with epochs greater than the specified value
     BlockEpochLessThan(u64),        // Matches blocks with epochs less than the specified value
@@ -212,9 +237,18 @@ pub enum BlockMatcher {
 
 impl BlockMatcher {
     /// Returns true iff the matcher matches the given block information
-    fn matches(&self, block_id: HashValue, block_epoch: u64, block_timestamp: u64) -> bool {
+    fn matches(
+        &self,
+        block_id: HashValue,
+        block_author: Option<AccountAddress>,
+        block_epoch: u64,
+        block_timestamp: u64,
+    ) -> bool {
         match self {
             BlockMatcher::All => true,
+            BlockMatcher::Author(target_author) => {
+                matches_block_author(block_author, target_author)
+            },
             BlockMatcher::BlockId(target_block_id) => matches_block_id(block_id, target_block_id),
             BlockMatcher::BlockEpochGreaterThan(target_epoch) => {
                 matches_epoch_greater_than(block_epoch, target_epoch)
@@ -229,6 +263,18 @@ impl BlockMatcher {
                 matches_timestamp_less_than(block_timestamp, target_timestamp)
             },
         }
+    }
+}
+
+/// Returns true iff the block author matches the target author.
+/// Note: if the block author is None, it does not match the target author.
+fn matches_block_author(
+    block_author: Option<AccountAddress>,
+    target_author: &AccountAddress,
+) -> bool {
+    match block_author {
+        Some(block_author) => block_author == *target_author,
+        None => false,
     }
 }
 
@@ -260,6 +306,25 @@ fn matches_timestamp_less_than(block_timestamp: u64, target_timestamp: &u64) -> 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_matches_block_author() {
+        // Create a block author
+        let block_author = AccountAddress::random();
+
+        // Verify that a missing block author does not match
+        assert!(!matches_block_author(None, &block_author));
+
+        // Verify that the block author matches itself
+        assert!(matches_block_author(Some(block_author), &block_author));
+
+        // Verify that a different block author does not match
+        let different_block_author = AccountAddress::random();
+        assert!(!matches_block_author(
+            Some(block_author),
+            &different_block_author
+        ));
+    }
 
     #[test]
     fn test_matches_block_id() {

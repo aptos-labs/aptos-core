@@ -14,6 +14,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::future::Shared;
+use move_core_types::account_address::AccountAddress;
 use std::{future::Future, sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
@@ -61,17 +62,22 @@ impl BlockPreparer {
                    result
                 }
         }?;
+
         let txn_filter_config = self.txn_filter_config.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
+
         let block_id = block.id();
+        let block_author = block.author();
         let block_epoch = block.epoch();
         let block_timestamp_usecs = block.timestamp_usecs();
+
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         let result = tokio::task::spawn_blocking(move || {
             let filtered_txns = filter_block_transactions(
                 txn_filter_config,
                 block_id,
+                block_author,
                 block_epoch,
                 block_timestamp_usecs,
                 txns,
@@ -100,6 +106,7 @@ impl BlockPreparer {
 fn filter_block_transactions(
     txn_filter_config: Arc<BlockTransactionFilterConfig>,
     block_id: HashValue,
+    block_author: Option<AccountAddress>,
     block_epoch: u64,
     block_timestamp_usecs: u64,
     txns: Vec<SignedTransaction>,
@@ -112,5 +119,11 @@ fn filter_block_transactions(
     // Otherwise, filter the transactions
     txn_filter_config
         .block_transaction_filter()
-        .filter_block_transactions(block_id, block_epoch, block_timestamp_usecs, txns)
+        .filter_block_transactions(
+            block_id,
+            block_author,
+            block_epoch,
+            block_timestamp_usecs,
+            txns,
+        )
 }

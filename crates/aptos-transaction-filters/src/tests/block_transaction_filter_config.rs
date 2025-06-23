@@ -3,6 +3,7 @@
 
 use crate::{block_transaction_filter::BlockTransactionFilter, tests::utils};
 use aptos_crypto::HashValue;
+use move_core_types::account_address::AccountAddress;
 
 #[test]
 fn test_block_transaction_filter_config_allow() {
@@ -44,12 +45,13 @@ fn test_block_transaction_filter_config_allow() {
             serde_yaml::from_str::<BlockTransactionFilter>(&block_transaction_filter_string)
                 .unwrap();
 
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Verify that only the first five transactions are allowed
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             block_id,
+            Some(block_author),
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -95,12 +97,13 @@ fn test_block_transaction_filter_config_deny() {
             serde_yaml::from_str::<BlockTransactionFilter>(&block_transaction_filter_string)
                 .unwrap();
 
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
 
         // Verify that the first five transactions are denied
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             block_id,
+            Some(block_author),
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -112,8 +115,11 @@ fn test_block_transaction_filter_config_deny() {
 #[test]
 fn test_block_transaction_filter_config_multiple_matchers() {
     for use_new_txn_payload_format in [false, true] {
-        // Create a block ID, epoch, and timestamp
-        let (block_id, block_epoch, block_timestamp) = utils::get_random_block_info();
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
+
+        // Create a malicious block author (where blocks are not allowed)
+        let malicious_block_author = AccountAddress::random();
 
         // Create a filter that denies transactions based on multiple criteria
         let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
@@ -144,6 +150,9 @@ fn test_block_transaction_filter_config_multiple_matchers() {
                         BlockId: "0000000000000000000000000000000000000000000000000000000000000000"
                 - Deny:
                     - Block:
+                        Author: "{}"
+                - Deny:
+                    - Block:
                         BlockEpochLessThan: {}
                 - Allow:
                     - Transaction:
@@ -154,6 +163,7 @@ fn test_block_transaction_filter_config_multiple_matchers() {
             transactions[1].sender().to_standard_string(),
             block_id.to_hex(),
             transactions[2].sender().to_standard_string(),
+            malicious_block_author,
             block_epoch,
         );
         let block_transaction_filter =
@@ -163,6 +173,7 @@ fn test_block_transaction_filter_config_multiple_matchers() {
         // Verify that the first two transactions are denied in the current block
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             block_id,
+            Some(block_author),
             block_epoch,
             block_timestamp,
             transactions.clone(),
@@ -172,19 +183,31 @@ fn test_block_transaction_filter_config_multiple_matchers() {
         // Verify that all transactions are denied in the previous block
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             HashValue::random(),
+            Some(block_author),
             block_epoch - 1,
             block_timestamp - 1,
             transactions.clone(),
         );
         assert!(filtered_transactions.is_empty());
 
-        // Verify that all transactions are allowed in a future block
+        // Verify that all transactions are allowed in a completely different block
         let filtered_transactions = block_transaction_filter.filter_block_transactions(
             HashValue::random(),
+            Some(block_author),
             block_epoch + 1,
             block_timestamp + 1,
             transactions.clone(),
         );
         assert_eq!(filtered_transactions, transactions);
+
+        // Verify that all transactions are denied in a block with a malicious author
+        let filtered_transactions = block_transaction_filter.filter_block_transactions(
+            HashValue::random(),
+            Some(malicious_block_author),
+            block_epoch + 1,
+            block_timestamp + 1,
+            transactions.clone(),
+        );
+        assert!(filtered_transactions.is_empty());
     }
 }
