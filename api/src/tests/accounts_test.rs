@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{new_test_context, new_test_context_with_orderless_flags};
-use crate::tests::new_test_context_with_db_sharding_and_internal_indexer;
 use aptos_api_test_context::{current_function_name, find_value, TestContext};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
@@ -226,7 +225,7 @@ async fn test_get_account_resources_by_ledger_version_with_shard_context(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
 ) {
-    let shard_context = new_test_context_with_db_sharding_and_internal_indexer(
+    let shard_context = new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
         use_orderless_transactions,
@@ -313,13 +312,6 @@ async fn test_get_account_balance(
             APTOS_COIN_TYPE_STR,
         ))
         .await;
-<<<<<<< HEAD
-
-    // Migrate to fungible store
-    let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
-        aptos_stdlib::coin_migrate_to_fungible_store(AptosCoinType::type_tag()),
-    ));
-=======
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
@@ -333,7 +325,6 @@ async fn test_get_account_balance(
                 context.use_orderless_transactions,
             ),
     );
->>>>>>> 7fef1f7d49 (satya/orderless_pr_api_tests,Update API tests for orderless transactions)
     context.commit_block(&vec![txn.clone()]).await;
 
     // Check coin balance after migration
@@ -353,15 +344,6 @@ async fn test_get_account_balance(
         ))
         .await;
     assert_eq!(coin_balance_after, fa_balance);
-<<<<<<< HEAD
-
-    // Upgrade to concurrent store
-    let txn = root_account.sign_with_transaction_builder(context.transaction_factory().payload(
-        TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                AccountAddress::TEN,
-                Identifier::new("fungible_asset").unwrap(),
-=======
     // upgrade to concurrent store
     let txn = root_account.sign_with_transaction_builder(
         context
@@ -380,7 +362,6 @@ async fn test_get_account_balance(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
->>>>>>> 7fef1f7d49 (satya/orderless_pr_api_tests,Update API tests for orderless transactions)
             ),
     );
     context.commit_block(&vec![txn.clone()]).await;
@@ -456,7 +437,7 @@ async fn test_get_account_modules_by_ledger_version(
         use_orderless_transactions,
     );
     test_get_account_modules_by_ledger_version_with_context(context).await;
-    let shard_context = new_test_context_with_db_sharding_and_internal_indexer(
+    let shard_context = new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
         use_orderless_transactions,
@@ -541,8 +522,6 @@ async fn test_get_core_account_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
-    // To accommodate stateless accounts, fetching non-existing data should still succeed with 200.
-    // For stateless_accounts, the output should contain `state_exists: false`.
     let resp = context.expect_status_code(200).get("/accounts/0xf").await;
     context.check_golden_output(resp);
     context

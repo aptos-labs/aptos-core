@@ -56,7 +56,7 @@
     "sequence_number": "0",
     "max_gas_amount": "100000000",
     "gas_unit_price": "0",
-    "expiration_timestamp_secs": "59",
+    "expiration_timestamp_secs": "60",
     "payload": {
       "function": "0x1::MemeCoin::transfer",
       "type_arguments": [
@@ -70,7 +70,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0xe9ac0041dde70c8ca75c926478fd5d452029b796041b2d84c2f542cee5aa5b2e6ca0c75606dee2bcf4af6530bf8321502af206549412b69ea346a19a04bc2901",
+      "signature": "0x5dfea1a4ea3d405634e1cc2257742582f6312c549ce9db5113985a82662be88c6d50423830f20e299e90414e11312344e7d416b891c5e02aac8c620d9b8f4900",
       "type": "ed25519_signature"
     },
     "replay_protection_nonce": null,

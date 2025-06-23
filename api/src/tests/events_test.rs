@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use crate::tests::{
-    new_test_context_with_db_sharding_and_internal_indexer, new_test_context_with_orderless_flags,
-};
+use crate::tests::new_test_context_with_orderless_flags;
 use aptos_api_test_context::{current_function_name, TestContext};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use rstest::rstest;
@@ -67,7 +65,7 @@ async fn test_get_events_filter_by_start_sequence_number(
     context.check_golden_output(resp.clone());
 
     // assert the same resp after db sharding migration with internal indexer turned on
-    let shard_context = new_test_context_with_db_sharding_and_internal_indexer(
+    let shard_context = new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
         use_orderless_transactions,

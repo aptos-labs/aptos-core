@@ -26,8 +26,7 @@ use std::convert::TryInto;
     use_orderless_transactions,
     case("", false, false),
     case("_payload_v2", true, false),
-    // Not testing for orderless transactions because the nonce and thereby the signature changes everytime we run the code.
-    // case("_orderless", true, true)
+    case("_orderless", true, true)
 )]
 async fn test_multi_secp256k1_ecdsa(
     case_name: &str,
@@ -104,8 +103,7 @@ async fn test_multi_secp256k1_ecdsa(
     use_orderless_transactions,
     case("", false, false),
     case("_payload_v2", true, false),
-    // Not testing for orderless transactions because the nonce and thereby the signature changes everytime we run the code.
-    // case("_orderless", true, true)
+    case("_orderless", true, true)
 )]
 async fn test_secp256k1_ecdsa(
     case_name: &str,

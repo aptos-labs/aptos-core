@@ -39,7 +39,6 @@ async fn simulate_aptos_transfer(
             .then(|| signature.to_string())
             .unwrap_or(Ed25519Signature::dummy_signature().to_string());
 
-        // TODO[Orderless]: Is there a more concise way to write this statement?
         let mut request = json!({
             "sender": txn.sender().to_string(),
             "sequence_number": txn.sequence_number().to_string(),
@@ -241,7 +240,8 @@ async fn test_simulate_transaction_with_insufficient_balance(
 async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check_with_aa_disabled(
     use_txn_payload_v2_format: bool,
 ) {
-    // Without account abstraction, orderless transactions can't be used. Hence, not testing orderless transactions here.
+    // Orderless transactions use the new prologue methods introduced when account abstraction is introduced.
+    // Hence, not testing orderless transactions here.
     let mut context = new_test_context_with_orderless_flags(
         current_function_name!(),
         use_txn_payload_v2_format,
@@ -318,51 +318,31 @@ async fn test_simulate_txn_with_aggregator(
     } = txn.authenticator_ref()
     {
         let function = format!("{}::counter::increment_counter", account.address());
-        let request = if context.use_orderless_transactions {
+        let mut request = json!({
+            "sender": txn.sender().to_string(),
+            "sequence_number": txn.sequence_number().to_string(),
+            "max_gas_amount": txn.max_gas_amount().to_string(),
+            "gas_unit_price": txn.gas_unit_price().to_string(),
+            "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+            "payload": {
+                "type": "entry_function_payload",
+                "function": function,
+                "type_arguments": [],
+                "arguments": []
+            },
+            "signature": {
+                "type": "ed25519_signature",
+                "public_key": public_key.to_string(),
+                "signature": Ed25519Signature::dummy_signature().to_string(),
+            },
+        });
+        if context.use_orderless_transactions {
             let replay_protection_nonce = match txn.replay_protector() {
                 ReplayProtector::SequenceNumber(_) => 0,
                 ReplayProtector::Nonce(nonce) => nonce,
             };
-            // TODO[Orderless]: Check if there is there a more concise way to write this statement.
-            json!({
-                "sender": txn.sender().to_string(),
-                "sequence_number": txn.sequence_number().to_string(),
-                "max_gas_amount": txn.max_gas_amount().to_string(),
-                "gas_unit_price": txn.gas_unit_price().to_string(),
-                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-                "payload": {
-                    "type": "entry_function_payload",
-                    "function": function,
-                    "type_arguments": [],
-                    "arguments": []
-                },
-                "signature": {
-                    "type": "ed25519_signature",
-                    "public_key": public_key.to_string(),
-                    "signature": Ed25519Signature::dummy_signature().to_string(),
-                },
-                "replay_protection_nonce": replay_protection_nonce.to_string(),
-            })
-        } else {
-            json!({
-                "sender": txn.sender().to_string(),
-                "sequence_number": txn.sequence_number().to_string(),
-                "max_gas_amount": txn.max_gas_amount().to_string(),
-                "gas_unit_price": txn.gas_unit_price().to_string(),
-                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-                "payload": {
-                    "type": "entry_function_payload",
-                    "function": function,
-                    "type_arguments": [],
-                    "arguments": []
-                },
-                "signature": {
-                    "type": "ed25519_signature",
-                    "public_key": public_key.to_string(),
-                    "signature": Ed25519Signature::dummy_signature().to_string(),
-                },
-            })
-        };
+            request["replay_protection_nonce"] = json!(replay_protection_nonce.to_string());
+        }
         let resp = context
             .expect_status_code(200)
             .post("/transactions/simulate", request)
