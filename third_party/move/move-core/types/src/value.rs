@@ -270,28 +270,6 @@ pub enum MoveTypeLayout {
     Function,
 }
 
-impl MoveTypeLayout {
-    /// Determines whether the layout is serialization compatible with the other layout
-    /// (that is, any value serialized with this layout can be deserialized by the other).
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        use MoveTypeLayout::*;
-        match (self, other) {
-            (Vector(t1), Vector(t2)) => t1.is_compatible_with(t2),
-            (Struct(s1), Struct(s2)) => s1.is_compatible_with(s2),
-            // For all other cases, equality is used
-            (t1, t2) => t1 == t2,
-        }
-    }
-
-    pub fn is_compatible_with_slice(this: &[Self], other: &[Self]) -> bool {
-        this.len() == other.len()
-            && this
-                .iter()
-                .zip(other)
-                .all(|(t1, t2)| t1.is_compatible_with(t2))
-    }
-}
-
 impl MoveValue {
     pub fn simple_deserialize(blob: &[u8], ty: &MoveTypeLayout) -> AResult<Self> {
         Ok(bcs::from_bytes_seed(ty, blob)?)
@@ -508,31 +486,6 @@ impl MoveStructLayout {
 
     pub fn with_variants(variants: Vec<MoveVariantLayout>) -> Self {
         Self::WithVariants(variants)
-    }
-
-    /// Determines whether the layout is serialization compatible with the other layout
-    /// (that is, any value serialized with this layout can be deserialized by the other).
-    /// This only will consider runtime variants, decorated variants are only compatible
-    /// if equal.
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        use MoveStructLayout::*;
-        match (self, other) {
-            (RuntimeVariants(variants1), RuntimeVariants(variants2)) => {
-                variants1.len() <= variants2.len()
-                    && variants1.iter().zip(variants2).all(|(fields1, fields2)| {
-                        MoveTypeLayout::is_compatible_with_slice(fields1, fields2)
-                    })
-            },
-            (Runtime(fields1), Runtime(fields2)) => {
-                fields1.len() == fields2.len()
-                    && fields1
-                        .iter()
-                        .zip(fields2)
-                        .all(|(t1, t2)| t1.is_compatible_with(t2))
-            },
-            // All other cases require equality
-            (s1, s2) => s1 == s2,
-        }
     }
 
     pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
