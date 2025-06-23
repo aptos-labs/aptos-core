@@ -6,9 +6,7 @@ mod code_cache_tests;
 
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
-    errors::SequentialBlockExecutionError,
-    executor::BlockExecutor,
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockOutput, MockTask},
         types::{
@@ -16,6 +14,8 @@ use crate::{
             ValueType,
         },
     },
+    errors::SequentialBlockExecutionError,
+    executor::BlockExecutor,
     scheduler::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },

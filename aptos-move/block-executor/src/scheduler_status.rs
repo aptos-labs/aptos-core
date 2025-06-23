@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO(BlockSTMv2): enable dead code lint.
-#![allow(dead_code)]
-
 use crate::scheduler_v2::ExecutionQueueManager;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockTask},
         resource_tests::{
@@ -17,12 +17,13 @@ use crate::{
 };
 use proptest::test_runner::TestRunner;
 use std::marker::PhantomData;
-use test_case::test_case;
+use test_case::test_matrix;
 
 fn run_transactions_deltas(
     universe_size: usize,
     transaction_count: usize,
     use_gas_limit: bool,
+    block_stm_v2: bool,
     num_executions: usize,
     num_random_generations: usize,
 ) {
@@ -67,7 +68,7 @@ fn run_transactions_deltas(
                     &txn_provider,
                     &data_view,
                     None,
-                    false,
+                    block_stm_v2,
                 );
 
                 BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
@@ -77,16 +78,14 @@ fn run_transactions_deltas(
     }
 }
 
-#[test_case(50, 1000, false, 10, 2 ; "deltas and writes")]
-#[test_case(10, 1000, false, 10, 2 ; "deltas with small universe")]
-#[test_case(50, 1000, true, 10, 2 ; "deltas and writes with gas limit")]
-#[test_case(10, 1000, true, 10, 2 ; "deltas with small universe with gas limit")]
+#[test_matrix([10, 50], 1000, [false, true], [false, true], 6, 5; "deltas and writes")]
 fn deltas_transaction_tests(
     universe_size: usize,
     transaction_count: usize,
     use_gas_limit: bool,
-    num_executions: usize,
+    block_stm_v2: bool,
     num_random_generations: usize,
+    num_executions: usize,
 ) where
     MockTask<KeyType<[u8; 32]>, MockEvent>:
         ExecutorTask<Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
@@ -95,6 +94,7 @@ fn deltas_transaction_tests(
         universe_size,
         transaction_count,
         use_gas_limit,
+        block_stm_v2,
         num_executions,
         num_random_generations,
     );

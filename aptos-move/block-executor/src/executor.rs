@@ -195,9 +195,6 @@ where
         );
         let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
-        let mut prev_modified_keys = last_input_output
-            .modified_keys(idx_to_execute, true)
-            .map_or_else(HashMap::new, |keys| keys.collect());
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
@@ -207,6 +204,13 @@ where
 
         let maybe_output =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+
+        let mut prev_modified_keys = last_input_output
+            .modified_keys(idx_to_execute, true)
+            .map_or_else(HashMap::new, |keys| keys.collect());
+        let mut prev_modified_delayed_fields = last_input_output
+            .delayed_field_keys(idx_to_execute)
+            .map_or_else(HashSet::new, |keys| keys.collect());
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         let mut resource_write_set = vec![];
@@ -255,7 +259,60 @@ where
                     maybe_layout,
                 ))?;
             }
-            // TODO(BlockSTMv2): delayed fields and aggregator v1.
+
+            // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
+            // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
+            // commit-time validation in BlockSTMv2.
+            for (key, value) in output.aggregator_v1_write_set().into_iter() {
+                remove_from_previous_keys::<T>(
+                    &mut prev_modified_keys,
+                    &key,
+                    KeyKind::AggregatorV1,
+                )?;
+
+                versioned_cache.data().write(
+                    key,
+                    idx_to_execute,
+                    incarnation,
+                    Arc::new(value),
+                    None,
+                );
+            }
+            for (key, delta) in output.aggregator_v1_delta_set().into_iter() {
+                remove_from_previous_keys::<T>(
+                    &mut prev_modified_keys,
+                    &key,
+                    KeyKind::AggregatorV1,
+                )?;
+                versioned_cache.data().add_delta(key, idx_to_execute, delta);
+            }
+
+            for (id, change) in output.delayed_field_change_set().into_iter() {
+                prev_modified_delayed_fields.remove(&id);
+
+                let entry = change.into_entry_no_additional_history();
+
+                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
+                if let Err(e) =
+                    versioned_cache
+                        .delayed_fields()
+                        .record_change(id, idx_to_execute, entry)
+                {
+                    match e {
+                        PanicOr::CodeInvariantError(m) => {
+                            return Err(code_invariant_error(format!(
+                                "Record change failed with CodeInvariantError: {:?}",
+                                m
+                            )));
+                        },
+                        PanicOr::Or(_) => {
+                            read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                                MVDelayedFieldsError::DeltaApplicationFailure,
+                            ));
+                        },
+                    };
+                }
+            }
         }
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -282,9 +339,14 @@ where
                     )?;
                 },
                 AggregatorV1 => {
-                    // TODO(BlockSTMv2): handle aggregator v1.
+                    versioned_cache.data().remove(&key, idx_to_execute);
                 },
             };
+        }
+        for id in prev_modified_delayed_fields {
+            versioned_cache
+                .delayed_fields()
+                .remove_v2(&id, idx_to_execute);
         }
 
         last_input_output.record(
@@ -631,32 +693,36 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        is_v2: bool,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
             .read_set(txn_idx)
             .expect("Read set must be recorded");
 
-        let mut execution_still_valid =
-            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?;
+        if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
+            || (is_v2
+                && !read_set.validate_aggregator_v1_reads(
+                    versioned_cache.data(),
+                    last_input_output.aggregator_v1_write_keys(txn_idx),
+                    txn_idx,
+                )?)
+        {
+            return Ok(false);
+        }
 
-        if execution_still_valid {
-            if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
-                if let Err(e) = versioned_cache
-                    .delayed_fields()
-                    .try_commit(txn_idx, delayed_field_ids.collect())
-                {
-                    match e {
-                        CommitError::ReExecutionNeeded(_) => {
-                            execution_still_valid = false;
-                        },
-                        CommitError::CodeInvariantError(msg) => {
-                            return Err(code_invariant_error(msg));
-                        },
-                    }
-                }
+        if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
+            if let Err(e) = versioned_cache
+                .delayed_fields()
+                .try_commit(txn_idx, delayed_field_ids.collect())
+            {
+                return match e {
+                    CommitError::ReExecutionNeeded(_) => Ok(false),
+                    CommitError::CodeInvariantError(msg) => Err(code_invariant_error(msg)),
+                };
             }
         }
-        Ok(execution_still_valid)
+
+        Ok(true)
     }
 
     /// This method may be executed by different threads / workers, but is guaranteed to be executed
@@ -695,7 +761,12 @@ where
         let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
-        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
+        if !Self::validate_and_commit_delayed_fields(
+            txn_idx,
+            versioned_cache,
+            last_input_output,
+            scheduler.is_v2(),
+        )? {
             // Transaction needs to be re-executed, one final time.
             side_effect_at_commit = true;
 
@@ -707,28 +778,54 @@ where
                 incarnation + 1,
             );
 
-            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
-            // We are going to skip reducing validation index here, as we
-            // are executing immediately, and will reduce it unconditionally
-            // after execution, inside finish_execution_during_commit.
-            // Because of that, we can also ignore _needs_suffix_validation result.
-            let _needs_suffix_validation = Self::execute(
-                txn_idx,
-                incarnation + 1,
-                block,
-                last_input_output,
-                versioned_cache,
-                executor,
-                base_view,
-                global_module_cache,
-                runtime_environment,
-                parallel_state,
-            )?;
+            match scheduler.as_v2() {
+                None => {
+                    Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+                    // We are going to skip reducing validation index here, as we
+                    // are executing immediately, and will reduce it unconditionally
+                    // after execution, inside finish_execution_during_commit.
+                    // Because of that, we can also ignore _needs_suffix_validation result.
+                    let _needs_suffix_validation = Self::execute(
+                        txn_idx,
+                        incarnation + 1,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        executor,
+                        base_view,
+                        global_module_cache,
+                        runtime_environment,
+                        parallel_state,
+                    )?;
+                },
+                Some(scheduler) => {
+                    counters::SPECULATIVE_ABORT_COUNT.inc();
+
+                    // Any logs from the aborted execution should be cleared and not reported.
+                    clear_speculative_txn_logs(txn_idx as usize);
+
+                    scheduler.direct_abort(txn_idx, incarnation, false)?;
+                    Self::execute_v2(
+                        txn_idx,
+                        incarnation + 1,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        executor,
+                        base_view,
+                        global_module_cache,
+                        runtime_environment,
+                        parallel_state,
+                        scheduler,
+                    )?;
+                },
+            }
 
             if !Self::validate_and_commit_delayed_fields(
                 txn_idx,
                 versioned_cache,
                 last_input_output,
+                scheduler.is_v2(),
             )
             .unwrap_or(false)
             {
@@ -1388,7 +1485,7 @@ where
                         // If there are multiple errors, they all get logged: FatalVMError is
                         // logged at construction, below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!(
+                            panic!(
                                 "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
                                 err_msg
                             );

@@ -237,6 +237,30 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].load_full()
     }
 
+    // Called in BlockSTMv2 during the sequential commit hook to get AggregatorV1 write keys
+    // and check an invariant alongside AggregatorV1 validation that any reads for these keys
+    // are also recorded in aggregator_v1_reads in the input (captured reads). This is required
+    // for the correctness of the commit-time validation.
+    // Note: since there are not many legacy AggregatorV1 instances, we do not optimize the
+    // retrieval here (returning & would otherwise suffice).
+    pub(crate) fn aggregator_v1_write_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                    t.aggregator_v1_write_set()
+                        .into_keys()
+                        .chain(t.aggregator_v1_delta_set().into_iter().map(|(k, _)| k)),
+                ),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
     // Extracts a set of resource paths (keys) written or updated during execution from transaction
     // output, with corresponding KeyKind. If take_group_tags is true, the final HashSet
     // of tags is moved for the group key - should be called once for each incarnation / record
