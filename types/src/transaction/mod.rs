@@ -1860,6 +1860,7 @@ impl TransactionInfo {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self::V0(TransactionInfoV0::new(
             transaction_hash,
@@ -1868,6 +1869,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            auxiliary_info_hash,
         ))
     }
 
@@ -1884,6 +1886,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            None,
         )
     }
 
@@ -1896,6 +1899,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
+            None,
         )
     }
 }
@@ -1936,8 +1940,8 @@ pub struct TransactionInfoV0 {
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
 
-    /// Potentially summarizes all evicted items from state. Always `None` for now.
-    state_cemetery_hash: Option<HashValue>,
+    /// The hash value summarizing PersistedAuxiliaryInfo.
+    auxiliary_info_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -1948,6 +1952,7 @@ impl TransactionInfoV0 {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -1956,7 +1961,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
-            state_cemetery_hash: None,
+            auxiliary_info_hash,
         }
     }
 
@@ -1974,6 +1979,10 @@ impl TransactionInfoV0 {
 
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
+    }
+
+    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
+        self.auxiliary_info_hash
     }
 
     pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
@@ -2679,7 +2688,7 @@ impl AuxiliaryInfo {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Serialize, Deserialize)]
 pub enum PersistedAuxiliaryInfo {
     None,
 }

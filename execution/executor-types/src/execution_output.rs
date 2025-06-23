@@ -178,12 +178,12 @@ impl Inner {
         let aborts = self
             .to_commit
             .iter()
-            .flat_map(|(txn, output)| match output.status().status() {
+            .flat_map(|(txn, output, aux_info)| match output.status().status() {
                 Ok(execution_status) => {
                     if execution_status.is_success() {
                         None
                     } else {
-                        Some(format!("{:?}: {:?}", txn, output.status()))
+                        Some(format!("{txn:?}: {:?} {aux_info:?}", output.status()))
                     }
                 },
                 Err(_) => None,
@@ -194,13 +194,13 @@ impl Inner {
             .to_discard
             .iter()
             .take(3)
-            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .map(|(txn, output, aux_info)| format!("{txn:?}: {:?} {aux_info:?}", output.status()))
             .collect::<Vec<_>>();
         let retries_3 = self
             .to_retry
             .iter()
             .take(3)
-            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .map(|(txn, output, aux_info)| format!("{txn:?}: {:?} {aux_info:?}", output.status()))
             .collect::<Vec<_>>();
 
         if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {
