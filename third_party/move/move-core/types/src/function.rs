@@ -73,7 +73,7 @@ impl ClosureMask {
     pub fn set_captured(&mut self, i: usize) -> Result<(), String> {
         if i >= Self::MAX_ARGS {
             return Err(format!(
-                "Argument index {} exceeds maximum allowed arguments {}",
+                "Captured argument index {} exceeds maximum allowed captured arguments {}",
                 i,
                 Self::MAX_ARGS
             ));
