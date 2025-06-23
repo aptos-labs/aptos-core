@@ -20,6 +20,7 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Function `block_prologue_common`](#0x1_block_block_prologue_common)
 -  [Function `block_prologue`](#0x1_block_block_prologue)
 -  [Function `block_prologue_ext`](#0x1_block_block_prologue_ext)
+-  [Function `block_epilogue`](#0x1_block_block_epilogue)
 -  [Function `get_current_block_height`](#0x1_block_get_current_block_height)
 -  [Function `emit_new_block_event`](#0x1_block_emit_new_block_event)
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
@@ -699,6 +700,34 @@ The runtime always runs this before executing the transactions in a block.
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>();
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_block_block_epilogue"></a>
+
+## Function `block_epilogue`
+
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_epilogue">block_epilogue</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fee_distribution_validator_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, fee_amounts_octa: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_epilogue">block_epilogue</a>(
+    vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    fee_distribution_validator_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    fee_amounts_octa: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+) {
+    <a href="stake.md#0x1_stake_record_fee">stake::record_fee</a>(vm, fee_distribution_validator_indices, fee_amounts_octa);
 }
 </code></pre>
 
