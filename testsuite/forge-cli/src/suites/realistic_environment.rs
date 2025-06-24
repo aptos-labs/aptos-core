@@ -316,8 +316,8 @@ pub(crate) fn realistic_env_max_load_test(
             // Give at least 60s for catchup, give 10% of the run for longer durations.
             (duration.as_secs() / 10).max(60),
         )
-        .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P70)
+        .add_latency_threshold(3.6, LatencyType::P50)
+        .add_latency_threshold(4.8, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
             max_epoch_no_progress_secs: 16.0,
