@@ -78,6 +78,11 @@ use std::{
     },
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CommitReexecutionKind {
+    DelayedFieldFixup,
+    ApplyModulePublishingOutput,
+}
 struct SharedSyncParams<'a, T, E, S>
 where
     T: BlockExecutableTransaction,
@@ -162,107 +167,136 @@ where
         }
     }
 
-    fn execute_v2(
-        idx_to_execute: TxnIndex,
+    // Used to streamline the BlockSTMv2 implementation flow of txn execution logic.
+    // Called at (a) during speculative execution, in which case maybe_last_input_outputs
+    // will be set to Some(txn_last_input_outputs), and the maybe_output determines
+    // what will be applied to the multi-versioned data structures. It is important to
+    // note that the caller may implement additional logic, e.g. to decide to provide
+    // maybe_outputs None if the speculative output contained module publishing - this
+    // has an effect of removing the prior write set from the shared data-structures,
+    // but not actually sharing the new output with module publishing. Instead, the
+    // output is stored locally (in txn_last_input_outputs), and can be applied later:
+    // (b) During sequential commit hook, to apply previously locally recorded output
+    // that contained module publishing. In this case maybe_output is Some(output),
+    // and maybe_last_input_outputs is None, since everything must be already deleted.
+    //
+    // apply_aggregator_output_only controls whether resource and group output is applied
+    // to the shared data-structures (in this case the previous output, if provided
+    // last_input_outputs, is fully removed).
+    fn apply_multi_versioned_output(
+        txn_idx: TxnIndex,
         incarnation: Incarnation,
-        signature_verified_block: &TP,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        maybe_output: Option<&E::Output>,
+        maybe_last_input_output: Option<&TxnLastInputOutput<T, E::Output, E::Error>>,
+        apply_aggregator_output_only: bool,
+        abort_manager: &mut AbortManager,
+        read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        executor: &E,
-        base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        runtime_environment: &RuntimeEnvironment,
-        parallel_state: ParallelState<T>,
-        scheduler: &SchedulerV2,
-    ) -> Result<(), PanicError> {
-        let _timer = TASK_EXECUTE_SECONDS.start_timer();
-
-        // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
-        let txn = signature_verified_block.get_txn(idx_to_execute);
-
-        let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
-        let sync_view = LatestView::new(
-            base_view,
-            global_module_cache,
-            runtime_environment,
-            ViewState::Sync(parallel_state),
-            idx_to_execute,
+    ) -> Result<
+        (
+            Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
+            Vec<(T::Key, HashSet<T::Tag>)>,
+        ),
+        PanicError,
+    > {
+        assert!(
+            maybe_output.is_some() || maybe_last_input_output.is_some(),
+            "maybe_output or maybe_last_input_output must be set"
         );
-        let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
-        let mut read_set = sync_view.take_parallel_reads();
-        if read_set.is_incorrect_use() {
-            return Err(code_invariant_error(format!(
-                "Incorrect use detected in CapturedReads after executing txn = {idx_to_execute} incarnation = {incarnation}"
-            )));
-        }
+        let mut prev_modified_resource_keys = maybe_last_input_output.map_or_else(
+            || HashSet::new(),
+            |last_input_output| {
+                last_input_output
+                    .modified_resource_keys_no_aggregator_v1(txn_idx)
+                    .map_or_else(HashSet::new, |keys| keys.collect())
+            },
+        );
+        let mut prev_modified_aggregator_v1_keys = maybe_last_input_output.map_or_else(
+            || HashSet::new(),
+            |last_input_output| {
+                last_input_output
+                    .modified_aggregator_v1_keys(txn_idx)
+                    .map_or_else(HashSet::new, |keys| keys.collect())
+            },
+        );
+        let mut prev_modified_group_keys = maybe_last_input_output.map_or_else(
+            || HashMap::new(),
+            |last_input_output| {
+                last_input_output
+                    .take_modified_group_keys(txn_idx)
+                    .into_iter()
+                    .collect()
+            },
+        );
+        let mut prev_modified_delayed_fields = maybe_last_input_output.map_or_else(
+            || HashSet::new(),
+            |last_input_output| {
+                last_input_output
+                    .delayed_field_keys(txn_idx)
+                    .map_or_else(HashSet::new, |keys| keys.collect())
+            },
+        );
 
-        let maybe_output =
-            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
-
-        let mut prev_modified_resource_keys = last_input_output
-            .modified_resource_keys_no_aggregator_v1(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
-        let mut prev_modified_aggregator_v1_keys = last_input_output
-            .modified_aggregator_v1_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
-        let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
-            .take_modified_group_keys(idx_to_execute)
-            .into_iter()
-            .collect();
-        let mut prev_modified_delayed_fields = last_input_output
-            .delayed_field_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
-
-        // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
-        let mut resource_write_set = vec![];
-        let mut group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = vec![];
+        let mut resource_write_set_to_record = vec![];
+        let mut group_keys_and_tags_to_record: Vec<(T::Key, HashSet<T::Tag>)> = vec![];
         if let Some(output) = maybe_output {
-            let group_output = output.resource_group_write_set();
-            group_keys_and_tags = group_output
-                .iter()
-                .map(|(key, _, _, ops)| {
-                    let tags = ops.iter().map(|(tag, _)| tag.clone()).collect();
-                    (key.clone(), tags)
-                })
-                .collect();
-            for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
-                let prev_tags = prev_modified_group_keys
-                    .remove(&group_key)
-                    .unwrap_or_default();
-                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<true>(
-                    group_key.clone(),
-                    idx_to_execute,
-                    incarnation,
-                    Arc::new(group_metadata_op),
-                    None,
-                ))?;
-                abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
-                    group_key,
-                    idx_to_execute,
-                    incarnation,
-                    group_ops.into_iter(),
-                    group_size,
-                    prev_tags,
-                )?)?;
+            if !apply_aggregator_output_only {
+                let group_output = output.resource_group_write_set();
+                group_keys_and_tags_to_record = group_output
+                    .iter()
+                    .map(|(key, _, _, ops)| {
+                        let tags = ops.iter().map(|(tag, _)| tag.clone()).collect();
+                        (key.clone(), tags)
+                    })
+                    .collect();
+                for (group_key, group_metadata_op, group_size, group_ops) in
+                    group_output.into_iter()
+                {
+                    let prev_tags = prev_modified_group_keys
+                        .remove(&group_key)
+                        .unwrap_or_default();
+                    abort_manager.invalidate_dependencies(
+                        versioned_cache.data().write_v2::<true>(
+                            group_key.clone(),
+                            txn_idx,
+                            incarnation,
+                            Arc::new(group_metadata_op),
+                            None,
+                        ),
+                    )?;
+                    abort_manager.invalidate_dependencies(
+                        versioned_cache.group_data().write_v2(
+                            group_key,
+                            txn_idx,
+                            incarnation,
+                            group_ops.into_iter(),
+                            group_size,
+                            prev_tags,
+                        )?,
+                    )?;
+                }
+
+                resource_write_set_to_record = output.resource_write_set();
+                for (key, value, maybe_layout) in resource_write_set_to_record.clone().into_iter() {
+                    prev_modified_resource_keys.remove(&key);
+
+                    abort_manager.invalidate_dependencies(
+                        versioned_cache.data().write_v2::<false>(
+                            key,
+                            txn_idx,
+                            incarnation,
+                            value,
+                            maybe_layout,
+                        ),
+                    )?;
+                }
             }
 
-            resource_write_set = output.resource_write_set();
-            for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
-                prev_modified_resource_keys.remove(&key);
-                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
-                    key,
-                    idx_to_execute,
-                    incarnation,
-                    value,
-                    maybe_layout,
-                ))?;
-            }
+            // CAUTION: as a defensive pattern, it is desired to keep most changes made
+            // to the shared data-structures under the !apply_aggregator_output_only branch.
+            // This ensures that, e.g. auxiliary information such as layouts will not be
+            // recorded in a speculative state by txn executions that publish modules.
 
             // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
             // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
@@ -270,17 +304,13 @@ where
             for (key, value) in output.aggregator_v1_write_set().into_iter() {
                 prev_modified_aggregator_v1_keys.remove(&key);
 
-                versioned_cache.data().write(
-                    key,
-                    idx_to_execute,
-                    incarnation,
-                    Arc::new(value),
-                    None,
-                );
+                versioned_cache
+                    .data()
+                    .write(key, txn_idx, incarnation, Arc::new(value), None);
             }
             for (key, delta) in output.aggregator_v1_delta_set().into_iter() {
                 prev_modified_aggregator_v1_keys.remove(&key);
-                versioned_cache.data().add_delta(key, idx_to_execute, delta);
+                versioned_cache.data().add_delta(key, txn_idx, delta);
             }
 
             for (id, change) in output.delayed_field_change_set().into_iter() {
@@ -289,10 +319,9 @@ where
                 let entry = change.into_entry_no_additional_history();
 
                 // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
-                if let Err(e) =
-                    versioned_cache
-                        .delayed_fields()
-                        .record_change(id, idx_to_execute, entry)
+                if let Err(e) = versioned_cache
+                    .delayed_fields()
+                    .record_change(id, txn_idx, entry)
                 {
                     match e {
                         PanicOr::CodeInvariantError(m) => {
@@ -314,38 +343,129 @@ where
         // Remove entries from previous write/delta set that were not overwritten.
         for key in prev_modified_resource_keys {
             abort_manager.invalidate_dependencies(
-                versioned_cache
-                    .data()
-                    .remove_v2::<_, false>(&key, idx_to_execute),
+                versioned_cache.data().remove_v2::<_, false>(&key, txn_idx),
             )?;
         }
         for (key, tags) in prev_modified_group_keys {
             abort_manager.invalidate_dependencies(
-                versioned_cache
-                    .data()
-                    .remove_v2::<_, true>(&key, idx_to_execute),
+                versioned_cache.data().remove_v2::<_, true>(&key, txn_idx),
             )?;
-            abort_manager.invalidate_dependencies(versioned_cache.group_data().remove_v2(
-                &key,
-                idx_to_execute,
-                tags,
-            )?)?;
+            abort_manager.invalidate_dependencies(
+                versioned_cache
+                    .group_data()
+                    .remove_v2(&key, txn_idx, tags)?,
+            )?;
         }
         for key in prev_modified_aggregator_v1_keys {
-            versioned_cache.data().remove(&key, idx_to_execute);
+            versioned_cache.data().remove(&key, txn_idx);
         }
         for id in prev_modified_delayed_fields {
-            versioned_cache
-                .delayed_fields()
-                .remove_v2(&id, idx_to_execute);
+            versioned_cache.delayed_fields().remove_v2(&id, txn_idx);
         }
+
+        Ok((resource_write_set_to_record, group_keys_and_tags_to_record))
+    }
+
+    /// Consider three cases for maybe_commit_reexecution_kind:
+    /// - None: normal speculative execution. The output is applied to shared
+    /// multi-versioned data structures unless it contains module publishing.
+    /// In this case, delayed field and AggregatorV1 changes are applied to
+    /// the shared data-structures (these are IDs and integers and need to be
+    /// available for validation during sequential commit hook), while the
+    /// rest of the output (resources, groups, modules) are applied only
+    /// later in sequential commit hook (the whole output is locally recorded).
+    /// - Some(ApplyModulePublishingOutput): In this case, VM is not used for
+    /// execution. Instead, the previously recorded write-set (of a txn that
+    /// had module publishing) is fully applied to the multi-versioned
+    /// data-structures (with an increased incarnation). Note that the previous
+    /// write-set was removed from it at the end of the speculative execution.
+    /// - Some(DelayedFieldFixup): In this case, the only difference from
+    /// normal speculative execution is that the output is fully applied to the
+    /// shared multi-versioned data-structures even if txn has module publishing.
+    fn execute_v2(
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
+        signature_verified_block: &TP,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        executor: &E,
+        base_view: &S,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        runtime_environment: &RuntimeEnvironment,
+        parallel_state: ParallelState<T>,
+        scheduler: &SchedulerV2,
+        maybe_commit_reexecution_kind: Option<CommitReexecutionKind>,
+    ) -> Result<(), PanicError> {
+        let _timer = TASK_EXECUTE_SECONDS.start_timer();
+
+        // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
+        let txn = signature_verified_block.get_txn(idx_to_execute);
+
+        let sync_view = LatestView::new(
+            base_view,
+            global_module_cache,
+            runtime_environment,
+            ViewState::Sync(parallel_state),
+            idx_to_execute,
+        );
+
+        let (execution_result, mut read_set) = if maybe_commit_reexecution_kind
+            == Some(CommitReexecutionKind::ApplyModulePublishingOutput)
+        {
+            (
+                last_input_output.take_output(idx_to_execute)?,
+                last_input_output.take_read_set(idx_to_execute)?,
+            )
+        } else {
+            let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+            let read_set = sync_view.take_parallel_reads();
+            if read_set.is_incorrect_use() {
+                return Err(code_invariant_error(format!(
+                    "Incorrect use detected in CapturedReads after executing txn = {idx_to_execute} incarnation = {incarnation}"
+                )));
+            }
+            (execution_result, read_set)
+        };
+        let maybe_output =
+            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+        let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
+
+        // When called from sequential commit hook, applied output should never be filtered.
+        // For normal (speculative) executions, if the output contains module publishing,
+        // application of the output except delayed fields and aggregatorV1 is deferred until
+        // commit time. This, as an additional defensive mechanism, limits speculative side
+        // effects (of published code) visible to other workers (e.g. reduces impact scope of
+        // errors such as incorrect caching in the VM, breaking invariant checks, etc).
+        // TODO(BlockSTMv2): test CommitReexecutionKind and this flag logic.
+        let apply_aggregator_output_only = maybe_commit_reexecution_kind.is_none()
+            && maybe_output.is_some_and(|output| !output.module_write_set().is_empty());
+        let maybe_last_input_output = (maybe_commit_reexecution_kind
+            != Some(CommitReexecutionKind::ApplyModulePublishingOutput))
+        .then_some(last_input_output);
+
+        let (resource_write_set_to_record, group_keys_and_tags_to_record) =
+            Self::apply_multi_versioned_output(
+                idx_to_execute,
+                incarnation,
+                maybe_output,
+                maybe_last_input_output,
+                apply_aggregator_output_only,
+                &mut abort_manager,
+                &mut read_set,
+                versioned_cache,
+            )?;
 
         last_input_output.record(
             idx_to_execute,
             read_set,
             execution_result,
-            resource_write_set,
-            group_keys_and_tags,
+            resource_write_set_to_record,
+            group_keys_and_tags_to_record,
         );
 
         scheduler.finish_execution(abort_manager)?;
@@ -786,6 +906,7 @@ where
                         runtime_environment,
                         parallel_state,
                         scheduler,
+                        Some(CommitReexecutionKind::DelayedFieldFixup),
                     )?;
                 },
             }
@@ -807,12 +928,53 @@ where
             }
         }
 
-        let module_write_set = last_input_output.module_write_set(txn_idx);
-        // Publish modules before we decrease validation index (in V1) so that validations observe
-        // the new module writes as well.
-        if !module_write_set.is_empty() {
-            side_effect_at_commit = true;
+        // For BlockSTMv2 implementation, it matters that the module publishing handling (above)
+        // goes before delayed fields checks (below), as this ensures the outputs of txns with
+        // module publishing are properly reflected before final invariant checks.
+        // NO, TODO: only application above, rest / publish below bc it can change!!!
 
+        let module_write_set = last_input_output.module_write_set(txn_idx);
+        if !module_write_set.is_empty() {
+            if !side_effect_at_commit {
+                // If a re-execution happened here (in BlockSTMv2) to fix up delayed field or
+                // AggregatorV1 values, then the full output would already been applied to the
+                // shared data-structures (due to CommitReexecutionKind passed to execute_v2).
+                // Otherwise (side_effect_at_commit is still false), we invoke execute_v2 to
+                // share the locally stored (resource and resource group) updates now, before
+                // also making the modules visible (publishing) below.
+                if let Some(scheduler_v2) = scheduler.as_v2() {
+                    let parallel_state = ParallelState::new(
+                        versioned_cache,
+                        scheduler,
+                        start_shared_counter,
+                        shared_counter,
+                        incarnation + 1,
+                    );
+
+                    counters::SPECULATIVE_ABORT_COUNT.inc();
+
+                    // Any logs from the aborted execution should be cleared and not reported.
+                    clear_speculative_txn_logs(txn_idx as usize);
+
+                    scheduler_v2.direct_abort(txn_idx, incarnation, false)?;
+                    Self::execute_v2(
+                        txn_idx,
+                        incarnation + 1,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        executor,
+                        base_view,
+                        global_module_cache,
+                        runtime_environment,
+                        parallel_state,
+                        scheduler_v2,
+                        Some(CommitReexecutionKind::ApplyModulePublishingOutput),
+                    )?;
+                }
+            }
+
+            side_effect_at_commit = true;
             Self::publish_module_writes(
                 txn_idx,
                 module_write_set,
@@ -825,6 +987,8 @@ where
         }
 
         if side_effect_at_commit {
+            // Modules published above before we decrease validation index (in V1) so
+            // that validations observe the new module writes as well.
             scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)?;
         }
 
@@ -1450,6 +1614,7 @@ where
                             incarnation,
                         ),
                         scheduler,
+                        None,
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
