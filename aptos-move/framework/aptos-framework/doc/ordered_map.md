@@ -1933,7 +1933,6 @@ to O(n).
     map_destroy_empty = destroy_empty,
     map_has_key = contains,
     map_add_no_override = add,
-    map_del_return_key = remove,
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
     map_spec_get = spec_get,
@@ -2020,8 +2019,8 @@ to O(n).
 
 <pre><code><b>pragma</b> opaque;
 <b>pragma</b> verify = <b>false</b>;
-<b>aborts_if</b> [abstract] <b>forall</b> i in 0..len(keys), j in 0..len(keys) <b>where</b> i != j : keys[i] == keys[j];
-<b>ensures</b> [abstract] <b>forall</b> i in 0..len(keys), j in 0..len(keys) <b>where</b> i != j : keys[i] != keys[j];
+<b>aborts_if</b> [abstract] <b>exists</b> i in 0..len(keys), j in 0..len(keys) <b>where</b> i != j : keys[i] == keys[j];
+<b>aborts_if</b> [abstract] len(keys) != len(values);
 <b>ensures</b> [abstract] <b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(result, k)} : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(keys,k) &lt;==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(result, k);
 <b>ensures</b> [abstract] <b>forall</b> i in 0..len(keys) : <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(result, keys[i]) == values[i];
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(result) == len(keys);
@@ -2120,6 +2119,8 @@ to O(n).
 <b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), key) == result;
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self) + 1;
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, k) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(self), k);
+<b>ensures</b> [abstract] <b>forall</b> k: K <b>where</b> k != key: <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), k) == <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
 </code></pre>
 
 
@@ -2380,10 +2381,9 @@ std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
 
 <pre><code><b>pragma</b> opaque;
 <b>pragma</b> verify = <b>false</b>;
-<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt; (<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key) &&
-(<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) && k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less)) ||
-    (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} : <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt;
-    std::cmp::compare(key, k) == std::cmp::Ordering::Less);
+<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt;
+(<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)
+&& k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
 <b>ensures</b> [abstract] result.is_some() &lt;==&gt;
     <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
     (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Less)
@@ -2407,10 +2407,9 @@ std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
 
 <pre><code><b>pragma</b> opaque;
 <b>pragma</b> verify = <b>false</b>;
-<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt; (<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key) &&
-(<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) && k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Greater)) ||
-    (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} : <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) ==&gt;
-    std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
+<b>ensures</b> [abstract] result == std::option::spec_none() &lt;==&gt;
+(<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) && k != key:
+std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
 <b>ensures</b> [abstract] result.is_some() &lt;==&gt;
     <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
     (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Greater)
@@ -2705,6 +2704,7 @@ std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> opaque;
+<b>ensures</b> [abstract] <b>forall</b> k: K: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(result, k) &lt;==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k);
 </code></pre>
 
 

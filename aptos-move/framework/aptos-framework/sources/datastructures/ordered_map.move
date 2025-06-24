@@ -1315,7 +1315,7 @@ module aptos_std::ordered_map {
         spec {
             assert spec_len(map) == 3;
         };
-        let (key, value) = map.borrow_back();
+        let (_key, _value) = map.borrow_back();
         let result_1 = map.upsert(4, 5);
         spec {
             assert spec_contains_key(map, 4);
@@ -1390,5 +1390,41 @@ module aptos_std::ordered_map {
             assert option::spec_is_some(result_2);
         };
     }
+
+     #[verify_only]
+     fun test_aborts_if_new_from_1(): OrderedMap<u64, u64> {
+        let keys: vector<u64> = vector[1, 2, 3, 1];
+        let values: vector<u64> = vector[4, 5, 6, 7];
+        spec {
+            assert keys[0] == 1;
+            assert keys[3] == 1;
+        };
+        let map = new_from(keys, values);
+        map
+     }
+
+     spec test_aborts_if_new_from_1 {
+        aborts_if true;
+     }
+
+     #[verify_only]
+     fun test_aborts_if_new_from_2(keys: vector<u64>, values: vector<u64>): OrderedMap<u64, u64> {
+        let map = new_from(keys, values);
+        map
+     }
+
+     spec test_aborts_if_new_from_2 {
+        aborts_if exists i in 0..len(keys), j in 0..len(keys) where i != j : keys[i] == keys[j];
+        aborts_if len(keys) != len(values);
+     }
+
+     #[verify_only]
+     fun test_aborts_if_remove(map: &mut OrderedMap<u64, u64>) {
+        map.remove(&1);
+     }
+
+     spec test_aborts_if_remove {
+        aborts_if !spec_contains_key(map, 1);
+     }
 
 }
