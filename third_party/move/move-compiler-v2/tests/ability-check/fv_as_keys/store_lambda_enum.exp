@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: function resulting from lambda lifting is missing the `store` ability
+  ┌─ tests/ability-check/fv_as_keys/store_lambda_enum.move:8:48
+  │
+8 │         let f1: |&mut u64|u64 has copy+store = |x| *x+1;
+  │                                                ^^^^^^^^
+  │
+  = lambda cannot be reduced to partial application of existing function
+  = expected function type: `|&mut u64|u64 has copy + store`
