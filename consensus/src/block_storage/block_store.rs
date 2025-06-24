@@ -22,6 +22,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -595,6 +596,16 @@ impl BlockStore {
 
     pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
+    }
+
+    pub async fn check_denied_inline_transactions(
+        &self,
+        block: &Block,
+        block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()> {
+        self.payload_manager
+            .check_denied_inline_transactions(block, block_txn_filter_config)
+            .await
     }
 
     pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {

@@ -11,6 +11,7 @@ use crate::{
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, ProofWithData},
@@ -289,6 +290,47 @@ impl TPayloadManager for QuorumStorePayloadManager {
         };
     }
 
+    async fn check_denied_inline_transactions(
+        &self,
+        block: &Block,
+        block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()> {
+        // If the filter is disabled, return early
+        if !block_txn_filter_config.is_enabled() {
+            return Ok(());
+        }
+
+        // Get the inline transactions for the block proposal
+        let inline_transactions = get_inline_transactions(block);
+        if inline_transactions.is_empty() {
+            return Ok(());
+        }
+
+        // Fetch the block metadata
+        let block_id = block.id();
+        let block_author = block.author();
+        let block_epoch = block.epoch();
+        let block_timestamp = block.timestamp_usecs();
+
+        // Identify any denied inline transactions
+        let block_transaction_filter = block_txn_filter_config.block_transaction_filter();
+        let denied_inline_transactions = block_transaction_filter.get_denied_block_transactions(
+            block_id,
+            block_author,
+            block_epoch,
+            block_timestamp,
+            inline_transactions,
+        );
+        if !denied_inline_transactions.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Inline transactions for QuorumStorePayload denied by block transaction filter: {:?}",
+                denied_inline_transactions
+            ));
+        }
+
+        Ok(()) // No transactions were denied
+    }
+
     fn check_payload_availability(&self, block: &Block) -> Result<(), BitVec> {
         let Some(payload) = block.payload() else {
             return Ok(());
@@ -486,6 +528,36 @@ impl TPayloadManager for QuorumStorePayloadManager {
             transaction_payload.transaction_limit(),
             transaction_payload.gas_limit(),
         ))
+    }
+}
+
+/// Extracts and returns all inline transactions from the payload in the given block
+fn get_inline_transactions(block: &Block) -> Vec<SignedTransaction> {
+    // If the block has no payload, return an empty vector
+    let Some(payload) = block.payload() else {
+        return vec![];
+    };
+
+    // Fetch the inline transactions from the payload
+    match payload {
+        Payload::QuorumStoreInlineHybrid(inline_batches, ..) => {
+            // Flatten the inline batches and return the transactions
+            inline_batches
+                .iter()
+                .flat_map(|(_batch_info, txns)| txns.clone())
+                .collect()
+        },
+        Payload::QuorumStoreInlineHybridV2(inline_batches, ..) => {
+            // Flatten the inline batches and return the transactions
+            inline_batches
+                .iter()
+                .flat_map(|(_batch_info, txns)| txns.clone())
+                .collect()
+        },
+        Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.inline_batches().transactions(),
+        _ => {
+            vec![] // Other payload types do not have inline transactions
+        },
     }
 }
 

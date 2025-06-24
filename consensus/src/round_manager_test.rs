@@ -30,7 +30,7 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::ConsensusConfig,
+    config::{BlockTransactionFilterConfig, ConsensusConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::{
@@ -384,6 +384,7 @@ impl NodeSetup {
             storage.clone(),
             onchain_consensus_config.clone(),
             round_manager_tx,
+            BlockTransactionFilterConfig::default(),
             local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),

@@ -10,6 +10,7 @@ use crate::{
     payload_manager::TPayloadManager,
 };
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
@@ -96,6 +97,14 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
     fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
 
     fn prefetch_payload_data(&self, _payload: &Payload, _author: Author, _timestamp: u64) {}
+
+    async fn check_denied_inline_transactions(
+        &self,
+        _block: &Block,
+        _block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()> {
+        Ok(()) // Consensus observer doesn't filter transactions
+    }
 
     fn check_payload_availability(&self, _block: &Block) -> Result<(), BitVec> {
         unreachable!("this method isn't used in ConsensusObserver")
