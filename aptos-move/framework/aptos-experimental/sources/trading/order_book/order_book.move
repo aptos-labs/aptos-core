@@ -140,7 +140,7 @@ module aptos_experimental::order_book {
     /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
     public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
-        price: u64,
+        price: Option<u64>,
         is_buy: bool,
         trigger_condition: Option<TriggerCondition>
     ): bool {
@@ -243,7 +243,7 @@ module aptos_experimental::order_book {
     /// API to ensure that the order is a taker order before calling this API, otherwise it will abort.
     public fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut OrderBook<M>,
-        price: u64,
+        price: Option<u64>,
         size: u64,
         is_buy: bool
     ): SingleOrderMatch<M> {
@@ -386,7 +386,7 @@ module aptos_experimental::order_book {
         let match_results = vector::empty();
         let remainig_size = order_req.remaining_size;
         while (remainig_size > 0) {
-            if (!self.is_taker_order(order_req.price, order_req.is_buy, order_req.trigger_condition)) {
+            if (!self.is_taker_order(option::some(order_req.price), order_req.is_buy, order_req.trigger_condition)) {
                 self.place_maker_order(
                     OrderRequest {
                         account: order_req.account,
@@ -403,7 +403,7 @@ module aptos_experimental::order_book {
             };
             let match_result =
                 self.get_single_match_for_taker(
-                    order_req.price, remainig_size, order_req.is_buy
+                    option::some(order_req.price), remainig_size, order_req.is_buy
                 );
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
@@ -477,9 +477,8 @@ module aptos_experimental::order_book {
         let total_matched_size = 0;
         let i = 0;
         while (i < match_results.length()) {
-            total_matched_size = total_matched_size
-                + match_results[i].get_matched_size();
-            i = i + 1;
+            total_matched_size += match_results[i].get_matched_size();
+            i += 1;
         };
         total_matched_size
     }

@@ -222,14 +222,14 @@ module aptos_experimental::active_order_book {
 
     /// Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
     public fun is_taker_order(
-        self: &ActiveOrderBook, price: u64, is_buy: bool
+        self: &ActiveOrderBook, price: Option<u64>, is_buy: bool
     ): bool {
         if (is_buy) {
             let best_ask_price = self.best_ask_price();
-            best_ask_price.is_some() && price >= best_ask_price.destroy_some()
+            best_ask_price.is_some() && (price.is_none() || price.destroy_some() >= best_ask_price.destroy_some())
         } else {
             let best_bid_price = self.best_bid_price();
-            best_bid_price.is_some() && price <= best_bid_price.destroy_some()
+            best_bid_price.is_some() && (price.is_none() || price.destroy_some() <= best_bid_price.destroy_some())
         }
     }
 
@@ -264,10 +264,12 @@ module aptos_experimental::active_order_book {
     }
 
     fun get_single_match_for_buy_order(
-        self: &mut ActiveOrderBook, price: u64, size: u64
+        self: &mut ActiveOrderBook, price: Option<u64>, size: u64
     ): ActiveMatchedOrder {
         let (smallest_key, smallest_value) = self.sells.borrow_front();
-        assert!(price >= smallest_key.price, EINTERNAL_INVARIANT_BROKEN);
+        if (price.is_some()) {
+            assert!(price.destroy_some() >= smallest_key.price, EINTERNAL_INVARIANT_BROKEN);
+        };
         single_match_with_current_active_order(
             size,
             smallest_key,
@@ -277,10 +279,12 @@ module aptos_experimental::active_order_book {
     }
 
     fun get_single_match_for_sell_order(
-        self: &mut ActiveOrderBook, price: u64, size: u64
+        self: &mut ActiveOrderBook, price: Option<u64>, size: u64
     ): ActiveMatchedOrder {
         let (largest_key, largest_value) = self.buys.borrow_back();
-        assert!(price <= largest_key.price, EINTERNAL_INVARIANT_BROKEN);
+        if (price.is_some()) {
+            assert!(price.destroy_some() <= largest_key.price, EINTERNAL_INVARIANT_BROKEN);
+        };
         single_match_with_current_active_order(
             size,
             largest_key,
@@ -291,7 +295,7 @@ module aptos_experimental::active_order_book {
 
     public fun get_single_match_result(
         self: &mut ActiveOrderBook,
-        price: u64,
+        price: Option<u64>,
         size: u64,
         is_buy: bool
     ): ActiveMatchedOrder {
@@ -348,7 +352,7 @@ module aptos_experimental::active_order_book {
         let key = ActiveBidKey { price, tie_breaker };
         let value = ActiveBidData { order_id, size };
         // Assert that this is not a taker order
-        assert!(!self.is_taker_order(price, is_buy), EINVALID_MAKER_ORDER);
+        assert!(!self.is_taker_order(option::some(price), is_buy), EINVALID_MAKER_ORDER);
         if (is_buy) {
             self.buys.add(key, value);
         } else {
@@ -379,7 +383,7 @@ module aptos_experimental::active_order_book {
         let result = vector::empty();
         let remaining_size = order.size;
         while (remaining_size > 0) {
-            if (!self.is_taker_order(order.price, order.is_buy)) {
+            if (!self.is_taker_order(option::some(order.price), order.is_buy)) {
                 self.place_maker_order(
                     new_order_id_type(order.account, order.account_order_id),
                     order.price,
@@ -390,7 +394,7 @@ module aptos_experimental::active_order_book {
                 return result;
             };
             let match_result =
-                self.get_single_match_result(order.price, remaining_size, order.is_buy);
+                self.get_single_match_result(option::some(order.price), remaining_size, order.is_buy);
             remaining_size -= match_result.get_active_matched_size();
             result.push_back(match_result);
         };
