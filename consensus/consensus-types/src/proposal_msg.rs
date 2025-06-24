@@ -95,12 +95,20 @@ impl ProposalMsg {
                 sender
             );
         }
-        self.proposal().payload().map_or(Ok(()), |p| {
-            p.verify(validator, proof_cache, quorum_store_enabled)
-        })?;
-        self.proposal()
-            .validate_signature(validator)
-            .map_err(|e| format_err!("{:?}", e))?;
+        let (payload_result, sig_result) = rayon::join(
+            || {
+                self.proposal().payload().map_or(Ok(()), |p| {
+                    p.verify(validator, proof_cache, quorum_store_enabled)
+                })
+            },
+            || {
+                self.proposal()
+                    .validate_signature(validator)
+                    .map_err(|e| format_err!("{:?}", e))
+            },
+        );
+        payload_result?;
+        sig_result?;
 
         // if there is a timeout certificate, verify its signatures
         if let Some(tc) = self.sync_info.highest_2chain_timeout_cert() {
