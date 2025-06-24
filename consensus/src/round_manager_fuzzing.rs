@@ -27,7 +27,10 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
+use aptos_config::{
+    config::{BlockTransactionFilterConfig, ConsensusConfig},
+    network_id::NetworkId,
+};
 use aptos_consensus_types::{proposal_msg::ProposalMsg, utils::PayloadTxnsSize};
 use aptos_infallible::Mutex;
 use aptos_network::{
@@ -215,6 +218,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         storage,
         OnChainConsensusConfig::default(),
         round_manager_tx,
+        BlockTransactionFilterConfig::default(),
         ConsensusConfig::default(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),

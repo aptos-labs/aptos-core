@@ -35,7 +35,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
-use aptos_config::config::ConsensusConfig;
+use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
@@ -273,6 +273,7 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
+    block_txn_filter_config: BlockTransactionFilterConfig,
     local_config: ConsensusConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
@@ -304,6 +305,7 @@ impl RoundManager {
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
+        block_txn_filter_config: BlockTransactionFilterConfig,
         local_config: ConsensusConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
@@ -333,6 +335,7 @@ impl RoundManager {
             onchain_config,
             vtxn_config,
             buffered_proposal_tx,
+            block_txn_filter_config,
             local_config,
             randomness_config,
             jwk_consensus_config,
@@ -1155,6 +1158,21 @@ impl RoundManager {
             author,
             proposal,
         );
+
+        // If the proposal contains any inline transactions that need to be denied
+        // (e.g., due to filtering) drop the message and do not vote for the block.
+        if let Err(error) = self
+            .block_store
+            .check_denied_inline_transactions(&proposal, &self.block_txn_filter_config)
+            .await
+        {
+            counters::REJECTED_PROPOSAL_DENY_INLINE_TXN_COUNT.inc();
+            bail!(
+                "[RoundManager] Proposal for block {} contains denied inline transactions: {}. Dropping proposal!",
+                proposal.id(),
+                error
+            );
+        }
 
         if !proposal.is_opt_block() {
             // Validate that failed_authors list is correctly specified in the block.

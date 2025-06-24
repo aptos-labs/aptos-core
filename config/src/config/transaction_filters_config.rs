@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct TransactionFiltersConfig {
-    pub api_filter: TransactionFilterConfig, // Filter configuration for the API (e.g., transaction simulation)
-    pub consensus_filter: BlockTransactionFilterConfig, // Filter configuration for consensus
-    pub execution_filter: BlockTransactionFilterConfig, // Filter configuration for execution
-    pub mempool_filter: TransactionFilterConfig, // Filter configuration for mempool
-    pub quorum_store_filter: BatchTransactionFilterConfig, // Filter configuration for quorum store
+    pub api_filter: TransactionFilterConfig, // Filter configuration for the API (txn simulation)
+    pub consensus_filter: BlockTransactionFilterConfig, // Filter configuration for consensus (proposal voting)
+    pub execution_filter: BlockTransactionFilterConfig, // Filter configuration for execution (block execution)
+    pub mempool_filter: TransactionFilterConfig, // Filter configuration for mempool (txn submission)
+    pub quorum_store_filter: BatchTransactionFilterConfig, // Filter configuration for quorum store (batch voting)
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]

@@ -457,6 +457,58 @@ fn test_empty_filter() {
 }
 
 #[test]
+fn test_get_denied_block_transactions() {
+    for use_new_txn_payload_format in [false, true] {
+        // Create a block ID, author, epoch, and timestamp
+        let (block_id, block_author, block_epoch, block_timestamp) = utils::get_random_block_info();
+
+        // Create a filter that denies transactions from specific senders
+        let transactions = utils::create_entry_function_transactions(use_new_txn_payload_format);
+        let filter = BlockTransactionFilter::empty()
+            .add_multiple_matchers_filter(false, vec![BlockTransactionMatcher::Transaction(
+                TransactionMatcher::Sender(transactions[0].sender()),
+            )])
+            .add_multiple_matchers_filter(false, vec![BlockTransactionMatcher::Transaction(
+                TransactionMatcher::Sender(transactions[1].sender()),
+            )])
+            .add_multiple_matchers_filter(false, vec![BlockTransactionMatcher::Transaction(
+                TransactionMatcher::Sender(transactions[2].sender()),
+            )])
+            .add_all_filter(true);
+
+        // Verify that the filter denies transactions from the specified senders
+        let denied_transactions = filter.get_denied_block_transactions(
+            block_id,
+            Some(block_author),
+            block_epoch,
+            block_timestamp,
+            transactions.clone(),
+        );
+        assert_eq!(denied_transactions, transactions[0..3].to_vec());
+
+        // Create a filter that allows transactions from specific senders
+        let filter = BlockTransactionFilter::empty()
+            .add_multiple_matchers_filter(true, vec![BlockTransactionMatcher::Transaction(
+                TransactionMatcher::Sender(transactions[0].sender()),
+            )])
+            .add_multiple_matchers_filter(true, vec![BlockTransactionMatcher::Transaction(
+                TransactionMatcher::Sender(transactions[1].sender()),
+            )])
+            .add_all_filter(false);
+
+        // Verify that the filter allows transactions from the specified senders
+        let denied_transactions = filter.get_denied_block_transactions(
+            block_id,
+            Some(block_author),
+            block_epoch,
+            block_timestamp,
+            transactions.clone(),
+        );
+        assert_eq!(denied_transactions, transactions[2..].to_vec());
+    }
+}
+
+#[test]
 fn test_multiple_matchers_filter() {
     for use_new_txn_payload_format in [false, true] {
         // Create a block ID, author, epoch, and timestamp
