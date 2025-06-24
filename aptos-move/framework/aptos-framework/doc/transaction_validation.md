@@ -2020,7 +2020,7 @@ not equal the number of singers.
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>pragma</b> verify_duration_estimate = 120;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_FEE_PAYER_ENABLED">features::FEE_PAYER_ENABLED</a>);
-<b>let</b> gas_payer = <a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(fee_payer_address);
+<b>let</b> gas_payer = <a href="create_signer.md#0x1_create_signer_spec_create_signer">create_signer::spec_create_signer</a>(fee_payer_address);
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     gas_payer,
     replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
