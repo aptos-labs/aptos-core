@@ -16,7 +16,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use serde::Serialize;
@@ -1322,9 +1322,23 @@ impl TypeBuilder {
                     results,
                     abilities,
                 } = fun.as_ref();
-                let mut to_list = |ts: &[TypeTag]| {
+                let mut to_list = |ts: &[FunctionParamOrReturnTag]| {
                     ts.iter()
-                        .map(|t| self.create_ty_impl(t, resolver, count, depth + 1))
+                        .map(|t| {
+                            // Note: for reference or mutable reference tags, we add 1 more level
+                            // of depth, hence adding 2 to the counter.
+                            Ok(match t {
+                                FunctionParamOrReturnTag::Reference(t) => Reference(Box::new(
+                                    self.create_ty_impl(t, resolver, count, depth + 2)?,
+                                )),
+                                FunctionParamOrReturnTag::MutableReference(t) => MutableReference(
+                                    Box::new(self.create_ty_impl(t, resolver, count, depth + 2)?),
+                                ),
+                                FunctionParamOrReturnTag::Value(t) => {
+                                    self.create_ty_impl(t, resolver, count, depth + 1)?
+                                },
+                            })
+                        })
                         .collect::<VMResult<Vec<_>>>()
                 };
                 Function {
