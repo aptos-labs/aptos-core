@@ -1697,32 +1697,23 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
     };
 
     <b>let</b> maker_cancellation_reason = settle_result.get_maker_cancellation_reason();
-    <b>if</b> (maker_cancellation_reason.is_some()) {
-        self.<a href="market.md#0x7_market_cancel_maker_order_internal">cancel_maker_order_internal</a>(
-            &maker_order,
-            maker_order_id,
-            maker_address,
-            maker_cancellation_reason.destroy_some(),
-            unsettled_maker_size,
-            callbacks
-        );
-    };
+
 
     <b>let</b> taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
     <b>if</b> (taker_cancellation_reason.is_some()) {
-            self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
-                user_addr,
-                price,
-                order_id,
-                orig_size,
-                *remaining_size,
-                *fill_sizes,
-                is_bid,
-                <b>true</b>, // is_taker
-                OrderCancellationReason::ClearinghouseSettleViolation,
-                taker_cancellation_reason.destroy_some(),
-                callbacks
-            );
+        self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
+            user_addr,
+            price,
+            order_id,
+            orig_size,
+            *remaining_size,
+            *fill_sizes,
+            is_bid,
+            <b>true</b>, // is_taker
+            OrderCancellationReason::ClearinghouseSettleViolation,
+            taker_cancellation_reason.destroy_some(),
+            callbacks
+        );
         <b>if</b> (maker_cancellation_reason.is_none() && unsettled_maker_size &gt; 0) {
             // If the taker is cancelled but the maker is not cancelled, then we need <b>to</b> re-insert
             // the maker order back into the order book
@@ -1742,7 +1733,16 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
         };
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(OrderCancellationReason::ClearinghouseSettleViolation);
     };
-    <b>if</b> (maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>() == 0) {
+    <b>if</b> (maker_cancellation_reason.is_some()) {
+        self.<a href="market.md#0x7_market_cancel_maker_order_internal">cancel_maker_order_internal</a>(
+            &maker_order,
+            maker_order_id,
+            maker_address,
+            maker_cancellation_reason.destroy_some(),
+            unsettled_maker_size,
+            callbacks
+        );
+    } <b>else</b> <b>if</b> (maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>() == 0) {
         callbacks.cleanup_order(
             maker_address,
             maker_order_id,
