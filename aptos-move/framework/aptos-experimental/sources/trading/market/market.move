@@ -594,32 +594,23 @@ module aptos_experimental::market {
         };
 
         let maker_cancellation_reason = settle_result.get_maker_cancellation_reason();
-        if (maker_cancellation_reason.is_some()) {
-            self.cancel_maker_order_internal(
-                &maker_order,
-                maker_order_id,
-                maker_address,
-                maker_cancellation_reason.destroy_some(),
-                unsettled_maker_size,
-                callbacks
-            );
-        };
+
 
         let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
         if (taker_cancellation_reason.is_some()) {
-                self.cancel_order_internal(
-                    user_addr,
-                    price,
-                    order_id,
-                    orig_size,
-                    *remaining_size,
-                    *fill_sizes,
-                    is_bid,
-                    true, // is_taker
-                    OrderCancellationReason::ClearinghouseSettleViolation,
-                    taker_cancellation_reason.destroy_some(),
-                    callbacks
-                );
+            self.cancel_order_internal(
+                user_addr,
+                price,
+                order_id,
+                orig_size,
+                *remaining_size,
+                *fill_sizes,
+                is_bid,
+                true, // is_taker
+                OrderCancellationReason::ClearinghouseSettleViolation,
+                taker_cancellation_reason.destroy_some(),
+                callbacks
+            );
             if (maker_cancellation_reason.is_none() && unsettled_maker_size > 0) {
                 // If the taker is cancelled but the maker is not cancelled, then we need to re-insert
                 // the maker order back into the order book
@@ -639,7 +630,16 @@ module aptos_experimental::market {
             };
             return option::some(OrderCancellationReason::ClearinghouseSettleViolation);
         };
-        if (maker_order.get_remaining_size() == 0) {
+        if (maker_cancellation_reason.is_some()) {
+            self.cancel_maker_order_internal(
+                &maker_order,
+                maker_order_id,
+                maker_address,
+                maker_cancellation_reason.destroy_some(),
+                unsettled_maker_size,
+                callbacks
+            );
+        } else if (maker_order.get_remaining_size() == 0) {
             callbacks.cleanup_order(
                 maker_address,
                 maker_order_id,
