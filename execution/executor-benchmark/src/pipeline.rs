@@ -18,11 +18,16 @@ use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     block_metadata::BlockMetadata,
-    transaction::{Transaction, TransactionPayload, Version},
+    transaction::{
+        scheduled_txn::SCHEDULED_TRANSACTIONS_MODULE_INFO, Transaction, TransactionPayload, Version,
+    },
 };
-use aptos_vm::VMBlockExecutor;
+use aptos_vm::{AptosVM, VMBlockExecutor};
 use derivative::Derivative;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    language_storage::StructTag,
+    value::{serialize_values, MoveValue},
+};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
@@ -51,6 +56,8 @@ pub struct PipelineConfig {
     #[derivative(Default(value = "8"))]
     pub num_sig_verify_threads: usize,
     pub run_scheduled_txns: bool,
+    #[derivative(Default(value = "1000"))]
+    pub ready_sched_txns_limit: usize,
 
     pub print_transactions: bool,
 }
@@ -76,6 +83,7 @@ where
     ) -> (Self, SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
         let run_scheduled_txns = config.run_scheduled_txns;
+        let ready_sched_txns_limit = config.ready_sched_txns_limit;
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
         let executor_3 = executor_1.clone();
@@ -204,6 +212,7 @@ where
             prepare_ready_txns: &mut BlockPreparationStage,
             exe: &mut TransactionExecutor<V>,
             executor: &BlockExecutor<V>,
+            ready_sched_txns_limit: usize,
         ) -> u64 {
             info!(
                 "Running scheduled transactions: {} total scheduled transactions",
@@ -221,11 +230,21 @@ where
 
             while total_executed < total_scheduled_txns {
                 let state_view = executor.state_view(current_parent_id).unwrap();
-                let mut current_block_txns =
-                    ScheduledTxnsHandler::get_ready_txns(&state_view, mock_block_time_ms + 1000)
-                        .into_iter()
-                        .map(Transaction::ScheduledTransaction)
-                        .collect::<Vec<Transaction>>();
+                let args = vec![
+                    MoveValue::U64(mock_block_time_ms + 1000),
+                    MoveValue::U64(ready_sched_txns_limit as u64),
+                ];
+                let res = AptosVM::execute_function(
+                    &state_view,
+                    &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+                    &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_with_limit_name,
+                    vec![],
+                    serialize_values(&args),
+                );
+                let mut current_block_txns = ScheduledTxnsHandler::handle_ready_txns_result(res)
+                    .into_iter()
+                    .map(Transaction::ScheduledTransaction)
+                    .collect::<Vec<Transaction>>();
 
                 if current_block_txns.is_empty() {
                     break; // No more ready transactions available
@@ -384,6 +403,7 @@ where
                         &mut prepare_ready_txns,
                         &mut exe,
                         executor_4.as_ref(),
+                        ready_sched_txns_limit,
                     );
                 }
                 start_ledger_update_tx.map(|tx| tx.send(()));

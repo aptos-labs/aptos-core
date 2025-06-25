@@ -80,8 +80,8 @@ async fn test_basic_schedule() {
         response.inner()
     );
 
-    // sleep for 5 seconds
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // sleep for 15 seconds
+    tokio::time::sleep(Duration::from_secs(15)).await;
 
     info!(
         "Account balance after {}",

@@ -59,7 +59,7 @@ module aptos_framework::scheduled_txns {
     const EXPIRY_DELTA_DEFAULT: u64 = 100;
 
     /// The maximum number of scheduled transactions that can be run in a block
-    const GET_READY_TRANSACTIONS_LIMIT: u64 = 1000;
+    const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
 
     /// The maximum number of transactions that can be cancelled in a block during shutdown
     const SHUTDOWN_CANCEL_LIMIT: u64 = GET_READY_TRANSACTIONS_LIMIT * 2;
@@ -123,7 +123,7 @@ module aptos_framework::scheduled_txns {
     }
 
     struct ScheduleQueue has key {
-        /// key_size = 48 bytes; value_size = key_size + AVG_SCHED_TXN_SIZE
+        /// key_size = 48 bytes; value_size = key_size + object ref size = 80 bytes (48 + 32)
         schedule_map: BigOrderedMap<ScheduleMapKey, Object<ScheduledTransactionContainer>>
     }
 
@@ -412,7 +412,12 @@ module aptos_framework::scheduled_txns {
             signer::address_of(sender) == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
-        cancel_internal(signer::address_of(sender), key, deposit_amt, delete_ref);
+        cancel_internal(
+            signer::address_of(sender),
+            key,
+            deposit_amt,
+            delete_ref
+        );
     }
 
     const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
@@ -440,7 +445,10 @@ module aptos_framework::scheduled_txns {
     /// Internal cancel function that takes an address instead of signer. No signer verification, assumes key is present
     /// in the schedule_map.
     fun cancel_internal(
-        account_addr: address, key: ScheduleMapKey, deposit_amt: u64, delete_ref: DeleteRef
+        account_addr: address,
+        key: ScheduleMapKey,
+        deposit_amt: u64,
+        delete_ref: DeleteRef
     ) acquires ScheduleQueue, AuxiliaryData {
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
 
@@ -470,6 +478,12 @@ module aptos_framework::scheduled_txns {
     fun get_ready_transactions(
         timestamp_ms: u64
     ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
+        get_ready_transactions_with_limit(timestamp_ms, GET_READY_TRANSACTIONS_LIMIT)
+    }
+
+    fun get_ready_transactions_with_limit(
+        timestamp_ms: u64, limit: u64
+    ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         remove_txns();
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
@@ -484,8 +498,7 @@ module aptos_framework::scheduled_txns {
         let txns_to_expire = vector::empty<KeyAndTxnInfo>();
 
         let iter = queue.schedule_map.new_begin_iter();
-        while (!iter.iter_is_end(&queue.schedule_map)
-            && count < GET_READY_TRANSACTIONS_LIMIT) {
+        while (!iter.iter_is_end(&queue.schedule_map) && count < limit) {
             let key = iter.iter_borrow_key();
             if (key.time > block_time) {
                 break;
@@ -573,7 +586,8 @@ module aptos_framework::scheduled_txns {
                         remove_count = remove_count + 1;
 
                         let txn_obj = queue.schedule_map.borrow(&key);
-                        let (_, delete_ref) = move_scheduled_transaction_container(txn_obj);
+                        let (_, delete_ref) =
+                            move_scheduled_transaction_container(txn_obj);
                         // Delete the scheduled function object
                         object::delete(delete_ref);
                         queue.schedule_map.remove(&key);

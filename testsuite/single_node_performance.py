@@ -146,6 +146,7 @@ class RunGroupKeyExtra:
     single_block_dst_working_set: bool = field(default=False)
     execution_sharding: bool = field(default=False)
     run_scheduled_txns: bool = field(default=False)
+    ready_sched_txns_limit: Optional[int] = field(default=None)
     block_size_override: Optional[float] = field(default=None)
 
 
@@ -786,8 +787,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             pipeline_extra_args.append("--split-stages")
         if test.key_extra.skip_commit_override:
             pipeline_extra_args.append("--skip-commit")
-        if test.key_extra.run_scheduled_txns:  # Get it from test configuration
+        if test.key_extra.run_scheduled_txns:
             pipeline_extra_args.append("--run-scheduled-txns")
+        if test.key_extra.ready_sched_txns_limit:
+            pipeline_extra_args.append(
+                f"--ready-sched-txns-limit {test.key_extra.ready_sched_txns_limit}"
+            )
 
         pipeline_extra_args.append(
             test.key_extra.sharding_traffic_flags or "--transactions-per-sender 1"

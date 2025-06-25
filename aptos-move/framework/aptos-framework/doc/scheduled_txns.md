@@ -30,6 +30,7 @@
 -  [Function `move_scheduled_transaction_container`](#0x1_scheduled_txns_move_scheduled_transaction_container)
 -  [Function `cancel_internal`](#0x1_scheduled_txns_cancel_internal)
 -  [Function `get_ready_transactions`](#0x1_scheduled_txns_get_ready_transactions)
+-  [Function `get_ready_transactions_with_limit`](#0x1_scheduled_txns_get_ready_transactions_with_limit)
 -  [Function `finish_execution`](#0x1_scheduled_txns_finish_execution)
 -  [Function `remove_txns`](#0x1_scheduled_txns_remove_txns)
 -  [Function `execute_user_function_wrapper`](#0x1_scheduled_txns_execute_user_function_wrapper)
@@ -306,7 +307,7 @@ Note: ScheduledTxn is still variable size though due to its closure.
 <code>schedule_map: <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionContainer">scheduled_txns::ScheduledTransactionContainer</a>&gt;&gt;</code>
 </dt>
 <dd>
- key_size = 48 bytes; value_size = key_size + AVG_SCHED_TXN_SIZE
+ key_size = 48 bytes; value_size = key_size + object ref size = 80 bytes (48 + 32)
 </dd>
 </dl>
 
@@ -695,7 +696,7 @@ If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will a
 The maximum number of scheduled transactions that can be run in a block
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 5000;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>: u64 = 100;
 </code></pre>
 
 
@@ -743,7 +744,7 @@ Conversion factor between our time granularity (100ms) and milliseconds
 The maximum number of transactions that can be cancelled in a block during shutdown
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_SHUTDOWN_CANCEL_LIMIT">SHUTDOWN_CANCEL_LIMIT</a>: u64 = 10000;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_SHUTDOWN_CANCEL_LIMIT">SHUTDOWN_CANCEL_LIMIT</a>: u64 = 200;
 </code></pre>
 
 
@@ -1127,7 +1128,12 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
         <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender) == txn.sender_addr,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>)
     );
-    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), key, deposit_amt, delete_ref);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
+        key,
+        deposit_amt,
+        delete_ref
+    );
 }
 </code></pre>
 
@@ -1232,7 +1238,10 @@ in the schedule_map.
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(
-    account_addr: <b>address</b>, key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, deposit_amt: u64, delete_ref: DeleteRef
+    account_addr: <b>address</b>,
+    key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>,
+    deposit_amt: u64,
+    delete_ref: DeleteRef
 ) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
     <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
 
@@ -1282,6 +1291,32 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(
     timestamp_ms: u64
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionContainer">ScheduledTransactionContainer</a> {
+    <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(timestamp_ms, <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_scheduled_txns_get_ready_transactions_with_limit"></a>
+
+## Function `get_ready_transactions_with_limit`
+
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(timestamp_ms: u64, limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">scheduled_txns::ScheduledTransactionInfoWithKey</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(
+    timestamp_ms: u64, limit: u64
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionContainer">ScheduledTransactionContainer</a> {
     <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>();
     // If scheduling is shutdown, we cannot schedule <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> more transactions
     <b>let</b> aux_data = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>&gt;(@aptos_framework);
@@ -1296,8 +1331,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
     <b>let</b> txns_to_expire = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a>&gt;();
 
     <b>let</b> iter = queue.schedule_map.new_begin_iter();
-    <b>while</b> (!iter.iter_is_end(&queue.schedule_map)
-        && count &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>) {
+    <b>while</b> (!iter.iter_is_end(&queue.schedule_map) && count &lt; limit) {
         <b>let</b> key = iter.iter_borrow_key();
         <b>if</b> (key.time &gt; block_time) {
             <b>break</b>;
@@ -1425,7 +1459,8 @@ Remove the txns that are run
                     remove_count = remove_count + 1;
 
                     <b>let</b> txn_obj = queue.schedule_map.borrow(&key);
-                    <b>let</b> (_, delete_ref) = <a href="scheduled_txns.md#0x1_scheduled_txns_move_scheduled_transaction_container">move_scheduled_transaction_container</a>(txn_obj);
+                    <b>let</b> (_, delete_ref) =
+                        <a href="scheduled_txns.md#0x1_scheduled_txns_move_scheduled_transaction_container">move_scheduled_transaction_container</a>(txn_obj);
                     // Delete the scheduled function <a href="object.md#0x1_object">object</a>
                     <a href="object.md#0x1_object_delete">object::delete</a>(delete_ref);
                     queue.schedule_map.remove(&key);

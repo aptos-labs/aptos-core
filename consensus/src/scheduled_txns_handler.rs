@@ -13,17 +13,9 @@ use aptos_vm::AptosVM;
 pub struct ScheduledTxnsHandler {}
 
 impl ScheduledTxnsHandler {
-    pub fn get_ready_txns(
-        state_view: &impl StateView,
-        block_timestamp_ms: u64,
+    pub fn handle_ready_txns_result(
+        res: Result<Vec<Vec<u8>>, move_core_types::vm_status::VMStatus>,
     ) -> Vec<ScheduledTransactionInfoWithKey> {
-        let res = AptosVM::execute_function(
-            state_view,
-            &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
-            &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_name,
-            vec![],
-            vec![bcs::to_bytes(&block_timestamp_ms).expect("Failed to serialize block timestamp")],
-        );
         match res {
             Ok(bytes_vec) => {
                 if let Some(first_result) = bytes_vec.first() {
@@ -54,5 +46,19 @@ impl ScheduledTxnsHandler {
                 Vec::new()
             },
         }
+    }
+
+    pub fn get_ready_txns(
+        state_view: &impl StateView,
+        block_timestamp_ms: u64,
+    ) -> Vec<ScheduledTransactionInfoWithKey> {
+        let res = AptosVM::execute_function(
+            state_view,
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+            &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_name,
+            vec![],
+            vec![bcs::to_bytes(&block_timestamp_ms).expect("Failed to serialize block timestamp")],
+        );
+        Self::handle_ready_txns_result(res)
     }
 }
