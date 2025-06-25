@@ -53,11 +53,13 @@ impl PersistedAuxiliaryInfoDb {
 
     /// Returns an iterator that yields `num_persisted_auxiliary_info` persisted_auxiliary_info
     /// starting from `start_version`.
+    ///
+    /// Requires the caller to not query the data beyond the latest version.
     pub(crate) fn get_persisted_auxiliary_info_iter(
         &self,
         start_version: Version,
         num_persisted_auxiliary_info: usize,
-    ) -> Result<impl Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_> {
+    ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>> {
         let mut iter = self.db.iter::<PersistedAuxiliaryInfoSchema>()?;
         iter.seek(&start_version)?;
         let mut iter = iter.peekable();
@@ -65,16 +67,25 @@ impl PersistedAuxiliaryInfoDb {
         let version = if item.is_some() {
             item.unwrap().as_ref().map_err(|e| e.clone())?.0
         } else {
+            let mut iter = self.db.iter::<PersistedAuxiliaryInfoSchema>()?;
+            iter.seek_to_last();
+            if iter.next().transpose()?.is_some() {
+                return Ok(Box::new(std::iter::empty()));
+            }
+            // Note in this case we return all Nones. We rely on the caller to not query future
+            // data when the DB is empty.
+            // TODO(grao): This will be unreachable in the future, consider make it an error later.
             start_version + num_persisted_auxiliary_info as u64
         };
-        let num_none = version.saturating_sub(start_version) as usize;
+        let num_none = std::cmp::min(
+            num_persisted_auxiliary_info,
+            version.saturating_sub(start_version) as usize,
+        );
         let none_iter = itertools::repeat_n(Ok(PersistedAuxiliaryInfo::None), num_none);
-        Ok(none_iter.chain(
-            iter.expect_continuous_versions(
-                start_version,
-                num_persisted_auxiliary_info - num_none,
-            )?,
-        ))
+        Ok(Box::new(none_iter.chain(iter.expect_continuous_versions(
+            start_version + num_none as u64,
+            num_persisted_auxiliary_info - num_none,
+        )?)))
     }
 
     pub(crate) fn commit_auxiliary_info(
