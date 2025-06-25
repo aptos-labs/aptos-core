@@ -274,7 +274,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 </dd>
 <dt>
-<code>is_buy: bool</code>
+<code>is_bid: bool</code>
 </dt>
 <dd>
 
@@ -1032,7 +1032,10 @@ Post Only order type - ensures that the order is not a taker order
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_new_market_config">new_market_config</a>(
     allow_self_matching: bool, allow_events_emission: bool
 ): <a href="market.md#0x7_market_MarketConfig">MarketConfig</a> {
-    <a href="market.md#0x7_market_MarketConfig">MarketConfig</a> { allow_self_trade: allow_self_matching, allow_events_emission: allow_events_emission }
+    <a href="market.md#0x7_market_MarketConfig">MarketConfig</a> {
+        allow_self_trade: allow_self_matching,
+        allow_events_emission: allow_events_emission
+    }
 }
 </code></pre>
 
@@ -1203,7 +1206,7 @@ Post Only order type - ensures that the order is not a taker order
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, price: u64, is_buy: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, price: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
 </code></pre>
 
 
@@ -1215,10 +1218,10 @@ Post Only order type - ensures that the order is not a taker order
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_is_taker_order">is_taker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;,
     price: u64,
-    is_buy: bool,
+    is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;
 ): bool {
-    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_is_taker_order">is_taker_order</a>(price, is_buy, trigger_condition)
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_is_taker_order">is_taker_order</a>(price, is_bid, trigger_condition)
 }
 </code></pre>
 
@@ -1237,7 +1240,7 @@ The order is placed with the following parameters:
 - user: The user who is placing the order
 - price: The price at which the order is placed
 - orig_size: The original size of the order
-- is_buy: Whether the order is a buy order or a sell order
+- is_bid: Whether the order is a buy order or a sell order
 - time_in_force: The time in force for the order. This can be one of the following:
 - TIME_IN_FORCE_GTC: Good till cancelled order type
 - TIME_IN_FORCE_POST_ONLY: Post Only order type - ensures that the order is not a taker order
@@ -1391,7 +1394,7 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
                 remaining_size,
                 size_delta,
                 price,
-                is_buy: is_bid,
+                is_bid: is_bid,
                 is_taker,
                 status,
                 details: *details
@@ -1520,8 +1523,8 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>let</b> maker_cancel_size = unsettled_size + maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>();
-
-    self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
+        self
+        .<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
         order_id,
         maker_address,
         maker_order.get_orig_size(),
@@ -1698,7 +1701,6 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
 
     <b>let</b> maker_cancellation_reason = settle_result.get_maker_cancellation_reason();
 
-
     <b>let</b> taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
     <b>if</b> (taker_cancellation_reason.is_some()) {
         self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
@@ -1728,7 +1730,7 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
                     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
                     maker_order.get_metadata_from_order()
                 ),
-                maker_order.get_unique_priority_idx()
+                maker_order
             );
         };
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(OrderCancellationReason::ClearinghouseSettleViolation);
@@ -2016,7 +2018,6 @@ Cancels an order - this will cancel the order and emit an event for the order ca
         <b>let</b> order = maybe_order.destroy_some();
         <b>let</b> (
             order_id_type,
-            _unique_priority_idx,
             price,
             orig_size,
             remaining_size,
@@ -2078,7 +2079,6 @@ Cancels an order - this will cancel the order and emit an event for the order ca
     <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();
     <b>let</b> (
         order_id_type,
-        _unique_priority_idx,
         price,
         orig_size,
         remaining_size,

@@ -5,8 +5,8 @@
 
 
 
--  [Struct `SettleTradeResult`](#0x7_market_types_SettleTradeResult)
--  [Struct `MarketClearinghouseCallbacks`](#0x7_market_types_MarketClearinghouseCallbacks)
+-  [Enum `SettleTradeResult`](#0x7_market_types_SettleTradeResult)
+-  [Enum `MarketClearinghouseCallbacks`](#0x7_market_types_MarketClearinghouseCallbacks)
 -  [Constants](#@Constants_0)
 -  [Function `new_settle_trade_result`](#0x7_market_types_new_settle_trade_result)
 -  [Function `new_market_clearinghouse_callbacks`](#0x7_market_types_new_market_clearinghouse_callbacks)
@@ -28,13 +28,21 @@
 
 <a id="0x7_market_types_SettleTradeResult"></a>
 
-## Struct `SettleTradeResult`
+## Enum `SettleTradeResult`
 
 
 
-<pre><code><b>struct</b> <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> <b>has</b> drop
+<pre><code>enum <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> <b>has</b> drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -65,15 +73,27 @@
 
 </details>
 
+</details>
+
+</details>
+
 <a id="0x7_market_types_MarketClearinghouseCallbacks"></a>
 
-## Struct `MarketClearinghouseCallbacks`
+## Enum `MarketClearinghouseCallbacks`
 
 
 
-<pre><code><b>struct</b> <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> drop
+<pre><code>enum <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -113,6 +133,10 @@
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -159,7 +183,7 @@
     maker_cancellation_reason: Option&lt;String&gt;,
     taker_cancellation_reason: Option&lt;String&gt;
 ): <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> {
-    <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> {
+    SettleTradeResult::V1 {
         settled_size,
         maker_cancellation_reason,
         taker_cancellation_reason
@@ -195,7 +219,7 @@
     cleanup_order_f: |<b>address</b>, u64, bool, u64| <b>has</b> drop + <b>copy</b>,
     decrease_order_size_f: |<b>address</b>, u64, bool, u64, u64| <b>has</b> drop + <b>copy</b>,
 ): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a>&lt;M&gt; {
-    <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">MarketClearinghouseCallbacks</a> {
+    MarketClearinghouseCallbacks::V1 {
         settle_trade_f,
         validate_order_placement_f,
         place_maker_order_f,

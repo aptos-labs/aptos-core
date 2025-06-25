@@ -20,7 +20,7 @@ module aptos_experimental::market_test_utils {
         user: &signer,
         price: u64,
         size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         event_store: &mut EventStore,
         is_taker: bool,
@@ -33,7 +33,7 @@ module aptos_experimental::market_test_utils {
             user,
             price,
             size,
-            is_buy, // is_buy
+            is_bid, // is_bid
             time_in_force, // order_type
             option::none(), // trigger_condition
             metadata,
@@ -57,7 +57,7 @@ module aptos_experimental::market_test_utils {
             size,
             size,
             price,
-            is_buy,
+            is_bid,
             is_taker,
             order_status_open()
         );
@@ -78,7 +78,7 @@ module aptos_experimental::market_test_utils {
                 0, // Remaining size is always 0 when the order is cancelled
                 size,
                 price,
-                is_buy,
+                is_bid,
                 is_taker,
                 order_status_cancelled()
             )
@@ -91,7 +91,7 @@ module aptos_experimental::market_test_utils {
         taker: &signer,
         taker_price: u64,
         size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         event_store: &mut EventStore,
         max_fills: Option<u64>,
@@ -109,7 +109,7 @@ module aptos_experimental::market_test_utils {
             taker,
             taker_price,
             size,
-            is_buy, // is_buy
+            is_bid, // is_bid
             time_in_force, // order_type
             option::none(), // trigger_condition
             metadata,
@@ -130,7 +130,7 @@ module aptos_experimental::market_test_utils {
             size,
             size,
             taker_price,
-            is_buy,
+            is_bid,
             true,
             order_status_open()
         );
@@ -142,7 +142,7 @@ module aptos_experimental::market_test_utils {
         taker: &signer,
         taker_price: u64,
         size: u64,
-        is_buy: bool,
+        is_bid: bool,
         time_in_force: u8,
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
@@ -162,7 +162,7 @@ module aptos_experimental::market_test_utils {
                 taker,
                 taker_price,
                 size,
-                is_buy,
+                is_bid,
                 time_in_force,
                 event_store,
                 max_fills,
@@ -176,7 +176,7 @@ module aptos_experimental::market_test_utils {
             order_id, // taker_order_id
             taker_price,
             size,
-            is_buy,
+            is_bid,
             fill_sizes,
             fill_prices,
             maker_addr,
@@ -199,7 +199,7 @@ module aptos_experimental::market_test_utils {
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
-        is_buy: bool,
+        is_bid: bool,
         event_store: &mut EventStore
     ) {
         let user_addr = signer::address_of(user);
@@ -214,7 +214,7 @@ module aptos_experimental::market_test_utils {
             remaining_size,
             size_delta,
             price, // price
-            is_buy,
+            is_bid,
             is_taker,
             order_status_cancelled()
         );
@@ -226,7 +226,7 @@ module aptos_experimental::market_test_utils {
         taker_order_id: u64,
         taker_price: u64,
         size: u64,
-        is_buy: bool,
+        is_bid: bool,
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,
@@ -271,7 +271,7 @@ module aptos_experimental::market_test_utils {
                 size - taker_total_fill,
                 fill_size,
                 fill_price,
-                is_buy,
+                is_bid,
                 true,
                 order_status_filled()
             );
@@ -285,7 +285,7 @@ module aptos_experimental::market_test_utils {
                 maker_remaining_size - fill_size,
                 fill_size,
                 fill_price,
-                !is_buy,
+                !is_bid,
                 false,
                 order_status_filled()
             );
@@ -302,7 +302,7 @@ module aptos_experimental::market_test_utils {
                 0, // Remaining size is always 0 when the order is cancelled
                 size - taker_total_fill,
                 taker_price,
-                is_buy,
+                is_bid,
                 true,
                 order_status_cancelled()
             )
@@ -317,7 +317,7 @@ module aptos_experimental::market_test_utils {
                 size - total_fill_size,
                 size,
                 taker_price,
-                is_buy,
+                is_bid,
                 false,
                 order_status_open()
             )

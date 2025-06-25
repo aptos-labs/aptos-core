@@ -165,7 +165,7 @@ module aptos_experimental::market {
         /// REJECTED - size_delta will always be 0
         size_delta: u64,
         price: u64,
-        is_buy: bool,
+        is_bid: bool,
         /// Whether the order crosses the orderbook.
         is_taker: bool,
         status: u8,
@@ -229,7 +229,10 @@ module aptos_experimental::market {
     public fun new_market_config(
         allow_self_matching: bool, allow_events_emission: bool
     ): MarketConfig {
-        MarketConfig { allow_self_trade: allow_self_matching, allow_events_emission: allow_events_emission }
+        MarketConfig {
+            allow_self_trade: allow_self_matching,
+            allow_events_emission: allow_events_emission
+        }
     }
 
     public fun new_market<M: store + copy + drop>(
@@ -272,10 +275,10 @@ module aptos_experimental::market {
     public fun is_taker_order<M: store + copy + drop>(
         self: &Market<M>,
         price: u64,
-        is_buy: bool,
+        is_bid: bool,
         trigger_condition: Option<TriggerCondition>
     ): bool {
-        self.order_book.is_taker_order(price, is_buy, trigger_condition)
+        self.order_book.is_taker_order(price, is_bid, trigger_condition)
     }
 
     /// Places an order - If its a taker order, it will be matched immediately and if its a maker order, it will simply
@@ -285,7 +288,7 @@ module aptos_experimental::market {
     /// - user: The user who is placing the order
     /// - price: The price at which the order is placed
     /// - orig_size: The original size of the order
-    /// - is_buy: Whether the order is a buy order or a sell order
+    /// - is_bid: Whether the order is a buy order or a sell order
     /// - time_in_force: The time in force for the order. This can be one of the following:
     ///  - TIME_IN_FORCE_GTC: Good till cancelled order type
     /// - TIME_IN_FORCE_POST_ONLY: Post Only order type - ensures that the order is not a taker order
@@ -368,7 +371,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta,
                     price,
-                    is_buy: is_bid,
+                    is_bid: is_bid,
                     is_taker,
                     status,
                     details: *details
@@ -457,8 +460,8 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
-
-        self.emit_event_for_order(
+            self
+            .emit_event_for_order(
             order_id,
             maker_address,
             maker_order.get_orig_size(),
@@ -595,7 +598,6 @@ module aptos_experimental::market {
 
         let maker_cancellation_reason = settle_result.get_maker_cancellation_reason();
 
-
         let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
         if (taker_cancellation_reason.is_some()) {
             self.cancel_order_internal(
@@ -625,7 +627,7 @@ module aptos_experimental::market {
                         option::none(),
                         maker_order.get_metadata_from_order()
                     ),
-                    maker_order.get_unique_priority_idx()
+                    maker_order
                 );
             };
             return option::some(OrderCancellationReason::ClearinghouseSettleViolation);
@@ -873,7 +875,6 @@ module aptos_experimental::market {
             let order = maybe_order.destroy_some();
             let (
                 order_id_type,
-                _unique_priority_idx,
                 price,
                 orig_size,
                 remaining_size,
@@ -915,7 +916,6 @@ module aptos_experimental::market {
         let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
         let (
             order_id_type,
-            _unique_priority_idx,
             price,
             orig_size,
             remaining_size,
@@ -1006,7 +1006,7 @@ module aptos_experimental::market {
         remaining_size: u64,
         size_delta: u64,
         price: u64,
-        is_buy: bool,
+        is_bid: bool,
         is_taker: bool,
         status: u8
     ) {
@@ -1017,7 +1017,7 @@ module aptos_experimental::market {
         assert!(self.remaining_size == remaining_size);
         assert!(self.size_delta == size_delta);
         assert!(self.price == price);
-        assert!(self.is_buy == is_buy);
+        assert!(self.is_bid == is_bid);
         assert!(self.is_taker == is_taker);
         assert!(self.status == status);
     }
