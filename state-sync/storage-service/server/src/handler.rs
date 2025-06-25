@@ -102,6 +102,17 @@ impl<T: StorageReaderInterface> Handler<T> {
             request.get_label(),
         );
 
+        // If the request is for v2 data, drop the message (v2 is not supported yet)
+        if request.data_request.is_transaction_data_v2_request() {
+            warn!(LogSchema::new(LogEntry::StorageServiceError)
+                .error(&Error::InvalidRequest(
+                    "Received a v2 data request, which is not supported yet!".into()
+                ))
+                .peer_network_id(&peer_network_id)
+                .request(&request));
+            return;
+        }
+
         // Handle any optimistic fetch requests
         if request.data_request.is_optimistic_fetch() {
             self.handle_optimistic_fetch_request(peer_network_id, request, response_sender);
