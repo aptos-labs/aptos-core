@@ -287,15 +287,6 @@ types of pending orders are supported.
 ## Constants
 
 
-<a id="0x7_order_book_U256_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_U256_MAX">U256_MAX</a>: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-</code></pre>
-
-
-
 <a id="0x7_order_book_EORDER_ALREADY_EXISTS"></a>
 
 
@@ -585,17 +576,20 @@ it is added to the order book, if it exists, it's size is updated.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_reinsert_maker_order">reinsert_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;,
-    original_order: Order&lt;M&gt;
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;, original_order: Order&lt;M&gt;
 ) {
     <b>let</b> order_id = new_order_id_type(order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_req.account_order_id);
 
     <b>assert</b>!(&original_order.get_order_id() == &order_id, <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>assert</b>!(
-        original_order.get_orig_size() &gt;= order_req.orig_size,
+        original_order.get_orig_size() == order_req.orig_size,
         <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>
     );
+    // TODO check what should the rule be for remaining_size. check test_maker_order_reinsert_not_exists unit test.
+    // <b>assert</b>!(
+    //     original_order.<a href="order_book.md#0x7_order_book_get_remaining_size">get_remaining_size</a>() &gt;= order_req.remaining_size,
+    //     <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>
+    // );
     <b>assert</b>!(original_order.get_price() == order_req.price, <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>assert</b>!(original_order.is_bid() == order_req.is_bid, <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
 

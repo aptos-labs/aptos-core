@@ -115,7 +115,7 @@ This is internal module, which cannot be used directly, use OrderBook instead.
 OrderBook tracking active (i.e. unconditional, immediately executable) limit orders.
 
 - invariant - all buys are smaller than sells, at all times.
-- tie_breaker in sells is U256_MAX-value, to make sure largest value in the book
+- tie_breaker in sells is U128_MAX-value, to make sure largest value in the book
 that is taken first, is the one inserted first, amongst those with same bid price.
 
 
@@ -169,15 +169,6 @@ There is a code bug that breaks internal invariant
 
 
 <pre><code><b>const</b> <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x7_active_order_book_U256_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="active_order_book.md#0x7_active_order_book_U256_MAX">U256_MAX</a>: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
 </code></pre>
 
 

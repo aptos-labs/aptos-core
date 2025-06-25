@@ -7,8 +7,7 @@ module aptos_experimental::order_book_types {
     friend aptos_experimental::order_book;
     friend aptos_experimental::pending_order_book_index;
 
-    const U256_MAX: u256 =
-        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+    const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
 
     const BIG_MAP_INNER_DEGREE: u16 = 64;
     const BIG_MAP_LEAF_DEGREE: u16 = 32;
@@ -28,7 +27,7 @@ module aptos_experimental::order_book_types {
 
     // Internal type representing order in which trades are placed. Unique per instance of AscendingIdGenerator.
     struct UniqueIdxType has store, copy, drop {
-        idx: u256
+        idx: u128
     }
 
     // Struct providing ascending ids, to be able to be used as tie-breaker to respect FIFO order of trades.
@@ -47,20 +46,24 @@ module aptos_experimental::order_book_types {
         remaining_size: u64
     }
 
-    struct SingleOrderMatch<M: store + copy + drop> has drop, copy {
-        order: Order<M>,
-        matched_size: u64
+    enum SingleOrderMatch<M: store + copy + drop> has drop, copy {
+        V1 {
+            order: Order<M>,
+            matched_size: u64
+        }
     }
 
-    struct Order<M: store + copy + drop> has store, copy, drop {
-        order_id: OrderIdType,
-        unique_priority_idx: UniqueIdxType,
-        price: u64,
-        orig_size: u64,
-        remaining_size: u64,
-        is_bid: bool,
-        trigger_condition: Option<TriggerCondition>,
-        metadata: M
+    enum Order<M: store + copy + drop> has store, copy, drop {
+        V1 {
+            order_id: OrderIdType,
+            unique_priority_idx: UniqueIdxType,
+            price: u64,
+            orig_size: u64,
+            remaining_size: u64,
+            is_bid: bool,
+            trigger_condition: Option<TriggerCondition>,
+            metadata: M
+        }
     }
 
     enum TriggerCondition has store, drop, copy {
@@ -69,9 +72,11 @@ module aptos_experimental::order_book_types {
         TimeBased(u64)
     }
 
-    struct OrderWithState<M: store + copy + drop> has store, drop, copy {
-        order: Order<M>,
-        is_active: bool // i.e. where to find it.
+    enum OrderWithState<M: store + copy + drop> has store, drop, copy {
+        V1 {
+            order: Order<M>,
+            is_active: bool // i.e. where to find it.
+        }
     }
 
     public(friend) fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
@@ -104,15 +109,15 @@ module aptos_experimental::order_book_types {
         self: &mut AscendingIdGenerator
     ): UniqueIdxType {
         self.value += 1;
-        new_unique_idx_type(self.value as u256)
+        new_unique_idx_type(self.value as u128)
     }
 
-    public(friend) fun new_unique_idx_type(idx: u256): UniqueIdxType {
+    public(friend) fun new_unique_idx_type(idx: u128): UniqueIdxType {
         UniqueIdxType { idx }
     }
 
     public(friend) fun descending_idx(self: &UniqueIdxType): UniqueIdxType {
-        UniqueIdxType { idx: U256_MAX - self.idx }
+        UniqueIdxType { idx: U128_MAX - self.idx }
     }
 
     public(friend) fun new_active_matched_order(
@@ -137,7 +142,7 @@ module aptos_experimental::order_book_types {
         trigger_condition: Option<TriggerCondition>,
         metadata: M
     ): Order<M> {
-        Order {
+        Order::V1 {
             order_id,
             unique_priority_idx,
             price,
@@ -152,7 +157,7 @@ module aptos_experimental::order_book_types {
     public(friend) fun new_single_order_match<M: store + copy + drop>(
         order: Order<M>, matched_size: u64
     ): SingleOrderMatch<M> {
-        SingleOrderMatch { order, matched_size }
+        SingleOrderMatch::V1 { order, matched_size }
     }
 
     public(friend) fun get_active_matched_size(self: &ActiveMatchedOrder): u64 {
@@ -168,7 +173,7 @@ module aptos_experimental::order_book_types {
     public fun new_order_with_state<M: store + copy + drop>(
         order: Order<M>, is_active: bool
     ): OrderWithState<M> {
-        OrderWithState { order, is_active }
+        OrderWithState::V1 { order, is_active }
     }
 
     public fun tp_trigger_condition(take_profit: u64): TriggerCondition {
@@ -287,15 +292,18 @@ module aptos_experimental::order_book_types {
     public fun destroy_order<M: store + copy + drop>(
         self: Order<M>
     ): (OrderIdType, u64, u64, u64, bool, Option<TriggerCondition>, M) {
-        (
-            self.order_id,
-            self.price,
-            self.orig_size,
-            self.remaining_size,
-            self.is_bid,
-            self.trigger_condition,
-            self.metadata
-        )
+        let Order::V1 {
+            order_id,
+            unique_priority_idx: _,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            trigger_condition,
+            metadata
+        } = self;
+
+        (order_id, price, orig_size, remaining_size, is_bid, trigger_condition, metadata)
     }
 
     public fun destroy_single_order_match<M: store + copy + drop>(

@@ -35,10 +35,6 @@ module aptos_experimental::active_order_book {
 
     const U64_MAX: u64 = 0xffffffffffffffff;
 
-    const U256_MAX: u256 =
-        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    // 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-
     struct ActiveBidKey has store, copy, drop {
         price: u64,
         tie_breaker: UniqueIdxType
@@ -52,7 +48,7 @@ module aptos_experimental::active_order_book {
     /// OrderBook tracking active (i.e. unconditional, immediately executable) limit orders.
     ///
     /// - invariant - all buys are smaller than sells, at all times.
-    /// - tie_breaker in sells is U256_MAX-value, to make sure largest value in the book
+    /// - tie_breaker in sells is U128_MAX-value, to make sure largest value in the book
     ///   that is taken first, is the one inserted first, amongst those with same bid price.
     enum ActiveOrderBook has store {
         V1 {
