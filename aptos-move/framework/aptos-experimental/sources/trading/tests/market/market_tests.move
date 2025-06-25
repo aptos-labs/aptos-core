@@ -947,4 +947,89 @@ module aptos_experimental::market_tests {
         );
         market.destroy_market()
     }
+
+    #[test(
+        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
+    )]
+    public fun test_self_matching_not_allowed_no_match(
+        admin: &signer,
+        market_signer: &signer,
+        maker1: &signer,
+        maker2: &signer
+    ) {
+        // Setup accounts
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true)
+        );
+        clearinghouse_test::initialize(admin);
+        let maker1_addr = signer::address_of(maker1);
+        let maker2_addr = signer::address_of(maker2);
+        let event_store = event_utils::new_event_store();
+        let maker1_order_id =
+            place_maker_order_and_verify(
+                &mut market,
+                maker1,
+                1001,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        let _ =
+            place_maker_order_and_verify(
+                &mut market,
+                maker2,
+                1000,
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(),
+                &test_market_callbacks()
+            );
+
+        // Order not filled yet, so size is 0
+        assert!(get_position_size(maker1_addr) == 0);
+
+        // This should result in a self match order which should be cancelled and the taker order should not match
+        place_taker_order(
+            &mut market,
+            maker1,
+            1001,
+            1000000,
+            false,
+            good_till_cancelled(),
+            &mut event_store,
+            option::none(),
+            new_test_order_metadata(),
+            &test_market_callbacks()
+        );
+
+        verify_cancel_event(
+            &mut market,
+            maker1,
+            false,
+            maker1_order_id,
+            1001,
+            2000000,
+            0,
+            2000000,
+            true,
+            &mut event_store
+        );
+
+        assert!(get_position_size(maker1_addr) == 0);
+        assert!(get_position_size(maker2_addr) == 0);
+        market.destroy_market()
+    }
+
 }
