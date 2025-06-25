@@ -228,42 +228,27 @@ impl<'a> StackUsageVerifier<'a> {
                 (arg_count, return_count)
             },
 
-            // ClosEval pops the number of arguments and pushes the results of the given function
-            // type
+            // `CallClosure` pops the closure and then the number of arguments and
+            // pushes the results of the given function type
             Bytecode::CallClosure(idx) => {
                 if let Some(SignatureToken::Function(args, result, _)) =
                     self.resolver.signature_at(*idx).0.first()
                 {
                     ((1 + args.len()) as u64, result.len() as u64)
                 } else {
-                    // We don't know what it will pop/push, but the signature checker
+                    // We don't know what it will pop/push, but the signature checker v2
                     // ensures we never reach this
                     (0, 0)
                 }
             },
 
-            // ClosPack pops the captured arguments and returns 1 value
-            Bytecode::PackClosure(idx, mask) => {
-                let function_handle = self.resolver.function_handle_at(*idx);
-                // TODO(#15664): use `captured_count` for efficiency
-                let arg_count = mask
-                    .extract(
-                        &self.resolver.signature_at(function_handle.parameters).0,
-                        true,
-                    )
-                    .len() as u64;
+            // `PackClosure` pops the captured arguments and returns 1 value
+            Bytecode::PackClosure(_, mask) => {
+                let arg_count = mask.captured_count() as u64;
                 (arg_count, 1)
             },
-            Bytecode::PackClosureGeneric(idx, mask) => {
-                let func_inst = self.resolver.function_instantiation_at(*idx);
-                let function_handle = self.resolver.function_handle_at(func_inst.handle);
-                // TODO(#15664): use `captured_count` for efficiency
-                let arg_count = mask
-                    .extract(
-                        &self.resolver.signature_at(function_handle.parameters).0,
-                        true,
-                    )
-                    .len() as u64;
+            Bytecode::PackClosureGeneric(_, mask) => {
+                let arg_count = mask.captured_count() as u64;
                 (arg_count, 1)
             },
 
