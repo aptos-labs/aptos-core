@@ -3,9 +3,7 @@ module 0xABCD::order_book_example {
     use std::error;
     use std::option;
 
-    use aptos_experimental::active_order_book::{Self, ActiveOrderBook};
     use aptos_experimental::order_book::{Self, OrderBook};
-    use aptos_experimental::order_book_types;
 
     const ENOT_AUTHORIZED: u64 = 1;
     // Resource being modified doesn't exist

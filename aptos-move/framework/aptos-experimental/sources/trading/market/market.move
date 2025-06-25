@@ -61,7 +61,7 @@ module aptos_experimental::market {
     use aptos_framework::event;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
     use aptos_experimental::order_book_types::{TriggerCondition, Order};
-    use aptos_experimental::market_types::MarketClearinghouseCallbacks;
+    use aptos_experimental::market_types::{Self, TimeInForce, OrderStatus, MarketClearinghouseCallbacks};
 
     // Error codes
     const EINVALID_ORDER: u64 = 1;
@@ -70,81 +70,33 @@ module aptos_experimental::market {
     const ENOT_ADMIN: u64 = 4;
     const EINVALID_FEE_TIER: u64 = 5;
     const EORDER_DOES_NOT_EXIST: u64 = 6;
-    const EINVALID_TIME_IN_FORCE_FOR_MAKER: u64 = 7;
-    const EINVALID_TIME_IN_FORCE_FOR_TAKER: u64 = 8;
     const EINVALID_MATCHING_FOR_MAKER_REINSERT: u64 = 9;
     const EINVALID_TAKER_POSITION_UPDATE: u64 = 10;
     const EINVALID_LIQUIDATION: u64 = 11;
 
-    /// Order time in force
-    /// Good till cancelled order type
-    const TIME_IN_FORCE_GTC: u8 = 0;
-    /// Post Only order type - ensures that the order is not a taker order
-    const TIME_IN_FORCE_POST_ONLY: u8 = 1;
-    /// Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
-    /// order as possible as taker order and cancel the rest.
-    const TIME_IN_FORCE_IOC: u8 = 2;
-
-    public fun good_till_cancelled(): u8 {
-        TIME_IN_FORCE_GTC
+    enum Market<M: store + copy + drop> has store {
+        V1 {
+            /// Address of the parent object that created this market
+            /// Purely for grouping events based on the source DEX, not used otherwise
+            parent: address,
+            /// Address of the market object of this market.
+            market: address,
+            // TODO: remove sequential order id generation
+            last_order_id: u64,
+            // Incremental fill id for matched orders
+            next_fill_id: u64,
+            config: MarketConfig,
+            order_book: OrderBook<M>
+        }
     }
 
-    public fun post_only(): u8 {
-        TIME_IN_FORCE_POST_ONLY
-    }
-
-    public fun immediate_or_cancel(): u8 {
-        TIME_IN_FORCE_IOC
-    }
-
-    struct Market<M: store + copy + drop> has store {
-        /// Address of the parent object that created this market
-        /// Purely for grouping events based on the source DEX, not used otherwise
-        parent: address,
-        /// Address of the market object of this market.
-        market: address,
-        // TODO: remove sequential order id generation
-        last_order_id: u64,
-        // Incremental fill id for matched orders
-        next_fill_id: u64,
-        config: MarketConfig,
-        order_book: OrderBook<M>
-    }
-
-    struct MarketConfig has store {
-        /// Weather to allow self matching orders
-        allow_self_trade: bool,
-        /// Whether to allow sending all events for the markett
-        allow_events_emission: bool
-    }
-
-    /// Order has been accepted by the engine.
-    const ORDER_STATUS_OPEN: u8 = 0;
-    /// Order has been fully or partially filled.
-    const ORDER_STATUS_FILLED: u8 = 1;
-    /// Order has been cancelled by the user or engine.
-    const ORDER_STATUS_CANCELLED: u8 = 2;
-    /// Order has been rejected by the engine. Unlike cancelled orders, rejected
-    /// orders are invalid orders. Rejection reasons:
-    /// 1. Insufficient margin
-    /// 2. Order is reduce_only but does not reduce
-    const ORDER_STATUS_REJECTED: u8 = 3;
-    const ORDER_SIZE_REDUCED: u8 = 4;
-
-    public fun order_status_open(): u8 {
-        ORDER_STATUS_OPEN
-    }
-
-    public fun order_status_filled(): u8 {
-        ORDER_STATUS_FILLED
-    }
-
-    public fun order_status_cancelled(): u8 {
-        ORDER_STATUS_CANCELLED
-    }
-
-    public fun order_status_rejected(): u8 {
-        ORDER_STATUS_REJECTED
+    enum MarketConfig has store {
+        V1 {
+            /// Weather to allow self matching orders
+            allow_self_trade: bool,
+            /// Whether to allow sending all events for the markett
+            allow_events_emission: bool
+        }
     }
 
     #[event]
@@ -168,7 +120,7 @@ module aptos_experimental::market {
         is_bid: bool,
         /// Whether the order crosses the orderbook.
         is_taker: bool,
-        status: u8,
+        status: OrderStatus,
         details: std::string::String
     }
 
@@ -229,7 +181,7 @@ module aptos_experimental::market {
     public fun new_market_config(
         allow_self_matching: bool, allow_events_emission: bool
     ): MarketConfig {
-        MarketConfig {
+        MarketConfig::V1 {
             allow_self_trade: allow_self_matching,
             allow_events_emission: allow_events_emission
         }
@@ -240,7 +192,7 @@ module aptos_experimental::market {
     ): Market<M> {
         // requiring signers, and not addresses, purely to guarantee different dexes
         // cannot polute events to each other, accidentally or maliciously.
-        Market {
+        Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
             last_order_id: 0,
@@ -290,9 +242,9 @@ module aptos_experimental::market {
     /// - orig_size: The original size of the order
     /// - is_bid: Whether the order is a buy order or a sell order
     /// - time_in_force: The time in force for the order. This can be one of the following:
-    ///  - TIME_IN_FORCE_GTC: Good till cancelled order type
-    /// - TIME_IN_FORCE_POST_ONLY: Post Only order type - ensures that the order is not a taker order
-    /// - TIME_IN_FORCE_IOC: Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
+    ///  - TimeInForce::GTC: Good till cancelled order type
+    /// - TimeInForce::POST_ONLY: Post Only order type - ensures that the order is not a taker order
+    /// - TimeInForce::IOC: Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
     /// order as possible as taker order and cancel the rest.
     /// - trigger_condition: The trigger condition
     /// - metadata: The metadata for the order. This can be any type that the clearing house implementation supports.
@@ -311,7 +263,7 @@ module aptos_experimental::market {
         price: u64,
         orig_size: u64,
         is_bid: bool,
-        time_in_force: u8,
+        time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         max_fill_limit: u64,
@@ -356,7 +308,7 @@ module aptos_experimental::market {
         price: u64,
         is_bid: bool,
         is_taker: bool,
-        status: u8,
+        status: OrderStatus,
         details: &String
     ) {
         // Final check whether event sending is enabled
@@ -388,7 +340,7 @@ module aptos_experimental::market {
         remaining_size: u64,
         fill_sizes: vector<u64>,
         is_bid: bool,
-        time_in_force: u8,
+        time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: u64,
@@ -396,7 +348,7 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         // Validate that the order is valid from position management perspective
-        if (time_in_force == TIME_IN_FORCE_IOC) {
+        if (time_in_force == market_types::immediate_or_cancel()) {
             return self.cancel_order_internal(
                 user_addr,
                 price,
@@ -422,7 +374,7 @@ module aptos_experimental::market {
                 price,
                 is_bid,
                 false,
-                ORDER_STATUS_OPEN,
+                market_types::order_status_open(),
                 &std::string::utf8(b"")
             );
         };
@@ -459,8 +411,7 @@ module aptos_experimental::market {
         unsettled_size: u64,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
-        let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
-            self
+        let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();self
             .emit_event_for_order(
             order_id,
             maker_address,
@@ -470,7 +421,7 @@ module aptos_experimental::market {
             maker_order.get_price(),
             maker_order.is_bid(),
             false,
-            ORDER_STATUS_CANCELLED,
+            market_types::order_status_cancelled(),
             &maker_cancellation_reason
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
@@ -505,7 +456,7 @@ module aptos_experimental::market {
             price,
             is_bid,
             is_taker,
-            ORDER_STATUS_CANCELLED,
+            market_types::order_status_cancelled(),
             &cancel_details
         );
         callbacks.cleanup_order(
@@ -578,7 +529,7 @@ module aptos_experimental::market {
                 maker_order.get_price(),
                 is_bid,
                 true,
-                ORDER_STATUS_FILLED,
+                market_types::order_status_filled(),
                 &std::string::utf8(b"")
             );
             // Event for maker fill
@@ -591,7 +542,7 @@ module aptos_experimental::market {
                 maker_order.get_price(),
                 !is_bid,
                 false,
-                ORDER_STATUS_FILLED,
+                market_types::order_status_filled(),
                 &std::string::utf8(b"")
             );
         };
@@ -665,7 +616,7 @@ module aptos_experimental::market {
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
-        time_in_force: u8,
+        time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: Option<u64>,
@@ -723,7 +674,7 @@ module aptos_experimental::market {
                 price,
                 is_bid,
                 is_taker_order,
-                ORDER_STATUS_OPEN,
+                market_types::order_status_open(),
                 &std::string::utf8(b"")
             );
         };
@@ -746,7 +697,7 @@ module aptos_experimental::market {
 
         // NOTE: We should always use is_taker: true for this order past this
         // point so that indexer can consistently track the order's status
-        if (time_in_force == TIME_IN_FORCE_POST_ONLY) {
+        if (time_in_force == market_types::post_only()) {
             return self.cancel_order_internal(
                 user_addr,
                 price,
@@ -794,7 +745,7 @@ module aptos_experimental::market {
             let is_taker_order =
                 self.order_book.is_taker_order(price, is_bid, option::none());
             if (!is_taker_order) {
-                if (time_in_force == TIME_IN_FORCE_IOC) {
+                if (time_in_force == market_types::immediate_or_cancel()) {
                     return self.cancel_order_internal(
                         user_addr,
                         price,
@@ -895,7 +846,7 @@ module aptos_experimental::market {
                 price,
                 is_bid,
                 false,
-                ORDER_STATUS_CANCELLED,
+                market_types::order_status_cancelled(),
                 &std::string::utf8(b"Order cancelled")
             );
         }
@@ -937,7 +888,7 @@ module aptos_experimental::market {
             price,
             is_bid,
             false,
-            ORDER_SIZE_REDUCED,
+            market_types::order_status_size_reduced(),
             &std::string::utf8(b"Order size reduced")
         );
     }
@@ -968,7 +919,7 @@ module aptos_experimental::market {
     // ============================= test_only APIs ====================================
     #[test_only]
     public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
-        let Market {
+        let Market::V1 {
             parent: _parent,
             market: _market,
             last_order_id: _last_order_id,
@@ -976,7 +927,7 @@ module aptos_experimental::market {
             config,
             order_book
         } = self;
-        let MarketConfig { allow_self_trade: _, allow_events_emission: _ } = config;
+        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _ } = config;
         order_book.destroy_order_book()
     }
 
@@ -1008,7 +959,7 @@ module aptos_experimental::market {
         price: u64,
         is_bid: bool,
         is_taker: bool,
-        status: u8
+        status: OrderStatus
     ) {
         assert!(self.order_id == order_id);
         assert!(self.market == market);

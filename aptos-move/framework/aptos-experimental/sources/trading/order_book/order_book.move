@@ -38,9 +38,6 @@ module aptos_experimental::order_book {
     #[test_only]
     use aptos_experimental::order_book_types::{tp_trigger_condition, UniqueIdxType};
 
-    const U256_MAX: u256 =
-        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EPOST_ONLY_FILLED: u64 = 2;
     const EORDER_NOT_FOUND: u64 = 4;
@@ -188,17 +185,20 @@ module aptos_experimental::order_book {
     /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
     /// it is added to the order book, if it exists, it's size is updated.
     public fun reinsert_maker_order<M: store + copy + drop>(
-        self: &mut OrderBook<M>,
-        order_req: OrderRequest<M>,
-        original_order: Order<M>
+        self: &mut OrderBook<M>, order_req: OrderRequest<M>, original_order: Order<M>
     ) {
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
 
         assert!(&original_order.get_order_id() == &order_id, E_REINSERT_ORDER_MISMATCH);
         assert!(
-            original_order.get_orig_size() >= order_req.orig_size,
+            original_order.get_orig_size() == order_req.orig_size,
             E_REINSERT_ORDER_MISMATCH
         );
+        // TODO check what should the rule be for remaining_size. check test_maker_order_reinsert_not_exists unit test.
+        // assert!(
+        //     original_order.get_remaining_size() >= order_req.remaining_size,
+        //     E_REINSERT_ORDER_MISMATCH
+        // );
         assert!(original_order.get_price() == order_req.price, E_REINSERT_ORDER_MISMATCH);
         assert!(original_order.is_bid() == order_req.is_bid, E_REINSERT_ORDER_MISMATCH);
 
@@ -372,7 +372,12 @@ module aptos_experimental::order_book {
 
     #[test_only]
     public fun destroy_order_book<M: store + copy + drop>(self: OrderBook<M>) {
-        let OrderBook::V1 { orders, active_orders, pending_orders, ascending_id_generator: _ } = self;
+        let OrderBook::V1 {
+            orders,
+            active_orders,
+            pending_orders,
+            ascending_id_generator: _
+        } = self;
         orders.destroy(|_v| {});
         active_orders.destroy_active_order_book();
         pending_orders.destroy_pending_order_book_index();

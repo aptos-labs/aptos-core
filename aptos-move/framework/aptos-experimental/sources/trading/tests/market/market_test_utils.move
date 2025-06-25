@@ -5,12 +5,15 @@ module aptos_experimental::market_test_utils {
     use std::signer;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::event_utils::{latest_emitted_events, EventStore};
-    use aptos_experimental::market_types::MarketClearinghouseCallbacks;
-
-    use aptos_experimental::market::{
+    use aptos_experimental::market_types::{
         order_status_cancelled,
         order_status_filled,
         order_status_open,
+        TimeInForce,
+        MarketClearinghouseCallbacks
+    };
+
+    use aptos_experimental::market::{
         OrderEvent,
         Market
     };
@@ -21,7 +24,7 @@ module aptos_experimental::market_test_utils {
         price: u64,
         size: u64,
         is_bid: bool,
-        time_in_force: u8,
+        time_in_force: TimeInForce,
         event_store: &mut EventStore,
         is_taker: bool,
         is_cancelled: bool,
@@ -92,7 +95,7 @@ module aptos_experimental::market_test_utils {
         taker_price: u64,
         size: u64,
         is_bid: bool,
-        time_in_force: u8,
+        time_in_force: TimeInForce,
         event_store: &mut EventStore,
         max_fills: Option<u64>,
         metadata: M,
@@ -143,7 +146,7 @@ module aptos_experimental::market_test_utils {
         taker_price: u64,
         size: u64,
         is_bid: bool,
-        time_in_force: u8,
+        time_in_force: TimeInForce,
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,

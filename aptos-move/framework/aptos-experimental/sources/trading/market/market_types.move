@@ -2,8 +2,81 @@ module aptos_experimental::market_types {
     use std::option::Option;
     use std::string::String;
 
+    friend aptos_experimental::market;
+
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
+    const EINVALID_TIME_IN_FORCE: u64 = 3;
+
+    /// Order time in force
+    enum TimeInForce has drop, copy, store {
+        /// Good till cancelled order type
+        GTC,
+        /// Post Only order type - ensures that the order is not a taker order
+        POST_ONLY,
+        /// Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
+        /// order as possible as taker order and cancel the rest.
+        IOC
+    }
+
+    public fun time_in_force_from_index(index: u8): TimeInForce {
+        if (index == 0) {
+            TimeInForce::GTC
+        } else if (index == 1) {
+            TimeInForce::POST_ONLY
+        } else if (index == 2) {
+            TimeInForce::IOC
+        } else {
+            abort EINVALID_TIME_IN_FORCE
+        }
+    }
+
+    public fun good_till_cancelled(): TimeInForce {
+        TimeInForce::GTC
+    }
+
+    public fun post_only(): TimeInForce {
+        TimeInForce::POST_ONLY
+    }
+
+    public fun immediate_or_cancel(): TimeInForce {
+        TimeInForce::IOC
+    }
+
+    enum OrderStatus has drop, copy, store {
+        /// Order has been accepted by the engine.
+        OPEN,
+        /// Order has been fully or partially filled.
+        FILLED,
+        /// Order has been cancelled by the user or engine.
+        CANCELLED,
+        /// Order has been rejected by the engine. Unlike cancelled orders, rejected
+        /// orders are invalid orders. Rejection reasons:
+        /// 1. Insufficient margin
+        /// 2. Order is reduce_only but does not reduce
+        REJECTED,
+        SIZE_REDUCED
+    }
+
+    public fun order_status_open(): OrderStatus {
+        OrderStatus::OPEN
+    }
+
+    public fun order_status_filled(): OrderStatus {
+        OrderStatus::FILLED
+    }
+
+    public fun order_status_cancelled(): OrderStatus {
+        OrderStatus::CANCELLED
+    }
+
+    public fun order_status_rejected(): OrderStatus {
+        OrderStatus::REJECTED
+    }
+
+    public fun order_status_size_reduced(): OrderStatus {
+        OrderStatus::SIZE_REDUCED
+    }
 
     enum SettleTradeResult has drop {
         V1 {
@@ -70,7 +143,7 @@ module aptos_experimental::market_types {
         self.taker_cancellation_reason
     }
 
-    public fun settle_trade<M: store + copy + drop>(
+    public(friend) fun settle_trade<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         taker: address,
         maker: address,
@@ -85,7 +158,7 @@ module aptos_experimental::market_types {
         (self.settle_trade_f)(taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size, taker_metadata, maker_metadata)
     }
 
-    public fun validate_order_placement<M: store + copy + drop>(
+    public(friend) fun validate_order_placement<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: u64,
@@ -97,7 +170,7 @@ module aptos_experimental::market_types {
         (self.validate_order_placement_f)(account, order_id, is_taker, is_bid, price, size, order_metadata)
     }
 
-    public fun place_maker_order<M: store + copy + drop>(
+    public(friend) fun place_maker_order<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: u64,
@@ -108,7 +181,7 @@ module aptos_experimental::market_types {
         (self.place_maker_order_f)(account, order_id, is_bid, price, size, order_metadata)
     }
 
-    public fun cleanup_order<M: store + copy + drop>(
+    public(friend) fun cleanup_order<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: u64,
@@ -117,7 +190,7 @@ module aptos_experimental::market_types {
         (self.cleanup_order_f)(account, order_id, is_bid, remaining_size)
     }
 
-    public fun decrease_order_size<M: store + copy + drop>(
+    public(friend) fun decrease_order_size<M: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M>,
         account: address,
         order_id: u64,

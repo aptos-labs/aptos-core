@@ -18,10 +18,12 @@ module aptos_experimental::market_tests {
         verify_fills
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market::{
+    use aptos_experimental::market_types::{
         good_till_cancelled,
         post_only,
         immediate_or_cancel,
+    };
+    use aptos_experimental::market::{
         new_market,
         new_market_config
     };

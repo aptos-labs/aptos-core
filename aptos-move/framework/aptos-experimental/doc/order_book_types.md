@@ -10,10 +10,10 @@
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
--  [Struct `SingleOrderMatch`](#0x7_order_book_types_SingleOrderMatch)
--  [Struct `Order`](#0x7_order_book_types_Order)
+-  [Enum `SingleOrderMatch`](#0x7_order_book_types_SingleOrderMatch)
+-  [Enum `Order`](#0x7_order_book_types_Order)
 -  [Enum `TriggerCondition`](#0x7_order_book_types_TriggerCondition)
--  [Struct `OrderWithState`](#0x7_order_book_types_OrderWithState)
+-  [Enum `OrderWithState`](#0x7_order_book_types_OrderWithState)
 -  [Constants](#@Constants_0)
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
 -  [Function `get_slippage_pct_precision`](#0x7_order_book_types_get_slippage_pct_precision)
@@ -112,7 +112,7 @@
 
 <dl>
 <dt>
-<code>idx: u256</code>
+<code>idx: u128</code>
 </dt>
 <dd>
 
@@ -202,13 +202,21 @@
 
 <a id="0x7_order_book_types_SingleOrderMatch"></a>
 
-## Struct `SingleOrderMatch`
+## Enum `SingleOrderMatch`
 
 
 
-<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">SingleOrderMatch</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
+<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">SingleOrderMatch</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -233,15 +241,27 @@
 
 </details>
 
+</details>
+
+</details>
+
 <a id="0x7_order_book_types_Order"></a>
 
-## Struct `Order`
+## Enum `Order`
 
 
 
-<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop, store
+<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -299,6 +319,10 @@
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -387,13 +411,21 @@
 
 <a id="0x7_order_book_types_OrderWithState"></a>
 
-## Struct `OrderWithState`
+## Enum `OrderWithState`
 
 
 
-<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop, store
+<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -418,18 +450,13 @@
 
 </details>
 
+</details>
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
-
-
-<a id="0x7_order_book_types_U256_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_U256_MAX">U256_MAX</a>: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-</code></pre>
-
 
 
 <a id="0x7_order_book_types_BIG_MAP_INNER_DEGREE"></a>
@@ -491,6 +518,15 @@
 
 
 <pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_SLIPPAGE_PCT_PRECISION">SLIPPAGE_PCT_PRECISION</a>: u64 = 100;
+</code></pre>
+
+
+
+<a id="0x7_order_book_types_U128_MAX"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_U128_MAX">U128_MAX</a>: u128 = 340282366920938463463374607431768211455;
 </code></pre>
 
 
@@ -640,7 +676,7 @@
     self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a>
 ): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
     self.value += 1;
-    <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(self.value <b>as</b> u256)
+    <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(self.value <b>as</b> u128)
 }
 </code></pre>
 
@@ -654,7 +690,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u256): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
 </code></pre>
 
 
@@ -663,7 +699,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u256): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
     <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx }
 }
 </code></pre>
@@ -688,7 +724,7 @@
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_descending_idx">descending_idx</a>(self: &<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
-    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx: <a href="order_book_types.md#0x7_order_book_types_U256_MAX">U256_MAX</a> - self.idx }
+    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx: <a href="order_book_types.md#0x7_order_book_types_U128_MAX">U128_MAX</a> - self.idx }
 }
 </code></pre>
 
@@ -773,7 +809,7 @@
     trigger_condition: Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;,
     metadata: M
 ): <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt; {
-    <a href="order_book_types.md#0x7_order_book_types_Order">Order</a> {
+    Order::V1 {
         order_id,
         unique_priority_idx,
         price,
@@ -808,7 +844,7 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match">new_single_order_match</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;, matched_size: u64
 ): <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">SingleOrderMatch</a>&lt;M&gt; {
-    <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">SingleOrderMatch</a> { order, matched_size }
+    SingleOrderMatch::V1 { order, matched_size }
 }
 </code></pre>
 
@@ -884,7 +920,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_with_state">new_order_with_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;, is_active: bool
 ): <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt; {
-    <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a> { order, is_active }
+    OrderWithState::V1 { order, is_active }
 }
 </code></pre>
 
@@ -1382,15 +1418,18 @@
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order">destroy_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;
 ): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, M) {
-    (
-        self.order_id,
-        self.price,
-        self.orig_size,
-        self.remaining_size,
-        self.is_bid,
-        self.trigger_condition,
-        self.metadata
-    )
+    <b>let</b> Order::V1 {
+        order_id,
+        unique_priority_idx: _,
+        price,
+        orig_size,
+        remaining_size,
+        is_bid,
+        trigger_condition,
+        metadata
+    } = self;
+
+    (order_id, price, orig_size, remaining_size, is_bid, trigger_condition, metadata)
 }
 </code></pre>
 
