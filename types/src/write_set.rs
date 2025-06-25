@@ -83,13 +83,26 @@ impl PersistedWriteOp {
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
     MakeHot { prev_slot: StateSlot },
     Eviction { prev_slot: StateSlot },
+}
+
+impl std::fmt::Debug for BaseStateOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let var = match self {
+            Self::Creation(_) => "Creation(...)",
+            Self::Modification(_) => "Modification(...)",
+            Self::Deletion(_) => "Deletion(...)",
+            Self::MakeHot { .. } => "MakeHot",
+            Self::Eviction { .. } => "Eviction",
+        };
+        write!(f, "{}", var)
+    }
 }
 
 impl BaseStateOp {

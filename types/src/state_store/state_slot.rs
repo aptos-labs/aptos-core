@@ -154,3 +154,16 @@ impl StateSlot {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct HotLRUEntry {
+    pub prev: StateKey,
+    pub next: StateKey,
+}
+
+// 4 GiB
+pub const HOT_STATE_MAX_BYTES: usize = 4 * 1024 * 1024 * 1024;
+// 4 million items
+pub const HOT_STATE_MAX_ITEMS: usize = 4_000_000;
+// 10KB, worst case the hot state still caches 400K items
+pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;

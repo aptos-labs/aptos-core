@@ -20,7 +20,9 @@ use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_key::StateKey,
+        state_slot::{HotLRUEntry, StateSlot},
+        state_storage_usage::StateStorageUsage,
         StateViewId,
     },
     transaction::Version,
@@ -30,6 +32,25 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
+
+#[derive(Debug)]
+pub struct HotStateMeta {
+    pub lru_state: MapLayer<StateKey, HotLRUEntry>,
+    pub latest: Option<StateKey>,
+    pub oldest: Option<StateKey>,
+    pub num_items: usize,
+}
+
+impl HotStateMeta {
+    fn new() -> Self {
+        Self {
+            lru_state: MapLayer::new_family("hot_state_meta"),
+            latest: None,
+            oldest: None,
+            num_items: 0,
+        }
+    }
+}
 
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
@@ -42,6 +63,8 @@ pub struct State {
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
     shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    /// Metadata (the linked list) for the LRU.
+    pub hot_state_meta: Arc<HotStateMeta>,
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -50,11 +73,13 @@ impl State {
     pub fn new_with_updates(
         version: Option<Version>,
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        hot_state_meta: Arc<HotStateMeta>,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
+            hot_state_meta,
             usage,
         }
     }
@@ -63,6 +88,7 @@ impl State {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
+            Arc::new(HotStateMeta::new()),
             usage,
         )
     }
@@ -112,6 +138,8 @@ impl State {
     ) -> Self {
         let _timer = TIMER.timer_with(&["state__update"]);
 
+        println!("updates: {:?}", updates);
+
         // 1. The update batch must begin at self.next_version().
         assert_eq!(self.next_version(), updates.first_version);
         // 2. The cache must be at a version equal or newer than `persisted`, otherwise
@@ -150,7 +178,15 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        let new_hot = overlay.lru.new_layer(&[]);
+        let hot_state_meta = Arc::new(HotStateMeta {
+            lru_state: new_hot,
+            latest: self.hot_state_meta.latest.clone(),
+            oldest: self.hot_state_meta.oldest.clone(),
+            num_items: self.hot_state_meta.num_items,
+        });
+
+        State::new_with_updates(updates.last_version(), shards, hot_state_meta, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
@@ -239,6 +275,8 @@ impl LedgerState {
         reads: &ShardedStateCache,
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
+
+        println!("all updates: {:?}", updates);
 
         let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
             self.latest().update(persisted_snapshot, updates, reads)

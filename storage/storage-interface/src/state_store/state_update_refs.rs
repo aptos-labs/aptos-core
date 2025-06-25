@@ -16,6 +16,7 @@ use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
@@ -97,6 +98,7 @@ impl BatchedStateUpdateRefs<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
     /// Batched updates (updates for the same keys are merged) from the

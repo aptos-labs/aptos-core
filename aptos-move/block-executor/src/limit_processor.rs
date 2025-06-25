@@ -42,6 +42,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
+        println!(
+            "BlockGasLimitProcessor::new. block_gas_limit_type: {:?}",
+            block_gas_limit_type
+        );
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
             .then(|| BlockHotStateOpAccumulator::new(base_view));

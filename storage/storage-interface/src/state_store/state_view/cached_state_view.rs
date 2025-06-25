@@ -218,7 +218,7 @@ impl CachedStateView {
         let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
-        } else if let Some(slot) = self.hot.get_state_slot(state_key)? {
+        } else if let Some(slot) = self.hot.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_hot"]);
             slot
         } else if let Some(base_version) = self.base_version() {
@@ -280,6 +280,30 @@ impl TStateView for CachedStateView {
 
     fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        Some(self.speculative.num_free_hot_slots())
+    }
+
+    fn hot_state_contains(&self, state_key: &StateKey) -> bool {
+        if self.speculative.hot_state_contains(state_key) {
+            return true;
+        }
+
+        self.hot.get_state_slot(state_key).is_some()
+    }
+
+    fn get_next_old_key(&self, state_key: Option<&StateKey>) -> Option<StateKey> {
+        let key = match state_key {
+            Some(k) => k,
+            None => return self.speculative.get_oldest_key(),
+        };
+        if let Some(x) = self.speculative.get_lru_entry(key) {
+            return Some(x.next.clone());
+        }
+
+        self.hot.get_lru_entry(key).map(|entry| entry.next.clone())
     }
 }
 
